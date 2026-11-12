@@ -284,7 +284,7 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 		}
 		switch {
 		case lockEnv == nil && o.LockedTo != "":
-			p.Problem = fmt.Sprintf("no environment named %q with a game folder (archo env list)", o.LockedTo)
+			p.Problem = fmt.Sprintf("no Game Config named %q with a game folder (archo env list)", o.LockedTo)
 		case lockEnv == nil:
 			p.Problem = "no game folder to move the lock library's copies into; remove them instead"
 		case o.RemoveGames && downloadedGame(lockEnv.GameRoot):

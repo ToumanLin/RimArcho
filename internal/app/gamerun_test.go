@@ -52,7 +52,7 @@ func TestWhatRuns(t *testing.T) {
 	if tr.What = a.WhatRuns(en, tr.Run); !tr.What.Test || tr.What.Pack != "" {
 		t.Fatalf("test run data folder: %+v", tr.What)
 	}
-	if d := tr.Describe(nil); d != "environment "+en.Name+" is running a test run (pid 7)" {
+	if d := tr.Describe(nil); d != "Game Config "+en.Name+" is running a test run (pid 7)" {
 		t.Fatal(d)
 	}
 	// The command line unreadable: the launch records decide.
@@ -107,7 +107,7 @@ func TestRunningSiblingAttribution(t *testing.T) {
 			t.Fatalf("probe: %+v %v", g, err)
 		}
 		if tc.want == "" {
-			if !g.UnknownEnv || !strings.Contains(g.Describe(nil), "environment unknown") {
+			if !g.UnknownEnv || !strings.Contains(g.Describe(nil), "Game Config unknown") {
 				t.Fatalf("guessed sibling: %+v", g)
 			}
 		} else if g.UnknownEnv || g.Env.Name != tc.want {

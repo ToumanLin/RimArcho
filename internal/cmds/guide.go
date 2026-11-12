@@ -117,7 +117,7 @@ const guidePlans = `Plans: every editing tool acts on the current plan. edit_loa
 Inventory: list_library lists every mod on this machine with its copies, sizes, states and the plans using it; manage_library moves a spare Mods/ copy into the lock library or takes mods out of every plan. manage_subscriptions adds, checks, updates and removes the subscriptions RimArcho keeps itself (Git repositories, download pages, Workshop items downloaded with SteamCMD). manage_textures converts mods' PNG textures to DDS next to them (lighter loading and video memory; the PNGs stay) and takes them back.
 Editing mod files: pin_mod first creates a locked version (a copy the current plan uses instead; never edit Workshop files in place — Steam overwrites them), then edit the copy; test_run tests the copy before anything is saved.`
 
-const guideWords = `Talking to the player: the interface calls a plan a list, an environment a game, the library the mod library, save_loadout "save", pin_mod "lock this version", swap "switch version" and a pack a pack (16 §7.2); use those words with the player, and the tool names only in calls.`
+const guideWords = `Talking to the player: the interface calls a plan a list, an environment a Game Config, the library the mod library, save_loadout "save", pin_mod "lock this version", swap "switch version" and a pack a pack (16 §7.2); use those words with the player, and the tool names only in calls.`
 
 func textureToolInstallGuide() string {
 	if textures.ToddsZipURL == "" {

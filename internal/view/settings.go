@@ -2,6 +2,7 @@ package view
 
 import (
 	"fmt"
+	"github.com/ToumanLin/RimArcho/internal/env"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -132,18 +133,22 @@ type SettingGroup struct {
 
 // EnvRow is an environment on the environment page.
 type EnvRow struct {
-	Name    string `json:"name"`
-	Path    string `json:"path"`
-	Game    string `json:"game"` // "1.6.4633  D:\…\RimWorld"
-	Current bool   `json:"current"`
+	Installation string `json:"installation"`
+	GameID       string `json:"gameID"`
+	AddReason    string `json:"addReason,omitempty"`
+	Name         string `json:"name"`
+	Path         string `json:"path"`
+	Game         string `json:"game"` // "1.6.4633  D:\…\RimWorld"
+	Current      bool   `json:"current"`
 }
 
 // EnvPage is the environment page: the environments, and the current one's game folder,
 // version, launch and saves (what belongs to one game, 03 §2; the mod folders every game
 // shares are on the settings page).
 type EnvPage struct {
-	Envs   []EnvRow       `json:"envs"`
-	Groups []SettingGroup `json:"groups"`
+	Envs    []EnvRow       `json:"envs"`
+	Groups  []SettingGroup `json:"groups"`
+	Notices []string       `json:"notices,omitempty"`
 }
 
 // BuildEnvPage builds the environment page.
@@ -153,11 +158,11 @@ func BuildEnvPage(a *app.App, st *app.LoadoutState) *EnvPage {
 	if st != nil {
 		cur = st.Ix.Env.ID
 	}
-	if envs, err := a.Store.Envs(); err == nil {
-		for _, e := range envs {
-			p.Envs = append(p.Envs, EnvRow{Name: e.Name, Game: e.GameVersion + "  " + e.GameRoot, Path: e.GameRoot, Current: e.ID == cur})
-		}
+	p.Envs = EnvironmentRows(a, cur)
+	if names := a.LegacyInstallationAliases(); len(names) > 0 && a.Store.Meta("notice.shared-game-folder") != "seen" {
+		p.Notices = []string{Tf("these two Game Configs use the same game folder: %s", strings.Join(names, ", "))}
 	}
+
 	return p
 }
 
@@ -171,21 +176,18 @@ func EnvGroups(a *app.App, st *app.LoadoutState) []SettingGroup {
 	if version == "" {
 		version = T("unknown")
 	}
-	saves := SettingItem{Label: T("saves"), Value: a.Saves(e), Edit: "choice", Choices: []string{app.SavesShared, app.SavesOwn},
-		ChoiceLabels: []string{T("shared (the game's default folder)"), T("its own")}, Argv: []string{"env", "set", e.Name, "--saves", "{}"}, Note: e.UserDataRoot, NotePaths: []string{e.UserDataRoot}}
-	if saves.Value == app.SavesCustom {
-		saves.Choices = append([]string{app.SavesCustom}, saves.Choices...)
-		saves.ChoiceLabels = append([]string{T("a folder you chose")}, saves.ChoiceLabels...)
+	current := ""
+	if p, _ := a.Store.CurrentPlan(e.ID); p != nil {
+		current = p.Name
 	}
-	return []SettingGroup{{Title: T("this game"), Items: []SettingItem{
-		{Label: T("game folder"), Value: e.GameRoot, ValuePath: true, Edit: "path", Argv: []string{"env", "set", e.Name, "--game", "{}"},
-			Note: T("RimArcho checks that the mods are still the same before it moves them over")},
-		{Key: "game.version", Label: T("game version"), Value: version},
-		{Label: T("start the game through"), Value: e.Launch, Edit: "choice", Choices: []string{"steam", "direct"},
-			ChoiceLabels: []string{"Steam", T("the game's own exe")}, Argv: []string{"env", "set", e.Name, "--launch", "{}"}},
-		saves,
-		{Label: T("extra arguments"), Value: a.LaunchArgs(e.ID), Edit: "text", Argv: []string{"env", "set", e.Name, "--launch-args", "{}"},
-			Note: T("for example -popupwindow")},
+	return []SettingGroup{{Title: T("Game Config"), Items: []SettingItem{
+		{Key: "environment.name", Label: T("name"), Value: e.Name, Edit: "text", Argv: []string{"env", "set", e.Name, "--name", "{}"}},
+		{Label: T("game folder"), Value: e.GameRoot, ValuePath: true, Note: version, Edit: "path", Argv: []string{"env", "set", e.Name, "--game", "{}"}},
+		{Key: "environment.user-data", Label: T("saves folder"), Value: e.UserDataRoot, ValuePath: true, Edit: "path", Argv: []string{"env", "set", e.Name, "--user-data", "{}"}},
+		{Key: "environment.list", Label: T("Mod list"), Value: current},
+		{Label: T("start the game through"), Value: e.Launch, Edit: "choice", Choices: []string{"steam", "direct"}, ChoiceLabels: []string{"Steam", T("the game's own exe")}, Argv: []string{"env", "set", e.Name, "--launch", "{}"}},
+		{Label: T("extra arguments"), Value: a.LaunchArgs(e.ID), Edit: "text", Argv: []string{"env", "set", e.Name, "--launch-args", "{}"}, Note: T("use a JSON array to keep arguments with spaces as separate tokens")},
+		{Key: "environment.remove", Label: T("remove Game Config"), Actions: []SettingAction{{Label: T("remove Game Config"), Argv: []string{"env", "remove", e.Name}}}},
 	}}}
 }
 
@@ -413,4 +415,25 @@ func SettingCommand(argv []string) error {
 		return nil
 	}
 	return fmt.Errorf("not a settings command: %s", strings.Join(argv, " "))
+}
+
+// EnvironmentRows returns flat config metadata without loading any inventories.
+func EnvironmentRows(a *app.App, current string) []EnvRow {
+	es, err := a.Store.Envs()
+	if err != nil {
+		return nil
+	}
+	var out []EnvRow
+	for _, e := range es {
+		title := "RimWorld"
+		if v := env.MajorMinor(e.GameVersion); v != "" {
+			title += " " + v
+		}
+		reason := ""
+		if env.IsProtonGame(e.GameRoot) {
+			reason = T("Proton does not support separate saves folders yet")
+		}
+		out = append(out, EnvRow{Name: e.Name, GameID: e.GameID, Installation: title, Path: e.GameRoot, Game: e.GameVersion + "  " + e.GameRoot, Current: e.ID == current, AddReason: reason})
+	}
+	return out
 }

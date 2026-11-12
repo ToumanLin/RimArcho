@@ -9,8 +9,8 @@ This specification defines environments and sources: the terms, what an environm
 
 | Term | Definition | UI name (16 §7.2) |
 | --- | --- | --- |
-| Environment | One game directory plus its save mode (user data directory). A player may have several, such as a licensed 1.7 and a 1.5 downloaded with SteamCMD | game |
-| Source | A root directory that holds Mods. A game's `Data` and `Mods` belong to its environment; the others are **Mod folders**, shared by all environments | mod folders; source in filters |
+| Environment | One play context selecting an installation and a separate user data directory | environment |
+| Source | A root directory that holds Mods. An installation's `Data` and `Mods` belong to that installation; the others are **Mod folders**, shared by all environments | mod folders; source in filters |
 | Instance | One Mod copy on disk, with an ID RimArcho assigns | this one |
 | Snapshot | An Instance's metadata and content fingerprint from one scan | — |
 | Lineage | A family of "the same Mod": the Workshop original, a locked version, the Mod before and after a rename | copies of the same mod |
@@ -213,7 +213,7 @@ The lifecycle of links RimArcho creates is separate from scan aliases: `managed_
 
 ## 6. Environments sharing a game installation
 
-> Status: installation/environment separation and CLI/core sibling workflows are implemented. The interface redesign and RimCrow profile import (§6.4–§6.5) are not implemented; log-path validation remains VM work (§6.3).
+> Status: installation/environment separation and CLI/core sibling workflows are implemented. The interface and RimCrow profile import (§6.4–§6.5) are implemented; legacy aliases are notice-only and log-path validation remains VM work (§6.3).
 
 **Why.** RimCrow players keep several profiles on one game install, each with its own user data folder (saves, `Config/` with ModsConfig.xml and Mod settings), launched with `-savedatafolder` (RimCrow `GameProfile`). RimArcho adopts the same meaning: **an environment is one game installation plus one user data folder**, and several environments may share an installation. To the player each environment is a separate copy of the game: what they see or change in one applies to it only.
 
@@ -238,6 +238,8 @@ Rules for multiple environments:
 5. Packs show in every environment whose game version is compatible (10 §3), labelled with the environment that built them; `pack.json` `env` stays origin metadata.
 6. Proton (09 §2) cannot redirect saves, so a Proton installation has one environment; "add environment" for it is disabled with that reason.
 
+`env set --name <name>` renames only that environment, retaining its existing user data path, current plan and historical launch names.
+
 `env add/set --launch-args` refuses `-savedatafolder` under the launch validation rules (09 §2); use `--user-data` instead.
 
 Registration already enforces the Proton redirection restriction for both own and custom user data folders (`TestProtonRegistrationUserData`, `TestLinuxLaunch`); a second Proton environment cannot satisfy the distinct-root requirement.
@@ -247,7 +249,7 @@ Registration already enforces the Proton redirection restriction for both own an
 - **Add** (`archo env add <name> --game <dir> --saves own | --user-data <dir>`, or `--like <environment>`): a taken game directory is accepted when the user data folder differs; bare `--game` on a taken directory whose default pair exists is refused with the existing environment's name and the `--saves own` hint. The interface offers two choices and lists what each copies:
   - **Copy this environment** (default, `--like`): `Config/*.xml` except ModsConfig.xml and `HugsLib/` (the pack rules, 10 §3 step 4), and the current list **as the editor shows it**, unsaved edits included, copied into a **new** plan named after the environment. Not copied: saves, logs, history, undo, staging, finding ignores.
   - **Empty**: no files; the game creates its defaults; the list is Core and DLC (07 §1.4).
-  Copying never overwrites files in the destination, and copy failures are reported. The new plan uses the environment name (control characters replaced, leading hyphens removed, trimmed to 56 characters; empty becomes `environment`), with ` 2`, ` 3`, etc. for case-insensitive name collisions. Only the displayed list is cloned into its initial version and workspace. `--like` copies extra arguments except `-savedatafolder` and its value, reporting the omission.
+  Copying never overwrites files in the destination, and copy failures are reported. The new plan uses "<environment>'s list" (control characters replaced, leading hyphens removed, trimmed to 56 characters; empty becomes `environment`), with ` 2`, ` 3`, etc. for case-insensitive name collisions. Only the displayed list is cloned into its initial version and workspace. `--like` copies extra arguments except `-savedatafolder` and its value, reporting the omission.
 - **Move the installation** (`env set --game` on a relocated install): one rebinding (§4.2) updates every environment of that installation; the confirmation names them. Pointing **one** environment at another installation changes only that environment.
 - **Remove an environment**: deletes its own rows (launch records, ignores, settings); the installation's inventory and analysis stay while another environment uses it. Removing the **last** environment of an installation also removes the installation's records as `env remove` does today (§3.1). Files are never touched.
 - **Running game**: the game is identified first by installation, then by the effective user data folder from `-savedatafolder` (absent means the installation's default folder, not the selected environment's), then by launch records of all environments of that installation; when still ambiguous the interface says the installation runs with an unknown environment (09 §4).
@@ -258,12 +260,20 @@ Each environment's log page shows only its own runs. Where the game writes Playe
 
 ### 6.4 RimCrow profiles
 
-Not implemented.
+Implemented by `app.importCrowProfiles` and the existing CLI/GUI manager import.
 
 The RimCrow import (07 §6.2) also reads `GameProfile`. Each profile becomes an environment, grouped by installation (`game_install_path`, added as an installation if new and scanned once). `user_data_path` is **adopted in place**, not copied; an empty path means the installation's default folder; an empty `game_install_path` is skipped as unconfigured. `<root>/Config/ModsConfig.xml` becomes a new plan, current for that environment. `prefer_steam_launch` → launch method; `run_commands` → launch arguments, kept as separate arguments (a `-savedatafolder` among them is refused). `use_workshop_mods` / `use_self_mods` are not imported: the plan's entries decide what loads. The preview groups profiles by installation, marks conflicts, and states that the folders stay shared with RimCrow, so removing a profile there removes its saves. The import itself writes nothing to RimCrow's files.
 
+Profile import preflights every row before registration. Invalid/relative paths, overlapping roots, existing installation/data pairs, environment name collisions, missing or unreadable Config, and unsupported Proton combinations are skipped with a reason. Whitespace and reserved characters in profile names become hyphens; collisions require renaming the source profile. Existing pairs are not adopted or given a new current plan implicitly. Source database canonical path plus profile ID identifies a mapping in `meta`; repeat imports keep player edits, renamed environments and removals. An interrupted initialization is reported as incomplete and requires inspecting the registered environment instead of overwriting it on retry.
+
+Launch arguments accept a JSON string array for lossless argv storage and editing; legacy whitespace-separated text remains supported. Copying an environment preserves that representation. Profile source flags are reported and not imported; unresolved package tokens stay in the new plan. The GUI preview detects changes to the source DB/WAL and each eligible profile's Config before applying. Import itself writes no profile files; later explicit launches write the adopted root.
+
 ### 6.5 Interface
 
-Not implemented, except `env list` groups environments under one installation name/version/path and source pair. GUI/TUI keep their existing controls.
+The player-facing term is **Game Config** (16 §7.2). A config acts as a separate copy of the game: its settings, saves and Mod list apply only to it. Installations remain an internal sharing mechanism; GUI/TUI expose no installation layer or grouping.
 
-The environment switcher groups environments by installation. Settings split "this environment" (user data folder, current list, launch method and arguments, remove) from "game installation" (folder, version, official and local sources). The installation is named automatically ("RimWorld 1.6", with the folder added when versions repeat). Environments of one installation that existed before the upgrade (legacy path aliases) stay separate; RimArcho offers to merge them and never merges silently. The UI term for an environment changes from "game" (16 §7.2) to "environment", and "game installation" names the new layer.
+Pickers are flat: config name, RimWorld major.minor version, current marker, then + Add Game Config. Settings are one config section: name, game folder with version, saves folder, Mod list, launch method and arguments, remove. Relocating a shared game folder previews the count and names of the other affected configs. Adding defaults to copying the current config; the dialog specifies settings and editor-list copying, no Mod file copying and no saves (16 §2.8).
+
+Legacy aliases remain separate. A one-time notice says that two Game Configs use the same game folder. There is no merge feature or merge command.
+
+The RimCrow GUI import presents a checklist of profile names, game folders and saves locations. Eligible profiles are checked; unconfigured or conflicting profiles remain visible, unchecked and skipped. Applying imports only checked profiles, alongside existing manager-data imports, with the shared-folder warning visible (16 §2.15).

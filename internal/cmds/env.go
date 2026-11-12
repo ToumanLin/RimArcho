@@ -21,20 +21,20 @@ var envFlags = []Flag{
 	{Name: "extra", Value: "<dir>", Multi: true, Help: "= archo folder add extra <dir>"},
 }
 
-var launchArgsFlag = Flag{Name: "launch-args", Value: "<args>", Help: "extra game arguments; use --user-data for -savedatafolder (\"\" removes arguments)"}
+var launchArgsFlag = Flag{Name: "launch-args", Value: "<args>", Help: "extra game arguments (JSON string array keeps token boundaries); use --user-data for -savedatafolder (\"\" removes arguments)"}
 
 var removeSourceFlag = Flag{Name: "remove-source", Value: "<src:label>", Multi: true, Help: "= archo folder remove <src:label>"}
 
 func init() {
-	register(&Command{Name: "env list", Summary: "list environments (grouped by installation) and the shared mod folders", MaxArgs: 0, Run: envList})
+	register(&Command{Name: "env list", Summary: "list Game Configs (grouped by installation) and the shared mod folders", MaxArgs: 0, Run: envList})
 	register(&Command{Name: "env detect", Summary: "detect game, user data and workshop paths (suggestion only)", MaxArgs: 0, Run: envDetect})
-	register(&Command{Name: "env add", Args: "<name>", Summary: "add an environment with separate saves and settings", MinArgs: 1, MaxArgs: 1,
-		Flags: append([]Flag{{Name: "detected", Help: "use the paths env detect finds"}, {Name: "like", Value: "<environment>", Help: "copy its installation, launch, settings and current workspace into an independent plan (defaults to own saves)"}}, append(envFlags, launchArgsFlag)...), Run: envAdd})
-	register(&Command{Name: "env set", Args: "<name>", Summary: "change an environment's game folder, saves or launch (re-binds a moved game)", MinArgs: 1, MaxArgs: 1,
-		Flags: append(append([]Flag(nil), envFlags...), removeSourceFlag, launchArgsFlag), Run: envSet})
-	register(&Command{Name: "env remove", Args: "<name>", Summary: "forget an environment (RimArcho data only; no game files)", MinArgs: 1, MaxArgs: 1,
+	register(&Command{Name: "env add", Args: "<name>", Summary: "add a Game Config with separate saves and settings", MinArgs: 1, MaxArgs: 1,
+		Flags: append([]Flag{{Name: "detected", Help: "use the paths env detect finds"}, {Name: "like", Value: "<config>", Help: "copy its installation, launch, settings and current workspace into an independent plan (defaults to own saves)"}}, append(envFlags, launchArgsFlag)...), Run: envAdd})
+	register(&Command{Name: "env set", Args: "<name>", Summary: "change a Game Config's game folder, saves or launch (re-binds a moved game)", MinArgs: 1, MaxArgs: 1,
+		Flags: append(append([]Flag{{Name: "name", Value: "<name>", Help: "rename only this Game Config; folders and launch history stay"}}, envFlags...), removeSourceFlag, launchArgsFlag), Run: envSet})
+	register(&Command{Name: "env remove", Args: "<name>", Summary: "forget a Game Config (RimArcho data only; no game files)", MinArgs: 1, MaxArgs: 1,
 		Flags: []Flag{{Name: "yes", Help: "remove (without it: the dry run)"}}, Run: envRemove})
-	register(&Command{Name: "env use", Args: "<name>", Summary: "select the current environment", MinArgs: 1, MaxArgs: 1, Run: envUse})
+	register(&Command{Name: "env use", Args: "<name>", Summary: "select the current Game Config", MinArgs: 1, MaxArgs: 1, Run: envUse})
 	register(&Command{Name: "env rebind", Args: "<src:label> yes|no", Summary: "answer a pending source re-binding", MinArgs: 2, MaxArgs: 2, Run: envRebind})
 }
 
@@ -69,7 +69,7 @@ func envList(c *Ctx, a *Args) (*render.Doc, error) {
 		return nil, err
 	}
 	cur, _ := c.App.Store.CurrentEnv()
-	d, root := render.New(fmt.Sprintf("environments: %d", len(envs)))
+	d, root := render.New(fmt.Sprintf("Game Configs: %d", len(envs)))
 	groups := map[string]*render.Node{}
 	for _, e := range envs {
 		group := groups[e.GameID]
@@ -108,7 +108,7 @@ func envList(c *Ctx, a *Args) (*render.Doc, error) {
 	if fs, err := c.App.Folders(); err != nil {
 		return nil, err
 	} else if len(fs) > 0 {
-		addSourceLines(root.Section("mod folders (every environment)"), fs)
+		addSourceLines(root.Section("mod folders (every Game Config)"), fs)
 	}
 	if len(envs) == 0 {
 		d.AddNext("archo env detect")
@@ -120,7 +120,7 @@ func envList(c *Ctx, a *Args) (*render.Doc, error) {
 
 func envDetect(c *Ctx, a *Args) (*render.Doc, error) {
 	det := c.App.Detected()
-	d, root := render.New("detected environment (suggestion, not saved)")
+	d, root := render.New("detected Game Config (suggestion, not saved)")
 	if det.GameRoot == "" {
 		root.KV("game", "not found")
 	} else {
@@ -151,7 +151,7 @@ func envDetect(c *Ctx, a *Args) (*render.Doc, error) {
 		if env.PathKey(other.GameRoot) == env.PathKey(det.GameRoot) {
 			continue
 		}
-		n := root.Section("another detected environment (suggestion, not saved)")
+		n := root.Section("another detected Game Config (suggestion, not saved)")
 		n.KV("game", other.GameRoot)
 		n.KV("version", versionText(other.GameVersion))
 		n.KV("launch", other.Launch)
@@ -164,7 +164,7 @@ func envDetect(c *Ctx, a *Args) (*render.Doc, error) {
 }
 
 func specFromArgs(a *Args) app.EnvSpec {
-	return app.EnvSpec{Like: a.Str("like"), GameRoot: a.Str("game"), UserDataRoot: a.Str("user-data"), Saves: a.Str("saves"), WorkshopRoot: a.Str("workshop"),
+	return app.EnvSpec{Rename: a.Str("name"), Like: a.Str("like"), GameRoot: a.Str("game"), UserDataRoot: a.Str("user-data"), Saves: a.Str("saves"), WorkshopRoot: a.Str("workshop"),
 		Launch: a.Str("launch"), SteamCMD: a.List("steamcmd"), Extra: a.List("extra"), RemoveSources: a.List("remove-source")}
 }
 
@@ -270,7 +270,7 @@ func envSet(c *Ctx, a *Args) (*render.Doc, error) {
 				names = append(names, envRef(o))
 			}
 		}
-		d.Nodes[0].KV("installation environments", strings.Join(names, ", "))
+		d.Nodes[0].KV("installation Game Configs", strings.Join(names, ", "))
 	}
 	return d, nil
 }
@@ -381,11 +381,11 @@ var steamcmdFlag = Flag{Name: "install-steamcmd", Help: "download SteamCMD from 
 func init() {
 	register(&Command{Name: "env branches", Summary: "list RimWorld's Steam branches (versions) SteamCMD can download", MaxArgs: 0,
 		Flags: []Flag{steamcmdFlag}, Run: envBranches})
-	register(&Command{Name: "env download", Args: "<branch>", Summary: "download a RimWorld version with SteamCMD and add it as an environment (anonymous by default)",
+	register(&Command{Name: "env download", Args: "<branch>", Summary: "download a RimWorld version with SteamCMD and add it as a Game Config (anonymous by default)",
 		MinArgs: 1, MaxArgs: 1, Flags: []Flag{
 			{Name: "to", Value: "<dir>", Help: "the new game folder"},
 			{Name: "account", Value: "<name>", Help: "override steamcmd.account for this download; anonymous forces anonymous login (the default when no account is set)"},
-			{Name: "name", Value: "<env>", Help: "the environment's name (default: the version, e.g. 1.6)"},
+			{Name: "name", Value: "<env>", Help: "the Game Config's name (default: the version, e.g. 1.6)"},
 			{Name: "saves", Value: "shared|own"},
 			steamcmdFlag,
 		}, Run: envDownload})

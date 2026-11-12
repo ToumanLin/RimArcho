@@ -681,11 +681,11 @@ func TestEnvRemoveAndSourceRemove(t *testing.T) {
 	if out, code := e.Run("env", "remove", "main"); code != 0 || !strings.Contains(out, "dry run") {
 		t.Fatalf("env remove without --yes is the dry run: exit %d\n%s", code, out)
 	}
-	if out := e.MustRun("env", "list"); !strings.Contains(out, "environments: 1") {
+	if out := e.MustRun("env", "list"); !strings.Contains(out, "Game Configs: 1") {
 		t.Fatal("the dry run removes nothing: " + out)
 	}
 	e.MustRun("env", "remove", "main", "--yes")
-	if out := e.MustRun("env", "list"); !strings.Contains(out, "environments: 0") {
+	if out := e.MustRun("env", "list"); !strings.Contains(out, "Game Configs: 0") {
 		t.Fatal(out)
 	}
 	// The game's own rows go; the shared mod folders and their mods stay (03 §2).
@@ -693,7 +693,7 @@ func TestEnvRemoveAndSourceRemove(t *testing.T) {
 	e.App.Store.DB.QueryRow(`SELECT (SELECT count(*) FROM instance WHERE game_id<>'') + (SELECT count(*) FROM source WHERE game_id<>'')
 		+ (SELECT count(*) FROM snapshot_file WHERE snapshot_id IN (SELECT n.id FROM snapshot n LEFT JOIN instance i ON i.id=n.instance_id WHERE i.id IS NULL))`).Scan(&n)
 	if n != 0 {
-		t.Fatalf("%d rows of the environment left after env remove", n)
+		t.Fatalf("%d rows of the Game Config left after env remove", n)
 	}
 	e.App.Store.DB.QueryRow(`SELECT count(*) FROM source WHERE game_id='' AND kind='workshop' AND status='ok'`).Scan(&shared)
 	if shared != 1 {

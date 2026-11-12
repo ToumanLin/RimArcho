@@ -28,6 +28,7 @@ const (
 // EnvSpec is what the player passes to `env add` / `env set`. Empty fields mean "keep" (set)
 // or "derive" (add).
 type EnvSpec struct {
+	Rename       string
 	Like         string
 	GameRoot     string
 	UserDataRoot string
@@ -41,6 +42,7 @@ type EnvSpec struct {
 	// RemoveSources lists shared folder labels to forget (env set only; = FolderRemove).
 	RemoveSources []string
 	// directoryOnly relocates this game without guessing a new shared Workshop.
+	deferPlan     bool // profile import supplies its own initial plan
 	directoryOnly bool
 }
 
@@ -182,7 +184,7 @@ func nextLabel(existing []*source.Source, kind source.Kind) string {
 // ValidEnvName checks an environment name.
 func ValidEnvName(name string) error {
 	if name == "" || name == "." || name == ".." || strings.ContainsAny(name, " \t:#/\\") {
-		return fmt.Errorf("environment name %q must be non-empty without spaces, ':', '#' or slashes", name)
+		return fmt.Errorf("Game Config name %q must be non-empty without spaces, ':', '#' or slashes", name)
 	}
 	return nil
 }
@@ -202,7 +204,7 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 	if e, err := a.Store.EnvByName(name); err != nil {
 		return nil, nil, err
 	} else if e != nil {
-		return nil, nil, fmt.Errorf("environment %q already exists (archo env set %s ...)", name, name)
+		return nil, nil, fmt.Errorf("Game Config %q already exists (archo env set %s ...)", name, name)
 	}
 	var like *env.Environment
 	var clone *LoadoutState
@@ -213,10 +215,10 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 			return nil, nil, err
 		}
 		if like == nil {
-			return nil, nil, fmt.Errorf("no environment named %q (archo env list)", spec.Like)
+			return nil, nil, fmt.Errorf("no Game Config named %q (archo env list)", spec.Like)
 		}
 		if spec.GameRoot != "" && !samePath(spec.GameRoot, like.GameRoot) {
-			return nil, nil, fmt.Errorf("--like uses %s; omit --game or use the same installation", like.GameRoot)
+			return nil, nil, fmt.Errorf("--like uses %s; use the same game folder or start empty without --like", like.GameRoot)
 		}
 		spec.GameRoot = like.GameRoot
 		if spec.Launch == "" {
@@ -272,6 +274,10 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 	if like != nil {
 		reader := &App{Home: a.Home, Store: a.Store, Config: a.Config, Now: a.Now, Rand: a.Rand, Loc: a.Loc, Detect: a.Detect, EnvName: like.Name}
 		var err error
+		if current, _ := a.Env(); current != nil && current.ID == like.ID {
+			reader.OpenPlan = a.OpenPlan
+			reader.PlanName = a.PlanName
+		}
 		clone, err = reader.Loadout()
 		if err != nil {
 			return nil, nil, err
@@ -289,8 +295,10 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 		return nil, nil, err
 	}
 	if installation != nil {
-		if err := a.initializeSibling(e, like, clone); err != nil {
-			return e, nil, err
+		if !spec.deferPlan {
+			if err := a.initializeSibling(e, like, clone); err != nil {
+				return e, nil, err
+			}
 		}
 		changes, err := a.foldersFromSpec(e, spec, false, false)
 		return e, changes, err
@@ -336,7 +344,7 @@ func (a *App) envOfGame(game string) (*env.Environment, error) {
 			continue
 		}
 		if found != nil && found.GameID != e.GameID {
-			return nil, fmt.Errorf("multiple legacy installations use %s; add with --like <environment> to choose one; inventories are not merged automatically", game)
+			return nil, fmt.Errorf("multiple legacy installations use %s; add with --like <Game Config> to choose one; inventories are not merged automatically", game)
 		}
 		found = e
 	}
@@ -422,7 +430,20 @@ func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChang
 		return nil, nil, err
 	}
 	if e == nil {
-		return nil, nil, fmt.Errorf("no environment named %q (archo env list)", name)
+		return nil, nil, fmt.Errorf("no Game Config named %q (archo env list)", name)
+	}
+	if spec.Rename != "" && spec.Rename != e.Name {
+		if err := ValidEnvName(spec.Rename); err != nil {
+			return nil, nil, err
+		}
+		other, err := a.Store.EnvByName(spec.Rename)
+		if err != nil {
+			return nil, nil, err
+		}
+		if other != nil {
+			return nil, nil, fmt.Errorf("Game Config %q already exists", spec.Rename)
+		}
+		e.Name = spec.Rename
 	}
 	if err := spec.normalise(); err != nil {
 		return nil, nil, err
@@ -492,7 +513,7 @@ func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChang
 			if o.ID != e.ID && o.GameID == e.GameID {
 				g, r := canonicalRoot(e.GameRoot), canonicalRoot(o.UserDataRoot)
 				if r != "" && (underDir(r, g) || underDir(g, r)) {
-					return nil, nil, fmt.Errorf("installation move overlaps environment %s's user data folder %s; choose a separate --game directory", o.Name, o.UserDataRoot)
+					return nil, nil, fmt.Errorf("installation move overlaps Game Config %s's user data folder %s; choose a separate --game directory", o.Name, o.UserDataRoot)
 				}
 			}
 		}
@@ -553,6 +574,9 @@ func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChang
 		}
 		changes = append(changes, ch)
 	}
+	if a.EnvName == name {
+		a.EnvName = e.Name
+	}
 	return e, changes, nil
 }
 
@@ -560,11 +584,12 @@ func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChang
 // result. Only RimArcho's records go: game files, mods and saves stay, and so do the shared
 // mod folders with their mods, what the player noted on them, and the lists (shared by every game).
 type EnvRemoval struct {
-	Env      *env.Environment
-	Launches int    // its launch records
-	Mods     int    // instances RimArcho read from its Data/ and Mods/
-	Current  bool   // it is the current environment
-	Next     string // the environment that becomes current ("" none left: the guide)
+	Env         *env.Environment
+	LastSibling bool   // removing it also forgets installation records
+	Launches    int    // its launch records
+	Mods        int    // instances RimArcho read from its Data/ and Mods/
+	Current     bool   // it is the current environment
+	Next        string // the environment that becomes current ("" none left: the guide)
 }
 
 // EnvRemovePreview is the dry run of EnvRemove: nothing changes.
@@ -574,9 +599,9 @@ func (a *App) EnvRemovePreview(name string) (*EnvRemoval, error) {
 		return nil, err
 	}
 	if e == nil {
-		return nil, fmt.Errorf("no environment named %q (archo env list)", name)
+		return nil, fmt.Errorf("no Game Config named %q (archo env list)", name)
 	}
-	r := &EnvRemoval{Env: e}
+	r := &EnvRemoval{Env: e, LastSibling: true}
 	db := a.Store.DB
 	if err := db.QueryRow(`SELECT (SELECT count(*) FROM launch WHERE environment_id=?),
 		(SELECT count(*) FROM instance WHERE game_id=? AND status='live')`, e.ID, e.GameID).Scan(&r.Launches, &r.Mods); err != nil {
@@ -589,6 +614,7 @@ func (a *App) EnvRemovePreview(name string) (*EnvRemoval, error) {
 	for _, o := range es {
 		if o.ID != e.ID && o.GameID == e.GameID {
 			r.Mods = 0
+			r.LastSibling = false
 			r.Next = o.Name
 			break
 		}
@@ -621,7 +647,7 @@ func (a *App) EnvRemove(name string) (*EnvRemoval, error) {
 		return nil, err
 	}
 	if g := a.probe()(r.Env.GameRoot); g != nil {
-		return nil, fmt.Errorf("env:%s's game is running (pid %d); close it before removing the environment", r.Env.Name, g.PID)
+		return nil, fmt.Errorf("env:%s's game is running (pid %d); close it before removing the Game Config", r.Env.Name, g.PID)
 	}
 	if err := a.Store.DeleteEnv(r.Env.ID); err != nil {
 		return nil, err
@@ -719,7 +745,7 @@ func (a *App) PrepareEnv(name string) (*env.Environment, error) {
 		return nil, err
 	}
 	if e == nil {
-		return nil, fmt.Errorf("no environment named %q (archo env list)", name)
+		return nil, fmt.Errorf("no Game Config named %q (archo env list)", name)
 	}
 	cur, err := a.Store.CurrentEnv()
 	if err != nil {
@@ -743,7 +769,7 @@ func (a *App) PrepareEnvForScan(name string) (*env.Environment, error) {
 		return nil, err
 	}
 	if e == nil {
-		return nil, fmt.Errorf("no environment named %q (archo env list)", name)
+		return nil, fmt.Errorf("no Game Config named %q (archo env list)", name)
 	}
 	return e, a.prepareEnvLinks(e, false)
 }

@@ -115,8 +115,9 @@ type managerPreview struct {
 }
 
 type ManagerPreview struct {
-	Text    string `json:"text"`
-	Request uint64 `json:"request"`
+	Text     string          `json:"text"`
+	Request  uint64          `json:"request"`
+	Profiles []app.RCProfile `json:"profiles,omitempty"`
 }
 
 func managerSignature(kind, path string) string {
@@ -164,36 +165,67 @@ func (s *API) PreviewManagerImport(kind, path string) (*ManagerPreview, error) {
 	s.x.seq++
 	s.x.manager = nil
 	e, err := s.a.Env()
-	if err != nil {
+	if err != nil && !(kind == "rimcrow" && errors.Is(err, app.ErrNoEnv)) {
 		return nil, err
 	}
-	signature := managerSignature(kind, path)
+	envID := ""
+	if e != nil {
+		envID = e.ID
+	}
+	signature := s.managerSourceSignature(kind, path)
 	text, err := s.managerReport(kind, path, true)
 	if err != nil {
 		return nil, err
 	}
-	if signature != managerSignature(kind, path) {
+	if signature != s.managerSourceSignature(kind, path) {
 		return nil, errors.New("source data changed; preview it again")
 	}
-	s.x.manager = &managerPreview{kind, path, e.ID, signature, s.a.Store.ChangeKey(), s.x.seq}
-	return &ManagerPreview{text, s.x.seq}, nil
+	s.x.manager = &managerPreview{kind, path, envID, signature, s.a.Store.ChangeKey(), s.x.seq}
+	preview := &ManagerPreview{Text: text, Request: s.x.seq}
+	if kind == "rimcrow" {
+		r, err := s.a.ImportRimCrow(app.RimCrowOptions{DB: path, DryRun: true})
+		if err != nil {
+			return nil, err
+		}
+		preview.Profiles = r.Profiles
+	}
+	return preview, nil
 }
 
 func (s *API) ApplyManagerImport(request uint64) (string, error) {
+	return s.applyManagerImport(request, nil, false)
+}
+func (s *API) ApplyManagerImportProfiles(request uint64, ids []string) (string, error) {
+	return s.applyManagerImport(request, ids, true)
+}
+func (s *API) applyManagerImport(request uint64, ids []string, selected bool) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	p := s.x.manager
 	e, err := s.a.Env()
-	if err != nil {
+	if err != nil && !(p != nil && p.Kind == "rimcrow" && errors.Is(err, app.ErrNoEnv)) {
 		return "", err
 	}
-	if p == nil || p.Sequence != request || p.Sequence != s.x.seq || p.Env != e.ID || p.State != s.a.Store.ChangeKey() {
+	envID := ""
+	if e != nil {
+		envID = e.ID
+	}
+	if p == nil || p.Sequence != request || p.Sequence != s.x.seq || p.Env != envID || p.State != s.a.Store.ChangeKey() {
 		return "", errors.New("import preview changed; preview it again")
 	}
-	if p.Signature != managerSignature(p.Kind, p.Path) {
+	if p.Signature != s.managerSourceSignature(p.Kind, p.Path) {
 		return "", errors.New("source data changed; preview it again")
 	}
-	text, err := s.managerReport(p.Kind, p.Path, false)
+	var text string
+	if p.Kind == "rimcrow" && selected {
+		r, e := s.a.ImportRimCrow(app.RimCrowOptions{DB: p.Path, SelectProfiles: true, ProfileIDs: ids})
+		err = e
+		if e == nil {
+			text = view.ManagerImportText(r)
+		}
+	} else {
+		text, err = s.managerReport(p.Kind, p.Path, false)
+	}
 	s.x.manager = nil
 	s.board, s.needs = nil, nil
 	return text, err
@@ -216,4 +248,19 @@ func (s *API) ManagerFileKind(path string) string {
 		}
 	}
 	return "list"
+}
+
+// Profile Config files live outside the source database and can change independently.
+func (s *API) managerSourceSignature(kind, path string) string {
+	signature := managerSignature(kind, path)
+	if kind == "rimcrow" {
+		rep, err := s.a.ImportRimCrow(app.RimCrowOptions{DB: path, DryRun: true})
+		if err != nil {
+			return signature + err.Error()
+		}
+		data, _ := json.Marshal(rep.Profiles)
+		sum := sha256.Sum256(data)
+		signature += hex.EncodeToString(sum[:])
+	}
+	return signature
 }

@@ -237,14 +237,15 @@ type Board struct {
 	*view.Board
 	Status map[string]int `json:"status"` // row icons (16 §7)
 	// Reasons are the items behind each row icon, for its hover / pinned popover (16 §4.2).
-	Reasons   map[string][]view.Reason `json:"reasons,omitempty"`
-	Needs     int                      `json:"needs"` // the top bar's number
-	Stamp     string                   `json:"stamp"` // the database state: the page reloads when it changes
-	Envs      []string                 `json:"envs"`
-	Error     string                   `json:"error,omitempty"`
-	Scanning  bool                     `json:"scanning"`
-	Analyzing bool                     `json:"analyzing"`
-	Never     bool                     `json:"neverScanned"`
+	Reasons         map[string][]view.Reason `json:"reasons,omitempty"`
+	Needs           int                      `json:"needs"` // the top bar's number
+	Stamp           string                   `json:"stamp"` // the database state: the page reloads when it changes
+	EnvironmentRows []view.EnvRow            `json:"environmentRows"`
+	Envs            []string                 `json:"envs"`
+	Error           string                   `json:"error,omitempty"`
+	Scanning        bool                     `json:"scanning"`
+	Analyzing       bool                     `json:"analyzing"`
+	Never           bool                     `json:"neverScanned"`
 }
 
 // Board builds the columns (16 §2.5) and the counts from the workspace.
@@ -276,7 +277,14 @@ func (s *API) boardLocked() *Board {
 		out.Error = err.Error()
 		return out
 	}
-	for _, e := range envs {
+	cur, _ := s.a.Env()
+	current := ""
+	if cur != nil {
+		current = cur.ID
+	}
+	out.EnvironmentRows = view.EnvironmentRows(s.a, current)
+	out.Envs = make([]string, 0, len(envs))
+	for _, e := range out.EnvironmentRows {
 		out.Envs = append(out.Envs, e.Name)
 	}
 	if e, err := s.a.Env(); err == nil {
@@ -559,7 +567,12 @@ func (s *API) Settings() []view.SettingGroup {
 	}
 	defer r.Close()
 	defer s.free.soon()
-	return view.SettingsPage(r, nil)
+	groups := view.SettingsPage(r, nil)
+	if e, err := r.Env(); err == nil {
+		envGroups := view.EnvGroups(r, &app.LoadoutState{Ix: &app.Index{Env: e}})
+		groups = append(groups[:1], append(envGroups, groups[1:]...)...)
+	}
+	return groups
 }
 
 // Environment is the environment page: the environments, the current one's folders and
@@ -1716,11 +1729,13 @@ func (s *API) Palette(query string) []view.PalEntry {
 	if s.board != nil {
 		cur = s.board.EnvName
 	}
-	if envs, err := s.a.Store.Envs(); err == nil {
+	if envs := view.EnvironmentRows(s.a, ""); len(envs) > 0 {
 		for _, e := range envs {
-			if e.Name != cur {
-				all = append(all, view.PalEntry{Kind: view.PalEnv, ID: e.Name, Name: view.Tf("switch to %s", e.Name), Alias: e.Name, Desc: "env"})
+			label := view.Tf("switch to %s", e.Name) + "  " + e.Installation
+			if e.Name == cur {
+				label = e.Name + "  " + e.Installation + "  " + view.T("current")
 			}
+			all = append(all, view.PalEntry{Kind: view.PalEnv, ID: e.Name, Name: label, Alias: e.Name})
 		}
 	}
 	if rows, err := view.PlanRows(s.a); err == nil {
@@ -1805,4 +1820,56 @@ func firstLine(s string) string {
 		return s[:i]
 	}
 	return s
+}
+
+// AddEnvironment uses the same sibling initialization and validation as the CLI.
+func (s *API) AddEnvironment(name, from string, copySettings bool, userData string) (string, error) {
+	return s.AddGameConfig(name, from, "", copySettings, userData)
+}
+func (s *API) AddGameConfig(name, from, game string, copySettings bool, userData string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	base, err := s.a.Store.EnvByName(from)
+	if err != nil {
+		return "", err
+	}
+	if base == nil {
+		return "", fmt.Errorf("Game Config %s not found", from)
+	}
+	if game == "" {
+		game = base.GameRoot
+	}
+	spec := app.EnvSpec{GameRoot: game, Saves: app.SavesOwn}
+	if copySettings {
+		spec.Like = from
+	}
+	if userData != "" {
+		spec.Saves = ""
+		spec.UserDataRoot = userData
+	}
+	e, _, err := s.a.EnvAdd(name, spec)
+	if err != nil {
+		return "", err
+	}
+	s.board, s.lib = nil, nil
+	return e.Name, nil
+}
+
+func (s *API) EnvGameChangePreview(name, path string) ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	lines, err := s.a.EnvGameChangePreview(name, path)
+	if err != nil {
+		return nil, err
+	}
+	for i, line := range lines {
+		lines[i] = view.Text(line)
+	}
+	return lines, nil
+}
+
+func (s *API) AcknowledgeAliasNotice() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.a.Store.SetMeta("notice.shared-game-folder", "seen")
 }

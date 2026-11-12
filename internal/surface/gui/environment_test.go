@@ -19,18 +19,18 @@ func environmentResult(t *testing.T, events <-chan string, request uint64) *Envi
 	for {
 		select {
 		case event := <-events:
-			if !strings.HasPrefix(event, "environment ") {
+			if !strings.HasPrefix(event, "Game Config ") {
 				continue
 			}
 			var r EnvironmentResult
-			if err := json.Unmarshal([]byte(strings.TrimPrefix(event, "environment ")), &r); err != nil {
+			if err := json.Unmarshal([]byte(strings.TrimPrefix(event, "Game Config ")), &r); err != nil {
 				t.Fatal(err)
 			}
 			if r.Request == request {
 				return &r
 			}
 		case <-timeout:
-			t.Fatal("no environment result")
+			t.Fatal("no Game Config result")
 		}
 	}
 }
@@ -155,7 +155,7 @@ func TestEnvironmentSiblingSwitch(t *testing.T) {
 			t.Fatal(err)
 		}
 		if st.Ix.Env.Name != name {
-			t.Fatalf("cached environment %s, want %s", st.Ix.Env.Name, name)
+			t.Fatalf("cached Game Config %s, want %s", st.Ix.Env.Name, name)
 		}
 		if name == "sibling" && st.Plan.ID != e.App.Store.CurrentPlanID(sibling.ID) {
 			t.Fatal("sibling inherited another plan")

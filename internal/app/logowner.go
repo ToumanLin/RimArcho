@@ -70,7 +70,7 @@ func (a *App) logOwner(st *LoadoutState, path string) (own bool, err error) {
 			}
 		} else {
 			if e := a.envWithGame(root); e != nil {
-				return false, fmt.Errorf("log belongs to environment %s", e.Name)
+				return false, fmt.Errorf("log belongs to Game Config %s", e.Name)
 			}
 			// A game folder no environment has (a log someone sent, a corpus log, or this
 			// game before it moved): unknown owner, not another environment's. It can be read
@@ -85,11 +85,11 @@ func (a *App) logOwner(st *LoadoutState, path string) (own bool, err error) {
 			if es, err := a.Store.Envs(); err == nil {
 				for _, e := range es {
 					if e.ID == src.EnvID {
-						return false, fmt.Errorf("log belongs to environment %s", e.Name)
+						return false, fmt.Errorf("log belongs to Game Config %s", e.Name)
 					}
 				}
 			}
-			return false, fmt.Errorf("log belongs to another environment")
+			return false, fmt.Errorf("log belongs to another Game Config")
 		}
 		return src.EnvID == st.Ix.Env.ID, nil
 	}

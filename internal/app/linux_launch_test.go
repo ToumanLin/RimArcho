@@ -63,7 +63,7 @@ func TestLinuxLaunch(t *testing.T) {
 					t.Fatalf("adding own saves: %v", err)
 				}
 				if added, _ := e.App.Store.EnvByName("own"); added != nil {
-					t.Fatal("refused environment was added")
+					t.Fatal("refused Game Config was added")
 				}
 				return
 			}
@@ -176,7 +176,7 @@ func TestProtonRegistrationUserData(t *testing.T) {
 				t.Fatalf("expected Proton refusal: %v", err)
 			}
 			if en, err := e.App.Store.EnvByName("proton"); err != nil || en != nil {
-				t.Fatalf("refusal persisted environment: %+v, %v", en, err)
+				t.Fatalf("refusal persisted Game Config: %+v, %v", en, err)
 			}
 			games, err := e.App.Store.Games()
 			if err != nil || len(games) != 0 {

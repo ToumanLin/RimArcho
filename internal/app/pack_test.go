@@ -100,7 +100,7 @@ func TestPackBuildAndLaunch(t *testing.T) {
 		}
 	}
 	if e.ReadModsConfig() != envCfg {
-		t.Fatal("K4: the environment's ModsConfig.xml changed")
+		t.Fatal("K4: the Game Config's ModsConfig.xml changed")
 	}
 	packCfg, err := os.ReadFile(filepath.Join(dir, "userdata", "Config", "ModsConfig.xml"))
 	if err != nil || !strings.Contains(string(packCfg), "<li>tester.versions</li>") || !strings.Contains(string(packCfg), "<li>tester.a</li>") {

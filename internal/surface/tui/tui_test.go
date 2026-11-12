@@ -552,7 +552,7 @@ func TestEnvRemoveFromChooser(t *testing.T) {
 		t.Fatalf("env %q", m.envName)
 	}
 	if envs, _ := e.App.Store.Envs(); len(envs) != 1 {
-		t.Fatalf("%d environments", len(envs))
+		t.Fatalf("%d Game Configs", len(envs))
 	}
 }
 

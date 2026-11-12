@@ -140,7 +140,7 @@ func TestSettingsAboutFirst(t *testing.T) {
 			t.Fatal("no settings panel")
 		}
 		text := strings.Join(m.panel.lines, "\n")
-		if !strings.HasPrefix(text, view.T("about")+"\n") || strings.Index(text, view.T("this game")) < strings.Index(text, view.T("about")) {
+		if !strings.HasPrefix(text, view.T("about")+"\n") || strings.Index(text, view.T("Game Config")) < strings.Index(text, view.T("about")) {
 			t.Fatal(text)
 		}
 		for _, value := range []string{"config set updates.auto {}", "config set updates.interval {}", `config set steamcmd.path ""`, "https://discord.gg/HF2GVyurQs", "https://github.com/ToumanLin/RimArcho"} {

@@ -8,7 +8,7 @@
 1. **The TUI has no borders.** Blank space, two-cell indentation, and muted subheadings separate areas; there are no boxes or rules. The GUI uses magpie cards: a quiet base with hairline borders (`--hairline`, §7.3) and 12px corners.
 2. **Use one accent.** The palette has an accent, success green, error red, and warning amber. The accent marks what the player is operating: the cursor, selected name, focused heading, or input prompt.
 3. **Most text is gray.** Most characters use the secondary or faint color; only the object being operated is bright.
-4. **The cursor uses a faint background and a changed text color; selection uses a faint accent background.** The cursor row has a faint background, and its name becomes accent-colored when focused; the TUI also adds ▸. Selected rows use a faint accent background. Solid backgrounds are reserved for pills, such as the current environment or focused filter. **Do not add a left vertical line or color strip to any box, row, or card to indicate selection, the cursor, or emphasis.** The TUI follows the same rule: selected rows have a full-row accent tint, with a deeper tint for the selected cursor row.
+4. **The cursor uses a faint background and a changed text color; selection uses a faint accent background.** The cursor row has a faint background, and its name becomes accent-colored when focused; the TUI also adds ▸. Selected rows use a faint accent background. Solid backgrounds are reserved for pills, such as the current Game Config or focused filter. **Do not add a left vertical line or color strip to any box, row, or card to indicate selection, the cursor, or emphasis.** The TUI follows the same rule: selected rows have a full-row accent tint, with a deeper tint for the selected cursor row.
 5. **Bold indicates identity only**, such as Mod names and headings. Do not use italics, underlining, or inverted colors.
 6. **Hide developer terms.** Finding codes, #id, decl, and lineage belong only in technical information, the CLI, or MCP. The exception is the package ID, shown in details by default. See §7.2 for interface names.
 7. **Keep the interface still.** The TUI has no animations or spinners; the status line uses … for work in progress. GUI motion only explains what changed or where something went (§7.1). It is brief and is disabled under `prefers-reduced-motion`. The one exception is Archo's figure while the player waits (§7.1 "Archo figure"): it moves continuously on one canvas, only during a wait, and becomes a still under `prefers-reduced-motion`, without hardware WebGL2, or when the player chooses still or off.
@@ -124,11 +124,11 @@ The following rules apply:
 
 ### 7.2 Interface wording
 
-Both languages of the GUI and TUI use the player's wording. Code, the CLI, MCP, and specifications keep domain names such as plan, environment, and Instance. A plan in the specification is therefore a list in the UI.
+Both languages of the GUI and TUI use the player's wording. Code and specifications keep internal names such as environment and Instance; CLI/MCP prose says Game Config. Stable command and protocol keys do not change. A plan in the specification is therefore a list in the UI.
 
 English UI text is the translation lookup key, so changing it also requires changing the callers. Keys that app and modchanges supply in CLI wording, such as the current plan, keep that wording; `view.enText` overrides how the UI shows them. History operation names such as checkout, swap, and restore come from app operation codes and are mapped to player wording by stepWords.
 
-`TestWording` in `internal/surface/cli` (`view.WordingProblems`) checks the language resources and command names. It fails if a Chinese text contains a term from the Avoid column below (its Chinese forms are the `@retired.` entries in the zh language resources, each with its replacement), or if the English contains plan, environment, upstream, workspace, swap, pinned, checkout, not written, light pack, or full pack (`retiredEn`). A key translated differently within one JSON file or across files also fails, including supplemental resources; identical duplicates are allowed. English interface overrides live in `view.enText`. Necessary exceptions are listed in `wordingExempt`, for example decompilation.
+`TestWording` in `internal/surface/cli` (`view.WordingProblems`) checks the language resources and command names. It fails if a Chinese text contains a term from the Avoid column below (its Chinese forms are the `@retired.` entries in the zh language resources, each with its replacement), or if the English contains plan, upstream, workspace, swap, pinned, checkout, not written, light pack, or full pack (`retiredEn`). A key translated differently within one JSON file or across files also fails, including supplemental resources; identical duplicates are allowed. English interface overrides live in `view.enText`. Necessary exceptions are listed in `wordingExempt`, for example decompilation.
 
 | Domain concept | UI wording | English | Avoid |
 | --- | --- | --- | --- |
@@ -140,7 +140,8 @@ English UI text is the translation lookup key, so changing it also requires chan
 | save | Save; the editor button says Save changes / no changes, the count says N unsaved, and versions are saved versions | save; save changes / no changes; N unsaved; saved versions | write to game, unwritten, not yet written, written versions |
 | checkout | Go back to this version; history step go back | go back to this version | load version, load list |
 | External ModsConfig changes | Use outside change | use the outside change | load into list |
-| Environment | Game; `env remove` removes the game without changing files | game; remove the game | environment, delete environment |
+| Environment (internal) | A play context with its own user data and current list | Game Config (Chinese and Japanese: see glossary); remove Game Config | environment; game when referring to this context |
+| Game installation (internal only) | The physical installed game | game folder | showing an installation layer or grouping |
 | Source | Mod folders in settings, source in filters and details, such as Workshop or local | mod folders; source | — |
 | Instance | This one, another copy, N copies | this one, another copy | instance, Instance |
 | Lineage | Copies of same Mod | copies of the same mod | Lineage |

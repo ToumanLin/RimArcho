@@ -15,8 +15,8 @@ func TestSearchNextPreservesScope(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := searchNext(&Ctx{App: &app.App{EnvName: "other environment"}}, a, 2)
-	for _, part := range []string{"archo --env 'other environment' files search", "--mod '#one'", "--mod pkg:a.b", "--regex --case --word --def", "--kind defs,patches --languages", "--lang English --lang 'Chinese Simplified'", "--all-versions --game without --mode files", "--limit 3 --per-file 2 --game-version 1.5 --page 2 --"} {
+	got := searchNext(&Ctx{App: &app.App{EnvName: "other Game Config"}}, a, 2)
+	for _, part := range []string{"archo --env 'other Game Config' files search", "--mod '#one'", "--mod pkg:a.b", "--regex --case --word --def", "--kind defs,patches --languages", "--lang English --lang 'Chinese Simplified'", "--all-versions --game without --mode files", "--limit 3 --per-file 2 --game-version 1.5 --page 2 --"} {
 		if !strings.Contains(got, part) {
 			t.Errorf("missing %q in %s", part, got)
 		}

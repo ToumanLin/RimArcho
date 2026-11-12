@@ -353,9 +353,11 @@ Storage: `lineage_data` (environment, Lineage, alias, note), `lineage_tag` (envi
 
 **Whole-tag edits** (`cmds.RenameTag`, `MergeTags`, `DeleteTags`, `SetTagNote`; each one store transaction): a merge gives every Mod carrying one of the source tags the target tag (new or existing; an existing target keeps its spelling) and removes the sources; their notes are appended to the target's. A rename is a merge into a new name and may change only the case; a name another tag already has is refused, because that is a merge (a pinned tag no Mod carries does not count, so a tag can take a preset name). A delete removes the tags and their notes and touches nothing else. `tags.pinned` (16 §3.8) follows: a renamed or merged tag takes the source's pinned place unless the target is pinned already, a deleted tag leaves the list, and an unchanged list is not written, so the preset stays a preset. Removing the last pinned tag stores `,` (none pinned), since an empty value would bring the preset back. These edits are player data, outside the undo history (16 §3.8). Test: `TestTagEdits`.
 
-### 6.2 One-time RimCrow import
+### 6.2 RimCrow import
 
 `archo import rimcrow --db <path> [--rules <path>] [--dry-run] [--include-disabled-rules] [--all]`
+
+Profile environments and their independent current plans follow 03 §6.4. The same preview/apply path is used by CLI, first-run and Settings; the preview lists installation groups, profile destinations, argv and list tokens, including the shared-folder/deletion warning. Profile conflicts never replace an existing current plan.
 
 1. `--db` is required: RimCrow keeps its database at `<installation directory>/data/mod_manager.db`, which cannot be found through the registry or a configuration file. `--rules` defaults to `data\rules\user_rules.json` beside the database.
 2. Copy the database and WAL into a temporary `rimcrow-*` directory under RimArcho's data, open the copy read-only, and delete it afterwards. RimCrow's originals are never opened for writing.
@@ -375,6 +377,8 @@ Storage: `lineage_data` (environment, Lineage, alias, note), `lineage_tag` (envi
 6. Report the mapped counts (by path or packageId), imported, already existing and conflicting; list every unmapped or conflicting item, and the count of resources disabled in RimCrow. Count the directories that have only About.xml.disabled, by source, with what to do (rename them back, or enable them again in RimCrow, then `archo scan`; or unsubscribe or delete them; RimArcho's handling: 09 §5).
 7. Running it again gives the same result: identical values are skipped, and rules are deduplicated by kind + Lineage. RimCrow's log tables are not imported.
 8. `--dry-run` only reports and writes nothing. By default 6 details per category; `--all` shows all.
+
+The GUI profile checklist selects which RimCrow profiles become Game Configs (03 §6.5). Unconfigured profiles remain visible and skipped.
 
 The GUI's shared manager-import flow (16 §2.15) discovers sources read-only with `app.DiscoverManagerImports`:
 

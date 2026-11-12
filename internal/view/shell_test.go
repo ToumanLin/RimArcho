@@ -159,7 +159,7 @@ func TestBuildHome(t *testing.T) {
 	e.MustRun("env", "add", "other", "--game", game)
 	other, err := e.App.Store.EnvByName("other")
 	if err != nil || other == nil {
-		t.Fatalf("other environment: %v", err)
+		t.Fatalf("other Game Config: %v", err)
 	}
 	if _, err := e.App.Store.CreatePlan(other.ID, "Other list", e.Now()); err != nil {
 		t.Fatal(err)
@@ -170,12 +170,12 @@ func TestBuildHome(t *testing.T) {
 		if r.OtherEnv {
 			found = true
 			if r.GameVersion != "1.7.4985 rev1269" || r.Env != "other  1.7" {
-				t.Fatalf("other environment version: %+v", r)
+				t.Fatalf("other Game Config version: %+v", r)
 			}
 		}
 	}
 	if !found {
-		t.Fatal("missing other environment rows")
+		t.Fatal("missing other Game Config rows")
 	}
 }
 
@@ -240,7 +240,7 @@ func TestAddTwoGamesOfOneVersion(t *testing.T) {
 			t.Fatalf("%v: added %v, %v", names, out, err)
 		}
 		if n := envCount(); n != 1 {
-			t.Fatalf("%v: a refused batch left %d environments", names, n)
+			t.Fatalf("%v: a refused batch left %d Game Configs", names, n)
 		}
 	}
 	out, err := view.CreateGames(e.App, []view.GameFound{*g2, *g3})

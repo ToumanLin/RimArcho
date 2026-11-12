@@ -15,7 +15,7 @@ Section numbers run through all of 16. Find the file by number:
 | --- | --- |
 | [1-layers-and-view-models](1-layers-and-view-models.md) | Layers and shared view models (§1) |
 | [2.1-navigation-and-launch](2.1-navigation-and-launch.md) | Information architecture; sidebar, top bar, Launch, Can it run (§2–2.4) |
-| [2.5-plans-and-packs](2.5-plans-and-packs.md) | Plan editor, building a pack, packs, environments (§2.5–2.8) |
+| [2.5-plans-and-packs](2.5-plans-and-packs.md) | Plan editor, building a pack, packs, Game Configs (§2.5–2.8) |
 | [2.9-mod-library-and-game-logs](2.9-mod-library-and-game-logs.md) | Mod library, updates, game logs (§2.9–2.10) |
 | [2.11-play-review-and-saves](2.11-play-review-and-saves.md) | Play review and Saves (§2.11) |
 | [2.12-worth-playing-and-archo-panel](2.12-worth-playing-and-archo-panel.md) | Worth playing, Archo panel, Texture optimisation (§2.12–2.13) |

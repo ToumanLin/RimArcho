@@ -271,7 +271,7 @@ func (a *App) scanAfterFileOp(ix *Index, m *store.Mod) (*ScanReport, error) {
 			return nil, err
 		}
 		if e == nil {
-			return nil, fmt.Errorf("environment %s no longer exists", s.EnvID)
+			return nil, fmt.Errorf("Game Config %s no longer exists", s.EnvID)
 		}
 		if _, err := a.scanEnvironment(e, ScanOptions{GameOnly: true}); err != nil {
 			return nil, err

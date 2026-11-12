@@ -18,7 +18,7 @@ func saveTools() []tool {
 // the review first reads the saves that lack a current full read, as get_save reads its one. env both selects the game and keeps only
 // its saves, as the global --env does on the CLI.
 type ListSavesIn struct {
-	Env       string `json:"env,omitempty" jsonschema:"only this environment's saves"`
+	Env       string `json:"env,omitempty" jsonschema:"only this Game Config's saves"`
 	Colony    string `json:"colony,omitempty" jsonschema:"only this colony"`
 	Mod       string `json:"mod,omitempty" jsonschema:"only saves using this Mod (#id, pkg:, packageId or ws:), installed or not"`
 	Attention bool   `json:"attention,omitempty" jsonschema:"only warnings or errors"`
@@ -36,7 +36,7 @@ func ListSavesArgv(in ListSavesIn) []string {
 
 // GetSaveIn is get_save: archo saves show.
 type GetSaveIn struct {
-	Env     string `json:"env,omitempty" jsonschema:"environment; default current"`
+	Env     string `json:"env,omitempty" jsonschema:"Game Config; default current"`
 	Save    string `json:"save" jsonschema:"sv:ref, name or colony/save"`
 	Mods    bool   `json:"mods,omitempty" jsonschema:"all Mods"`
 	Play    bool   `json:"play,omitempty" jsonschema:"all colonists and events"`
@@ -51,7 +51,7 @@ func GetSaveArgv(in GetSaveIn) []string {
 
 // ManageSavesIn is manage_saves.
 type ManageSavesIn struct {
-	Env          string  `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env          string  `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Action       string  `json:"action" jsonschema:"fix, rename, copy, backup or trash"`
 	Saves        StrList `json:"saves" jsonschema:"sv:<hex>, file names or <colony>/<save>; fix, rename, copy take one"`
 	Name         string  `json:"name,omitempty" jsonschema:"rename: the new name"`

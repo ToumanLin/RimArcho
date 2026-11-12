@@ -303,7 +303,7 @@ func (a *App) setDirectoryRecords(d *ManagedDirectory, path string) error {
 		if e, err = a.Store.EnvByID(strings.TrimPrefix(d.ID, "game:")); err != nil {
 			return err
 		} else if e == nil {
-			return fmt.Errorf("no environment for %s", d.ID)
+			return fmt.Errorf("no Game Config for %s", d.ID)
 		}
 		if !env.LooksLikeGameRoot(path) {
 			return fmt.Errorf("%s does not look like a RimWorld installation", path)
@@ -311,7 +311,7 @@ func (a *App) setDirectoryRecords(d *ManagedDirectory, path string) error {
 		if o, err := a.envOfGame(path); err != nil {
 			return err
 		} else if o != nil && o.ID != e.ID {
-			return fmt.Errorf("environment %s already uses %s; one environment per game folder", o.Name, path)
+			return fmt.Errorf("Game Config %s already uses %s; one Game Config per game folder", o.Name, path)
 		}
 		if err := a.checkRoots(path, filepath.Join(path, "Data"), filepath.Join(path, "Mods")); err != nil {
 			return err

@@ -35,7 +35,7 @@ func monitorCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if s.Source != nil {
 		root.KV("source", fmt.Sprintf("src:%s %s", s.Source.Label, s.Source.Root))
 	} else {
-		root.KV("source", "not registered in this environment")
+		root.KV("source", "not registered in this Game Config")
 	}
 	root.KV("plan", MonitorPlanLine(c, s))
 	def := "on"

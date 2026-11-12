@@ -1,7 +1,7 @@
 package mcp
 
 type MemoryIn struct {
-	Env  string `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env  string `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Plan string `json:"plan,omitempty" jsonschema:"plan name or ID (default: current)"`
 }
 

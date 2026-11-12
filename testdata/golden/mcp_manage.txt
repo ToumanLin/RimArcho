@@ -1,5 +1,5 @@
 > status {"show":"envs"}
-environments: 1
+Game Configs: 1
   main  1.6.4633 rev1261
     game: $ROOT/Steam/steamapps/common/RimWorld
     sources:
@@ -9,7 +9,7 @@ environments: 1
       saves: shared
       user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
       launch: direct
-  mod folders (every environment):
+  mod folders (every Game Config):
     src:workshop  $ROOT/Steam/steamapps/workshop/content/294100
 
 > status {"show":"settings"}
@@ -256,7 +256,7 @@ pack launch: dry run, nothing written
     + !ArchoPack_first_2009463077
   from Mods/: 1 mods: the same version is already in Mods/, so the pack's copy is not linked next to it
     A
-  list: $ROOT/ArchoHome/packs/first/userdata/Config/ModsConfig.xml (3 entries; the environment's ModsConfig.xml is not touched)
+  list: $ROOT/ArchoHome/packs/first/userdata/Config/ModsConfig.xml (3 entries; the Game Config's ModsConfig.xml is not touched)
   saves: $ROOT/ArchoHome/packs/first/userdata
   command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe -savedatafolder=$ROOT/ArchoHome/packs/first/userdata
 
@@ -269,7 +269,7 @@ pack first: the game is starting
     + !ArchoPack_first_2009463077
   from Mods/: 1 mods: the same version is already in Mods/, so the pack's copy is not linked next to it
     A
-  list: $ROOT/ArchoHome/packs/first/userdata/Config/ModsConfig.xml (3 entries; the environment's ModsConfig.xml is not touched)
+  list: $ROOT/ArchoHome/packs/first/userdata/Config/ModsConfig.xml (3 entries; the Game Config's ModsConfig.xml is not touched)
   saves: $ROOT/ArchoHome/packs/first/userdata
   command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe -savedatafolder=$ROOT/ArchoHome/packs/first/userdata
 

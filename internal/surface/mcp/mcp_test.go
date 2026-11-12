@@ -420,7 +420,7 @@ func TestEnvParameter(t *testing.T) {
 	if out, _ := call(t, cs, "status", nil); !strings.HasPrefix(out, "env:main") {
 		t.Fatalf("env is per call:\n%s", out)
 	}
-	if out, isErr := call(t, cs, "status", map[string]any{"env": "nope"}); !isErr || !strings.Contains(out, `no environment named "nope"`) {
+	if out, isErr := call(t, cs, "status", map[string]any{"env": "nope"}); !isErr || !strings.Contains(out, `no Game Config named "nope"`) {
 		t.Fatalf("unknown env:\n%s", out)
 	}
 }

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -143,7 +144,7 @@ func (a *App) SetLaunchArgs(envID, args string) error {
 		return err
 	}
 	if e == nil {
-		return fmt.Errorf("environment %s not found", envID)
+		return fmt.Errorf("Game Config %s not found", envID)
 	}
 	if err := ValidateLaunchArgs(e.Name, args); err != nil {
 		return err
@@ -153,10 +154,14 @@ func (a *App) SetLaunchArgs(envID, args string) error {
 
 // ValidateLaunchArgs keeps the game's data root under environment control (03 §6.2).
 func ValidateLaunchArgs(name, args string) error {
-	for _, arg := range strings.Fields(args) {
+	argv, err := ParseLaunchArgs(args)
+	if err != nil {
+		return err
+	}
+	for _, arg := range argv {
 		key := strings.ToLower(strings.Trim(arg, "\"'"))
 		if key == "-savedatafolder" || strings.HasPrefix(key, "-savedatafolder=") {
-			return fmt.Errorf("launch argument %q overrides the environment's user data folder; use archo env set %s --user-data <dir> and remove -savedatafolder from the launch arguments", arg, quoteArg(name))
+			return fmt.Errorf("launch argument %q overrides the Game Config's user data folder; use archo env set %s --user-data <dir> and remove -savedatafolder from the launch arguments", arg, quoteArg(name))
 		}
 	}
 	return nil
@@ -168,4 +173,16 @@ func (a *App) checkLaunchArgs() error {
 		return err
 	}
 	return ValidateLaunchArgs(e.Name, a.LaunchArgs(e.ID))
+}
+
+// ParseLaunchArgs accepts a JSON argv array for lossless imports, or legacy whitespace-separated arguments.
+func ParseLaunchArgs(args string) ([]string, error) {
+	if strings.HasPrefix(strings.TrimSpace(args), "[") {
+		var argv []string
+		if err := json.Unmarshal([]byte(args), &argv); err != nil {
+			return nil, fmt.Errorf("launch arguments must be a JSON array of strings: %w", err)
+		}
+		return argv, nil
+	}
+	return strings.Fields(args), nil
 }

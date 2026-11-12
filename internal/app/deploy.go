@@ -182,7 +182,7 @@ func planLinks(st *LoadoutState, copies []ModsCopy) (string, []LinkChange, []Dup
 	}
 	if mods == "" {
 		if len(want) > 0 {
-			return "", nil, nil, fmt.Errorf("the environment has no Mods/ folder to link %d mod(s) into; set the game folder with archo env set --game <dir>", len(want))
+			return "", nil, nil, fmt.Errorf("the Game Config has no Mods/ folder to link %d mod(s) into; set the game folder with archo env set --game <dir>", len(want))
 		}
 		return "", nil, nil, nil
 	}
@@ -206,7 +206,7 @@ func planLinks(st *LoadoutState, copies []ModsCopy) (string, []LinkChange, []Dup
 		if envLink(name) && source.IsLink(filepath.Join(mods, name)) {
 			l, err := source.ReadLink(filepath.Join(mods, name))
 			if err != nil || l.State != source.TargetPresent || (l.Kind != "junction" && l.Kind != "symlink") {
-				return "", nil, nil, fmt.Errorf("unhealthy environment link: %s; inspect and confirm repair with archo links repair --dry-run", filepath.Join(mods, name))
+				return "", nil, nil, fmt.Errorf("unhealthy Game Config link: %s; inspect and confirm repair with archo links repair --dry-run", filepath.Join(mods, name))
 			}
 			for key, m := range want {
 				if sameDir(filepath.Join(mods, name), m.RealPath) {

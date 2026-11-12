@@ -60,5 +60,11 @@ func ManagerImportText(r *app.RimCrowReport) string {
 	if r.CrowDisabled > 0 || len(r.AboutDisabled) > 0 {
 		lines = append(lines, Tf("%d folders have About.xml.disabled; enable them in RimCrow, then scan again (%d disabled in RimCrow)", len(r.AboutDisabled), r.CrowDisabled))
 	}
+	for _, p := range r.Profiles {
+		lines = append(lines, fmt.Sprintf("%s  %s  %s  %s", p.Name, p.Game, p.UserData, p.Status))
+	}
+	if len(r.Profiles) > 0 {
+		lines = append(lines, T("folders stay shared with RimCrow; launching writes their Config and saves; deleting the profile in RimCrow deletes its saves"), T("profile source flags are not imported; list entries decide what loads; check unresolved Mods and which copies are selected"))
+	}
 	return strings.Join(lines, "\n")
 }

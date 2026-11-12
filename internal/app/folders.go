@@ -94,7 +94,7 @@ func (a *App) overlapping(root string, skip func(*source.Source) bool) (*source.
 // moves it (re-bound as in 03 §4.2). A folder already known is left as it is.
 func (a *App) FolderAdd(kind source.Kind, root string) (SourceChange, error) {
 	if !SharedKind(kind) {
-		return SourceChange{}, fmt.Errorf("a mod folder is workshop, steamcmd or extra, not %s (a game's Data/ and Mods/ come with its environment)", kind)
+		return SourceChange{}, fmt.Errorf("a mod folder is workshop, steamcmd or extra, not %s (a game's Data/ and Mods/ come with its Game Config)", kind)
 	}
 	root = strings.Trim(strings.TrimSpace(root), `"'`)
 	if root == "" {
@@ -191,7 +191,7 @@ func (a *App) FolderRemove(ref string) (SourceChange, error) {
 	case s == nil:
 		return SourceChange{}, fmt.Errorf("no mod folder src:%s (archo folder list)", label)
 	case s.EnvID != store.Shared:
-		return SourceChange{}, fmt.Errorf("src:%s is a game's %s folder; it comes and goes with its environment (change --game instead)", label, s.Kind)
+		return SourceChange{}, fmt.Errorf("src:%s is a game's %s folder; it comes and goes with its Game Config (change --game instead)", label, s.Kind)
 	case OwnFolder(s):
 		return SourceChange{}, fmt.Errorf("src:%s is RimArcho's own folder (%s); it is not removed", label, s.Root)
 	}

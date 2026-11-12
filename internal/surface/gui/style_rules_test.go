@@ -252,7 +252,7 @@ var endlessWhileWorking = map[string]string{
 	".btn .ic.spin svg":                   "spinner of a running operation",
 	".bd-step.cur .n::after":              "pack build step in progress",
 	".skel .bar::after":                   "page skeleton while it loads",
-	".env-progress-bar > span":            "game environment work in progress",
+	".env-progress-bar > span":            "game Game Config work in progress",
 	".hm-go.switching::before":            "launch block while a list or game is applied",
 	".hm-go .bar::after":                  "launch block while a list or game is applied",
 	".prog .bar.busy i::after":            "task progress without a value",

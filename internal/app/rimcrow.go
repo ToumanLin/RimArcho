@@ -27,6 +27,7 @@ type RCItem struct{ Key, Reason string }
 // RimCrowReport is the outcome of one import (or dry run).
 type RimCrowReport struct {
 	DB, Rules string
+	Profiles  []RCProfile
 	DryRun    bool
 
 	Records, ByPath, ByPackage int // mod records carrying data, and how they mapped
@@ -52,6 +53,8 @@ type RimCrowReport struct {
 // RimCrowOptions select the files and what to import.
 type RimCrowOptions struct {
 	DB, Rules            string
+	SelectProfiles       bool
+	ProfileIDs           []string
 	DryRun               bool
 	IncludeDisabledRules bool
 }
@@ -106,16 +109,30 @@ type crowMod struct {
 // ImportRimCrow maps RimCrow's aliases, notes, groups (as tags), tags, interlocks (as
 // attach rules) and user rules onto lineages. Running it again changes nothing.
 func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
-	ix, err := a.Index()
-	if err != nil {
-		return nil, err
-	}
 	rep := &RimCrowReport{DB: opt.DB, DryRun: opt.DryRun, NotMapped: map[string]int{}, DisabledKinds: map[string]int{}}
 	db, done, err := a.openCopy(opt.DB)
 	if err != nil {
 		return nil, fmt.Errorf("RimCrow database: %w", err)
 	}
 	defer done()
+	if err := a.importCrowProfiles(db, opt, rep); err != nil {
+		return nil, err
+	}
+	var assetsTable int
+	if err := db.QueryRow("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='modasset'").Scan(&assetsTable); err != nil {
+		return nil, err
+	}
+	if assetsTable == 0 && len(rep.Profiles) > 0 {
+		return rep, nil
+	}
+	ix, err := a.Index()
+	if err != nil {
+		if opt.DryRun && len(rep.Profiles) > 0 {
+			rep.Unmapped = append(rep.Unmapped, RCItem{"annotations", "add a Game Config before importing Mod annotations"})
+			return rep, nil
+		}
+		return nil, err
+	}
 
 	// Paths RimArcho knows, for the path-first mapping.
 	byPath := map[string]string{}

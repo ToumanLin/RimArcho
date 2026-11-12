@@ -169,7 +169,7 @@ func (a *App) prepareEnvLinks(e *env.Environment, scan bool) error {
 			if sameDir(p, m.RealPath) {
 				continue
 			}
-			return fmt.Errorf("%s already exists; keep it or remove it before switching environments", p)
+			return fmt.Errorf("%s already exists; keep it or remove it before switching Game Configs", p)
 		} else if !errors.Is(err, os.ErrNotExist) {
 			return err
 		}

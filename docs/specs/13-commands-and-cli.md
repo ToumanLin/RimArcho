@@ -348,3 +348,5 @@ Run `archo workshop publish` from the repository root after building the release
 | I10 | Run `plan new`, `plan use`, `plan rename`, `plan remove`, and `loadout import --new` through the CLI and MCP. | The output is identical. `plan use` writes no game files, and the last plan cannot be removed. | Pass |
 | I11 | Paste the printed commands (`fix:`, `next:`, `… N more (…)`, and error hints) into cmd, PowerShell, or bash. | All arguments survive and references resolve. `TestPrintedCommandsSurviveShells` parses each with PowerShell 5.1 / 7, checks that nothing became a comment and that the expected words are there, then runs it; see also `TestShellSafe`. | Synthetic tests pass; real VM verification is pending. |
 | I12 | Type a `#` reference in PowerShell or bash, where it becomes a comment. | If the missing argument is a Mod reference, the usage error explains why (`TestMissingRefNamesTheComment`, run on host PowerShell 5.1 / 7). | Synthetic tests pass; real VM verification is pending. |
+
+Environment rename (`env set <name> --name <new-name>`) and lossless JSON launch argv arrays follow 03 §6.2 and 03 §6.4. Existing command/JSON identifiers stay unchanged.

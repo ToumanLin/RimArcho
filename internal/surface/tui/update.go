@@ -659,19 +659,39 @@ func (m *model) panelKey(s string) tea.Cmd {
 }
 
 func (m *model) chooseEnv() tea.Cmd {
-	envs, err := m.app.Store.Envs()
-	if err != nil || len(envs) == 0 {
+	envs := view.EnvironmentRows(m.app, "")
+	if len(envs) == 0 {
 		m.say(sayInfo, T("no games yet (archo env add)"))
 		return nil
 	}
-	p := &panel{title: T("switch game"), nav: 8}
+	p := &panel{title: T("switch game"), nav: 8, choiceCurrent: map[int]bool{}}
+	labels := map[string]string{}
 	for i, e := range envs {
 		p.choices = append(p.choices, e.Name)
+		labels[e.Name] = e.Installation
 		if e.Name == m.envName {
 			p.choice = i
+			p.choiceCurrent[i] = true
 		}
 	}
+	if names := m.app.LegacyInstallationAliases(); len(names) > 0 && m.app.Store.Meta("notice.shared-game-folder") != "seen" {
+		p.lines = []string{Tf("these two Game Configs use the same game folder: %s", strings.Join(names, ", "))}
+		_ = m.app.Store.SetMeta("notice.shared-game-folder", "seen")
+	}
+	p.choiceLabels = labels
+	p.choices = append(p.choices, "+ Add Game Config")
 	p.onPick = func(m *model, name string) tea.Cmd {
+		if name == "+ Add Game Config" {
+			for _, e := range envs {
+				if e.Name == m.envName && e.AddReason != "" {
+					m.say(sayWarn, e.AddReason)
+					return nil
+				}
+			}
+			cmd := m.openCmdLine()
+			m.cmdl.info = T("add a Game Config: archo env add <name> --game <folder> --saves own (or --like <config>)")
+			return cmd
+		}
 		m.app.EnvName = ""
 		if m.act(Tf("switched to %s", name), "env", "use", name) {
 			for k := range m.cols {
@@ -683,7 +703,12 @@ func (m *model) chooseEnv() tea.Cmd {
 		}
 		return m.requestDetail()
 	}
-	p.onDelete = func(m *model, name string) tea.Cmd { m.removeEnv(name); return nil }
+	p.onDelete = func(m *model, name string) tea.Cmd {
+		if name != "+ Add Game Config" {
+			m.removeEnv(name)
+		}
+		return nil
+	}
 	m.panel = p
 	return nil
 }

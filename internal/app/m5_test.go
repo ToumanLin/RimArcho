@@ -269,7 +269,7 @@ func TestAnalysisPerGameVersion(t *testing.T) {
 		t.Fatalf("alternating commands re-ran the analysis: %d runs", runs)
 	}
 	if out := e.MustRun("harmony", "--target", "Verse.Pawn.Tick"); !strings.Contains(out, "4 patches from 3 mods") {
-		t.Fatalf("facts of the environment's version:\n%s", out)
+		t.Fatalf("facts of the Game Config's version:\n%s", out)
 	}
 	if out := e.MustRun("log", "--cluster", "E1"); !strings.Contains(out, "analysed: as 1.5") || !strings.Contains(out, "patch.no-match: target-inactive") {
 		t.Fatalf("the 1.5 analysis is used for the 1.5 log:\n%s", out)

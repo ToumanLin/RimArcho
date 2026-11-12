@@ -1102,7 +1102,7 @@ func (a *App) writeGame(st *LoadoutState, dryRun, launch, move bool, creditFrom 
 		return nil, err
 	}
 	if st.FilePath == "" {
-		return nil, errors.New("the environment has no user data directory; set one with archo env set --user-data <dir>")
+		return nil, errors.New("the Game Config has no user data directory; set one with archo env set --user-data <dir>")
 	}
 	if st.FileErr != nil {
 		return nil, fmt.Errorf("cannot read %s: %v (fix or remove the file first)", st.FilePath, st.FileErr)
@@ -1291,7 +1291,7 @@ func (a *App) ParseVersionRef(envID, ref string) (int, error) {
 		return 0, err
 	}
 	if p == nil {
-		return 0, errors.New("the environment has no plan yet")
+		return 0, errors.New("the Game Config has no plan yet")
 	}
 	return a.parsePlanVersion(p, ref)
 }

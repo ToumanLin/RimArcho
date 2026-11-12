@@ -253,7 +253,7 @@ func (a *App) ModSettings() (*ModSettingsList, error) {
 	}
 	root := st.Ix.Env.UserDataRoot
 	if root == "" {
-		return nil, errors.New("the environment has no user data directory; set one with archo env set --user-data <dir>")
+		return nil, errors.New("the Game Config has no user data directory; set one with archo env set --user-data <dir>")
 	}
 	out := &ModSettingsList{Plan: PlanRef(st.Plan), Config: filepath.Join(root, "Config")}
 	var listed []string
@@ -283,7 +283,7 @@ func (a *App) ModSettingsOf(m *store.Mod) (*ModSettingsMod, error) {
 		return nil, err
 	}
 	if ix.Env.UserDataRoot == "" {
-		return nil, errors.New("the environment has no user data directory; set one with archo env set --user-data <dir>")
+		return nil, errors.New("the Game Config has no user data directory; set one with archo env set --user-data <dir>")
 	}
 	aliases, err := a.Store.AllAliases(ix.Env.GameID)
 	if err != nil {

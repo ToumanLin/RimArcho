@@ -375,14 +375,14 @@ func Help() *render.Doc {
 	}
 	root.Section("commands").AddColumns(rows)
 	root.KV("references", "#<id> instance, L#<id> lineage, pkg:<packageId> or the bare packageId, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>, pattern:<id> error pattern")
-	root.KV("global flags", "--env <name> (use another environment for this command)")
+	root.KV("global flags", "--env <name> (use another Game Config for this command)")
 	return d
 }
 
 var gameVersionRe = regexp.MustCompile(`^\d+\.\d+$`)
 
 // gameVersionFlag is accepted by the analysis commands (05 §3).
-var gameVersionFlag = Flag{Name: "game-version", Value: "<X.Y>", Help: "analyse for another game version than the environment's"}
+var gameVersionFlag = Flag{Name: "game-version", Value: "<X.Y>", Help: "analyse for another game version than the Game Config's"}
 
 // CommandHelp is `archo <command> --help`: the usage line, the summary and each flag.
 func CommandHelp(c *Command) *render.Doc {

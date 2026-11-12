@@ -60,7 +60,7 @@ func TestGameIdentityDistinctFromEnvironment(t *testing.T) {
 		t.Fatalf("ignore leaked into game scope: %v %v", ignores, err)
 	}
 	if ignores, err := e.App.Store.Ignores("profile"); err != nil || len(ignores) != 1 {
-		t.Fatalf("environment ignore: %v %v", ignores, err)
+		t.Fatalf("Game Config ignore: %v %v", ignores, err)
 	}
 	if err := e.App.Store.SetMeta("env:profile:launch_args", "-popupwindow"); err != nil {
 		t.Fatal(err)

@@ -144,6 +144,7 @@ function optionList(pop, p, opts, render, pick, input) {
       d.id = "popup-option-" + i;
       d.setAttribute("role", "option");
       d.setAttribute("aria-selected", String(i === p.sel));
+      if(o.disabled)d.setAttribute("aria-disabled","true");
       d.setAttribute("aria-posinset", String(i + 1));
       d.setAttribute("aria-setsize", String(p.opts.length));
       render(d, o);
@@ -151,7 +152,7 @@ function optionList(pop, p, opts, render, pick, input) {
       d.onclick = () => pick(o, i);
       list.append(d);
     });
-    const on = list.children[p.sel];
+    const on = list.querySelector("#popup-option-" + p.sel);
     if (on) owner.setAttribute("aria-activedescendant", on.id); else owner.removeAttribute("aria-activedescendant");
     if (on) on.scrollIntoView({ block: "nearest" });
   };
@@ -492,7 +493,7 @@ export async function identity(question, run) {
 export function choose(title, labels, pick, current = 0, other = null) {
   open("choose", title, (pop, p) => {
     pop.append(el("div", "ttl", title));
-    optionList(pop, p, labels.map((l, i) => ({ l, i })), (d, o) => d.append(el("span", "word-facts", o.l)), (o) => { close(); pick(o.i); });
+    optionList(pop, p, labels.map((l, i) => ({ l, i, disabled:typeof l === "object" && l.disabled })), (d, o) => d.append(el("span", "word-facts", typeof o.l === "string" ? o.l : o.l.name)), (o) => { if(o.disabled)return;close(); pick(o.i); });
     if (other) {
       const btns = el("div", "btns");
       const b = el("button", "", other.label);

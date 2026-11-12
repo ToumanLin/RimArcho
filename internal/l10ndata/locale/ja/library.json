@@ -150,7 +150,7 @@
   "left over after unsubscribing": "サブスクライブ解除後に残ったファイル",
   "library source": "ライブラリの入手元",
   "lists %s": "リスト%s",
-  "lists, games": "リスト、ゲーム",
+  "lists, games": "リスト、ゲーム構成",
   "lock this version": "このバージョンを固定",
   "locked version": "固定バージョン",
   "locked version made on %s": "%sに作成した固定バージョン",
@@ -389,7 +389,7 @@
   "; its colour marks the Mod": "。このタグの色がMODに適用されます",
   "colour of %s cleared": "%sの色を解除しました",
   "colour of %s: %s": "%sの色：%s",
-  "Texture optimisation needs a Linux todds. The Linux build of todds 0.4.1 (https://github.com/todds-encoder/todds/releases/tag/0.4.1) runs on Ubuntu 24.04, Fedora 39, Arch and newer; on older systems, build it from source. Then put todds on PATH or set textures.todds to its full path.": "テクスチャ最適化にはLinux版toddsが必要です。todds 0.4.1のLinux版（https://github.com/todds-encoder/todds/releases/tag/0.4.1）はUbuntu 24.04、Fedora 39、Archおよびそれ以降で動作します。古い環境ではソースからビルドしてください。その後toddsをPATHに追加するか、textures.toddsにフルパスを設定してください。",
+  "Texture optimisation needs a Linux todds. The Linux build of todds 0.4.1 (https://github.com/todds-encoder/todds/releases/tag/0.4.1) runs on Ubuntu 24.04, Fedora 39, Arch and newer; on older systems, build it from source. Then put todds on PATH or set textures.todds to its full path.": "テクスチャ最適化にはLinux版toddsが必要です。todds 0.4.1のLinux版（https://github.com/todds-encoder/todds/releases/tag/0.4.1）はUbuntu 24.04、Fedora 39、Archおよびそれ以降で動作します。古いゲーム構成ではソースからビルドしてください。その後toddsをPATHに追加するか、textures.toddsにフルパスを設定してください。",
   "new": "新着",
   "added": "追加日"
 }

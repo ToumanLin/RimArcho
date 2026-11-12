@@ -141,6 +141,7 @@ Real data and the 10-minute acceptance (16 §10) remain VM checks.
 | Game type index (05 §5.3, 2026-11-04) | Off the GUI process; an unchanged game costs nothing | Real 1.6.4633 (Ryzen 9 7950X, 3 runs): `Assembly-CSharp.dll` 9,662 types (437 nested; 16,158 TypeDefs with compiler-generated ones), firstpass 71. First index 55–61 ms inside the scan (read 17–20, write 37–40), database +1.6 MB per environment; unchanged rescan one stat per file (<1 ms); 100 `GameClassOwners` 2.6–3.2 ms, 100 `GameTypeOwners` 1.6–2.5 ms | Met |
 | List loading resource use (16 §2.17) | Immediate numbers on reopen | 476 Mods: first 47 seconds (first opening of 30,000 DDS headers), later 0.45. Measured on 1.7 (RTX 4090, isolated data directory, 100 / 250 / 484 Mods): vanilla + DLC private memory 2.30 GB, video memory 1.25 GB; 484 Mods first launch 15.1 / 7.3 GB, subsequent 21.9–22.1 / 15.3 GB (video memory is the engine's upload high-water mark); the estimated range covers 5 of 6 measurements | Recorded; 1.6 unmeasured |
 
+
 ## 3. Real-data counts (referenced by specifications)
 
 | Item | Measurement |

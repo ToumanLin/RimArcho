@@ -975,8 +975,14 @@ async function cmd(id) {
 async function chooseEnv() {
   const envs = (S.board && S.board.envs) || [];
   if (!envs.length) return say("", T("no games yet (archo env add)"));
-  pop.choose(T("switch game"), envs, (i) => useEnv(envs[i]),
-    Math.max(0, envs.indexOf(S.board.env)), { key: "Delete", label: T("remove the game"), envWrite: "remove-env", run: (i) => scr.removeEnv(envs[i]) });
+  const rows = S.board.environmentRows || [];
+  const labels = rows.map(e => e.name + "  " + e.installation + (e.current ? "  " + T("in use") : ""));
+  const current=rows.find(e=>e.current)||rows[0];
+  labels.push({name:"+ "+T("Add Game Config")+(current?.addReason?"  "+current.addReason:""),disabled:!!current?.addReason});
+  pop.choose(T("switch game"), labels, (i) => {
+    if (i === rows.length) return scr.addEnvironment(rows.find(e => e.current) || rows[0]);
+    return useEnv(envs[i]);
+  }, Math.max(0, envs.indexOf(S.board.env)), { key:"Delete", label:T("remove the game"), envWrite:"remove-env", run:i => { if(i<envs.length) scr.removeEnv(envs[i]); } });
 }
 
 async function useEnv(name) {

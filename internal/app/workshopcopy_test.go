@@ -152,7 +152,7 @@ func TestUpdateToWorkshop(t *testing.T) {
 			}
 			current, _ := e.App.Env()
 			if current.Name != "main" {
-				t.Fatal("changed current environment")
+				t.Fatal("changed current Game Config")
 			}
 		})
 	}

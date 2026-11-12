@@ -27,6 +27,6 @@ func versionMuteCmd(c *Ctx, a *Args, muted bool) (*render.Doc, error) {
 	}
 	d, root := render.New(fmt.Sprintf("version warnings %s for %s", verb, mm))
 	root.KV("mods", strings.Join(a.Pos, " "))
-	root.KV("scope", "packages in every plan and environment; survives mod updates; other game minor versions are unchanged")
+	root.KV("scope", "packages in every plan and Game Config; survives mod updates; other game minor versions are unchanged")
 	return d, nil
 }

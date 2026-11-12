@@ -93,10 +93,22 @@ async function discoverManagers(body) {
       result.textContent = "";
       result.append(copyablePath(el("div", "xc-note", candidate.path), candidate.path), el("pre", "", data.text));
       result.append(el("div", "xc-note", T("Existing values stay; importing player data cannot be undone.")));
+      const selected = new Set();
+      if (data.profiles?.length) {
+        const profiles = el("fieldset", "xc-sec"); profiles.append(el("legend", "", T("RimCrow profiles")));
+        for (const profile of data.profiles) {
+          const row=el("label","xc-row"), check=el("input");check.type="checkbox";
+          check.checked=profile.Status==="ready";check.disabled=profile.Status!=="ready";
+          if(check.checked)selected.add(profile.ID);
+          check.onchange=()=>{if(check.checked)selected.add(profile.ID);else selected.delete(profile.ID);};
+          row.append(check,el("span","",profile.Name+"  "+profile.Game+"  "+profile.UserData+"  "+profile.Status));profiles.append(row);
+        }
+        result.append(profiles);
+      }
       const apply = button(T("import"), "enter", async () => {
         apply.disabled = true;
         try {
-          const text = await api.ApplyManagerImport(data.request);
+          const text = await (candidate.kind==="rimcrow" ? api.ApplyManagerImportProfiles(data.request,[...selected]) : api.ApplyManagerImport(data.request));
           if (session !== active || S.screen !== "plan-import") return;
           result.textContent = "";
           result.append(el("pre", "", text));

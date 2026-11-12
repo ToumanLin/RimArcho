@@ -20,7 +20,7 @@ func subscriptionTools() []tool {
 
 // ManageSubscriptionsIn is manage_subscriptions.
 type ManageSubscriptionsIn struct {
-	Env      string  `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env      string  `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Action   string  `json:"action,omitempty" jsonschema:"list (default), add, check, update or remove"`
 	URL      string  `json:"url,omitempty" jsonschema:"add: a Git repository URL, a download page (a LoversLab file page or another https page), or Workshop links or IDs separated by spaces"`
 	Kind     string  `json:"kind,omitempty" jsonschema:"add: git, page or workshop; empty recognises it from url the way the window's paste box does"`

@@ -59,12 +59,14 @@ const (
 
 // panel is a secondary screen: command output to read, or a chooser.
 type panel struct {
-	title   string
-	lines   []string
-	off     int
-	choices []string // chooser values (env names)
-	choice  int
-	onPick  func(m *model, value string) tea.Cmd
+	title         string
+	lines         []string
+	off           int
+	choiceLabels  map[string]string
+	choiceCurrent map[int]bool
+	choices       []string // chooser values (env names)
+	choice        int
+	onPick        func(m *model, value string) tea.Cmd
 	// onPickAt: enter on choice i, for choices whose labels may repeat (H's steps)
 	onPickAt func(m *model, i int) tea.Cmd
 	// onDelete: d / delete on a choice (the environment chooser's remove game, 16 §2.14)

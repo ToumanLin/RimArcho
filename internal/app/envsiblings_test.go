@@ -36,7 +36,7 @@ func TestEnvSiblingsAddCloneAndSwitch(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Force the generated plan to choose a unique name.
-	e.MustRun("plan", "new", "clone")
+	e.MustRun("plan", "new", "clone's list")
 	var scans, instances, sources int
 	count := func() []int {
 		t.Helper()
@@ -73,7 +73,7 @@ func TestEnvSiblingsAddCloneAndSwitch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cloned.Plan.ID == original.Plan.ID || cloned.Plan.Name != "clone 2" || !cloned.List.Equal(original.List) {
+	if cloned.Plan.ID == original.Plan.ID || cloned.Plan.Name != "clone's list 2" || !cloned.List.Equal(original.List) {
 		t.Fatalf("clone workspace: %s %s", cloned.Plan.Name, cloned.List.Encode())
 	}
 	if e.App.Store.VersionCount(cloned.Plan.ID) != 1 || e.App.Store.Meta(store.StageKey(cloned.Plan.ID)) != "" {
@@ -103,11 +103,11 @@ func TestEnvSiblingsAddCloneAndSwitch(t *testing.T) {
 		t.Fatal(err)
 	}
 	if st.Ix.Env.ID != empty.ID || st.Plan.ID == cloned.Plan.ID || len(st.List) == 0 {
-		t.Fatalf("wrong environment/plan: %+v", st.Plan)
+		t.Fatalf("wrong Game Config/plan: %+v", st.Plan)
 	}
 	for _, en := range st.List {
 		if m := st.Ix.ByID[en.Instance]; m == nil || m.Kind != source.Official {
-			t.Fatalf("empty environment inherited a mod: %+v", en)
+			t.Fatalf("empty Game Config inherited a mod: %+v", en)
 		}
 	}
 	e.MustRun("env", "use", "clone")
@@ -165,7 +165,7 @@ func TestEnvSiblingMoveAndReattach(t *testing.T) {
 	sibling, _ = e.App.Store.EnvByName("sibling")
 	main, _ = e.App.Store.EnvByName("main")
 	if sibling.GameID != other.GameID || main.GameRoot != moved || main.GameID == sibling.GameID {
-		t.Fatalf("reattach moved another environment: %+v %+v", main, sibling)
+		t.Fatalf("reattach moved another Game Config: %+v %+v", main, sibling)
 	}
 }
 

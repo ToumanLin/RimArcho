@@ -140,7 +140,7 @@ func (s *API) ImportPreviewFor(id int64, kind, src string) (*PlanImportPreview, 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if env, e := s.a.Env(); e != nil || env.ID != envID {
-		return nil, errors.New("import environment changed")
+		return nil, errors.New("import Game Config changed")
 	}
 	if seq != s.x.seq {
 		return nil, errors.New("import preview superseded")

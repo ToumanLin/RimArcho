@@ -171,7 +171,7 @@ func TestPlanLoadCostUsesSelectedEnvironmentVersion(t *testing.T) {
 			t.Fatal(err)
 		}
 		if r.Game != loadcost.Game17 || len(r.PerMod) != 1 || r.PerMod[0].Measure.PNG.Count != 1 || r.PerMod[0].Measure.Defs.Bytes <= int64(len("<Defs/>")) {
-			t.Fatalf("selected environment/folders ignored for plan %d: %+v", id, r)
+			t.Fatalf("selected Game Config/folders ignored for plan %d: %+v", id, r)
 		}
 	}
 	game, err := e.App.Env()

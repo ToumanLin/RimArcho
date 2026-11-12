@@ -317,11 +317,11 @@ func LoadConfig(path string) (Config, error) {
 	return c, sc.Err()
 }
 
-// NewID mints an Instance/Lineage/Environment/Source ID.
+// NewID mints an Instance/Lineage/environment/Source ID.
 func (a *App) NewID() string { return ids.New(a.Rand) }
 
 // ErrNoEnv is returned when no environment has been configured.
-var ErrNoEnv = errors.New("no environment configured (archo env detect, then archo env add <name> --detected; or give the game folder yourself: archo env add <name> --game <dir>)")
+var ErrNoEnv = errors.New("no Game Config configured (archo env detect, then archo env add <name> --detected; or give the game folder yourself: archo env add <name> --game <dir>)")
 
 // Env returns the environment for this invocation: --env, else the current one.
 func (a *App) Env() (*env.Environment, error) {
@@ -331,7 +331,7 @@ func (a *App) Env() (*env.Environment, error) {
 			return nil, err
 		}
 		if e == nil {
-			return nil, fmt.Errorf("no environment named %q (archo env list)", a.EnvName)
+			return nil, fmt.Errorf("no Game Config named %q (archo env list)", a.EnvName)
 		}
 		return e, nil
 	}

@@ -89,7 +89,7 @@ func TestUseInstalledRealCopy(t *testing.T) {
 		}
 		return cards
 	}
-	t.Logf("BEFORE environment=%s plan=%q entries=%d enabled=%d missing=%d canEnable=%d kinds=%v", before.Ix.Env.Name, before.Plan.Name, len(before.List), len(before.List)-count(before), count(before), len(packages), kinds)
+	t.Logf("BEFORE Game Config=%s plan=%q entries=%d enabled=%d missing=%d canEnable=%d kinds=%v", before.Ix.Env.Name, before.Plan.Name, len(before.List), len(before.List)-count(before), count(before), len(packages), kinds)
 	if logNeeds("BEFORE") != 1 {
 		t.Fatal("expected installed-copy needs item")
 	}

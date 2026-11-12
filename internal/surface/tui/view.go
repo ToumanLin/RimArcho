@@ -356,6 +356,12 @@ func (m *model) panelLines(n int) []string {
 			out = append(out, "")
 		}
 		for i, c := range p.choices {
+			if v := p.choiceLabels[c]; v != "" {
+				c += "  " + v
+			}
+			if p.choiceCurrent[i] {
+				c += "  " + T("in use")
+			}
 			if i == p.choice {
 				out = append(out, "  "+sAccent.Render(markSel+" ")+sSel.Render(fit(c, inner-2)))
 			} else {

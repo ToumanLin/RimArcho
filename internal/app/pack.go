@@ -818,7 +818,7 @@ func (a *App) launchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 	}
 	mods := modsDir(st.Ix)
 	if mods == "" {
-		return nil, fmt.Errorf("%w: the environment has no Mods/ folder", ErrLaunchBlocked)
+		return nil, fmt.Errorf("%w: the Game Config has no Mods/ folder", ErrLaunchBlocked)
 	}
 	dir := a.packPath(name)
 	r := &PackLaunch{Pack: p, Check: check, UserData: filepath.Join(dir, "userdata"), DryRun: dryRun}

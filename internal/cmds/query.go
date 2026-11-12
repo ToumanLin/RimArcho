@@ -21,7 +21,7 @@ func init() {
 		Flags: []Flag{{Name: "full", Help: "re-hash every semantic file"},
 			{Name: "game-only", Help: "only the game's own Data/ and Mods/, not the shared mod folders"},
 			{Name: "progress", Help: "progress lines on stderr: mod folders read, then saving"}}, Run: scanCmd})
-	register(&Command{Name: "status", Summary: "overview of the current environment", MaxArgs: 0, Run: statusCmd})
+	register(&Command{Name: "status", Summary: "overview of the current Game Config", MaxArgs: 0, Run: statusCmd})
 	register(&Command{Name: "list", Summary: "list mods", MaxArgs: 0,
 		Flags: []Flag{{Name: "filter", Value: "<expr>", Help: "terms: source:<label|kind> status:live|tombstone|all residue unloadable copies pkg:<id> ws:<id> tag:<tag> or words"},
 			{Name: "active", Help: "the workspace Loadout in load order"}, {Name: "all", Help: "no truncation"}}, Run: listCmd})

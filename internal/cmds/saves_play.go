@@ -79,9 +79,9 @@ func playedText(sec float64) string {
 // playCounts are the numbers the change line compares.
 type playCounts struct {
 	alive, slaves, dead, world, animals, mechs, prisoners int
-	wealth                                         int
-	hasWealth, hasStats                            bool
-	stats                                          savefile.Stats
+	wealth                                                int
+	hasWealth, hasStats                                   bool
+	stats                                                 savefile.Stats
 }
 
 func countsOf(f *savefile.Facts) playCounts {

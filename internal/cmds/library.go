@@ -370,7 +370,7 @@ func libraryRemoveCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	for _, r := range rs {
 		how := "undo it in that plan: archo plan use " + quote(r.Plan) + ", then archo undo"
 		if strings.Contains(r.Plan, "/") {
-			how = "another environment's plan; undo it there"
+			how = "another Game Config's plan; undo it there"
 		}
 		if r.Current {
 			how, cur = "archo undo reverts it", true

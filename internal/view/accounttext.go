@@ -11,7 +11,7 @@ import (
 
 func init() {
 	enText["environment create failed"] = "WebView2 setup failed"
-	enText["environment interface not available"] = "WebView2 interface not available"
+	enText["Game Config interface not available"] = "WebView2 interface not available"
 }
 
 type interfaceFormat struct {
@@ -19,7 +19,10 @@ type interfaceFormat struct {
 	re  *regexp.Regexp
 }
 
-var interfaceFormats = []interfaceFormat{}
+var interfaceFormats = []interfaceFormat{
+	interfaceFormatFor("%d other Game Configs use this folder and will change too: %s"),
+	interfaceFormatFor("only Game Config %s changes game folder; other Game Configs stay"),
+}
 
 func init() {
 	for _, key := range []string{"detach and reattach -> %s", "create link -> %s", "%s: only part of it was deleted (%s); the game links to it were removed, delete the rest yourself", ".rimarcho/origin.json could not be written in %s; nothing was moved: %w", "the record could not follow the move; nothing was moved: %w", "the copy of %s is incomplete; nothing was moved", "the copy of %s differs at %s; nothing was moved", "%s already exists; nothing was moved", "%s is not an exact copy of %s; nothing was moved (move it out of Mods/ yourself if you do not need it)", "cannot tell which linked repository is the mod (%d: %s); subscribe to it with archo subscribe git <repository>", "cannot rule out an incoming link at %s: %s; leave it alone and resolve the check failure first", "moving or removing %s would break foreign link %s -> %s (%s); detach it yourself first", "unfinished link operation: %s; review archo links repair --all --dry-run first", "the game is running (pid %d); close it before updating subscriptions", "%s is not a page subscription; --from is only for page subscriptions", "included link is not a prefixed entry in the selected game scope: %s", "old folder is in the recycle bin; replacement remains at %s: %w", "repository root has no About/About.xml; mod subdirectories: %s", "Workshop %s: Steam did not confirm subscription (%s); %s", "installed at %s but scan did not find a live instance", "game is running: %s; stop it before repairing links", "install SteamCMD in Settings; Workshop pages: %s", "SteamCMD download directory overlaps src:%s (%s)", "%s is not directly inside a subscription source", "SteamCMD item %s has no About/About.xml at %s", "new link path is occupied or inaccessible: %s", "%s: updating %s requires --from <zip|folder>", "%s: update check unavailable offline for %s", "incoming link changed since preview: %s", "%s (%s %q) is subscribed already at %s", "%s Workshop items could not be checked", "cannot check incoming links in %s: %w", "scan did not find subscription at %s", "link recovery remains pending: %s", "target changed since preview: %s", "page is subscribed already: %s", "link changed since preview: %s", "Steam request failed (code %s)", "affected game is running: %s", "%s is not a subscription", "SteamCMD item %s: %s; %s", "invalid repair entry: %s", "not a Workshop URL: %s", "invalid Workshop ID %q", "cannot reattach %s: %s", "unknown instance: %s", "subscription %s: %w", "game is running: %s", "check failed: %s", "Repository: %s", "Version: %s", "failed: %s", "Page: %s"} {

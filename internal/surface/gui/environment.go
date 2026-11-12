@@ -62,7 +62,7 @@ func (s *API) queueEnvironment(request uint64, name, kind string, plan int64, pa
 		return false
 	}
 	if request <= w.seq {
-		go s.send("environment", &EnvironmentResult{Request: request, Stale: true})
+		go s.send("Game Config", &EnvironmentResult{Request: request, Stale: true})
 		return true
 	}
 	w.seq = request
@@ -81,7 +81,7 @@ func (s *API) queueEnvironment(request uint64, name, kind string, plan int64, pa
 		}
 		defer func() {
 			result.Stale = !current()
-			s.send("environment", result)
+			s.send("Game Config", result)
 		}()
 		if !current() {
 			return
@@ -196,7 +196,7 @@ func (s *API) Workspace(request uint64) bool {
 		return false
 	}
 	if request <= w.readSeq {
-		go s.send("environment", &EnvironmentResult{Request: request, Stale: true})
+		go s.send("Game Config", &EnvironmentResult{Request: request, Stale: true})
 		return true
 	}
 	w.readSeq = request
@@ -212,7 +212,7 @@ func (s *API) Workspace(request uint64) bool {
 				break
 			}
 		}
-		s.send("environment", result)
+		s.send("Game Config", result)
 	}()
 	return true
 }

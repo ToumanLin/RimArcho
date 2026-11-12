@@ -82,7 +82,7 @@ func (a *App) LaunchWith(dryRun, move bool) (*SaveResult, error) {
 		return nil, err
 	}
 	if e.UserDataRoot == "" {
-		return nil, errors.New("the environment has no user data directory; set one with archo env set --user-data <dir>")
+		return nil, errors.New("the Game Config has no user data directory; set one with archo env set --user-data <dir>")
 	}
 	// The command first: a missing Steam or executable refuses before anything is written.
 	p, err := a.gamePlan(e, e.UserDataRoot)
@@ -158,7 +158,11 @@ func (a *App) gamePlan(e *env.Environment, userData string) (*LaunchPlan, error)
 		}
 		extra = append(extra, "-savedatafolder="+userData)
 	}
-	extra = append(extra, strings.Fields(a.LaunchArgs(e.ID))...) // 16 §2.14
+	argv, err := ParseLaunchArgs(a.LaunchArgs(e.ID))
+	if err != nil {
+		return nil, err
+	}
+	extra = append(extra, argv...) // 16 §2.14
 	if proton {
 		for _, arg := range extra {
 			if strings.HasPrefix(strings.ToLower(arg), "-savedatafolder") {

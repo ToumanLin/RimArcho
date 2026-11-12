@@ -1723,7 +1723,7 @@ function settingPathPicker(row, it, again) {
   if (it.edit !== "directory" && it.edit !== "path") return;
   const choose = it.edit === "directory"
     ? () => directoryPrompt({ id: it.directory, label: it.label, path: it.value }, false, async () => { await ui.reload(); again(); })
-    : () => chooseLocalPath(it.editValue ?? it.value ?? "", value => settingRunner(again)(it.argv, value), { file: !!it.file });
+    : () => chooseLocalPath(it.editValue ?? it.value ?? "", value => applyPathSetting(it, value, again), { file: !!it.file });
   editablePath(row.querySelector(".setting-value"), choose, !!it.file);
   if (it.file) editablePath(row.querySelector(".setting-note"), choose, true);
 }
@@ -1802,7 +1802,7 @@ function renderGroups(w, groups, again) {
         right.append(factText(el("span", "muted setting-value"), { text: it.value || "", paths: it.valuePath ? [it.value] : [] }));
         const adding = it.argv[0] === "folder" && it.argv[1] === "add";
         right.append(button(T(adding ? "add…" : "change…"), "", () => chooseLocalPath(it.editValue ?? it.value ?? "",
-          value => run(it.argv, value), { file: !!it.file }), "", "apply-setting"));
+          value => applyPathSetting(it, value, again), { file: !!it.file }), "", "apply-setting"));
       } else if (it.edit === "url") {
         right.append(factText(el("span", "muted setting-value"), { text: it.value, paths: [it.value] }),
           button(T("change…"), "", () => urlPrompt(it.label, it.value, value => run(it.argv, value)), "", "apply-setting"));
@@ -1858,6 +1858,7 @@ function settingDetails(d) {
 
 function renderSettingActions(right, actions, run, item) {
   for (const a of actions || []) {
+    if(a.argv[0]==="env"&&a.argv[1]==="remove"){right.append(button(a.label,"",()=>removeEnv(a.argv[2]),"quiet danger","remove-env"));continue;}
     if (a.argv[0] === "import-managers") {
       right.append(button(a.label, "", () => ui.importManagers())); continue;
     }
@@ -1988,7 +1989,11 @@ export async function environment() {
   const sc = S.screen === "env" ? $("#screen") : openScreen("env");
   const top = sc.scrollTop;
   sc.innerHTML = "";
-  const w = page("env", "", act(T("add a game"), "plus", () => ui.go("guide")), rescanButton());
+  const current=(p.envs||[]).find(e=>e.current);
+  const addConfig=act(T("Add Game Config"),"plus",()=>addEnvironment(current));
+  addConfig.disabled=!!current?.addReason;
+  const w = page("env", "", addConfig, rescanButton());
+  if(current?.addReason)w.append(el("p","notice",current.addReason));
   sc.append(w);
   const envLab = el("div", "label section", T("every game"));
   w.append(envLab);
@@ -1996,6 +2001,7 @@ export async function environment() {
   area(card, envLab);
   for (const e of p.envs || []) {
     const row = el("div", "envrow" + (e.current ? " on" : ""));
+    row.id = "environment-row-" + encodeURIComponent(e.name);
     const l = el("div", "l");
     l.append(el("div", "name", e.name), factText(el("div", "sub"), { text: e.game, paths: [e.path] }));
     row.append(l);
@@ -2010,6 +2016,8 @@ export async function environment() {
     card.append(row);
   }
   w.append(card);
+  for (const notice of p.notices || []) w.append(el("p","notice",notice));
+  if(p.notices?.length) api.AcknowledgeAliasNotice().catch(()=>{});
   renderGroups(w, p.groups || [], environment);
   sc.scrollTop = top;
   read.finish();
@@ -2028,4 +2036,59 @@ export async function removeEnv(name) {
     if (!(S.board && S.board.envs && S.board.envs.length)) return ui.go("guide");
     if (S.screen === "env") environment();
   });
+}
+
+export function addEnvironment(source) {
+  if (!source) return ui.go("guide");
+  if (source.addReason) return say("warn",source.addReason);
+  pop.open("add-environment", T("add environment"), (box, state) => {
+    box.append(el("h2", "ttl", T("add environment")));
+    state.modal=true;
+    const body = el("div", "body"); box.append(body);
+    body.append(el("p", "", source.name + "  " + source.installation));
+    const field = (label, control) => { const row = el("label", "env-create-field"); row.append(el("span", "", label), control); body.append(row); return control; };
+    const name = field(T("environment name"), el("input", "field")); name.required = true;
+    const game = field(T("game folder"), el("button", "", source.path)); game.type="button"; game.value=source.path;
+    game.onclick=async()=>{const selected=await api.PickFolder(game.value);if(selected){game.value=selected;game.textContent=selected;}};
+    const mode = field(T("start with"), el("select"));
+    for (const [value, text] of [["copy", T("Copy current Game Config (recommended)")], ["empty", T("Start empty")]]) { const option = el("option", "", text); option.value=value; mode.append(option); }
+    const detail = el("p"); body.append(detail);
+    const describe = () => { detail.textContent = mode.value === "copy" ? T("copies game settings, Mod settings and the Mod list as the editor shows it (enabled Mods and their order, including unsaved edits); no Mod files are copied; saves, logs and history are not copied") : T("game defaults, Core and DLC; no settings, saves, logs or history are copied"); }; mode.onchange=describe; describe();
+    const root = field(T("saves"), el("select"));
+    for (const [value,text] of [["own",T("own folder in RimArcho")],["custom",T("a folder you choose")]]) {const option=el("option","",text);option.value=value;root.append(option);}
+    const path=field(T("user data folder"),el("button","",T("choose a user data folder")));path.type="button";path.value="";path.disabled=true;
+    path.onclick=async()=>{try{const selected=await api.PickFolder(path.value);if(selected){path.value=selected;path.textContent=selected;}}catch(e){say("fail",errText(e));}};
+    root.onchange=()=>{path.disabled=root.value!=="custom";};
+    const error=el("p", "error");error.setAttribute("role","alert");body.append(error);
+    fieldError(name, error, () => error.dataset.field === "name" && !!error.textContent);
+    fieldError(path, error, () => error.dataset.field === "path" && !!error.textContent);
+    const clearError = () => { error.textContent = ""; };
+    name.oninput = clearError;
+    const refuse = (field, text) => {
+      error.dataset.field = field === name ? "name" : "path";
+      error.textContent = text;
+      field.focus();
+    };
+    const buttons=el("div","btns");box.append(buttons);
+    const cancel=el("button","",T("cancel"));cancel.onclick=pop.close;buttons.append(cancel);
+    const submit=el("button","go",T("add environment"));submit.dataset.envWrite="add-env";buttons.append(submit);
+    submit.onclick=async()=>{
+      if (!name.value.trim()) return refuse(name,T("enter an environment name"));
+      if(root.value==="custom"&&!path.value.trim())return refuse(path,T("choose a user data folder"));
+      submit.disabled=true;
+      try {await api.AddGameConfig(name.value.trim(),source.name,game.value,mode.value==="copy",root.value==="custom"?path.value.trim():"");pop.close();await ui.reload();await environment();}
+      catch(e){refuse(name,errText(e));submit.disabled=false;}
+    };
+    state.keys=e=>{if(e.key==="Enter"&&e.target.tagName!=="SELECT"){e.preventDefault();submit.click();return true;}return false;};
+    name.focus();
+  });
+}
+
+async function applyPathSetting(it, value, again) {
+ const screen = S.screen, epoch = S.screenSeq;
+ const run=()=>settingRunner(again)(it.argv,value);
+ if(it.argv?.[0]==="env"&&it.argv.includes("--game")) {
+  try {const lines=await api.EnvGameChangePreview(it.argv[2],value);if(S.screen!==screen||S.screenSeq!==epoch)return;pop.confirm(T("game folder"),[...lines,value],T("apply"),run);}
+  catch(e){say("fail",errText(e));}
+ } else return run();
 }

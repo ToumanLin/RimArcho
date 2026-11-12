@@ -2818,3 +2818,11 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 .row.group-head.later::before { content: ""; position: absolute; left: 4px; right: 4px; top: 0; border-top: var(--hairline) solid var(--line-2); }
 @media (prefers-reduced-motion: reduce) { .row.group-head .fold-chev { transition: none; } }
 :root[data-motion="reduced"] .row.group-head .fold-chev { transition: none; }
+
+/* Environment creation shares the modal's focus and reference-number behavior. */
+.env-create-field { display: grid; grid-template-columns: minmax(110px, 1fr) minmax(0, 2fr); align-items: center; gap: 12px; margin: 12px 0; }
+.env-create-field > :last-child { min-width: 0; width: 100%; }
+.env-create-field select { background: var(--card-2); color: var(--fg); border: var(--hairline) solid var(--line-2); border-radius: var(--r-sm); padding: 4px 6px; font: inherit; }
+.env-create-field button { overflow-wrap: anywhere; text-align: left; }
+.envrow { flex-wrap: wrap; }
+.envrow > .sub { flex-basis: 100%; white-space: normal; }

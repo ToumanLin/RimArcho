@@ -16,7 +16,7 @@ import (
 func init() {
 	register(&Command{Name: "test run", Args: "[<plan>]", Summary: "run the game with isolated data, capture startup errors, then stop it", MaxArgs: 1,
 		Flags: []Flag{
-			{Name: "env", Value: "<name>", Help: "test another environment"},
+			{Name: "env", Value: "<name>", Help: "test another Game Config"},
 			{Name: "map", Help: "load a quick test map instead of the main menu"},
 			{Name: "save", Value: "<save>", Help: "load this save (a saves list reference, name or .rws path) in the run's own data and play --ticks (default 4000)"},
 			{Name: "ticks", Value: "<n>", Help: "with --map or --save: play this many ticks (60 a second at normal speed), then stop"},

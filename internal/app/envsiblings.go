@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -47,16 +48,17 @@ func (a *App) checkEnvironmentRoot(self, game, root string) error {
 		}
 		o := canonicalRoot(e.UserDataRoot)
 		if g == canonicalRoot(e.GameRoot) && r == o {
-			return fmt.Errorf("environment %s already uses this installation and user data folder; use --saves own or --user-data <dir>", e.Name)
+			return fmt.Errorf("Game Config %s already uses this installation and user data folder; use --saves own or --user-data <dir>", e.Name)
 		}
 		if r != "" && o != "" && r != o && (underDir(r, o) || underDir(o, r)) {
-			return fmt.Errorf("user data folder %s overlaps environment %s's folder %s; choose a separate --user-data <dir>", root, e.Name, e.UserDataRoot)
+			return fmt.Errorf("user data folder %s overlaps Game Config %s's folder %s; choose a separate --user-data <dir>", root, e.Name, e.UserDataRoot)
 		}
 	}
 	return nil
 }
 
 func (a *App) siblingPlanName(name string) (string, error) {
+	name += "'s list"
 	base := strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) {
 			return '_'
@@ -65,7 +67,7 @@ func (a *App) siblingPlanName(name string) (string, error) {
 	}, name)
 	base = strings.TrimSpace(strings.TrimLeft(base, "-"))
 	if base == "" {
-		base = "environment"
+		base = "Game Config"
 	}
 	if runes := []rune(base); len(runes) > 56 {
 		base = string(runes[:56])
@@ -100,7 +102,7 @@ func (a *App) initializeSibling(e, like *env.Environment, clone *LoadoutState) e
 		}
 		list = emptyEnvironmentList(ix)
 	}
-	p, err := a.createPlan(e.ID, name, list, &store.Version{Source: "import", Note: "new environment", GameVersion: e.GameVersion})
+	p, err := a.createPlan(e.ID, name, list, &store.Version{Source: "import", Note: "new Game Config", GameVersion: e.GameVersion})
 	if err != nil {
 		return err
 	}
@@ -156,6 +158,27 @@ func seedSettings(from, to string, config bool) ([]string, error) {
 
 // Retain original quoting in arguments unrelated to the root override.
 func withoutSaveData(args string) (string, bool) {
+	if strings.HasPrefix(strings.TrimSpace(args), "[") {
+		argv, err := ParseLaunchArgs(args)
+		if err != nil {
+			return args, false
+		}
+		out := []string{}
+		omitted := false
+		for i := 0; i < len(argv); i++ {
+			key := strings.ToLower(argv[i])
+			if key == "-savedatafolder" || strings.HasPrefix(key, "-savedatafolder=") {
+				omitted = true
+				if key == "-savedatafolder" && i+1 < len(argv) {
+					i++
+				}
+				continue
+			}
+			out = append(out, argv[i])
+		}
+		data, _ := json.Marshal(out)
+		return string(data), omitted
+	}
 	var parts []string
 	start := -1
 	var quote rune
@@ -213,4 +236,60 @@ func emptyEnvironmentList(ix *Index) loadout.List {
 		return order.CompareOfficial(ix.ByID[list[i].Instance].PackageID, ix.ByID[list[j].Instance].PackageID) < 0
 	})
 	return list
+}
+
+// LegacyInstallationAliases lists environments under distinct game records resolving to one root.
+func (a *App) LegacyInstallationAliases() []string {
+	es, err := a.Store.Envs()
+	if err != nil {
+		return nil
+	}
+	groups := map[string]map[string]bool{}
+	names := map[string][]string{}
+	var order []string
+	for _, e := range es {
+		key := canonicalRoot(e.GameRoot)
+		if groups[key] == nil {
+			groups[key] = map[string]bool{}
+			order = append(order, key)
+		}
+		groups[key][e.GameID] = true
+		names[key] = append(names[key], e.Name)
+	}
+	var out []string
+	for _, key := range order {
+		if len(groups[key]) > 1 {
+			out = append(out, strings.Join(names[key], ", "))
+		}
+	}
+	return out
+}
+
+// EnvGameChangePreview distinguishes relocating siblings from reattaching one environment.
+func (a *App) EnvGameChangePreview(name, path string) ([]string, error) {
+	e, err := a.Store.EnvByName(name)
+	if err != nil {
+		return nil, err
+	}
+	if e == nil {
+		return nil, fmt.Errorf("no Game Config named %q", name)
+	}
+	other, err := a.envOfGame(path)
+	if err != nil {
+		return nil, err
+	}
+	if other != nil && other.GameID != e.GameID {
+		return []string{"only Game Config " + e.Name + " changes game folder; other Game Configs stay"}, nil
+	}
+	es, err := a.Store.Envs()
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, o := range es {
+		if o.GameID == e.GameID && o.ID != e.ID {
+			names = append(names, o.Name)
+		}
+	}
+	return []string{fmt.Sprintf("%d other Game Configs use this folder and will change too: %s", len(names), strings.Join(names, ", "))}, nil
 }

@@ -845,7 +845,7 @@ func TestCreditCrossEnvironmentCandidateRequired(t *testing.T) {
 	}
 	it := creditItem(t, e, batch)
 	if it.State != "retained" || !strings.Contains(it.Result, "blocked") {
-		t.Fatalf("missing environment reason: %+v", it)
+		t.Fatalf("missing Game Config reason: %+v", it)
 	}
 	ws, err := e.App.Store.Workspace(shared)
 	if err != nil || loadout.Decode(ws.Entries).Index(old) < 0 || loadout.Decode(ws.Entries).Index(target.ID) >= 0 {

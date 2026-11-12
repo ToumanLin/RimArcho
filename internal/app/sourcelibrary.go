@@ -269,7 +269,7 @@ func containsSourceInstance(ids []string, id string) bool {
 func (a *App) GameSourceDLL(st *LoadoutState) (*SourceDLL, error) {
 	build := sourceGameBuild(st.Ix.Env.GameVersion)
 	if build == "" {
-		return nil, fmt.Errorf("the current environment has no game build; configure its game version first")
+		return nil, fmt.Errorf("the current Game Config has no game build; configure its game version first")
 	}
 	dir := env.ManagedDir(st.Ix.Env.GameRoot)
 	if dir == "" {

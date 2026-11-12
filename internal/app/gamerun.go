@@ -133,7 +133,7 @@ type RunningGame struct {
 // pack it plays.
 func (g *RunningGame) Describe(loc *time.Location) string {
 	if g.UnknownEnv {
-		return fmt.Sprintf("installation %s running, environment unknown (pid %d)", g.Env.GameRoot, g.Run.PID)
+		return fmt.Sprintf("installation %s running, Game Config unknown (pid %d)", g.Env.GameRoot, g.Run.PID)
 	}
 	what := g.What.PlanText()
 	if g.What.Pack != "" {
@@ -146,7 +146,7 @@ func (g *RunningGame) Describe(loc *time.Location) string {
 	} else if g.What.UserData != "" && env.PathKey(g.What.UserData) != env.PathKey(g.Env.UserDataRoot) {
 		what = "data folder " + g.What.UserData
 	}
-	s := fmt.Sprintf("environment %s is running %s (pid %d", g.Env.Name, what, g.Run.PID)
+	s := fmt.Sprintf("Game Config %s is running %s (pid %d", g.Env.Name, what, g.Run.PID)
 	if !g.Run.Started.IsZero() {
 		if loc == nil {
 			loc = time.Local
@@ -169,7 +169,7 @@ func (e *GameRunningError) Error() string {
 func (e *GameRunningError) Unwrap() error { return ErrLaunchBlocked }
 
 // RunningGame finds a running game in any registered environment, the current one first: a
-// process whose executable is under an environment's game folder (09 §4). nil when none.
+// process whose executable is under a environment's game folder (09 §4). nil when none.
 func (a *App) RunningGame() (*RunningGame, error) {
 	envs, err := a.Store.Envs()
 	if err != nil {

@@ -125,7 +125,7 @@ func TestWorkshopPublishArguments(t *testing.T) {
 		t.Fatalf("default version: %+v, %v", r, err)
 	}
 	if WorkshopPublishOffline([]string{"workshop", "publish"}) {
-		t.Fatal("real publish bypasses configured environment")
+		t.Fatal("real publish bypasses configured Game Config")
 	}
 	if !WorkshopPublishOffline([]string{"workshop", "publish", "--help"}) {
 		t.Fatal("help opens player home")
