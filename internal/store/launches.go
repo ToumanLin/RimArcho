@@ -24,7 +24,7 @@ func (s *Store) LaunchRecordBefore(envIDs []string, t time.Time) (*LaunchRecord,
 	if len(envIDs) == 0 {
 		return nil, nil
 	}
-	q := `SELECT id, environment_id, coalesce(plan_id, 0), started_at, method, command, fingerprint, version_n FROM launch
+	q := `SELECT id, environment_id, coalesce(plan_id, 0), started_at, method, command, fingerprint, version_n, game_id, user_data_root, env_name FROM launch
 		WHERE started_at<=? AND environment_id IN (?` + strings.Repeat(",?", len(envIDs)-1) + `) ORDER BY started_at DESC, id DESC LIMIT 1`
 	args := []any{t.Unix()}
 	for _, id := range envIDs {
@@ -32,7 +32,7 @@ func (s *Store) LaunchRecordBefore(envIDs []string, t time.Time) (*LaunchRecord,
 	}
 	var r LaunchRecord
 	var at int64
-	err := s.DB.QueryRow(q, args...).Scan(&r.ID, &r.EnvID, &r.PlanID, &at, &r.Method, &r.Command, &r.Fingerprint, &r.VersionN)
+	err := s.DB.QueryRow(q, args...).Scan(&r.ID, &r.EnvID, &r.PlanID, &at, &r.Method, &r.Command, &r.Fingerprint, &r.VersionN, &r.GameID, &r.UserDataRoot, &r.EnvName)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

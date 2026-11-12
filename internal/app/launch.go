@@ -106,7 +106,7 @@ func (a *App) LaunchWith(dryRun, move bool) (*SaveResult, error) {
 	if r.Unchanged && st.Latest != nil {
 		vn = st.Latest.N
 	}
-	record := &store.LaunchRecord{EnvID: e.ID, PlanID: st.Plan.ID, Started: a.Now().UTC(),
+	record := &store.LaunchRecord{EnvID: e.ID, GameID: e.GameID, UserDataRoot: e.UserDataRoot, EnvName: e.Name, PlanID: st.Plan.ID, Started: a.Now().UTC(),
 		Method: p.Method, Command: p.Command(), Fingerprint: ListFingerprint(st.List), VersionN: vn}
 	if err := a.Store.AddLaunchRecord(record); err != nil {
 		return r, err

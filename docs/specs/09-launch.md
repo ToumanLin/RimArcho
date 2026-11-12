@@ -20,8 +20,8 @@ Every action that writes to disk follows 02 §1: RimArcho writes only to the loc
 
 **Pack exception.** A pack uses its own user data directory (`-savedatafolder`, 10 §3) and leaves the environment's ModsConfig.xml and saves untouched.
 
-**Launch records.** Every plan or pack launch records the environment, the plan or pack, the time, the launch method, the full command line and the fingerprint of the enabled list. Logs are matched to the latest launch by their write time (06 §4). Save management uses these records to identify the plan (12 §4).
-The table is `launch(environment_id, started_at, method, command, plan_id, fingerprint, version_n)`. `method` is `steam`, `direct` or `pack:<pack name>`. A plan launch records the plan, the fingerprint of its enabled list (`ListFingerprint`, also used for stale detection) and the version played. A pack launch has no plan and records the fingerprint of the pack's list.
+**Launch records.** New records capture installation ID, effective user data root and environment name at launch; changing a root or name does not rewrite those snapshots. Upgraded records retain an unknown root.  Every plan or pack launch records the environment, the plan or pack, the time, the launch method, the full command line and the fingerprint of the enabled list. Logs are matched to the latest launch by their write time (06 §4). Save management uses these records to identify the plan (12 §4).
+The table is `launch(environment_id, started_at, method, command, plan_id, fingerprint, version_n, game_id, user_data_root, env_name)`. `method` is `steam`, `direct` or `pack:<pack name>`. A plan launch records the plan, the fingerprint of its enabled list (`ListFingerprint`, also used for stale detection) and the version played. A pack launch has no plan and records the fingerprint of the pack's list.
 
 ## 2. Launching a plan
 
@@ -116,6 +116,8 @@ Mods may live in directories the game does not read: SteamCMD download directori
 **Duplicate packageIds in `Mods/`** (`pkg.duplicate-mods`, error, "breaks the game" in Can it run). Check the actual contents of `Mods/`, regardless of who put them there: ordinary folders, other tools' links, and `_Archo_` or `!ArchoPack_` links. `App.ModsCopies` reads the packageId from each folder or link and caches the result while `Mods/` remains unchanged. One-click fixes affect only items owned by RimArcho. If a pair includes an `_Archo_` link, use the existing `Mods/` copy (an undoable `swap` when it is in the same Lineage), or remove the linked copy from the plan so that the next write removes its link. Duplicates caused only by pack links are merged into `pack.links-left` (10 §3), with a one-click "remove the links" action. If an ordinary folder can be moved under the blocker rules above, the first action is **"move into the lock library"** (`M`, pressed again to confirm; `archo library move-to-locked <ref>`). Prefer the folder beside an `_Archo_` link; otherwise, move the copy that no plan uses and the game ignores. Its plans continue using it after the move. If none can be moved, explain that the player must manually move the extra copy out of `Mods/`.
 
 ## 4. Running-game detection
+
+Running-game detection first identifies the installation. Readable arguments select the environment by effective `-savedatafolder`; absence means the installation's default root. Otherwise recent launch records across all siblings may identify the environment. An unresolved sibling is reported as "installation running, environment unknown" and still blocks unsafe operations. The selected environment never supplies a missing command-line root.
 
 **Discovery.** On Windows, `CreateToolhelp32Snapshot` lists processes whose executable names start with `rimworld`, and `QueryFullProcessImageName` obtains their full paths. A path under an environment's game directory identifies that environment's game. Also read:
 

@@ -298,3 +298,26 @@ func TestUnknownGameLogAttributedHere(t *testing.T) {
 		t.Fatalf("another environment's log attributed here:\n%s", out)
 	}
 }
+
+func TestLogInstallationHeaderDoesNotProveSibling(t *testing.T) {
+	e := testkit.New(t)
+	e.HarmonyLogFixture()
+	main, _ := e.App.Env()
+	sibling := *main
+	sibling.ID, sibling.Name, sibling.UserDataRoot = e.App.NewID(), "sibling", filepath.Join(e.Root, "sibling-data")
+	if err := e.App.Store.InsertEnv(&sibling); err != nil {
+		t.Fatal(err)
+	}
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(e.UserData, "Player.log")
+	writeLogAt(t, e, path, fmt.Sprintf("Mono path[0] = '%s/RimWorldWin64_Data/Managed'\n", filepath.ToSlash(e.Game)), e.Now())
+	if err := e.App.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: sibling.ID, GameID: sibling.GameID, UserDataRoot: sibling.UserDataRoot, Started: e.Now().Add(-time.Minute), Method: "direct"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.App.CheckLogOwner(st, path); err == nil || !strings.Contains(err.Error(), "sibling") {
+		t.Fatalf("same installation proved own log: %v", err)
+	}
+}

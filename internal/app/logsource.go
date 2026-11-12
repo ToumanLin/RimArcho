@@ -52,15 +52,18 @@ func (a *App) sharedEnvs(e *env.Environment) []string {
 // environment's (10 §3). reg reads a written version's list for its fingerprint (nil:
 // not needed).
 func (a *App) sourceAt(e *env.Environment, reg *loadout.Registry, t time.Time, plansOnly bool) *RunSource {
+	return a.sourceAtIDs(e, reg, t, plansOnly, a.sharedEnvs(e), true)
+}
+
+func (a *App) sourceAtIDs(e *env.Environment, reg *loadout.Registry, t time.Time, plansOnly bool, ids []string, matchRoot bool) *RunSource {
 	src := &RunSource{}
-	ids := a.sharedEnvs(e)
 	var l *store.LaunchRecord
 	for at := t; ; {
 		r, err := a.Store.LaunchRecordBefore(ids, at)
 		if err != nil || r == nil {
 			break
 		}
-		if !plansOnly || r.Pack() == "" {
+		if (!plansOnly || r.Pack() == "") && (!matchRoot || r.UserDataRoot == "" || samePath(r.UserDataRoot, e.UserDataRoot)) {
 			l = r
 			break
 		}
@@ -99,7 +102,18 @@ func (a *App) sourceAt(e *env.Environment, reg *loadout.Registry, t time.Time, p
 func (a *App) logSource(st *LoadoutState, path string, mod time.Time) *RunSource {
 	root := st.Ix.Env.UserDataRoot
 	plansOnly := root != "" && path != "" && env.PathKey(filepath.Dir(path)) == env.PathKey(filepath.Join(root, "Logs"))
-	src := a.sourceAt(st.Ix.Env, st.Reg, mod, plansOnly)
+	ids := a.sharedEnvs(st.Ix.Env)
+	if es, err := a.Store.Envs(); err == nil {
+		for _, e := range es {
+			if e.GameID == st.Ix.Env.GameID && e.ID != st.Ix.Env.ID {
+				ids = append(ids, e.ID)
+			}
+		}
+	}
+	src := a.sourceAtIDs(st.Ix.Env, st.Reg, mod, plansOnly, ids, false)
+	if src.Launch != nil && src.EnvID == st.Ix.Env.ID && src.Launch.UserDataRoot != "" && !samePath(src.Launch.UserDataRoot, root) {
+		return &RunSource{Unknown: true}
+	}
 	// An explicit startup path can contradict a time-matched launch (Steam/external
 	// launches have no record). Do not assign that run to the recorded plan.
 	if root := logGameRoot(path); root != "" && src.EnvID != "" {

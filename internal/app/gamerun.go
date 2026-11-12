@@ -123,14 +123,18 @@ func underDir(p, dir string) bool {
 
 // RunningGame is a game running in any registered environment (09 §1, §4).
 type RunningGame struct {
-	Env  *env.Environment
-	Run  *GameRun
-	What RunWhat
+	Env        *env.Environment
+	Run        *GameRun
+	What       RunWhat
+	UnknownEnv bool
 }
 
 // Describe names what runs for a refusal or a status line: the environment and the list or
 // pack it plays.
 func (g *RunningGame) Describe(loc *time.Location) string {
+	if g.UnknownEnv {
+		return fmt.Sprintf("installation %s running, environment unknown (pid %d)", g.Env.GameRoot, g.Run.PID)
+	}
 	what := g.What.PlanText()
 	if g.What.Pack != "" {
 		what = "pack " + g.What.Pack
@@ -182,7 +186,56 @@ func (a *App) RunningGame() (*RunningGame, error) {
 	probe := a.probe()
 	for _, e := range envs {
 		if r := probe(e.GameRoot); r != nil {
-			return &RunningGame{Env: e, Run: r, What: a.WhatRuns(e, r)}, nil
+			g := &RunningGame{Env: e, Run: r, UnknownEnv: true}
+			var siblings []*env.Environment
+			for _, o := range envs {
+				if o.GameID == e.GameID {
+					siblings = append(siblings, o)
+				}
+			}
+			if r.ArgsKnown {
+				root := r.SaveData
+				if root == "" {
+					root = a.DefaultUserData(e.GameRoot)
+				}
+				for _, o := range siblings {
+					if samePath(root, o.UserDataRoot) {
+						g.Env, g.UnknownEnv = o, false
+						break
+					}
+				}
+			}
+			if g.UnknownEnv {
+				at := r.Started
+				if at.IsZero() {
+					at = a.Now()
+				}
+				ids := []string{}
+				for _, o := range siblings {
+					ids = append(ids, o.ID)
+				}
+				l, err := a.Store.LaunchRecordBefore(ids, at.Add(time.Minute))
+				if err != nil {
+					return nil, err
+				}
+				if l != nil && at.Sub(l.Started) >= -time.Minute && at.Sub(l.Started) < launchSlack &&
+					(!r.ArgsKnown || l.UserDataRoot != "" && samePath(l.UserDataRoot, r.SaveData)) {
+					for _, o := range siblings {
+						if o.ID == l.EnvID {
+							g.Env, g.UnknownEnv = o, false
+							break
+						}
+					}
+				}
+				if len(siblings) == 1 && !r.ArgsKnown {
+					g.UnknownEnv = false
+				}
+			}
+			g.What = a.WhatRuns(g.Env, r)
+			if g.UnknownEnv {
+				g.What.Plan, g.What.Pack = "", ""
+			}
+			return g, nil
 		}
 	}
 	return nil, nil
@@ -251,13 +304,17 @@ func (a *App) WhatRuns(e *env.Environment, r *GameRun) RunWhat {
 		at = a.Now()
 	}
 	if r.ArgsKnown {
-		if r.SaveData == "" || env.PathKey(r.SaveData) == env.PathKey(e.UserDataRoot) {
+		root := r.SaveData
+		if root == "" {
+			root = a.DefaultUserData(e.GameRoot)
+		}
+		if samePath(root, e.UserDataRoot) {
 			return a.withPlan(e, own, at)
 		}
-		if name := a.packOfDir(r.SaveData); name != "" {
+		if name := a.packOfDir(root); name != "" {
 			return RunWhat{Pack: name, UserData: r.SaveData}
 		}
-		return RunWhat{UserData: r.SaveData, Test: a.Home != "" && underDir(env.PathKey(realOrAbs(r.SaveData)), env.PathKey(realOrAbs(filepath.Join(a.Home, "tests"))))}
+		return RunWhat{UserData: root, Test: a.Home != "" && underDir(env.PathKey(realOrAbs(r.SaveData)), env.PathKey(realOrAbs(filepath.Join(a.Home, "tests"))))}
 	}
 	if m, t := a.Store.LaunchBefore(e.ID, at.Add(time.Minute)); strings.HasPrefix(m, "pack:") && at.Sub(t) < launchSlack {
 		name := strings.TrimPrefix(m, "pack:")

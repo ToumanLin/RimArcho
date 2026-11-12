@@ -17,6 +17,7 @@ import (
 func legacyGameSchema(t *testing.T, s *store.Store) {
 	t.Helper()
 	for _, q := range []string{
+		`ALTER TABLE launch DROP COLUMN game_id`, `ALTER TABLE launch DROP COLUMN user_data_root`, `ALTER TABLE launch DROP COLUMN env_name`,
 		`CREATE TABLE environment_legacy(
   id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, game_root TEXT NOT NULL,
   user_data_root TEXT NOT NULL DEFAULT '', game_version TEXT NOT NULL DEFAULT '',
@@ -140,7 +141,11 @@ func storedRows(t *testing.T, s *store.Store) map[string]string {
 	t.Helper()
 	out := map[string]string{}
 	for _, table := range []string{"source", "instance", "lineage", "scan", "identity_question", "analysis", "game_assembly", "game_type", "finding_ignore", "launch", "plan", "workspace", "snapshot", "snapshot_file", "snapshot_list", "lineage_data", "lineage_tag", "user_rule"} {
-		rows, err := s.DB.Query(`SELECT * FROM ` + table + ` ORDER BY 1`)
+		colsSQL := "*"
+		if table == "launch" {
+			colsSQL = "id,environment_id,started_at,method,command,plan_id,fingerprint,version_n"
+		}
+		rows, err := s.DB.Query(`SELECT ` + colsSQL + ` FROM ` + table + ` ORDER BY 1`)
 		if err != nil {
 			t.Fatal(err)
 		}
