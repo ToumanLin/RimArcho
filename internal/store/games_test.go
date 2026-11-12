@@ -17,6 +17,9 @@ import (
 func legacyGameSchema(t *testing.T, s *store.Store) {
 	t.Helper()
 	for _, q := range []string{
+		`CREATE TABLE credit_deployment_legacy(batch_id INTEGER NOT NULL,workshop_id TEXT NOT NULL,environment_id TEXT NOT NULL,plan_id INTEGER NOT NULL,done INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(batch_id,workshop_id,environment_id),FOREIGN KEY(batch_id,workshop_id) REFERENCES credit_item(batch_id,workshop_id))`,
+		`INSERT INTO credit_deployment_legacy SELECT batch_id,workshop_id,environment_id,plan_id,done FROM credit_deployment`,
+		`DROP TABLE credit_deployment`, `ALTER TABLE credit_deployment_legacy RENAME TO credit_deployment`,
 		`ALTER TABLE launch DROP COLUMN game_id`, `ALTER TABLE launch DROP COLUMN user_data_root`, `ALTER TABLE launch DROP COLUMN env_name`,
 		`CREATE TABLE environment_legacy(
   id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, game_root TEXT NOT NULL,

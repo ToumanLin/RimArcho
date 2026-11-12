@@ -161,10 +161,22 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, 
 		a.EnvName = o.Env
 		defer func() { a.EnvName = prevEnv }()
 	}
+	unlock, err := a.lockLaunch()
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
 	if err := a.checkLaunchArgs(); err != nil {
 		return nil, err
 	}
 	if err := a.checkNoGame(); err != nil {
+		return nil, err
+	}
+	effective, err := a.Env()
+	if err != nil {
+		return nil, err
+	}
+	if err := a.recoverInstallationTestLinks(filepath.Join(effective.GameRoot, "Mods"), false); err != nil {
 		return nil, err
 	}
 	st, err := a.Loadout()

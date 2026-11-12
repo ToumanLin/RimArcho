@@ -239,51 +239,8 @@ func (s *Store) DeleteEnv(envID string) error {
 			}
 			return nil
 		}
-		if err := keepLists(tx, gameID); err != nil {
+		if err := deleteInstallation(tx, gameID); err != nil {
 			return err
-		}
-		inst := `(SELECT id FROM instance WHERE game_id=?)`
-		for _, q := range []string{
-			`DELETE FROM snapshot_file WHERE snapshot_id IN (SELECT id FROM snapshot WHERE instance_id IN ` + inst + `)`,
-			`DELETE FROM snapshot_list WHERE snapshot_id IN (SELECT id FROM snapshot WHERE instance_id IN ` + inst + `)`,
-			`DELETE FROM content_state WHERE instance_id IN ` + inst,
-			`DELETE FROM instance_note WHERE instance_id IN ` + inst,
-			`DELETE FROM patch_fact WHERE analysis_id IN (SELECT id FROM analysis WHERE game_id=?)`,
-			`DELETE FROM finding WHERE analysis_id IN (SELECT id FROM analysis WHERE game_id=?)`,
-			`DELETE FROM analysis WHERE game_id=?`,
-			`DELETE FROM snapshot WHERE instance_id IN ` + inst,
-			`DELETE FROM instance_alias WHERE instance_id IN ` + inst,
-			`DELETE FROM instance_alias WHERE source_id IN (SELECT id FROM source WHERE game_id=?)`,
-			`DELETE FROM change_event WHERE instance_id IN ` + inst,
-			`DELETE FROM identity_question WHERE game_id=? OR instance_id IN ` + inst + ` OR candidate_instance_id IN ` + inst,
-			`DELETE FROM instance WHERE game_id=?`,
-			`DELETE FROM scan WHERE game_id=? AND id NOT IN (SELECT scan_id FROM change_event)`,
-			`UPDATE scan SET game_id='' WHERE game_id=?`,
-			`DELETE FROM source WHERE game_id=?`,
-			// The ModsConfig.xml write record belongs to the user data folder, which other
-			// environments may share; it stays.
-			// Lists are shared by every game and stay (07 §1.1); keepLists already named
-			// this game's own mods in them by packageId.
-			`DELETE FROM game_assembly WHERE game_id=?`, // and its game_type rows
-			`DELETE FROM game WHERE id=?`,
-		} {
-			args := make([]any, strings.Count(q, "?"))
-			for i := range args {
-				args[i] = gameID
-			}
-			if _, err := tx.Exec(q, args...); err != nil {
-				return err
-			}
-		}
-		for _, q := range []string{
-			`DELETE FROM lineage WHERE id NOT IN (SELECT lineage_id FROM instance)`,
-			`DELETE FROM lineage_data WHERE lineage_id NOT IN (SELECT id FROM lineage)`,
-			`DELETE FROM lineage_tag WHERE lineage_id NOT IN (SELECT id FROM lineage)`,
-			`DELETE FROM user_rule WHERE (a_lineage<>'' AND a_lineage NOT IN (SELECT id FROM lineage)) OR (b_lineage<>'' AND b_lineage NOT IN (SELECT id FROM lineage))`,
-		} {
-			if _, err := tx.Exec(q); err != nil {
-				return err
-			}
 		}
 		_, err = tx.Exec(`DELETE FROM meta WHERE key=? AND value=?`, metaCurrentEnv, envID)
 		if err != nil {
@@ -310,4 +267,54 @@ func (s *Store) LiveCounts() (map[string]int, error) {
 		out[id] = n
 	}
 	return out, rows.Err()
+}
+
+func deleteInstallation(tx *sql.Tx, gameID string) error {
+	if err := keepLists(tx, gameID); err != nil {
+		return err
+	}
+	inst := `(SELECT id FROM instance WHERE game_id=?)`
+	for _, q := range []string{
+		`DELETE FROM snapshot_file WHERE snapshot_id IN (SELECT id FROM snapshot WHERE instance_id IN ` + inst + `)`,
+		`DELETE FROM snapshot_list WHERE snapshot_id IN (SELECT id FROM snapshot WHERE instance_id IN ` + inst + `)`,
+		`DELETE FROM content_state WHERE instance_id IN ` + inst,
+		`DELETE FROM instance_note WHERE instance_id IN ` + inst,
+		`DELETE FROM patch_fact WHERE analysis_id IN (SELECT id FROM analysis WHERE game_id=?)`,
+		`DELETE FROM finding WHERE analysis_id IN (SELECT id FROM analysis WHERE game_id=?)`,
+		`DELETE FROM analysis WHERE game_id=?`,
+		`DELETE FROM snapshot WHERE instance_id IN ` + inst,
+		`DELETE FROM instance_alias WHERE instance_id IN ` + inst,
+		`DELETE FROM instance_alias WHERE source_id IN (SELECT id FROM source WHERE game_id=?)`,
+		`DELETE FROM change_event WHERE instance_id IN ` + inst,
+		`DELETE FROM identity_question WHERE game_id=? OR instance_id IN ` + inst + ` OR candidate_instance_id IN ` + inst,
+		`DELETE FROM instance WHERE game_id=?`,
+		`DELETE FROM scan WHERE game_id=? AND id NOT IN (SELECT scan_id FROM change_event)`,
+		`UPDATE scan SET game_id='' WHERE game_id=?`,
+		`DELETE FROM source WHERE game_id=?`,
+		// The ModsConfig.xml write record belongs to the user data folder, which other
+		// environments may share; it stays.
+		// Lists are shared by every game and stay (07 §1.1); keepLists already named
+		// this game's own mods in them by packageId.
+		`DELETE FROM game_assembly WHERE game_id=?`, // and its game_type rows
+		`DELETE FROM game WHERE id=?`,
+	} {
+		args := make([]any, strings.Count(q, "?"))
+		for i := range args {
+			args[i] = gameID
+		}
+		if _, err := tx.Exec(q, args...); err != nil {
+			return err
+		}
+	}
+	for _, q := range []string{
+		`DELETE FROM lineage WHERE id NOT IN (SELECT lineage_id FROM instance)`,
+		`DELETE FROM lineage_data WHERE lineage_id NOT IN (SELECT id FROM lineage)`,
+		`DELETE FROM lineage_tag WHERE lineage_id NOT IN (SELECT id FROM lineage)`,
+		`DELETE FROM user_rule WHERE (a_lineage<>'' AND a_lineage NOT IN (SELECT id FROM lineage)) OR (b_lineage<>'' AND b_lineage NOT IN (SELECT id FROM lineage))`,
+	} {
+		if _, err := tx.Exec(q); err != nil {
+			return err
+		}
+	}
+	return nil
 }

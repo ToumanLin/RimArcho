@@ -43,7 +43,7 @@ func TestEnvModelSharedWorkshop(t *testing.T) {
 	e.MustRun("enable", "#"+ws[:6])
 
 	g2 := secondGame(e, "Game15")
-	if out, code := e.Run("env", "add", "again", "--game", e.Game); code == 0 || !strings.Contains(out, "one environment per game folder") {
+	if out, code := e.Run("env", "add", "again", "--game", e.Game); code == 0 || !strings.Contains(out, "--saves own") {
 		t.Fatalf("a second environment for one game folder: exit %d\n%s", code, out)
 	}
 	out := e.MustRun("env", "add", "old", "--game", g2, "--saves", "own")

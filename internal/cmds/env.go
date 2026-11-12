@@ -26,10 +26,10 @@ var launchArgsFlag = Flag{Name: "launch-args", Value: "<args>", Help: "extra gam
 var removeSourceFlag = Flag{Name: "remove-source", Value: "<src:label>", Multi: true, Help: "= archo folder remove <src:label>"}
 
 func init() {
-	register(&Command{Name: "env list", Summary: "list environments (one per game folder) and the shared mod folders", MaxArgs: 0, Run: envList})
+	register(&Command{Name: "env list", Summary: "list environments (grouped by installation) and the shared mod folders", MaxArgs: 0, Run: envList})
 	register(&Command{Name: "env detect", Summary: "detect game, user data and workshop paths (suggestion only)", MaxArgs: 0, Run: envDetect})
-	register(&Command{Name: "env add", Args: "<name>", Summary: "add an environment: one game folder", MinArgs: 1, MaxArgs: 1,
-		Flags: append([]Flag{{Name: "detected", Help: "use the paths env detect finds"}}, append(envFlags, launchArgsFlag)...), Run: envAdd})
+	register(&Command{Name: "env add", Args: "<name>", Summary: "add an environment with separate saves and settings", MinArgs: 1, MaxArgs: 1,
+		Flags: append([]Flag{{Name: "detected", Help: "use the paths env detect finds"}, {Name: "like", Value: "<environment>", Help: "copy its installation, launch, settings and current workspace into an independent plan (defaults to own saves)"}}, append(envFlags, launchArgsFlag)...), Run: envAdd})
 	register(&Command{Name: "env set", Args: "<name>", Summary: "change an environment's game folder, saves or launch (re-binds a moved game)", MinArgs: 1, MaxArgs: 1,
 		Flags: append(append([]Flag(nil), envFlags...), removeSourceFlag, launchArgsFlag), Run: envSet})
 	register(&Command{Name: "env remove", Args: "<name>", Summary: "forget an environment (RimArcho data only; no game files)", MinArgs: 1, MaxArgs: 1,
@@ -70,30 +70,40 @@ func envList(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	cur, _ := c.App.Store.CurrentEnv()
 	d, root := render.New(fmt.Sprintf("environments: %d", len(envs)))
+	groups := map[string]*render.Node{}
 	for _, e := range envs {
-		line := envRef(e) + "  " + versionText(e.GameVersion)
+		group := groups[e.GameID]
+		if group == nil {
+			g, err := c.App.Store.GameByID(e.GameID)
+			if err != nil {
+				return nil, err
+			}
+			group = root.Add(g.Name + "  " + versionText(e.GameVersion))
+			groups[e.GameID] = group
+			group.KV("game", e.GameRoot)
+			srcs, err := c.App.Store.Sources(e.GameID)
+			if err != nil {
+				return nil, err
+			}
+			var own []*source.Source
+			for _, s := range srcs {
+				if s.EnvID == e.GameID {
+					own = append(own, s)
+				}
+			}
+			addSourceLines(group.Section("sources"), own)
+		}
+		line := envRef(e)
 		if cur != nil && cur.ID == e.ID {
 			line += "  [current]"
 		}
-		n := root.Add(line)
-		n.KV("game", e.GameRoot)
+		n := group.Add(line)
 		n.KV("saves", c.App.Saves(e))
 		n.KV("user-data", e.UserDataRoot)
 		n.KV("launch", e.Launch)
 		if e.UserDataRoot != "" {
 			n.KV("player-log", env.PlayerLog(e.UserDataRoot, e.GameVersion))
 		}
-		srcs, err := c.App.Store.Sources(e.GameID)
-		if err != nil {
-			return nil, err
-		}
-		var own []*source.Source
-		for _, s := range srcs {
-			if s.EnvID == e.GameID {
-				own = append(own, s)
-			}
-		}
-		addSourceLines(n.Section("sources"), own)
 	}
 	if fs, err := c.App.Folders(); err != nil {
 		return nil, err
@@ -154,7 +164,7 @@ func envDetect(c *Ctx, a *Args) (*render.Doc, error) {
 }
 
 func specFromArgs(a *Args) app.EnvSpec {
-	return app.EnvSpec{GameRoot: a.Str("game"), UserDataRoot: a.Str("user-data"), Saves: a.Str("saves"), WorkshopRoot: a.Str("workshop"),
+	return app.EnvSpec{Like: a.Str("like"), GameRoot: a.Str("game"), UserDataRoot: a.Str("user-data"), Saves: a.Str("saves"), WorkshopRoot: a.Str("workshop"),
 		Launch: a.Str("launch"), SteamCMD: a.List("steamcmd"), Extra: a.List("extra"), RemoveSources: a.List("remove-source")}
 }
 
@@ -228,7 +238,11 @@ func envAdd(c *Ctx, a *Args) (*render.Doc, error) {
 			return nil, err
 		}
 	}
-	return envDoc(c, e, "added", changes), nil
+	d := envDoc(c, e, "added", changes)
+	if spec.Like != "" && c.App.CloneArgsOmitted(spec.Like) {
+		d.Nodes[0].Add("left -savedatafolder out of copied launch arguments; use --user-data to choose the data folder")
+	}
+	return d, nil
 }
 
 func envSet(c *Ctx, a *Args) (*render.Doc, error) {
@@ -244,7 +258,21 @@ func envSet(c *Ctx, a *Args) (*render.Doc, error) {
 			return nil, err
 		}
 	}
-	return envDoc(c, e, "updated", changes), nil
+	d := envDoc(c, e, "updated", changes)
+	if a.Str("game") != "" {
+		es, err := c.App.Store.Envs()
+		if err != nil {
+			return nil, err
+		}
+		names := []string{}
+		for _, o := range es {
+			if o.GameID == e.GameID {
+				names = append(names, envRef(o))
+			}
+		}
+		d.Nodes[0].KV("installation environments", strings.Join(names, ", "))
+	}
+	return d, nil
 }
 
 func envDoc(c *Ctx, e *env.Environment, verb string, changes []app.SourceChange) *render.Doc {

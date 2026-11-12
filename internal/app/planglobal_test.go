@@ -38,8 +38,8 @@ func TestPlansSharedAcrossGames(t *testing.T) {
 	if !slices.Contains(names, "default") || !slices.Contains(names, "raid") || !slices.Contains(names, "chill") {
 		t.Fatalf("lists in the second game: %v", names)
 	}
-	if len(ps) != 3 {
-		t.Fatalf("a game without ModsConfig.xml takes a list, it does not make one: %v", names)
+	if len(ps) != 4 {
+		t.Fatalf("own saves start an independent list: %v", names)
 	}
 
 	e.MustRun("plan", "use", "raid")
@@ -79,7 +79,7 @@ func TestPlansSharedAcrossGames(t *testing.T) {
 	// Removing the first game keeps every list; its Core becomes a packageId the next
 	// game resolves.
 	e.MustRun("env", "remove", "main", "--yes")
-	if ps, _ := e.App.Store.Plans(); len(ps) != 3 {
+	if ps, _ := e.App.Store.Plans(); len(ps) != 4 {
 		t.Fatalf("lists after removing main: %d", len(ps))
 	}
 	e.MustRun("plan", "use", "default")

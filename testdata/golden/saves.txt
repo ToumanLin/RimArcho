@@ -308,8 +308,8 @@ error: Tundra is a save of pack P1; a pack's list does not change (loadout impor
 
 $ archo saves list
 saves: 1 save in 1 colony (env:old)
-  Outpost  1 save, latest 2026-10-01 06:00  [matches no list]
-    sv:<Outpost.rws>  Outpost  2026-10-01 06:00  meta only  no list  loads, but content will be lost
+  Outpost  1 save, latest 2026-10-01 06:00
+    sv:<Outpost.rws>  Outpost  2026-10-01 06:00  meta only  plan:old (same-mods)  loads, but content will be lost
   note: 1 save is meta only: only the head is read, so no in-game day yet; archo saves index reads them in full
 next:
   archo saves show sv:<Outpost.rws>
@@ -318,21 +318,15 @@ $ archo saves show Outpost
 sv:<Outpost.rws> Outpost  [loads, but content will be lost]
   colony: Outpost (1 save)
   game: 1.6.4633 rev1261, env:old runs 1.5.4409 rev1118
-  list: none (matches no list or pack)
+  list: plan:old (same Mods as one of its versions)
   file: $ROOT/ArchoHome/userdata/old/Saves/Outpost.rws
   saved: 2026-10-01 06:00, 385 B
   read: in full
   play: day 1 (2nd of Aprimay, 5500)
     colonists: unknown: no player faction found in the save
-  can it load: 2 items
+  can it load: 1 item
     warning game-version  1.6.4633 rev1261 → 1.5.4409 rev1118
       consequence: the game converts it on load
-    info no-list
-      consequence: nothing to compare its Mods with
-      fix: Make a list from this save (archo loadout import $ROOT/ArchoHome/userdata/old/Saves/Outpost.rws --new Outpost)
-  quick fix: Make a list from this save (archo loadout import $ROOT/ArchoHome/userdata/old/Saves/Outpost.rws --new Outpost)
-  mods: 1 Mod in the save
+  mods: 1 Mod in the save, the same as the list
     (the whole list: archo saves show sv:<Outpost.rws> --mods)
-next:
-  archo loadout import $ROOT/ArchoHome/userdata/old/Saves/Outpost.rws --new Outpost
 

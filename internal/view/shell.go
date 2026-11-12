@@ -15,6 +15,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/finding"
 	"github.com/ToumanLin/RimArcho/internal/modchanges"
 	"github.com/ToumanLin/RimArcho/internal/perftrace"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // The window's shell (16 §2.1–§2.3, §2.15): the sidebar, the home page and the first-run
@@ -540,7 +541,9 @@ func FindGames(a *app.App) []GameFound {
 	used := map[string]string{}
 	taken := map[string]bool{}
 	for _, e := range envs {
-		used[env.PathKey(e.GameRoot)] = e.Name
+		if store.UserDataKey(e.UserDataRoot) == store.UserDataKey(a.DefaultUserData(e.GameRoot)) {
+			used[env.PathKey(e.GameRoot)] = e.Name
+		}
 		taken[e.Name] = true
 	}
 	var out []GameFound
@@ -574,7 +577,7 @@ func GameAt(a *app.App, path string, pending ...string) (*GameFound, error) {
 	}
 	for _, e := range envs {
 		taken[e.Name] = true
-		if env.PathKey(e.GameRoot) == env.PathKey(path) {
+		if env.PathKey(e.GameRoot) == env.PathKey(path) && store.UserDataKey(e.UserDataRoot) == store.UserDataKey(g.UserData) {
 			g.Env = e.Name
 		}
 	}

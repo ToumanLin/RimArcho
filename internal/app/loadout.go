@@ -384,6 +384,9 @@ func (a *App) syncLocked(st *LoadoutState, now time.Time) error {
 		}
 	}
 	if plan == nil {
+		if st.File == nil && a.Saves(e) == SavesOwn {
+			fileList = emptyEnvironmentList(st.Ix)
+		}
 		// First use (07 §1.4): ModsConfig.xml becomes a new list, current in this game.
 		name := a.firstPlanName(e)
 		p, err := a.Store.CreatePlan(e.ID, name, now)
@@ -457,6 +460,9 @@ func (a *App) adoptPlan(st *LoadoutState, mcs *store.ModsConfigState, h []byte) 
 			return nil, err
 		}
 	default:
+		if a.Saves(e) == SavesOwn {
+			return nil, nil
+		}
 		ps, err := a.Store.Plans()
 		if err != nil {
 			return nil, err
@@ -1092,6 +1098,9 @@ func (a *App) SaveWith(dryRun, move bool) (*SaveResult, error) {
 // move: plain Mods/ folders in the way move into the lock library first (09 §3).
 func (a *App) writeGame(st *LoadoutState, dryRun, launch, move bool, creditFrom ...*store.Mod) (*SaveResult, error) {
 	e := st.Ix.Env
+	if err := a.recoverInstallationTestLinks(modsDir(st.Ix), dryRun); err != nil {
+		return nil, err
+	}
 	if st.FilePath == "" {
 		return nil, errors.New("the environment has no user data directory; set one with archo env set --user-data <dir>")
 	}

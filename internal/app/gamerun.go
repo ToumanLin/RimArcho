@@ -316,9 +316,18 @@ func (a *App) WhatRuns(e *env.Environment, r *GameRun) RunWhat {
 		}
 		return RunWhat{UserData: root, Test: a.Home != "" && underDir(env.PathKey(realOrAbs(r.SaveData)), env.PathKey(realOrAbs(filepath.Join(a.Home, "tests"))))}
 	}
-	if m, t := a.Store.LaunchBefore(e.ID, at.Add(time.Minute)); strings.HasPrefix(m, "pack:") && at.Sub(t) < launchSlack {
-		name := strings.TrimPrefix(m, "pack:")
-		return RunWhat{Pack: name, UserData: filepath.Join(a.packPath(name), "userdata"), Guess: true}
+	if l, err := a.Store.LaunchRecordBefore([]string{e.ID}, at.Add(time.Minute)); err == nil && l != nil && at.Sub(l.Started) < launchSlack {
+		if l.UserDataRoot != "" {
+			own.UserData = l.UserDataRoot
+			own.Guess = true
+		}
+		if name := l.Pack(); name != "" {
+			root := l.UserDataRoot
+			if root == "" {
+				root = filepath.Join(a.packPath(name), "userdata")
+			}
+			return RunWhat{Pack: name, UserData: root, Guess: true}
+		}
 	}
 	return a.withPlan(e, own, at)
 }

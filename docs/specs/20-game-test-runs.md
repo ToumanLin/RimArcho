@@ -18,6 +18,8 @@ Both read the probe line contract (§3), so a probe built with the skill runs un
 
 ## 2. Test runs
 
+Test userdata and reports remain per environment. Before modifying physical `Mods/`, test runs and player plan/pack writes inspect journals of all test environments (including removed ones), matching the canonical Mods path. Interrupted sibling journals are recovered under the launch lock before continuing; previews refuse pending recovery without writing.
+
 A test run (`internal/gametest`, `App.TestRun`, `archo test run`, MCP `test_run`) launches a plan in an environment's game, checks whether it reaches the main menu, a test map or a loaded save (optionally after playing N ticks) and which errors occur, then closes the game and reports. Research and measurements: `docs/research/2026-10-24_game-test-runs-rimdevtools.md`; why saves and ticks: `D:\RimArcho-test\mcp-eval\analysis\h8.md` and `h7.md` (the MCP eval, `docs/research/mcp-eval-design.md`). A test run does not touch the player's saves, configuration or logs; a save run reads one save and copies it. Its only writes to the game directory are the temporary links below and moving a `Mods/` entry aside into `_ArchoTestHidden/` next to `Mods/` ("Game-invisible Mods"), both undone when the run ends.
 
 Before preparing isolated data or starting a process, a test run performs the read-only link inspection from 09 §3. If the tested game's links are broken or the inspection fails, it returns a structured report with `status: links-blocked`, paths, targets, reasons and evidence. It then creates no test data, changes no Mods and does not launch the game. The low-level `internal/gametest.Run` also performs a read-only precheck.

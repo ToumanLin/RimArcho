@@ -1,9 +1,9 @@
 $ archo help
 archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
   commands:
-    env list                                  list environments (one per game folder) and the shared mod folders
+    env list                                  list environments (grouped by installation) and the shared mod folders
     env detect                                detect game, user data and workshop paths (suggestion only)
-    env add <name>                            add an environment: one game folder
+    env add <name>                            add an environment with separate saves and settings
     env set <name>                            change an environment's game folder, saves or launch (re-binds a moved game)
     env use <name>                            select the current environment
     env rebind <src:label> yes|no             answer a pending source re-binding
@@ -195,14 +195,15 @@ next:
 
 $ archo env list
 environments: 1
-  env:main  1.6.4633 rev1261  [current]
+  main  1.6.4633 rev1261
     game: $ROOT/Steam/steamapps/common/RimWorld
-    saves: shared
-    user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
-    launch: steam
     sources:
       src:official  $ROOT/Steam/steamapps/common/RimWorld/Data
       src:local     $ROOT/Steam/steamapps/common/RimWorld/Mods
+    env:main  [current]
+      saves: shared
+      user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
+      launch: steam
   mod folders (every environment):
     src:workshop  $ROOT/Steam/steamapps/workshop/content/294100
 

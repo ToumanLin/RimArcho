@@ -111,6 +111,9 @@ func (a *App) logSource(st *LoadoutState, path string, mod time.Time) *RunSource
 		}
 	}
 	src := a.sourceAtIDs(st.Ix.Env, st.Reg, mod, plansOnly, ids, false)
+	if len(ids) > len(a.sharedEnvs(st.Ix.Env)) && src.Launch == nil {
+		return &RunSource{Unknown: true}
+	}
 	if src.Launch != nil && src.EnvID == st.Ix.Env.ID && src.Launch.UserDataRoot != "" && !samePath(src.Launch.UserDataRoot, root) {
 		return &RunSource{Unknown: true}
 	}

@@ -408,7 +408,7 @@ func TestEnvParameter(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
-	e.MustRun("env", "add", "other", "--game", e.OtherGame("Other", "1.6.4633 rev1261"), "--user-data", e.UserData)
+	e.MustRun("env", "add", "other", "--game", e.Game, "--saves", "own")
 	e.MustRun("env", "use", "main")
 	cs := connect(t, e)
 	if out, _ := call(t, cs, "status", nil); !strings.HasPrefix(out, "env:main") {

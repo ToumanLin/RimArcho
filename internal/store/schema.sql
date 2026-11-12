@@ -157,7 +157,8 @@ CREATE TABLE credit_session(
 CREATE TABLE credit_deployment(
  batch_id INTEGER NOT NULL, workshop_id TEXT NOT NULL, environment_id TEXT NOT NULL,
  plan_id INTEGER NOT NULL, done INTEGER NOT NULL DEFAULT 0,
- PRIMARY KEY(batch_id, workshop_id, environment_id),
+ game_id TEXT NOT NULL, user_data_root TEXT NOT NULL, root_key TEXT NOT NULL, env_name TEXT NOT NULL,
+ PRIMARY KEY(batch_id, workshop_id, root_key),
  FOREIGN KEY(batch_id, workshop_id) REFERENCES credit_item(batch_id, workshop_id));
 CREATE TABLE version_mute(
   package_id TEXT NOT NULL, game_mm TEXT NOT NULL,

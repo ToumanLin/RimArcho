@@ -12,6 +12,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/deps"
+	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
@@ -1151,5 +1152,54 @@ func TestCreditManagedLinkOutsideEnvironmentRetained(t *testing.T) {
 	}
 	if !source.IsLink(link) {
 		t.Fatal("managed link changed")
+	}
+}
+
+func TestCreditSiblingRootsSurviveEditAndRemoval(t *testing.T) {
+	e, batch, items := creditEnv(t, "8100")
+	e.App.TrashFunc = func(path string) error { return creditRecycle(e, path) }
+	creditStart(t, e, batch, items)
+	creditClient(t, e, items)
+	e.MustRun("enable", items[0].InstanceID)
+	e.MustRun("save")
+	main, _ := e.App.Env()
+	e.MustRun("env", "add", "sibling", "--game", e.Game, "--saves", "own")
+	e.MustRun("env", "use", "sibling")
+	e.MustRun("enable", items[0].InstanceID)
+	e.MustRun("save")
+	sibling, _ := e.App.Env()
+	e.MustRun("scan")
+	target := refID(t, e, "Credit 8100", source.Workshop)
+	for _, en := range []*env.Environment{main, sibling} {
+		if err := e.App.Store.AddCreditDeployment(items[0], en.ID, e.App.Store.CurrentPlanID(en.ID)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	it := items[0]
+	it.State, it.TargetID = "switching", target
+	if err := e.App.Store.SaveCreditItem(it); err != nil {
+		t.Fatal(err)
+	}
+	oldRoot := sibling.UserDataRoot
+	e.MustRun("env", "set", "sibling", "--user-data", filepath.Join(e.Root, "new-sibling-data"))
+	e.MustRun("env", "remove", "main", "--yes")
+	if err := e.App.CreditStep(nil); err != nil {
+		t.Fatal(err)
+	}
+	it = creditItem(t, e, batch)
+	if it.State != "done" {
+		t.Fatalf("handoff: %+v", it)
+	}
+	for _, root := range []string{main.UserDataRoot, oldRoot} {
+		b, err := os.ReadFile(filepath.Join(root, "Config", "ModsConfig.xml"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(b), "credit.mod8100") || strings.Contains(string(b), "credit.mod8100_steam") {
+			t.Fatalf("captured root not rewritten: %s", b)
+		}
+	}
+	if ds, err := e.App.Store.CreditDeployments(it); err != nil || len(ds) != 0 {
+		t.Fatalf("pending: %+v %v", ds, err)
 	}
 }

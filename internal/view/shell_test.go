@@ -272,3 +272,21 @@ func TestPickFeatured(t *testing.T) {
 		t.Fatalf("lapsed: %d", h.Featured)
 	}
 }
+
+func TestGameAtOwnSavesDoesNotTakeDefaultPair(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	e.MustRun("env", "add", "own", "--game", e.Game, "--saves", "own")
+	g, err := view.GameAt(e.App, e.Game)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.Env != "" || g.Name == "" {
+		t.Fatalf("default pair unavailable: %+v", g)
+	}
+	e.MustRun("env", "add", "default", "--game", e.Game, "--user-data", g.UserData)
+	g, err = view.GameAt(e.App, e.Game)
+	if err != nil || g.Env != "default" {
+		t.Fatalf("default pair not recognized: %+v %v", g, err)
+	}
+}

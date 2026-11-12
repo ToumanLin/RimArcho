@@ -54,7 +54,7 @@ The GUI gathers these actions on all lists (16 §2.17). Commands: `archo plan li
 
 - When an environment is read and has no current plan (`environment.current_plan = 0`):
   - If ModsConfig.xml still matches a plan's last write (its hash equals the write record), make that plan current; create none.
-  - If ModsConfig.xml is absent (for example, a new game with its own saves) and plans exist, make the most recently edited plan current; create none.
+  - If ModsConfig.xml is absent for own saves, create a separate plan with Core and installed DLC in release order. Other environments without the file may adopt the most recently edited global plan.
   - Otherwise read ModsConfig.xml and create a plan: v1 has source `import` and note `ModsConfig.xml` (absent file: an empty list with note `no ModsConfig.xml`). It is named `default`; if that is taken, the environment's name, then numbered (`1.6 2`). The first-run guide also offers "move over from RimSort or RimCrow" and "open a pack or a Steam collection" (16 §2.15).
 
 ### 1.5 Archo Monitor added by default
@@ -89,6 +89,8 @@ Each plan records **allowed game versions** (major.minor, such as 1.5, 1.6, 1.7)
 - **Warning counts**: `PlanVersions.Missing` and the version notices in all lists leave out ignored version warnings and list them separately as `Muted` (05 §4.2). If all are ignored, say "no version warnings", never "every Mod supports it". `Common`, defaults, allowed versions and player selections still use the actual declarations: ignoring a warning does not count as support.
 
 ### 1.7 Plans shared across all games
+
+Sibling environments share installation inventory, not current-plan selection. `env add --like` creates an independent plan from the source workspace under 03 §6.2; global plans can still be shared explicitly.
 
 A plan is only "what is enabled and in what order", independent of game directories, and allowed game versions (§1.6) say which versions it is meant for. So plans do not belong to environments.
 

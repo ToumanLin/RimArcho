@@ -155,16 +155,24 @@ func (s *Store) FinishCreditBatches() error {
 }
 
 type CreditDeployment struct {
-	EnvID  string
-	PlanID int64
+	EnvID                                  string
+	PlanID                                 int64
+	GameID, UserDataRoot, RootKey, EnvName string
 }
 
 func (s *Store) AddCreditDeployment(i CreditItem, envID string, planID int64) error {
-	_, err := s.DB.Exec(`INSERT OR IGNORE INTO credit_deployment(batch_id,workshop_id,environment_id,plan_id) VALUES(?,?,?,?)`, i.BatchID, i.WorkshopID, envID, planID)
+	e, err := s.EnvByID(envID)
+	if err != nil {
+		return err
+	}
+	if e == nil {
+		return fmt.Errorf("deployment environment %s not found", envID)
+	}
+	_, err = s.DB.Exec(`INSERT OR IGNORE INTO credit_deployment(batch_id,workshop_id,environment_id,plan_id,game_id,user_data_root,root_key,env_name) VALUES(?,?,?,?,?,?,?,?)`, i.BatchID, i.WorkshopID, envID, planID, e.GameID, e.UserDataRoot, UserDataKey(directoryCanonical(e.UserDataRoot)), e.Name)
 	return err
 }
 func (s *Store) CreditDeployments(i CreditItem) ([]CreditDeployment, error) {
-	rows, err := s.DB.Query(`SELECT environment_id,plan_id FROM credit_deployment WHERE batch_id=? AND workshop_id=? AND done=0 ORDER BY environment_id`, i.BatchID, i.WorkshopID)
+	rows, err := s.DB.Query(`SELECT environment_id,plan_id,game_id,user_data_root,root_key,env_name FROM credit_deployment WHERE batch_id=? AND workshop_id=? AND done=0 ORDER BY environment_id`, i.BatchID, i.WorkshopID)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +180,7 @@ func (s *Store) CreditDeployments(i CreditItem) ([]CreditDeployment, error) {
 	var out []CreditDeployment
 	for rows.Next() {
 		var d CreditDeployment
-		if err := rows.Scan(&d.EnvID, &d.PlanID); err != nil {
+		if err := rows.Scan(&d.EnvID, &d.PlanID, &d.GameID, &d.UserDataRoot, &d.RootKey, &d.EnvName); err != nil {
 			return nil, err
 		}
 		out = append(out, d)
@@ -181,5 +189,54 @@ func (s *Store) CreditDeployments(i CreditItem) ([]CreditDeployment, error) {
 }
 func (s *Store) FinishCreditDeployment(i CreditItem, envID string) error {
 	_, err := s.DB.Exec(`UPDATE credit_deployment SET done=1 WHERE batch_id=? AND workshop_id=? AND environment_id=?`, i.BatchID, i.WorkshopID, envID)
+	return err
+}
+
+func (s *Store) FinishCreditRoot(i CreditItem, key string) error {
+	_, err := s.DB.Exec(`UPDATE credit_deployment SET done=1 WHERE batch_id=? AND workshop_id=? AND root_key=?`, i.BatchID, i.WorkshopID, key)
+	return err
+}
+
+func upgradeCreditRoots(tx *sql.Tx, report func(done, total int64)) error {
+	rows, err := tx.Query(`SELECT d.batch_id,d.workshop_id,d.environment_id,d.plan_id,d.done,coalesce(e.game_id,''),coalesce(e.user_data_root,''),coalesce(e.name,'') FROM credit_deployment d LEFT JOIN environment e ON e.id=d.environment_id`)
+	if err != nil {
+		return err
+	}
+	type deployment struct {
+		batch, plan                     int64
+		workshop, env, game, root, name string
+		done                            int
+	}
+	var ds []deployment
+	for rows.Next() {
+		var d deployment
+		if err := rows.Scan(&d.batch, &d.workshop, &d.env, &d.plan, &d.done, &d.game, &d.root, &d.name); err != nil {
+			rows.Close()
+			return err
+		}
+		ds = append(ds, d)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`CREATE TABLE credit_deployment_new(
+ batch_id INTEGER NOT NULL, workshop_id TEXT NOT NULL, environment_id TEXT NOT NULL,
+ plan_id INTEGER NOT NULL, done INTEGER NOT NULL DEFAULT 0,
+ game_id TEXT NOT NULL, user_data_root TEXT NOT NULL, root_key TEXT NOT NULL, env_name TEXT NOT NULL,
+ PRIMARY KEY(batch_id,workshop_id,root_key), FOREIGN KEY(batch_id,workshop_id) REFERENCES credit_item(batch_id,workshop_id));`); err != nil {
+		return err
+	}
+	for _, d := range ds {
+		key := UserDataKey(directoryCanonical(d.root))
+		if d.root == "" {
+			key = "unresolved:" + d.env
+		}
+		if _, err := tx.Exec(`INSERT INTO credit_deployment_new VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(batch_id,workshop_id,root_key) DO UPDATE SET done=min(done,excluded.done)`, d.batch, d.workshop, d.env, d.plan, d.done, d.game, d.root, key, d.name); err != nil {
+			return err
+		}
+	}
+	_, err = tx.Exec(`DROP TABLE credit_deployment; ALTER TABLE credit_deployment_new RENAME TO credit_deployment;`)
 	return err
 }

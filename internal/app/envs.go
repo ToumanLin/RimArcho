@@ -14,8 +14,8 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// An environment is one game folder (03 §2): its Data/ and Mods/, version, launch, saves and
-// plans. The mod folders every game shares (Workshop, SteamCMD, extra, monitor, lock
+// An environment selects an installation and user data root (03 §6). Installation-owned
+// Data/ and Mods/ inventory is shared by its siblings. The mod folders every game shares (Workshop, SteamCMD, extra, monitor, lock
 // library) are managed apart, with FolderAdd / FolderRemove (folders.go).
 
 // Saves values (03 §2 item 5).
@@ -28,6 +28,7 @@ const (
 // EnvSpec is what the player passes to `env add` / `env set`. Empty fields mean "keep" (set)
 // or "derive" (add).
 type EnvSpec struct {
+	Like         string
 	GameRoot     string
 	UserDataRoot string
 	Saves        string // shared | own ("" = keep, or shared when adding without --user-data)
@@ -180,16 +181,21 @@ func nextLabel(existing []*source.Source, kind source.Kind) string {
 
 // ValidEnvName checks an environment name.
 func ValidEnvName(name string) error {
-	if name == "" || strings.ContainsAny(name, " \t:#/\\") {
+	if name == "" || name == "." || name == ".." || strings.ContainsAny(name, " \t:#/\\") {
 		return fmt.Errorf("environment name %q must be non-empty without spaces, ':', '#' or slashes", name)
 	}
 	return nil
 }
 
-// EnvAdd creates an environment for one game folder: its Data/ and Mods/ sources. The
+// EnvAdd reuses an installation or creates its Data/ and Mods/ sources. The
 // Workshop folder of the Steam library holding the game becomes a shared folder when there
 // is none yet. The first environment becomes current.
 func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChange, error) {
+	unlock, err := a.lockLaunch()
+	if err != nil {
+		return nil, nil, err
+	}
+	defer unlock()
 	if err := ValidEnvName(name); err != nil {
 		return nil, nil, err
 	}
@@ -197,6 +203,28 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 		return nil, nil, err
 	} else if e != nil {
 		return nil, nil, fmt.Errorf("environment %q already exists (archo env set %s ...)", name, name)
+	}
+	var like *env.Environment
+	var clone *LoadoutState
+	if spec.Like != "" {
+		var err error
+		like, err = a.Store.EnvByName(strings.TrimPrefix(spec.Like, "env:"))
+		if err != nil {
+			return nil, nil, err
+		}
+		if like == nil {
+			return nil, nil, fmt.Errorf("no environment named %q (archo env list)", spec.Like)
+		}
+		if spec.GameRoot != "" && !samePath(spec.GameRoot, like.GameRoot) {
+			return nil, nil, fmt.Errorf("--like uses %s; omit --game or use the same installation", like.GameRoot)
+		}
+		spec.GameRoot = like.GameRoot
+		if spec.Launch == "" {
+			spec.Launch = like.Launch
+		}
+		if spec.Saves == "" && spec.UserDataRoot == "" {
+			spec.Saves = SavesOwn
+		}
 	}
 	if err := spec.normalise(); err != nil {
 		return nil, nil, err
@@ -207,12 +235,17 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 	if !env.LooksLikeGameRoot(spec.GameRoot) {
 		return nil, nil, fmt.Errorf("%s does not look like a RimWorld install (no executable or Data/Core)", spec.GameRoot)
 	}
-	if o, err := a.envOfGame(spec.GameRoot); err != nil {
+	installation := like
+	if installation == nil {
+		installation, err = a.envOfGame(spec.GameRoot)
+	}
+	if err != nil {
 		return nil, nil, err
-	} else if o != nil {
-		return nil, nil, fmt.Errorf("environment %s already uses %s; one environment per game folder (several lists of one game are plans: archo plan new <name>)", o.Name, spec.GameRoot)
 	}
 	user := a.userDataFor(name, spec, true)
+	if err := a.checkEnvironmentRoot("", spec.GameRoot, user); err != nil {
+		return nil, nil, err
+	}
 	if err := a.checkProtonUserData(spec.GameRoot, user); err != nil {
 		return nil, nil, err
 	}
@@ -233,6 +266,20 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 			e.Launch = "steam"
 		}
 	}
+	if installation != nil {
+		e.GameID, e.GameRoot, e.GameVersion = installation.GameID, installation.GameRoot, installation.GameVersion
+	}
+	if like != nil {
+		reader := &App{Home: a.Home, Store: a.Store, Config: a.Config, Now: a.Now, Rand: a.Rand, Loc: a.Loc, Detect: a.Detect, EnvName: like.Name}
+		var err error
+		clone, err = reader.Loadout()
+		if err != nil {
+			return nil, nil, err
+		}
+		if _, err := seedSettings(like.UserDataRoot, user, true); err != nil {
+			return nil, nil, fmt.Errorf("copy settings from %s: %w", like.Name, err)
+		}
+	}
 	if spec.Saves == SavesOwn {
 		if err := os.MkdirAll(user, 0o755); err != nil {
 			return nil, nil, err
@@ -240,6 +287,13 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 	}
 	if err := a.Store.InsertEnv(e); err != nil {
 		return nil, nil, err
+	}
+	if installation != nil {
+		if err := a.initializeSibling(e, like, clone); err != nil {
+			return e, nil, err
+		}
+		changes, err := a.foldersFromSpec(e, spec, false, false)
+		return e, changes, err
 	}
 	srcs, err := a.Store.Sources(e.GameID)
 	if err != nil {
@@ -272,16 +326,21 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 
 // envOfGame returns the environment that uses a game folder, or nil.
 func (a *App) envOfGame(game string) (*env.Environment, error) {
-	envs, err := a.Store.Envs()
+	es, err := a.Store.Envs()
 	if err != nil {
 		return nil, err
 	}
-	for _, e := range envs {
-		if env.PathKey(e.GameRoot) == env.PathKey(game) {
-			return e, nil
+	var found *env.Environment
+	for _, e := range es {
+		if canonicalRoot(e.GameRoot) != canonicalRoot(game) {
+			continue
 		}
+		if found != nil && found.GameID != e.GameID {
+			return nil, fmt.Errorf("multiple legacy installations use %s; add with --like <environment> to choose one; inventories are not merged automatically", game)
+		}
+		found = e
 	}
-	return nil, nil
+	return found, nil
 }
 
 func (a *App) checkFolderRoots(spec EnvSpec) error {
@@ -353,6 +412,11 @@ func (a *App) foldersFromSpec(e *env.Environment, spec EnvSpec, adding, moved bo
 // otherwise the change waits for `env rebind`. The older --workshop / --steamcmd / --extra /
 // --remove-source flags change the shared folders.
 func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChange, error) {
+	unlock, err := a.lockLaunch()
+	if err != nil {
+		return nil, nil, err
+	}
+	defer unlock()
 	e, err := a.Store.EnvByName(name)
 	if err != nil {
 		return nil, nil, err
@@ -363,15 +427,17 @@ func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChang
 	if err := spec.normalise(); err != nil {
 		return nil, nil, err
 	}
-	gameChanged := spec.GameRoot != "" && env.PathKey(spec.GameRoot) != env.PathKey(e.GameRoot)
+	gameChanged := spec.GameRoot != "" && canonicalRoot(spec.GameRoot) != canonicalRoot(e.GameRoot)
+	reattach := false
 	if gameChanged {
 		if !env.LooksLikeGameRoot(spec.GameRoot) {
 			return nil, nil, fmt.Errorf("%s does not look like a RimWorld install (no executable or Data/Core)", spec.GameRoot)
 		}
 		if o, err := a.envOfGame(spec.GameRoot); err != nil {
 			return nil, nil, err
-		} else if o != nil && o.ID != e.ID {
-			return nil, nil, fmt.Errorf("environment %s already uses %s; one environment per game folder", o.Name, spec.GameRoot)
+		} else if o != nil && o.GameID != e.GameID {
+			e.GameID = o.GameID
+			reattach = true
 		}
 		e.GameRoot = spec.GameRoot
 		e.GameVersion = env.ReadGameVersion(spec.GameRoot)
@@ -385,6 +451,9 @@ func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChang
 		if err := a.checkUserData(u); err != nil {
 			return nil, nil, err
 		}
+		if err := a.checkEnvironmentRoot(e.ID, e.GameRoot, u); err != nil {
+			return nil, nil, err
+		}
 		if spec.Saves == SavesOwn {
 			if err := os.MkdirAll(u, 0o755); err != nil {
 				return nil, nil, err
@@ -393,6 +462,9 @@ func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChang
 		e.UserDataRoot = u
 	}
 	if gameChanged {
+		if err := a.checkEnvironmentRoot(e.ID, e.GameRoot, e.UserDataRoot); err != nil {
+			return nil, nil, err
+		}
 		if err := a.checkProtonUserData(e.GameRoot, e.UserDataRoot); err != nil {
 			return nil, nil, err
 		}
@@ -411,7 +483,19 @@ func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChang
 		}
 	}
 	want := map[source.Kind]string{}
-	if gameChanged {
+	if gameChanged && !reattach {
+		es, err := a.Store.Envs()
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, o := range es {
+			if o.ID != e.ID && o.GameID == e.GameID {
+				g, r := canonicalRoot(e.GameRoot), canonicalRoot(o.UserDataRoot)
+				if r != "" && (underDir(r, g) || underDir(g, r)) {
+					return nil, nil, fmt.Errorf("installation move overlaps environment %s's user data folder %s; choose a separate --game directory", o.Name, o.UserDataRoot)
+				}
+			}
+		}
 		want[source.Official] = filepath.Join(e.GameRoot, "Data")
 		want[source.Local] = filepath.Join(e.GameRoot, "Mods")
 		if err := a.checkRoots(e.GameRoot, want[source.Official], want[source.Local]); err != nil {
@@ -498,6 +582,17 @@ func (a *App) EnvRemovePreview(name string) (*EnvRemoval, error) {
 		(SELECT count(*) FROM instance WHERE game_id=? AND status='live')`, e.ID, e.GameID).Scan(&r.Launches, &r.Mods); err != nil {
 		return nil, err
 	}
+	es, err := a.Store.Envs()
+	if err != nil {
+		return nil, err
+	}
+	for _, o := range es {
+		if o.ID != e.ID && o.GameID == e.GameID {
+			r.Mods = 0
+			r.Next = o.Name
+			break
+		}
+	}
 	if cur, _ := a.Store.CurrentEnv(); cur != nil && cur.ID == e.ID {
 		r.Current = true
 		envs, err := a.Store.Envs()
@@ -505,17 +600,19 @@ func (a *App) EnvRemovePreview(name string) (*EnvRemoval, error) {
 			return nil, err
 		}
 		for _, o := range envs {
-			if o.ID != e.ID {
+			if o.ID != e.ID && r.Next == "" {
 				r.Next = o.Name
 				break
 			}
 		}
 	}
+	if !r.Current {
+		r.Next = ""
+	}
 	return r, nil
 }
 
-// EnvRemove deletes an environment from RimArcho's database: its Data/ and Mods/ instances,
-// plans, launches and history. The shared mod folders and the player's data on mods stay.
+// EnvRemove deletes one environment and the installation inventory only for its last sibling. The shared mod folders and the player's data on mods stay.
 // Game and mod files are not touched. It is refused while that game runs. Removing the
 // current environment makes another one current (EnvRemoval.Next), or none.
 func (a *App) EnvRemove(name string) (*EnvRemoval, error) {
@@ -623,6 +720,13 @@ func (a *App) PrepareEnv(name string) (*env.Environment, error) {
 	}
 	if e == nil {
 		return nil, fmt.Errorf("no environment named %q (archo env list)", name)
+	}
+	cur, err := a.Store.CurrentEnv()
+	if err != nil {
+		return nil, err
+	}
+	if cur != nil && cur.GameID == e.GameID {
+		return e, nil
 	}
 	if err := a.prepareEnvLinks(e, true); err != nil {
 		return nil, err

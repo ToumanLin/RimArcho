@@ -16,7 +16,7 @@ import (
 
 // SchemaVersion is the version schema creates. A schema change bumps it, extends
 // the fresh schema and appends the step that upgrades the previous version to upgrades.
-const SchemaVersion = 39
+const SchemaVersion = 40
 
 // FirstReleaseSchema is the schema of the first public release (1.0.0). Databases from
 // development builds before it are not upgraded (04 §4).
@@ -40,6 +40,7 @@ var upgrades = []func(tx *sql.Tx, report func(done, total int64)) error{
 	upgradeSaveReviewCatalog, // 36 → 37
 	upgradeGameEnvironment,   // 37 → 38
 	upgradeLaunchContext,     // 38 → 39
+	upgradeCreditRoots,       // 39 → 40
 }
 
 // ErrPreRelease: the database was created by a development build before 1.0.0.

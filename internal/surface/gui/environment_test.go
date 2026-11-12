@@ -131,3 +131,34 @@ func TestHomeApplyReturnsPreparedWorkspace(t *testing.T) {
 		t.Fatalf("workspace result: %+v", refreshed)
 	}
 }
+
+// Siblings must publish their own environment and plan through the normal GUI API.
+func TestEnvironmentSiblingSwitch(t *testing.T) {
+	t.Parallel()
+	e, api, events := fixture(t)
+	e.MustRun("env", "add", "sibling", "--game", e.Game, "--saves", "own")
+	sibling, err := e.App.Store.EnvByName("sibling")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, name := range []string{"sibling", "main", "sibling"} {
+		request := uint64(i + 1)
+		if !api.UseEnv(request, name) {
+			t.Fatal("switch refused")
+		}
+		result := environmentResult(t, events, request)
+		if result.Error != "" || result.Stale || result.Board.EnvName != name {
+			t.Fatalf("switch: %+v", result)
+		}
+		st, err := e.App.Loadout()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if st.Ix.Env.Name != name {
+			t.Fatalf("cached environment %s, want %s", st.Ix.Env.Name, name)
+		}
+		if name == "sibling" && st.Plan.ID != e.App.Store.CurrentPlanID(sibling.ID) {
+			t.Fatal("sibling inherited another plan")
+		}
+	}
+}

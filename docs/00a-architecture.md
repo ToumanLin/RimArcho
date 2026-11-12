@@ -6,7 +6,7 @@
 ## 1. Domain model
 
 ```
-Game installation (directory and version; registration still allows one environment per installation, 03 §6)
+Game installation (directory and version; several environments with distinct data roots, 03 §6)
   ├─ Source (owned by this installation: official Data / local Mods)
   └─ Environment (user data directory, launch settings and current plan)
        └─ Launch (one launch: which plan or pack, when, what was enabled)

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/source"
@@ -189,26 +190,15 @@ func (a *App) replaceCreditLocked(it store.CreditItem, old, target *store.Mod, u
 		return "", err
 	}
 	for _, d := range deployments {
-		e, err := a.Store.EnvByID(d.EnvID)
-		if err != nil {
-			return "", err
-		}
-		if e == nil {
-			return "", fmt.Errorf("deployment environment %s no longer exists", d.EnvID)
-		}
-		if p, err := a.Store.PlanByID(d.PlanID); err != nil {
-			return "", err
-		} else if p == nil {
-			return "", fmt.Errorf("deployment plan %d no longer exists", d.PlanID)
-		}
-		a.EnvName, a.OpenPlan, a.PlanName = e.Name, d.PlanID, ""
 		if err := a.checkNoGame(); err != nil {
 			return "", err
 		}
-		st, err := a.Loadout()
+		a.OpenPlan, a.PlanName = d.PlanID, ""
+		st, err := a.creditDeploymentState(d)
 		if err != nil {
-			return "", err
+			return "retained: " + err.Error(), nil
 		}
+		e := st.Ix.Env
 		if !st.Reg.Loadable(target.ID) {
 			blocked = append(blocked, fmt.Sprintf("Workshop copy cannot be loaded in deployed game %s", e.Name))
 			continue
@@ -232,7 +222,7 @@ func (a *App) replaceCreditLocked(it store.CreditItem, old, target *store.Mod, u
 		if _, err := a.writeGame(st, false, false, false, old); err != nil {
 			return "", err
 		}
-		if err := a.Store.FinishCreditDeployment(it, d.EnvID); err != nil {
+		if err := a.Store.FinishCreditRoot(it, d.RootKey); err != nil {
 			return "", err
 		}
 	}
@@ -530,4 +520,49 @@ func (a *App) creditGameProjection(st *LoadoutState, rec *store.ModsConfigState,
 		}
 	}
 	return projection, nil
+}
+
+// Read the captured root without borrowing a sibling's mutable environment settings.
+func (a *App) creditDeploymentState(d store.CreditDeployment) (*LoadoutState, error) {
+	if d.UserDataRoot == "" {
+		return nil, fmt.Errorf("credit deployment %s has no captured user data root; retain the SteamCMD copy and repair the obligation", d.EnvID)
+	}
+	g, err := a.Store.GameByID(d.GameID)
+	if err != nil {
+		return nil, err
+	}
+	if g == nil {
+		return nil, fmt.Errorf("credit deployment installation %s is unavailable; retain the SteamCMD copy needed by %s", d.GameID, d.UserDataRoot)
+	}
+	e := &env.Environment{ID: d.EnvID, GameID: d.GameID, Name: d.EnvName, GameRoot: g.GameRoot, GameVersion: g.GameVersion, UserDataRoot: d.UserDataRoot}
+	ix, err := a.loadIndex(e)
+	if err != nil {
+		return nil, err
+	}
+	reg, aliases, cands, deploy, err := a.registry(ix)
+	if err != nil {
+		return nil, err
+	}
+	p, err := a.Store.PlanByID(d.PlanID)
+	if err != nil {
+		return nil, err
+	}
+	if p == nil {
+		return nil, fmt.Errorf("deployment plan %d no longer exists", d.PlanID)
+	}
+	ws, err := a.planWorkspace(p)
+	if err != nil {
+		return nil, err
+	}
+	latest, err := a.Store.LatestVersion(p.ID)
+	if err != nil {
+		return nil, err
+	}
+	st := &LoadoutState{Ix: ix, Reg: reg, Aliases: aliases, cands: cands, deploy: deploy, Plan: p, WS: ws, Latest: latest, localize: a.localizer(e.GameID, reg, ix), FilePath: env.ModsConfigPath(e.UserDataRoot)}
+	st.List = st.readList(ws.Entries)
+	st.File, st.FileErr = loadout.ReadModsConfig(st.FilePath)
+	if st.FileErr != nil {
+		return nil, st.FileErr
+	}
+	return st, nil
 }

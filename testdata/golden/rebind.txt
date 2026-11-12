@@ -36,6 +36,7 @@ env:main  updated  [current]
     src:local  rebound  $ROOT/NewDrive/RimWorld/Mods
       from: $ROOT/Steam/steamapps/common/RimWorld/Mods
       sample: 3/3 matched (100%, need 80%)
+  installation environments: env:main
 next:
   archo scan
 
@@ -65,20 +66,22 @@ env:main  updated  [current]
       sample: 0/1 matched (0%, need 80%)
       examples:
         Different  no old instance
+  installation environments: env:main
 next:
   archo env rebind src:local yes|no
   archo scan
 
 $ archo env list
 environments: 1
-  env:main  unknown version  [current]
+  main  unknown version
     game: $ROOT/Unrelated/RimWorld
-    saves: shared
-    user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
-    launch: steam
     sources:
       src:official  $ROOT/Unrelated/RimWorld/Data
       src:local     $ROOT/NewDrive/RimWorld/Mods  [rebind-pending → $ROOT/Unrelated/RimWorld/Mods]
+    env:main  [current]
+      saves: shared
+      user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
+      launch: steam
   mod folders (every environment):
     src:workshop  $ROOT/Steam/steamapps/workshop/content/294100
 
@@ -104,15 +107,16 @@ next:
 
 $ archo env list
 environments: 1
-  env:main  unknown version  [current]
+  main  unknown version
     game: $ROOT/Unrelated/RimWorld
-    saves: shared
-    user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
-    launch: steam
     sources:
       src:official   $ROOT/Unrelated/RimWorld/Data
       src:local      $ROOT/Unrelated/RimWorld/Mods
       src:local-old  $ROOT/NewDrive/RimWorld/Mods  [retired]
+    env:main  [current]
+      saves: shared
+      user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
+      launch: steam
   mod folders (every environment):
     src:workshop  $ROOT/Steam/steamapps/workshop/content/294100
 

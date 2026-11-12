@@ -224,7 +224,7 @@ Evaluate in order:
 `app.ListSaves` evaluates these in order and stops at the first match:
 
 1. Save is in a pack's save directory → that pack.
-2. Save modification time falls after a launch record (09 §1) and before the next launch, and that launch used this user data directory → that launch's plan. A pack's launch does not match a save in a game folder (packs save in their own folder).
+2. Save modification time falls after a launch record (09 §1) and before the next launch, and that launch used this user data directory (checked against its captured root when available, even after an environment is edited) → that launch's plan. A pack's launch does not match a save in a game folder (packs save in their own folder).
 3. Save `<modIds>` (enabled set resolved under 07 §4.2) exactly matches a version (07 §3) of a plan (`TokenFingerprint`) → that plan; if several match, choose the most recently played.
 4. No match → "matches no list".
 

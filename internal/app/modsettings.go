@@ -324,12 +324,17 @@ func copySettingsFile(job settingsJob, c SettingsCarry, check func(path string) 
 // count as the pack's own.
 func copyHugsLib(from, to string) ([]string, error) {
 	dst := filepath.Join(to, "HugsLib")
-	if _, err := os.Lstat(dst); err == nil || !errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Lstat(dst); err == nil {
 		return nil, nil
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
 	}
 	ents, err := os.ReadDir(filepath.Join(from, "HugsLib"))
-	if err != nil {
+	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
+	}
+	if err != nil {
+		return nil, err
 	}
 	tmp := dst + ".rimarcho-tmp"
 	os.RemoveAll(tmp)
