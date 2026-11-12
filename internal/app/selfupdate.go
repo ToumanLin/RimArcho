@@ -101,11 +101,21 @@ func (a *App) CheckSelfUpdate(ctx context.Context) (int, string, error) {
 	var err error
 	source, fallback := "GitHub", ""
 	if runtime.GOOS == "windows" && a.Store.Meta("cfg:updates.source") != "github" && !selfPrerelease(cur) && updateWorkshopItem() != "" {
-		r, err = a.workshopSelfRelease(ctx)
+		var fromFolder bool
+		r, fromFolder, err = a.workshopSelfRelease(ctx)
 		if err == nil {
 			source = "Workshop"
 		} else {
 			fallback = err.Error()
+		}
+		// Steam did not confirm the item (removed, private, offline), so the subscribed
+		// folder may hold a release Steam will never replace. Ask GitHub as well and keep
+		// the newer; if GitHub cannot answer either, the folder's version stands.
+		if fromFolder {
+			if g, gerr := a.selfClient().Latest(ctx, false); gerr == nil && selfupdate.Newer(r.Version, g.Version) {
+				fallback = "Workshop item unavailable; its subscribed folder holds " + r.Version
+				r, source = g, "GitHub"
+			}
 		}
 	}
 	if r == nil {

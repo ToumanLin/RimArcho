@@ -24,10 +24,13 @@ func updateWorkshopItem() string {
 	return selfupdate.WorkshopItem
 }
 
-func (a *App) workshopSelfRelease(ctx context.Context) (*selfupdate.Release, error) {
+// workshopSelfRelease reads the RimArcho item's release. fromFolder reports that the Web
+// API did not confirm it and the version came from a subscribed folder, which Steam stops
+// updating once the item is removed or made private.
+func (a *App) workshopSelfRelease(ctx context.Context) (r *selfupdate.Release, fromFolder bool, err error) {
 	id := updateWorkshopItem()
 	if valid, err := workshopIDs([]string{id}); err != nil || len(valid) != 1 || valid[0] != id {
-		return nil, errors.New("Workshop update item is not configured")
+		return nil, false, errors.New("Workshop update item is not configured")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
@@ -60,9 +63,9 @@ func (a *App) workshopSelfRelease(ctx context.Context) (*selfupdate.Release, err
 		}
 	}
 	if v == "" {
-		return nil, err
+		return nil, false, err
 	}
-	r := &selfupdate.Release{Version: v, Tag: "v" + v, Name: title, Notes: notes,
+	r = &selfupdate.Release{Version: v, Tag: "v" + v, Name: title, Notes: notes,
 		Page: workshopURL(id), WorkshopItem: id}
 	if runtime.GOOS == "windows" && runtime.GOARCH == "amd64" {
 		r.Zip.Name = selfupdate.ZipName(v, "windows", "amd64")
@@ -71,7 +74,7 @@ func (a *App) workshopSelfRelease(ctx context.Context) (*selfupdate.Release, err
 			r.Zip.Size = st.Size() // shown only; the checksum verifies the copy
 		}
 	}
-	return r, nil
+	return r, local != "", nil
 }
 
 func (a *App) selfWorkshopBase() string {

@@ -33,6 +33,7 @@ type selfRelease struct {
 	workshopResult int
 	workshopHTTP   int
 	workshopHits   atomic.Int32
+	githubDown     bool // GitHub's release lookups answer 503
 	stableHits     atomic.Int32
 	srv            *httptest.Server
 	zip            []byte
@@ -94,6 +95,10 @@ func newSelfRelease(t *testing.T) *selfRelease {
 			fmt.Fprint(w, release("v0.9.1", false))
 		case "/releases/latest":
 			f.stableHits.Add(1)
+			if f.githubDown {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
 			fmt.Fprint(w, release("v0.9.1", false))
 		case "/releases":
 			f.lists.Add(1)
@@ -274,6 +279,50 @@ func TestSelfUpdateWorkshopCheck(t *testing.T) {
 				if notice := view.AutomaticNotice(e.App, before, e.App.AutomaticStatus("self")); notice != "" {
 					t.Fatal("repeated notification", notice)
 				}
+			}
+		})
+	}
+}
+
+// A removed item (Web API result 9) leaves its subscribed folder in place, frozen at the
+// last release Steam delivered. The check must not take that folder as the latest release
+// while GitHub has a newer one.
+func TestSelfUpdateRemovedWorkshopItem(t *testing.T) {
+	if !app.SelfUpdateSupported() {
+		t.Skip("program replacement and Workshop self-update are Windows-only (D2)")
+	}
+	t.Setenv(app.UpdateWorkshopItemEnv, "8100")
+	for _, c := range []struct {
+		name, folder string
+		githubDown   bool
+		source, want string
+	}{
+		{"stale folder", "0.9.0", false, "GitHub", "0.9.1"},
+		{"folder as new as GitHub", "0.9.1", false, "Workshop", "0.9.1"},
+		{"GitHub unreachable", "0.9.1", true, "Workshop", "0.9.1"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			e := testkit.New(t)
+			f := newSelfRelease(t)
+			f.use(e.App)
+			e.App.SteamAPI = f.srv.URL + "/workshop"
+			e.App.SteamCMDRun = func(string, []string) (string, error) { t.Fatal("check started SteamCMD"); return "", nil }
+			f.workshopResult, f.githubDown = 9, c.githubDown
+			library := filepath.Join(e.Root, "OtherLibrary")
+			e.WriteFile(filepath.Join(e.Steam, "steamapps", "libraryfolders.vdf"), fmt.Sprintf(`"libraryfolders" { "1" { "path" %q } }`, strings.ReplaceAll(library, `\`, `/`)))
+			dir := filepath.Join(library, "steamapps", "workshop", "content", "294100", "8100")
+			zip := selfupdate.ZipName(c.folder, "windows", "amd64")
+			e.WriteFile(filepath.Join(dir, zip), "zip")
+			e.WriteFile(filepath.Join(dir, zip+".sha256"), "sum")
+			if _, _, err := e.App.CheckSelfUpdate(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			info := e.App.SelfUpdateInfo()
+			if info.Source != c.source || info.Release == nil || info.Release.Version != c.want || f.stableHits.Load() != 1 {
+				t.Fatal(info, f.stableHits.Load())
+			}
+			if c.source == "GitHub" && !strings.Contains(info.Fallback, "subscribed folder holds 0.9.0") {
+				t.Fatal("fallback reason", info.Fallback)
 			}
 		})
 	}
