@@ -85,6 +85,9 @@ func SettingTask(argv []string) string {
 	if len(argv) > 0 && argv[0] == "gc" {
 		return TaskGC
 	}
+	if len(argv) == 2 && argv[0] == "agent" && argv[1] == "install" {
+		return TaskAgentInstall
+	}
 	if len(argv) < 2 {
 		return ""
 	}
@@ -110,7 +113,7 @@ func TaskPending(kind string) string {
 		return T("removing…")
 	case TaskData:
 		return T("updating…")
-	case TaskSelfUpdate:
+	case TaskSelfUpdate, TaskAgentInstall:
 		return T("installing…")
 	case TaskSelfCheck:
 		return T("checking…")
@@ -307,7 +310,11 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	} else {
 		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon}})
 	}
-	out = append(out, NetworkGroup(a), DependencyGroup(a))
+	out = append(out, NetworkGroup(a))
+	if g, ok := AgentGroup(a); ok {
+		out = append(out, g)
+	}
+	out = append(out, DependencyGroup(a))
 
 	data := SettingGroup{Title: T("community data")}
 	status := a.DataStatus()
@@ -409,6 +416,11 @@ func SettingCommand(argv []string) error {
 		return nil
 	}
 	if argv[0] == "gc" {
+		return nil
+	}
+	// Archo Agent (15 §7); the key has its own call (API.SetAgentKey), never a command line
+	if len(argv) == 2 && argv[0] == "agent" && (argv[1] == "install" || argv[1] == "remove") ||
+		len(argv) == 3 && argv[0] == "agent" && argv[1] == "run" && argv[2] == "--window" {
 		return nil
 	}
 	if argv[0] == "update" && (len(argv) == 1 || len(argv) == 2 && argv[1] == "--check") {

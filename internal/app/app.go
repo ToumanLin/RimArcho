@@ -145,7 +145,9 @@ type App struct {
 	// SteamSignedIn replaces asking which account the running Steam client is signed in
 	// with (env.SteamSignedIn); tests fake it.
 	SteamSignedIn func() (account string, ok bool)
-	HTTP          *http.Client
+	// SteamSignedInID replaces env.SteamSignedInID (the Archo Agent's redaction list); tests fake it.
+	SteamSignedInID func() uint64
+	HTTP            *http.Client
 	// FindTool delegates dependency lookup; subscriptions never install tools.
 	FindTool func(name string) (path string, ok bool)
 	pageRepo func(string) string // resolved-repository override in local tests

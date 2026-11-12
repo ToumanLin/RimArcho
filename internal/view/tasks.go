@@ -51,7 +51,7 @@ const (
 // IsSettingTask identifies maintenance tasks shared by settings and the guide.
 func IsSettingTask(kind string) bool {
 	switch kind {
-	case TaskSourceDecompile, TaskSourceClean, TaskSourceCheck, TaskWorkshopUpdate, TaskSubscribe, TaskSubscriptionFrom, TaskSteamCMD, TaskTodds, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC, TaskSelfUpdate, TaskSelfCheck:
+	case TaskSourceDecompile, TaskSourceClean, TaskSourceCheck, TaskWorkshopUpdate, TaskSubscribe, TaskSubscriptionFrom, TaskSteamCMD, TaskTodds, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC, TaskSelfUpdate, TaskSelfCheck, TaskAgentInstall:
 		return true
 	}
 	return false
@@ -188,6 +188,8 @@ func TaskTitle(kind string) string {
 		return T("update RimArcho")
 	case TaskSelfCheck:
 		return T("check for RimArcho updates")
+	case TaskAgentInstall:
+		return T("install Archo Agent")
 	case TaskDepRemove:
 		return T("remove external tool")
 	case TaskData:

@@ -46,3 +46,12 @@ func LoginUserName(b []byte, id uint32) string {
 	}
 	return root.Str("users", strconv.FormatUint(steamID64Base+uint64(id), 10), "AccountName")
 }
+
+// SteamSignedInID is the 64-bit Steam ID of the account the running Steam client is signed in with, or 0.
+func SteamSignedInID() uint64 {
+	id, _ := steamActiveUser()
+	if id == 0 {
+		return 0
+	}
+	return steamID64Base + uint64(id)
+}

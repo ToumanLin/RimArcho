@@ -22,6 +22,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/scan"
+	"github.com/ToumanLin/RimArcho/internal/secret"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
@@ -265,7 +266,11 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 			p.Steps = append(p.Steps, &UninstallStep{Key: key, Items: items})
 		}
 	}
-	add(UnAccounts, []*UninstallItem{{Path: a.AccountsDir(), Do: "forget-accounts", Note: "Forget account sessions: delete site sessions and temporary login folders, and clear known authentication caches for all accounts in managed SteamCMD. External caches stay under their owner's control. This cannot be undone and does not sign out other devices."}})
+	accountItems := []*UninstallItem{{Path: a.AccountsDir(), Do: "forget-accounts", Note: "Forget account sessions: delete site sessions and temporary login folders, and clear known authentication caches for all accounts in managed SteamCMD. External caches stay under their owner's control. This cannot be undone and does not sign out other devices."}}
+	if a.AgentStatus().HasKey {
+		accountItems = append(accountItems, &UninstallItem{Path: "Windows Credential Manager: " + secret.Prefix + AgentKeyName, Do: "forget-agent-key", Note: "Remove the Archo Agent API key from Windows Credential Manager."})
+	}
+	add(UnAccounts, accountItems)
 
 	// Where kept lock library copies go: a game that is not itself removed.
 	var lockEnv *env.Environment
@@ -904,6 +909,8 @@ func (a *App) uninstallItem(step string, it *UninstallItem) error {
 	switch it.Do {
 	case "forget-accounts":
 		return a.ForgetAccounts()
+	case "forget-agent-key":
+		return SetAgentKey("")
 	case DoKeep, DoLeave:
 		return nil
 	case DoUnlink:

@@ -1,6 +1,6 @@
 # 15 · Archo (built-in AI assistant)
 
-> Status: designed for 1.1; not implemented. For now, the only AI integration is an external agent connected to `archo mcp` (14).
+> Status: designed for 1.1. Implemented: Archo Agent (§7), a separate download that runs in a console window of its own. Not implemented: the right panel, one-click tasks (§4.2), OCR (§5), per-task consent (§3.2) and confirmation inside RimArcho's tool layer (§2.3). External agents connect to `archo mcp` (14) as before.
 > Basis: 00 (§2, §3.2, §4), 00a, 13, 14, 16.
 
 Archo is RimArcho's built-in AI assistant. Its image is the project icon, `internal/icon/portrait.svg`; at small sizes, the bow on the portrait serves as its mark (16 §7). Wherever the interface refers to the AI assistant, it uses this name and portrait, for example "Ask Archo to analyze this error". External agents (Claude Code, Codex, etc.) that connect through MCP keep their own names.
@@ -12,7 +12,7 @@ Two premises apply throughout:
 
 ## 1. Form
 
-- **A lightweight built-in harness** (for example, Pi; the choice is undecided) runs in RimArcho's GUI process. It is **enabled by default and can be turned off** on the settings page (16 §2.14). Turning it off hides every "Ask Archo to …" button and the Archo entry at the bottom of the sidebar, leaving no gap.
+- **The harness is Pi with Archo's extensions, in a process of its own: Archo Agent (§7).** It is an optional download, so RimArcho stays small for players who do not use it. For now it opens in a console window (Pi's terminal interface). The right panel below is the planned form; how it will drive the same process (for example Pi's RPC mode) is undecided. Once the panel exists, Archo can be turned off on the settings page (16 §2.14). Turning it off hides every "Ask Archo to …" button and the Archo entry at the bottom of the sidebar, leaving no gap.
 - **Entry point**: Archo at the bottom of the sidebar opens the right panel (16 §2.13). It can open on any page; the panel and the conversation stay when the player changes pages. One-click task buttons on pages (§4.2) also open this panel and show task progress and results there.
 - **GUI only.** The TUI has no Archo panel (§6), and the CLI has no chat command. Terminal users who want AI help connect an external agent to `archo mcp`.
 - **No resident process**: closing the panel after a task ends leaves no background process (00 §4 item 6). When local Claude Code / Codex is used, its child process exits with the task.
@@ -58,7 +58,7 @@ Only the player can change environments and settings; there are no tools for the
 
 Two options; the player selects one on the settings page (16 §2.14):
 
-1. **The player's own API key.** The supported providers are undecided (at least one must accept images, for OCR, §5). The key stays local. Where it is stored is undecided (Windows Credential Manager is preferred over a plain configuration file). Keys never appear in logs, exports or diagnostics.
+1. **The player's own API key.** Archo Agent takes any provider that speaks one of the APIs in §7.2 (OpenAI-compatible chat completions, Anthropic messages, OpenAI responses, Google). The key stays local, in Windows Credential Manager (§7.2). Keys never appear in logs, exports or diagnostics.
 2. **Locally installed Claude Code or Codex.** RimArcho stores none of their login information; it uses the player's existing login. This option appears only when RimArcho finds `claude` or `codex` on PATH. How they are integrated is undecided (for example, run non-interactively with `archo mcp` as the only tool server), subject to §2.3: RimArcho's GUI still collects the confirmations.
 
 Without a configured model source, the Archo entry remains visible. Opening it shows an explanation and a "go to settings" button.
@@ -142,12 +142,50 @@ OCR therefore reads the titles and showcased content in these images; it does mo
 - The TUI is the keyboard version of the plan editor (16 §9.1). It has no Archo panel or "Ask Archo to …" buttons; whether it will get them is undecided.
 - External agents can do as much as Archo: Archo has no private tools. This keeps MCP a first-class interface. The external-agent acceptance test (I4 in 14 §4) also checks whether the tools available to Archo are enough.
 
-## 7. Acceptance
+## 7. Archo Agent
 
-None is implemented yet.
+Archo Agent is Archo as a separate program: Node, the Pi coding agent and Archo's Pi extensions, built and released from their own repository (`ToumanLin/ArchoAgent`). RimArcho downloads, configures and starts it; the agent reaches RimArcho only through `archo mcp` (14), with the same tools as any external agent. Windows x64 only. Code: `internal/app/agent.go`, `internal/cmds/agent.go`, `internal/view/agent.go`, `internal/secret`.
+
+### 7.1 Installing
+
+- **Source**: the latest stable GitHub release of `ToumanLin/ArchoAgent` (`RIMARCHO_AGENT_API` substitutes a test release service), through the GitHub mirror like RimArcho's own updates (17 §2.2). Assets: `archo-agent-<version>-windows-amd64.zip` and `<zip>.sha256`. `archo agent install --from <zip>` installs a downloaded zip instead, checked against a `.sha256` beside it when there is one.
+- **Download and check**: as RimArcho's self-update (17 §5.1 step 2): the checksum first, the zip into a `.part` file, kept only when its size and SHA-256 match; 200 MB limit.
+- **Extract** (`selfupdate.ExtractLayout`, `app.AgentLayout`): only `archo-agent.cmd`, `archo-agent.json`, `package.json`, `extensions/`, `node/`, `pi/`, `README.md`, `LICENSE` and `THIRD_PARTY.md` at the zip root, with the self-update's path checks (no absolute paths, `..` or links; 200 MB per entry, 500 MB in all). `archo-agent.json` (name `archo-agent`, a semantic version, the Pi and Node versions), `node/node.exe`, `package.json` and Pi's `cli.js` must exist. The bundle goes to `%LOCALAPPDATA%\RimArcho\agent\new\`, is renamed to `<version>\`, and `current.txt` names it; older versions and the download are then deleted (02 §1). Installing when the current version is not older than the release changes nothing.
+- **Remove** (Settings, `archo agent remove`) deletes the bundles only; settings, the key and the agent's folder in the data directory stay.
+
+### 7.2 Configuration and start
+
+- **Settings** (16 §2.14, `archo config set`): `agent.api` (`openai-completions` by default, `anthropic-messages`, `openai-responses`, `google-generative-ai`), `agent.base_url` (an http(s) URL), `agent.model` (the provider's model ID), `agent.thinking` (`high` by default, `medium`, `low`, `off`).
+- **The API key** is a generic credential `RimArcho/agent-api-key` in Windows Credential Manager (current user, not roamed; `internal/secret`). Settings takes it in a password field through its own call (`API.SetAgentKey`), never a command line; `archo agent key` reads one line from standard input; an empty value or `--clear` removes it. Uninstall removes it with the account sessions (02 §2).
+- **Start** (Settings "open Archo Agent", `archo agent run [--window]`) needs an installed bundle, a base URL, a model and a key; otherwise it says which is missing. `--window` (the GUI) opens a console window of its own, created by Windows with its own input and screen buffers (`startAgentConsole`; os/exec would hand Pi `NUL` and it would exit at once). Each start rewrites Pi's configuration in `<data-directory>/agent/pi/` (`PI_CODING_AGENT_DIR`):
+  - `models.json`: one provider `archo-model` with the settings above, `apiKey` `$ARCHO_AGENT_API_KEY` (the key is never written), a 128,000-token context and a 16,384-token reply limit (the agent continues a reply that reaches it);
+  - `settings.json`: that model as the default, the thinking level, Pi's install telemetry off;
+  - `mcp.json`: the server `archo`, this program folder's `archo.exe mcp`, exposure `direct`;
+  - `archo-redact.json`: the private values RimArcho knows (§7.3).
+- The bundle's Node runs Pi with the bundle's extensions, in `<data-directory>/agent/work/`, with `ARCHO_AGENT_API_KEY`, `RIMARCHO_HOME` and Pi's version check, telemetry and catalog refreshes turned off. From the GUI it opens in a new console window and RimArcho does not wait for it; `archo agent run` runs it in the current terminal.
+- Pi keeps its own sessions under `pi/sessions/`; they are local only. Conversations in the planned panel stay undecided (§1).
+
+### 7.3 What the extensions guarantee
+
+The extensions live in the Archo Agent repository; RimArcho relies on these behaviors:
+
+- **Redaction** (§3.2): every model request has the Windows user name inside user-folder paths replaced with `<user>`, and the values in `archo-redact.json` (the signed-in Steam account name and SteamID64, the SteamCMD account) replaced as whole words with `<steam-account>` and `<steam-id>`. Tool-call arguments get the real values back before the tool runs. Only known values are replaced; nothing is guessed from patterns.
+- **Confirmation** (§2.2): before a tool whose annotations say `destructiveHint` (14 §2) runs, the agent asks the player in its window; without an interactive window such calls are refused. This is the harness's confirmation (§2.3, external agents); RimArcho's own tool layer does not yet hold such calls back.
+- **Archo's instructions** (14 §3) are put into the system prompt, since Pi keeps an MCP server's instructions out of it.
+
+## 8. Acceptance
+
+AR1–AR10 cover the panel and are not implemented yet. AG1–AG7 cover Archo Agent.
 
 | # | Scenario | Expected |
 | --- | --- | --- |
+| AG1 | Install Archo Agent in Settings with no network, then with a zip whose checksum does not match | An error; no bundle is installed and nothing under `%LOCALAPPDATA%\RimArcho\agent` is left half-written |
+| AG2 | Install, then install again with no newer release | The first installs; the second reports the installed version and downloads nothing |
+| AG3 | "open Archo Agent" without a model or key | Says which is missing; nothing starts |
+| AG4 | Apply an API key in Settings | The key appears in Windows Credential Manager as `RimArcho/agent-api-key` and in no file under the data directory or `%LOCALAPPDATA%\RimArcho` |
+| AG5 | Open Archo Agent and ask about the current plan | A console window opens; the agent calls Archo tools; its requests contain `<user>` instead of the Windows user name |
+| AG6 | Ask Archo Agent to save the list | It asks for confirmation in its window; "no" leaves ModsConfig.xml unchanged |
+| AG7 | Uninstall RimArcho | The bundles, the agent's folder and the stored key are gone |
 | AR1 | Disable Archo in settings | Sidebar entry and all "Ask Archo to …" buttons disappear; other features are unaffected |
 | AR2 | Click Archo without a configured model source | Panel shows an explanation and "go to settings", without an error |
 | AR3 | Archo disables a Mod in chat | Plan undo history gains "Archo: …"; `undo` reverses it |

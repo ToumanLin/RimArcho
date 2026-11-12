@@ -54,6 +54,8 @@ if ($Group -eq 'B') {
   }
   # R, T: the package's extensions read Archo's instructions themselves (their log lines go to stderr.txt)
   if ($Group -in 'R', 'T') { $extra = ' --extension C:\Eval\agent' }
+  # the package asks the player before destructive Archo tools; there is no player in the VM
+  if ($Group -in 'R', 'T') { $env:ARCHO_AGENT_CONFIRM = 'allow' }
   $model = 'magpie/apikeyfan/deepseek-flash'
   if ($Group -in 'S', 'T') {
     $model = 'magpie/claude/claude-sonnet-5-5'

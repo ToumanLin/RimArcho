@@ -1733,7 +1733,7 @@ function settingRunner(again) {
   return async (argv, value, after, background = false, field = null) => {
     const screen = S.screen, epoch = S.screenSeq;
     try {
-      const out = argv[0] === "account" ? (argv[1] === "steamcmd" && argv[2] === "login" ? await api.SteamLogin(value) : await api.AccountAction(argv[1], argv[2])) : await api.ApplySetting(argv, value || "");
+      const out = argv[0] === "agent" && argv[1] === "key" ? await api.SetAgentKey(value || "") : argv[0] === "account" ? (argv[1] === "steamcmd" && argv[2] === "login" ? await api.SteamLogin(value) : await api.AccountAction(argv[1], argv[2])) : await api.ApplySetting(argv, value || "");
       say("ok", (out && out[0]) || T("done"));
     } catch (e) { if (S.screen === screen && S.screenSeq === epoch) { say("fail", errText(e)); if (field) fieldStatusError(field, $("#status")); } return; }
     if (S.screen !== screen || S.screenSeq !== epoch) return;
@@ -1810,6 +1810,8 @@ function renderGroups(w, groups, again) {
         for (const link of it.links) right.append(button(link.label, "", () => api.OpenURL(link.url).catch(e => say("fail", errText(e))), "community-link"));
       } else if (it.edit) {
         const inp = el("input", "field");
+        // a secret (Archo Agent's API key) is typed into a password field and never shown back
+        if (it.edit === "secret") { inp.type = "password"; inp.autocomplete = "off"; }
         inp.value = it.editValue ?? it.value ?? "";
         inp.spellcheck = false;
         inp.setAttribute("aria-labelledby", label.id);

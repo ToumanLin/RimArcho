@@ -26,8 +26,24 @@ func releaseFiles(goos string) []string {
 	return append(programs, "README.md", "README.zh-CN.md", "CHANGELOG.md", "LICENSE", "monitor", "skills")
 }
 
+// Layout says which top-level entries a zip may have and which files it must contain.
+type Layout struct {
+	Files    []string // allowed top-level entries (files or folders), matched without case
+	Required []string // regular files that must exist after extraction, slash-separated
+}
+
 // Extract validates and unpacks a release into a new directory, removing it on failure.
-func Extract(zipPath, dir string) (err error) {
+func Extract(zipPath, dir string) error {
+	programs := []string{"archo"}
+	if runtime.GOOS == "windows" {
+		programs = []string{"archo.exe", "RimArcho.exe"}
+	}
+	return ExtractLayout(zipPath, dir, Layout{Files: Files, Required: programs})
+}
+
+// ExtractLayout is Extract for another zip's layout (the Archo Agent bundle, 15 §7).
+// A root entry "./" (Windows tar writes one) is skipped.
+func ExtractLayout(zipPath, dir string, layout Layout) (err error) {
 	if err := os.Mkdir(dir, 0o755); err != nil {
 		return err
 	}
@@ -44,7 +60,7 @@ func Extract(zipPath, dir string) (err error) {
 	var total uint64
 	names := make([]string, len(z.File))
 	for i, entry := range z.File {
-		name, err := extractName(entry.Name)
+		name, err := extractName(entry.Name, layout.Files)
 		if err != nil {
 			return err
 		}
@@ -62,6 +78,9 @@ func Extract(zipPath, dir string) (err error) {
 	}
 	for i, entry := range z.File {
 		name := names[i]
+		if name == "" {
+			continue
+		}
 		target := filepath.Join(dir, filepath.FromSlash(name))
 		if entry.FileInfo().IsDir() || strings.HasSuffix(entry.Name, `\`) {
 			if err := os.MkdirAll(target, 0o755); err != nil {
@@ -76,20 +95,17 @@ func Extract(zipPath, dir string) (err error) {
 			return err
 		}
 	}
-	programs := []string{"archo"}
-	if runtime.GOOS == "windows" {
-		programs = []string{"archo.exe", "RimArcho.exe"}
-	}
-	for _, program := range programs {
-		info, err := os.Stat(filepath.Join(dir, program))
+	for _, file := range layout.Required {
+		info, err := os.Stat(filepath.Join(dir, filepath.FromSlash(file)))
 		if err != nil || !info.Mode().IsRegular() {
-			return fmt.Errorf("release zip is missing program %q", program)
+			return fmt.Errorf("release zip is missing program %q", file)
 		}
 	}
 	return nil
 }
 
-func extractName(name string) (string, error) {
+// extractName returns the entry's path under the allowed top-level name, or "" for the zip's root folder.
+func extractName(name string, files []string) (string, error) {
 	normal := strings.ReplaceAll(name, `\`, "/")
 	if normal == "" || strings.HasPrefix(normal, "/") || strings.Contains(normal, ":") || strings.ContainsRune(normal, 0) {
 		return "", fmt.Errorf("unsafe zip path %q", name)
@@ -104,8 +120,11 @@ func extractName(name string) (string, error) {
 		}
 	}
 	normal = path.Clean(normal)
+	if normal == "." {
+		return "", nil
+	}
 	top, rest, nested := strings.Cut(normal, "/")
-	for _, allowed := range Files {
+	for _, allowed := range files {
 		if strings.EqualFold(top, allowed) {
 			if nested {
 				return allowed + "/" + rest, nil

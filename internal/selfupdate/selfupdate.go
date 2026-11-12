@@ -51,6 +51,8 @@ type Client struct {
 	API          string
 	UserAgent    string
 	GOOS, GOARCH string
+	// Asset names a release's zip; nil means RimArcho's own (ZipName). The checksum is <zip>.sha256.
+	Asset func(version, goos, goarch string) string
 }
 
 var ErrNoRelease = errors.New("no release published yet")
@@ -165,7 +167,11 @@ func (c *Client) release(selected githubRelease) *Release {
 		Name: selected.Name, Notes: selected.Body, Page: selected.Page,
 		Published: selected.Published, Prerelease: selected.Prerelease,
 	}
-	name := ZipName(r.Version, goos, goarch)
+	zipName := ZipName
+	if c.Asset != nil {
+		zipName = c.Asset
+	}
+	name := zipName(r.Version, goos, goarch)
 	for _, a := range selected.Assets {
 		asset := Asset{Name: a.Name, URL: a.URL, Size: a.Size}
 		switch a.Name {
