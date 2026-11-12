@@ -285,24 +285,35 @@ func (a *App) LastLoadedSave(st *LoadoutState, runs []*LogRun) (*SaveCheck, *Log
 	if sv == nil {
 		return nil, run, nil
 	}
-	sv.Ref = SaveRef(sv.Path)
-	sv.Prefix, sv.Name = SplitSaveName(sv.File)
-	sv.Auto = autosaveRe.MatchString(sv.Name)
-	saves := []*Save{sv}
+	c, err := a.checkOneSave(st, sv, nil)
+	return c, run, err
+}
+
+// checkOneSave reads the one save sv (its head, its full read from the cache, and, with
+// others, the saves of its folder it is grouped with) and checks it against st's list as
+// it is now, whatever list the save matched.
+func (a *App) checkOneSave(st *LoadoutState, sv *Save, others []*Save) (*SaveCheck, error) {
+	saves := append([]*Save{sv}, others...)
+	for _, s := range saves {
+		s.Ref = SaveRef(s.Path)
+		s.Prefix, s.Name = SplitSaveName(s.File)
+		s.Auto = autosaveRe.MatchString(s.Name)
+	}
 	a.readHeads(saves)
 	if err := a.attachSummaries(saves); err != nil {
-		return nil, run, err
+		return nil, err
 	}
 	m, err := a.newSaveMatcher()
 	if err != nil {
-		return nil, run, err
+		return nil, err
 	}
-	m.match(sv)
+	for _, s := range saves {
+		m.match(s)
+	}
 	groupColonies(saves)
 	// Against the list Can it run is about, whatever list the save matched.
 	sv.Env, sv.Plan, sv.Pack = st.Ix.Env, st.Plan, ""
-	c, err := a.CheckSave(sv)
-	return c, run, err
+	return a.CheckSave(sv)
 }
 
 func folderHasEnv(f *SaveFolder, id string) bool {

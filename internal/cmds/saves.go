@@ -36,7 +36,10 @@ func init() {
 		Flags: []Flag{{Name: "only", Help: "only the named saves"}, {Name: "progress", Help: "a progress line per save on stderr"}}, Run: savesIndex})
 	register(&Command{Name: "saves rename", Args: "<save> <name>", Summary: "rename a save in its folder (keeps a RimSaves folder; refused while the game runs or when the name exists)", MinArgs: 2, MaxArgs: 2, Run: savesRename})
 	register(&Command{Name: "saves rename-colony", Args: "<colony|save> [<name>]", Summary: "name a colony in RimArcho (without a name: back to its saves' name; save files and the game keep theirs)", MinArgs: 1, MaxArgs: 2, Run: savesRenameColony})
-	register(&Command{Name: "saves copy", Args: "<save>", Summary: "copy a save beside itself as <name> (copy), never overwriting", MinArgs: 1, MaxArgs: 1, Run: savesCopy})
+	register(&Command{Name: "saves copy", Args: "<save>", Summary: "copy a save beside itself as <name> (copy), never overwriting; --to-current into the current Game Config's Saves folder", MinArgs: 1, MaxArgs: 1,
+		Flags: []Flag{{Name: "to-current", Help: "copy into the current Game Config's Saves folder (only the file: no Mod, list or setting)"}}, Run: savesCopy})
+	register(&Command{Name: "saves choose", Args: "[<save|colony>]", Summary: "which save Can it run checks for the current Game Config: this save, a colony's newest save (--colony), or the last loaded (--clear); no argument shows the choice", MaxArgs: 1,
+		Flags: []Flag{{Name: "colony", Help: "the save's colony: its newest save is checked, whichever it is"}, {Name: "clear", Help: "check the save the last run loaded again"}}, Run: savesChoose})
 	yes := []Flag{{Name: "yes", Help: "do it (without it: only show the files and sizes)"},
 		{Name: "token", Value: "<token>", Help: "with --yes: the preview's token; refused when the saves changed since that preview"}}
 	register(&Command{Name: "saves backup", Args: "<save…>", Summary: "copy saves into RimArcho's backups folder (confirm with --yes)", MinArgs: 1, MaxArgs: -1, Flags: yes, Run: savesBackup})
@@ -441,6 +444,13 @@ func savesList(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	lines := render.Columns(cells)
+	// Every Game Config's saves are listed (12 §4.8): with two or more folders, each colony
+	// says whose Saves folder it is in.
+	ownerSet := map[string]bool{}
+	for _, g := range groups {
+		ownerSet[folderOwner(g.c.Latest().Folder)] = true
+	}
+	owners := len(ownerSet)
 	k := 0
 	var firstAttention, first *app.Save
 	for _, p := range plan {
@@ -451,6 +461,9 @@ func savesList(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		col := p.g.c
 		line := col.Name + "  " + render.Plural(len(col.Saves), "save") + ", latest " + saveTime(c, col.Latest())
+		if owners > 1 {
+			line += "  [saves of " + folderOwner(col.Latest().Folder) + "]"
+		}
 		if col.Orphan() {
 			line += "  [matches no list]"
 		}
@@ -560,6 +573,15 @@ func savesShow(c *Ctx, a *Args) (*render.Doc, error) {
 		root.KV("checked against", against+" of env:"+s.Env.Name+" (--current)")
 	}
 	root.KV("file", s.Path)
+	where := folderOwner(own.Folder)
+	if noCloud(c.App, own.Folder) {
+		where += " (Steam Cloud does not sync this folder)"
+	}
+	root.KV("saves of", where)
+	if cur, _ := c.App.Env(); cur != nil && !own.SeenBy(cur) {
+		root.KV("not listed", "the game started with env:"+cur.Name+" does not list this save: it is in the Saves folder of "+folderOwner(own.Folder)+
+			" (copy it there: archo saves copy "+own.Ref+" --to-current)")
+	}
 	root.KV("saved", saveTime(c, s)+", "+render.Size(s.Size))
 	root.KV("read", readText(facts, s, ferr))
 	if a.Bool("content") {
@@ -1174,16 +1196,65 @@ func savesCopy(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil || amb != nil {
 		return amb, err
 	}
-	to, err := c.App.CopySave(s)
-	if err != nil {
+	var to string
+	head := "copied "
+	if a.Bool("to-current") {
+		e, err := c.App.Env()
+		if err != nil {
+			return nil, err
+		}
+		if e == nil {
+			return nil, app.ErrNoEnv
+		}
+		if to, err = c.App.CopySaveTo(s, e); err != nil {
+			return nil, err
+		}
+		head = "copied into the Saves folder of env:" + e.Name + ": "
+	} else if to, err = c.App.CopySave(s); err != nil {
 		return nil, err
 	}
 	ref := app.SaveRef(to)
 	_, name := app.SplitSaveName(fileBase(to))
-	d, root := render.New("copied " + s.Ref + " " + s.Name + " → " + ref + " " + name)
+	d, root := render.New(head + s.Ref + " " + s.Name + " → " + ref + " " + name)
 	root.KV("file", to)
 	d.AddNext("archo saves show " + ref)
 	return d, nil
+}
+
+// folderOwner names who saves in a Saves folder (12 §4.8): "pack X", the Game Configs
+// using it ("env:A, env:C"), or that none does any more.
+func folderOwner(f *app.SaveFolder) string {
+	if f == nil {
+		return "?"
+	}
+	if f.Pack != "" {
+		return "pack " + f.Pack
+	}
+	var names []string
+	for _, e := range f.Envs {
+		names = append(names, "env:"+e.Name)
+	}
+	if len(names) == 0 {
+		return "no Game Config"
+	}
+	return strings.Join(names, ", ")
+}
+
+// noCloud: Steam Cloud does not sync the folder: a pack's, or no Game Config using it keeps
+// the game's default (shared) user data.
+func noCloud(a *app.App, f *app.SaveFolder) bool {
+	if f == nil || f.Pack == "" && len(f.Envs) == 0 {
+		return false
+	}
+	if f.Pack != "" {
+		return true
+	}
+	for _, e := range f.Envs {
+		if a.Saves(e) == app.SavesShared {
+			return false
+		}
+	}
+	return true
 }
 
 // fileBase is a path's last element for both separators.
@@ -1192,6 +1263,73 @@ func fileBase(p string) string {
 		return p[i+1:]
 	}
 	return p
+}
+
+// savesChoose sets or shows the save Can it run checks for the current Game Config (12 §4.8).
+func savesChoose(c *Ctx, a *Args) (*render.Doc, error) {
+	e, err := c.App.Env()
+	if err != nil {
+		return nil, err
+	}
+	if e == nil {
+		return nil, app.ErrNoEnv
+	}
+	switch {
+	case a.Bool("clear"):
+		if err := c.App.ClearSaveChoice(e.ID); err != nil {
+			return nil, err
+		}
+		d, _ := render.New("env:" + e.Name + ": Can it run checks the save the last run loaded")
+		return d, nil
+	case len(a.Pos) == 0:
+		ch := c.App.SaveChoiceOf(e.ID)
+		if ch == nil {
+			d, _ := render.New("env:" + e.Name + ": Can it run checks the save the last run loaded (choose one: archo saves choose <save> [--colony])")
+			return d, nil
+		}
+		what := "save " + ch.Name
+		if ch.Kind == app.ChooseColony {
+			what = "the newest save of colony " + ch.Name
+		}
+		d, root := render.New("env:" + e.Name + ": Can it run checks " + what)
+		root.KV("folder", ch.Dir)
+		if ch.Path != "" {
+			root.KV("file", ch.Path)
+		}
+		d.AddNext("archo saves choose --clear")
+		return d, nil
+	}
+	colony := a.Bool("colony")
+	var s *app.Save
+	if colony { // a colony by name or key, or the colony of a save
+		l, err := c.App.ListSaves()
+		if err != nil {
+			return nil, err
+		}
+		if col, err := l.FindColony(a.Pos[0]); err == nil {
+			s = col.Latest()
+		}
+	}
+	if s == nil {
+		var amb *render.Doc
+		if s, amb, err = findSave(c, a.Pos[0]); err != nil || amb != nil {
+			return amb, err
+		}
+	}
+	ch, err := c.App.ChooseSave(e.ID, s, colony)
+	if err != nil {
+		return nil, err
+	}
+	what := "save " + s.Ref + " " + s.Name
+	if colony {
+		what = "the newest save of colony " + ch.Name + " (now " + s.Colony.Latest().Ref + " " + s.Colony.Latest().Name + ")"
+	}
+	d, root := render.New("env:" + e.Name + ": Can it run checks " + what)
+	if !s.SeenBy(e) {
+		root.KV("note", "it is in the Saves folder of "+folderOwner(s.Folder)+": the game started with env:"+e.Name+" does not list it")
+	}
+	d.AddNext("archo saves choose --clear")
+	return d, nil
 }
 
 func savesBackup(c *Ctx, a *Args) (*render.Doc, error) {

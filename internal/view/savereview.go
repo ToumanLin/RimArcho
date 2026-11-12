@@ -101,10 +101,21 @@ func countSaves(n int) string {
 func ReviewPageOf(r *app.SaveReview, cols []*app.Colony, colony string, tags map[string][]string) *ReviewPage {
 	p := &ReviewPage{Colony: colony, Colonies: []ReviewColony{}, Done: r.Done, Total: r.Total}
 	saves := 0
+	// Every Game Config's colonies are reviewed (12 §4.8): with two or more Saves folders
+	// each card also names whose folder it is in.
+	owners := map[string]bool{}
+	for _, c := range cols {
+		if f := c.Latest().Folder; f != nil {
+			owners[FolderOwner(f)] = true
+		}
+	}
 	for _, c := range cols {
 		line := countSaves(len(c.Saves))
 		if d, ok := SaveDay(c.Latest()); ok {
 			line = Tf("day %d", d) + T(", ") + line
+		}
+		if f := c.Latest().Folder; f != nil && len(owners) > 1 {
+			line += "  ·  " + FolderOwner(f)
 		}
 		saves += len(c.Saves)
 		p.Colonies = append(p.Colonies, ReviewColony{Key: c.Key, Name: colonyName(c), Line: line})

@@ -22,13 +22,13 @@ let ui = null;
 export function initSaves(u) { ui = u; }
 
 // page: the listing; sel: the selected save's ref; open: the colonies shown open; q: the
-// search (colony and save names); detail: the middle and right cards' data (for
+// search (colony and save names); owner: the Game Config filter ("" all, 12 §4.8); detail: the middle and right cards' data (for
 // detail.ref); mode: what the player is editing, tied to a save (mode.ref): null when only
 // viewing, {kind: "rename"} the save's name field, {kind: "colony"} the colony's (right
 // card), {kind: "confirm", what: "backup" | "recycle", preview, running} the inline
 // confirmation; viewing: the rows whose details View opened (by kind). built: the
 // navigation (S.screenSeq) whose visit drew the page; visit: the one open() last reset for.
-const X = { page: null, sel: "", open: new Set(), q: "", detail: null, mode: null, viewing: new Set(),
+const X = { page: null, sel: "", open: new Set(), q: "", owner: "", detail: null, mode: null, viewing: new Set(),
   listSeq: 0, detailSeq: 0, askSeq: 0, busy: false, built: -1, visit: -1 };
 let leftCard = null, midCard = null, rightCard = null, tree = null, input = null, timer = 0, mods = null;
 const waiting = new Map(); // listing request → its resolve
@@ -204,6 +204,18 @@ function build() {
   leftCard = el("section", "card sv-left");
   const treeHead = el("div", "sv-cardhead");
   treeHead.append(el("span", "", T("colonies")));
+  // every Game Config's saves are listed, whichever is current (12 §4.8); the filter only
+  // narrows the tree, and shows when saves come from two or more configs or packs
+  if (!(p.owners || []).includes(X.owner)) X.owner = "";
+  if (p.owners?.length) {
+    const sel = el("select", "sv-owner-filter");
+    sel.setAttribute("aria-label", T("whose saves"));
+    sel.append(new Option(T("all Game Configs"), ""));
+    for (const o of p.owners) sel.append(new Option(o, o));
+    sel.value = X.owner;
+    sel.onchange = () => { X.owner = sel.value; drawLeft(); };
+    treeHead.append(sel);
+  }
   tree = el("div", "sv-tree");
   tree.setAttribute("role", "tree");
   tree.setAttribute("aria-label", T("colonies and their saves"));
@@ -266,7 +278,8 @@ function focusTree() {
 
 const lc = (s) => String(s || "").toLowerCase();
 function saveMatch(c, s) { return !X.q || lc(c.name).includes(X.q) || lc(s.name).includes(X.q); }
-function colonyMatch(c) { return !X.q || lc(c.name).includes(X.q) || (c.game && lc(c.game).includes(X.q)) || c.saves.some((s) => lc(s.name).includes(X.q)); }
+function colonyMatch(c) { return (!X.owner || c.owner === X.owner) && colonyMatchQ(c); }
+function colonyMatchQ(c) { return !X.q || lc(c.name).includes(X.q) || (c.game && lc(c.game).includes(X.q)) || c.saves.some((s) => lc(s.name).includes(X.q)); }
 
 function setQuery(v) {
   X.q = lc(v.trim());
@@ -299,7 +312,9 @@ function drawLeft() {
     row.setAttribute("aria-expanded", String(opened));
     row.setAttribute("aria-level", "1");
     const chv = el("span", "chv"); chv.innerHTML = icon.chev;
-    row.append(chv, mark(c.name), el("span", "k", String(c.saves.length)));
+    row.append(chv, mark(c.name));
+    if (X.page.owners?.length && c.owner) row.append(el("span", "o", c.owner));
+    row.append(el("span", "k", String(c.saves.length)));
     row.setAttribute("aria-label", Tf("%s, %d saves", c.name, c.saves.length));
     if (c.game) row.title = Tf("its saves name it %s", c.game);
     tree.append(row);
@@ -441,6 +456,7 @@ function drawMid(keep) {
   add(T("copy"), "copy", () => copySave(), "", noFile);
   add(T("back up"), "backup", () => askFiles("backup"), "", noFile);
   if (d.newList) add(T("make a list"), "new-list", () => newList(d, false), "", "", "new-plan").title = d.newList.command;
+  if (!noFile) chooseButton(d, false, add);
   const rec = add(T("recycle…"), "recycle", () => askFiles("recycle"), "", locked || noFile);
   rec.classList.add("danger");
   row1.append(acts);
@@ -462,6 +478,9 @@ function drawMid(keep) {
     open.title = d.folder;
     loc.append(open);
     kv.append(el("dt", "", T("location")), loc);
+    // whose Saves folder, when the game line does not say it (a pack's, a shared folder)
+    if (d.owner) fact(T("saves of"), d.owner);
+    if (d.noCloud) loc.append(el("span", "muted sv-match", T("Steam Cloud does not sync this folder")));
     head.append(kv);
   }
   b.append(head);
@@ -496,6 +515,19 @@ function loadSection(d) {
   const h = el("h3", "", T("can it load?"));
   h.append(el("span", "r", d.switch ? "" : d.against || ""));
   s.append(h);
+  // in another Game Config's or a pack's Saves folder: the game started now does not list
+  // it (12 §4.8); Copy to … puts the file into the current config's folder
+  if (d.unseen) {
+    const u = el("div", "sv-unseen");
+    u.append(el("span", "t", d.unseen));
+    if (d.copyHere) {
+      const b = button(Tf("copy to the saves of %s", d.copyHere), "", () => copyHere(d), "small");
+      b.dataset.key = "copy-here";
+      b.title = T("copies only the save file; Mods, lists and settings stay as they are");
+      u.append(b);
+    }
+    s.append(u);
+  }
   // The save's own game and list, when the Launch page applied others: how it loads with
   // them, and Switch and launch; the bar and the rows below are then the current ones'.
   if (d.switch) {
@@ -737,6 +769,12 @@ function drawRight(keep) {
     rn.title = T("name this colony in RimArcho; the save files keep their names");
     row.append(rn);
   }
+  if (d.colonyKey && !d.loading && !d.error) chooseButton(d, true, (label, key, run) => {
+    const b = button(label, "", run, "small sv-colrename");
+    b.dataset.key = key;
+    row.append(b);
+    return b;
+  });
   head.append(row);
   if (p) {
     const kv = el("dl", "sv-kv");
@@ -1248,6 +1286,41 @@ async function once(key, run) {
   if (running.has(key)) return;
   running.add(key);
   try { await run(); } finally { running.delete(key); }
+}
+
+// chooseButton is Check on Can it run (12 §4.8): this save, or (colony) its colony's newest
+// save, becomes what Can it run checks for the current Game Config; pressed again, Can it
+// run goes back to the last loaded save.
+function chooseButton(d, colony, add) {
+  const kind = colony ? "colony" : "save";
+  const on = d.chosen === kind;
+  const label = on ? "✓ " + T("on Can it run") : colony ? T("check this colony") : T("check this save");
+  const b = add(label, "choose-" + kind, () => choose(d, colony, on));
+  b.setAttribute("aria-pressed", String(on));
+  b.title = on ? T("press to check the last loaded save again")
+    : colony ? T("Can it run checks this colony's newest save, for the current Game Config") : T("Can it run checks this save, for the current Game Config");
+  return b;
+}
+
+async function choose(d, colony, clear) {
+  await once("choose", async () => {
+    let text;
+    try { text = await api.SaveChoose(d.ref, colony, clear); } catch (e) { say("fail", errText(e)); return; }
+    say("ok", text);
+    if (live() && X.detail?.ref === d.ref) {
+      X.detail.chosen = clear ? "" : colony ? "colony" : "save";
+      drawDetail(true);
+    }
+  });
+}
+
+async function copyHere(d) {
+  await once("copy-here", async () => {
+    let r;
+    try { r = await api.SaveCopyTo(d.ref); } catch (e) { say("fail", errText(e)); return; }
+    say("ok", r.text);
+    await reread(X.sel === d.ref ? r.ref : "");
+  });
 }
 
 async function copySave() {

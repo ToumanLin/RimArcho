@@ -245,13 +245,20 @@ func lastSaveLine(v *view.LastSaveView) string {
 	if v == nil {
 		return ""
 	}
-	l := T("your last save") + "  " + v.Name + T(": ") + v.Verdict
+	title := v.Title // the last loaded save, or the save or colony chosen on Saves (12 §4.8)
+	if title == "" {
+		title = T("your last save")
+	}
+	l := title + "  " + v.Name + T(": ") + v.Verdict
 	if len(v.Lines) > 0 {
 		l += " (" + strings.Join(v.Lines, "; ")
 		if v.More > 0 {
 			l += "; " + Tf("and %d more", v.More)
 		}
 		l += ")"
+	}
+	if v.Unseen != "" {
+		l += " (" + v.Unseen + ")"
 	}
 	if v.Command != "" {
 		l += "  archo " + v.Command

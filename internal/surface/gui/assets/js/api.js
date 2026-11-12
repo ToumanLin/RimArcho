@@ -21,7 +21,7 @@ const writesGame = new Set([
   "LibraryDo", "LibrarySetNote", "Subscribe", "SubscriptionFrom", "CheckSubscriptionSource", "WorkshopUpdate", "Scan", "Analyze", "RemoveEnv", "AddEnvironment", "ApplySetting", "AddMonitor",
   "PackLaunch", "PackBuild", "PackRemove", "PackRemoveUnfinished", "TexturesRun", "TexturesClean", "CreditAnswer", "CompleteDependencies", "ReplaceRecommended",
   // Saves (16 §2.11): fixes edit the save's list, the file actions change its folder
-  "SaveFix", "SaveNewList", "SaveRename", "ColonyRename", "SaveCopy", "SaveTrash",
+  "SaveFix", "SaveNewList", "SaveRename", "ColonyRename", "SaveCopy", "SaveCopyTo", "SaveTrash",
 ]);
 on("environment", (result) => {
   const p = pending.get(result.request);

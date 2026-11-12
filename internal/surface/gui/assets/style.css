@@ -2195,6 +2195,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .sv-kv dd { margin: 0; color: var(--fg-2); min-width: 0; overflow-wrap: anywhere; }
 .sv-kv dd.sv-loc { font: 12px var(--code); display: flex; align-items: center; flex-wrap: wrap; gap: 2px 8px; }
 .sv-kv dd.sv-loc .btn.link.sv-open { font: 12px var(--font); padding: 0 4px; height: 20px; }
+.sv-kv dd.sv-loc .sv-match { font: 12px var(--font); }
 .sv-match { font-size: 12px; }
 .sv-sect { padding: 14px 16px; }
 .sv-sect + .sv-sect { border-top: var(--hairline) solid var(--line-2); }
@@ -2252,7 +2253,8 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .need-save .err .need-save-dot, .need-save .err .need-save-verdict { color: var(--red); }
 .need-save .need-save-verdict { color: var(--fg-2); }
 .need-save .need-save-lines { margin: 0; padding-left: 22px; font-size: 12px; color: var(--fg-2); display: flex; flex-direction: column; gap: 2px; }
-.need-save .need-save-open { margin-left: 22px; }
+.need-save .need-save-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-left: 22px; }
+.need-save .need-save-unseen { margin: 0 0 0 22px; font-size: 12px; }
 .sv-mods .r .sg { font-weight: 600; font-size: 13px; width: 16px; text-align: center; }
 .sv-mods .r.add .sg, .sv-mods .r.add .n { color: var(--green); }
 .sv-mods .r.del .sg, .sv-mods .r.del .n { color: var(--red); }
@@ -2826,3 +2828,9 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 .env-create-field button { overflow-wrap: anywhere; text-align: left; }
 .envrow { flex-wrap: wrap; }
 .envrow > .sub { flex-basis: 100%; white-space: normal; }
+
+/* Saves (16 §2.11, 12 §4.8): whose Saves folder, and a save the current Game Config's game does not list */
+.sv-col .o { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; font-size: 12px; color: var(--muted); }
+.sv-cardhead .sv-owner-filter { margin-left: auto; max-width: 60%; height: 22px; padding: 0 4px; background: var(--card-2); color: var(--fg); border: var(--hairline) solid var(--line-2); border-radius: var(--r-sm); font: 400 12px var(--font); }
+.sv-unseen { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 0 0 8px; padding: 8px 10px; border-radius: var(--r-sm); background: var(--line-2); font-size: 12px; color: var(--fg); }
+.sv-unseen .t { flex: 1; min-width: 200px; }

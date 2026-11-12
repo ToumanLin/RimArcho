@@ -211,13 +211,21 @@ type LastSaveView struct {
 	Name    string   `json:"name"`
 	Colony  string   `json:"colony,omitempty"`
 	Loaded  string   `json:"loaded,omitempty"` // when it was loaded: "Oct 28 18:13"
+	Saved   string   `json:"saved,omitempty"`  // a chosen save: when it was written
 	Level   string   `json:"level"`            // "" loads, warning, error, writing
 	Verdict string   `json:"verdict"`
 	Lines   []string `json:"lines,omitempty"` // the warning and error rows' headings, LastSaveLines at most
 	More    int      `json:"more,omitempty"`  // rows not in Lines
 	Command string   `json:"command"`         // the archo command that shows the whole check
-	// Gone: the run named a save that is no longer in the Saves folder.
+	// Gone: the run named a save (or the player chose one) that is no longer there.
 	Gone bool `json:"gone,omitempty"`
+	// Chosen: the player chose this save ("save") or its colony ("colony") on Saves
+	// (12 §4.8); "" it is the save the last run loaded. Title is the card's heading.
+	Chosen string `json:"chosen,omitempty"`
+	Title  string `json:"title"`
+	// Unseen: the save is in another Game Config's (or a pack's) Saves folder, so the game
+	// started with this config does not list it: the sentence saying so.
+	Unseen string `json:"unseen,omitempty"`
 }
 
 // LastSaveLines is how many rows the last save's card names.
@@ -226,11 +234,32 @@ const LastSaveLines = 3
 // lastSaveView checks the save the newest run loaded against st's list (nil: none named,
 // or it could not be checked).
 func lastSaveView(a *app.App, st *app.LoadoutState, runs []*app.LogRun) *LastSaveView {
+	if c, ch, err := a.ChosenSave(st); err == nil && ch != nil {
+		v := &LastSaveView{Chosen: ch.Kind}
+		if ch.Kind == app.ChooseColony {
+			v.Title = Tf("the newest save of %s", ch.Name)
+		} else {
+			v.Title = T("the save you chose")
+		}
+		if c == nil {
+			v.Name, v.Gone = ch.Name, true
+			v.Verdict = T("not in its Saves folder any more")
+			return v
+		}
+		fillLastSave(v, c)
+		if t := c.Save.ModTime; !t.IsZero() {
+			v.Saved = ShortDate(t) + " " + t.In(a.Loc).Format("15:04")
+		}
+		if !c.Save.SeenBy(st.Ix.Env) {
+			v.Unseen = UnseenText(c.Save.Folder, st.Ix.Env.Name)
+		}
+		return v
+	}
 	c, run, err := a.LastLoadedSave(st, runs)
 	if err != nil || run == nil {
 		return nil
 	}
-	v := &LastSaveView{}
+	v := &LastSaveView{Title: T("your last save")}
 	at := run.ModTime
 	for _, p := range run.Marks {
 		if p != nil && p.Name == "save" && !p.At.IsZero() {
@@ -245,6 +274,11 @@ func lastSaveView(a *app.App, st *app.LoadoutState, runs []*app.LogRun) *LastSav
 		v.Verdict = T("not in the Saves folder any more")
 		return v
 	}
+	fillLastSave(v, c)
+	return v
+}
+
+func fillLastSave(v *LastSaveView, c *app.SaveCheck) {
 	d := SaveDetailOf(c, false, true)
 	v.Ref, v.Name, v.Colony, v.Level, v.Verdict = d.Ref, d.Name, d.Colony, d.Level, d.Verdict
 	v.Command = "saves show " + d.Ref
@@ -258,7 +292,28 @@ func lastSaveView(a *app.App, st *app.LoadoutState, runs []*app.LogRun) *LastSav
 		}
 		v.Lines = append(v.Lines, is.Head)
 	}
-	return v
+}
+
+// UnseenText says a save in folder f is not listed by the game started with cur (a Game
+// Config, or "pack X"; 12 §4.8): the folder is another config's, or a pack's.
+func UnseenText(f *app.SaveFolder, cur string) string {
+	return Tf("in the Saves folder of %s: the game started with %s does not list it", FolderOwner(f), cur)
+}
+
+// FolderOwner names who saves in a Saves folder: "pack X", the Game Configs using it
+// ("A, C"), or that none does any more.
+func FolderOwner(f *app.SaveFolder) string {
+	if f.Pack != "" {
+		return Tf("pack %s", f.Pack)
+	}
+	var names []string
+	for _, e := range f.Envs {
+		names = append(names, e.Name)
+	}
+	if len(names) == 0 {
+		return T("no Game Config saves here")
+	}
+	return strings.Join(names, ", ")
 }
 
 // Related points at an item of the other column: its ID and a line naming it.

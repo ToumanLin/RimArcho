@@ -598,8 +598,10 @@ function drawNeeds() {
 // Saves, where each row has its fix.
 function lastSaveCard(v) {
   const sec = el("section", "sec need-save");
-  const h = el("h2", "label word-facts", T("your last save"));
+  // the save the last run loaded, or the save or colony the player chose on Saves (12 §4.8)
+  const h = el("h2", "label word-facts", v.title || T("your last save"));
   if (v.loaded) h.append(el("span", "muted", Tf("loaded %s", v.loaded)));
+  else if (v.saved) h.append(el("span", "muted", Tf("saved %s", v.saved)));
   sec.append(h);
   const card = el("div", "card need-list");
   const lvl = v.gone ? "warn" : v.level === "error" ? "err" : v.level === "warning" ? "warn" : v.level === "writing" ? "" : "ok";
@@ -616,11 +618,22 @@ function lastSaveCard(v) {
     if (v.more) ul.append(el("li", "muted", Tf("and %d more", v.more)));
     row.append(ul);
   }
+  if (v.unseen) row.append(el("p", "need-save-unseen muted", v.unseen));
+  const acts = el("div", "need-save-acts");
   if (v.ref) {
     const b = button(T("open in saves"), "", () => ui.go("save:" + v.ref), "small need-save-open");
     b.title = v.command ? "archo " + v.command : "";
-    row.append(b);
+    acts.append(b);
   }
+  if (v.chosen) {
+    const b = button(T("check the last loaded save"), "", async () => {
+      try { say("ok", await api.SaveChoose("", false, true)); } catch (e) { say("fail", errText(e)); return; }
+      needs(true);
+    }, "small");
+    b.title = T("the save was chosen on Saves; this goes back to the save the last run loaded");
+    acts.append(b);
+  }
+  if (acts.childNodes.length) row.append(acts);
   card.append(row);
   sec.append(card);
   return sec;

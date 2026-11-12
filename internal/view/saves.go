@@ -29,6 +29,9 @@ type SavesPage struct {
 	Empty   string   `json:"empty,omitempty"`
 	Folders []string `json:"folders"`
 	Errors  []string `json:"errors,omitempty"`
+	// Owners are the colonies' Owner values, in order of first colony, when there are two
+	// or more: the left card's Game Config filter (12 §4.8); none with one.
+	Owners []string `json:"owners,omitempty"`
 }
 
 // SaveColonyRow is one colony: its name and its saves, newest first.
@@ -38,6 +41,8 @@ type SaveColonyRow struct {
 	// Game is the name its saves give it when the player renamed it (12 §4.1).
 	Game  string    `json:"game,omitempty"`
 	Saves []SaveRow `json:"saves"`
+	// Owner is who saves in its folder: the Game Configs ("A, C") or "pack X" (12 §4.8).
+	Owner string `json:"owner,omitempty"`
 }
 
 // SaveRow is one save in the tree: its name and when it was played.
@@ -57,8 +62,16 @@ func SavesRows(l *app.SaveList) *SavesPage {
 	for _, f := range l.Folders {
 		p.Folders = append(p.Folders, f.Dir)
 	}
+	seenOwner := map[string]bool{}
 	for _, c := range l.Colonies {
 		row := SaveColonyRow{Key: c.Key, Name: colonyName(c), Game: c.GameName, Saves: []SaveRow{}}
+		if f := c.Latest().Folder; f != nil {
+			row.Owner = FolderOwner(f)
+		}
+		if row.Owner != "" && !seenOwner[row.Owner] {
+			seenOwner[row.Owner] = true
+			p.Owners = append(p.Owners, row.Owner)
+		}
 		for _, s := range c.Saves {
 			r := SaveRow{Ref: s.Ref, Name: s.Name, When: saveWhen(s), Auto: s.Auto}
 			if d, ok := SaveDay(s); ok {
@@ -76,6 +89,9 @@ func SavesRows(l *app.SaveList) *SavesPage {
 		p.Empty = T("no save in the Saves folders of your games and packs")
 	default:
 		p.Lead = Tf("%d colonies  %d saves", len(p.Colonies), p.Saves)
+	}
+	if len(p.Owners) < 2 {
+		p.Owners = nil
 	}
 	return p
 }
@@ -156,6 +172,19 @@ type SaveDetail struct {
 	Mods    []SaveModView `json:"mods"`
 	Changes []SaveModView `json:"changes"`
 	NewList *SaveFixView  `json:"newList,omitempty"`
+
+	// Where its folder belongs (12 §4.8): Owner names who saves there (FolderOwner) when
+	// the game line does not (a pack's folder, or one several Game Configs share);
+	// Unseen says the game started with what the Launch page applied does not list it;
+	// NoCloud that Steam Cloud does not sync the folder; CopyHere, when Unseen, is the
+	// Game Config whose Saves folder Copy to … copies it into.
+	Owner    string `json:"owner,omitempty"`
+	Unseen   string `json:"unseen,omitempty"`
+	NoCloud  bool   `json:"noCloud,omitempty"`
+	CopyHere string `json:"copyHere,omitempty"`
+	// Chosen: Can it run checks this save ("save") or its colony ("colony") for the
+	// current Game Config (12 §4.8); "" neither.
+	Chosen string `json:"chosen,omitempty"`
 
 	// Locked says why Rename and Recycle are off now (a game runs, the file is written).
 	Locked string `json:"locked,omitempty"`

@@ -1,5 +1,7 @@
 package mcp
 
+import "strings"
+
 // Saves (12 §1.6, §4; 14 §2): two read-only tools for agents diagnosing a save that will
 // not load or asking about a playthrough, and the save actions for the player. Each call
 // maps to one archo saves argv, so the text is the CLI's (I1).
@@ -52,7 +54,7 @@ func GetSaveArgv(in GetSaveIn) []string {
 // ManageSavesIn is manage_saves.
 type ManageSavesIn struct {
 	Env          string  `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
-	Action       string  `json:"action" jsonschema:"fix, rename, copy, backup or trash"`
+	Action       string  `json:"action" jsonschema:"see the description"`
 	Saves        StrList `json:"saves" jsonschema:"sv:<hex>, file names or <colony>/<save>; fix, rename, copy take one"`
 	Name         string  `json:"name,omitempty" jsonschema:"rename: the new name"`
 	Mods         StrList `json:"mods,omitempty" jsonschema:"fix: only these packageIds"`
@@ -76,15 +78,23 @@ func ManageSavesArgv(in ManageSavesIn) []string {
 			b.str("mod", m)
 		}
 		return b.flag("disable-added", in.DisableAdded).flag("order", in.Order).flag("launch", in.Launch).flag("dry-run", in.DryRun).a
-	case "rename", "copy":
+	case "rename", "copy", "copy_to_current":
 		if in.DryRun {
 			return []string{"manage_saves: " + in.Action + " has no dry run; it only changes a file name in the save's folder and never overwrites"}
 		}
-		b := argv("saves", in.Action).pos(first(in.Saves))
+		b := argv("saves", strings.TrimSuffix(in.Action, "_to_current")).pos(first(in.Saves))
 		if in.Action == "rename" {
 			b.pos(in.Name)
 		}
-		return b.a
+		return b.flag("to-current", in.Action == "copy_to_current").a
+	case "choose", "choose_colony":
+		b := argv("saves", "choose")
+		if len(in.Saves) > 0 {
+			b.pos(first(in.Saves))
+		}
+		return b.flag("colony", in.Action == "choose_colony").a
+	case "unchoose":
+		return argv("saves", "choose").flag("clear", true).a
 	case "backup", "trash":
 		yes := in.Confirm && !in.DryRun
 		if yes && in.Action == "trash" && in.Token == "" {

@@ -4,6 +4,7 @@ sv:<Content.rws> Content  [loads with the list]
   game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
   list: plan:default (same Mods as one of its versions)
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Content.rws
+  saves of: env:main
   saved: 2026-10-01 09:59, 617 B
   read: in full
   content: 5 distinct names; sources use installed Mod versions
@@ -23,6 +24,7 @@ sv:<Content.rws> Content  [loads with the list]
   game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
   list: plan:default (same Mods as one of its versions)
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Content.rws
+  saves of: env:main
   saved: 2026-10-01 09:59, 617 B
   read: in full
   content: 5 distinct names; sources use installed Mod versions
@@ -44,6 +46,7 @@ sv:<Content.rws> Content  [loads with the list]
   game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
   list: plan:default (same Mods as one of its versions)
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Content.rws
+  saves of: env:main
   saved: 2026-10-01 09:59, 617 B
   read: in full
   content: 5 distinct names; sources use installed Mod versions
