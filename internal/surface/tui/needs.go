@@ -305,6 +305,12 @@ func (m *model) needLines(n int) []string {
 	if l := lastSaveLine(p.lastSave); l != "" {
 		out = append(out, "  "+sSecond.Render(fit(l, w-2)), "")
 	}
+	if p.missingLog != "" {
+		for _, line := range wrap(p.missingLog, w-2) {
+			out = append(out, "  "+sSecond.Render(line))
+		}
+		out = append(out, "")
+	}
 	if len(items) == 0 {
 		out = append(out, "  "+sOK.Render(markOK)+" "+sSecond.Render(fit(T("nothing needs your attention"), w-4)))
 		if away := m.elsewhereLines(w); len(away) > 0 {

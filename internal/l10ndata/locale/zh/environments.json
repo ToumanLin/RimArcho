@@ -81,5 +81,10 @@
   "unreadable Config/ModsConfig.xml: %s": "无法读取 Config/ModsConfig.xml：%s",
   "sign_color": "RimCrow 的标记颜色",
   "user_mod_type": "RimCrow 的 Mod 分类",
-  "ignored_issues": "RimCrow 的已忽略问题"
+  "ignored_issues": "RimCrow 的已忽略问题",
+  "other Game Configs use this game folder: its inventory and analysis stay": "其他游戏配置仍使用此游戏目录：保留 Mod 库与分析",
+  "this is the last Game Config using this folder: its records and %d Mod inventory records are removed": "这是使用此目录的最后一个游戏配置：将移除目录记录和 %d 条 Mod 库记录",
+  "the last run's log was not found: %s": "未找到上次运行的日志：%s",
+  "Game Config %s is running": "游戏配置 %s 正在运行",
+  "installation %s running, Game Config unknown": "游戏目录 %s 正在运行，游戏配置未知"
 }

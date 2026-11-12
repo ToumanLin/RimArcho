@@ -272,7 +272,7 @@ func TestRunningGameNamesThePlan(t *testing.T) {
 	if out, code := e.Run("launch"); code == 0 || !strings.Contains(out, "Game Config main is running plan:default (pid 7") {
 		t.Fatalf("exit %d\n%s", code, out)
 	}
-	if out := e.MustRun("status"); !strings.Contains(out, "game: running plan:default for") {
+	if out := e.MustRun("status"); !strings.Contains(out, "game: Game Config main is running plan:default") {
 		t.Fatal(out)
 	}
 

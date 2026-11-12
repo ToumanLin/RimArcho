@@ -569,7 +569,7 @@ function drawNeeds() {
   // a question whose item is gone (resolved by a refresh) is no question: enter must not run it
   if (!askShown) N.ask = null;
   if (!N.cols[0].length && !d.lastSave) lbox.append(el("section", "card empty-state", "✓ " + T("nothing here")));
-  if (!N.cols[1].length) rbox.append(el("div", "need-empty", T("no errors in the last run")));
+  if (!N.cols[1].length) rbox.append(el("div", "need-empty", N.data.missingLog || T("no errors in the last run")));
   // what other pages handle: one line each (16 §2.4)
   for (const e of d.elsewhere || []) {
     const b = el("button", "need-away", "→ " + e.text);

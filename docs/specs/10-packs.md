@@ -116,7 +116,7 @@ Before moving a blocking copy (step 2), plan the incoming links from all games u
 - **UI.** Show one "for you to confirm" item with a one-click "remove the links" action and no confirmation, since relaunching the pack rebuilds them. Launching through RimArcho removes the links anyway, so this is not a "breaks the game" item. If there are no game-breaking findings, the notice on the Launch page shows this message and links to Can it run (16 §2.3).
 - **Removal.** `archo pack unlink [--dry-run]` and MCP `manage_packs action=unlink` remove only the links under 09 §3, leaving the pack unchanged. Refuse if any game is running.
 
-**Pack Player.log (not verified in the game).** The code assumes that 1.7 and later write logs to `Logs/Player.log` in the data directory, so a pack's log is at `<pack>/userdata/Logs/Player.log`. Earlier Unity versions use a fixed path shared with the environment. Whether the location actually follows `-savedatafolder` must be checked in the game, with the result recorded in 18. Log following and attribution use these locations (06 §4, §6).
+**Pack Player.log.** Launch arguments and previous-log rotation follow 03 §6.3 using the pack's userdata. Log following uses the pack's own file without borrowing the selected environment's log (06 §4, §6). Real-game verification of the explicit-log launch remains pending, including 1.7 Waylith.
 
 ## 4. Import, export and deletion
 
@@ -162,7 +162,7 @@ The comparison appears in `pack import` and `pack check` results, in the MCP `ma
 | K10 | An interrupted build leaves `.archo-tmp` | List it and allow removal with `--unfinished`; do not allow deletion of a running build (`TestPackUnfinished`) | Pass |
 | K11 | Observe build progress | Steps advance in `build.json`; a 15-second heartbeat loss marks interruption (`TestPackBuildProgress`) | Pass |
 | K12 | Launch directly through Steam with leftover links | Can it run offers one-click removal (`TestPackLinksLeft` covers stopped, running as the pack and Steam-launched games; removal deletes only links and refuses while running) | Pass |
-| K13 | Play a pack on 1.7 | Write the log to `<pack>/userdata/Logs/Player.log` and follow it live | Verification pending |
+| K13 | Play a pack on 1.7 | Find the pack's own log under 03 §6.3 and follow it live; if Waylith ignores redirection, report absence without borrowing the config log | Verification pending |
 | K14 | Run `pack launch` while a game runs | Refuse | Pass |
 | K15 | A same-content `Mods/` copy exists (RimCrow `_<ID>_` or `_Link_`), then the local copy updates | Reuse the existing copy without a duplicate link; after the update, refuse and list the folder (`TestPackLaunchNoDuplicates`, which reproduces the player's log) | Pass |
 | K16 | A plan's `_Archo_` link has the same package ID as a bundled copy | Remove the link before pack launch, leaving no duplicates (`TestPackDropsDuplicateDeploy`) | Pass |

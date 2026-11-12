@@ -122,6 +122,24 @@ func (a *App) LaunchWith(dryRun, move bool) (*SaveResult, error) {
 }
 
 func (a *App) startGame(p *LaunchPlan) error {
+	// Unity truncates an explicit -logfile instead of preserving the previous run.
+	for i, arg := range p.Args {
+		if arg == "-logfile" && i+1 < len(p.Args) {
+			path := p.Args[i+1]
+			if _, err := os.Stat(path); err == nil {
+				prev := filepath.Join(filepath.Dir(path), "Player-prev.log")
+				if err := os.Remove(prev); err != nil && !os.IsNotExist(err) {
+					return err
+				}
+				if err := os.Rename(path, prev); err != nil {
+					return err
+				}
+			} else if !os.IsNotExist(err) {
+				return err
+			}
+		}
+	}
+
 	launcher := a.Launcher
 	if launcher == nil {
 		launcher = ExecLauncher
@@ -141,7 +159,7 @@ func (a *App) gamePlan(e *env.Environment, userData string) (*LaunchPlan, error)
 		goos = runtime.GOOS
 	}
 	proton := goos == "linux" && env.IsProtonGame(e.GameRoot)
-	defaultUserData := env.DefaultUserDataRoot()
+	defaultUserData := a.DefaultUserData(e.GameRoot)
 	if goos == "linux" {
 		defaultUserData = a.DefaultUserData()
 		if e.Launch == "steam" || proton {
@@ -156,7 +174,7 @@ func (a *App) gamePlan(e *env.Environment, userData string) (*LaunchPlan, error)
 		if proton {
 			return nil, fmt.Errorf("%w: Proton games do not support own or custom saves yet; use archo env set --saves shared", ErrLaunchBlocked)
 		}
-		extra = append(extra, "-savedatafolder="+userData)
+		extra = append(extra, "-savedatafolder="+userData, "-logfile", filepath.Join(userData, "Player.log"))
 	}
 	argv, err := ParseLaunchArgs(a.LaunchArgs(e.ID))
 	if err != nil {

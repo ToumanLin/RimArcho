@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
@@ -193,6 +194,8 @@ type Needs struct {
 	LastRunDay string `json:"lastRunDay,omitempty"` // its day: "Oct 21"
 	// LastRunPending: that log is not analysed yet, so its errors are not counted.
 	LastRunPending bool `json:"lastRunPending,omitempty"`
+	// MissingLog explains why no clean last-run verdict is available.
+	MissingLog string `json:"missingLog,omitempty"`
 	// Elsewhere: what is not on Can it run but handled on another page (SectionElsewhere),
 	// one line each at the bottom of the page (16 §2.4).
 	Elsewhere []Elsewhere `json:"elsewhere,omitempty"`
@@ -346,6 +349,18 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 			n.LastRun = T("the list") + "  " + when
 		}
 		break
+	}
+	if n.LastRun == "" && st.Ix.Env.UserDataRoot != "" {
+		cur, prev := a.LogPaths(st)
+		if cur == "" && prev == "" {
+			path := filepath.Join(st.Ix.Env.UserDataRoot, "Player.log")
+			if same := a.DefaultUserData(st.Ix.Env.GameRoot); env.PathKey(same) == env.PathKey(st.Ix.Env.UserDataRoot) {
+				if mm := env.MajorMinor(st.Ix.Env.GameVersion); mm != "" && !env.VersionLess(mm, "1.7") {
+					path = filepath.Join(st.Ix.Env.UserDataRoot, "Logs", "Player.log")
+				}
+			}
+			n.MissingLog = Tf("the last run's log was not found: %s", path)
+		}
 	}
 	n.LastSave = lastSaveView(a, st, ps.Logs)
 	indexNeeds(n)

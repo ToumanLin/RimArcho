@@ -90,7 +90,7 @@ Validated by the player on 2026-11-10 and removed from this table: SteamCMD game
 | TUI | Use the editor, Mod library and change history keys in a real terminal (Windows Terminal) | Player or agent |
 | Cold-cache scan | Measure the first scan after a reboot; target ≤ 60 seconds | Player after reboot |
 | Missing WebView2 | Double-click `RimArcho.exe` in a VM without WebView2 | Player or VM |
-| Pack Player.log location | Where the game writes its log when launched with `-savedatafolder` (10 §3) | Player enters game |
+| Pack Player.log location | Verify explicit log redirection and previous-log rotation (03 §6.3, 10 §3), including Waylith ignoring `-logfile` | Player enters game |
 | Real community data download | `archo data update` against the real sources (about 50 MB) | Player |
 | DDS textures | Optimized textures and slimmed packs look right in the game, in 1.6 and 1.7 (10 §2; research dds-texture-optimization §6) | Player enters game |
 | GUI accessibility | Narrator; the A13 branches that need real files, the network or a launch; A17 on the remaining pages (16 §11) | Player or agent |

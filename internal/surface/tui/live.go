@@ -40,7 +40,7 @@ func liveKey(l *view.Live) string {
 	if l == nil {
 		return ""
 	}
-	k := ""
+	k := l.Owner + "\n" + l.Blocked + "\n"
 	for _, it := range l.Items {
 		k += it.Text + "\n"
 	}

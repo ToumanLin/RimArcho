@@ -161,6 +161,9 @@ func ValidateLaunchArgs(name, args string) error {
 	}
 	for _, arg := range argv {
 		key := strings.ToLower(strings.Trim(arg, "\"'"))
+		if key == "-logfile" || strings.HasPrefix(key, "-logfile=") {
+			return fmt.Errorf("launch argument %q overrides the Game Config's log file; remove -logfile from the launch arguments; RimArcho manages Player.log in the user data folder", arg)
+		}
 		if key == "-savedatafolder" || strings.HasPrefix(key, "-savedatafolder=") {
 			return fmt.Errorf("launch argument %q overrides the Game Config's user data folder; use archo env set %s --user-data <dir> and remove -savedatafolder from the launch arguments", arg, quoteArg(name))
 		}

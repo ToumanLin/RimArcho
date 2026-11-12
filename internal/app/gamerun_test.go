@@ -9,6 +9,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 func TestSaveDataArg(t *testing.T) {
@@ -101,6 +102,27 @@ func TestRunningSiblingAttribution(t *testing.T) {
 	} {
 		e.App.GameProbe = func(string) *app.GameRun {
 			return &app.GameRun{PID: 42, ArgsKnown: tc.known, SaveData: tc.root, Started: e.Now()}
+		}
+		st, err := e.App.Loadout()
+		if err != nil {
+			t.Fatal(err)
+		}
+		var tracker view.LiveTracker
+		live, err := tracker.Update(e.App, st)
+		if err != nil {
+			t.Fatal(err)
+		}
+		status := e.MustRun("status")
+		if tc.want == "" {
+			if live.Running || !strings.Contains(live.Blocked, "Game Config unknown") || !strings.Contains(status, "Game Config unknown") {
+				t.Fatalf("unknown displayed as selected: %+v\n%s", live, status)
+			}
+		} else if tc.want != sibling.Name {
+			if live.Running || !strings.Contains(live.Blocked, "Game Config "+tc.want) || !strings.Contains(status, "Game Config "+tc.want+" is running") {
+				t.Fatalf("sibling displayed as selected: %+v\n%s", live, status)
+			}
+		} else if !live.Running || !strings.Contains(live.Owner, sibling.Name) {
+			t.Fatalf("own run: %+v", live)
 		}
 		g, err := e.App.RunningGame()
 		if err != nil || g == nil {

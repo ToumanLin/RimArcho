@@ -15,6 +15,7 @@ const GroupThisRun = 6
 // Live is the running game as the interfaces show it.
 type Live struct {
 	Running bool   `json:"running"`
+	Owner   string `json:"owner,omitempty"`
 	Since   string `json:"since,omitempty"` // HH:MM
 	Errors  int    `json:"errors"`
 	Items   []Need `json:"items"`
@@ -55,7 +56,7 @@ func (t *LiveTracker) Update(a *app.App, st *app.LoadoutState) (*Live, error) {
 		return nil, err
 	}
 	var run *app.GameRun
-	if g != nil && g.Env.ID == st.Ix.Env.ID {
+	if g != nil && !g.UnknownEnv && g.Env.ID == st.Ix.Env.ID {
 		run = g.Run
 	}
 	if run == nil {
@@ -64,7 +65,7 @@ func (t *LiveTracker) Update(a *app.App, st *app.LoadoutState) (*Live, error) {
 			t.lv, t.pid = nil, 0
 		}
 		if g != nil {
-			return newLog(a, st, &Live{Blocked: Tf("a game is already running (%s)", g.Env.Name)}), nil
+			return newLog(a, st, &Live{Blocked: runningOwner(g)}), nil
 		}
 		return newLog(a, st, &Live{}), nil
 	}
@@ -73,21 +74,28 @@ func (t *LiveTracker) Update(a *app.App, st *app.LoadoutState) (*Live, error) {
 			t.lv.Close(a)
 			t.lv, t.pid = nil, 0
 		}
-		// a pack run writes its own log on 1.7 (10 §3): follow the one this run writes
+		// Follow this run's own log, including packs (03 §6.3).
 		t.what = a.WhatRuns(st.Ix.Env, run)
 		path := a.RunLog(st, t.what)
 		if path == "" {
-			return &Live{Running: true, Since: run.Started.In(a.Loc).Format("15:04"), Pack: t.what.Pack, Guess: t.what.Guess}, nil
+			return &Live{Running: true, Owner: runningOwner(g), Since: run.Started.In(a.Loc).Format("15:04"), Pack: t.what.Pack, Guess: t.what.Guess}, nil
 		}
 		t.lv, t.pid = a.FollowRun(path, a.RunDataRoot(st, t.what)), run.PID
 	}
 	if _, err := t.lv.Poll(a); err != nil {
 		return nil, err
 	}
-	l := &Live{Running: true, Since: run.Started.In(a.Loc).Format("15:04"), Pack: t.what.Pack, Guess: t.what.Guess}
+	l := &Live{Running: true, Owner: runningOwner(g), Since: run.Started.In(a.Loc).Format("15:04"), Pack: t.what.Pack, Guess: t.what.Guess}
 	l.Items = LiveNeeds(st, t.lv.Clusters())
 	l.Errors = len(l.Items)
 	return l, nil
+}
+
+func runningOwner(g *app.RunningGame) string {
+	if g.UnknownEnv {
+		return Tf("installation %s running, Game Config unknown", g.Env.GameRoot)
+	}
+	return Tf("Game Config %s is running", g.Env.Name)
 }
 
 // LiveNeeds turns the running game's clusters into Can it run items, newest first.
@@ -151,11 +159,21 @@ func LiveNeeds(st *app.LoadoutState, cs []*app.LiveCluster) []Need {
 // pack is played ("" when the game is not running). The GUI's sidebar foot and the TUI's
 // status line show it with this run's errors as an amber number beside it (16 §2.1, §9.1).
 func LiveText(l *Live) string {
-	if l == nil || !l.Running {
+	if l == nil {
 		return ""
 	}
-	if l.Pack != "" {
-		return Tf("pack %s running since %s", l.Pack, l.Since)
+	if l.Blocked != "" {
+		return l.Blocked
 	}
-	return Tf("game running since %s", l.Since)
+	if !l.Running {
+		return ""
+	}
+	text := Tf("game running since %s", l.Since)
+	if l.Pack != "" {
+		text = Tf("pack %s running since %s", l.Pack, l.Since)
+	}
+	if l.Owner != "" {
+		text = l.Owner + "  " + text
+	}
+	return text
 }

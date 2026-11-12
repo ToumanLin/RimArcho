@@ -81,5 +81,10 @@
   "unreadable Config/ModsConfig.xml: %s": "Config/ModsConfig.xml を読み取れません：%s",
   "sign_color": "RimCrow のマークの色",
   "user_mod_type": "RimCrow の Mod 分類",
-  "ignored_issues": "RimCrow の無視した問題"
+  "ignored_issues": "RimCrow の無視した問題",
+  "other Game Configs use this game folder: its inventory and analysis stay": "他のゲーム構成がこのゲームフォルダーを使用するため、在庫と解析結果は残ります",
+  "this is the last Game Config using this folder: its records and %d Mod inventory records are removed": "このフォルダーを使用する最後のゲーム構成です。記録と %d 件の Mod 在庫記録を削除します",
+  "the last run's log was not found: %s": "前回の実行ログが見つかりません: %s",
+  "Game Config %s is running": "ゲーム構成 %s が実行中です",
+  "installation %s running, Game Config unknown": "ゲームフォルダー %s が実行中です。ゲーム構成は不明です"
 }

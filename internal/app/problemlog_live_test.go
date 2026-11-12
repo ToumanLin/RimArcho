@@ -61,7 +61,7 @@ func TestProblemLogSkipsTheRunningGamesLog(t *testing.T) {
 	// A clean live log must not make the cached previous report look like this run.
 	e.WriteFile(cur, "synthetic clean live log\n")
 	out := e.MustRun("status")
-	for _, want := range []string{"game: running plan:default", "log findings are from a previous run", "log: previous run: Player-prev.log", "current run: archo log --follow"} {
+	for _, want := range []string{"game: Game Config main is running plan:default", "log findings are from a previous run", "log: previous run: Player-prev.log", "current run: archo log --follow"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q:\n%s", want, out)
 		}

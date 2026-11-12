@@ -25,6 +25,8 @@ The table is `launch(environment_id, started_at, method, command, plan_id, finge
 
 ## 2. Launching a plan
 
+**Managed log arguments.** Plan and pack redirection and rotation follow 03 §6.3. User-supplied `-logfile` (separate, `=`, quoted or mixed-case forms) is refused in both typed and stored extra arguments before writes, like `-savedatafolder`. The refusal tells the player to remove the override; RimArcho manages the log path.
+
 `archo launch [--dry-run]` launches the current plan. See 13 §4 for arguments that name a plan and for other reference forms. The UI entry points are the launch control in the top bar, "launch the game" on the Launch page, and `L` (16 §2.1, §2.3). One click launches, and the status line reports the result. If step 1 or 2 below refuses the launch, the status line gives the reason and commands that can resolve it (16 §6). The command panel's "preview the launch" is read-only.
 
 **Steps** (if any step fails, stop without executing the later steps):
@@ -48,7 +50,7 @@ The links are handled before ModsConfig.xml is written. If a link operation fail
 | `direct` | The first executable found in the game directory: `RimWorldWin64.exe`, `RimWorld.exe`, `RimWorldLinux`, `RimWorldMac.app`; Linux tries `RimWorldLinux` first | The extra arguments |
 
 - Both methods append `-savedatafolder=<path>` when the user data directory differs from the local default, using normalized paths for the comparison. On Linux Steam launches use the game's default (03 §3.2); direct native launches use the host default, so a native Flatpak game launched directly receives its Flatpak data path explicitly.
-- The player enters "extra arguments" in the "this game" group in settings (16 §2.14). They are stored as `env:<environmentID>:launch_args`, split on whitespace and appended last.
+- The player enters "extra arguments" in the "this game" group in settings (16 §2.14). They are stored as `env:<environmentID>:launch_args`, parsed as quoted command-line text or imported JSON argv and appended last.
 - The working directory is the game directory. Arguments containing spaces or tabs are displayed in double quotes.
 - If Steam is missing, refuse and suggest `archo env set --launch direct` for a native game; for Proton, explain that Steam is required. If the game executable is missing, refuse and name the directory that was searched. Scripts inside a Flatpak Steam root are launched through Flatpak, not directly on the host.
 
@@ -139,9 +141,9 @@ Detection is not implemented on other systems, where games are always considered
 
 **Display.** Show "not running" or "running", with the PID and start time when running.
 
-- `archo status` displays `game: running the list for 12m (pid 1234; archo log --follow)`. For a pack, it uses `pack <pack name>`; an inferred pack adds `(from the launch records)`. The game of a test run (its data folder is under RimArcho's `tests/`, 20 §1) is `a test run`, here and in refusals that name a running game.
-- In the GUI, the disabled block on the Launch page says "the game is running" and shows the error count for this run. The "last game" control at the top right does the same. Errors enter Can it run and its badge (16 §2.1, §2.3).
-- The TUI displays the same information in its status bar (16 §9).
+- `archo status` uses `RunningGame.Describe`, the same attribution as launch refusals: for example, `game: Game Config Steam is running plan:default (pid 1234, since 12:00)`. Unknown ownership explicitly names the installation and says "Game Config unknown". For a pack, it uses `pack <pack name>`; an inferred pack adds `(from the launch records)`. The game of a test run (its data folder is under RimArcho's `tests/`, 20 §1) is `a test run`, here and in refusals that name a running game.
+- In the GUI, the disabled block on the Launch page names the actual running Game Config or says its owner is unknown. It never labels the selected sibling as running. Only a run attributed to the selected config supplies its live error count. The "last game" control at the top right does the same. Errors enter Can it run and its badge (16 §2.1, §2.3).
+- The TUI displays the same owner in its status bar and Start page (16 §9). CLI status, GUI and TUI all use `RunningGame` attribution (installation, effective data root, then launch records).
 - On exit, stop following the log, perform a full analysis (06 §6), and suggest log analysis under §2.
 
 ## 5. Hidden Mods
@@ -199,7 +201,7 @@ Test runs and probe runs launch a plan with isolated data and report its errors;
 
 | # | Scenario | Expected | Status |
 | --- | --- | --- | --- |
-| J1 | `launch --dry-run` with Steam and nondefault user data | The command includes `steam.exe`, `-applaunch 294100` and `-savedatafolder=`; no launch (`TestLaunchPlans`) | Pass |
+| J1 | `launch --dry-run` with Steam and nondefault user data | The command includes `steam.exe`, `-applaunch 294100`, `-savedatafolder=` and the config's explicit logfile; default data omits redirection (`TestLaunchPlans`, `TestConfigLogLaunchAndRotation`) | Pass |
 | J2 | Launch after `--launch direct` | Run `RimWorldWin64.exe` and create one launch record | Pass |
 | J17 | Linux native and Proton launches; missing Steam; own/custom saves, extra savedatafolder, pack and test runs | Native selects its executable; Proton shared saves launch through Steam, and unsupported routes refuse before game-file writes (`TestLinuxLaunch`, `TestSteamCommand`, `TestProtonRefusesIsolatedRun`) | Synthetic; Linux VM pending |
 | J3 | Enable a SteamCMD Mod, run `save --dry-run`, then `save` | The preview lists the link without creating it; save creates `Mods/_Archo_…` (`TestLinkDeployment`) | Pass |

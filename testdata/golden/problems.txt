@@ -39,7 +39,7 @@ launch: dry run (steam), nothing written
   entries: 5
   changes: 0 since v1
   history: same as v1, no new version
-  command: $ROOT/Steam/steam.exe -applaunch 294100 "-savedatafolder=$ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios"
+  command: $ROOT/Steam/steam.exe -applaunch 294100
   before you play: 3 problems that often cause errors in the game (they do not block the launch)
     warning patch.no-match  #hnyg Compat: Patches/Compat.xml:2 Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) matched nothing (target-inactive, unguarded-optional)
       why: patches that find nothing usually fail with red errors: such mods were error sources in 37% of logs (4.5% by chance)
@@ -162,7 +162,7 @@ launch: dry run (steam), nothing written
   entries: 5
   changes: 0 since v1
   history: same as v1, no new version
-  command: $ROOT/Steam/steam.exe -applaunch 294100 "-savedatafolder=$ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios"
+  command: $ROOT/Steam/steam.exe -applaunch 294100
   before you play: 2 problems that often cause errors in the game (they do not block the launch)
     warning patch.no-match  #hnyg Compat: Patches/Compat.xml:2 Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) matched nothing (target-inactive, unguarded-optional)
       why: patches that find nothing usually fail with red errors: such mods were error sources in 37% of logs (4.5% by chance)

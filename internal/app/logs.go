@@ -116,7 +116,7 @@ func (a *App) LogPaths(st *LoadoutState) (cur, prev string) {
 		return "", ""
 	}
 	dirs := []string{root, filepath.Join(root, "Logs")}
-	if mm := env.MajorMinor(st.Ix.Env.GameVersion); mm != "" && !env.VersionLess(mm, "1.7") {
+	if mm := env.MajorMinor(st.Ix.Env.GameVersion); mm != "" && !env.VersionLess(mm, "1.7") && samePath(root, a.DefaultUserData(st.Ix.Env.GameRoot)) {
 		dirs[0], dirs[1] = dirs[1], dirs[0]
 	}
 	pick := func(name string) string {
@@ -171,7 +171,8 @@ var ErrLogNotCached = errors.New("log not analysed yet")
 // was modified" and comp-list tick crashes, Harmony patches on callers listed only, no
 // --target suggestion for TargetMethod() patches (06 §2, §3); 21: native Linux paths;
 // 22: audio and other asset paths in stable finding keys and attribution on both platforms.
-const logCacheVersion = 22
+// 23: isolated log ownership ignores later redirected sibling and pack launches.
+const logCacheVersion = 23
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -1414,11 +1415,22 @@ func (a *App) LiveLog(st *LoadoutState) string {
 	if st == nil || st.Ix == nil || st.Ix.Env == nil {
 		return ""
 	}
+	// Log selection only needs this installation; probing unrelated games can wait
+	// behind their preparation while the current page must remain readable.
 	r := a.readProbe()(st.Ix.Env.GameRoot)
 	if r == nil {
 		return ""
 	}
-	return a.RunLog(st, a.WhatRuns(st.Ix.Env, r))
+	g, err := a.runningGame(func(root string) *GameRun {
+		if samePath(root, st.Ix.Env.GameRoot) {
+			return r
+		}
+		return nil
+	})
+	if err != nil || g == nil || g.UnknownEnv || g.Env.ID != st.Ix.Env.ID {
+		return ""
+	}
+	return a.RunLog(st, g.What)
 }
 
 // sameLog: two log paths name one file ("" names none).

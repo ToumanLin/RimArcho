@@ -171,6 +171,10 @@ func (e *GameRunningError) Unwrap() error { return ErrLaunchBlocked }
 // RunningGame finds a running game in any registered environment, the current one first: a
 // process whose executable is under a environment's game folder (09 §4). nil when none.
 func (a *App) RunningGame() (*RunningGame, error) {
+	return a.runningGame(a.probe())
+}
+
+func (a *App) runningGame(probe func(string) *GameRun) (*RunningGame, error) {
 	envs, err := a.Store.Envs()
 	if err != nil {
 		return nil, err
@@ -183,7 +187,6 @@ func (a *App) RunningGame() (*RunningGame, error) {
 			}
 		}
 	}
-	probe := a.probe()
 	for _, e := range envs {
 		if r := probe(e.GameRoot); r != nil {
 			g := &RunningGame{Env: e, Run: r, UnknownEnv: true}
@@ -256,7 +259,7 @@ func (a *App) checkNoGame() error {
 // RunWhat is what a game run plays: one of the environment's plans or a pack (10 §3).
 type RunWhat struct {
 	Pack     string // "" for the environment's list
-	UserData string // the run's data folder: its ModsConfig.xml, and on 1.7 its Logs/
+	UserData string // the run's data folder: its ModsConfig.xml and Player.log
 	Guess    bool   // read from the launch records: the command line was not available
 	// Plan names the plan played, from the launch records (09 §4) or, for a game started
 	// elsewhere, the plan last written to the game; "" when neither says.
@@ -365,13 +368,16 @@ func (a *App) packOfDir(dir string) string {
 	return parts[0]
 }
 
-// RunLog is the Player.log a run writes: on 1.7 under its data folder's Logs/, before 1.7
-// the one Unity keeps (the environment's).
+// RunLog prefers the explicit Player.log in the run's own data folder (03 §6.3).
+// A pack never falls back to the selected environment's log.
 func (a *App) RunLog(st *LoadoutState, w RunWhat) string {
 	if w.UserData != "" && env.PathKey(w.UserData) != env.PathKey(st.Ix.Env.UserDataRoot) {
-		if p := env.PlayerLog(w.UserData, st.GameMM()); p != "" && a.CheckLogOwner(st, p) == nil {
-			return p
+		for _, p := range []string{filepath.Join(w.UserData, "Player.log"), env.PlayerLog(w.UserData, st.GameMM())} {
+			if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+				return p
+			}
 		}
+		return ""
 	}
 	cur, _ := a.LogPaths(st)
 	return cur

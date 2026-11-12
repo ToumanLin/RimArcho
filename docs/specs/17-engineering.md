@@ -253,7 +253,7 @@ Basis: ilspycmd decompilation of 1.7.4982 `Assembly-CSharp.dll`, covering `Verse
 5. Derived packageId (when absent in About.xml, `ModMetaDataInternal.TryParsePackageId`): `ConvertToASCII(author + first 3 characters of description hash) + "." + ConvertToASCII(name)`; default `author` is `Anonymous`; description hash uses `GenText.StableStringHash` (UTF-16, wrapping int32 overflow). Official content without packageId uses `ludeon.rimworld` for Core, `ludeon.rimworld.<folder>` otherwise (04 §1.5).
 6. Official DLC About.xml has no `<name>`; display name comes from the ExpansionDef label, the folder name (for example, "Royalty").
 7. Log Mod prefix `[Name]` uses About.xml's name, not RimArcho's alias.
-8. Player.log: `<user data>/Logs/Player.log` in 1.7+, user data root in earlier versions (03 §3.3).
+8. Player.log location and redirection: 03 §3.3 / §6.3. Windows 1.6 VM evidence confirms `-savedatafolder` alone leaves Unity logs shared; Waylith test runs capture stdout instead (20 §2).
 
 **Def and Patch (behavior XPath simulation must honor, 05 §5.2)**
 

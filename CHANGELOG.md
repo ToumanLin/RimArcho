@@ -4,6 +4,9 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Game Configs: own/custom user data folders and packs now launch with their own Player.log and preserve Player-prev.log; default-folder launches keep the game defaults. Extra -logfile overrides are refused. Can it run and home report missing logs with the path checked instead of claiming a clean run, including when 1.7 ignores redirection.
+- Status, TUI and GUI Launch now name the actual running Game Config, or explicitly say its owner is unknown, using the same attribution as launch refusals.
+- Chinese and Japanese: translate both sibling and last-config removal confirmation lines.
 - Adding a Game Config selects a global Mod list instead of copying the editor list. The dialog offers all lists and a new Core/DLC list; `env add` accepts `--list <plan>` or `--new-list`, and `--like` defaults to the source config's current list. New lists use the config or RimCrow profile name without a suffix.
 - Settings shows extra launch arguments as quoted command-line text, including arguments imported from RimCrow. RimCrow import shows profiles once, with translated statuses and player wording for source settings in Chinese and Japanese.
 

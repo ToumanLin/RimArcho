@@ -170,6 +170,11 @@ func (m *model) homeLines(n int) []string {
 		state = sErrS.Render(r.State)
 	}
 	add("  " + label("list") + sText.Render(r.Facts) + "  " + state)
+	if h.data.MissingLog != "" {
+		for _, line := range wrap(h.data.MissingLog, max(1, m.w-2)) {
+			add("  " + sSecond.Render(line))
+		}
+	}
 	if d := h.data; d.LastRun != "" {
 		errs := T("no errors")
 		switch {
@@ -194,6 +199,12 @@ func (m *model) homeLines(n int) []string {
 		case "warning":
 			launchLabel, launchStyle = T("launch with limited RAM"), sWarnS
 		}
+	}
+	if m.live != nil && (m.live.Running || m.live.Blocked != "") {
+		for _, line := range wrap(view.LiveText(m.live), max(1, m.w-2)) {
+			add("  " + sSecond.Render(line))
+		}
+		return out
 	}
 	add("  " + indent + launchStyle.Background(cPill).Bold(true).Render("  "+ic.play+" "+launchLabel+"   ") + sPill.Bold(true).Render("L") + sPill.Render("  "))
 	if r.Unsaved > 0 && m.launches == "" {

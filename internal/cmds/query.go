@@ -914,23 +914,12 @@ func loadoutStatus(c *Ctx, root *render.Node, d *render.Doc) {
 	if s, err := c.App.MonitorState(); err == nil && (s.Bundled != nil || s.Source != nil || s.Newest != nil || s.InPlan != nil) {
 		root.KV("monitor", MonitorPlanLine(c, s))
 	}
-	if run, _ := c.App.GameRunning(); run != nil {
-		w := c.App.WhatRuns(st.Ix.Env, run)
-		what := w.PlanText() // the plan, from the launch records (09 §4)
-		if what == "its list" {
-			what = "the list"
-		}
-		if w.Pack != "" {
-			what = "pack " + w.Pack
-			if w.Guess {
-				what += " (from the launch records)"
-			}
-		}
-		if w.Test { // VM 2026-11-10: a test run's game read "running the list"
-			what = "a test run"
-		}
-		root.KV("game", fmt.Sprintf("running %s for %s (pid %d; archo log --follow)", what, c.App.Now().Sub(run.Started).Round(time.Minute), run.PID))
+	if g, err := c.App.RunningGame(); err != nil {
+		root.KV("game", "unavailable: "+err.Error())
+	} else if g != nil {
+		root.KV("game", g.Describe(c.App.Loc))
 	}
+
 	for _, n := range st.Notices {
 		root.KV("notice", n)
 	}

@@ -435,14 +435,14 @@ function launchStep(f) {
   b.dataset.envWrite = "launch";
   arrived = false;
   const top = el("div", "top");
-  const title = el("span", "title", live ? T("the game is running") : starting ? T("starting…") : T(severity === "severe" ? "launch with RAM risk" : severity === "warning" ? "launch with limited RAM" : "launch the game"));
+  const title = el("span", "title", live ? (S.live.blocked || S.live.owner || T("the game is running")) : starting ? T("starting…") : T(severity === "severe" ? "launch with RAM risk" : severity === "warning" ? "launch with limited RAM" : "launch the game"));
   if (live) title.prepend(el("span", "dot"));
   top.append(title);
   if (!live) top.append(keyCaps("L"));
   // 01 and 02 already say what starts; the block adds only the edits that launching saves,
   // and they can be saved alone: save sits in the block's corner, beside it, not in it
   const saving = !starting && canSave(f);
-  const sub = live ? (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet")) : f && f.unsaved && !saving ? Tf("%d unsaved", f.unsaved) : "";
+  const sub = live && S.live.blocked ? "" : live ? (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet")) : f && f.unsaved && !saving ? Tf("%d unsaved", f.unsaved) : "";
   const bottom = el("div", "bottom");
   bottom.append(el("span", "sub num", sub));
   if (!live) bottom.append(el("span", "arrow", "→"));
@@ -602,9 +602,9 @@ function showSwitch(r) {
 function activity() {
   const box = el("div", "hm-act");
   const live = S.live && S.live.running;
-  if (live || data.lastRun) {
-    const runText = live ? T("the game is running") + "  " + (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet"))
-      : (data.lastRunDay || data.lastRun) + "  " + (data.lastRunErrors ? Tf("%d errors", data.lastRunErrors) : data.lastRunPending ? T("not checked yet") : T("no errors"));
+  if (live || data.lastRun || data.missingLog) {
+    const runText = live ? (S.live.owner || T("the game is running")) + "  " + (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet"))
+      : data.missingLog || (data.lastRunDay || data.lastRun) + "  " + (data.lastRunErrors ? Tf("%d errors", data.lastRunErrors) : data.lastRunPending ? T("not checked yet") : T("no errors"));
     const runGo = live || data.lastRunErrors ? "needs" : "log";
     box.append(actLine(T("last game"), runText, () => ui.go(runGo)));
   }

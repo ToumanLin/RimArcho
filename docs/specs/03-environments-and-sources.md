@@ -120,6 +120,8 @@ Detection results are only suggestions: `env detect` prints the first match, the
 
 ### 3.3 Player.log location
 
+Redirected plan and pack logs follow §6.3. For the game's default user data folder, the reader checks these layouts:
+
 - RimWorld 1.7 and later: `<user_data_root>/Logs/Player.log`
 - Earlier versions: `<user_data_root>/Player.log`
 - Unknown version: check both and take the newer mtime. The previous run's log is `Player-prev.log` in the same directory.
@@ -257,7 +259,11 @@ Registration already enforces the Proton redirection restriction for both own an
 
 ### 6.3 Logs
 
-Each environment's log page shows only its own runs. Where the game writes Player.log for `-savedatafolder` runs is not yet verified (§3.3, 10 §3, 01 §4.2). If environments of one installation turn out to write one file, newly created environments get their own `-logfile` under their user data folder; existing environments keep their log location.
+Each environment's log page shows only its own runs. Every plan launch whose effective user data root differs from the game's default adds `-logfile <user-data>/Player.log`; this applies to existing and new environments. Packs use the same argument with their own userdata. Default-folder environments add no `-logfile` and keep the game's normal behavior. Before starting a redirected run, RimArcho replaces `Player-prev.log` with the previous `Player.log`; dry runs never rotate files. Refuse a rotation failure before starting the process.
+
+Windows RimWorld 1.6 does not move Unity's log with `-savedatafolder`: sibling launches overwrite the default LocalLow file and rotate each other's logs. Evidence: the [Game Config VM round](../research/2026-11-12_game-configs-vm-round.md#playerlog-answer-03-63). Unity truncates explicit `-logfile` output, so RimArcho preserves the previous generation itself. For 1.7 Waylith, `-logfile` may be ignored (20 §2); normal plan and pack launches do not capture stdout. If their own file is absent, report the missing log and the path checked, never a clean run. Do not borrow the default folder's log for an own-folder environment.
+
+File selection and launch attribution are in 06 §4. Extra launch arguments cannot override either `-savedatafolder` or `-logfile` (09 §2).
 
 ### 6.4 RimCrow profiles
 

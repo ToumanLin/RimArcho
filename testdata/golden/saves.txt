@@ -233,7 +233,7 @@ next:
 $ archo saves fix Tundra --launch
 sv:<Tundra.rws> Tundra: nothing to fix in plan:default
   launch: started RimWorld via direct with plan:default
-  command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe "-savedatafolder=$ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios"
+  command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe
 
 $ archo saves fix Broken
 sv:<Broken.rws> Broken: nothing to fix in plan:default

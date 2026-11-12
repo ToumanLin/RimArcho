@@ -147,7 +147,7 @@ func (m *model) statusLine() string {
 func (m *model) liveStatus() (string, int) {
 	l := m.live
 	switch {
-	case l != nil && l.Running:
+	case l != nil && (l.Running || l.Blocked != ""):
 		t := view.LiveText(l)
 		s, w := sOK.Render(ic.unsaved)+" "+sSecond.Render(t), 2+width.StringWidth(t)
 		if l.Errors > 0 {
