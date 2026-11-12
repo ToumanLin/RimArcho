@@ -343,7 +343,7 @@ export function crumbs() {
   const sh = S.shell;
   const cur = current();
   let out = (sh && sh.crumbs && sh.crumbs[cur]) || [];
-  if (S.screen === "guide") out = (S.guideFrom === "env" ? out : []).concat([{ label: S.guideFrom === "env" ? T("add a game") : T("getting started"), id: "guide" }]);
+  if (S.screen === "guide") out = (S.guideFrom === "env" ? out : []).concat([{ label: S.guideFrom === "env" ? T("Add Game Config") : T("getting started"), id: "guide" }]);
   if (S.screen === "full" && S.fullName) out = out.concat([{ label: S.fullName, id: "full" }]);
   if (S.screen === "uninstall" || S.screen === "uninstall-progress") out = out.concat([{ label: T("uninstall RimArcho"), id: "uninstall" }]);
   if (S.screen === "feedback") out = out.concat([{ label: T("feedback"), id: "feedback" }]);
@@ -375,7 +375,7 @@ function renderCrumbs() {
   if (S.screen === "needs" && sh && sh.plan) chip = sh.plan.name + "  " + chip;
   factText(env, chip);
   env.hidden = !chip || !S.screen || S.screen === "home" || S.screen === "guide" || S.screen === "library" || S.screen === "changes" || S.screen === "subscribe" || S.screen === "uninstall" || S.screen === "uninstall-progress" || S.screen === "textures" || S.screen === "tasks";
-  env.title = T("game") + T("; ") + "E";
+  env.title = T("Game Config") + T("; ") + "E";
   env.classList.toggle("on", S.screen === "env");
   const nav = $("#crumbs");
   nav.setAttribute("aria-label", T("breadcrumbs"));

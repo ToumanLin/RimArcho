@@ -11,7 +11,7 @@ import (
 
 func init() {
 	enText["environment create failed"] = "WebView2 setup failed"
-	enText["Game Config interface not available"] = "WebView2 interface not available"
+	enText["environment interface not available"] = "WebView2 interface not available"
 }
 
 type interfaceFormat struct {

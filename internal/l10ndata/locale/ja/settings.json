@@ -143,7 +143,7 @@
   "external tools": "外部ツール",
   "feedback": "フィードバック",
   "full: no new entries after 32 MiB": "上限：32MiBを超える新しい記録は追加されません",
-  "game": "ゲーム構成",
+  "game": "ゲーム",
   "game %s": "ゲーム%s",
   "game folder (%s)": "ゲームフォルダ（%s）",
   "game log errors (Player.log of %s)": "ゲームログのエラー（%sのPlayer.log）",

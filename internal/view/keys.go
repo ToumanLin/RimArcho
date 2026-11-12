@@ -70,7 +70,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 				r("S / w / L", "sort, save, to the launch page (the palette previews them)"),
 				r(pick("i / e", "e"), pick("import, export the mod list", "export the mod list")),
 				r("R / A", "rescan, check the files again"),
-				r("P / E", "lists, games"),
+				r("P / E", "lists, Game Configs"),
 				r(":", "run an archo command"),
 				r("H", "the history: steps and versions"),
 				r("C", "this mod's changes"),

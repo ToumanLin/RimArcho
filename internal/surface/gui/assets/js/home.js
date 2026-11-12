@@ -197,7 +197,7 @@ export function homeKey(e) {
 
 // (w, save, is on its button while there is something to save: the line holds seven)
 export function hintList() {
-  return [{ key: "1–3", label: T("column") }, { key: "↑↓", label: T("list") }, { key: "←→", label: T("game") }, { key: "enter", label: T("edit") }, { key: "L", label: T("launch") },
+  return [{ key: "1–3", label: T("column") }, { key: "↑↓", label: T("list") }, { key: "←→", label: T("Game Config") }, { key: "enter", label: T("edit") }, { key: "L", label: T("launch") },
     { key: "shift+1–8", label: T("pages") }, { key: "?", label: T("all keys") }];
 }
 
@@ -258,9 +258,9 @@ function draw() {
   const f = applied();
   if (!rows().length) {
     const e = el("div", "hm-empty");
-    const add = el("button", "btn", T("add a game"));
+    const add = el("button", "btn", T("Add Game Config"));
     add.onclick = () => ui.go("env");
-    e.append(el("h1", "", T("no game yet: add one on the games page")), add);
+    e.append(el("h1", "", T("no Game Config yet: add one on the Game Configs page")), add);
     w.append(e);
     return;
   }
@@ -380,7 +380,7 @@ function step(n, cls, title) {
 // pick, else its most recently played). Each says its short version unless its name
 // already does ("1.6"); the full build is on hover.
 function gameStep(env) {
-  const s = step("01", "hm-s1", T("game"));
+  const s = step("01", "hm-s1", T("Game Config"));
   const list = el("div", "hm-picks");
   list.append(el("span", "hm-mark"));
   for (const g of shownFirst(games(), (g) => g.name === env)) {

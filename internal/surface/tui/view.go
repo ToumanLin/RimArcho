@@ -224,7 +224,7 @@ func (m *model) hintLine() string {
 	case m.panel != nil && m.panel.choices != nil:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("confirm")}, {"esc", T("back")}}
 		if m.panel.onDelete != nil {
-			pairs = append(pairs, [2]string{"d", T("remove the game")})
+			pairs = append(pairs, [2]string{"d", T("remove Game Config")})
 		}
 	case m.tags != nil:
 		pairs = [][2]string{{"←→", T("choose")}, {"enter", T("apply")}, {"esc", T("close")}, {"←", T("type a new tag")}}
@@ -357,7 +357,7 @@ func (m *model) panelLines(n int) []string {
 		}
 		for i, c := range p.choices {
 			if v := p.choiceLabels[c]; v != "" {
-				c += "  " + v
+				c = v
 			}
 			if p.choiceCurrent[i] {
 				c += "  " + T("in use")

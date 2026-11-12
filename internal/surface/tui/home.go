@@ -147,7 +147,7 @@ func (m *model) homeLines(n int) []string {
 	}
 	r := m.homeRow()
 	if r == nil {
-		add("  " + sDimS.Render(T("no game")))
+		add("  " + sDimS.Render(T("no Game Config")))
 		return out
 	}
 	add("  " + sBold.Render(r.Name))
@@ -155,7 +155,7 @@ func (m *model) homeLines(n int) []string {
 	// labels in one column as wide as the longest, and everything below them on the value
 	// column (16 §7 grid)
 	lw := 0
-	for _, s := range []string{"game", "list", "last game"} {
+	for _, s := range []string{"Game Config", "list", "last game"} {
 		lw = max(lw, width.StringWidth(T(s)))
 	}
 	label := func(s string) string { return sDimS.Render(fit(T(s), lw)) + "  " }
@@ -164,7 +164,7 @@ func (m *model) homeLines(n int) []string {
 	if r.GameVersion != "" {
 		ver += "  " + sDimS.Render(r.GameVersion)
 	}
-	add("  " + label("game") + ver)
+	add("  " + label("Game Config") + ver)
 	state := sText.Render(r.State)
 	if r.Level == view.LevelBad {
 		state = sErrS.Render(r.State)

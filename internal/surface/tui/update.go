@@ -661,14 +661,14 @@ func (m *model) panelKey(s string) tea.Cmd {
 func (m *model) chooseEnv() tea.Cmd {
 	envs := view.EnvironmentRows(m.app, "")
 	if len(envs) == 0 {
-		m.say(sayInfo, T("no games yet (archo env add)"))
+		m.say(sayInfo, T("no Game Configs yet (archo env add)"))
 		return nil
 	}
-	p := &panel{title: T("switch game"), nav: 8, choiceCurrent: map[int]bool{}}
+	p := &panel{title: T("switch Game Config"), nav: 8, choiceCurrent: map[int]bool{}}
 	labels := map[string]string{}
 	for i, e := range envs {
 		p.choices = append(p.choices, e.Name)
-		labels[e.Name] = e.Installation
+		labels[e.Name] = e.Name + "  " + e.Installation
 		if e.Name == m.envName {
 			p.choice = i
 			p.choiceCurrent[i] = true
@@ -679,9 +679,10 @@ func (m *model) chooseEnv() tea.Cmd {
 		_ = m.app.Store.SetMeta("notice.shared-game-folder", "seen")
 	}
 	p.choiceLabels = labels
-	p.choices = append(p.choices, "+ Add Game Config")
+	p.choices = append(p.choices, "+ add-environment")
+	p.choiceLabels["+ add-environment"] = "+ " + T("Add Game Config")
 	p.onPick = func(m *model, name string) tea.Cmd {
-		if name == "+ Add Game Config" {
+		if name == "+ add-environment" {
 			for _, e := range envs {
 				if e.Name == m.envName && e.AddReason != "" {
 					m.say(sayWarn, e.AddReason)
@@ -704,7 +705,7 @@ func (m *model) chooseEnv() tea.Cmd {
 		return m.requestDetail()
 	}
 	p.onDelete = func(m *model, name string) tea.Cmd {
-		if name != "+ Add Game Config" {
+		if name != "+ add-environment" {
 			m.removeEnv(name)
 		}
 		return nil
@@ -720,7 +721,7 @@ func (m *model) removeEnv(name string) {
 		m.say(sayFail, m.humanize(err.Error()))
 		return
 	}
-	lines := append(view.EnvRemovalLines(r), "", Tf("enter: %s, esc: cancel", T("remove the game")))
+	lines := append(view.EnvRemovalLines(r), "", Tf("enter: %s, esc: cancel", T("remove Game Config")))
 	m.panel = &panel{title: view.EnvRemovalTitle(r), lines: lines,
 		onEnter: func(m *model) tea.Cmd {
 			m.app.EnvName = ""

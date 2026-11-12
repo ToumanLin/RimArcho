@@ -129,11 +129,11 @@ func TestBackgroundLookupUsesOnlyPublishedEnvironment(t *testing.T) {
 	}
 	// A stale board must not rebuild another environment's image allow-list during an
 	// image request. No folder discovery should occur in bgFind.
-	api.bgsEnv = "another Game Config"
+	api.bgsEnv = "another environment"
 	if b := api.bgFind("fixture"); b != nil {
 		t.Fatal("background from previous Game Config was served")
 	}
-	if api.bgsEnv != "another Game Config" {
+	if api.bgsEnv != "another environment" {
 		t.Fatal("image lookup triggered background discovery")
 	}
 }

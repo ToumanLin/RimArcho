@@ -14,6 +14,7 @@ Before a release, walk every row in the VM with real data to find potential bugs
 
 | Scenario | Checks | Status |
 | --- | --- | --- |
+| Game Config event and picker regression | Open with two synthetic configs in English and Chinese; sidebar and lists render, switching and removal target the displayed row, and game-version/running-game labels still describe the game. | Synthetic GUI/CDP passed in en/zh; real-data VM pending |
 | Flat Game Config switcher | GUI/TUI show name + RimWorld version, current marker and + Add Game Config; no installation headings; sibling switching does no scan/link/Config work | Pending VM |
 | Add Game Config | Copy default includes editor edits, explicit no Mod files/no saves text; Start empty has Core/DLC; game folder defaults to current, own/custom saves picker; Enter, Tab, Escape, reference numbers and accessible labels/errors | Pending VM |
 | Game Config settings | Rename preserves paths/history; per-Game Config list/launch/data settings; game-folder relocation previews count and names of other configs, reattach affects only one | Pending VM |

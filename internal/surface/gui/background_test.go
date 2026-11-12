@@ -44,7 +44,7 @@ func TestRemovalIOKeepsPagesAndEditorAvailable(t *testing.T) {
 	}
 	workspace := make(chan *EnvironmentResult, 1)
 	api.emit = func(name string, data any) {
-		if name == "Game Config" {
+		if name == "environment" {
 			workspace <- data.(*EnvironmentResult)
 		}
 	}

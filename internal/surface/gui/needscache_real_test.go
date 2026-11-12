@@ -53,7 +53,7 @@ func TestNeedsRealCopy(t *testing.T) {
 		if name == "list-problems" {
 			events <- data.(*view.ListProblems)
 		}
-		if name == "Game Config" {
+		if name == "environment" {
 			envs <- data.(*EnvironmentResult)
 		}
 	})

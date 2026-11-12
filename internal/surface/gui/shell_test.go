@@ -42,7 +42,7 @@ func TestGuide(t *testing.T) {
 	events := make(chan map[string]any, 16)
 	added := make(chan *EnvironmentResult, 1)
 	api := NewAPI(e.App, func(name string, data any) {
-		if name == "Game Config" {
+		if name == "environment" {
 			added <- data.(*EnvironmentResult)
 		}
 		if name != "guide" {

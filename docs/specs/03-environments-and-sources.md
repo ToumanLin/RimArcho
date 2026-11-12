@@ -272,7 +272,9 @@ Launch arguments accept a JSON string array for lossless argv storage and editin
 
 The player-facing term is **Game Config** (16 §7.2). A config acts as a separate copy of the game: its settings, saves and Mod list apply only to it. Installations remain an internal sharing mechanism; GUI/TUI expose no installation layer or grouping.
 
-Pickers are flat: config name, RimWorld major.minor version, current marker, then + Add Game Config. Settings are one config section: name, game folder with version, saves folder, Mod list, launch method and arguments, remove. Relocating a shared game folder previews the count and names of the other affected configs. Adding defaults to copying the current config; the dialog specifies settings and editor-list copying, no Mod file copying and no saves (16 §2.8).
+Game Config is display text only: protocol events, storage keys and identifiers retain environment terminology. Generic game labels describe RimWorld itself.
+
+Pickers are flat: config name, RimWorld major.minor version, current marker, then + Add Game Config. Selection and removal use the same ordered rows as the picker labels. Settings are one config section: name, game folder with version, saves folder, Mod list, launch method and arguments, remove. Relocating a shared game folder previews the count and names of the other affected configs. Adding defaults to copying the current config; the dialog specifies settings and editor-list copying, no Mod file copying and no saves (16 §2.8).
 
 Legacy aliases remain separate. A one-time notice says that two Game Configs use the same game folder. There is no merge feature or merge command.
 

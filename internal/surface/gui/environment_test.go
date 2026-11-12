@@ -19,11 +19,11 @@ func environmentResult(t *testing.T, events <-chan string, request uint64) *Envi
 	for {
 		select {
 		case event := <-events:
-			if !strings.HasPrefix(event, "Game Config ") {
+			if !strings.HasPrefix(event, "environment ") {
 				continue
 			}
 			var r EnvironmentResult
-			if err := json.Unmarshal([]byte(strings.TrimPrefix(event, "Game Config ")), &r); err != nil {
+			if err := json.Unmarshal([]byte(strings.TrimPrefix(event, "environment ")), &r); err != nil {
 				t.Fatal(err)
 			}
 			if r.Request == request {

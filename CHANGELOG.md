@@ -4,6 +4,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Fixed the blank GUI sidebar and lists after opening or switching Game Configs. Picker selection and removal now follow the displayed row order; Game Config labels no longer replace labels for the game itself.
+
 - Game Configs: flat GUI/TUI pickers show config names and versions; add copy/empty configs with a game-folder picker and explicit no-Mod-files/no-saves copy boundaries. Per-config settings, rename, shared-folder move previews and removal messages keep effects clear. Proton adding is disabled with a reason; legacy aliases show one same-folder notice.
 - RimCrow: select profiles from a GUI checklist and import configured profiles as Game Configs and independent current lists, adopting their data folders in place. Preview conflicts and shared-folder deletion risks; keep player edits on repeat imports. JSON argv arrays preserve spaces, empty arguments and quoting through launch; `-savedatafolder` overrides are refused.
 

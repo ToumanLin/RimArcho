@@ -143,7 +143,7 @@
   "external tools": "外部工具",
   "feedback": "反馈",
   "full: no new entries after 32 MiB": "已满：32 MiB 之后不再记新条目",
-  "game": "游戏配置",
+  "game": "游戏",
   "game %s": "游戏 %s",
   "game folder (%s)": "游戏目录（%s）",
   "game log errors (Player.log of %s)": "游戏日志里的错误（%s 的 Player.log）",

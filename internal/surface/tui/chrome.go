@@ -128,7 +128,7 @@ func (m *model) topBar() string {
 	at, _ := m.navAt()
 	items := m.navItems()
 	need := m.needCount()
-	envText := T("no game")
+	envText := T("no Game Config")
 	if m.envName != "" {
 		envText = m.envName
 		if mm := env.MajorMinor(m.gameVer); mm != "" {

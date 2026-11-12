@@ -52,5 +52,14 @@
   "these two Game Configs use the same game folder: %s": "次のゲーム構成は同じゲームフォルダーを使用しています: %s",
   "%d other Game Configs use this folder and will change too: %s": "他の %d 個のゲーム構成もこのフォルダーを使用しており、同時に変更されます: %s",
   "only Game Config %s changes game folder; other Game Configs stay": "ゲーム構成 %s のゲームフォルダーだけを変更します。他のゲーム構成はそのままです",
-  "add a Game Config: archo env add <name> --game <folder> --saves own (or --like <config>)": "ゲーム構成を追加: archo env add <name> --game <folder> --saves own（または --like <config>）"
+  "add a Game Config: archo env add <name> --game <folder> --saves own (or --like <config>)": "ゲーム構成を追加: archo env add <name> --game <folder> --saves own（または --like <config>）",
+  "a command, a mod, a Game Config": "コマンド、Mod、ゲーム構成",
+  "lists, Game Configs": "リスト、ゲーム構成",
+  "no Game Config": "ゲーム構成なし",
+  "no Game Configs yet (archo env add)": "ゲーム構成が未登録です（archo env add）",
+  "switch Game Config": "ゲーム構成を切り替え",
+  "all Game Configs": "すべてのゲーム構成",
+  "no Game Config yet": "ゲーム構成が未登録です",
+  "no Game Config selected": "ゲーム構成が選択されていません",
+  "no Game Config yet: add one on the Game Configs page": "ゲーム構成が未登録です。ゲーム構成ページから追加してください"
 }

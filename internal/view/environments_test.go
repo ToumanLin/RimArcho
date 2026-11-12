@@ -104,3 +104,16 @@ func TestLegacyAliasNoticeAndProtonAdd(t *testing.T) {
 		}
 	}
 }
+
+func TestGameAndConfigTextAreDistinct(t *testing.T) {
+	defer view.SetLang("auto")
+	for _, lang := range []struct{ code, game, config string }{{"en", "game", "Game Config"}, {"zh", "\u6e38\u620f", "\u6e38\u620f\u914d\u7f6e"}, {"ja", "\u30b2\u30fc\u30e0", "\u30b2\u30fc\u30e0\u69cb\u6210"}} {
+		view.SetLang(lang.code)
+		if got := view.T("game"); got != lang.game {
+			t.Errorf("%s generic game label = %q", lang.code, got)
+		}
+		if got := view.T("Game Config"); got != lang.config {
+			t.Errorf("%s config label = %q", lang.code, got)
+		}
+	}
+}

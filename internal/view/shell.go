@@ -62,7 +62,7 @@ func LastRunErrors(n *Needs) int {
 // EnvChip is an environment as a chip: "steam · 1.6".
 func EnvChip(name, gameVersion string) string {
 	if name == "" {
-		return T("no game")
+		return T("no Game Config")
 	}
 	if mm := env.MajorMinor(gameVersion); mm != "" {
 		return name + "  " + mm
@@ -191,7 +191,7 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all mods")}, {ID: PageChanges, Label: T("updates")}, {ID: PageSubscribe, Label: T("add a subscription")}, {ID: PageSearch, Label: T("search files")}, {ID: PageModSettings, Label: T("mod settings")}}},
 		// what the game loads faster (10 §2)
 		{ID: PageTextures, Label: T("texture optimisation")},
-		{ID: PageEnv, Label: T("game")},
+		{ID: PageEnv, Label: T("Game Config")},
 	}
 	// Saves is a group of its own since 2026-11-11 (16 §2.11): the saves, and the play
 	// review (12 §3). Its own name: the plain "saves" key is translated for settings rows.

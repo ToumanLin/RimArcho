@@ -973,16 +973,15 @@ async function cmd(id) {
 }
 
 async function chooseEnv() {
-  const envs = (S.board && S.board.envs) || [];
-  if (!envs.length) return say("", T("no games yet (archo env add)"));
-  const rows = S.board.environmentRows || [];
+  const rows = S.board?.environmentRows || [];
+  if (!rows.length) return say("", T("no Game Configs yet (archo env add)"));
   const labels = rows.map(e => e.name + "  " + e.installation + (e.current ? "  " + T("in use") : ""));
   const current=rows.find(e=>e.current)||rows[0];
   labels.push({name:"+ "+T("Add Game Config")+(current?.addReason?"  "+current.addReason:""),disabled:!!current?.addReason});
-  pop.choose(T("switch game"), labels, (i) => {
+  pop.choose(T("switch Game Config"), labels, (i) => {
     if (i === rows.length) return scr.addEnvironment(rows.find(e => e.current) || rows[0]);
-    return useEnv(envs[i]);
-  }, Math.max(0, envs.indexOf(S.board.env)), { key:"Delete", label:T("remove the game"), envWrite:"remove-env", run:i => { if(i<envs.length) scr.removeEnv(envs[i]); } });
+    return useEnv(rows[i].name);
+  }, Math.max(0, rows.findIndex(e => e.current)), { key:"Delete", label:T("remove Game Config"), envWrite:"remove-env", run:i => { if(i<rows.length) scr.removeEnv(rows[i].name); } });
 }
 
 async function useEnv(name) {

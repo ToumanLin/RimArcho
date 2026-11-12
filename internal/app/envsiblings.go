@@ -67,7 +67,7 @@ func (a *App) siblingPlanName(name string) (string, error) {
 	}, name)
 	base = strings.TrimSpace(strings.TrimLeft(base, "-"))
 	if base == "" {
-		base = "Game Config"
+		base = "environment"
 	}
 	if runes := []rune(base); len(runes) > 56 {
 		base = string(runes[:56])
@@ -102,7 +102,7 @@ func (a *App) initializeSibling(e, like *env.Environment, clone *LoadoutState) e
 		}
 		list = emptyEnvironmentList(ix)
 	}
-	p, err := a.createPlan(e.ID, name, list, &store.Version{Source: "import", Note: "new Game Config", GameVersion: e.GameVersion})
+	p, err := a.createPlan(e.ID, name, list, &store.Version{Source: "import", Note: "new environment", GameVersion: e.GameVersion})
 	if err != nil {
 		return err
 	}

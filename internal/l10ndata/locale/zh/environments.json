@@ -52,5 +52,14 @@
   "these two Game Configs use the same game folder: %s": "这两个游戏配置使用同一个游戏目录：%s",
   "%d other Game Configs use this folder and will change too: %s": "另有 %d 个游戏配置使用此目录，也将随之更改：%s",
   "only Game Config %s changes game folder; other Game Configs stay": "仅游戏配置 %s 更改游戏目录；其他游戏配置保持不变",
-  "add a Game Config: archo env add <name> --game <folder> --saves own (or --like <config>)": "添加游戏配置：archo env add <name> --game <folder> --saves own（或 --like <config>）"
+  "add a Game Config: archo env add <name> --game <folder> --saves own (or --like <config>)": "添加游戏配置：archo env add <name> --game <folder> --saves own（或 --like <config>）",
+  "a command, a mod, a Game Config": "命令、Mod 或游戏配置",
+  "lists, Game Configs": "列表、游戏配置",
+  "no Game Config": "没有游戏配置",
+  "no Game Configs yet (archo env add)": "还没有游戏配置（archo env add）",
+  "switch Game Config": "切换游戏配置",
+  "all Game Configs": "所有游戏配置",
+  "no Game Config yet": "还没有游戏配置",
+  "no Game Config selected": "没有选择游戏配置",
+  "no Game Config yet: add one on the Game Configs page": "还没有游戏配置：请在游戏配置页添加"
 }

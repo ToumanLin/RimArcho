@@ -1995,7 +1995,7 @@ export async function environment() {
   const w = page("env", "", addConfig, rescanButton());
   if(current?.addReason)w.append(el("p","notice",current.addReason));
   sc.append(w);
-  const envLab = el("div", "label section", T("every game"));
+  const envLab = el("div", "label section", T("all Game Configs"));
   w.append(envLab);
   const card = el("section", "card");
   area(card, envLab);
@@ -2012,7 +2012,7 @@ export async function environment() {
     } else {
       row.append(button(T("use this one"), "", () => ui.useEnv(e.name)));
     }
-    row.append(button(T("remove the game"), "", () => removeEnv(e.name), "quiet danger", "remove-env"));
+    row.append(button(T("remove Game Config"), "", () => removeEnv(e.name), "quiet danger", "remove-env"));
     card.append(row);
   }
   w.append(card);
@@ -2029,7 +2029,7 @@ export async function environment() {
 export async function removeEnv(name) {
   let p;
   try { p = await api.EnvRemovePreview(name); } catch (e) { say("fail", errText(e)); return; }
-  pop.confirm(p.title, p.lines, T("remove the game"), async () => {
+  pop.confirm(p.title, p.lines, T("remove Game Config"), async () => {
     try { say("ok", await api.RemoveEnv(name)); } catch (e) { say("fail", errText(e)); return; }
     for (const c of S.cols) { c.query = ""; c.cursor = 0; c.sel.clear(); }
     await ui.reload();
