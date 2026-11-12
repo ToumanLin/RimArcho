@@ -321,7 +321,7 @@ func LoadConfig(path string) (Config, error) {
 func (a *App) NewID() string { return ids.New(a.Rand) }
 
 // ErrNoEnv is returned when no environment has been configured.
-var ErrNoEnv = errors.New("no environment configured (archo env detect, then archo env add <name> --detected)")
+var ErrNoEnv = errors.New("no environment configured (archo env detect, then archo env add <name> --detected; or give the game folder yourself: archo env add <name> --game <dir>)")
 
 // Env returns the environment for this invocation: --env, else the current one.
 func (a *App) Env() (*env.Environment, error) {

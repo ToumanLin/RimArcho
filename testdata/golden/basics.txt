@@ -165,7 +165,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
   global flags: --env <name> (use another environment for this command)
 
 $ archo status
-error: no environment configured (archo env detect, then archo env add <name> --detected)
+error: no environment configured (archo env detect, then archo env add <name> --detected; or give the game folder yourself: archo env add <name> --game <dir>)
 [exit 1]
 
 $ archo env detect

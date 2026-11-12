@@ -36,7 +36,7 @@ func (m *model) View() string {
 			first = sErrS.Render(fit(T("error: ")+view.Humanize(nil, m.loadErr.Error()), m.w-2))
 		}
 		content = []string{"", "  " + first,
-			"  " + sSecond.Render(fit(T("Add a game first: archo env detect, archo env add <name> --detected"), m.w-2))}
+			"  " + sSecond.Render(fit(T("Add a game first: archo env detect, archo env add <name> --detected (or --game <dir> to name the game folder yourself)"), m.w-2))}
 		if windowNextToUs() {
 			content = append(content, "  "+sSecond.Render(fit(T("Or open RimArcho.exe in this folder: the window has a guide that finds your games."), m.w-2)))
 		}

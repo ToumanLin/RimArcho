@@ -118,7 +118,7 @@
   "(the files are the same)": "（ファイルは同じです）",
   ", %s": "、%s",
   "About.xml is renamed: the game cannot load it": "About.xmlの名前が変更されているため、ゲームで読み込めません",
-  "Add a game first: archo env detect, archo env add <name> --detected": "先にゲームを追加してください：archo env detect、archo env add <name> --detected",
+  "Add a game first: archo env detect, archo env add <name> --detected (or --game <dir> to name the game folder yourself)": "先にゲームを追加してください：archo env detect、archo env add <name> --detected（または --game <dir> でゲームフォルダを自分で指定）",
   "No game added yet.": "まだゲームが追加されていません。",
   "Archo Monitor not added: %s": "Archo Monitorを追加しませんでした：%s",
   "Core and %d DLCs from the game": "ゲーム本体のCoreと%d件のDLCを使用します",

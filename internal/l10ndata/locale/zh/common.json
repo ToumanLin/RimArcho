@@ -118,7 +118,7 @@
   "(the files are the same)": "（文件相同）",
   ", %s": "，%s",
   "About.xml is renamed: the game cannot load it": "About.xml 被改了名，游戏无法加载它",
-  "Add a game first: archo env detect, archo env add <name> --detected": "请先添加游戏：archo env detect，archo env add <名称> --detected",
+  "Add a game first: archo env detect, archo env add <name> --detected (or --game <dir> to name the game folder yourself)": "请先添加游戏：archo env detect，archo env add <名称> --detected（或用 --game <目录> 自己指定游戏文件夹）",
   "No game added yet.": "还没有添加游戏。",
   "Archo Monitor not added: %s": "没有加入 Archo Monitor：%s",
   "Core and %d DLCs from the game": "Core 和 %d 个 DLC 用游戏自带的",
