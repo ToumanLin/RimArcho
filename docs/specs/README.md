@@ -8,7 +8,7 @@ For what RimArcho is and the decisions behind it, see [00 · Top-level design](.
 | [01 · Scope and status](01-scope-and-status.md) | Version scope, capabilities, exclusions, work still open |
 | [02 · File writes and uninstall](02-file-writes-and-uninstall.md) | Every file RimArcho writes (the safety boundary), uninstall, the recycle bin |
 | **What is installed** | |
-| [03 · Environments and sources](03-environments-and-sources.md) | Terms, environments (one game directory each), Mod sources, links and aliases |
+| [03 · Environments and sources](03-environments-and-sources.md) | Terms, environments (one game directory each; several per installation decided in §6), Mod sources, links and aliases |
 | [04 · Scanning and identity](04-scanning-and-identity.md) | Scanning, reconciliation, Lineage, change events, storage |
 | [05 · Facts and findings](05-facts-and-findings.md) | Effective content, fact types, the finding catalog, Def / Patch / Harmony analysis |
 | [06 · Game log](06-game-log.md) | Log parsing, attribution, which launch owns a log, live tracking, companion logs, error patterns |
