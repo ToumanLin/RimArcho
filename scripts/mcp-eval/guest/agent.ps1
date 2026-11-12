@@ -2,6 +2,8 @@
 #   A = Pi + Archo MCP, B = dsh + Archo MCP (since 2026-11-04), N = Pi without MCP (group B before 2026-11-04),
 #   P = Pi + Archo MCP + Archo's MCP server instructions in the system prompt, as dsh puts them (Pi 1.4 drops them)
 #   Q = P + pi-harness.ts (bash default timeout, run rules taken from Alma)
+#   R = A + the Archo Agent package (the ArchoAgent repository, pushed to C:\Eval\agent): run rules, Archo's instructions read by an extension, continuation after a cut-off reply
+#   S = P and T = R on a strong model (claude-sonnet-5-5), M0 of the Archo Agent roadmap
 #   L = Alma (headless alma-server driven by alma-run.mjs) + Archo MCP, M = L + Archo's MCP server instructions in the system prompt
 #   J = L and K = M, each with Alma's tool model and local-embedding memory set (alma-run.mjs --full)
 param([string]$Group, [int]$Minutes = 15, [switch]$Probe)
@@ -30,12 +32,12 @@ if ($Group -eq 'B') {
   $line = "node C:\Eval\alma-run.mjs --alma C:\Eval\alma\Alma --task C:\Eval\work\TASK.md --out C:\Eval\out --minutes $Minutes --base-url $($gw.baseUrl) --api-key $($gw.apiKey)$almaFlags > C:\Eval\out\driver.log 2>&1"
 } else {
   $extra = ''
-  if ($Group -eq 'A' -or $Group -eq 'P' -or $Group -eq 'Q') {
+  if ($Group -in 'A', 'P', 'Q', 'R', 'S', 'T') {
     @{mcpServers = @{archo = @{command = 'C:\Eval\tools\archo.exe'; args = @('mcp'); exposure = 'direct'}}} | ConvertTo-Json -Depth 5 | Set-Content "$pi\mcp.json"
   } else {
     Remove-Item "$pi\mcp.json" -EA 0; $extra = ' --no-mcp'
   }
-  if ($Group -eq 'P' -or $Group -eq 'Q') {
+  if ($Group -in 'P', 'Q', 'S') {
     # the instructions this archo build sends at initialize, read from the server itself
     $psi = New-Object Diagnostics.ProcessStartInfo 'C:\Eval\tools\archo.exe', 'mcp'
     $psi.UseShellExecute = $false; $psi.RedirectStandardInput = $true; $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
@@ -50,7 +52,20 @@ if ($Group -eq 'B') {
     # Q: P plus the harness changes taken from Alma (pi-harness.ts)
     if ($Group -eq 'Q') { $extra += ' --extension C:\Eval\pi-harness.ts' }
   }
-  $line = "pi -p @C:\Eval\work\TASK.md ""Do the task described in the attached file."" --mode json --no-session --no-context-files --no-skills --no-prompt-templates --model magpie/apikeyfan/deepseek-flash$extra > C:\Eval\out\transcript.jsonl 2> C:\Eval\out\stderr.txt"
+  # R, T: the package's extensions read Archo's instructions themselves (their log lines go to stderr.txt)
+  if ($Group -in 'R', 'T') { $extra = ' --extension C:\Eval\agent' }
+  $model = 'magpie/apikeyfan/deepseek-flash'
+  if ($Group -in 'S', 'T') {
+    $model = 'magpie/claude/claude-sonnet-5-5'
+    # the snapshot's models.json may lack it: add the host's entry (written without a BOM)
+    $mj = Get-Content "$pi\models.json" -Raw | ConvertFrom-Json
+    if (-not ($mj.providers.magpie.models | Where-Object { $_.id -eq 'claude/claude-sonnet-5-5' })) {
+      $mj.providers.magpie.models = @($mj.providers.magpie.models) + [pscustomobject]@{ id = 'claude/claude-sonnet-5-5'; name = 'Claude Sonnet 5.5'; contextWindow = 1000000; maxTokens = 128000; reasoning = $true; input = @('text', 'image')
+        cost = @{ input = 2; output = 10; cacheRead = 0.1; cacheWrite = 2.5 }; thinkingLevelMap = @{ high = 'high'; low = 'low'; max = 'max'; medium = 'medium'; xhigh = 'xhigh' } }
+      [IO.File]::WriteAllText("$pi\models.json", ($mj | ConvertTo-Json -Depth 20), (New-Object Text.UTF8Encoding($false)))
+    }
+  }
+  $line = "pi -p @C:\Eval\work\TASK.md ""Do the task described in the attached file."" --mode json --no-session --no-context-files --no-skills --no-prompt-templates --model $model$extra > C:\Eval\out\transcript.jsonl 2> C:\Eval\out\stderr.txt"
 }
 $sw = [Diagnostics.Stopwatch]::StartNew()
 $p = Start-Process cmd -ArgumentList '/c', $line -WorkingDirectory C:\Eval\work -WindowStyle Hidden -PassThru

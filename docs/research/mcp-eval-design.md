@@ -326,6 +326,41 @@ Follow-up the same day, groups **J** (L + extras) and **K** (M + extras): the to
 
 The Chinese reports (`ArchoAgent/research/`: results, reverse engineering of Alma's coding harness and memory system, Pi upgrade plan) stay outside the repo.
 
+### Round 7, the Archo Agent package on two models (2026-11-12)
+
+Question: does Q's prototype still work when it is packaged as extensions, and does it hold back a strong model? This is M0 of the Archo Agent roadmap. The package is the separate repository `ArchoAgent`; `run-case.ps1 -AgentDir` pushes it into the guest every run.
+
+- **R:** A plus the package. It has three extensions:
+  - `run-harness`: Q's timeout and run rules.
+  - `archo-instructions`: reads Archo's instructions from the connected server, falling back to the server's `initialize` reply; this replaces `--append-system-prompt`.
+  - `continue-truncated`: continues a reply cut off at the output limit.
+- **S:** P on claude-sonnet-5-5.
+- **T:** R on claude-sonnet-5-5.
+
+Setup: 27 runs on Player-Test, Eval-3 and Eval-4, plus h8 runs 4 to 6 for R and Q. The limit, Archo build and grading are the same as in round 6.
+
+| Case | Q (round 6) | R deepseek + package | S Sonnet + instructions | T Sonnet + package |
+| --- | --- | --- | --- | --- |
+| h4 | 3/3, 439 s, 1.56 M | 3/3, 516 s, 2.26 M | 3/3, 55 s, 0.18 M | 2/3, 101 s, 0.43 M |
+| h7 | 3/3, 335 s, 0.99 M | 3/3, 329 s, 1.26 M | 2/3, 437 s, 0.19 M | 3/3, 121 s, 0.28 M |
+| h8 | 3/3, 366 s, 1.82 M | 1/3, 572 s, 3.49 M | 3/3, 69 s, 0.32 M | 3/3, 90 s, 0.26 M |
+| All | 9/9 | 7/9 | 8/9 | 8/9 |
+| h8 runs 4–6 | 3/3 | 2/3 | | |
+
+Failures:
+
+- **h8-R-1, R-2 and R-5:** each named the right culprit, rebuilt Progression: Education and verified it with `test_run`. Grading loads the case's prepared save and found new errors: a NullReferenceException in the classroom job twice, and a broken static constructor once. The VM's `test_run` starts a new map and never loads that save (see Setup), so the agent cannot reproduce h8's fault there, and a passing `test_run` proves nothing for this case.
+- **h4-T-2:** the decoy workaround again.
+- **h7-S-3:** an unbounded `find /` ran out the 20 minutes. S has no `run-harness`, so this is the failure its default timeout prevents, now seen on a strong model.
+
+Reading:
+
+- **R and Q send the same prompt.** A captured request (a fake MCP server; `before_provider_request`) shows the instructions and run rules in the system message in both. Only their place relative to `<cwd>` differs. `continue-truncated` never fired in any run: no reply reached the output limit. h8's 3/6 for R against Q's 6/6 has no mechanism behind it (Fisher's two-sided p ≈ 0.18), so it is read as noise. R also used about twice Q's tokens on h8.
+- **The package does not hold back a strong model:** T 8/9 against S 8/9. Sonnet runs take 1 to 2 minutes and about a tenth of deepseek-flash's tokens.
+- **M0's exit criterion is missed by one run:** R is 7/9 against the 8/9 asked for. With the prompt shown to be the same as Q's, the package is kept.
+- **h8 needs a verification path.** Verifying an h8 fix needs `test_run` to load a save. The VM gets no saves, because the guest's Steam syncs them to the real Steam Cloud. Until that changes, h8 measures whether the agent can reason about the fault without seeing it.
+- **The gateway reports `stop` for a reply cut at `max_tokens`** (found while testing `continue-truncated` on the host). The extension therefore also treats a reply that used the model's whole `maxTokens` as cut off.
+
 ## Grading
 
 `scripts/mcp-eval/logdiff.mjs` compares a run's error lines (paths and addresses normalised) with the case's `reference.Player.log`. A submission is applied as a layer over the case (`sandbox.mjs <case> --layer <dir>`; files at `<packageId>/<mod-relative path>`, `enable.json` for re-enabled Mods), the game starts, and the log must have no error line the reference fix lacks. Culprit scoring uses `answer.json`: every Mod in `required` must be named, or, where the key has `requiredAny` (h7), every Mod of one of its lists; naming only a `decoy` fails.

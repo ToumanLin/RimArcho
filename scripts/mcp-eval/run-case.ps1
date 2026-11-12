@@ -1,10 +1,11 @@
 # One eval run, from the host: revert the VM, stage the case, run Pi, collect the evidence, stop the VM.
 #   pwsh run-case.ps1 -Case c1 -Group A -Run 1 [-Minutes 15] [-Archo D:\RimArcho-test\mcp-eval\tools\archo.exe] [-StageOnly]
-# Group A = Pi with the Archo MCP server, B = dsh with it (since 2026-11-04), N = Pi without it (B before 2026-11-04), P = Pi with it and its server instructions in the system prompt (as dsh has them), L = Alma with it, Q = P plus guest/pi-harness.ts, M = Alma with it and its server instructions in the project card (headless; -Probe sets Alma up and saves its tools instead of running the task), J = L and K = M with Alma's tool model and local-embedding memory set (-EmbedTar, the model files, goes into the guest). Results: D:\RimArcho-test\mcp-eval\results\<case>-<group>-<run>\
+# Group A = Pi with the Archo MCP server, B = dsh with it (since 2026-11-04), N = Pi without it (B before 2026-11-04), P = Pi with it and its server instructions in the system prompt (as dsh has them), L = Alma with it, Q = P plus guest/pi-harness.ts, M = Alma with it and its server instructions in the project card (headless; -Probe sets Alma up and saves its tools instead of running the task), J = L and K = M with Alma's tool model and local-embedding memory set (-EmbedTar, the model files, goes into the guest), R = A plus the Archo Agent package (-AgentDir, pushed every run), S = P and T = R on claude-sonnet-5-5. Results: D:\RimArcho-test\mcp-eval\results\<case>-<group>-<run>\
 # -Archo replaces the snapshot's archo.exe with this build; -StageOnly stops after staging and leaves the VM running.
-param([Parameter(Mandatory)][string]$Case, [Parameter(Mandatory)][ValidateSet('A', 'B', 'N', 'P', 'L', 'M', 'Q', 'J', 'K')][string]$Group, [int]$Run = 1, [int]$Minutes = 15,
+param([Parameter(Mandatory)][string]$Case, [Parameter(Mandatory)][ValidateSet('A', 'B', 'N', 'P', 'L', 'M', 'Q', 'J', 'K', 'R', 'S', 'T')][string]$Group, [int]$Run = 1, [int]$Minutes = 15,
   [string]$Snapshot = 'RimArcho-Eval-Staged5', [string]$Archo = '', [switch]$KeepRunning, [switch]$StageOnly, [switch]$Probe, [string]$AlmaZip = 'D:\VMs\Transfer\alma\alma-0.4.567-win-x64.zip',
   [string]$EmbedTar = 'D:\VMs\Transfer\alma\embedding-models.tar',
+  [string]$AgentDir = 'D:\Game\RimModManager_Upgrade\ArchoAgent',
   [string]$VMX = 'D:\VMs\Player-Test\Win11-Player-Test.vmx')
 $ErrorActionPreference = 'Stop'
 # -VMX picks one of the eval VMs (Player-Test, or a copy such as D:\VMs\Eval-2\Win11-Player-Test.vmx).
@@ -44,6 +45,13 @@ if ($Group -in 'J', 'K') {
   Put $EmbedTar 'C:\Users\Public\emb.tar'
   Guest -Rest @('-Command', 'New-Item -ItemType Directory -Force C:\Eval\alma-data\embedding-models | Out-Null; tar -xf C:\Users\Public\emb.tar -C C:\Eval\alma-data\embedding-models; Remove-Item C:\Users\Public\emb.tar')
 }
+# R, T: the Archo Agent package (its own repository, -AgentDir)
+if ($Group -in 'R', 'T') {
+  Remove-Item "$xfer\agent-$vmName.tar" -Force -ErrorAction SilentlyContinue
+  & C:\Windows\System32\tar.exe -cf "$xfer\agent-$vmName.tar" -C $AgentDir package.json extensions
+  Put "$xfer\agent-$vmName.tar" 'C:\Users\Public\agent.tar'
+  Guest -Rest @('-Command', 'New-Item -ItemType Directory -Force C:\Eval\agent | Out-Null; tar -xf C:\Users\Public\agent.tar -C C:\Eval\agent; Remove-Item C:\Users\Public\agent.tar')
+}
 # the evaluated build's name and hash go with the results (the builds stay in tools\)
 if ($Archo) { Put $Archo 'C:\Eval\tools\archo.exe'; "$(Split-Path $Archo -Leaf) sha256 $((Get-FileHash $Archo).Hash.ToLower())" | Set-Content "$out\archo-build.txt" }
 Remove-Item "$xfer\pkg-$Case-$vmName.tar" -Force -ErrorAction SilentlyContinue
@@ -77,7 +85,7 @@ while ((Get-Date) -lt $deadline) {
 Guest -Rest @('-Command', 'Compress-Archive -Path C:\Eval\submit\* -DestinationPath C:\Eval\submit.zip -Force; Copy-Item C:\Eval\work\TASK.md C:\Eval\out\TASK.md')
 $alma = 'driver.log', 'alma-run.json', 'messages.json', 'traces.json', 'probe-settings.json', 'probe-providers.json', 'probe-mcp-tools.json', 'probe-tools.json', 'probe-thread.json'
 if ($Group -in 'J', 'K') { $alma += 'memories.json', 'usage.json' }
-foreach ($f in @('transcript.jsonl', 'stderr.txt', 'TASK.md', 'session.v4.jsonl.zstd', 'archo-instructions.md') + $alma) { if (($f -like 'session*' -and $Group -ne 'B') -or ($f -like 'archo-*' -and $Group -notin 'P', 'M', 'Q', 'K') -or ($alma -contains $f -and -not $isAlma)) { continue }; try { Pull "C:\Eval\out\$f" "$out\$f" } catch { Write-Warning "missing $f" } }
+foreach ($f in @('transcript.jsonl', 'stderr.txt', 'TASK.md', 'session.v4.jsonl.zstd', 'archo-instructions.md') + $alma) { if (($f -like 'session*' -and $Group -ne 'B') -or ($f -like 'archo-*' -and $Group -notin 'P', 'M', 'Q', 'K', 'S') -or ($alma -contains $f -and -not $isAlma)) { continue }; try { Pull "C:\Eval\out\$f" "$out\$f" } catch { Write-Warning "missing $f" } }
 try { Pull 'C:\Eval\submit.zip' "$out\submit.zip" } catch { Write-Warning 'nothing submitted' }
 if (-not $KeepRunning) { & $inv -VMX $vmx -Command stop -VMArgs @('hard') | Out-Null }
 "done $Case $Group $Run -> $out"
