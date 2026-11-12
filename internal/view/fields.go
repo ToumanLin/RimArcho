@@ -82,6 +82,10 @@ func ModFields(a *app.App, st *app.LoadoutState, mod *store.Mod, d *DetailData) 
 	if a != nil {
 		fs = appendSubscriptionFields(fs, a.SubscriptionOf(mod))
 	}
+	// The size of the files the last scan read, as on Mod library's detail (same rule as app.Library).
+	if mod.SnapID != 0 && (mod.FileCount > 0 || mod.TotalSize > 0) {
+		fs = append(fs, Field{Kind: FieldSize, Label: T("size"), Value: render.Size(mod.TotalSize)})
+	}
 	fs = append(fs, Field{Kind: FieldTags, Label: T("tags"), Value: strings.Join(mod.Tags, "  "), List: mod.Tags, Act: ActTags, ActAt: T("edit")})
 	if mod.Alias != "" {
 		fs = append(fs, Field{Kind: FieldAlias, Label: T("alias"), Value: mod.Alias, Extra: mod.Name})

@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Window and TUI, plan editor: a Mod's details now show its size (the files the last scan read), as the Mod library's details already did.
 - CLI and TUI with no game added: the error (and the TUI's hint) now also names `archo env add <name> --game <dir>`, so a player whose game folder detection does not find (a Linux Steam library on another mount, a custom install) sees that they can give the folder by hand, instead of only `--detected`.
 - Database: separate game installations from environments while preserving existing IDs, settings, lists and launch behavior. The database upgrades on first open; adding the same game directory twice is still refused.
 

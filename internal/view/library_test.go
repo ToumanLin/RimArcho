@@ -254,10 +254,18 @@ func TestLibFields(t *testing.T) {
 		t.Fatalf("order %v", got)
 	}
 	// the editor's: no library rows
+	sizes := 0
 	for _, f := range view.ModFields(e.App, lib.St, i.Mod, nil) {
 		if f.Kind == "state" || f.Kind == "used" {
 			t.Fatalf("editor field %s", f.Kind)
 		}
+		if f.Kind == "size" {
+			sizes++
+		}
+	}
+	// the editor's detail shows the size too (once), as the library's does
+	if sizes != 1 {
+		t.Fatalf("editor size fields %d", sizes)
 	}
 	// the page's columns: name first, the hidden ones last
 	p := libPage(t, e, "")
