@@ -11,6 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
 func TestEnvSiblingsAddCloneAndSwitch(t *testing.T) {
@@ -35,8 +36,9 @@ func TestEnvSiblingsAddCloneAndSwitch(t *testing.T) {
 	if err := e.App.Store.SetMeta("env:"+main.ID+":launch_args", args); err != nil {
 		t.Fatal(err)
 	}
-	// Force the generated plan to choose a unique name.
-	e.MustRun("plan", "new", "clone's list")
+	// An unrelated global plan must not become the new config's current list.
+	e.MustRun("plan", "new", "other")
+	plansBefore, _ := e.App.Store.Plans()
 	var scans, instances, sources int
 	count := func() []int {
 		t.Helper()
@@ -73,11 +75,11 @@ func TestEnvSiblingsAddCloneAndSwitch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cloned.Plan.ID == original.Plan.ID || cloned.Plan.Name != "clone's list 2" || !cloned.List.Equal(original.List) {
+	if cloned.Plan.ID != original.Plan.ID || !cloned.List.Equal(original.List) {
 		t.Fatalf("clone workspace: %s %s", cloned.Plan.Name, cloned.List.Encode())
 	}
-	if e.App.Store.VersionCount(cloned.Plan.ID) != 1 || e.App.Store.Meta(store.StageKey(cloned.Plan.ID)) != "" {
-		t.Fatal("history or staging copied")
+	if plans, _ := e.App.Store.Plans(); len(plans) != len(plansBefore) {
+		t.Fatal("adding a config created a list")
 	}
 	b, err := os.ReadFile(filepath.Join(dest, "Config", "Prefs.xml"))
 	if err != nil || string(b) != "<Prefs>destination</Prefs>" {
@@ -91,7 +93,7 @@ func TestEnvSiblingsAddCloneAndSwitch(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dest, "HugsLib", "settings.xml")); err != nil {
 		t.Fatal(err)
 	}
-	e.MustRun("env", "add", "empty", "--game", e.Game, "--saves", "own")
+	e.MustRun("env", "add", "empty", "--game", e.Game, "--saves", "own", "--new-list")
 	empty, _ := e.App.Store.EnvByName("empty")
 	before := e.ReadModsConfig()
 	beforeLinks := linkNames(t, filepath.Join(e.Game, "Mods"))
@@ -212,5 +214,52 @@ func TestSiblingPackVisibilityAndOrigin(t *testing.T) {
 	p, err := e.App.ReadPack("shared-pack")
 	if err != nil || p.Env != "main" {
 		t.Fatalf("manifest origin changed: %+v %v", p, err)
+	}
+}
+
+func TestEnvAddListSelectionValidation(t *testing.T) {
+	e := loadoutEnv(t)
+	scanNow(t, e)
+	e.MustRun("plan", "new", "fresh")
+	e.MustRun("env", "add", "fresh", "--like", "main", "--new-list")
+	fresh, _ := e.App.Store.EnvByName("fresh")
+	plan, _ := e.App.Store.CurrentPlan(fresh.ID)
+	if plan.Name != "fresh 2" {
+		t.Fatalf("new list name: %s", plan.Name)
+	}
+	e.MustRun("env", "add", "selected", "--like", "main", "--list", "fresh")
+	selected, _ := e.App.Store.EnvByName("selected")
+	want, _ := e.App.Store.PlanByName("fresh")
+	if e.App.Store.CurrentPlanID(selected.ID) != want.ID {
+		t.Fatal("explicit list not selected")
+	}
+	for _, args := range [][]string{{"--list", "missing"}, {"--list", "fresh", "--new-list"}} {
+		argv := append([]string{"env", "add", "invalid", "--like", "main"}, args...)
+		if out, code := e.Run(argv...); code == 0 {
+			t.Fatalf("accepted invalid list selection: %s", out)
+		}
+		if got, _ := e.App.Store.EnvByName("invalid"); got != nil {
+			t.Fatal("invalid selection registered a config")
+		}
+	}
+}
+
+func TestEnvAddNewListBeforeFirstScan(t *testing.T) {
+	e := testkit.New(t)
+	e.WriteMod(filepath.Join(e.Game, "Data", "Biotech"), testkit.Sample("ludeon.rimworld.biotech", "Biotech"))
+	e.WriteMod(filepath.Join(e.Game, "Data", "Royalty"), testkit.Sample("ludeon.rimworld.royalty", "Royalty"))
+	e.MustRun("env", "add", "fresh", "--game", e.Game, "--saves", "own", "--new-list")
+	plans, err := e.App.Store.Plans()
+	if err != nil || len(plans) != 1 || plans[0].Name != "fresh" {
+		t.Fatalf("initial plans: %+v %v", plans, err)
+	}
+	st, err := e.App.Loadout()
+	if err != nil || len(st.List) != 3 {
+		t.Fatalf("initial Core/DLC list: %+v %v", st, err)
+	}
+	for i, pkg := range []string{"ludeon.rimworld", "ludeon.rimworld.royalty", "ludeon.rimworld.biotech"} {
+		if got := st.Ix.ByID[st.List[i].Instance].PackageID; got != pkg {
+			t.Fatalf("official order: %s != %s", got, pkg)
+		}
 	}
 }

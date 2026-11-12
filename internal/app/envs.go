@@ -30,6 +30,8 @@ const (
 type EnvSpec struct {
 	Rename       string
 	Like         string
+	List         string
+	NewList      bool
 	GameRoot     string
 	UserDataRoot string
 	Saves        string // shared | own ("" = keep, or shared when adding without --user-data)
@@ -207,7 +209,17 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 		return nil, nil, fmt.Errorf("Game Config %q already exists (archo env set %s ...)", name, name)
 	}
 	var like *env.Environment
-	var clone *LoadoutState
+	var selectedPlan int64
+	if spec.List != "" && spec.NewList {
+		return nil, nil, fmt.Errorf("--list and --new-list cannot be combined")
+	}
+	if spec.List != "" {
+		p, err := a.findPlan(spec.List)
+		if err != nil {
+			return nil, nil, err
+		}
+		selectedPlan = p.ID
+	}
 	if spec.Like != "" {
 		var err error
 		like, err = a.Store.EnvByName(strings.TrimPrefix(spec.Like, "env:"))
@@ -272,15 +284,13 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 		e.GameID, e.GameRoot, e.GameVersion = installation.GameID, installation.GameRoot, installation.GameVersion
 	}
 	if like != nil {
-		reader := &App{Home: a.Home, Store: a.Store, Config: a.Config, Now: a.Now, Rand: a.Rand, Loc: a.Loc, Detect: a.Detect, EnvName: like.Name}
-		var err error
-		if current, _ := a.Env(); current != nil && current.ID == like.ID {
-			reader.OpenPlan = a.OpenPlan
-			reader.PlanName = a.PlanName
-		}
-		clone, err = reader.Loadout()
-		if err != nil {
-			return nil, nil, err
+		if selectedPlan == 0 && !spec.NewList {
+			reader := &App{Home: a.Home, Store: a.Store, Config: a.Config, Now: a.Now, Rand: a.Rand, Loc: a.Loc, Detect: a.Detect, EnvName: like.Name}
+			st, err := reader.Loadout()
+			if err != nil {
+				return nil, nil, err
+			}
+			selectedPlan = st.Plan.ID
 		}
 		if _, err := seedSettings(like.UserDataRoot, user, true); err != nil {
 			return nil, nil, fmt.Errorf("copy settings from %s: %w", like.Name, err)
@@ -296,7 +306,7 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 	}
 	if installation != nil {
 		if !spec.deferPlan {
-			if err := a.initializeSibling(e, like, clone); err != nil {
+			if err := a.initializeSibling(e, like, selectedPlan, spec.NewList); err != nil {
 				return e, nil, err
 			}
 		}
@@ -327,6 +337,11 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 	if cur, _ := a.Store.CurrentEnv(); cur == nil {
 		if err := a.Store.SetCurrentEnv(e.ID); err != nil {
 			return nil, nil, err
+		}
+	}
+	if !spec.deferPlan {
+		if err := a.initializeSibling(e, like, selectedPlan, spec.NewList); err != nil {
+			return e, changes, err
 		}
 	}
 	return e, changes, nil

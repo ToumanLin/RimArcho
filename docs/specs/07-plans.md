@@ -90,7 +90,7 @@ Each plan records **allowed game versions** (major.minor, such as 1.5, 1.6, 1.7)
 
 ### 1.7 Plans shared across all games
 
-Sibling environments share installation inventory, not current-plan selection. `env add --like` creates an independent plan from the source workspace under 03 §6.2; global plans can still be shared explicitly.
+Sibling environments share installation inventory, not current-plan selection. `env add --like` selects the source environment's current global plan under 03 §6.2; adding an environment never copies a plan.
 
 A plan is only "what is enabled and in what order", independent of game directories, and allowed game versions (§1.6) say which versions it is meant for. So plans do not belong to environments.
 

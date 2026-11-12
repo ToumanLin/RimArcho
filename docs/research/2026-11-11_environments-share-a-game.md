@@ -368,6 +368,8 @@ One rule decides each question: to the player, **an environment is a separate co
 | 9 | Legacy path aliases: environments that turn out to share one physical installation stay as they were after the upgrade; RimArcho offers to merge them, never merges silently |
 | 10 | Switcher grouped by installation; settings split into "this environment" (user data, list, launch method and arguments) and "game installation" (folder, version) |
 
+2026-11-12 owner, decision 2: no list copy; the config selects a list.
+
 ### Questions as researched
 
 1. **Finding ignores:** this note recommends keeping them per environment. Sharing by game is possible, but changes acceptance behavior across play contexts; choose deliberately.

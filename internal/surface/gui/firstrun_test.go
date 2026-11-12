@@ -95,10 +95,11 @@ func TestRimCrowProfileConfigInvalidatesPreview(t *testing.T) {
 	}
 }
 
-func TestAddEnvironmentCopiesDisplayedPlan(t *testing.T) {
+func TestAddEnvironmentSelectsCurrentPlan(t *testing.T) {
 	e := testkit.New(t)
 	e.AddEnv(false)
 	e.MustRun("scan")
+	current, _ := e.App.Loadout()
 	e.MustRun("plan", "new", "editor", "--from", "current")
 	plan, err := e.App.FindPlan("editor")
 	if err != nil {
@@ -121,7 +122,7 @@ func TestAddEnvironmentCopiesDisplayedPlan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if copied.Plan.ID == plan.ID || !copied.List.Equal(displayed.List) {
+	if copied.Plan.ID != current.Plan.ID || copied.List.Equal(displayed.List) {
 		t.Fatalf("copied another plan: %s vs %s", copied.List.Encode(), displayed.List.Encode())
 	}
 }
@@ -171,7 +172,9 @@ func TestRimCrowProfileChecklistSelection(t *testing.T) {
 	if len(preview.Profiles) != 3 {
 		t.Fatalf("checklist: %+v", preview)
 	}
-	t.Log(preview.Text)
+	if strings.Contains(preview.Text, "not set up") || strings.Contains(preview.Text, "use_workshop_mods") {
+		t.Fatalf("duplicate or technical profile text: %s", preview.Text)
+	}
 	if _, err = api.ApplyManagerImportProfiles(preview.Request, []string{"b"}); err != nil {
 		t.Fatal(err)
 	}

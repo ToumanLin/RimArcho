@@ -4,6 +4,9 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Adding a Game Config selects a global Mod list instead of copying the editor list. The dialog offers all lists and a new Core/DLC list; `env add` accepts `--list <plan>` or `--new-list`, and `--like` defaults to the source config's current list. New lists use the config or RimCrow profile name without a suffix.
+- Settings shows extra launch arguments as quoted command-line text, including arguments imported from RimCrow. RimCrow import shows profiles once, with translated statuses and player wording for source settings in Chinese and Japanese.
+
 - Fixed the blank GUI sidebar and lists after opening or switching Game Configs. Picker selection and removal now follow the displayed row order; Game Config labels no longer replace labels for the game itself.
 
 - Game Configs: flat GUI/TUI pickers show config names and versions; add copy/empty configs with a game-folder picker and explicit no-Mod-files/no-saves copy boundaries. Per-config settings, rename, shared-folder move previews and removal messages keep effects clear. Proton adding is disabled with a reason; legacy aliases show one same-folder notice.

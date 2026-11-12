@@ -57,7 +57,8 @@ type ScanReport struct {
 
 // ScanOptions choose what a scan reads.
 type ScanOptions struct {
-	Full bool // ignore cached hashes and read every semantic file again
+	deferLoadout bool // environment creation supplies its own initial plan
+	Full         bool // ignore cached hashes and read every semantic file again
 	// GameOnly reads only the environment's own Data/ and Mods/, not the shared mod folders
 	// (a game just added, 03 §2 item 8).
 	GameOnly bool
@@ -304,10 +305,12 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 	}
 	rep := &ScanReport{Env: e, ScanID: scanID, Full: full, GameOnly: o.GameOnly, Stats: st}
 	// 07 §4.3: every scan compares ModsConfig.xml with what RimArcho last wrote.
-	if ls, err := a.Loadout(); err == nil {
-		rep.Notices = ls.Notices
-	} else {
-		rep.Notices = []string{"loadout: " + err.Error()}
+	if !o.deferLoadout {
+		if ls, err := a.Loadout(); err == nil {
+			rep.Notices = ls.Notices
+		} else {
+			rep.Notices = []string{"loadout: " + err.Error()}
+		}
 	}
 	rep.GameLinks, err = a.InspectGameLinks()
 	return rep, err

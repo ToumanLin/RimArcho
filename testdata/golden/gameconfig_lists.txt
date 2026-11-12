@@ -1,0 +1,51 @@
+$ archo env add shared --like main
+env:shared  added
+  game: $ROOT/Steam/steamapps/common/RimWorld
+  version: 1.6.4633 rev1261
+  saves: own
+  user-data: $ROOT/ArchoHome/userdata/shared
+  launch: steam
+  sources:
+next:
+  archo scan
+
+$ archo plan list
+plans: 1 (env:main)
+  plan:default  1 active  1 version  never played  [current]
+next:
+  archo plan new <name> --from current
+
+$ archo env add fresh --like main --new-list
+env:fresh  added
+  game: $ROOT/Steam/steamapps/common/RimWorld
+  version: 1.6.4633 rev1261
+  saves: own
+  user-data: $ROOT/ArchoHome/userdata/fresh
+  launch: steam
+  sources:
+next:
+  archo scan
+
+$ archo env add selected --like main --list fresh
+env:selected  added
+  game: $ROOT/Steam/steamapps/common/RimWorld
+  version: 1.6.4633 rev1261
+  saves: own
+  user-data: $ROOT/ArchoHome/userdata/selected
+  launch: steam
+  sources:
+next:
+  archo scan
+
+$ archo env use selected
+env:selected  current
+next:
+  archo status
+
+$ archo plan list
+plans: 2 (env:selected)
+  plan:default  1 active  1 version  never played
+  plan:fresh    1 active  1 version  never played  [current]
+next:
+  archo plan use <name>
+

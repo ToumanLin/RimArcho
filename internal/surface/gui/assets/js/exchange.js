@@ -101,7 +101,7 @@ async function discoverManagers(body) {
           check.checked=profile.Status==="ready";check.disabled=profile.Status!=="ready";
           if(check.checked)selected.add(profile.ID);
           check.onchange=()=>{if(check.checked)selected.add(profile.ID);else selected.delete(profile.ID);};
-          row.append(check,el("span","",profile.Name+"  "+profile.Game+"  "+profile.UserData+"  "+profile.Status));profiles.append(row);
+          row.append(check,el("span","",profile.Name+"  "+profile.Game+"  "+profile.UserData+"  "+(profile.DisplayStatus || profile.Status)));profiles.append(row);
         }
         result.append(profiles);
       }

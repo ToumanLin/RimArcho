@@ -186,7 +186,7 @@ func EnvGroups(a *app.App, st *app.LoadoutState) []SettingGroup {
 		{Key: "environment.user-data", Label: T("saves folder"), Value: e.UserDataRoot, ValuePath: true, Edit: "path", Argv: []string{"env", "set", e.Name, "--user-data", "{}"}},
 		{Key: "environment.list", Label: T("Mod list"), Value: current},
 		{Label: T("start the game through"), Value: e.Launch, Edit: "choice", Choices: []string{"steam", "direct"}, ChoiceLabels: []string{"Steam", T("the game's own exe")}, Argv: []string{"env", "set", e.Name, "--launch", "{}"}},
-		{Label: T("extra arguments"), Value: a.LaunchArgs(e.ID), Edit: "text", Argv: []string{"env", "set", e.Name, "--launch-args", "{}"}, Note: T("use a JSON array to keep arguments with spaces as separate tokens")},
+		{Label: T("extra arguments"), Value: app.DisplayLaunchArgs(a.LaunchArgs(e.ID)), Edit: "text", Argv: []string{"env", "set", e.Name, "--launch-args", "{}"}},
 		{Key: "environment.remove", Label: T("remove Game Config"), Actions: []SettingAction{{Label: T("remove Game Config"), Argv: []string{"env", "remove", e.Name}}}},
 	}}}
 }

@@ -156,6 +156,9 @@ func (s *API) managerReport(kind, path string, dry bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if dry {
+		return view.ManagerImportPreviewText(r), nil
+	}
 	return view.ManagerImportText(r), nil
 }
 
@@ -187,7 +190,10 @@ func (s *API) PreviewManagerImport(kind, path string) (*ManagerPreview, error) {
 		if err != nil {
 			return nil, err
 		}
-		preview.Profiles = r.Profiles
+		preview.Profiles = append([]app.RCProfile(nil), r.Profiles...)
+		for i := range preview.Profiles {
+			preview.Profiles[i].DisplayStatus = view.ProfileStatus(preview.Profiles[i].Status)
+		}
 	}
 	return preview, nil
 }

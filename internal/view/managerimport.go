@@ -9,13 +9,18 @@ import (
 )
 
 func init() {
-	for _, key := range []string{"the managed folder overlaps %s", "the install folder overlaps %s", "%s already contains %s; choose an empty install folder", "release is missing %s", "release file changed while copying: %s", "release entry is not a plain file or directory: %s"} {
+	for _, key := range []string{"the managed folder overlaps %s", "the install folder overlaps %s", "%s already contains %s; choose an empty install folder", "release is missing %s", "release file changed while copying: %s", "release entry is not a plain file or directory: %s", "missing or unreadable Config/ModsConfig.xml: %s", "unreadable Config/ModsConfig.xml: %s"} {
 		interfaceFormats = append(interfaceFormats, interfaceFormatFor(key))
 	}
 }
 
 // ManagerImportText is the preview and result of a player-data migration.
-func ManagerImportText(r *app.RimCrowReport) string {
+func ManagerImportText(r *app.RimCrowReport) string { return managerImportText(r, true) }
+
+// ManagerImportPreviewText leaves profiles to the GUI checklist.
+func ManagerImportPreviewText(r *app.RimCrowReport) string { return managerImportText(r, false) }
+
+func managerImportText(r *app.RimCrowReport, profiles bool) string {
 	lines := []string{
 		Tf("aliases: %d new, %d already present", r.AliasNew, r.AliasSame),
 		Tf("notes: %d new, %d already present", r.NoteNew, r.NoteSame),
@@ -52,7 +57,10 @@ func ManagerImportText(r *app.RimCrowReport) string {
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		lines = append(lines, fmt.Sprintf("%s: %d (%s)", k, r.NotMapped[k], T("no RimArcho equivalent")))
+		if k == "profile source flags (use_workshop_mods/use_self_mods)" {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("%s: %d (%s)", T(k), r.NotMapped[k], T("no RimArcho equivalent")))
 	}
 	if r.RulesDisabled {
 		lines = append(lines, T("disabled RimCrow rules are skipped"))
@@ -60,11 +68,24 @@ func ManagerImportText(r *app.RimCrowReport) string {
 	if r.CrowDisabled > 0 || len(r.AboutDisabled) > 0 {
 		lines = append(lines, Tf("%d folders have About.xml.disabled; enable them in RimCrow, then scan again (%d disabled in RimCrow)", len(r.AboutDisabled), r.CrowDisabled))
 	}
-	for _, p := range r.Profiles {
-		lines = append(lines, fmt.Sprintf("%s  %s  %s  %s", p.Name, p.Game, p.UserData, p.Status))
+	if profiles {
+		for _, p := range r.Profiles {
+			lines = append(lines, fmt.Sprintf("%s  %s  %s  %s", p.Name, p.Game, p.UserData, ProfileStatus(p.Status)))
+		}
 	}
 	if len(r.Profiles) > 0 {
 		lines = append(lines, T("folders stay shared with RimCrow; launching writes their Config and saves; deleting the profile in RimCrow deletes its saves"), T("profile source flags are not imported; list entries decide what loads; check unresolved Mods and which copies are selected"))
 	}
 	return strings.Join(lines, "\n")
+}
+
+// ProfileStatus translates the stable status and leaves diagnostic paths intact.
+func ProfileStatus(status string) string {
+	if strings.HasPrefix(status, "skipped: ") {
+		return Tf("skipped: %s", Text(strings.TrimPrefix(status, "skipped: ")))
+	}
+	if strings.HasPrefix(status, "incomplete: ") {
+		return Tf("incomplete: %s", Text(strings.TrimPrefix(status, "incomplete: ")))
+	}
+	return Text(status)
 }

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
 )
 
 // What the settings page (16 §2.14) shows and changes besides environments and config keys:
@@ -175,7 +176,7 @@ func (a *App) checkLaunchArgs() error {
 	return ValidateLaunchArgs(e.Name, a.LaunchArgs(e.ID))
 }
 
-// ParseLaunchArgs accepts a JSON argv array for lossless imports, or legacy whitespace-separated arguments.
+// ParseLaunchArgs accepts lossless imported JSON argv or quoted command-line text.
 func ParseLaunchArgs(args string) ([]string, error) {
 	if strings.HasPrefix(strings.TrimSpace(args), "[") {
 		var argv []string
@@ -184,5 +185,61 @@ func ParseLaunchArgs(args string) ([]string, error) {
 		}
 		return argv, nil
 	}
-	return strings.Fields(args), nil
+	var argv []string
+	var word strings.Builder
+	var quote rune
+	started := false
+	runes := []rune(args)
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+		if r == '\\' && i+1 < len(runes) && quote == '"' && (runes[i+1] == '"' || runes[i+1] == '\\') {
+			i++
+			word.WriteRune(runes[i])
+			started = true
+			continue
+		}
+		if r == '"' || r == '\'' {
+			if quote == 0 {
+				quote = r
+				started = true
+				continue
+			}
+			if quote == r {
+				quote = 0
+				continue
+			}
+		}
+		if unicode.IsSpace(r) && quote == 0 {
+			if started {
+				argv = append(argv, word.String())
+				word.Reset()
+				started = false
+			}
+			continue
+		}
+		word.WriteRune(r)
+		started = true
+	}
+	if quote != 0 {
+		return nil, fmt.Errorf("launch arguments contain an unclosed quote")
+	}
+	if started {
+		argv = append(argv, word.String())
+	}
+	return argv, nil
+}
+
+// DisplayLaunchArgs hides the import storage format from editable player fields.
+func DisplayLaunchArgs(args string) string {
+	if !strings.HasPrefix(strings.TrimSpace(args), "[") {
+		return args
+	}
+	argv, err := ParseLaunchArgs(args)
+	if err != nil {
+		return args
+	}
+	for i, arg := range argv {
+		argv[i] = `"` + strings.ReplaceAll(strings.ReplaceAll(arg, `\`, `\\`), `"`, `\"`) + `"`
+	}
+	return strings.Join(argv, " ")
 }

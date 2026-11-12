@@ -17,6 +17,7 @@ import (
 
 // RCProfile is one profile preview, grouped by its physical installation path (03 §6.4).
 type RCProfile struct {
+	DisplayStatus                                       string `json:",omitempty"`
 	ID, Name, Game, UserData, Args, Environment, Status string
 	Tokens                                              []string
 	Unresolved                                          []string
@@ -275,7 +276,7 @@ func (a *App) importCrowProfiles(db *sql.DB, opt RimCrowOptions, rep *RimCrowRep
 				return err
 			}
 			st := &LoadoutState{Ix: ix, Reg: reg}
-			name, err := reader.siblingPlanName(e.Name)
+			name, err := reader.siblingPlanName(p.Name)
 			if err != nil {
 				return err
 			}

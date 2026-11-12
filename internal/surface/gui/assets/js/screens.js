@@ -2038,9 +2038,11 @@ export async function removeEnv(name) {
   });
 }
 
-export function addEnvironment(source) {
+export async function addEnvironment(source) {
   if (!source) return ui.go("guide");
   if (source.addReason) return say("warn",source.addReason);
+  let lists;
+  try { lists = await api.GameConfigLists(source.name); } catch(e) { return say("fail",errText(e)); }
   pop.open("add-environment", T("add environment"), (box, state) => {
     box.append(el("h2", "ttl", T("add environment")));
     state.modal=true;
@@ -2051,9 +2053,12 @@ export function addEnvironment(source) {
     const game = field(T("game folder"), el("button", "", source.path)); game.type="button"; game.value=source.path;
     game.onclick=async()=>{const selected=await api.PickFolder(game.value);if(selected){game.value=selected;game.textContent=selected;}};
     const mode = field(T("start with"), el("select"));
-    for (const [value, text] of [["copy", T("Copy current Game Config (recommended)")], ["empty", T("Start empty")]]) { const option = el("option", "", text); option.value=value; mode.append(option); }
+    for (const [value, text] of [["copy", T("Copy current Game Config")], ["empty", T("Start empty")]]) { const option = el("option", "", text); option.value=value; mode.append(option); }
     const detail = el("p"); body.append(detail);
-    const describe = () => { detail.textContent = mode.value === "copy" ? T("copies game settings, Mod settings and the Mod list as the editor shows it (enabled Mods and their order, including unsaved edits); no Mod files are copied; saves, logs and history are not copied") : T("game defaults, Core and DLC; no settings, saves, logs or history are copied"); }; mode.onchange=describe; describe();
+    const describe = () => { detail.textContent = mode.value === "copy" ? T("copies game settings and Mod settings; no Mod files or saves are copied; choose the Mod list below") : T("game defaults; no settings or saves are copied; choose the Mod list below"); }; mode.onchange=describe; describe();
+    const list = field(T("Mod list"), el("select"));
+    for (const name of lists) { const option=el("option","",name); option.value=name; list.append(option); }
+    const emptyList=el("option","",T("New empty list")); emptyList.value=""; list.append(emptyList);
     const root = field(T("saves"), el("select"));
     for (const [value,text] of [["own",T("own folder in RimArcho")],["custom",T("a folder you choose")]]) {const option=el("option","",text);option.value=value;root.append(option);}
     const path=field(T("user data folder"),el("button","",T("choose a user data folder")));path.type="button";path.value="";path.disabled=true;
@@ -2076,7 +2081,7 @@ export function addEnvironment(source) {
       if (!name.value.trim()) return refuse(name,T("enter an environment name"));
       if(root.value==="custom"&&!path.value.trim())return refuse(path,T("choose a user data folder"));
       submit.disabled=true;
-      try {await api.AddGameConfig(name.value.trim(),source.name,game.value,mode.value==="copy",root.value==="custom"?path.value.trim():"");pop.close();await ui.reload();await environment();}
+      try {await api.AddGameConfig(name.value.trim(),source.name,game.value,mode.value==="copy",root.value==="custom"?path.value.trim():"",list.value,list.selectedIndex===lists.length);pop.close();await ui.reload();await environment();}
       catch(e){refuse(name,errText(e));submit.disabled=false;}
     };
     state.keys=e=>{if(e.key==="Enter"&&e.target.tagName!=="SELECT"){e.preventDefault();submit.click();return true;}return false;};

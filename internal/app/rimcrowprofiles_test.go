@@ -69,6 +69,9 @@ func TestRimCrowProfilesAdoption(t *testing.T) {
 	if !strings.Contains(st.List.Encode(), "missing.example") {
 		t.Fatalf("missing entry lost: %s", st.List.Encode())
 	}
+	if st.Plan.Name != "Colony A" {
+		t.Fatalf("profile list name: %s", st.Plan.Name)
+	}
 	// A player edit and renamed Game Config survive repeated import by source profile ID.
 	e.MustRun("disable", "pkg:missing.example")
 	e.MustRun("env", "set", a.Name, "--name", "renamed")

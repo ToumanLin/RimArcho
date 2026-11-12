@@ -1822,11 +1822,42 @@ func firstLine(s string) string {
 	return s
 }
 
+// GameConfigLists returns every global list, with the source config's current list first.
+func (s *API) GameConfigLists(from string) ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, err := s.a.Store.EnvByName(from)
+	if err != nil {
+		return nil, err
+	}
+	if e == nil {
+		return nil, fmt.Errorf("Game Config %s not found", from)
+	}
+	current, err := s.a.Store.CurrentPlan(e.ID)
+	if err != nil {
+		return nil, err
+	}
+	plans, err := s.a.Store.Plans()
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	if current != nil {
+		names = append(names, current.Name)
+	}
+	for _, p := range plans {
+		if current == nil || p.ID != current.ID {
+			names = append(names, p.Name)
+		}
+	}
+	return names, nil
+}
+
 // AddEnvironment uses the same sibling initialization and validation as the CLI.
 func (s *API) AddEnvironment(name, from string, copySettings bool, userData string) (string, error) {
-	return s.AddGameConfig(name, from, "", copySettings, userData)
+	return s.AddGameConfig(name, from, "", copySettings, userData, "", false)
 }
-func (s *API) AddGameConfig(name, from, game string, copySettings bool, userData string) (string, error) {
+func (s *API) AddGameConfig(name, from, game string, copySettings bool, userData, list string, newList bool) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	base, err := s.a.Store.EnvByName(from)
@@ -1839,7 +1870,7 @@ func (s *API) AddGameConfig(name, from, game string, copySettings bool, userData
 	if game == "" {
 		game = base.GameRoot
 	}
-	spec := app.EnvSpec{GameRoot: game, Saves: app.SavesOwn}
+	spec := app.EnvSpec{GameRoot: game, Saves: app.SavesOwn, List: list, NewList: newList}
 	if copySettings {
 		spec.Like = from
 	}

@@ -58,7 +58,6 @@ func (a *App) checkEnvironmentRoot(self, game, root string) error {
 }
 
 func (a *App) siblingPlanName(name string) (string, error) {
-	name += "'s list"
 	base := strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) {
 			return '_'
@@ -87,27 +86,34 @@ func (a *App) siblingPlanName(name string) (string, error) {
 	return a.checkPlanName(name, 0)
 }
 
-func (a *App) initializeSibling(e, like *env.Environment, clone *LoadoutState) error {
-	name, err := a.siblingPlanName(e.Name)
-	if err != nil {
-		return err
-	}
-	var list loadout.List
-	if clone != nil {
-		list = clone.List.Clone()
-	} else {
+func (a *App) initializeSibling(e, like *env.Environment, plan int64, newList bool) error {
+	if newList {
+		if scan, _, err := a.LastScan(e.GameID); err != nil {
+			return err
+		} else if scan == nil {
+			reader := &App{Home: a.Home, Store: a.Store, Config: a.Config, Now: a.Now, Rand: a.Rand, Loc: a.Loc, Detect: a.Detect, EnvName: e.Name}
+			if _, err := reader.scanEnvironment(e, ScanOptions{GameOnly: true, deferLoadout: true}); err != nil {
+				return err
+			}
+		}
+		name, err := a.siblingPlanName(e.Name)
+		if err != nil {
+			return err
+		}
 		ix, err := a.loadIndex(e)
 		if err != nil {
 			return err
 		}
-		list = emptyEnvironmentList(ix)
+		p, err := a.createPlan(e.ID, name, emptyEnvironmentList(ix), &store.Version{Source: "import", Note: "new environment", GameVersion: e.GameVersion})
+		if err != nil {
+			return err
+		}
+		plan = p.ID
 	}
-	p, err := a.createPlan(e.ID, name, list, &store.Version{Source: "import", Note: "new environment", GameVersion: e.GameVersion})
-	if err != nil {
-		return err
-	}
-	if err := a.Store.SetCurrentPlan(e.ID, p.ID); err != nil {
-		return err
+	if plan != 0 {
+		if err := a.Store.SetCurrentPlan(e.ID, plan); err != nil {
+			return err
+		}
 	}
 	if like != nil {
 		args, _ := withoutSaveData(a.LaunchArgs(like.ID))

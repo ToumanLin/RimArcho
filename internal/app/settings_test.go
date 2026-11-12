@@ -6,6 +6,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -97,5 +98,23 @@ func TestLaunchArgsRejectDataOverride(t *testing.T) {
 				t.Fatal("stored refusal changed state")
 			}
 		})
+	}
+}
+
+func TestLaunchArgumentsDisplayRoundTrip(t *testing.T) {
+	for _, stored := range []string{`["-name","a b","","C:\\My Games\\","a\"b","a'b","[literal]"]`, `["\u65e5\u672c\u8a9e \u306e\u540d\u524d", "-popupwindow"]`} {
+		want, err := app.ParseLaunchArgs(stored)
+		if err != nil {
+			t.Fatal(err)
+		}
+		shown := app.DisplayLaunchArgs(stored)
+		got, err := app.ParseLaunchArgs(shown)
+		if err != nil || !reflect.DeepEqual(got, want) {
+			t.Fatalf("%q: %v != %v (%v)", shown, got, want, err)
+		}
+	}
+	got, err := app.ParseLaunchArgs(`-name "a b" -path 'C:\My Games'`)
+	if err != nil || !reflect.DeepEqual(got, []string{"-name", "a b", "-path", `C:\My Games`}) {
+		t.Fatalf("quoted arguments: %v %v", got, err)
 	}
 }

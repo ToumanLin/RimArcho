@@ -29,7 +29,7 @@ func init() {
 	register(&Command{Name: "env list", Summary: "list Game Configs (grouped by installation) and the shared mod folders", MaxArgs: 0, Run: envList})
 	register(&Command{Name: "env detect", Summary: "detect game, user data and workshop paths (suggestion only)", MaxArgs: 0, Run: envDetect})
 	register(&Command{Name: "env add", Args: "<name>", Summary: "add a Game Config with separate saves and settings", MinArgs: 1, MaxArgs: 1,
-		Flags: append([]Flag{{Name: "detected", Help: "use the paths env detect finds"}, {Name: "like", Value: "<config>", Help: "copy its installation, launch, settings and current workspace into an independent plan (defaults to own saves)"}}, append(envFlags, launchArgsFlag)...), Run: envAdd})
+		Flags: append([]Flag{{Name: "list", Value: "<plan>", Help: "select an existing global plan"}, {Name: "new-list", Help: "create a Core and DLC plan named after the Game Config"}, {Name: "detected", Help: "use the paths env detect finds"}, {Name: "like", Value: "<config>", Help: "copy its game folder, launch and settings; select its current plan (defaults to own saves)"}}, append(envFlags, launchArgsFlag)...), Run: envAdd})
 	register(&Command{Name: "env set", Args: "<name>", Summary: "change a Game Config's game folder, saves or launch (re-binds a moved game)", MinArgs: 1, MaxArgs: 1,
 		Flags: append(append([]Flag{{Name: "name", Value: "<name>", Help: "rename only this Game Config; folders and launch history stay"}}, envFlags...), removeSourceFlag, launchArgsFlag), Run: envSet})
 	register(&Command{Name: "env remove", Args: "<name>", Summary: "forget a Game Config (RimArcho data only; no game files)", MinArgs: 1, MaxArgs: 1,
@@ -164,7 +164,7 @@ func envDetect(c *Ctx, a *Args) (*render.Doc, error) {
 }
 
 func specFromArgs(a *Args) app.EnvSpec {
-	return app.EnvSpec{Rename: a.Str("name"), Like: a.Str("like"), GameRoot: a.Str("game"), UserDataRoot: a.Str("user-data"), Saves: a.Str("saves"), WorkshopRoot: a.Str("workshop"),
+	return app.EnvSpec{Rename: a.Str("name"), Like: a.Str("like"), List: a.Str("list"), NewList: a.Bool("new-list"), GameRoot: a.Str("game"), UserDataRoot: a.Str("user-data"), Saves: a.Str("saves"), WorkshopRoot: a.Str("workshop"),
 		Launch: a.Str("launch"), SteamCMD: a.List("steamcmd"), Extra: a.List("extra"), RemoveSources: a.List("remove-source")}
 }
 
