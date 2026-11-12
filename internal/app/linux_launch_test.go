@@ -11,6 +11,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
 func TestLinuxLaunch(t *testing.T) {
@@ -73,7 +74,17 @@ func TestLinuxLaunch(t *testing.T) {
 				e.MustRun("env", "set", "main", "--launch", "direct")
 			}
 			if mode == "custom" {
-				e.MustRun("env", "set", "main", "--user-data", e.UserData)
+				if _, code := e.Run("env", "set", "main", "--user-data", e.UserData); code == 0 {
+					t.Fatal("Proton accepted custom user data")
+				}
+				if after, err := e.App.Store.EnvByName("main"); err != nil || after.UserDataRoot != ud {
+					t.Fatalf("refusal changed user data: %+v, %v", after, err)
+				}
+				// Old databases may already contain this unsupported setting.
+				current.UserDataRoot = e.UserData
+				if err := e.App.Store.UpdateEnv(current); err != nil {
+					t.Fatal(err)
+				}
 			}
 			if mode == "argument" {
 				e.MustRun("env", "set", "main", "--launch-args=-savedatafolder=elsewhere")
@@ -131,6 +142,47 @@ func TestLinuxLaunch(t *testing.T) {
 				}
 				if _, err := os.Stat(filepath.Join(e.Home, "packs", "proton-test", "userdata")); !os.IsNotExist(err) {
 					t.Fatal("refused pack created user data")
+				}
+			}
+		})
+	}
+}
+
+func TestProtonRegistrationUserData(t *testing.T) {
+	for _, mode := range []string{"own", "custom", "default"} {
+		t.Run(mode, func(t *testing.T) {
+			e := testkit.New(t)
+			e.App.Detect = env.DetectOptions{GOOS: "linux", Home: e.Root, SteamRoots: []string{e.Steam}, ManualRoots: []string{}, SkipRegistry: true}
+			e.MkdirAll(filepath.Join(e.Steam, "steamapps", "compatdata", env.WorkshopAppID, "pfx"))
+			spec := app.EnvSpec{GameRoot: e.Game}
+			switch mode {
+			case "own":
+				spec.Saves = app.SavesOwn
+			case "custom":
+				spec.UserDataRoot = filepath.Join(e.Root, "custom-data")
+			case "default":
+				spec.UserDataRoot = e.App.DefaultUserData(e.Game)
+			}
+			_, _, err := e.App.EnvAdd("proton", spec)
+			if mode == "default" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), "Proton") {
+				t.Fatalf("expected Proton refusal: %v", err)
+			}
+			if en, err := e.App.Store.EnvByName("proton"); err != nil || en != nil {
+				t.Fatalf("refusal persisted environment: %+v, %v", en, err)
+			}
+			games, err := e.App.Store.Games()
+			if err != nil || len(games) != 0 {
+				t.Fatalf("refusal persisted installation: %+v, %v", games, err)
+			}
+			for _, path := range []string{filepath.Join(e.Home, "userdata", "proton"), filepath.Join(e.Root, "custom-data")} {
+				if _, err := os.Stat(path); !os.IsNotExist(err) {
+					t.Fatalf("refusal created %s: %v", path, err)
 				}
 			}
 		})

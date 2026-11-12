@@ -120,6 +120,15 @@ func (a *App) DefaultUserData(gameRoot ...string) string {
 	return env.DefaultUserDataFor(a.Detect)
 }
 
+// Proton cannot translate a redirected host data folder into the game's Wine path.
+func (a *App) checkProtonUserData(gameRoot, userData string) error {
+	linux := a.Detect.GOOS == "linux" || a.Detect.GOOS == "" && runtime.GOOS == "linux"
+	if linux && env.IsProtonGame(gameRoot) && env.PathKey(realOrAbs(userData)) != env.PathKey(realOrAbs(a.DefaultUserData(gameRoot))) {
+		return fmt.Errorf("Proton games do not support own or custom saves yet; use --saves shared")
+	}
+	return nil
+}
+
 // Saves tells how an environment keeps its saves: shared, own or custom.
 func (a *App) Saves(e *env.Environment) string {
 	switch {
@@ -204,8 +213,8 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 		return nil, nil, fmt.Errorf("environment %s already uses %s; one environment per game folder (several lists of one game are plans: archo plan new <name>)", o.Name, spec.GameRoot)
 	}
 	user := a.userDataFor(name, spec, true)
-	if spec.Saves == SavesOwn && (a.Detect.GOOS == "linux" || a.Detect.GOOS == "" && runtime.GOOS == "linux") && env.IsProtonGame(spec.GameRoot) {
-		return nil, nil, fmt.Errorf("Proton games do not support own saves yet; use --saves shared")
+	if err := a.checkProtonUserData(spec.GameRoot, user); err != nil {
+		return nil, nil, err
 	}
 	if err := a.checkRoots(spec.GameRoot, filepath.Join(spec.GameRoot, "Data"), filepath.Join(spec.GameRoot, "Mods")); err != nil {
 		return nil, nil, err
@@ -369,10 +378,10 @@ func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChang
 	}
 	dataSpec := spec
 	dataSpec.GameRoot = e.GameRoot
-	if spec.Saves == SavesOwn && (a.Detect.GOOS == "linux" || a.Detect.GOOS == "" && runtime.GOOS == "linux") && env.IsProtonGame(e.GameRoot) {
-		return nil, nil, fmt.Errorf("Proton games do not support own saves yet; use --saves shared")
-	}
 	if u := a.userDataFor(e.Name, dataSpec, false); u != "" {
+		if err := a.checkProtonUserData(e.GameRoot, u); err != nil {
+			return nil, nil, err
+		}
 		if err := a.checkUserData(u); err != nil {
 			return nil, nil, err
 		}
@@ -382,6 +391,11 @@ func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChang
 			}
 		}
 		e.UserDataRoot = u
+	}
+	if gameChanged {
+		if err := a.checkProtonUserData(e.GameRoot, e.UserDataRoot); err != nil {
+			return nil, nil, err
+		}
 	}
 	if spec.Launch != "" {
 		e.Launch = spec.Launch
