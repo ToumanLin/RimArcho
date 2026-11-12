@@ -115,7 +115,7 @@ func ReviewPageOf(r *app.SaveReview, cols []*app.Colony, colony string, tags map
 			line = Tf("day %d", d) + T(", ") + line
 		}
 		if f := c.Latest().Folder; f != nil && len(owners) > 1 {
-			line += "  ·  " + FolderOwner(f)
+			line += "  " + FolderOwner(f)
 		}
 		saves += len(c.Saves)
 		p.Colonies = append(p.Colonies, ReviewColony{Key: c.Key, Name: colonyName(c), Line: line})

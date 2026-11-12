@@ -65,7 +65,7 @@ func TestGameIdentityDistinctFromEnvironment(t *testing.T) {
 	if err := e.App.Store.SetMeta("env:profile:launch_args", "-popupwindow"); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.App.Store.AddLaunch("profile", testkit.Start, "direct", "synthetic"); err != nil {
+	if err := e.App.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: "profile", Started: testkit.Start, Method: "direct", Command: "synthetic", PlanID: e.App.Store.CurrentPlanID("profile")}); err != nil {
 		t.Fatal(err)
 	}
 	if launches, err := e.App.Store.Launches(old.GameID, 10); err != nil || len(launches) != 0 {

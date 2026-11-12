@@ -963,12 +963,6 @@ func SaveNameProblem(s *app.Save, name string) string {
 	return ""
 }
 
-// fileThere: a file or folder exists at p.
-func fileThere(p string) bool {
-	_, err := os.Stat(p)
-	return err == nil
-}
-
 // argQuote quotes a command argument that holds spaces or quotes.
 func argQuote(s string) string {
 	if s != "" && !strings.ContainsAny(s, " 	\"'#&|;<>()") {

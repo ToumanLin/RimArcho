@@ -164,8 +164,6 @@ func (s *API) runReview(request uint64, colony string) *ReviewEvent {
 					}
 				}
 			}
-		} else if colony == "*" {
-			cols = l2.Colonies
 		}
 		l, stamp = l2, reviewStamp(l2.Colonies)+input
 	}
