@@ -236,6 +236,8 @@ Rules for enabling multiple environments (**not implemented**):
 5. Packs show in every environment whose game version is compatible (10 §3), labelled with the environment that built them; `pack.json` `env` stays origin metadata.
 6. Proton (09 §2) cannot redirect saves, so a Proton installation has one environment; "add environment" for it is disabled with that reason.
 
+`env add/set --launch-args` refuses `-savedatafolder` under the launch validation rules (09 §2); use `--user-data` instead.
+
 Registration already enforces the Proton redirection restriction for both own and custom user data folders (`TestProtonRegistrationUserData`, `TestLinuxLaunch`); the multiple-environment workflow remains unimplemented.
 
 ### 6.2 Adding, moving and removing

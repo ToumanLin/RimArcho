@@ -161,6 +161,9 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, 
 		a.EnvName = o.Env
 		defer func() { a.EnvName = prevEnv }()
 	}
+	if err := a.checkLaunchArgs(); err != nil {
+		return nil, err
+	}
 	if err := a.checkNoGame(); err != nil {
 		return nil, err
 	}

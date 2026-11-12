@@ -21,15 +21,17 @@ var envFlags = []Flag{
 	{Name: "extra", Value: "<dir>", Multi: true, Help: "= archo folder add extra <dir>"},
 }
 
+var launchArgsFlag = Flag{Name: "launch-args", Value: "<args>", Help: "extra game arguments; use --user-data for -savedatafolder (\"\" removes arguments)"}
+
 var removeSourceFlag = Flag{Name: "remove-source", Value: "<src:label>", Multi: true, Help: "= archo folder remove <src:label>"}
 
 func init() {
 	register(&Command{Name: "env list", Summary: "list environments (one per game folder) and the shared mod folders", MaxArgs: 0, Run: envList})
 	register(&Command{Name: "env detect", Summary: "detect game, user data and workshop paths (suggestion only)", MaxArgs: 0, Run: envDetect})
 	register(&Command{Name: "env add", Args: "<name>", Summary: "add an environment: one game folder", MinArgs: 1, MaxArgs: 1,
-		Flags: append([]Flag{{Name: "detected", Help: "use the paths env detect finds"}}, envFlags...), Run: envAdd})
+		Flags: append([]Flag{{Name: "detected", Help: "use the paths env detect finds"}}, append(envFlags, launchArgsFlag)...), Run: envAdd})
 	register(&Command{Name: "env set", Args: "<name>", Summary: "change an environment's game folder, saves or launch (re-binds a moved game)", MinArgs: 1, MaxArgs: 1,
-		Flags: append(append([]Flag(nil), envFlags...), removeSourceFlag, Flag{Name: "launch-args", Value: "<args>", Help: "extra game arguments, e.g. -popupwindow (\"\" removes them)"}), Run: envSet})
+		Flags: append(append([]Flag(nil), envFlags...), removeSourceFlag, launchArgsFlag), Run: envSet})
 	register(&Command{Name: "env remove", Args: "<name>", Summary: "forget an environment (RimArcho data only; no game files)", MinArgs: 1, MaxArgs: 1,
 		Flags: []Flag{{Name: "yes", Help: "remove (without it: the dry run)"}}, Run: envRemove})
 	register(&Command{Name: "env use", Args: "<name>", Summary: "select the current environment", MinArgs: 1, MaxArgs: 1, Run: envUse})
@@ -195,6 +197,9 @@ func envRemovalLines(n *render.Node, r *app.EnvRemoval) {
 }
 
 func envAdd(c *Ctx, a *Args) (*render.Doc, error) {
+	if err := app.ValidateLaunchArgs(a.Pos[0], a.Str("launch-args")); err != nil {
+		return nil, err
+	}
 	spec := specFromArgs(a)
 	if a.Bool("detected") {
 		det := c.App.Detected()
@@ -218,10 +223,18 @@ func envAdd(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
+	if a.Bool("launch-args") {
+		if err := c.App.SetLaunchArgs(e.ID, a.Str("launch-args")); err != nil {
+			return nil, err
+		}
+	}
 	return envDoc(c, e, "added", changes), nil
 }
 
 func envSet(c *Ctx, a *Args) (*render.Doc, error) {
+	if err := app.ValidateLaunchArgs(a.Pos[0], a.Str("launch-args")); err != nil {
+		return nil, err
+	}
 	e, changes, err := c.App.EnvSet(a.Pos[0], specFromArgs(a))
 	if err != nil {
 		return nil, err

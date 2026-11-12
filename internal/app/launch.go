@@ -67,6 +67,9 @@ func (a *App) LaunchWith(dryRun, move bool) (*SaveResult, error) {
 		return nil, err
 	}
 	defer unlock()
+	if err := a.checkLaunchArgs(); err != nil {
+		return nil, err
+	}
 	if err := a.checkNoGame(); err != nil {
 		return nil, err
 	}
@@ -129,6 +132,9 @@ func (a *App) startGame(p *LaunchPlan) error {
 // gamePlan is how the environment's game is started with userData as its data folder:
 // Steam or the executable, -savedatafolder when it is not the default, the launch arguments.
 func (a *App) gamePlan(e *env.Environment, userData string) (*LaunchPlan, error) {
+	if err := ValidateLaunchArgs(e.Name, a.LaunchArgs(e.ID)); err != nil {
+		return nil, err
+	}
 	p := &LaunchPlan{Method: e.Launch, Dir: e.GameRoot}
 	goos := a.Detect.GOOS
 	if goos == "" {

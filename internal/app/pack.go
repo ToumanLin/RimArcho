@@ -798,6 +798,9 @@ func (a *App) LaunchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 }
 
 func (a *App) launchPackWith(name string, dryRun, move bool) (*PackLaunch, error) {
+	if err := a.checkLaunchArgs(); err != nil {
+		return nil, err
+	}
 	if err := a.checkNoGame(); err != nil { // one game at a time (09 §1)
 		return nil, err
 	}

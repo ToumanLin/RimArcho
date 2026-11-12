@@ -138,5 +138,34 @@ func (a *App) LaunchArgs(envID string) string { return a.Store.Meta("env:" + env
 
 // SetLaunchArgs stores them ("" removes them).
 func (a *App) SetLaunchArgs(envID, args string) error {
+	e, err := a.Store.EnvByID(envID)
+	if err != nil {
+		return err
+	}
+	if e == nil {
+		return fmt.Errorf("environment %s not found", envID)
+	}
+	if err := ValidateLaunchArgs(e.Name, args); err != nil {
+		return err
+	}
 	return a.Store.SetMeta("env:"+envID+":launch_args", strings.TrimSpace(args))
+}
+
+// ValidateLaunchArgs keeps the game's data root under environment control (03 §6.2).
+func ValidateLaunchArgs(name, args string) error {
+	for _, arg := range strings.Fields(args) {
+		key := strings.ToLower(strings.Trim(arg, "\"'"))
+		if key == "-savedatafolder" || strings.HasPrefix(key, "-savedatafolder=") {
+			return fmt.Errorf("launch argument %q overrides the environment's user data folder; use archo env set %s --user-data <dir> and remove -savedatafolder from the launch arguments", arg, quoteArg(name))
+		}
+	}
+	return nil
+}
+
+func (a *App) checkLaunchArgs() error {
+	e, err := a.Env()
+	if err != nil {
+		return err
+	}
+	return ValidateLaunchArgs(e.Name, a.LaunchArgs(e.ID))
 }

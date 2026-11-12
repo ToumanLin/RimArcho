@@ -29,7 +29,7 @@ The table is `launch(environment_id, started_at, method, command, plan_id, finge
 
 **Steps** (if any step fails, stop without executing the later steps):
 
-1. **Check.** No game may be running (§1, §4). The environment must have a user data directory; otherwise, suggest `archo env set --user-data <dir>`. If an existing ModsConfig.xml cannot be read, refuse and ask the player to repair or delete it first.
+1. **Check.** Extra launch arguments containing `-savedatafolder` (case-insensitive, including quoted and separate-value forms) are refused before any write for plan, pack and test launches. The refusal names the argument and gives `archo env set <name> --user-data <dir>`; stored arguments remain untouched. No game may be running (§1, §4). The environment must have a user data directory; otherwise, suggest `archo env set --user-data <dir>`. If an existing ModsConfig.xml cannot be read, refuse and ask the player to repair or delete it first.
 2. **Handle outside changes.** If the file differs from the last write, first attribute the change to the last plan that wrote it, under 07 §4.3. Load the change if possible, then continue. If it creates a conflict (an outside version has not been loaded), refuse and offer commands to view the diff, load the change or ignore it (07 §4.1 item 1). This prevents the write from silently overwriting edits made in the game's Mod menu.
 3. **Synchronize `_Archo_` links** (§3): create any missing links that the plan needs, and remove extra links or links with the wrong targets.
 4. **Remove all `!ArchoPack_` links** (10 §3): the game must not see pack copies when playing a plan. Steps 3 and 4 run as one operation plan that removes links before creating them.

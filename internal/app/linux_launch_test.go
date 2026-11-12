@@ -87,7 +87,9 @@ func TestLinuxLaunch(t *testing.T) {
 				}
 			}
 			if mode == "argument" {
-				e.MustRun("env", "set", "main", "--launch-args=-savedatafolder=elsewhere")
+				if err := e.App.Store.SetMeta("env:"+current.ID+":launch_args", "-savedatafolder=elsewhere"); err != nil {
+					t.Fatal(err)
+				}
 			}
 			scanNow(t, e)
 			config := filepath.Join(ud, "Config", "ModsConfig.xml")
@@ -115,7 +117,7 @@ func TestLinuxLaunch(t *testing.T) {
 					t.Fatalf("launch: %v", e.Launched)
 				}
 			} else {
-				if code == 0 || !strings.Contains(out, "Proton") {
+				if code == 0 || (mode != "argument" && !strings.Contains(out, "Proton")) {
 					t.Fatalf("refusal: %d %s", code, out)
 				}
 				if _, err := e.App.Launch(false); err == nil {

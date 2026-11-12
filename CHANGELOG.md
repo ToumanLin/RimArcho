@@ -6,6 +6,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 - Window and TUI, plan editor: a Mod's details now show its size (the files the last scan read), as the Mod library's details already did.
 - CLI and TUI with no game added: the error (and the TUI's hint) now also names `archo env add <name> --game <dir>`, so a player whose game folder detection does not find (a Linux Steam library on another mount, a custom install) sees that they can give the folder by hand, instead of only `--detected`.
+- Launch arguments: `env add/set --launch-args` refuses `-savedatafolder`; use `env set <name> --user-data <dir>` instead. Plan, pack and test launches also refuse stored overrides before writing, keeping the stored arguments for correction.
+
 - Environments: adding or changing a Linux Proton game now refuses custom user data folders as well as own saves, before changing records or creating data folders. Use the game's shared default folder instead.
 
 - Database: separate game installations from environments while preserving existing IDs, settings, lists and launch behavior. The database upgrades on first open; adding the same game directory twice is still refused.
