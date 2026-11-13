@@ -46,6 +46,14 @@ func testClient(t *testing.T, handler http.HandlerFunc) (Client, *httptest.Serve
 	return Client{HTTP: server.Client(), ShareURL: server.URL + "/share", Password: "private +&=", testOrigin: server.URL}, server
 }
 
+// fullPage is a folder page of folderPageSize entries: entries first, then filler files.
+func fullPage(prefix string, entries ...string) string {
+	for i := len(entries); i < folderPageSize; i++ {
+		entries = append(entries, fmt.Sprintf(`{"name_all":"notes-%s-%d.txt","id":"%s-%d"}`, prefix, i, prefix, i))
+	}
+	return `{"zt":1,"text":[` + strings.Join(entries, ",") + `]}`
+}
+
 func TestListingOnlyAndPagination(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
@@ -53,15 +61,20 @@ func TestListingOnlyAndPagination(t *testing.T) {
 		version  string
 		checksum bool
 		wantErr  string
+		served   int // pages requested when the listing succeeds; 0 means all of pages
 	}{
-		{"later numeric maximum", []string{`{"zt":1,"text":[{"name_all":"archo-1.9.0-windows-amd64.zip","id":"old"},{"name_all":"archo-99.0.0-rc1-windows-amd64.zip","id":"rc"}]}`, `{"zt":1,"text":[{"name_all":"archo-1.10.0-windows-amd64.zip","id":"new"},{"name_all":"archo-1.10.0-windows-amd64.zip.sha256","id":"sum"}]}`, `{"zt":1,"text":[]}`}, "1.10.0", true, ""},
-		{"zip only", []string{`{"zt":"1","text":[{"name_all":"` + testName + `","id":"zip?secret=token"}]}`, `{"zt":"2"}`}, "1.2.3", false, ""},
-		{"stable exact only", []string{`{"zt":1,"text":[{"name_all":"archo-01.2.3-windows-amd64.zip","id":"a"},{"name_all":"archo-9.9.9-linux-amd64.zip","id":"b"},{"name_all":"archo-1.2.3-windows-amd64.zip.bak","id":"c"}]}`, `{"zt":1,"text":[]}`}, "", false, ""},
-		{"ambiguous", []string{`{"zt":1,"text":[{"name_all":"` + testName + `","id":"a"},{"name_all":"` + testName + `","id":"b"}]}`, `{"zt":2}`}, "", false, "ambiguous"},
-		{"later failure", []string{`{"zt":1,"text":[{"name_all":"` + testName + `","id":"a"}]}`, `{"zt":0,"info":"private-secret"}`}, "", false, "listing failed"},
-		{"repeated", []string{`{"zt":1,"text":[{"name_all":"` + testName + `","id":"a"}]}`, `{"zt":1,"text":[{"name_all":"` + testName + `","id":"a"}]}`}, "", false, "no progress"},
-		{"malformed", []string{`{"zt":1,"text":[{"name_all":"x"}]}`}, "", false, "invalid"},
-		{"page cap", nil, "", false, "16-page"},
+		{"later numeric maximum", []string{fullPage("p1", `{"name_all":"archo-1.9.0-windows-amd64.zip","id":"old"}`, `{"name_all":"archo-99.0.0-rc1-windows-amd64.zip","id":"rc"}`), `{"zt":1,"text":[{"name_all":"archo-1.10.0-windows-amd64.zip","id":"new"},{"name_all":"archo-1.10.0-windows-amd64.zip.sha256","id":"sum"}]}`}, "1.10.0", true, "", 0},
+		{"zip only", []string{fullPage("p1", `{"name_all":"`+testName+`","id":"zip?secret=token"}`), `{"zt":"2"}`}, "1.2.3", false, "", 0},
+		{"full page then empty", []string{fullPage("p1", `{"name_all":"`+testName+`","id":"zip"}`), `{"zt":1,"text":[]}`}, "1.2.3", false, "", 0},
+		// Some nodes answer the request after the last page as expired instead of zt=2:
+		// a short page is the last, so that request is never made (RimCrow's PAGE_SIZE rule).
+		{"short page ends", []string{`{"zt":1,"text":[{"name_all":"` + testName + `","id":"zip"}]}`, `{"zt":3,"info":"expired"}`}, "1.2.3", false, "", 1},
+		{"stable exact only", []string{`{"zt":1,"text":[{"name_all":"archo-01.2.3-windows-amd64.zip","id":"a"},{"name_all":"archo-9.9.9-linux-amd64.zip","id":"b"},{"name_all":"archo-1.2.3-windows-amd64.zip.bak","id":"c"}]}`}, "", false, "", 0},
+		{"ambiguous", []string{`{"zt":1,"text":[{"name_all":"` + testName + `","id":"a"},{"name_all":"` + testName + `","id":"b"}]}`}, "", false, "ambiguous", 0},
+		{"later failure", []string{fullPage("p1", `{"name_all":"`+testName+`","id":"a"}`), `{"zt":0,"info":"node busy\nretry later"}`}, "", false, `page 2: zt=0 info="node busy retry later"`, 0},
+		{"repeated", []string{fullPage("p1", `{"name_all":"`+testName+`","id":"a"}`), fullPage("p1", `{"name_all":"`+testName+`","id":"a"}`)}, "", false, "no progress", 0},
+		{"malformed", []string{`{"zt":1,"text":[{"name_all":"x"}]}`}, "", false, "invalid", 0},
+		{"page cap", nil, "", false, "16-page", 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			pages, other := 0, 0
@@ -80,7 +93,7 @@ func TestListingOnlyAndPagination(t *testing.T) {
 					t.Error("incorrect listing form")
 				}
 				if tc.pages == nil {
-					fmt.Fprintf(w, `{"zt":1,"text":[{"name_all":"other.zip","id":"%d"}]}`, pages)
+					io.WriteString(w, fullPage("p"+strconv.Itoa(pages)))
 					return
 				}
 				if pages > len(tc.pages) {
@@ -99,7 +112,11 @@ func TestListingOnlyAndPagination(t *testing.T) {
 				}
 				return
 			}
-			if err != nil || listing.Version != tc.version || listing.HasChecksum != tc.checksum || pages != len(tc.pages) {
+			served := tc.served
+			if served == 0 {
+				served = len(tc.pages)
+			}
+			if err != nil || listing.Version != tc.version || listing.HasChecksum != tc.checksum || pages != served {
 				t.Fatalf("listing=%+v pages=%d err=%v", listing, pages, err)
 			}
 		})
