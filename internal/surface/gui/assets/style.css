@@ -1248,7 +1248,7 @@ svg.i.fill { fill: currentColor; }
 .game { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); background: var(--card-2); }
 .game:has(input:checked) { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: var(--accent-soft); }
 .game.used { opacity: .75; }
-.game input[type=checkbox] { width: 15px; height: 15px; margin-top: 2px; accent-color: var(--accent); flex: none; }
+.game input[type=checkbox], .game input[type=radio] { width: 15px; height: 15px; margin-top: 2px; accent-color: var(--accent); flex: none; }
 .game .b { flex: 1; min-width: 0; }
 .game .top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .game .top .v { font-weight: 600; }
