@@ -54,7 +54,8 @@ type Source struct {
 	Challenge string   `json:"challenge,omitempty"`
 }
 
-// Step has no branches, loops, script evaluation, filesystem or process access.
+// Step has no general branches, loops, script evaluation, filesystem or process access.
+// lanzou-list is a fixed, bounded folder-pagination operation.
 // See the research note for the operation and substitution contracts.
 type Step struct {
 	Op      string            `json:"op"`

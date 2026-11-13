@@ -28,6 +28,13 @@ type runner struct {
 	cookies                            map[string][]*http.Cookie
 	requests, redirects, metadataBytes int
 	testOrigin                         string
+	observe                            func(ProbeEvent)
+}
+
+func (r *runner) report(stage, host string, status int) {
+	if r.observe != nil {
+		r.observe(ProbeEvent{Stage: stage, Host: host, Status: status})
+	}
 }
 
 func newRunner(client *http.Client, source Source, testOrigin string) (*runner, error) {
@@ -194,12 +201,14 @@ func (r *runner) send(ctx context.Context, raw, method string, form url.Values, 
 		}
 		resp, err := r.client.Do(req)
 		if err != nil {
+			r.report("http-failed", u.Hostname(), 0)
 			// url.Error includes bearer query tokens; callers only need the failure class.
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
 			}
 			return nil, errors.New("update HTTP request failed")
 		}
+		r.report("http", u.Hostname(), resp.StatusCode)
 		if err := r.remember(u, resp.Cookies()); err != nil {
 			resp.Body.Close()
 			return nil, err
@@ -328,5 +337,9 @@ func (r *runner) challenge(resp *http.Response, b []byte) bool {
 	if !ok {
 		return false
 	}
-	return r.remember(resp.Request.URL, []*http.Cookie{{Name: "acw_sc__v2", Value: value}}) == nil
+	ok = r.remember(resp.Request.URL, []*http.Cookie{{Name: "acw_sc__v2", Value: value}}) == nil
+	if ok {
+		r.report("acw-challenge", resp.Request.URL.Hostname(), resp.StatusCode)
+	}
+	return ok
 }

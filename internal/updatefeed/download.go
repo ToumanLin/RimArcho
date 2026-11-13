@@ -50,6 +50,12 @@ func (f *Feed) download(ctx context.Context, client *http.Client, index int, dir
 }
 
 func (r *runner) download(ctx context.Context, target string, a Artifact, dir string) (result *Archive, err error) {
+	return r.transfer(ctx, target, &a, dir)
+}
+
+// A nil artifact is used only by the diagnostic probe to measure untrusted bytes.
+// Feed.Download always supplies authenticated metadata.
+func (r *runner) transfer(ctx context.Context, target string, a *Artifact, dir string) (result *Archive, err error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 	// At most one fixed challenge retry per download host, within the shared request budget.
@@ -68,8 +74,12 @@ func (r *runner) download(ctx context.Context, target string, a Artifact, dir st
 			return nil, e
 		}
 		host := resp.Request.URL.Hostname()
+		if strings.Contains(string(b), "down_r") {
+			r.report("human-verification-required", host, resp.StatusCode)
+			return nil, errors.New("Lanzou requires human verification in a browser; this source failed")
+		}
 		if challenged[host] || !r.challenge(resp, b) {
-			return nil, errors.New("download source returned HTML instead of an archive")
+			return nil, errors.New("download node verification failed: HTML instead of an archive")
 		}
 		challenged[host] = true
 		target = resp.Request.URL.String()
@@ -78,8 +88,12 @@ func (r *runner) download(ctx context.Context, target string, a Artifact, dir st
 	if encoding := resp.Header.Get("Content-Encoding"); encoding != "" && encoding != "identity" {
 		return nil, errors.New("archive content encoding is unsupported")
 	}
-	if resp.ContentLength >= 0 && resp.ContentLength != a.Size {
+	if a != nil && resp.ContentLength >= 0 && resp.ContentLength != a.Size {
 		return nil, errors.New("archive Content-Length differs from signed size")
+	}
+	limit := int64(MaxArchive)
+	if a != nil {
+		limit = a.Size
 	}
 	file, err := os.CreateTemp(dir, "updatefeed-*.part")
 	if err != nil {
@@ -91,12 +105,15 @@ func (r *runner) download(ctx context.Context, target string, a Artifact, dir st
 		}
 	}()
 	hash := sha256.New()
-	n, err := io.Copy(io.MultiWriter(file, hash), io.LimitReader(resp.Body, a.Size+1))
+	n, err := io.Copy(io.MultiWriter(file, hash), io.LimitReader(resp.Body, limit+1))
 	if err != nil {
 		return nil, err
 	}
 	sum := hex.EncodeToString(hash.Sum(nil))
-	if n != a.Size || sum != a.SHA256 {
+	if n <= 0 || n > limit {
+		return nil, errors.New("archive is empty or exceeds byte limit")
+	}
+	if a != nil && (n != a.Size || sum != a.SHA256) {
 		return nil, errors.New("archive differs from signed size or SHA-256")
 	}
 	if err = ctx.Err(); err != nil {

@@ -30,12 +30,15 @@ func validateSource(s Source) error {
 			return errors.New("step destination must be an identifier other than artifact")
 		}
 		switch step.Op {
-		case "request":
+		case "request", "lanzou-list":
 			if step.Method != "GET" && step.Method != "POST" {
 				return errors.New("request method must be GET or POST")
 			}
 			if len(step.Form) > 16 || len(step.Headers) > 6 || (step.Method == "GET" && len(step.Form) != 0) {
 				return errors.New("invalid request fields")
+			}
+			if step.Op == "lanzou-list" && (step.Method != "POST" || step.Form["pg"] != "1") {
+				return errors.New("lanzou-list needs POST with pg=1")
 			}
 			for k := range step.Headers {
 				switch http.CanonicalHeaderKey(k) {
@@ -107,61 +110,10 @@ func (r *runner) resolve(ctx context.Context, artifact string) (string, error) {
 		var value string
 		var err error
 		switch s.Op {
+		case "lanzou-list":
+			value, err = r.lanzouList(ctx, s, vars, artifact)
 		case "request":
-			var raw string
-			raw, err = expand(s.URL, vars)
-			if err != nil {
-				break
-			}
-			headers := http.Header{}
-			form := url.Values{}
-			for k, v := range s.Headers {
-				var x string
-				x, err = expand(v, vars)
-				if err != nil {
-					break
-				}
-				headers.Set(k, x)
-			}
-			if err != nil {
-				break
-			}
-			for k, v := range s.Form {
-				var x string
-				x, err = expand(v, vars)
-				if err != nil {
-					break
-				}
-				form.Set(k, x)
-			}
-			if err != nil {
-				break
-			}
-			if len(form.Encode()) > 16<<10 {
-				err = errors.New("form exceeds 16 KiB")
-				break
-			}
-			requestCtx, stop := context.WithTimeout(ctx, 20*time.Second)
-			for attempt := 0; attempt < 2; attempt++ {
-				var resp *http.Response
-				resp, err = r.send(requestCtx, raw, s.Method, form, headers)
-				if err != nil {
-					break
-				}
-				var b []byte
-				b, err = r.metadata(resp)
-				if err != nil {
-					break
-				}
-				if attempt == 0 && s.Method == "GET" && r.challenge(resp, b) {
-					raw = resp.Request.URL.String()
-					continue
-				}
-				value = string(b)
-				vars[s.Into+"_url"] = resp.Request.URL.String()
-				break
-			}
-			stop()
+			value, vars[s.Into+"_url"], err = r.requestMetadata(ctx, s, vars)
 		case "regex":
 			var input string
 			input, err = expandedInput(s.Input, vars)
@@ -268,6 +220,7 @@ func (r *runner) resolve(ctx context.Context, artifact string) (string, error) {
 			return "", errors.New("extracted value exceeds 8 KiB")
 		}
 		vars[s.Into] = value
+		r.report("step-"+s.Into, "", 0)
 		if len(vars) > 97 {
 			return "", errors.New("recipe exceeds variable limit")
 		}
@@ -278,6 +231,53 @@ func (r *runner) resolve(ctx context.Context, artifact string) (string, error) {
 	}
 	_, err = r.checkURL(target)
 	return target, err
+}
+
+func (r *runner) requestMetadata(ctx context.Context, s Step, vars map[string]string) (string, string, error) {
+	raw, err := expand(s.URL, vars)
+	if err != nil {
+		return "", "", err
+	}
+	headers := http.Header{}
+	form := url.Values{}
+	for k, v := range s.Headers {
+		x, err := expand(v, vars)
+		if err != nil {
+			return "", "", err
+		}
+		headers.Set(k, x)
+	}
+	for k, v := range s.Form {
+		x, err := expand(v, vars)
+		if err != nil {
+			return "", "", err
+		}
+		form.Set(k, x)
+	}
+	if len(form.Encode()) > 16<<10 {
+		return "", "", errors.New("form exceeds 16 KiB")
+	}
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	for attempt := 0; attempt < 2; attempt++ {
+		resp, err := r.send(ctx, raw, s.Method, form, headers)
+		if err != nil {
+			return "", "", err
+		}
+		b, err := r.metadata(resp)
+		if err != nil {
+			return "", "", err
+		}
+		if s.Method == "GET" && strings.Contains(string(b), "acw_sc__v2") {
+			if attempt != 0 || !r.challenge(resp, b) {
+				return "", "", errors.New("metadata cookie challenge failed")
+			}
+			raw = resp.Request.URL.String()
+			continue
+		}
+		return string(b), resp.Request.URL.String(), nil
+	}
+	return "", "", errors.New("metadata cookie challenge failed")
 }
 
 // Input names a variable rather than interpolating a potentially 1 MiB page.
