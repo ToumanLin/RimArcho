@@ -1,4 +1,4 @@
-package updatefeed
+package lanzou
 
 import (
 	"compress/gzip"
@@ -21,10 +21,10 @@ const maxRequests = 24
 const maxRedirects = 6
 const maxValue = 8 << 10
 
-// A test origin is injected only by same-package tests, never by signed metadata.
+// A test origin is injected only by same-package tests, never by public configuration.
 type runner struct {
 	client                             *http.Client
-	source                             Source
+	hosts                              []string
 	cookies                            map[string][]*http.Cookie
 	requests, redirects, metadataBytes int
 	testOrigin                         string
@@ -37,14 +37,14 @@ func (r *runner) report(stage, host string, status int) {
 	}
 }
 
-func newRunner(client *http.Client, source Source, testOrigin string) (*runner, error) {
+func newRunner(client *http.Client, hosts []string, testOrigin string) (*runner, error) {
 	var base http.RoundTripper = http.DefaultTransport
 	if client != nil && client.Transport != nil {
 		base = client.Transport
 	}
 	transport, ok := base.(*http.Transport)
 	if !ok {
-		return nil, errors.New("updatefeed requires a standard http.Transport for destination enforcement")
+		return nil, errors.New("lanzou requires a standard http.Transport for destination enforcement")
 	}
 	t := transport.Clone()
 	// This experiment is direct-only. A proxy can resolve a public name to a private
@@ -68,7 +68,7 @@ func newRunner(client *http.Client, source Source, testOrigin string) (*runner, 
 	t.DisableCompression = true
 	t.DisableKeepAlives = true
 	c := &http.Client{Transport: t, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	return &runner{client: c, source: source, cookies: map[string][]*http.Cookie{}, testOrigin: testOrigin}, nil
+	return &runner{client: c, hosts: hosts, cookies: map[string][]*http.Cookie{}, testOrigin: testOrigin}, nil
 }
 
 // Validate every DNS answer, then connect to a checked literal IP. The HTTP
@@ -142,13 +142,13 @@ func (r *runner) checkURL(raw string) (*url.URL, error) {
 		return nil, errors.New("update URL must use HTTPS port 443")
 	}
 	allowed := false
-	for _, host := range r.source.Hosts {
+	for _, host := range r.hosts {
 		if strings.EqualFold(u.Hostname(), host) {
 			allowed = true
 		}
 	}
 	if !allowed {
-		return nil, fmt.Errorf("update URL host %q is outside the signed allowlist", u.Hostname())
+		return nil, fmt.Errorf("update URL host %q is outside the configured allowlist", u.Hostname())
 	}
 	if ip, err := netip.ParseAddr(u.Hostname()); err == nil && !publicIP(ip) {
 		return nil, errors.New("update URL contains a non-public address")
@@ -178,9 +178,9 @@ func (r *runner) send(ctx context.Context, raw, method string, form url.Values, 
 		req.Header = headers.Clone()
 		req.Header.Set("Accept-Encoding", "identity")
 		if req.Header.Get("User-Agent") == "" {
-			ua := r.source.UserAgent
+			ua := userAgent
 			if ua == "" {
-				ua = "RimArcho-updatefeed/1"
+				ua = "RimArcho-lanzou/1"
 			}
 			req.Header.Set("User-Agent", ua)
 		}
@@ -305,7 +305,7 @@ func (r *runner) metadata(resp *http.Response) ([]byte, error) {
 }
 
 // acwCookie implements only the fixed permutation/XOR observed in the live page.
-// The recipe can request this strategy, but cannot supply or execute JavaScript.
+// Page JavaScript is never evaluated.
 var acwArg = regexp.MustCompile(`\barg1\s*=\s*['"]([0-9a-fA-F]{40})['"]`)
 
 func acwCookie(body []byte) (string, bool) {
@@ -330,9 +330,6 @@ func acwCookie(body []byte) (string, bool) {
 }
 
 func (r *runner) challenge(resp *http.Response, b []byte) bool {
-	if r.source.Challenge != "acw-v2" {
-		return false
-	}
 	value, ok := acwCookie(b)
 	if !ok {
 		return false

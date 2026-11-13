@@ -7,21 +7,21 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ToumanLin/RimArcho/internal/updatefeed"
+	"github.com/ToumanLin/RimArcho/internal/lanzou"
 )
 
 func TestProbeOutputAndExitStatus(t *testing.T) {
 	for _, fail := range []bool{false, true} {
 		var out bytes.Buffer
-		code := run(context.Background(), []string{"-url", "https://example.com/share", "-password", "private-password", "-filename", "test.zip"}, &out, func(_ context.Context, share, password, filename string, _ []string, report func(updatefeed.ProbeEvent)) (updatefeed.ProbeResult, error) {
+		code := run(context.Background(), []string{"-url", "https://example.com/share", "-password", "private-password", "-filename", "test.zip"}, &out, func(_ context.Context, share, password, filename string, _ []string, report func(lanzou.ProbeEvent)) (lanzou.ProbeResult, error) {
 			if share != "https://example.com/share" || password != "private-password" || filename != "test.zip" {
 				t.Fatal("arguments not passed")
 			}
-			report(updatefeed.ProbeEvent{Stage: "http", Host: "example.com", Status: 200})
+			report(lanzou.ProbeEvent{Stage: "http", Host: "example.com", Status: 200})
 			if fail {
-				return updatefeed.ProbeResult{Host: "example.com"}, errors.New("Lanzou requires human verification in a browser; this source failed")
+				return lanzou.ProbeResult{Host: "example.com"}, errors.New("Lanzou requires human verification in a browser; this source failed")
 			}
-			return updatefeed.ProbeResult{Host: "example.com", Size: 123, SHA256: strings.Repeat("a", 64)}, nil
+			return lanzou.ProbeResult{Host: "example.com", Size: 123, SHA256: strings.Repeat("a", 64)}, nil
 		})
 		if strings.Contains(out.String(), "private-password") || strings.Contains(out.String(), "/share") {
 			t.Fatal("output exposed credentials or URL")

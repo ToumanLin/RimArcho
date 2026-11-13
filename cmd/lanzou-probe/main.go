@@ -10,16 +10,16 @@ import (
 	"os/signal"
 	"strings"
 
-	"github.com/ToumanLin/RimArcho/internal/updatefeed"
+	"github.com/ToumanLin/RimArcho/internal/lanzou"
 )
 
-type prober func(context.Context, string, string, string, []string, func(updatefeed.ProbeEvent)) (updatefeed.ProbeResult, error)
+type prober func(context.Context, string, string, string, []string, func(lanzou.ProbeEvent)) (lanzou.ProbeResult, error)
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	os.Exit(run(ctx, os.Args[1:], os.Stdout, func(ctx context.Context, share, password, filename string, hosts []string, observe func(updatefeed.ProbeEvent)) (updatefeed.ProbeResult, error) {
-		return updatefeed.ProbeLanzou(ctx, nil, share, password, filename, hosts, observe)
+	os.Exit(run(ctx, os.Args[1:], os.Stdout, func(ctx context.Context, share, password, filename string, hosts []string, observe func(lanzou.ProbeEvent)) (lanzou.ProbeResult, error) {
+		return lanzou.ProbeLanzou(ctx, nil, share, password, filename, hosts, observe)
 	}))
 }
 
@@ -52,7 +52,7 @@ func run(ctx context.Context, args []string, out io.Writer, probe prober) int {
 		extra = strings.Split(*hosts, ",")
 	}
 	fmt.Fprintln(out, "Lanzou probe: temporary download only; no install or execution.")
-	result, err := probe(ctx, *share, *password, *filename, extra, func(event updatefeed.ProbeEvent) {
+	result, err := probe(ctx, *share, *password, *filename, extra, func(event lanzou.ProbeEvent) {
 		fmt.Fprintf(out, "stage=%s", event.Stage)
 		if event.Host != "" {
 			fmt.Fprintf(out, " host=%s", event.Host)

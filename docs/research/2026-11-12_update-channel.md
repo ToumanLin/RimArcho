@@ -1,265 +1,132 @@
-# Signed update feeds through Archo Monitor
+# Parallel update checks and GitHub/Lanzou release pairs
 
-> Research and unwired prototype, 2026-11-12 (America/Los_Angeles).
-> Live observations were made on 2026-11-13 UTC. **[C]** means confirmed by a live HTTP or browser observation; maintainer-supplied browser evidence is attributed explicitly. Source inspection and design proposals are not [C].
-> Basis: [17 §5 and §5.1](../specs/17-engineering.md#5-releases), [earlier Workshop research](2026-11-05_workshop-distribution.md).
+> Research and unwired prototype, 2026-11-12 (America/Los_Angeles), with live observations on 2026-11-13 UTC.
+> **[C]** means confirmed by a live HTTP/browser observation. Maintainer-supplied browser evidence is attributed explicitly; source inspection and proposals are not [C].
+> Basis: [17 §5.1](../specs/17-engineering.md#51-rimarcho-self-update), [earlier Workshop research](2026-11-05_workshop-distribution.md).
 
-## 1. Decisions and readiness
+## 1. Decisions
 
-1. Use one Ed25519-signed file as the authority for a stable Windows update's version, exact archive name, byte length, SHA-256 and ordered download recipes. Workshop, GitHub and future object storage carry identical bytes. Transport metadata and netdisk filenames never establish authenticity.
-2. Put it at **`.rimarcho/updates/stable.json` inside the new standalone Monitor item**. Keep the program ZIP off Workshop. The new item ID remains unassigned; this investigation publishes nothing.
-3. Keep recipes declarative: HTTP GET / form POST, one-capture RE2 extraction, JSON pointers, exact filename selection, URL resolution, literal substitution and equality assertions. No JavaScript, shell, general expression evaluator, recursion or general loops. Fixed cookie handling and folder pagination are named native operations with bounded retries/pages.
-4. Preserve existing ZIP naming and extraction/swap rules. A signed digest replaces an unsigned downloaded checksum as the authority for stable-feed downloads. The prototype returns a verified temporary archive and never installs it.
-5. Respect signed source order in `auto`: **GitHub first, Lanzou second**, with OSS/COS possibly later. Keep GitHub's DNS/connect deadline near five seconds so unreachable GitHub falls through promptly. Contact Lanzou only after a player confirms installation and GitHub fails. Version checks read the signed feed from Monitor / GitHub and never contact Lanzou. Do not infer reachability from language. `github` must bypass Steam and netdisks. Prereleases and Linux remain on existing GitHub paths pending a separate integration decision.
-6. Match RimCrow's Lanzou boundary: compute the fixed `acw_sc__v2` cookie that a browser computes, follow allowed redirects, and stop when a node returns non-challenge HTML or challenges the same host twice. The node's `down_r(el)` human-verification page is a **source failure**; never POST its `file`/`el`/`sign` form to `ajax.php`.
-7. If Lanzou also fails, offer the share link/password for a browser download and let the player select the ZIP. Require the exact signed size and SHA-256 before the existing installation steps. The library check exists; application, CLI and UI integration are design only (§4.2).
-8. **Lanzou cannot yet be the only China-accessible download source. [C]** This machine reaches network-verification HTML even in Chromium, whereas the maintainer downloaded directly in a desktop browser outside China. A final byte host, ZIP size and SHA-256 remain unconfirmed on this network. The standalone probe reports this failure explicitly.
+1. **Keep the release layout exactly as today:** `archo-<X.Y.Z>-windows-amd64.zip` plus `<zip>.sha256`, in the existing sha256sum format. Publish the same pair to GitHub Releases and `https://rimarcho.lanzn.com/b01i608qja` (password `ctot`). ZIP roots, bundled files, extraction and swap/rollback stay under 17 §5.1. This design adds no package entries or update-file format requiring a stepping-stone updater release.
+2. **Check three metadata sources concurrently, with one overall deadline, and choose the highest stable version:** GitHub Releases latest; the standalone Archo Monitor item's description stamp via anonymous `GetPublishedFileDetails`; and the Lanzou folder's exact stable ZIP filenames. Preserve each source's result. A failed/timed-out source never discards another source's successful result. Checking order is separate from download priority.
+3. The new Workshop item carries **only Archo Monitor**. Its description ends with `RimArcho v<X.Y.Z>`, read by `selfupdate.DescriptionVersion`. No item-file reads, subscriptions, SteamCMD, tags or feed are involved in checks. Its ID is unassigned: `updatechannel.MonitorWorkshopItem` remains empty, with `RIMARCHO_UPDATE_MONITOR_ITEM` as the future VM/test override. Never reuse the retired program item **3835688284**.
+4. **Download precisely the checked version: GitHub pair first, Lanzou pair second, manual browser pair last.** A version known only from Lanzou is eligible for Lanzou download. Both automatic sources require the exact ZIP's `.sha256`; missing/invalid checksum fails that source while the version can still support a notice. Never silently substitute another version.
+5. Lanzou checks stop after folder GET/password POST/pagination. File details, iframe/download API and download node are installation-time work after player confirmation. The resolver computes the fixed `acw_sc__v2` cookie and follows allowed redirects, like RimCrow. Non-challenge HTML or a repeated challenge on the same node host fails the source. **Never automate the `down_r(el)` human-verification page or its POST.**
+6. Manual fallback opens the public share in the player's browser. The player can complete human verification and pick the ZIP and `.sha256`; RimArcho can find the sidecar beside the ZIP or resolve that exact sidecar from the listing. Verify using `selfupdate.VerifyLocal` unchanged. Missing/mismatching checksum never authorizes installation.
+7. `updates.source github` uses GitHub only. Prereleases stay GitHub-only. This prototype does not change Linux's existing notification path. Object storage (OSS/COS) is **not planned**.
 
-The experiment lives in [internal/updatefeed](../../internal/updatefeed/feed.go), [cmd/lanzou-probe](../../cmd/lanzou-probe/main.go) and this research note/index. It remains separate from the self-update behavior specified by 17 §5.1; that specification describes the existing application path, not this prototype. No application, frontend, existing updater, specifications, changelog or release pipeline behavior changes. No production key, built-in public key, upload, push or publishing step is included.
+Implementation is limited to [internal/lanzou](../../internal/lanzou/client.go), [internal/updatechannel](../../internal/updatechannel/check.go), [cmd/lanzou-probe](../../cmd/lanzou-probe/main.go), and research documentation. Application, public CLI, UI, actual specifications, CHANGELOG and release scripts are untouched. Per-source reporting and browser selection are library/design work, not newly available `archo` controls. No upload, publication or game/application data access occurs.
 
-## 2. Live Lanzou observations
+## 2. Checks and source results
 
-### 2.1 Scope and evidence
+`updatechannel.Check` starts at most three tasks concurrently under one deadline (default 30 seconds, maximum 60). It uses `selfupdate.Client.Latest`, an anonymous single-item POST equivalent to `app.postWorkshopDetails`, and `lanzou.Client.List`. Standard transports get a five-second connect timeout; TLS and response-header deadlines are separate. Successful results survive other source failures or the overall deadline. Result order stays GitHub, Monitor, Lanzou, while the maximum semantic version wins independently of latency.
 
-The maintainer supplied `https://rimarcho.lanzn.com/b01i608qja`, password `ctot`, for live HTTP testing. Requests were serial, with fresh cookie jars in multiple independent attempts. No Steam credentials, browser profile, real game, Mods or RimArcho data directory were accessed. No concurrent downloads or rate-limit stress tests were attempted. Bodies were bounded; no ZIP was executed or installed. Bearer query values and cookies are omitted from this note.
+Each `SourceResult` records source, status (`ok`, `failed`, `timeout`, `unconfigured`), version, elapsed time, safe failure reason and whether a checksum asset was advertised. This is input for a later `archo update --check` display; the CLI is not wired. Monitor supplies a version only. GitHub/Lanzou checksum presence means an asset/filename was advertised, not that its contents were downloaded or validated. Verification remains mandatory at download time.
 
-| Evidence | Observation | Finding and next action |
-| --- | --- | --- |
-| E1 [C] | Fresh folder GET: HTTP 200, ESA headers, gzip body with `arg1` and `acw_sc__v2`; `X-Tengine-Error: denied by http_custom` | HTTP 200 is insufficient. Bound decompression, recognize the fixed challenge, retry once. |
-| E2 [C] | Permutation/XOR cookie followed by another GET returned the password form and folder AJAX declaration | The fixed native strategy works for the observed folder. Do not evaluate its obfuscated script. |
-| E3 [C] | Password POST returned `zt:1` and one file, `archo-1.0.10-windows-amd64.zip`, displayed size `33.9 M` | Select the signed exact filename; rounded size cannot authorize installation. |
-| E4 [C] | The full file ID, including `webpage` query, led to `/fn?...` iframe and an external AJAX API | Retain query state. A bare file ID did not yield the same iframe in a fresh attempt. |
-| E5 [C] | Download AJAX returned `zt:1`, `dom:https://developer4.lanrar.com` and an opaque query token | This is a resolver URL, not a confirmed file URL. |
-| E6 [C] | Node GET returned another cookie challenge, then HTML network verification | Host-specific challenge state is needed. Reject HTML where a ZIP is required. |
-| E8 [C] | Fresh Go session, consistent Chrome User-Agent, no download Referer: still network-verification HTML after the cookie challenge | Matching the anchor's `rel=noreferrer` behavior did not remove the blocker. |
-| E9 [C], maintainer-supplied live evidence, 2026-11-13 | The maintainer's desktop browser outside China downloaded the file directly, without a verification page | The page is conditional; outside-China location alone does not imply failure. No size/hash or final byte host was supplied. |
-| E10 [C], maintainer-supplied live evidence, 2026-11-13 | A real Chromium pane on this machine followed password → file page → iframe link and received the verification page from `developer4.lanrar.com`; the anchor had `rel=noreferrer`, `target=_blank`, and the page also loaded `/file/kdns.js` | Go is not the cause by itself. The behavior depends on network/browser reputation; the exact signal/trigger is unknown. Do not automate the human check. |
-| E11 [C], follow-up standalone probe | Folder GET/cookie retry, listing pages 1 and 2 (empty), file page, iframe and download API succeeded; node GET/cookie retry returned human-verification HTML | Exit 1: `Lanzou requires human verification in a browser; this source failed`. Last host `developer4.lanrar.com`; ZIP bytes/hash unavailable. |
+Proposed display example, not an implemented CLI contract:
 
-Reproduce E1 (cookies/tokens vary):
-
-```powershell
-curl.exe --compressed --max-time 25 --max-filesize 1048576 -sS -D - https://rimarcho.lanzn.com/b01i608qja
+```text
+github   failed       GitHub release lookup failed
+monitor  unconfigured standalone Monitor item ID is not assigned
+lanzou   ok           version=1.0.10 checksum_present=false
+latest=1.0.10
 ```
 
-The standalone probe and opt-in test in §6 reproduce the implemented chain and current failure without logging bearer tokens. The supported path ends at the human-verification page. Exploratory verification submissions are excluded from the supported path and code.
+The Web API request uses `itemcount=1`, `publishedfileids[0]=<Monitor ID>`, with no credentials. Require HTTP 200, exactly that returned ID, result 1 and a stable description stamp. Missing item/stamp, result 9, malformed/oversized response or invalid ID fails just Monitor. Tags do not substitute for the stamp. No named account, SteamCMD install/run, local Workshop scan or item-file download occurs. The application-layer `postWorkshopDetails` remains unchanged; the unwired adapter duplicates its small request rather than importing app.
 
-### 2.2 Requests and extraction
+A stamped Monitor version can precede binary mirror publication: report it, then show download failures if its pair is unavailable. A stale/dead source cannot suppress a newer result. If all sources fail, do not claim the player is up to date. There is no cryptographic freshness/rollback protection; future integration still compares against the running version and never downgrades.
 
-| Stage | Request / fields | Result |
+### RimCrow comparison (read only)
+
+Inspected `../../../../RimModManager/backend/managers/mgr_update.py`, `_check_sources`: a four-worker pool, one overall timeout, per-source results, maximum version wins. Its same-version downloads are sorted by latency; RimArcho retains the fixed order in §1. Its Lanzou source infers versions from supported ZIP filenames and supplies `file_hash=None`: the inspected download path has **no checksum verification**.
+
+**Local-code discrepancy:** `LanzouSource.check()` calls `LanzouParser.get_all_files()`, which also calls `get_file()` after selecting a filename and resolves download details. Thus the inspected local code is not strictly listing-only and may fail during a check at the node. Folder metadata alone can reveal the version without that chain. Our `Client.List` deliberately stops before file details, and synthetic tests reject any file/node request during checks.
+
+RimCrow's `_resolve_download_url` stops on non-acw HTML or a second challenge on the same host, including the human-verification page. Its folder parser bounds pagination at 100 pages and also stops on a short page. Ours scans through an empty page/status 2, bounded at 16 pages and shared budgets, never returning an incomplete successful listing. RimCrow code was inspected read-only and not copied.
+
+## 3. Download, verification and manual fallback
+
+`updatechannel.Download(ctx, options, checkedVersion, stagingDir)` looks up that exact stable GitHub version through `selfupdate.Client.Version`, then uses the existing `Client.Download` for its ZIP/checksum pair. The GitHub-only prerelease prototype requires the lookup still to name the checked version; a changed result fails safely. Later integration can retain the checked release snapshot. Downloads and fallback share a five-minute absolute deadline.
+
+If GitHub fails, `lanzou.Client.Download` lists afresh, requires exactly the checked ZIP and `.sha256`, resolves the checksum first, then the ZIP, and delegates verification to `selfupdate.VerifyLocal`. A higher filename appearing during download does not change the selection. Missing/ambiguous files, failed pagination, changed HTML, human verification, cancellation, limits or checksum mismatch fail the source and remove staging. Neither package extracts, installs or executes anything.
+
+GitHub supplies its asset size and sidecar. Lanzou's rounded listing size is not an authoritative byte count: the transfer enforces 200 MiB, measures actual bytes and checks the staged ZIP's digest against the sidecar. It checks the staged copy again with that measured size. Manual verification uses a positive known size when available; zero retains `VerifyLocal`'s existing checksum-only size convention. No size manifest or new checksum syntax is introduced.
+
+`updatechannel.VerifyLocal` accepts an explicit sidecar or looks for `<selected zip>.sha256`, then the exact release sidecar in the same directory. `VerifyWithChecksum` also accepts bounded bytes from `lanzou.Client.Checksum`. Both call unchanged `selfupdate.VerifyLocal` with the checked release filename. Browser-renamed ZIPs are allowed if their contents match. A filename-bearing checksum must identify the checked ZIP; the existing parser also accepts a bare hash.
+
+Future manual installation retains the lock (17 §5.1 step 1), copies selected inputs to private `download/` staging, re-verifies the staged ZIP (the selected input can change), then follows steps 3–7: archive-root/path/symlink/executable/expansion checks, process wait, journaled swap, startup verification/rollback and restart. Selected files remain untouched. Confirmation, locks, progress, browser and picker controls are not wired here. Proposed CLI shape `archo update --from <zip> [--checksum <sidecar>]` is design only.
+
+### Trust boundary
+
+A ZIP plus a `.sha256` from the **same source detects corruption, incomplete transfers and accidental mismatches**. It does not authenticate a compromised source: control of the GitHub repository or Lanzou folder can allow replacing both ZIP and checksum with a matching malicious pair. Explicitly selecting a malicious pair has the same limitation. This is the same trust model as today's GitHub updater, with integrity checking absent from RimCrow's inspected Lanzou path.
+
+A compromised Steam/Monitor description can advertise a misleading version or deny service, but the stamp cannot supply a binary, hash, mirror URL or executable instructions. Installation still needs a matching pair from the configured GitHub/Lanzou location or explicit manual selection. This is not a guarantee that any single compromised distribution account is harmless: an account controlling **both ZIP and sidecar** defeats same-source checksums. This design has neither signatures nor independently pinned expected hashes.
+
+## 4. Fixed Go resolver and bounds
+
+The download chain is folder GET, fixed cookie retry, password/pagination, exact full file ID, file page, iframe, download API, node redirects/cookie retry, bytes. IDs retain query state. There is no recipe interpreter, arbitrary script execution or downloadable parser. Lanzou page/API changes can require a normal RimArcho release; that maintenance cost is accepted. Cookies and bearer URLs remain session-local and are never logged or persisted.
+
+| Resource | Bound |
+| --- | --- |
+| Destinations | HTTPS port 443; exact configured hosts; no userinfo/fragments/wildcards |
+| Default hosts | Share host, `apifile.woozooo.com`, `developer4.lanrar.com` |
+| DNS/connect | Every answer must be public; dial a checked literal IP with original TLS hostname; five seconds including DNS |
+| TLS / response headers | Five / ten seconds; request/response headers at most 16 KiB |
+| Requests / redirects | 24 / 6 per session, shared across listing, resolution, cookies and transfers |
+| Pagination | 16 pages including terminating empty page; failed/no-progress/incomplete listings fail |
+| Metadata | 1 MiB wire/decoded body, 4 MiB aggregate; bounded gzip; JSON depth 32, no duplicate/case-colliding keys |
+| Values / forms | 8 KiB values/URLs; 16 fields / 16 KiB encoded form |
+| Cookies | Fresh host-local state, 16 cookies / 8 KiB |
+| Time | 20 seconds per metadata request; 60 seconds per listing/resolution; three minutes per transfer, four per Lanzou pair |
+| Files | ZIP at most 200 MiB; checksum at most 64 KiB; read one extra byte to detect overflow |
+
+Budgets apply together: requests/time can end a large listing/pair before its page limit. POST redirects fail; cross-host GET redirects discard request-specific headers and keep cookies host-local. Reject private/loopback/link-local/CGNAT/reserved DNS answers, including mixed public/private responses. Do not retry HTTP 429/5xx or human checks automatically. Synthetic tests alone can inject one exact httptest origin; callers cannot enable that exception.
+
+Lanzou uses direct connections, clones standard `http.Transport`, and rejects custom wrappers. GitHub/Steam standard transports retain routing/TLS settings with short connects. Application `netcfg` wrapper/proxy integration is deferred until wiring. Unknown redirect hosts fail closed; the diagnostic's `-hosts` permits explicitly reviewed exact extra hosts while retaining HTTPS/public-IP enforcement.
+
+## 5. Live evidence
+
+Serial requests used fresh cookie state against the maintainer-provided share/password, with bounded bodies and no game, Mods, Steam account or RimArcho data access. Nothing downloaded was installed/executed. Bearer queries and cookies are omitted.
+
+| Evidence | Observation | Consequence |
 | --- | --- | --- |
-| Folder | GET supplied URL, then one challenge retry | [C] Valid folder HTML. |
-| Listing | POST `/filemoreajax.php?file=14238640`; `lx=2`, `fid=14238640`, `uid=5546482`, page-derived `puid`, `pg=1,2,...`, `rep=0`, page-derived `t` and `k`, `up=1`, `ls=1`, `pwd=ctot` | [C] Page 1 returned one ZIP; page 2 was empty in the follow-up probe. Larger folders are covered synthetically. |
-| File | GET `/` plus selected entry's full `id` | [C] File page with `<iframe class="ifr2" ... src="/fn?...">`. |
-| Iframe | GET iframe URL, Referer file page | [C] `domain1`, `domain2`, `ajaxdata`, `wp_sign` and a `downprocess` declaration. |
-| Download API | POST `https://apifile.woozooo.com/ajaxfile.php?file=330523359`; `action=downprocess`, `websignkey=ajaxdata`, `signs=ajaxdata`, `sign=wp_sign`, `websign=2`, `kd=1`, `ves=1` | [C] JSON `dom` and `url`; combine as `dom + "/file/" + url`. |
-| Resolver node | GET combined URL, one host-specific challenge retry | [C] Network-verification HTML on `developer4.lanrar.com`; no successful byte-serving redirect observed. |
-
-[lanzou.go](../../internal/updatefeed/lanzou.go), `LanzouSource`, contains the exact extraction expressions shared by the standalone probe and [live_test.go](../../internal/updatefeed/live_test.go): literal folder fields, a ten-digit `t`, 32-hex-character `k`, iframe `src`, and literal `domain1`, `ajaxdata`, `wp_sign`. These are dated patterns, not a JavaScript parser. Folder variable names changed across requests; fixed variable names alone would be insufficient. A signed recipe update can change the patterns without an executable release.
-
-[C] Returned iframe HTML also advertised `https://apifile.lanzouw.com` and a script-controlled fallback `https://developer2oss.lanzouc.com:661` when its DNS helper is absent. Neither alternative was requested or confirmed as a working route. Port 661 is rejected by the prototype; supporting it needs an explicit policy decision.
-
-[C] Both short `Mozilla/5.0` and full Chrome User-Agents worked through metadata resolution. Successful AJAX requests included Referer, Origin and X-Requested-With; a separate download-API POST succeeded without a preexisting cookie jar. A complete header-omission matrix was not run, so necessity/optionality at every stage is unknown. The supplied password was accepted.
-
-[C] ESA set `acw_tc` and `cdn_sec_tc` with `Max-Age=3600`. The returned challenge script specified one hour for its own cookie. Its fixed transformation permutes the 40 hex characters of `arg1`, then XORs the resulting 20 bytes with an embedded constant. `acwCookie` implements that bounded transformation independently from the observed page, without evaluating surrounding JavaScript. Cookie lifetimes do not establish download-token lifetime.
-
-### 2.3 Stability, expiry and throttling
-
-[C] Folder signing values, iframe parameters and download queries changed across fresh sessions. Resolve again on each download; do not persist bearer URLs. Reusing an earlier API signature later returned `zt:0`, but headers/state also differed: this is not a controlled TTL measurement.
-
-The iframe contains a 1,800,000 ms timeout display. That is a UI timer, **not a confirmed server expiry guarantee**. No working direct URL was available for delayed reuse. Final-host stability, token lifetime, speed and range support remain unknown.
-
-No HTTP 429 was observed. E9–E10 show that the network/browser reputation context affects the verification page, including in a real browser; the exact trigger is unknown. No rate ceiling is claimed. Fail a source once and use the next signed source inside the aggregate deadline. After Lanzou failure, offer the manual fallback in §4.2. Do not automate an interactive CAPTCHA or loop verification attempts.
-
-### 2.4 RimCrow comparison (read only)
-
-Read `../../../../RimModManager/backend/managers/mgr_update.py`, class `LanzouSource`, and delegated `backend/utils/lanzou_parser.py`; no code was copied.
-
-RimCrow infers latest version from supported ZIP filenames and sets `file_hash=None`. Its direct session disables environment/application proxy routing. The parser uses a browser User-Agent, restricted JavaScript literal/alias/concatenation extraction, the known cookie challenge, folder pagination, iframe resolution and up to eight download redirects, rejecting unexpected HTML.
-
-Here the signed feed supplies version, exact name, size and digest; the netdisk only supplies those bytes. Both clients paginate folders and compute the fixed cookie without running arbitrary page scripts. RimCrow bounds pagination at 100 pages and also stops on a short page; this prototype scans until an empty page/status 2, capped at 16 pages inside its shared request/body/deadline budgets. It selects the exact signed filename, never the netdisk's inferred latest release. The implementations were written independently.
-
-RimCrow's `_resolve_download_url` stops with verification failure when HTML is not an acw challenge or the same host challenges twice. It **also stops at the `down_r` human-verification page**. The prototype keeps that same boundary. Reading RimCrow's code establishes this behavior, not a successful live transfer from this host.
-
-## 3. Feed contract
-
-### 3.1 Envelope, signature and freshness
-
-Implemented types: `Envelope`, `Manifest`, `Artifact`, `Source`, `Step` and authenticated opaque `Feed` in [feed.go](../../internal/updatefeed/feed.go). The envelope has three fields:
-
-| Field | Meaning |
-| --- | --- |
-| `key_id` | Identifier selecting an executable-trusted public key, never a URL or downloadable key. |
-| `payload` | Padded standard base64 of exact UTF-8 manifest JSON bytes. |
-| `signature` | Padded standard base64 of the 64-byte Ed25519 signature. |
-
-The signed message is ASCII `RimArcho update feed v1\n`, followed by `key_id`, a newline, then decoded payload bytes. Here `\n` denotes a single newline byte. Signing binds the key selector and exact serialization; JSON canonicalization is unnecessary. Reformatting the payload requires signing again. Duplicate JSON keys (including case collisions), invalid UTF-8, unknown fields and trailing JSON are rejected. Verification happens before interpreting payload fields.
-
-| Manifest field | Implemented contract |
-| --- | --- |
-| `format` | Integer 1. Unknown versions fail closed; incompatible schema/vocabulary changes require a new format and executable support. |
-| `sequence` | Positive monotonically increasing unsigned integer, including same-version recipe repairs. `Parse` accepts a caller-supplied minimum; persistence is future integration. |
-| `issued`, `expires` | RFC 3339 dates. Implemented validity cap: 90 days. Reject expired, nonpositive validity, zero issue date or issue more than five minutes ahead. Publication-policy recommendation: 90–180 days (§7); use 90 with this validator, and revise/test the cap explicitly before accepting 180. |
-| `version` | Stable `X.Y.Z`, no leading-zero components, prefix, build metadata or prerelease. |
-| `artifact` | `name`, positive integer `size` in bytes, 64 lowercase hex `sha256`. |
-| `sources` | One to four uniquely named ordered entries. |
-
-Future integration must atomically persist the highest accepted sequence **and payload digest** with authenticated bytes. Reject lower sequences and a different payload at an already accepted sequence. The prototype enforces only the supplied sequence floor; persistence and same-sequence equivocation detection are not implemented. Distribute a rotation public key in an executable before using its key ID; a feed cannot add trusted keys. Compromise recovery needs a new executable/distribution path and revocation procedure.
-
-Signatures prevent tampering, not withholding. Dead items and stale mirrors can freeze a client until expiry. Cold installs have no high-water mark; expiry and a trustworthy clock are the remaining freeze controls. An expired cached feed may inform a “last known version” display but cannot authorize downloads. Re-parse/reverify cached bytes at installation time; never restore recipes from unsigned application state.
-
-### 3.2 Archive identity
-
-V1 targets Windows amd64: name must be exactly `archo-<version>-windows-amd64.zip`, matching `selfupdate.ZipName`. Signed size is mandatory and at most 200 MiB, measured in actual bytes. Content-Length, when present, must agree too. Every source must deliver the same size/hash; its own checksum cannot substitute a different artifact.
-
-Keep publishing `<zip>.sha256` for legacy clients. `Feed.VerifyLocal(ctx, path)` constructs the sha256sum line from authenticated metadata and delegates to `selfupdate.VerifyLocal` with a positive signed size. An unsigned sidecar never replaces the signed digest. Recheck cached ZIP bytes against the signed size/hash.
-
-Then keep `selfupdate.Extract` and existing ZIP-root, path, symlink, executable, per-entry and expansion-total checks, followed by lock/wait/journal/swap/startup verification/rollback from 17 §5.1. A digest is not a ZIP layout check. The prototype does not extract, execute, replace installed files or persist a release.
-
-### 3.3 Recipe operations
-
-`Source` has `name`, exact `hosts`, optional `user_agent`, optional `challenge:"acw-v2"`, ordered `steps`, and final `download` template. Names/destinations are identifiers. `${artifact}` is the signed archive name. Substitution reads only recipe variables, never environment, files or application state.
-
-| `op` | Inputs and result |
-| --- | --- |
-| `request` | GET or POST `method`, `url`, optional allowlisted `headers` and `form`. Decoded body goes to `into`; response URL goes to `<into>_url`. Forms are URL-encoded after substitution. |
-| `lanzou-list` | Fixed POST pagination operation, with the same URL/headers/form inputs and initial `pg=1`. Set `pg=1,2,...`; accept `zt=1` and the `text` array, stop at empty array or `zt=2`. Return the sole exact `name_all == artifact` entry's full `id` into `into`. Fail on malformed/failed pages, conflicting matches, no progress, or budget exhaustion. |
-| `regex` | `input` names a variable; static RE2 `pattern` has exactly one capture, stored in `into`. No match fails. |
-| `json` | JSON variable `input`, JSON pointer `path`; extract a scalar to `into`. |
-| `select` | Array at `path`; exactly one object must have field `match` equal to expanded `equal`. Extract scalar `field`. Use the signed exact filename. |
-| `url` | Resolve expanded `value` against expanded `base`; store in `into`. Recheck destination policy before requesting it. |
-| `value` | Store expanded `value`, including bounded concatenation. |
-| `assert` | Require expanded `input` equal expanded `equal`; store the matched value. |
-
-For regex/json/select, `input` is a variable **name**, so large pages need not pass through small-value substitution. Other templates use `${name}`. Substitution is single-pass: extracted text cannot introduce recursive template evaluation. Undefined variables, unsupported operations/headers, malformed JSON and ambiguous selections fail the source.
-
-The fixed `acw-v2` strategy handles one GET challenge retry, and the download stage allows one retry per host, inside shared budgets. It cannot solve arbitrary new challenges; a changed transformation requires an executable update. Folder pagination preserves query state in the selected ID and scans through the empty page, including after a match, to reject later ambiguity or incomplete listings. It never automates a node's human check. Folder contents never determine latest version.
-
-### 3.4 Bounds and destination policy
-
-Implementation: [network.go](../../internal/updatefeed/network.go), [recipe.go](../../internal/updatefeed/recipe.go), [download.go](../../internal/updatefeed/download.go).
-
-| Resource | Limit |
-| --- | --- |
-| Envelope / decoded manifest | 96 KiB / 64 KiB |
-| JSON nesting | 32 |
-| Sources / hosts per source / steps per source | 4 / 8 / 48 |
-| HTTP exchanges / redirects per source | 24 / 6, shared by recipe, challenges and download |
-| Folder pagination | 16 pages including the terminating empty page, also inside shared budgets |
-| Metadata body | 1 MiB wire-read cap and decoded cap; 4 MiB total decoded metadata |
-| Extracted value / substitution / URL | 8 KiB |
-| Regex / serialized step | 512 bytes / 16 KiB |
-| Form fields / recipe headers | 16 / 6; encoded form at most 16 KiB |
-| Request / response headers | 16 KiB each |
-| Cookies | Fresh host-only state, 16 cookies and 8 KiB serialized state |
-| Default User-Agent | 256 bytes |
-| DNS plus connect / TLS / response headers | 5 s / 5 s / 10 s |
-| Individual metadata request / full recipe | 20 s / 60 s, including body reads |
-| Download / full source | 3 min / 4 min absolute deadlines |
-| ZIP | Exact signed length, at most 200 MiB; read at most signed length + 1 |
-
-Every initial URL, extracted target and redirect must use HTTPS port 443, have no userinfo/fragment, and match an exact signed hostname. No wildcards or arbitrary ports. Validate **all** DNS answers as public before dialing a checked literal IP, retaining original hostname for TLS. Reject private, loopback, link-local, CGNAT, unspecified, multicast, documentation/benchmark ranges and transition routes. Check DNS on connection establishment to prevent rebinding. POST redirects are rejected; cross-host GET redirects discard recipe headers and keep cookies host-local.
-
-Only User-Agent, Referer, Origin, X-Requested-With, Accept and Accept-Language can be set. No inherited Authorization, caller cookie jar, arbitrary Cookie header, file URL or application secret. HTTP 429/5xx fails without automatic source retries. Absolute deadlines bound slow bodies and headers; bounded decompression handles gzip bombs.
-
-The experiment clones only `*http.Transport`, overrides dialing, disables proxies and creates fresh cookies. Wrapped/custom RoundTrippers are rejected. **It does not yet interoperate with the application's installed `netcfg` wrapper.** The passed `http.Client` supplies a trusted standard transport/TLS configuration, not inherited routing/cookies/redirect/timeout policy.
-
-A hostile recipe can still send small requests to allowed public services and consume its bounded request/time/disk budgets. A valid archive hash does not prevent those effects; a stolen signing key can also authorize malicious binaries. The hash is not a second independent trust anchor. Integration needs caller cancellation and an aggregate fallback deadline (proposed five minutes across sources). Tests use an unexported exact-origin exception for httptest; signed data and the public API cannot enable it.
-
-## 4. Future integration decisions
-
-### 4.1 Discovery and freshness
-
-Search `env.WorkshopFolders` for the **new configured Monitor item ID**, then read only `.rimarcho/updates/stable.json`. Bound reads and reject symlinks/reparse escapes; do not search arbitrary Mods or trust PublishedFileId.txt as authorization. A copied Monitor can have a stale feed; verify its signature and dates too. Discovery/link checks are design only.
-
-`internal/scan/fingerprint.go:skipDir` excludes `.rimarcho` entirely, avoiding snapshot/semantic churn. This directory has no About.xml and creates no separate Mod candidate. JSON outside the game's standard content directories is outside its loaders; VM validation of the published Monitor layout is still needed. Do not use semantic `About/` or overwrite `.rimarcho/origin.json`. RimArcho only reads published metadata, consistent with not writing markers into subscribed folders.
-
-Proposed `auto` acquisition order: subscribed Monitor file, then an **already installed** anonymous SteamCMD using existing `steamcmd-self` and shared locks, then identical GitHub-hosted bytes. Invalid, missing or expired metadata falls through. Never use the configured named account, install SteamCMD here, or register a Mod source. Confirm both item result and expected feed; clean ACF/content together under the lock.
-
-**Maintainer decision needed:** today's check never starts SteamCMD or downloads Workshop content (17 §5.1). Fetching even a small Monitor item changes that contract and may involve SteamCMD runtime updates. Proposed policy allows a bounded metadata refresh only with existing SteamCMD, as background maintenance or explicit check, after documenting disk/network effects. Do not block a UI thread. This investigation changes no current check behavior.
-
-A stale subscribed copy must not indefinitely suppress network checks. Use it for immediate “last known” results, then refresh accessible metadata on the check interval, including a short-deadline GitHub-feed attempt. Compare authenticated sequences, retain the highest, and label expired metadata stale rather than “up to date.” This refines strict local-else-SteamCMD-else-GitHub: a valid local file is useful evidence, not proof Steam can still update it. Decide the periodic anonymous refresh policy when desktop Steam is offline.
-
-### 4.2 Settings, channels and offline use
-
-- `updates.source auto`: discovery above, then **after installation confirmation**, signed source order from §1: GitHub, Lanzou, possibly OSS/COS later. The existing five-second DNS/connect budget bounds an unreachable GitHub connection attempt; TLS and response deadlines are separate. Lanzou is never contacted by version checks. Locale alone does not reorder sources. Same-version recipe repairs increment sequence without a repeated new-version notification.
-- `updates.source github`: bypass Monitor and SteamCMD; fetch stable signed metadata from a fixed GitHub URL and use only GitHub source(s). Also attach identical bytes to releases for exact-version recovery. A signature failure must never fall back to an unsigned sidecar for that stable update.
-- A fallback retrieves the **same checked version/artifact**. A newer feed during installation requires a new check/confirmation, not silent substitution.
-- Prereleases today use the GitHub release list. V1 accepts stable only; preserving the existing prerelease path retains its unsigned-sidecar trust, outside the stable-feed guarantee. Before claiming every update is signed, add a separately signed GitHub-only prerelease manifest/channel and tests. Linux stays GitHub notification-only under the current specification.
-- Offline: retain last known version/notes/source and authenticated bytes; report unavailable/stale checks. Install only from a still-valid authenticated feed and exact size/hash-matching ZIP, after existing confirmation, and never downgrade the running version. No expired recipe execution. App comparison/persistence are not implemented here.
-
-**Manual fallback (design; library check implemented, surfaces unwired):** after GitHub and Lanzou fail, show the public Lanzou share URL and password, with an action to open the share in the player's browser and an action to select the downloaded ZIP. A player can complete any human check there. Never display or persist a resolved bearer URL. The share link/password come from the authenticated source configuration; only the signed artifact identity authorizes the bytes.
-
-Proposed CLI shape: `archo update --from <zip>`. It would use the checked, still-valid signed feed (re-authenticate cached bytes and enforce persisted sequence/version rules), rather than infer a version from the local name or trust a nearby sidecar. `--from` is **not implemented** and does not add a command/option to the public CLI in this round.
-
-`Feed.VerifyLocal` checks the selected file through `selfupdate.VerifyLocal`, allowing a browser-renamed file only when its contents match the signed size/hash. Future installation acquires the existing update lock (17 §5.1 step 1), copies the input into private `download/` staging, verifies that staged copy again (the selected input can change), then follows steps 3–7: extraction/layout checks, process wait, journaled swap, startup verification/rollback and restart. The local input remains untouched. Missing/expired feed, wrong size/hash, cancellation or failed layout checks authorize no replacement; browsing or selecting a ZIP alone is not installation consent.
-
-`netcfg` applies system/configured proxies and GitHub mirrors to normal HTTP. Its wrapper is deliberately rejected by this experiment. A future adapter must distinguish user-trusted proxy endpoints (possibly loopback) from recipe targets, validate logical destinations at every hop, and decide how to trust remote proxy DNS. Adding a mirror/proxy outside the guarded transport can bypass host/SSRF policy. An integrated release must not silently ignore player routing settings; direct-only is an experiment limit.
-
-### 4.3 Retiring the old item
-
-A later integration should replace `selfupdate.WorkshopItem=3835688284`, description/tag version parsing and GetPublishedFileDetails in the stable check with Monitor-feed discovery. Stop treating the removed item's ZIPs as an update authority. Keep generic Workshop-folder relocation and already-confirmed legacy cleanup for extracted programs; those protect existing players independently. Never automatically unsubscribe or delete their item folders.
-
-Assign the new ID after a standalone Monitor item exists. Use a new Monitor-ID VM override rather than accidentally retaining the removed program ID; update `monitor/About/PublishedFileId.txt` in that publishing change. Old clients need a bridge executable from GitHub or manual download before they know the key/channel. Do not put a program ZIP in the new Monitor item to bridge them.
-
-The supplied removal/result-9 background was not re-probed here. Code confirms `5af77ab9`: when Steam cannot confirm the item, a subscribed folder is compared with GitHub and the newer wins; offline the folder result remains. This matches current 17 §5.1. No discrepancy was found there. SteamCMD-on-check and signed authority are proposed changes, not current behavior.
-
-### 4.4 Release signing and staging
-
-Extend the release workflow later:
-
-1. Produce the exact ZIP and existing sidecar normally. Its bundled Monitor must **not contain the feed naming that ZIP**: otherwise the ZIP hash depends on a file containing its hash.
-2. Measure exact size/SHA-256 and validate ZIP layout. Publish immutable ZIP bytes to sources using maintainer-controlled steps; re-download mirrors and compare before advertising them.
-3. Build a payload with new sequence, validity and tested recipes. A same-version recipe repair retains artifact name/size/hash and increments sequence. Review hosts/forms before signing.
-4. Invoke a small offline Go Ed25519 helper. Read the private key from an explicitly supplied external/removable file or protected signing device, never the repo, command-line literal or CI log. Serialize once, sign §3.1's exact message, verify against the public key, then stage. Tests generate throwaway keys in memory.
-5. Copy standalone Monitor to a **separate staging folder** and add `.rimarcho/updates/stable.json`, with no program ZIP/launcher. Stage identical feed bytes as GitHub release asset and fixed stable-feed object. Never mutate the finished ZIP.
-6. Publish manually through the established maintainer-only path. `scripts/release.ps1` continues to stage, not push/publish. Report partial publication if Monitor upload fails after GitHub succeeds; never generate different bytes with the same sequence.
-
-Signing/staging is design only; no scripts or real keys changed here. Store public keys/recipes in the repo, not private signing material. Monitor modVersion remains independent of launcher version/feed sequence.
-
-## 5. Prototype coverage and limits
-
-`Parse(reader, trustedKeys, now, minimumSequence)` returns a `Feed` with private manifest, preventing accidental mutation of verified recipe maps/slices. Accessors expose small values/copies. `Feed.Download(ctx, client, sourceIndex, quarantineDir)` runs one source and returns `Archive` only after signed size/hash verification. Read/Seek expose verified bytes; Close deletes the private temporary file. Failed transfers remove it without exposing an archive. Temporary names are random and created exclusively in caller-provided staging.
-
-`Feed.VerifyLocal(ctx, path)` supplies the cheap manual-fallback verification in §4.2. `LanzouSource(shareURL, password)` builds the dated recipe shared by the probe and live test. `ProbeLanzou` runs it without a signed feed, downloads at most 200 MiB into an OS temporary directory, checks the ZIP prefix, measures size/SHA-256, closes/deletes the file and removes that directory before returning. Its observations never authorize installation. On failure it reports the last contacted host and leaves byte/hash values unavailable. Redirect destinations still require exact allowed hosts and public HTTPS; a tester can supply additional explicit hosts, never wildcards. No host is learned and automatically trusted from a response.
-
-Callers own fallback, aggregate deadline, acquisition, key pinning, sequence persistence, current-version comparison, directory permissions and extraction. None of those app integrations is included. Standard library only. Stable-only schema, standard-transport restriction and fixed challenge transformation are experiment limits.
-
-Synthetic tests use generated ZIPs/keys, httptest and t.TempDir. Coverage includes signature/key/freshness/sequence/schema/duplicate-key failures; exact artifact identity; form/regex/JSON/selection/relative URLs; cookies/challenge; redirect/request budgets; public-address policy; mixed DNS-answer rejection and literal-IP pinning; gzip limits; cancellation; size/hash mismatch; and quarantine cleanup. Follow-up tests cover later-page selection, empty/status-2 termination, later failures/ambiguity, no-progress/page caps, the shared Lanzou recipe through a redirected synthetic ZIP, local-file verification, human-page/repeated-challenge termination without verification POSTs, and probe output/argument redaction. No real game/Mod/app paths are used.
-
-The opt-in live test first observes a real ZIP's size/hash, signs metadata with a throwaway key, reruns from a fresh state and independently hashes the verified result. This tests repeatability and implementation consistency, **not upstream authenticity**. `RIMARCHO_LIVE_LANZOU_SHA256` optionally supplies an independent expected digest. A self-observed SHA-256 cannot prove an official release. Here the probe failed before observing ZIP bytes, at network-verification HTML.
+| E1 [C] | Folder GET returned HTTP 200 containing `arg1` / `acw_sc__v2`; fixed permutation/XOR cookie retry returned folder HTML | HTTP 200 alone is insufficient; the fixed strategy handles this observed page. |
+| E2 [C] | Password POST returned `archo-1.0.10-windows-amd64.zip`; follow-up pagination reached empty page 2 | Folder metadata alone reveals the stable version. |
+| E3 [C], replacement-design listing test | PASS: `version=1.0.10 checksum_present=false`; folder/listing requests only, on `rimarcho.lanzn.com` | A version notice works. The sidecar was absent at observation time, so this Lanzou release cannot yet pass pair verification. |
+| E4 [C] | Full file ID/query led to `/fn?...` iframe and a download API resolver under `developer4.lanrar.com` | Preserve query state; resolver host is not a confirmed final byte host. |
+| E5 [C], replacement-design ZIP probe | Node returned a cookie challenge, retry returned HTTP 200 human-verification HTML; exit 1 | Clear source failure; ZIP byte count/hash unavailable. |
+| E6 [C], maintainer's desktop browser, 2026-11-13 | Outside China, downloaded directly without verification | Browser/network context can permit a direct download; no final host/size/hash was supplied. |
+| E7 [C], maintainer-supplied real Chromium pane on this machine, 2026-11-13 | Password, file page and iframe link also reached human verification; anchor had `rel=noreferrer`, `target=_blank`; page also loaded `/file/kdns.js` | Go alone is not the cause. Network/browser reputation affects the page; exact trigger is unknown. |
+
+[C] A fresh Go session with Chrome User-Agent and no download Referer still reached verification. No final successful transfer, speed/range measurement, token TTL or rate ceiling was established. No HTTP 429 was observed. UI timers/cookie lifetimes do not establish server token lifetime. The page advertised alternative API/domain routes; successful use was not confirmed, and port 661 remains rejected. Verification submissions and arbitrary page scripts are outside the supported chain.
 
 ## 6. Validation and reproduction
 
+Default tests use only synthetic ZIP/checksum bytes, httptest and t.TempDir. Coverage includes concurrent start/max-version selection/deadline isolation; GitHub-only/prerelease routing; Monitor ID/stamp/results; listing-only pagination/exact names; failed/ambiguous/missing pages; exact-version pair selection; checksum mismatch/limits; human/repeated challenges without verification POSTs; DNS/destination/resource limits; local pair checks; cleanup and probe output redaction. Tests never run SteamCMD or touch real game/Mod/application state.
+
 ```powershell
 go build ./...
-go vet ./internal/updatefeed/ ./cmd/lanzou-probe/
-go test -count=1 ./internal/updatefeed/ ./cmd/lanzou-probe/
+go vet ./internal/lanzou/ ./internal/updatechannel/ ./cmd/lanzou-probe/
+go test -count=1 ./internal/lanzou/ ./internal/updatechannel/ ./cmd/lanzou-probe/
+$env:RIMARCHO_LIVE_LANZOU_LIST = '1'
+go test -count=1 -run '^TestLiveLanzouListing$' -v ./internal/lanzou/
+Remove-Item Env:RIMARCHO_LIVE_LANZOU_LIST
 go run ./cmd/lanzou-probe -url https://rimarcho.lanzn.com/b01i608qja -password ctot -filename archo-1.0.10-windows-amd64.zip
-$env:RIMARCHO_LIVE_LANZOU = '1'
-go test -count=1 -run '^TestLiveLanzou$' -v ./internal/updatefeed/
-Remove-Item Env:RIMARCHO_LIVE_LANZOU
 node scripts/docs-refs/refs.cjs check
 ```
 
-The fixture selects 1.0.10; use `RIMARCHO_LIVE_LANZOU_VERSION` for another exact version. It never auto-selects untrusted latest. Default tests skip external traffic. The standalone tool prints completed recipe stages, per-request HTTP status and hostname, fixed cookie retries, the download node and the observed final host/size/hash on success. Paths, query tokens, password and cookies are never printed. `-hosts host1,host2` allows a tester to add independently reviewed exact byte hosts if the resolver changes; an unknown host otherwise fails closed. The tool's exit codes are 0 for an observed ZIP, 1 for source/transfer/cleanup failure and 2 for invalid arguments. `go run` additionally prints `exit status 1` for failure. It never installs or executes downloads, and it is separate from `archo`'s command list.
+`RIMARCHO_LIVE_LANZOU=1` retains the opt-in ZIP test too. Both skip by default. The standalone tool prints stages, HTTP statuses and hostnames, then final byte count/hash on success. Its temporary download is deleted before return; it never installs or executes it. Exit 0 means observed ZIP, 1 source/transfer/cleanup failure, 2 invalid arguments. An observation never substitutes for checksum verification. The `archo` command list is unchanged.
 
-Live downloads, if available, use OS temporary storage (the probe) or t.TempDir (the signed repeat), and never install. No VM game/Workshop validation ran: this package is unwired.
-
-| Check | Result / output |
+| Check | Result |
 | --- | --- |
 | `go build ./...` | Exit 0, no output. |
-| `go vet ./internal/updatefeed/ ./cmd/lanzou-probe/` | Exit 0, no output. |
-| `go test -count=1 ./internal/updatefeed/ ./cmd/lanzou-probe/` | Exit 0: updatefeed `0.933s`, lanzou-probe `0.277s`; live test skipped by default. |
-| Standalone `lanzou-probe` [C] | Exit 1, expected on this network: folder pages 1/2, file, iframe and API succeeded; `developer4.lanrar.com` returned HTTP 200 cookie challenge, then HTTP 200 human-verification HTML. Output below. |
-| Opt-in `TestLiveLanzou` (previous round) | Exit 1: resolved node `developer4.lanrar.com`, then network-verification HTML; no ZIP/hash assertion reached. The gate is retained and now shares the standalone probe's resolver. |
+| `go vet ./internal/lanzou/ ./internal/updatechannel/ ./cmd/lanzou-probe/` | Exit 0, no output. |
+| `go test -count=1 ./internal/lanzou/ ./internal/updatechannel/ ./cmd/lanzou-probe/` | Exit 0: Lanzou `1.023s`, updatechannel `0.969s`, probe `0.284s`; live tests skipped by default. |
 | `node scripts/docs-refs/refs.cjs check` | Exit 0: `all references resolve`. |
-
-The live failure is a material research result, not a passing end-to-end test. A successful final transfer and token-lifetime/rate-limit measurements remain outstanding.
-
-Follow-up live probe output after metadata resolution (no bearer values):
+| Env-gated listing-only test [C] | PASS: `version=1.0.10 checksum_present=false`; folder pages 1/2 only. |
+| Single standalone ZIP probe [C] | Expected exit 1 at `developer4.lanrar.com` human verification; output below. |
 
 ```text
+stage=http host=apifile.woozooo.com status=200
 stage=download-node host=developer4.lanrar.com
 stage=http host=developer4.lanrar.com status=200
 stage=acw-challenge host=developer4.lanrar.com status=200
@@ -270,11 +137,22 @@ last_host=developer4.lanrar.com bytes=unavailable sha256=unavailable
 exit status 1
 ```
 
-## 7. Maintainer questions before rollout
+Mainland-China end-to-end transfer remains to be tested. Publishing the exact `.sha256` beside the observed share's ZIP is still needed. VM validation of Monitor publication/stamp and integrated browser/staging/rollback behavior has not run.
 
-1. Can the intended mainland-China network download this share without the verification failure? Run the standalone probe there. A working trace or alternative mirror must establish the final byte host, TLS/port policy, size and independent digest. Which OSS/COS provider, region, domain, cost/bandwidth policy and release-staging workflow should supply an additional source? Keep GitHub first and Lanzou second pending that decision.
-2. Is background anonymous SteamCMD metadata refresh acceptable despite the no-SteamCMD-on-check rule? How often should a possibly frozen subscribed item refresh?
-3. Which new public Monitor ID and fixed GitHub stable-feed location will be used? Confirm publication accepts the JSON and continues updating subscribers; policy acceptance is not assumed.
-4. Who holds the offline key, renewal calendar and backup/revocation procedure? Recommend **90–180 days** of validity rather than 30: releases and manual/offline signing may be infrequent, Workshop refresh can lag, and players may return after weeks offline. A monthly renewal can disable installation of an otherwise valid release without any new code being needed. Longer validity also extends the possible withholding/freeze window, so retain sequence high-water marks, refresh checks and planned renewal. Start at 90 days under the implemented cap; accepting 180 requires an explicit validator/test change. Missed renewal still disables feed-authorized installation, including manual ZIPs.
-5. Should first integration include signed prereleases and trusted proxy/mirror support? Both are needed before extending the stable/direct guarantee to all update paths.
-6. VM-check that `.rimarcho` data is ignored by RimWorld, survives publication, avoids scan identity churn and is staged without a circular ZIP/hash dependency. Test anonymous refresh/cleanup only there.
+## 7. Proposed spec text for 17 §5.1 (review only)
+
+Proposed text only; neither the specification nor application is changed:
+
+> **Check (stable Windows, automatic source):** concurrently query GitHub Releases latest, the standalone Archo Monitor item's description stamp through anonymous `GetPublishedFileDetails`, and Lanzou's paginated stable ZIP filenames under one deadline. Record per-source results; choose the highest stable version. Missing/unreachable sources do not suppress other successes. Lanzou checks never request file details/download nodes. Monitor checks never start SteamCMD or read item files. `updates.source github` and prereleases use GitHub only.
+>
+> **Sources and assets:** configure the standalone Monitor ID separately from retired program item 3835688284. Its description stamp is `RimArcho v<X.Y.Z>`. Assets stay `archo-<version>-windows-amd64.zip` plus `<zip>.sha256`, identical on GitHub Releases and the configured Lanzou folder. Monitor carries no update data file or program ZIP.
+>
+> **Install (player confirmation required):** obtain the exact checked version's ZIP/checksum pair from GitHub, else Lanzou, else let the player download both in a browser and select them. Never substitute another version. Verify through `selfupdate.VerifyLocal` and preserve steps 1–7, including staging, archive checks and rollback. Missing/invalid checksum, network verification or mismatch fails that source without replacing files. Same-source checksums detect corruption, not a compromised publisher.
+
+The real spec/application retain the legacy Workshop/GitHub flow and prohibit SteamCMD during checks. This proposal likewise uses no SteamCMD during checks, but replaces legacy item/file discovery with description-only Monitor metadata plus concurrent Lanzou listing. Keep Workshop-folder relocation and explicitly confirmed legacy cleanup; do not automatically unsubscribe or delete old item directories. Retire 3835688284 from future update selection, and assign the new Monitor ID only with the actual publication/integration change.
+
+## 8. Considered and dropped
+
+**Removed:** Ed25519, signing keys/key IDs, envelopes, signed manifests, sequence/expiry/freshness machinery, the `.rimarcho/updates/stable.json` proposal and declarative download recipes. No signing/renewal/key-custody recommendation remains. `internal/updatefeed` is removed. Pushed format or package-layout changes couple publication to installed updaters and can force stepping-stone updater releases. The maintainer chose the existing release pair and fixed Go parsing for simplicity; Lanzou parser changes may require a normal RimArcho release.
+
+Remaining integration questions are the public Monitor ID/stamp publication, report presentation, player proxy/mirror routing, mainland-China transfers and VM browser/staging/rollback tests. Update-file publication and cryptographic key custody are not rollout tasks.
