@@ -16,7 +16,8 @@ test('Game Config picker selects and removes the displayed row', async () => {
   T:s=>s, say:()=>{},
   pop:{choose:(...args)=>{chooser=args;}},
   useEnv:name=>selected.push(name),
-  scr:{removeEnv:name=>removed.push(name),addEnvironment:row=>added.push(row.name)}
+  go:page=>added.push(page),
+  scr:{removeEnv:name=>removed.push(name)}
  });
  await choose();
  const [title,labels,pick,current,other] = chooser;
@@ -27,5 +28,5 @@ test('Game Config picker selects and removes the displayed row', async () => {
  other.run(0);other.run(1);other.run(2);
  assert.deepEqual(selected,['second','first']);
  assert.deepEqual(removed,['second','first']);
- assert.deepEqual(added,['first']);
+ assert.deepEqual(added,['guide']);
 });

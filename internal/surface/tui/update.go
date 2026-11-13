@@ -683,12 +683,6 @@ func (m *model) chooseEnv() tea.Cmd {
 	p.choiceLabels["+ add-environment"] = "+ " + T("Add Game Config")
 	p.onPick = func(m *model, name string) tea.Cmd {
 		if name == "+ add-environment" {
-			for _, e := range envs {
-				if e.Name == m.envName && e.AddReason != "" {
-					m.say(sayWarn, e.AddReason)
-					return nil
-				}
-			}
 			cmd := m.openCmdLine()
 			m.cmdl.info = T("add a Game Config: archo env add <name> --game <folder> --saves own (or --like <config>)")
 			return cmd

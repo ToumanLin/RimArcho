@@ -75,12 +75,12 @@ type API struct {
 	// removedRule is the rule the editor removed last, for its undo (rules.go).
 	removedRule *store.UserRule
 	free        releaser // returns memory to the OS after heavy work (memory.go)
-	// bgs are the environment bgsEnv's backgrounds; bgPick the image rotation chose for
+	// bgs are the game installation bgsGame's backgrounds; bgPick the image rotation chose for
 	// this window (background.go)
-	bgs    []app.Background
-	bgsEnv string
-	bgPick string
-	bgRead backgroundReader
+	bgs     []app.Background
+	bgsGame string
+	bgPick  string
+	bgRead  backgroundReader
 	// Exe runs the scan, analysis and pack build children; "" is this executable (the
 	// development harness points it at archo.exe).
 	Exe string
@@ -567,12 +567,8 @@ func (s *API) Settings() []view.SettingGroup {
 	}
 	defer r.Close()
 	defer s.free.soon()
-	groups := view.SettingsPage(r, nil)
-	if e, err := r.Env(); err == nil {
-		envGroups := view.EnvGroups(r, &app.LoadoutState{Ix: &app.Index{Env: e}})
-		groups = append(groups[:1], append(envGroups, groups[1:]...)...)
-	}
-	return groups
+	// The Game Config's own settings are on the Game Config page (16 §2.8), not here.
+	return view.SettingsPage(r, nil)
 }
 
 // Environment is the environment page: the environments, the current one's folders and
@@ -1851,39 +1847,6 @@ func (s *API) GameConfigLists(from string) ([]string, error) {
 		}
 	}
 	return names, nil
-}
-
-// AddEnvironment uses the same sibling initialization and validation as the CLI.
-func (s *API) AddEnvironment(name, from string, copySettings bool, userData string) (string, error) {
-	return s.AddGameConfig(name, from, "", copySettings, userData, "", false)
-}
-func (s *API) AddGameConfig(name, from, game string, copySettings bool, userData, list string, newList bool) (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	base, err := s.a.Store.EnvByName(from)
-	if err != nil {
-		return "", err
-	}
-	if base == nil {
-		return "", fmt.Errorf("Game Config %s not found", from)
-	}
-	if game == "" {
-		game = base.GameRoot
-	}
-	spec := app.EnvSpec{GameRoot: game, Saves: app.SavesOwn, List: list, NewList: newList}
-	if copySettings {
-		spec.Like = from
-	}
-	if userData != "" {
-		spec.Saves = ""
-		spec.UserDataRoot = userData
-	}
-	e, _, err := s.a.EnvAdd(name, spec)
-	if err != nil {
-		return "", err
-	}
-	s.board, s.lib = nil, nil
-	return e.Name, nil
 }
 
 func (s *API) EnvGameChangePreview(name, path string) ([]string, error) {

@@ -281,7 +281,7 @@ The player-facing term is **Game Config** (16 §7.2). A config acts as a separat
 
 Game Config is display text only: protocol events, storage keys and identifiers retain environment terminology. Generic game labels describe RimWorld itself.
 
-Pickers are flat: config name, RimWorld major.minor version, current marker, then + Add Game Config. Selection and removal use the same ordered rows as the picker labels. Settings are one config section: name, game folder with version, saves folder, Mod list, launch method and arguments, remove. Relocating a shared game folder previews the count and names of the other affected configs. Adding defaults to copying the current config; the dialog specifies settings copying, no Mod file copying and no saves, with independent Mod list selection (16 §2.8).
+Pickers are flat: config name, RimWorld major.minor version, current marker, then + Add Game Config. Selection and removal use the same ordered rows as the picker labels. The config's settings are one section on the Game Config page (not repeated in Settings): name, game folder with version, saves folder (shared, own or a chosen folder), Mod list, launch method and arguments, remove. Relocating a shared game folder previews the count and names of the other affected configs. Adding is a page (the first-run guide's, 16 §2.8, §2.15) with SteamCMD download still among its ways; it defaults to copying the current config's settings, says no Mod files and no saves are copied, and selects the Mod list and the saves folder (shared, own or chosen).
 
 Legacy aliases remain separate. A one-time notice says that two Game Configs use the same game folder. There is no merge feature or merge command.
 

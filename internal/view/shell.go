@@ -534,6 +534,38 @@ type GameFound struct {
 	UserData string `json:"userData,omitempty"`
 	// Env is the environment that already uses this folder ("" when none).
 	Env string `json:"env,omitempty"`
+	// Known: a Game Config already uses this game folder, so its Mods are read; Current:
+	// it is the current config's game (Add Game Config picks it first).
+	Known   bool `json:"known,omitempty"`
+	Current bool `json:"current,omitempty"`
+
+	// The Add Game Config page's choices (16 §2.15; none on the first run). AddConfig adds
+	// a Game Config for a folder another config already uses. Saves is "shared" (the
+	// game's default folder, UserData), "own" (RimArcho's own folder for this config) or
+	// "custom" (CustomData); "" is shared. Like copies that config's game and Mod settings
+	// (no Mod files, no saves). List selects a global list; NewList makes a Core and DLC
+	// list named after the config; neither keeps what env add does by default.
+	AddConfig  bool   `json:"addConfig,omitempty"`
+	Saves      string `json:"saves,omitempty"`
+	CustomData string `json:"customData,omitempty"`
+	Like       string `json:"like,omitempty"`
+	List       string `json:"list,omitempty"`
+	NewList    bool   `json:"newList,omitempty"`
+}
+
+// spec is the env add of a found game with the page's choices.
+func (g GameFound) spec() app.EnvSpec {
+	sp := app.EnvSpec{GameRoot: g.Game, UserDataRoot: g.UserData, Launch: g.Launch, Like: g.Like, List: g.List, NewList: g.NewList}
+	switch g.Saves {
+	case app.SavesOwn:
+		sp.UserDataRoot, sp.Saves = "", app.SavesOwn
+	case "custom":
+		sp.UserDataRoot = g.CustomData
+	}
+	if g.Like != "" {
+		sp.Launch = "" // the copied config's launch
+	}
+	return sp
 }
 
 // FindGames lists the installs detection finds (03 §3.2), each with a free name; the
@@ -548,14 +580,40 @@ func FindGames(a *app.App) []GameFound {
 		}
 		taken[e.Name] = true
 	}
+	known := map[string]bool{}
+	for _, e := range envs {
+		known[env.PathKey(e.GameRoot)] = true
+	}
+	cur := ""
+	if e, err := a.Env(); err == nil && e != nil {
+		cur = env.PathKey(e.GameRoot)
+	}
 	var out []GameFound
-	for _, d := range env.DetectAll(a.Detect) {
-		g := GameFound{Game: d.GameRoot, Version: d.GameVersion, Launch: d.Launch, Workshop: d.WorkshopRoot, UserData: d.UserDataRoot, Env: used[env.PathKey(d.GameRoot)]}
-		if g.Env == "" {
-			g.Name = freeName(env.MajorMinor(d.GameVersion), taken)
-			taken[g.Name] = true
+	seen := map[string]bool{}
+	add := func(g GameFound) {
+		k := env.PathKey(g.Game)
+		if seen[k] {
+			return
 		}
+		seen[k] = true
+		g.Env, g.Known, g.Current = used[k], known[k], k == cur
+		// a used folder gets a name too: Add Game Config may add another config for it
+		g.Name = freeName(env.MajorMinor(g.Version), taken)
+		taken[g.Name] = true
 		out = append(out, g)
+	}
+	// The games Game Configs use first (detection may not find a game in a folder of the
+	// player's own), the current config's at the top; then what detection finds.
+	for _, e := range envs {
+		if env.PathKey(e.GameRoot) == cur {
+			add(GameFound{Game: e.GameRoot, Version: e.GameVersion, Launch: e.Launch, UserData: a.DefaultUserData(e.GameRoot)})
+		}
+	}
+	for _, e := range envs {
+		add(GameFound{Game: e.GameRoot, Version: e.GameVersion, Launch: e.Launch, UserData: a.DefaultUserData(e.GameRoot)})
+	}
+	for _, d := range env.DetectAll(a.Detect) {
+		add(GameFound{Game: d.GameRoot, Version: d.GameVersion, Launch: d.Launch, Workshop: d.WorkshopRoot, UserData: d.UserDataRoot})
 	}
 	return out
 }
@@ -586,9 +644,7 @@ func GameAt(a *app.App, path string, pending ...string) (*GameFound, error) {
 	if ws := env.WorkshopRootFor(path); ws != "" && dirExists(ws) {
 		g.Workshop, g.Launch = ws, "steam"
 	}
-	if g.Env == "" {
-		g.Name = freeName(env.MajorMinor(g.Version), taken)
-	}
+	g.Name = freeName(env.MajorMinor(g.Version), taken)
 	return g, nil
 }
 
@@ -627,11 +683,14 @@ func CreateGames(a *app.App, games []GameFound) ([]string, error) {
 	}
 	var out []string
 	for _, g := range games {
-		if g.Env != "" {
+		if g.Env != "" && !g.AddConfig {
 			continue
 		}
 		name := strings.TrimSpace(g.Name)
-		if _, _, err := a.EnvAdd(name, app.EnvSpec{GameRoot: g.Game, UserDataRoot: g.UserData, Launch: g.Launch}); err != nil {
+		if g.Saves == "custom" && strings.TrimSpace(g.CustomData) == "" {
+			return out, errors.New(T("choose a user data folder"))
+		}
+		if _, _, err := a.EnvAdd(name, g.spec()); err != nil {
 			return out, err
 		}
 		out = append(out, name)
@@ -644,7 +703,7 @@ func CreateGames(a *app.App, games []GameFound) ([]string, error) {
 func checkGameNames(a *app.App, games []GameFound) error {
 	seen := map[string]bool{}
 	for _, g := range games {
-		if g.Env != "" {
+		if g.Env != "" && !g.AddConfig {
 			continue
 		}
 		name := strings.TrimSpace(g.Name)

@@ -37,7 +37,7 @@ These rules apply in full to the plan editor and Mod library › all mods. The t
 - A secondary screen, such as full-screen details, a technical page, an expanded can it run item, or TUI pack or settings text, returns to its opener. In technical pages, `esc` closes the entire stack, while `backspace` returns one level. This keeps the limit at 3 presses at any depth.
 - Esc does not move between peer sidebar pages. Use the sidebar, breadcrumbs, or `ctrl+k` to change pages, and use the side buttons or alt arrows for history (rule 11).
 
-The add-Game Config dialog (§2.8) participates in `ctrl+\` reference numbering. Its name, initialization choice, user-data choice and native folder button have visible labels. Tab stays inside the modal, Enter submits, Escape cancels, and focus returns to the opener. Errors describe the offending field; Proton restrictions are visible text beside the disabled action.
+Add Game Config is a page (§2.8, §2.15): its name, start-with choice, Mod list, saves-folder choice and native folder button have visible labels, and the core's refusals (Proton included) show in the page's footer.
 
 ### 3.2 Position
 

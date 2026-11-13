@@ -138,7 +138,6 @@ type SettingGroup struct {
 type EnvRow struct {
 	Installation string `json:"installation"`
 	GameID       string `json:"gameID"`
-	AddReason    string `json:"addReason,omitempty"`
 	Name         string `json:"name"`
 	Path         string `json:"path"`
 	Game         string `json:"game"` // "1.6.4633  D:\…\RimWorld"
@@ -186,7 +185,12 @@ func EnvGroups(a *app.App, st *app.LoadoutState) []SettingGroup {
 	return []SettingGroup{{Title: T("Game Config"), Items: []SettingItem{
 		{Key: "environment.name", Label: T("name"), Value: e.Name, Edit: "text", Argv: []string{"env", "set", e.Name, "--name", "{}"}},
 		{Label: T("game folder"), Value: e.GameRoot, ValuePath: true, Note: version, Edit: "path", Argv: []string{"env", "set", e.Name, "--game", "{}"}},
-		{Key: "environment.user-data", Label: T("saves folder"), Value: e.UserDataRoot, ValuePath: true, Edit: "path", Argv: []string{"env", "set", e.Name, "--user-data", "{}"}},
+		// shared / own / a folder the player chooses (custom: the page asks for the folder,
+		// then runs env set --user-data); the folder itself is the note
+		{Key: "environment.saves", Label: T("saves folder"), Value: a.Saves(e), Edit: "choice",
+			Choices:      []string{app.SavesShared, app.SavesOwn, app.SavesCustom},
+			ChoiceLabels: []string{T("shared (the game's default folder)"), T("own folder in RimArcho"), T("a folder you choose")},
+			Argv:         []string{"env", "set", e.Name, "--saves", "{}"}, Note: e.UserDataRoot, NotePaths: []string{e.UserDataRoot}},
 		{Key: "environment.list", Label: T("Mod list"), Value: current},
 		{Label: T("start the game through"), Value: e.Launch, Edit: "choice", Choices: []string{"steam", "direct"}, ChoiceLabels: []string{"Steam", T("the game's own exe")}, Argv: []string{"env", "set", e.Name, "--launch", "{}"}},
 		{Label: T("extra arguments"), Value: app.DisplayLaunchArgs(a.LaunchArgs(e.ID)), Edit: "text", Argv: []string{"env", "set", e.Name, "--launch-args", "{}"}},
@@ -441,11 +445,7 @@ func EnvironmentRows(a *app.App, current string) []EnvRow {
 		if v := env.MajorMinor(e.GameVersion); v != "" {
 			title += " " + v
 		}
-		reason := ""
-		if env.IsProtonGame(e.GameRoot) {
-			reason = T("Proton does not support separate saves folders yet")
-		}
-		out = append(out, EnvRow{Name: e.Name, GameID: e.GameID, Installation: title, Path: e.GameRoot, Game: e.GameVersion + "  " + e.GameRoot, Current: e.ID == current, AddReason: reason})
+		out = append(out, EnvRow{Name: e.Name, GameID: e.GameID, Installation: title, Path: e.GameRoot, Game: e.GameVersion + "  " + e.GameRoot, Current: e.ID == current})
 	}
 	return out
 }

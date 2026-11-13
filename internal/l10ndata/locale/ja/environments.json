@@ -86,5 +86,14 @@
   "this is the last Game Config using this folder: its records and %d Mod inventory records are removed": "このフォルダーを使用する最後のゲーム構成です。記録と %d 件の Mod 在庫記録を削除します",
   "the last run's log was not found: %s": "前回の実行ログが見つかりません: %s",
   "Game Config %s is running": "ゲーム構成 %s が実行中です",
-  "installation %s running, Game Config unknown": "ゲームフォルダー %s が実行中です。ゲーム構成は不明です"
+  "installation %s running, Game Config unknown": "ゲームフォルダー %s が実行中です。ゲーム構成は不明です",
+  "added Game Config %s": "ゲーム構成 %s を追加しました",
+  "choose the game, then how this Game Config starts: its settings, Mod list and saves folder": "ゲームを選び、このゲーム構成の始め方（設定、MODリスト、セーブフォルダー）を選びます",
+  "copies game settings and Mod settings; no Mod files or saves are copied": "ゲーム設定とMOD設定をコピーします。MODファイルとセーブはコピーしません",
+  "copy the settings of %s": "%s の設定をコピー",
+  "enter a Game Config name": "ゲーム構成の名前を入力してください",
+  "game defaults": "ゲームの既定",
+  "game defaults; no settings or saves are copied": "ゲームの既定設定を使います。設定とセーブはコピーしません",
+  "which game is this Game Config for?": "このゲーム構成はどのゲームを使いますか？",
+  "has a Game Config": "ゲーム構成あり"
 }

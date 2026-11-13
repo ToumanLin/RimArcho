@@ -193,9 +193,10 @@ func TestFindAndAddGames(t *testing.T) {
 	if cur, err := e.App.Env(); err != nil || cur.Name != "1.6" {
 		t.Fatalf("current %v %v", cur, err)
 	}
-	// Found again: it is in use, and adding it again does nothing.
+	// Found again: it is in use (with a free name for another Game Config), and adding it
+	// again without AddConfig does nothing.
 	gs = view.FindGames(e.App)
-	if len(gs) != 1 || gs[0].Env != "1.6" || gs[0].Name != "" {
+	if len(gs) != 1 || gs[0].Env != "1.6" || gs[0].Name != "1.6-2" {
 		t.Fatalf("again %+v", gs)
 	}
 	if names, err := view.AddGames(e.App, gs); err != nil || len(names) != 0 {
@@ -207,6 +208,23 @@ func TestFindAndAddGames(t *testing.T) {
 	}
 	if _, err := view.GameAt(e.App, e.Root); err == nil {
 		t.Fatal("not a game folder was accepted")
+	}
+	// Add Game Config (16 §2.15): another config of the used game, with its own saves
+	// folder, the settings of 1.6 and a new Core and DLC list.
+	one := gs[0]
+	one.AddConfig, one.Saves, one.Like, one.NewList = true, "own", "1.6", true
+	names, err = view.CreateGames(e.App, []view.GameFound{one})
+	if err != nil || strings.Join(names, ",") != "1.6-2" {
+		t.Fatalf("add config: %v %v", names, err)
+	}
+	added, err := e.App.Store.EnvByName("1.6-2")
+	if err != nil || added == nil || added.GameRoot != e.Game || !strings.HasPrefix(added.UserDataRoot, e.Home) {
+		t.Fatalf("added config %+v %v", added, err)
+	}
+	// A custom saves folder needs its path.
+	one.Name, one.Saves = "1.6-3", "custom"
+	if _, err := view.CreateGames(e.App, []view.GameFound{one}); err == nil {
+		t.Fatal("custom saves without a folder was accepted")
 	}
 }
 

@@ -1802,8 +1802,15 @@ function renderGroups(w, groups, again) {
           s.setAttribute("aria-describedby", note.id);
         }
         // A new language: the page's text again, in place (main.js relang).
-        s.onchange = () => run(it.argv, s.value,
-          it.argv[2] === "ui.lang" ? () => ui.relang() : it.argv[2] === "ui.accent" ? () => ui.reaccent() : null);
+        s.onchange = () => {
+          // a Game Config's saves in a folder the player chooses: pick it, then env set
+          // --user-data; the choice shows what is set until then (16 §2.8)
+          if (it.key === "environment.saves" && s.value === "custom") {
+            s.value = it.value;
+            return chooseLocalPath(it.note || "", (path) => run(["env", "set", it.argv[2], "--user-data", "{}"], path));
+          }
+          run(it.argv, s.value, it.argv[2] === "ui.lang" ? () => ui.relang() : it.argv[2] === "ui.accent" ? () => ui.reaccent() : null);
+        };
         right.append(s);
       } else if (it.edit === "directory") {
         const value = factText(el("span", "muted setting-value"), { text: it.value, paths: [it.value] });
@@ -2005,10 +2012,7 @@ export async function environment() {
   const top = sc.scrollTop;
   sc.innerHTML = "";
   const current=(p.envs||[]).find(e=>e.current);
-  const addConfig=act(T("Add Game Config"),"plus",()=>addEnvironment(current));
-  addConfig.disabled=!!current?.addReason;
-  const w = page("env", "", addConfig, rescanButton());
-  if(current?.addReason)w.append(el("p","notice",current.addReason));
+  const w = page("env", "", act(T("Add Game Config"), "plus", () => ui.go("guide")), rescanButton());
   sc.append(w);
   const envLab = el("div", "label section", T("all Game Configs"));
   w.append(envLab);
@@ -2050,57 +2054,6 @@ export async function removeEnv(name) {
     await ui.reload();
     if (!(S.board && S.board.envs && S.board.envs.length)) return ui.go("guide");
     if (S.screen === "env") environment();
-  });
-}
-
-export async function addEnvironment(source) {
-  if (!source) return ui.go("guide");
-  if (source.addReason) return say("warn",source.addReason);
-  let lists;
-  try { lists = await api.GameConfigLists(source.name); } catch(e) { return say("fail",errText(e)); }
-  pop.open("add-environment", T("add environment"), (box, state) => {
-    box.append(el("h2", "ttl", T("add environment")));
-    state.modal=true;
-    const body = el("div", "body"); box.append(body);
-    body.append(el("p", "", source.name + "  " + source.installation));
-    const field = (label, control) => { const row = el("label", "env-create-field"); row.append(el("span", "", label), control); body.append(row); return control; };
-    const name = field(T("environment name"), el("input", "field")); name.required = true;
-    const game = field(T("game folder"), el("button", "", source.path)); game.type="button"; game.value=source.path;
-    game.onclick=async()=>{const selected=await api.PickFolder(game.value);if(selected){game.value=selected;game.textContent=selected;}};
-    const mode = field(T("start with"), el("select"));
-    for (const [value, text] of [["copy", T("Copy current Game Config")], ["empty", T("Start empty")]]) { const option = el("option", "", text); option.value=value; mode.append(option); }
-    const detail = el("p"); body.append(detail);
-    const describe = () => { detail.textContent = mode.value === "copy" ? T("copies game settings and Mod settings; no Mod files or saves are copied; choose the Mod list below") : T("game defaults; no settings or saves are copied; choose the Mod list below"); }; mode.onchange=describe; describe();
-    const list = field(T("Mod list"), el("select"));
-    for (const name of lists) { const option=el("option","",name); option.value=name; list.append(option); }
-    const emptyList=el("option","",T("New empty list")); emptyList.value=""; list.append(emptyList);
-    const root = field(T("saves"), el("select"));
-    for (const [value,text] of [["own",T("own folder in RimArcho")],["custom",T("a folder you choose")]]) {const option=el("option","",text);option.value=value;root.append(option);}
-    const path=field(T("user data folder"),el("button","",T("choose a user data folder")));path.type="button";path.value="";path.disabled=true;
-    path.onclick=async()=>{try{const selected=await api.PickFolder(path.value);if(selected){path.value=selected;path.textContent=selected;}}catch(e){say("fail",errText(e));}};
-    root.onchange=()=>{path.disabled=root.value!=="custom";};
-    const error=el("p", "error");error.setAttribute("role","alert");body.append(error);
-    fieldError(name, error, () => error.dataset.field === "name" && !!error.textContent);
-    fieldError(path, error, () => error.dataset.field === "path" && !!error.textContent);
-    const clearError = () => { error.textContent = ""; };
-    name.oninput = clearError;
-    const refuse = (field, text) => {
-      error.dataset.field = field === name ? "name" : "path";
-      error.textContent = text;
-      field.focus();
-    };
-    const buttons=el("div","btns");box.append(buttons);
-    const cancel=el("button","",T("cancel"));cancel.onclick=pop.close;buttons.append(cancel);
-    const submit=el("button","go",T("add environment"));submit.dataset.envWrite="add-env";buttons.append(submit);
-    submit.onclick=async()=>{
-      if (!name.value.trim()) return refuse(name,T("enter an environment name"));
-      if(root.value==="custom"&&!path.value.trim())return refuse(path,T("choose a user data folder"));
-      submit.disabled=true;
-      try {await api.AddGameConfig(name.value.trim(),source.name,game.value,mode.value==="copy",root.value==="custom"?path.value.trim():"",list.value,list.selectedIndex===lists.length);pop.close();await ui.reload();await environment();}
-      catch(e){refuse(name,errText(e));submit.disabled=false;}
-    };
-    state.keys=e=>{if(e.key==="Enter"&&e.target.tagName!=="SELECT"){e.preventDefault();submit.click();return true;}return false;};
-    name.focus();
   });
 }
 

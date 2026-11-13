@@ -8,6 +8,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/surface/gui"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 func TestManagerPreviewApply(t *testing.T) {
@@ -111,9 +112,10 @@ func TestAddEnvironmentSelectsCurrentPlan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	api := gui.NewAPI(e.App, nil)
-	defer api.Close()
-	if _, err := api.AddEnvironment("copied", "main", true, ""); err != nil {
+	// Add Game Config (16 §2.15) copying main's settings: its current plan, not the
+	// list the editor shows.
+	copiedFound := view.GameFound{Name: "copied", Game: e.Game, Env: "main", AddConfig: true, Saves: "own", Like: "main"}
+	if _, err := view.CreateGames(e.App, []view.GameFound{copiedFound}); err != nil {
 		t.Fatal(err)
 	}
 	e.App.OpenPlan = 0

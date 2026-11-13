@@ -976,10 +976,10 @@ async function chooseEnv() {
   const rows = S.board?.environmentRows || [];
   if (!rows.length) return say("", T("no Game Configs yet (archo env add)"));
   const labels = rows.map(e => e.name + "  " + e.installation + (e.current ? "  " + T("in use") : ""));
-  const current=rows.find(e=>e.current)||rows[0];
-  labels.push({name:"+ "+T("Add Game Config")+(current?.addReason?"  "+current.addReason:""),disabled:!!current?.addReason});
+  labels.push("+ " + T("Add Game Config"));
   pop.choose(T("switch Game Config"), labels, (i) => {
-    if (i === rows.length) return scr.addEnvironment(rows.find(e => e.current) || rows[0]);
+    // Add Game Config is a page (16 §2.15), not a dialog
+    if (i === rows.length) return go("guide");
     return useEnv(rows[i].name);
   }, Math.max(0, rows.findIndex(e => e.current)), { key:"Delete", label:T("remove Game Config"), envWrite:"remove-env", run:i => { if(i<rows.length) scr.removeEnv(rows[i].name); } });
 }

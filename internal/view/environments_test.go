@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
@@ -98,10 +99,10 @@ func TestLegacyAliasNoticeAndProtonAdd(t *testing.T) {
 	}
 	e.WriteFile(filepath.Join(e.Game, "RimWorldWin64.exe"), "synthetic")
 	e.App.Detect.GOOS = "linux"
-	for _, row := range view.EnvironmentRows(e.App, "") {
-		if row.AddReason == "" {
-			t.Fatalf("Proton add enabled: %+v", row)
-		}
+	// Add Game Config refuses an own saves folder for a Proton game (the page shows why).
+	own := []view.GameFound{{Name: "proton-own", Game: e.Game, Env: "main", AddConfig: true, Saves: app.SavesOwn}}
+	if _, err := view.CreateGames(e.App, own); err == nil || !strings.Contains(err.Error(), "Proton") {
+		t.Fatalf("Proton own saves: %v", err)
 	}
 }
 
