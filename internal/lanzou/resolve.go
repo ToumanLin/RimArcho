@@ -67,7 +67,7 @@ func (r *runner) page(ctx context.Context, raw, method string, form url.Values, 
 	return "", "", errors.New("metadata cookie challenge failed")
 }
 
-// resolve is fixed Go parsing, shared by the probe and release-pair downloader.
+// resolve is fixed Go parsing, shared by the probe and release ZIP downloader.
 // IDs retain their query state; the allowlist is checked before every request.
 func (r *runner) resolve(ctx context.Context, share, id string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)

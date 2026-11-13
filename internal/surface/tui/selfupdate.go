@@ -47,12 +47,15 @@ func (m *model) selfUpdatePanel() tea.Cmd {
 	if it.Note != "" {
 		fmt.Fprintf(&b, "%s\n", it.Note)
 	}
-	var install, check *view.SettingAction
+	var install, check, page *view.SettingAction
 	for i, a := range it.Actions {
-		switch a.Task {
-		case view.TaskSelfUpdate:
+		switch {
+		case a.URL != "":
+			page = &it.Actions[i]
+		case a.Pick != "": // the TUI has no file dialog: :update --from below
+		case a.Task == view.TaskSelfUpdate:
 			install = &it.Actions[i]
-		case view.TaskSelfCheck:
+		case a.Task == view.TaskSelfCheck:
 			check = &it.Actions[i]
 		}
 	}
@@ -67,6 +70,11 @@ func (m *model) selfUpdatePanel() tea.Cmd {
 			fmt.Fprintf(&b, "  %s\n", d.Link)
 		}
 	}
+	if page != nil {
+		// The manual update (17 §5.1): the zip from the Lanzou share, then :update --from.
+		fmt.Fprintf(&b, "\n%s\n  %s  %s\n  :update --from <%s>\n\n%s\n", T("download the zip in the browser, then install it:"),
+			page.URL, page.Note, T("path to the zip"), T("o: open the download page"))
+	}
 	switch {
 	case install != nil:
 		fmt.Fprintf(&b, "\n%s\n\n%s\n", install.Confirm, T("enter: install; esc: cancel   :update --check checks again"))
@@ -79,6 +87,21 @@ func (m *model) selfUpdatePanel() tea.Cmd {
 		m.panel.onEnter = func(m *model) tea.Cmd { m.panel = nil; return m.startSelfUpdate() }
 	case check != nil:
 		m.panel.onEnter = func(m *model) tea.Cmd { m.panel = nil; return m.selfCheck() }
+	}
+	if page != nil {
+		url := page.URL
+		m.panel.keys = map[string]func(*model) tea.Cmd{"o": func(m *model) tea.Cmd {
+			open := m.opts.OpenURL
+			if open == nil {
+				open = openURL
+			}
+			if err := open(url); err != nil {
+				m.say(sayFail, err.Error())
+			} else {
+				m.say(sayOK, T("opened the download page"))
+			}
+			return nil
+		}}
 	}
 	return nil
 }
@@ -103,6 +126,10 @@ func (m *model) selfCheck() tea.Cmd {
 }
 
 func (m *model) startSelfUpdate() tea.Cmd {
+	return m.startSelfUpdateFrom("")
+}
+
+func (m *model) startSelfUpdateFrom(picked string) tea.Cmd {
 	snap := m.snapshot()
 	ctx, cancel := context.WithCancel(context.Background())
 	run := &selfUpdate{ch: make(chan tea.Msg, 8), cancel: cancel, phase: T("downloading…")}
@@ -115,7 +142,7 @@ func (m *model) startSelfUpdate() tea.Cmd {
 		}
 		defer a.Close()
 		last := ""
-		res, err := a.InstallSelfUpdate(ctx, func(s app.SelfUpdateStep) {
+		step := func(s app.SelfUpdateStep) {
 			text := view.SelfUpdatePhase(s)
 			if text == last {
 				return
@@ -125,7 +152,13 @@ func (m *model) startSelfUpdate() tea.Cmd {
 			case run.ch <- selfStepMsg{text}:
 			default: // the screen is behind; the next step says more
 			}
-		})
+		}
+		var res *app.SelfUpdateResult
+		if picked != "" {
+			res, err = a.InstallSelfUpdateFrom(ctx, picked, step)
+		} else {
+			res, err = a.InstallSelfUpdate(ctx, step)
+		}
 		run.ch <- selfDoneMsg{res: res, err: err}
 	}()
 	m.say(sayBusy, T("update RimArcho")+": "+run.phase)

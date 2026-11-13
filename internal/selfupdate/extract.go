@@ -79,10 +79,16 @@ func ExtractLayout(zipPath, dir string, layout Layout) (err error) {
 	for i, entry := range z.File {
 		name := names[i]
 		if name == "" {
+			if err := checkSkippedEntry(entry); err != nil {
+				return err
+			}
 			continue
 		}
 		target := filepath.Join(dir, filepath.FromSlash(name))
 		if entry.FileInfo().IsDir() || strings.HasSuffix(entry.Name, `\`) {
+			if err := checkSkippedEntry(entry); err != nil {
+				return err
+			}
 			if err := os.MkdirAll(target, 0o755); err != nil {
 				return err
 			}
@@ -102,6 +108,19 @@ func ExtractLayout(zipPath, dir string, layout Layout) (err error) {
 		}
 	}
 	return nil
+}
+
+// Even entries with no output must be read to EOF for archive/zip's CRC check.
+func checkSkippedEntry(entry *zip.File) error {
+	r, err := entry.Open()
+	if err != nil {
+		return err
+	}
+	n, readErr := io.Copy(io.Discard, io.LimitReader(r, maxDownload+1))
+	if n > maxDownload {
+		readErr = errors.Join(readErr, errors.New("zip entry exceeds 200 mb"))
+	}
+	return errors.Join(readErr, r.Close())
 }
 
 // extractName returns the entry's path under the allowed top-level name, or "" for the zip's root folder.

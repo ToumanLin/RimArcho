@@ -35,11 +35,7 @@ func checkMonitor(ctx context.Context, options Options) SourceResult {
 	if api == "" {
 		api = DefaultSteamAPI
 	}
-	client, err := shortHTTP(options.HTTP)
-	if err != nil {
-		return SourceResult{Status: "failed", Error: err.Error()}
-	}
-	defer client.CloseIdleConnections()
+	client := shortHTTP(options.HTTP)
 	form := url.Values{"itemcount": {"1"}, "publishedfileids[0]": {id}}
 	req, err := http.NewRequestWithContext(ctx, "POST", api, strings.NewReader(form.Encode()))
 	if err != nil {

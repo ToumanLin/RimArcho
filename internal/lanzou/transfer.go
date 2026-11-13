@@ -15,7 +15,7 @@ import (
 const MaxArchive = 200 << 20
 const MaxChecksum = 64 << 10
 
-// A transfer is private until its caller verifies the checksum or reports a probe observation.
+// A transfer stays private for archive verification or a probe observation.
 type transfer struct {
 	file   *os.File
 	SHA256 string

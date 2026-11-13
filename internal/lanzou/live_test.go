@@ -19,8 +19,8 @@ func TestLiveLanzouListing(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Logf("version=%s checksum_present=%t", listing.Version, listing.HasChecksum)
-	if listing.Version != "1.0.10" {
-		t.Fatalf("expected live research version 1.0.10, got %s", listing.Version)
+	if stableFilename("archo-"+listing.Version+"-windows-amd64.zip") == "" {
+		t.Fatalf("the share lists no stable Windows zip (got %q)", listing.Version)
 	}
 }
 

@@ -106,8 +106,8 @@ func TestListingOnlyAndPagination(t *testing.T) {
 	}
 }
 
-func TestReleasePairAndVerificationBoundary(t *testing.T) {
-	for _, mode := range []string{"ok", "missing checksum", "wrong hash", "human check", "repeated challenge", "oversized checksum", "newer also listed"} {
+func TestReleaseZipAndVerificationBoundary(t *testing.T) {
+	for _, mode := range []string{"ok", "missing checksum", "wrong hash", "human check", "repeated challenge", "oversized checksum", "no GitHub sum", "newer also listed"} {
 		t.Run(mode, func(t *testing.T) {
 			data := syntheticZip(t)
 			sum := sha256.Sum256(data)
@@ -136,6 +136,9 @@ func TestReleasePairAndVerificationBoundary(t *testing.T) {
 					}
 					json.NewEncoder(w).Encode(map[string]any{"zt": 1, "text": entries})
 				case "/entry":
+					if r.URL.Query().Get("kind") == "sum" {
+						t.Error("download fetched a Lanzou checksum")
+					}
 					fmt.Fprintf(w, `<iframe src="/fn?kind=%s&token=private-secret"></iframe>`, r.URL.Query().Get("kind"))
 				case "/fn":
 					fmt.Fprintf(w, "var domain1='%s/ajaxfile.php?kind=%s';var ajaxdata='private-secret';var wp_sign='private-secret';", origin, r.URL.Query().Get("kind"))
@@ -177,8 +180,15 @@ func TestReleasePairAndVerificationBoundary(t *testing.T) {
 			origin = server.URL
 			c.Observe = func(e ProbeEvent) { fmt.Fprintf(&events, "%s %s %d\n", e.Stage, e.Host, e.Status) }
 			dir := t.TempDir()
-			pair, err := c.Download(context.Background(), "1.2.3", dir)
-			if mode == "ok" || mode == "newer also listed" {
+			supplied := []byte(checksum)
+			if mode == "no GitHub sum" {
+				supplied = nil
+			}
+			if mode == "oversized checksum" {
+				supplied = []byte(strings.Repeat("x", MaxChecksum+1))
+			}
+			pair, err := c.Download(context.Background(), "1.2.3", dir, supplied)
+			if mode == "ok" || mode == "newer also listed" || mode == "missing checksum" || mode == "no GitHub sum" {
 				if err != nil {
 					t.Fatal(err)
 				}

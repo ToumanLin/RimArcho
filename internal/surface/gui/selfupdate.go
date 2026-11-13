@@ -33,18 +33,25 @@ func (s *API) runSelfCheck(a *app.App) (string, error) {
 
 // runSelfUpdate installs the pending release as a background task the player can stop
 // while it downloads or waits for the other RimArcho to close; then the window restarts.
-func (s *API) runSelfUpdate(a *app.App, id string) (string, error) {
+func (s *API) runSelfUpdate(a *app.App, id string, argv []string) (string, error) {
 	ctx, cancel := context.WithCancel(s.branchCtx)
 	defer cancel()
 	s.tasks.SetStop(id, func() error { cancel(); return nil })
-	res, err := a.InstallSelfUpdate(ctx, func(st app.SelfUpdateStep) {
+	step := func(st app.SelfUpdateStep) {
 		s.tasks.Update(id, func(t *app.Task) {
 			t.Phase = view.SelfUpdatePhase(st)
 			if st.Phase == "download" && st.Total > 0 {
 				t.Frac = min(0.9, 0.9*float64(st.Done)/float64(st.Total))
 			}
 		})
-	})
+	}
+	var res *app.SelfUpdateResult
+	var err error
+	if len(argv) == 3 && argv[1] == "--from" {
+		res, err = a.InstallSelfUpdateFrom(ctx, argv[2], step)
+	} else {
+		res, err = a.InstallSelfUpdate(ctx, step)
+	}
 	if err != nil {
 		return "", err
 	}

@@ -38,7 +38,10 @@ func (r *runner) report(stage, host string, status int) {
 }
 
 func newRunner(client *http.Client, hosts []string, testOrigin string) (*runner, error) {
-	var base http.RoundTripper = http.DefaultTransport
+	// netcfg replaces DefaultTransport. Lanzou must keep a direct transport of
+	// its own so every destination is checked before dialing (17 §2.2, §5.1).
+	var base http.RoundTripper = &http.Transport{ForceAttemptHTTP2: true,
+		MaxIdleConns: 100, IdleConnTimeout: 90 * time.Second, ExpectContinueTimeout: time.Second}
 	if client != nil && client.Transport != nil {
 		base = client.Transport
 	}
@@ -47,8 +50,7 @@ func newRunner(client *http.Client, hosts []string, testOrigin string) (*runner,
 		return nil, errors.New("lanzou requires a standard http.Transport for destination enforcement")
 	}
 	t := transport.Clone()
-	// This experiment is direct-only. A proxy can resolve a public name to a private
-	// address after local validation; integration with netcfg needs a trusted proxy policy.
+	// A proxy can resolve a public name to a private address after local validation.
 	t.Proxy = nil
 	t.DialTLSContext = nil
 	t.DialTLS = nil

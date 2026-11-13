@@ -101,6 +101,31 @@ func TestExtract(t *testing.T) {
 	}
 }
 
+func TestExtractRejectsCorruptEntry(t *testing.T) {
+	for _, name := range []string{"README.md", ".", "monitor\\"} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			data := makeZip(t, append(programEntries(), zipEntry{name: name, data: "CRC test payload"}))
+			at := bytes.Index(data, []byte("CRC test payload"))
+			if at < 0 {
+				t.Fatal("missing stored payload")
+			}
+			data[at] ^= 1
+			path := filepath.Join(root, "corrupt.zip")
+			if err := os.WriteFile(path, data, 0600); err != nil {
+				t.Fatal(err)
+			}
+			stage := filepath.Join(root, "new")
+			if err := Extract(path, stage); !errors.Is(err, zip.ErrChecksum) {
+				t.Fatalf("corrupt entry accepted: %v", err)
+			}
+			if _, err := os.Stat(stage); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("failed extraction retained staging: %v", err)
+			}
+		})
+	}
+}
+
 func TestExtractRejectsUnsafeArchives(t *testing.T) {
 	for _, tc := range []struct {
 		name    string

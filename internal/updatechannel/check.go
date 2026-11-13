@@ -1,11 +1,9 @@
-// Package updatechannel prototypes update-source coordination without wiring it
-// into the application, CLI or UI. Release archives retain their existing layout.
+// Package updatechannel coordinates release metadata sources (17 §5.1).
 package updatechannel
 
 import (
 	"context"
 	"errors"
-	"net"
 	"net/http"
 	"os"
 	"time"
@@ -20,12 +18,18 @@ const DefaultSteamAPI = "https://api.steampowered.com/ISteamRemoteStorage/GetPub
 
 type Options struct {
 	GitHub                selfupdate.Client
-	Lanzou                *lanzou.Client
+	Lanzou                LanzouClient
 	HTTP                  *http.Client // Steam Web API; no account/session is used.
 	MonitorItem, SteamAPI string
 	Source                string // auto (default) or github
 	Prerelease            bool
 	Timeout               time.Duration // One overall check deadline; default 30 s, maximum 60 s.
+}
+
+// LanzouClient allows synthetic app tests without relaxing Lanzou's network limits.
+type LanzouClient interface {
+	List(context.Context) (lanzou.Listing, error)
+	Download(context.Context, string, string, []byte) (*lanzou.Package, error)
 }
 
 type SourceResult struct {
@@ -35,11 +39,13 @@ type SourceResult struct {
 	HasChecksum bool          `json:"has_checksum"`
 	Error       string        `json:"error,omitempty"`
 	Elapsed     time.Duration `json:"elapsed_ns"`
+	release     *selfupdate.Release
 }
 
 type Report struct {
-	Version string         `json:"version,omitempty"`
-	Sources []SourceResult `json:"sources"`
+	Version string              `json:"version,omitempty"`
+	Sources []SourceResult      `json:"sources"`
+	GitHub  *selfupdate.Release `json:"-"`
 }
 
 type checkTask struct {
@@ -47,8 +53,8 @@ type checkTask struct {
 	run  func(context.Context) SourceResult
 }
 
-// Check runs metadata sources concurrently. Results retain source order for a
-// future archo update --check display. Version choice does not reorder downloads.
+// Check runs metadata sources concurrently. Results retain source order for
+// archo update --check. Version choice does not reorder downloads.
 func Check(ctx context.Context, options Options) (Report, error) {
 	if options.Source != "" && options.Source != "auto" && options.Source != "github" {
 		return Report{}, errors.New("unknown update source setting")
@@ -67,12 +73,7 @@ func Check(ctx context.Context, options Options) (Report, error) {
 		github.GOARCH = "amd64"
 	}
 	tasks := []checkTask{{"github", func(ctx context.Context) SourceResult {
-		client, err := shortHTTP(github.HTTP)
-		if err != nil {
-			return SourceResult{Status: "failed", Error: err.Error()}
-		}
-		defer client.CloseIdleConnections()
-		github.HTTP = client
+		github.HTTP = shortHTTP(github.HTTP)
 		release, err := github.Latest(ctx, options.Prerelease)
 		if err != nil {
 			return SourceResult{Status: "failed", Error: "GitHub release lookup failed"}
@@ -80,7 +81,7 @@ func Check(ctx context.Context, options Options) (Report, error) {
 		if !validVersion(release.Version, options.Prerelease) {
 			return SourceResult{Status: "failed", Error: "GitHub returned an invalid release version"}
 		}
-		return SourceResult{Status: "ok", Version: release.Version, HasChecksum: release.Installable() == nil}
+		return SourceResult{Status: "ok", Version: release.Version, HasChecksum: release.Sum.URL != "", release: release}
 	}}}
 	if options.Source != "github" && !options.Prerelease {
 		tasks = append(tasks, checkTask{"monitor", func(ctx context.Context) SourceResult { return checkMonitor(ctx, options) }})
@@ -146,6 +147,9 @@ func collect(ctx context.Context, tasks []checkTask) (Report, error) {
 		}
 	}
 	for _, source := range report.Sources {
+		if source.Source == "github" && source.Status == "ok" {
+			report.GitHub = source.release
+		}
 		if source.Status == "ok" && (report.Version == "" || selfupdate.Newer(report.Version, source.Version)) {
 			report.Version = source.Version
 		}
@@ -156,34 +160,18 @@ func collect(ctx context.Context, tasks []checkTask) (Report, error) {
 	return report, nil
 }
 
-// shortHTTP preserves standard transport routing/TLS settings while limiting
-// connection establishment to five seconds. netcfg wrapper integration is deferred.
-func shortHTTP(base *http.Client) (*http.Client, error) {
+// shortHTTP preserves netcfg's transport wrapper, including proxy/mirror routing.
+// Check also bounds all sources with one context deadline (17 §2.2, §5.1).
+func shortHTTP(base *http.Client) *http.Client {
 	client := http.Client{}
-	var transport http.RoundTripper = http.DefaultTransport
 	if base != nil {
 		client = *base
-		if base.Transport != nil {
-			transport = base.Transport
-		}
 	}
-	t, ok := transport.(*http.Transport)
-	if !ok {
-		return nil, errors.New("prototype requires a standard http.Transport")
-	}
-	t = t.Clone()
-	t.DialContext = (&net.Dialer{Timeout: 5 * time.Second}).DialContext
-	t.DialTLSContext = nil
-	t.DialTLS = nil
-	t.TLSHandshakeTimeout = 5 * time.Second
-	t.ResponseHeaderTimeout = 10 * time.Second
-	t.MaxResponseHeaderBytes = 16 << 10
-	client.Transport = t
 	client.Jar = nil
 	if client.Timeout <= 0 || client.Timeout > 15*time.Second {
 		client.Timeout = 15 * time.Second
 	}
-	return &client, nil
+	return &client
 }
 
 func monitorItem(options Options) string {

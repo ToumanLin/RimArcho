@@ -1880,6 +1880,34 @@ function settingDetails(d) {
 
 function renderSettingActions(right, actions, run, item) {
   for (const a of actions || []) {
+    // A web page for the player to use (the manual RimArcho update, 17 §5.1): the button
+    // opens it in the browser; its note (the share's password) can be copied beside it.
+    if (a.url) {
+      const b = button(a.label, "", () => api.OpenURL(a.url).catch(e => say("fail", errText(e))), "", "open-url");
+      b.title = a.url;
+      b.dataset.settingAction = "open " + a.url;
+      right.append(b);
+      if (a.note) right.append(a.copy ? copyablePath(el("span", "muted", a.note), a.copy) : el("span", "muted", a.note));
+      continue;
+    }
+    // A file the player downloaded: the native dialog picks it, then {} in argv is its path.
+    if (a.pick) {
+      const b = button(a.label, "", async () => {
+        let path = "";
+        try { path = await api.PickUpdateZip(); } catch (e) { say("fail", errText(e)); return; }
+        if (!path) return;
+        const argv = a.argv.map(x => x === "{}" ? path : x);
+        const go = () => {
+          if (a.task) { b.disabled = true; b.textContent = a.pending; }
+          return run(argv, "", null, !!a.task);
+        };
+        if (a.confirm) pop.confirm(a.label, [a.confirm, path], a.label, go); else go();
+      }, "", a.argv.join(" "));
+      b.dataset.settingAction = a.argv.join(" ");
+      if (a.task) { b.dataset.settingTask = a.task; b.dataset.label = a.label; b.dataset.pending = a.pending; }
+      right.append(b);
+      continue;
+    }
     if(a.argv[0]==="env"&&a.argv[1]==="remove"){right.append(button(a.label,"",()=>removeEnv(a.argv[2]),"quiet danger","remove-env"));continue;}
     if (a.argv[0] === "import-managers") {
       right.append(button(a.label, "", () => ui.importManagers())); continue;

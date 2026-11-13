@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,6 +15,36 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/lanzou"
 	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 )
+
+type wrappedTransport func(*http.Request) (*http.Response, error)
+
+func (f wrappedTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestCheckPreservesWrappedTransport(t *testing.T) {
+	for _, useDefault := range []bool{false, true} {
+		t.Run(fmt.Sprint(useDefault), func(t *testing.T) {
+			calls := 0
+			transport := wrappedTransport(func(r *http.Request) (*http.Response, error) {
+				calls++
+				if r.URL.String() != selfupdate.DefaultAPI+"/releases/latest" {
+					t.Fatal("wrapper received wrong request", r.URL)
+				}
+				return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"tag_name":"v1.2.3"}`))}, nil
+			})
+			client := &http.Client{Transport: transport}
+			if useDefault {
+				old := http.DefaultTransport
+				http.DefaultTransport = transport
+				t.Cleanup(func() { http.DefaultTransport = old })
+				client = nil
+			}
+			report, err := Check(context.Background(), Options{Source: "github", GitHub: selfupdate.Client{HTTP: client}})
+			if err != nil || calls != 1 || report.Version != "1.2.3" || report.GitHub == nil {
+				t.Fatalf("calls=%d report=%+v err=%v", calls, report, err)
+			}
+		})
+	}
+}
 
 func TestChecksChooseHighestAndKeepFailures(t *testing.T) {
 	for _, failGitHub := range []bool{false, true} {

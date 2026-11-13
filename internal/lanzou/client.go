@@ -1,4 +1,4 @@
-// Package lanzou is an unwired, bounded resolver for RimArcho release pairs.
+// Package lanzou is a bounded resolver for RimArcho release ZIPs.
 // It never installs or executes downloads, or reads game/application settings.
 package lanzou
 

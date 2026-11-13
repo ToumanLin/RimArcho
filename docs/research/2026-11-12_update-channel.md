@@ -1,5 +1,7 @@
 # Parallel update checks and GitHub/Lanzou release pairs
 
+> **Status (2026-11-13):** integrated; the behaviour is specified in [17 §5.1](../specs/17-engineering.md#51-rimarcho-self-update). The maintainer then dropped the `.sha256` requirement on Lanzou: the folder holds only the zip, which is checked against GitHub's checksum when that can be fetched, otherwise by its CRC-32, the extraction checks and the start-up test. Manual install takes the zip alone (`archo update --from <zip>`). Where §1, §3 and §7 below require a pair, the specification wins.
+
 > Research and unwired prototype, 2026-11-12 (America/Los_Angeles), with live observations on 2026-11-13 UTC.
 > **[C]** means confirmed by a live HTTP/browser observation. Maintainer-supplied browser evidence is attributed explicitly; source inspection and proposals are not [C].
 > Basis: [17 §5.1](../specs/17-engineering.md#51-rimarcho-self-update), [earlier Workshop research](2026-11-05_workshop-distribution.md).
