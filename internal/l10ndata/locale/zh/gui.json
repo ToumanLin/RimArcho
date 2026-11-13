@@ -136,7 +136,7 @@
   "mod": "Mod",
   "mod library changes": "Mod 库的变化",
   "move down / up 1 (10)": "下移 / 上移 1 位（10 位）",
-  "move over from RimSort or RimCrow": "从 RimSort、RimCrow 搬过来",
+  "move over from RimSort, RimCrow or RimPy": "从 RimSort、RimCrow、RimPy 搬过来",
   "move the cursor (scroll in the details)": "移动光标（在详情区中滚动）",
   "move to a position or after a mod": "移动到某个序号或某个 Mod 之后",
   "moved one place later": "往后排了一位",
@@ -304,5 +304,9 @@
   "lightness": "亮度",
   "new colour %s": "新颜色 %s",
   "preset colours": "预设颜色",
-  "use colour": "用这个颜色"
+  "use colour": "用这个颜色",
+  "found on this computer": "在这台电脑上找到",
+  "importing the pack…": "正在导入整合包…",
+  "open packs": "打开整合包页",
+  "choose this file with “choose a file…”": "请用“选择文件…”选这个文件"
 }

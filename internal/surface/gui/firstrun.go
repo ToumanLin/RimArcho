@@ -106,7 +106,7 @@ func (s *API) PickManagerImport() (string, error) {
 	if s.x.native == nil {
 		return "", nil
 	}
-	return s.x.native.openFile(view.T("import from RimSort or RimCrow"), [][2]string{{"Manager data and Mod lists", "*.db;*.json;*.xml;*.rml;*.txt"}, {"All files", "*.*"}})
+	return s.x.native.openFile(view.T("import from RimSort, RimCrow or RimPy"), [][2]string{{"Manager data and Mod lists", "*.db;*.json;*.xml;*.rml;*.txt"}, {"All files", "*.*"}})
 }
 
 type managerPreview struct {

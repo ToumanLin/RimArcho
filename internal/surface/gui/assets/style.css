@@ -1304,6 +1304,7 @@ svg.i.fill { fill: currentColor; }
 details.xc-sec > summary { cursor: pointer; }
 .xc-row { display: flex; gap: 8px; align-items: center; }
 .xc-row.end { justify-content: flex-end; }
+.xc-row .xc-kind { flex: none; white-space: nowrap; }
 .xc-input { flex: 1; min-width: 0; height: 28px; border: var(--hairline) solid var(--line-2); border-radius: var(--r-sm); padding: 0 8px; background: var(--card); color: var(--fg); font-size: 13px; }
 .xc-input option, .xc-input optgroup { color: var(--fg); background: var(--card); }
 :root { color-scheme: light; }

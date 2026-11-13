@@ -101,6 +101,18 @@ func (s *API) PickImportFile() (string, error) {
 	return s.x.native.openFile(view.T("import a mod list"), listFilters)
 }
 
+// PickAnyImport is the Import page's one file dialog: lists, saves, packs and other
+// managers' data (16 §2.18); "" when it was cancelled or there is no window.
+func (s *API) PickAnyImport() (string, error) {
+	if s.x.native == nil {
+		return "", nil
+	}
+	return s.x.native.openFile(view.T("import"), [][2]string{
+		{"Lists, saves, packs, manager data (*.xml;*.rml;*.json;*.txt;*.rws;*.archopack;*.db)", "*.xml;*.rml;*.json;*.txt;*.rws;*.archopack;*.db"},
+		{"All files (*.*)", "*.*"},
+	})
+}
+
 // PickPackFile selects an archive for the guide; cancellation leaves the guide unchanged.
 func (s *API) PickPackFile() (string, error) {
 	if s.x.native == nil {

@@ -55,7 +55,7 @@ The GUI gathers these actions on all lists (16 §2.17). Commands: `archo plan li
 - When an environment is read and has no current plan (`environment.current_plan = 0`):
   - If ModsConfig.xml still matches a plan's last write (its hash equals the write record), make that plan current; create none.
   - If ModsConfig.xml is absent for own saves, create a separate plan with Core and installed DLC in release order. Other environments without the file may adopt the most recently edited global plan.
-  - Otherwise read ModsConfig.xml and create a plan: v1 has source `import` and note `ModsConfig.xml` (absent file: an empty list with note `no ModsConfig.xml`). It is named `default`; if that is taken, the environment's name, then numbered (`1.6 2`). The first-run guide also offers "move over from RimSort or RimCrow" and "open a pack or a Steam collection" (16 §2.15).
+  - Otherwise read ModsConfig.xml and create a plan: v1 has source `import` and note `ModsConfig.xml` (absent file: an empty list with note `no ModsConfig.xml`). It is named `default`; if that is taken, the environment's name, then numbered (`1.6 2`). The first-run guide also offers "move over from RimSort, RimCrow or RimPy" and "open a pack or a Steam collection" (16 §2.15).
 
 ### 1.5 Archo Monitor added by default
 
@@ -380,10 +380,11 @@ Profile environments and their independent current plans follow 03 §6.4. The sa
 
 The GUI profile checklist selects which RimCrow profiles become Game Configs (03 §6.5). Unconfigured profiles remain visible and skipped.
 
-The GUI's shared manager-import flow (16 §2.15) discovers sources read-only with `app.DiscoverManagerImports`:
+The GUI's Import page (16 §2.18) discovers sources read-only with `app.DiscoverManagerImports`:
 
 - RimSort: `%LOCALAPPDATA%\RimSort` (Windows `platformdirs`, `appauthor=False`), with `%APPDATA%\RimSort` as a compatibility candidate; `modlists/`, `dbs/userRules.json`, and `settings.json`'s legacy `config_folder` or each `instances` entry's `config_folder` for ModsConfig.xml. Portable/development candidates also check the program folder and its `data/` child.
 - RimCrow: `<install>/data/mod_manager.db`; also a directly selected/recent data folder's `mod_manager.db`. Saved lists come from `<install>/backups/`, its `today`, `earlier`, `other` children, and up to 16 profile directories under `backups/profile/`.
+- RimPy: `ModLists/` in its data folder, `LocalLow\RimPy Mod Manager` beside `%APPDATA%` (Roaming). Its lists are read as any list (§7.2); the folder's `config.ini` is not read. The file format of RimPy's saved lists is not documented; a synthetic ModsConfig-style list is tested, a real RimPy file is a VM check.
 - Install candidates: running RimCrow/RimModManager/RimSort executable directories; named folders in Program Files, Local AppData/Programs, Local AppData, Downloads, Desktop, Games and beside RimArcho's parent folder; named Start-menu shortcuts and recent-folder shortcuts. Windows shortcut resolution is read-only, hidden and limited to four seconds and 200 shortcuts per root. No registry registration is assumed. Each list folder contributes at most its first 100 entries. Duplicate source paths are suppressed; inaccessible or absent locations are skipped.
 
 Choosing a candidate does not import it. Lists use §7; RimCrow data uses the existing dry-run report and import above. Original databases, WAL files, settings and rules remain unchanged. The manual file picker remains available when discovery finds nothing.
@@ -422,7 +423,7 @@ Formats are detected by content, not by extension (except `.rws`, read as a save
 | --- | --- | --- |
 | RimArcho list (`.archolist.json`) | Starts `{`, has `entries` array and numeric `format` | `pack.json` format (10 §1): `name` is list name, `game`, `entries[]` fields `package_id`, `name`, `workshop_id`, `hash`; reject newer `format`. Read pack-directory `pack.json` the same way |
 | Text list | Other text | One packageId per line (`author.name`), `#` comments, skip headings/prose |
-| ModsConfig.xml / RimSort exported list | Root `ModsConfigData` | `version`, `activeMods/li` |
+| ModsConfig.xml / RimSort or RimPy saved list | Root `ModsConfigData` | `version`, `activeMods/li` |
 | Save | `.rws` or `<savegame` in first 4096 bytes | `gameVersion`, `modIds`, `modNames` under `<meta>`; stop at `</meta>` (saves are tens of MB); names label missing entries |
 | RimWorld `.rml` (in-game "save Mod list", also written by RimCrow) | Root `savedModList` | Prefer `modList/ids` and `names`, else `meta/modIds`, `modNames`; matching `meta/modSteamIds` supplies Workshop IDs |
 | RimCrow `ModList.xml` | Root `ModList` | Parallel `modIds`, `modNames`, `modSteamWorkshopIds` (`0` = none) |
@@ -435,7 +436,7 @@ Formats are detected by content, not by extension (except `.rws`, read as a save
 
 - JSON entries may be strings or objects with `packageId` / `package_id` / `packageid` / `id`, `name`, `workshopId` / `workshop_id` / `publishedFileId`.
 - Of duplicate packageIds, the first is kept. UTF-16 and UTF-8 BOMs are detected and the text is normalized to UTF-8; files under 16 MB are read whole.
-- If no Mods are found, the error is "no mods found in it: a list from RimSort, RimCrow or RimWorld, a share code, packageIds or workshop links".
+- If no Mods are found, the error is "no mods found in it: a list from RimSort, RimCrow, RimPy or RimWorld, a share code, packageIds or workshop links".
 - Pasting one line in the UI: an existing file path reads the file; a Rentry link fetches `https://rentry.co/<id>/raw` (at most 4 MB; on failure, suggest opening the page, copying the list and pasting it); a Workshop link or a number of 6 or more digits reads a Steam collection (§7.5). Only the last two use the network.
 - Pack (`.archopack`) import: 10 §4. A pack's exported list is a RimArcho list, imported here.
 

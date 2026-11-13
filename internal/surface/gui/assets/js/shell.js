@@ -184,7 +184,7 @@ export function current() {
   if (S.screen === "packs" && S.packFocus) return "pack:" + S.packFocus;
   // a list's export: under Manage lists, or under the list when the editor opened it (16 §2.17)
   if (S.screen === "plan-export" && S.planExport) return S.planExport.from === "editor" ? "plan:" + S.planExport.id : "plans";
-  if (S.screen === "plan-import") return "plans"; // 16 §2.17
+  if (S.screen === "plan-import") return "import"; // Library > Import (16 §2.18)
   // uninstall RimArcho is under settings
   if (S.screen === "uninstall" || S.screen === "uninstall-progress" || S.screen === "feedback") return "settings";
   // adding an environment belongs to the environment page
@@ -210,7 +210,7 @@ function inGameMark(isInGame) {
   return m;
 }
 
-const ICONS = { home: "home", needs: "needs", plan: "plan", packs: "packs", saves: "saves", review: "review", textures: "textures", env: "env", library: "library", log: "log" };
+const ICONS = { home: "home", needs: "needs", plan: "plan", packs: "packs", saves: "saves", review: "review", textures: "textures", env: "env", library: "library", log: "log", import: "import" };
 
 // The entry whose sub-entries were open when the sidebar was last drawn: a redraw starts
 // from it, so the sub-entries open and close with a transition (16 §7.1).
@@ -349,7 +349,6 @@ export function crumbs() {
   if (S.screen === "feedback") out = out.concat([{ label: T("feedback"), id: "feedback" }]);
   if (S.screen === "build") out = out.concat([{ label: T("create a pack"), id: "build" }]);
   if (S.screen === "plan-export" && S.planExport) out = ((sh && sh.crumbs && sh.crumbs["plan:" + S.planExport.id]) || []).concat([{ label: T("export"), id: "plan-export" }]);
-  if (S.screen === "plan-import") out = out.slice(0, -1).concat([{ label: T("import"), id: "plan-import" }]);
   if (S.screen === "plans" && S.listCreating) out = out.concat([{ label: T("new list"), id: "plan:new" }]);
   return out;
 }

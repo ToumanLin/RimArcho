@@ -82,7 +82,7 @@ export async function openPage(id, plan = null, entry = null, save = "") {
     case "needs": return scr.needs();
     case "packs": return packsPage.list();
     case "plans": return planManage.open();
-    case "plan-import": return exchange();
+    case "plan-import": case "import": return exchange();
     case "plan-export": return planManage.exportOf(entry?.planExport?.id || planManage.exportPlan(), entry?.planExport?.from || planManage.exportFrom());
     case "build": return packsPage.build();
     case "env": return scr.environment();

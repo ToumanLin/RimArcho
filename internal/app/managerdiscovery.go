@@ -16,7 +16,9 @@ type ManagerImport struct {
 }
 
 // ManagerLocations separates discovery from machine locations for synthetic tests.
-type ManagerLocations struct{ RimSort, Installs []string }
+// RimPy is RimPy's data folders (AppData\LocalLow\RimPy Mod Manager): its saved lists
+// are in ModLists.
+type ManagerLocations struct{ RimSort, Installs, RimPy []string }
 
 // DiscoverManagerImports checks bounded, explicit locations, never whole drives.
 func DiscoverManagerImports(loc ManagerLocations) []ManagerImport {
@@ -107,6 +109,9 @@ func DiscoverManagerImports(loc ManagerLocations) []ManagerImport {
 			add("RimSort", "list", filepath.Join(config, "Config", "ModsConfig.xml"))
 		}
 	}
+	for _, root := range loc.RimPy {
+		lists("RimPy", filepath.Join(root, "ModLists"))
+	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Manager != out[j].Manager {
 			return out[i].Manager < out[j].Manager
@@ -124,6 +129,10 @@ func FindManagerImports() []ManagerImport {
 	}
 	if roaming != "" {
 		loc.RimSort = append(loc.RimSort, filepath.Join(roaming, "RimSort"))
+	}
+	if roaming != "" {
+		// RimPy keeps its data beside Roaming, in LocalLow
+		loc.RimPy = append(loc.RimPy, filepath.Join(filepath.Dir(roaming), "LocalLow", "RimPy Mod Manager"))
 	}
 	home, _ := os.UserHomeDir()
 	roots := []string{os.Getenv("ProgramFiles"), os.Getenv("ProgramFiles(x86)"), filepath.Join(local, "Programs"), local, filepath.Join(home, "Downloads"), filepath.Join(home, "Desktop"), filepath.Join(home, "Games")}

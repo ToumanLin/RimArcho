@@ -85,6 +85,8 @@ const (
 	PageLog      = "log"
 	PageSettings = "settings"
 	PageTextures = "textures" // Texture optimisation (10 §2), under Library
+	// PageImport: Library › Import, where every import starts (16 §2.18)
+	PageImport = "import"
 	// PageSubscribe: Mod library › add a subscription (16 §2.9)
 	PageSubscribe = "subscribe"
 	// PageSearch: Mod library › Search files (16 §2.9)
@@ -192,6 +194,8 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 		// what the game loads faster (10 §2)
 		{ID: PageTextures, Label: T("texture optimisation")},
 		{ID: PageEnv, Label: T("Game Config")},
+		// every import in one place: lists, packs, saves and other managers' data (16 §2.18)
+		{ID: PageImport, Label: T("import")},
 	}
 	// Saves is a group of its own since 2026-11-11 (16 §2.11): the saves, and the play
 	// review (12 §3). Its own name: the plain "saves" key is translated for settings rows.
@@ -200,7 +204,7 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	n := 0
 	for g := range groups {
 		for i := range groups[g].Items {
-			if id := groups[g].Items[i].ID; id == PageSaves || id == PageReview {
+			if id := groups[g].Items[i].ID; id == PageSaves || id == PageReview || id == PageImport {
 				continue // no shift key: shift+1–8 stay the eight pages the TUI also has (16 §3.5)
 			}
 			n++

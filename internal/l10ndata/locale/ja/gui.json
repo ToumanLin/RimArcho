@@ -136,7 +136,7 @@
   "mod": "MOD",
   "mod library changes": "MODライブラリの変更",
   "move down / up 1 (10)": "1件（10件）上下に移動",
-  "move over from RimSort or RimCrow": "RimSort／RimCrowから移行",
+  "move over from RimSort, RimCrow or RimPy": "RimSort／RimCrow／RimPyから移行",
   "move the cursor (scroll in the details)": "カーソルを移動（詳細画面ではスクロール）",
   "move to a position or after a mod": "指定位置またはMODの後ろに移動",
   "moved one place later": "1つ後ろに移動しました",
@@ -304,5 +304,9 @@
   "lightness": "明るさ",
   "new colour %s": "新しい色：%s",
   "preset colours": "プリセット色",
-  "use colour": "この色を使用"
+  "use colour": "この色を使用",
+  "found on this computer": "このPCで見つかったもの",
+  "importing the pack…": "パックをインポート中…",
+  "open packs": "パックを開く",
+  "choose this file with “choose a file…”": "このファイルは「ファイルを選択…」で選んでください"
 }

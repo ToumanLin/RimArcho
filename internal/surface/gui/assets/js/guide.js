@@ -633,7 +633,7 @@ function step3(card) {
   ways.append(way(T("the game's current list"), Tf("ModsConfig.xml enables %d mods; that becomes your first list", n),
     button(T("use this list"), "", () => finish(T("use the game's list as it is")), "primary")));
   const imp = button(T("import…"), "", () => { ui.afterImport = () => finish(""); ui.importManagers(); });
-  ways.append(way(T("move over from RimSort or RimCrow"), T("lists and player data, previewed before anything is imported"), imp));
+  ways.append(way(T("move over from RimSort, RimCrow or RimPy"), T("lists and player data, previewed before anything is imported"), imp));
   const src = el("input", "field");
   src.placeholder = T("a Steam Workshop collection link");
   src.type = "url"; src.spellcheck = false;

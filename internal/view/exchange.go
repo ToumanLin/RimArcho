@@ -105,7 +105,7 @@ func ReadImport(a *app.App, kind, src string) (*Import, error) {
 
 func checked(imp *Import) (*Import, error) {
 	if len(imp.List.Tokens) == 0 && len(imp.List.WorkshopOnly) == 0 {
-		return nil, errors.New(T("no mods found in it: a list from RimSort, RimCrow or RimWorld, a share code, packageIds or workshop links"))
+		return nil, errors.New(T("no mods found in it: a list from RimSort, RimCrow, RimPy or RimWorld, a share code, packageIds or workshop links"))
 	}
 	return imp, nil
 }

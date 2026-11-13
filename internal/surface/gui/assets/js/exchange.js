@@ -35,7 +35,9 @@ export async function importFrom(kind, src) {
   if (S.screen === "plan-import") return preview(kind, src);
 }
 
-export async function exchange(managers = false) {
+// The Import page (16 §2.18): the sidebar's Import, `i`, a dropped file, Settings and the guide
+// all open it. What was found on this computer comes first, then a file or pasted text.
+export async function exchange() {
   const from = S.screen === "plan-import" ? session?.from : S.screen || "plan";
   const target = from === "plans" ? ui.selectedList() : S.shell?.plan?.id || 0;
   const read = beginPageRead("plan-import", { replace: true });
@@ -49,7 +51,7 @@ export async function exchange(managers = false) {
   const result = el("section", "card pad xc-preview"); result.hidden = true;
   w.append(body, result); sc.append(w);
   importSource(body);
-  if (managers) discoverManagers(body);
+  discoverManagers(body);
   body.append(el("div", "xc-hint", T("or drop a file here")));
   read.finish(); ui.renderWhere(); ui.renderHints();
 }
@@ -63,27 +65,59 @@ export function cancel() {
 export function key(e) { if (e.key === "Escape") { e.preventDefault(); cancel(); } }
 export const hintList = () => [{ key: "tab", label: T("import destination") }, { key: "enter", label: T("import") }, { key: "esc", label: T("cancel") }];
 
-// The guide and Settings share this flow, including manual file selection.
+// What other managers left on this computer: RimSort, RimCrow and RimPy lists, RimCrow's
+// player data and RimSort's rules. Discovery only reads bounded folders (app.FindManagerImports).
 async function discoverManagers(body) {
   const active = session;
   const found = el("section", "xc-sec");
-  found.append(el("div", "xc-sec-t", T("import from RimSort or RimCrow")));
-  const candidates = el("div"), status = el("div", "muted", T("looking for RimSort and RimCrow…"));
+  found.append(el("div", "xc-sec-t", T("found on this computer")));
+  const candidates = el("div"), status = el("div", "muted", T("looking for RimSort, RimCrow and RimPy…"));
   found.append(status, candidates);
-  const pick = button(T("choose a file…"), "", async () => {
-    try {
-      const path = await api.PickManagerImport();
-      if (path && session === active && S.screen === "plan-import") {
-        const kind = await api.ManagerFileKind(path);
-        if (session === active && S.screen === "plan-import") select({ kind, path });
-      }
-    } catch (e) { say("fail", T(errText(e))); }
-  });
-  found.append(pick); body.prepend(found);
-  // One picker includes databases and lists; keep the shared paste input below.
-  const regular = body.querySelector(".xc-selected-file")?.parentElement;
-  if (regular) regular.hidden = true;
-  async function select(candidate) {
+  body.prepend(found);
+  try {
+    const rows = await api.DiscoverManagerImports();
+    if (session !== active || S.screen !== "plan-import") return;
+    status.textContent = rows?.length ? "" : T("No RimSort, RimCrow or RimPy data found.");
+    for (const row of rows || []) {
+      const line = el("div", "xc-row");
+      const kind = { list: "list", rimcrow: "player data", "rimsort-rules": "user rules" }[row.kind];
+      line.append(button(row.manager, "", () => managerPreview(row)), el("span", "muted xc-kind", T(kind)), copyablePath(el("span", "muted", row.path), row.path));
+      candidates.append(line);
+    }
+  } catch (e) { if (session === active) status.textContent = T(errText(e)); }
+}
+
+// openPicked sends a chosen file where it belongs: a pack is added to the packs, another
+// manager's database or rules get the migration preview, anything else the list preview.
+async function openPicked(path) {
+  const active = session;
+  if (/\.archopack$/i.test(path)) return importPack(path);
+  let kind = "list";
+  try { kind = await api.ManagerFileKind(path); } catch { /* read it as a list */ }
+  if (session !== active || S.screen !== "plan-import") return;
+  return kind === "list" ? preview("file", path) : managerPreview({ kind, path });
+}
+
+async function importPack(path) {
+  const active = session, result = $("#screen .xc-preview"), seq = ++previewSeq;
+  result.hidden = false; result.textContent = T("importing the pack…");
+  say("busy", T("importing the pack…"));
+  try {
+    const text = await api.PackImport(path);
+    if (session !== active || S.screen !== "plan-import" || seq !== previewSeq) return;
+    result.textContent = "";
+    result.append(copyablePath(el("div", "xc-note", path), path), el("pre", "", text));
+    await ui.reload();
+    say("ok", T("import complete"));
+    const btns = el("div", "xc-row end");
+    btns.append(button(T("open packs"), "enter", () => ui.go("packs"), "primary"));
+    result.append(btns);
+  } catch (e) { if (session === active && seq === previewSeq) { result.textContent = errText(e); say("fail", errText(e)); } }
+}
+
+async function managerPreview(candidate) {
+  const active = session;
+  {
     if (candidate.kind === "list") return preview("file", candidate.path);
     const result = $("#screen .xc-preview"), seq = ++previewSeq;
     result.hidden = false; result.textContent = T("reading the data…");
@@ -119,24 +153,13 @@ async function discoverManagers(body) {
       result.append(apply);
     } catch (e) { if (session === active && seq === previewSeq) result.textContent = T(errText(e)); }
   }
-  try {
-    const rows = await api.DiscoverManagerImports();
-    if (session !== active || S.screen !== "plan-import") return;
-    status.textContent = rows?.length ? "" : T("No RimSort or RimCrow data found.");
-    for (const row of rows || []) {
-      const line = el("div", "xc-row");
-      const kind = { list: "list", rimcrow: "player data", "rimsort-rules": "user rules" }[row.kind];
-      line.append(button(row.manager, "", () => select(row)), el("span", "muted", T(kind)), copyablePath(el("span", "muted", row.path), row.path));
-      candidates.append(line);
-    }
-  } catch (e) { if (session === active) status.textContent = T(errText(e)); }
 }
 
 // ---- import, step 1: where the list comes from ----
 
 function importSource(body) {
   const result = $("#screen .xc-preview");
-  body.append(el("div", "xc-note", T("RimArcho, RimSort, RimCrow and RimWorld lists, share codes, packageIds or workshop links. Nothing changes before you confirm.")));
+  body.append(el("div", "xc-note", T("RimArcho, RimSort, RimCrow, RimPy and RimWorld lists, saves, packs, share codes, packageIds or workshop links. Nothing changes before you confirm.")));
 
   // A selected file is read-only; choosing another file starts another preview.
   const file = section(body, T("from a file"));
@@ -147,8 +170,8 @@ function importSource(body) {
     fieldError(pick, result, () => result.dataset.fieldError === "file");
     pick.onclick = async () => {
       let f = "";
-      try { f = await api.PickImportFile(); } catch (e) { return say("fail", errText(e)); }
-      if (f && S.screen === "plan-import") { path.textContent = f; editablePath(copyablePath(path, f), () => pick.click(), true); preview("file", f); }
+      try { f = await api.PickAnyImport(); } catch (e) { return say("fail", errText(e)); }
+      if (f && S.screen === "plan-import") { path.textContent = f; editablePath(copyablePath(path, f), () => pick.click(), true); openPicked(f); }
       else if (!info.dialogs) fileInput.click();
     };
     const fileInput = el("input"); fileInput.type = "file"; fileInput.hidden = true;
@@ -164,7 +187,7 @@ function importSource(body) {
   const paste = section(body, T("paste"));
   const ta = el("textarea", "xc-text");
   ta.spellcheck = false;
-  ta.placeholder = T("a list from RimSort or RimCrow, a share code (RC-…), a Rentry link, or a Steam Workshop collection link");
+  ta.placeholder = T("a list from RimSort, RimCrow or RimPy, a share code (RC-…), a Rentry link, or a Steam Workshop collection link");
   ta.value = pasted;
   fieldError(ta, result, () => result.dataset.fieldError === "text");
   ta.oninput = () => { pasted = ta.value; };
@@ -187,6 +210,8 @@ function importSource(body) {
 
 async function readFile(f) {
   const active = session;
+  // a dropped or browser-picked file has no path: a pack or a database needs the dialog
+  if (/\.(archopack|db)$/i.test(f.name)) return say("fail", T("choose this file with “choose a file…”"));
   try {
     const blob = /\.rws$/i.test(f.name) ? f.slice(0, 4 << 20) : f;
     const text = await blob.text();

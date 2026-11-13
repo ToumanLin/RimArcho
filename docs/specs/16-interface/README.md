@@ -24,6 +24,7 @@ Section numbers run through all of 16. Find the file by number:
 | [2.16-background-tasks](2.16-background-tasks.md) | Background tasks (§2.16) |
 | [2.16.1-scheduled-behavior](2.16.1-scheduled-behavior.md) | Scheduled behavior table (§2.16.1) |
 | [2.17-all-lists](2.17-all-lists.md) | All lists (§2.17) |
+| [2.18-import](2.18-import.md) | Import (§2.18) |
 | [3-interaction-rules](3-interaction-rules.md) | Interaction rules (§3) |
 | [4-details-and-feedback](4-details-and-feedback.md) | Details and description, wording for can it run, confirmation and feedback (§4–6) |
 | [7-visual-design](7-visual-design.md) | Visual design, motion, interface wording (§7) |
