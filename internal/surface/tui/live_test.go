@@ -200,6 +200,7 @@ func TestTopBarLaunchBlocked(t *testing.T) {
 func TestStatusLineAfterGame(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
+	e.AddEnv(false) // a game ran, so there is one (with none, @ does nothing: noGameKey)
 	m := direct(t, e, 160, 40)
 	m.live = &view.Live{}
 	if live, _ := m.liveStatus(); live != "" {

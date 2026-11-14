@@ -241,3 +241,11 @@ func TestManageSavesArgv(t *testing.T) {
 		t.Errorf("list_saves → %q", got)
 	}
 }
+
+// get_save mod=<ref> is saves show --mod: can that Mod be removed (12 §4.7).
+func TestGetSaveModArgv(t *testing.T) {
+	got := mcp.GetSaveArgv(mcp.GetSaveIn{Save: "Tundra 2", Mod: "tester.alpha"})
+	if !slices.Equal(got, []string{"saves", "show", "Tundra 2", "--mod", "tester.alpha"}) {
+		t.Fatalf("%q", got)
+	}
+}

@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"os"
 	"strings"
@@ -107,7 +108,9 @@ func TestMaintenanceBusySpaceAndCancellation(t *testing.T) {
 					t.Fatal(err)
 				}
 				defer external.Close()
-				tx, err := external.DB.Begin()
+				// a reader's transaction is read only: one that may write takes the write
+				// lock when it begins (_txlock=immediate)
+				tx, err := external.DB.BeginTx(context.Background(), &sql.TxOptions{ReadOnly: mode == "reader"})
 				if err != nil {
 					t.Fatal(err)
 				}

@@ -47,8 +47,11 @@
   "Proton does not support separate saves folders yet": "Proton は独立したセーブフォルダーにまだ対応していません",
   "own folder in RimArcho": "RimArcho 内の専用フォルダー",
   "these two Game Configs use the same game folder: %s": "次のゲーム構成は同じゲームフォルダーを使用しています: %s",
+  "got it": "了解",
+  "x: got it, don't show this again": "x: 了解、今後は表示しない",
   "%d other Game Configs use this folder and will change too: %s": "他の %d 個のゲーム構成もこのフォルダーを使用しており、同時に変更されます: %s",
   "only Game Config %s changes game folder; other Game Configs stay": "ゲーム構成 %s のゲームフォルダーだけを変更します。他のゲーム構成はそのままです",
+  "no other Game Config uses %s: its %d Mod inventory records and analysis are removed; no files are deleted": "%s を使う他のゲーム構成はありません: その %d 件の Mod 在庫記録と分析を削除します。ファイルは削除しません",
   "add a Game Config: archo env add <name> --game <folder> --saves own (or --like <config>)": "ゲーム構成を追加: archo env add <name> --game <folder> --saves own（または --like <config>）",
   "a command, a mod, a Game Config": "コマンド、Mod、ゲーム構成",
   "lists, Game Configs": "リスト、ゲーム構成",
@@ -94,6 +97,7 @@
   "enter a Game Config name": "ゲーム構成の名前を入力してください",
   "game defaults": "ゲームの既定",
   "game defaults; no settings or saves are copied": "ゲームの既定設定を使います。設定とセーブはコピーしません",
+  "%s uses another game folder, so its settings cannot be copied; no settings or saves are copied": "%s は別のゲームフォルダを使っているため、その設定はコピーできません。設定とセーブはコピーしません",
   "which game is this Game Config for?": "このゲーム構成はどのゲームを使いますか？",
   "has a Game Config": "ゲーム構成あり"
 }

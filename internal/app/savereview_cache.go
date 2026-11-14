@@ -8,9 +8,11 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/analyze"
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/savefile"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
@@ -79,9 +81,11 @@ func (cache *reviewCatalogs) load(a *App, key string) (*reviewCatalog, error) {
 func (cache *reviewCatalogs) get(a *App, sv *Save, mods []SaveMod, src *defSource) (*reviewCatalog, error) {
 	oldMM := a.Store.MM
 	defer func() { a.Store.MM = oldMM }()
-	if sv.Env != nil {
-		a.Store.MM = env.MajorMinor(sv.Env.GameVersion)
+	mm, err := a.reviewMM(sv)
+	if err != nil {
+		return nil, err
 	}
+	a.Store.MM = mm
 	active := map[string]bool{}
 	for _, pkg := range sv.Head.ModIDs {
 		active[normPkg(pkg)] = true
@@ -141,14 +145,19 @@ func (cache *reviewCatalogs) get(a *App, sv *Save, mods []SaveMod, src *defSourc
 	return c, nil
 }
 
-// ReviewInputKey validates both persistent attributions and the GUI's kept pages.
+// ReviewInputKey is what every save's kept attribution rests on: the versions of the
+// parser, the Def extractor and the review, the installed copies and their analysed Defs
+// (Store.ReviewContentKey) and the packs' manifests. What a save's Mods resolve to beyond
+// that (its Game Config, game version and list) is the save's own context
+// (reviewContext), so the Game Config shown and the lists edited do not touch the saves
+// that do not load them (12 §3.4).
 func (a *App) ReviewInputKey() (string, error) {
 	key, err := a.Store.ReviewContentKey()
 	if err != nil {
 		return "", err
 	}
 	h := sha256.New()
-	fmt.Fprintf(h, "%d %d %d %s %q %d %q\n", reviewCacheVersion, savefile.ParserVersion, analyze.DefContentVersion, key, a.EnvName, a.OpenPlan, a.GameVersion)
+	fmt.Fprintf(h, "%d %d %d %s\n", reviewCacheVersion, savefile.ParserVersion, analyze.DefContentVersion, key)
 	// Pack entries select different installed copies from the library registry.
 	ents, err := os.ReadDir(a.PacksDir())
 	if err != nil && !os.IsNotExist(err) {
@@ -166,13 +175,109 @@ func (a *App) ReviewInputKey() (string, error) {
 	return fmt.Sprintf("review%d:%x", reviewCacheVersion, h.Sum(nil)), nil
 }
 
-func (a *App) reviewSave(sv *Save, read bool, input string, src *defSource, catalogs *reviewCatalogs) (*reviewSaveResult, bool, error) {
-	// The matcher may choose another environment when launches or plans change.
-	context := ""
-	if sv.Env != nil {
-		context = sv.Env.ID + "|" + sv.Env.GameVersion
+// ReviewContextKey is the context a save without a Game Config or list of its own is
+// attributed in: the current Game Config, game version and open list. The window keys
+// its kept pages by it.
+func (a *App) ReviewContextKey() (string, error) {
+	return a.reviewContext(&Save{}, map[int64]string{})
+}
+
+// ReviewSavesContextKey is the contexts of every save of cols together (reviewContext):
+// a kept review page is current only while none of them changed, including a list that
+// is not the current one but that some listed save is attributed under.
+func (a *App) ReviewSavesContextKey(cols []*Colony) (string, error) {
+	h := sha256.New()
+	lists := map[int64]string{}
+	for _, c := range cols {
+		for _, sv := range c.Saves {
+			k, err := a.reviewContext(sv, lists)
+			if err != nil {
+				return "", err
+			}
+			fmt.Fprintln(h, k)
+		}
 	}
-	key := input + "|" + context + "|" + sv.Pack
+	return fmt.Sprintf("%x", h.Sum(nil)[:12]), nil
+}
+
+// reviewContext names what a save's Mods resolve with besides ReviewInputKey: the Game
+// Config and game version it is attributed in (its own, or the current one), the list
+// whose copies RimArcho deploys there (by the copies it names, not their order) and its
+// pack. lists memoizes the lists' copies within one review.
+func (a *App) reviewContext(sv *Save, lists map[int64]string) (string, error) {
+	var out string
+	err := a.inSaveList(sv, func() error {
+		e, err := a.Env()
+		if err != nil {
+			return err
+		}
+		mm, err := a.reviewMM(sv)
+		if err != nil {
+			return err
+		}
+		plan, err := a.planFor(e.ID)
+		if err != nil {
+			return err
+		}
+		var id int64
+		if plan != nil {
+			id = plan.ID
+			if _, ok := lists[id]; !ok {
+				ws, err := a.Store.Workspace(id)
+				if err != nil {
+					return err
+				}
+				var insts []string
+				if ws != nil {
+					for _, en := range loadout.Decode(ws.Entries) {
+						if en.Instance != "" {
+							insts = append(insts, en.Instance)
+						}
+					}
+				}
+				sort.Strings(insts)
+				lists[id] = fmt.Sprintf("%x", sha256.Sum256([]byte(strings.Join(slices.Compact(insts), "\n"))))
+			}
+		}
+		out = fmt.Sprintf("%s|%s|%d|%s|%s", e.ID, mm, id, lists[id], sv.Pack)
+		return nil
+	})
+	return out, err
+}
+
+// reviewMM is the game version whose analysis a save's catalog reads: its Game Config's,
+// or for a save of none the version the current one reads (LoadoutState.GameMM).
+func (a *App) reviewMM(sv *Save) (string, error) {
+	if sv.Env != nil {
+		return env.MajorMinor(sv.Env.GameVersion), nil
+	}
+	if a.GameVersion != "" {
+		return env.MajorMinor(a.GameVersion), nil
+	}
+	e, err := a.Env()
+	if err != nil {
+		return "", err
+	}
+	return env.MajorMinor(e.GameVersion), nil
+}
+
+// reviewRun is what one SaveReview shares between its saves.
+type reviewRun struct {
+	input    string
+	src      *defSource
+	catalogs *reviewCatalogs
+	lists    map[int64]string // reviewContext's memo
+	tidied   bool             // obsolete review rows are dropped before the run's first write
+}
+
+func (a *App) reviewSave(sv *Save, read bool, run *reviewRun) (*reviewSaveResult, bool, error) {
+	// The matcher may choose another environment when launches or plans change.
+	context, err := a.reviewContext(sv, run.lists)
+	if err != nil {
+		return nil, false, err
+	}
+	key := run.input + "|" + context
+	src, catalogs := run.src, run.catalogs
 	if !sv.Writing && sv.Head != nil {
 		b, err := a.Store.SaveReviewCache(saveKey(sv), sv.Size, sv.ModTime.UnixNano(), savefile.ParserVersion, key)
 		if err != nil {
@@ -219,6 +324,15 @@ func (a *App) reviewSave(sv *Save, read bool, input string, src *defSource, cata
 		b, err := json.Marshal(out)
 		if err != nil {
 			return nil, false, err
+		}
+		if !run.tidied {
+			// Old rows duplicated full catalogs. Drop that format even for saves outside
+			// this request, while retaining their reusable L1 facts; only a review that
+			// writes does, so one that only merges kept rows writes nothing.
+			if err := a.Store.PruneSaveReviewFormat(fmt.Sprintf("review%d:", reviewCacheVersion)); err != nil {
+				return nil, false, err
+			}
+			run.tidied = true
 		}
 		err = a.Store.PutSaveReviewCache(&store.SaveReviewCache{Path: saveKey(sv), Size: sv.Size, MTime: sv.ModTime.UnixNano(), Parser: savefile.ParserVersion, InputKey: key, Result: b, CatalogKey: catalog.key, Catalog: catalog.raw})
 		if err != nil {

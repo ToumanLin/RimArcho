@@ -43,12 +43,13 @@ type GetSaveIn struct {
 	Mods    bool   `json:"mods,omitempty" jsonschema:"all Mods"`
 	Play    bool   `json:"play,omitempty" jsonschema:"all colonists and events"`
 	Content bool   `json:"content,omitempty" jsonschema:"content by Mod"`
+	Mod     string `json:"mod,omitempty" jsonschema:"a Mod"`
 	All     bool   `json:"all,omitempty" jsonschema:"no truncation"`
 }
 
 // GetSaveArgv maps get_save.
 func GetSaveArgv(in GetSaveIn) []string {
-	return argv("saves", "show", in.Save).flag("mods", in.Mods).flag("play", in.Play).flag("content", in.Content).flag("all", in.All).a
+	return argv("saves", "show", in.Save).flag("mods", in.Mods).flag("play", in.Play).flag("content", in.Content).str("mod", in.Mod).flag("all", in.All).a
 }
 
 // ManageSavesIn is manage_saves.

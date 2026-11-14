@@ -1,6 +1,8 @@
 package app_test
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -193,7 +195,10 @@ func TestModSettingsWindow(t *testing.T) {
 	if out := e.MustRun("mod-settings"); strings.Contains(out, "B window") {
 		t.Fatalf("before any window:\n%s", out)
 	}
-	windows := `{"timestamp":"2026-11-03 10:05:00.000","level":"INFO","message":"[Archo Monitor] settings window A settings","details":"","count":1,"context":{"window":{"packageId":"tester.a","folder":"1001","class":"AMod","file":"Mod_1001_AMod.xml","title":"A settings","full":true,"controls":[{"kind":"label","label":"General"},{"kind":"checkbox","label":"Raids","value":"False"},{"kind":"slider","label":"Scale","value":"0.75","min":"0","max":"2"},{"kind":"button","label":"Reset"},{"kind":"text","label":"Search:","value":""}]}},"source":"archo-monitor","schema":1,"kind":"settings-window"}` + "\n" +
+	// the file as A's window opened (Monitor's fileHash)
+	opened := `<?xml version="1.0" encoding="utf-8"?><SettingsBlock><ModSettings Class="AMod"><raids>False</raids></ModSettings></SettingsBlock>`
+	sum := sha256.Sum256([]byte(opened))
+	windows := `{"timestamp":"2026-11-03 10:05:00.000","level":"INFO","message":"[Archo Monitor] settings window A settings","details":"","count":1,"context":{"window":{"packageId":"tester.a","folder":"1001","class":"AMod","file":"Mod_1001_AMod.xml","title":"A settings","full":true,"fileHash":"sha256:` + hex.EncodeToString(sum[:]) + `","controls":[{"kind":"label","label":"General"},{"kind":"checkbox","label":"Raids","value":"False"},{"kind":"slider","label":"Scale","value":"0.75","min":"0","max":"2"},{"kind":"button","label":"Reset"},{"kind":"text","label":"Search:","value":""}]}},"source":"archo-monitor","schema":1,"kind":"settings-window"}` + "\n" +
 		`{"timestamp":"2026-11-03 10:06:00.000","level":"INFO","message":"[Archo Monitor] settings window B window","details":"","count":1,"context":{"window":{"packageId":"tester.b","folder":"B","class":"BMod","file":"Mod_B_BMod.xml","title":"B window","full":false,"controls":[{"kind":"text","label":"Name","value":"Bob"}]}},"source":"archo-monitor","schema":1,"kind":"settings-window"}` + "\n"
 	e.WriteFile(log, session+windows)
 	out := e.MustRun("mod-settings", "pkg:tester.a")
@@ -208,23 +213,29 @@ func TestModSettingsWindow(t *testing.T) {
 	if strings.Contains(out, "changed since") {
 		t.Fatalf("no file yet, nothing changed since:\n%s", out)
 	}
-	// the file written after the window was seen (a value changed in that opening): the
-	// window's values may be out of date
+	// closing the window writes the file again (Dialog_ModSettings.PreClose): with the same
+	// values it is the same file, however new its time
 	cfg := filepath.Join(e.UserData, "Config", "Mod_1001_AMod.xml")
-	e.WriteFile(cfg, `<?xml version="1.0" encoding="utf-8"?><SettingsBlock><ModSettings Class="AMod"><raids>True</raids></ModSettings></SettingsBlock>`)
+	e.WriteFile(cfg, opened)
 	seen := time.Date(2026, 11, 3, 10, 5, 0, 0, time.Local)
-	if err := os.Chtimes(cfg, seen.Add(-time.Minute), seen.Add(-time.Minute)); err != nil {
-		t.Fatal(err)
-	}
-	if out := e.MustRun("mod-settings", "pkg:tester.a"); strings.Contains(out, "changed since") {
-		t.Fatalf("a file older than the window:\n%s", out)
-	}
 	if err := os.Chtimes(cfg, seen.Add(time.Minute), seen.Add(time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	if out := e.MustRun("mod-settings", "pkg:tester.a"); !strings.Contains(out, "changed since: the values stored in the file are the current ones") {
-		t.Fatalf("a file written after the window:\n%s", out)
+	if out := e.MustRun("mod-settings", "pkg:tester.a"); strings.Contains(out, "changed since") {
+		t.Fatalf("a file rewritten with the same values:\n%s", out)
 	}
+	// a value changed in that opening (or here): the window's values may be out of date
+	e.WriteFile(cfg, strings.Replace(opened, "False", "True", 1))
+	if out := e.MustRun("mod-settings", "pkg:tester.a"); !strings.Contains(out, "changed since: the values stored in the file are the current ones") {
+		t.Fatalf("a value changed since the window:\n%s", out)
+	}
+	// a record without the hash (Monitor before 0.11.1) cannot tell: never changed since
+	cfgB := filepath.Join(e.UserData, "Config", "Mod_B_BMod.xml")
+	e.WriteFile(cfgB, `<?xml version="1.0" encoding="utf-8"?><SettingsBlock><ModSettings Class="BMod"><name>Al</name></ModSettings></SettingsBlock>`)
+	if out := e.MustRun("mod-settings", "pkg:tester.b"); strings.Contains(out, "changed since") {
+		t.Fatalf("a record without a hash:\n%s", out)
+	}
+	os.Remove(cfgB)
 	// the next run rotates the log away: the window stays
 	e.WriteFile(filepath.Join(e.UserData, "ArchoMonitor-prev.log"), "")
 	e.WriteFile(log, strings.ReplaceAll(session, "0123456789ab", "ba9876543210"))

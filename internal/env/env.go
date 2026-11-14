@@ -138,19 +138,16 @@ func ModsConfigPath(userDataRoot string) string {
 	return filepath.Join(userDataRoot, "Config", "ModsConfig.xml")
 }
 
-// PlayerLog locates Player.log per 03 §3.3: 1.7+ uses Logs/, older versions the root;
-// with an unknown version both are checked and the newest wins. Returns "" if none exists.
+// PlayerLog locates Player.log per 03 §3.3: 1.7+ uses Logs/, older versions the root.
+// For 1.7+ and an unknown version both are checked and the newest wins: a launch with
+// its own user data folder writes <root>/Player.log (-logfile, 03 §6.3) in every version.
+// Returns "" if none exists.
 func PlayerLog(userDataRoot, gameVersion string) string {
 	newer := filepath.Join(userDataRoot, "Logs", "Player.log")
 	older := filepath.Join(userDataRoot, "Player.log")
-	var cands []string
-	switch mm := MajorMinor(gameVersion); {
-	case mm == "":
-		cands = []string{newer, older}
-	case VersionLess(mm, "1.7"):
+	cands := []string{newer, older}
+	if mm := MajorMinor(gameVersion); mm != "" && VersionLess(mm, "1.7") {
 		cands = []string{older}
-	default:
-		cands = []string{newer}
 	}
 	best, bestT := "", time.Time{}
 	for _, c := range cands {

@@ -1862,8 +1862,10 @@ func (s *API) EnvGameChangePreview(name, path string) ([]string, error) {
 	return lines, nil
 }
 
+// AcknowledgeAliasNotice: the player dismissed the shared-game-folder notice on the Game
+// Config page ("got it"); drawing the notice does not call it.
 func (s *API) AcknowledgeAliasNotice() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.a.Store.SetMeta("notice.shared-game-folder", "seen")
+	return s.a.AcknowledgeAliasNotice()
 }

@@ -44,10 +44,20 @@ func shortHashes(names []string) map[uint16]string {
 type gridResult struct {
 	refs map[string]map[string]int // Def type → defName → cells: typed references
 	left map[string]int            // grid Def type → distinct hashes no Def could be given
-	// may are the copies defining something a grid of each type can hold: with hashes left
-	// of that type, one of them may be theirs.
+	// may are, by grid Def type, the copies a hash left of that type may belong to: those
+	// defining terrain (TerrainDef, TerrainTemplateDef) or biomes in their Def files, which
+	// may have had a Def under another name or had one added by a Patch; and for
+	// compressed things the copies with a compressible Def whose own hash is at most
+	// gridReach places before a hash left, which a Def not seen here may have pushed on.
+	// Natural rock does not make a copy one for terrain: its stone floors are named from
+	// the rock, and a rock under another name leaves a compressed thing unnamed as well.
 	may map[string]map[string]bool
 }
+
+// gridReach is how far a compressible Def's hash may have been pushed on by Defs not seen
+// here (the game's generated ThingDefs) and still be taken for a hash left of compressed
+// things: past the three places naming tries.
+const gridReach = 16
 
 // gridThings are the ThingDefs of the save's Mods, read once for what the grids need.
 type gridThings struct {
@@ -160,7 +170,7 @@ func (a *App) gridRefs(f *savefile.Facts, insts []string, active func(string) bo
 			own[n] = true
 		}
 		implied := map[string][2]string{} // generated defName → the reference it stands for
-		for n, to := range impliedTerrain(&t, active, names["TerrainTemplateDef"], names["ColorDef"], may) {
+		for n, to := range impliedTerrain(&t, active, names["TerrainTemplateDef"], names["ColorDef"]) {
 			if !own[n] { // a Def file has it: that one is loaded
 				implied[n] = to
 				list = append(list, n)
@@ -187,6 +197,7 @@ func (a *App) gridRefs(f *savefile.Facts, insts []string, active func(string) bo
 		var list []string
 		comp := map[string]bool{}
 		base := map[uint16][]string{}
+		owners := map[uint16][]string{} // a compressible Def's own hash → the copies defining it
 		for i := range t.all {
 			d := &t.all[i]
 			if d.Abstract || d.DefName == "" || !d.Loaded(active) {
@@ -194,7 +205,8 @@ func (a *App) gridRefs(f *savefile.Facts, insts []string, active func(string) bo
 			}
 			list = append(list, d.DefName)
 			if t.inherits(d, building("isNaturalRock")) || t.inherits(d, chunk) {
-				may("ThingDef", d.Instance)
+				h := defShortHash(d.DefName)
+				owners[h] = append(owners[h], d.Instance)
 				if !comp[d.DefName] {
 					comp[d.DefName] = true
 					base[defShortHash(d.DefName)] = append(base[defShortHash(d.DefName)], d.DefName)
@@ -214,6 +226,11 @@ func (a *App) gridRefs(f *savefile.Facts, insts []string, active func(string) bo
 			}
 			if n == "" {
 				g.left["ThingDef"]++
+				for back := uint16(0); back <= gridReach; back++ {
+					for _, inst := range owners[h-back] {
+						may("ThingDef", inst)
+					}
+				}
 				continue
 			}
 			add("ThingDef", n, k)
@@ -231,14 +248,13 @@ func (a *App) gridRefs(f *savefile.Facts, insts []string, active func(string) bo
 //     (TerrainDefGenerator_Carpet): the template's defName followed by the ColorDef's without
 //     "Structure_", attributed to the template. A colour's type is not in the facts, so the
 //     structure colours are taken to be the ColorDefs named "Structure_…", as the game's are.
-func impliedTerrain(t *gridThings, active func(string) bool, templates, colours []string, may func(typ, inst string)) map[string][2]string {
+func impliedTerrain(t *gridThings, active func(string) bool, templates, colours []string) map[string][2]string {
 	out := map[string][2]string{}
 	for i := range t.all {
 		d := &t.all[i]
 		if d.Abstract || d.DefName == "" || !d.Loaded(active) || !t.inherits(d, building("isNaturalRock")) || t.inherits(d, building("isResourceRock")) {
 			continue
 		}
-		may("TerrainDef", d.Instance)
 		for _, suffix := range []string{"_Rough", "_RoughHewn", "_Smooth"} {
 			out[d.DefName+suffix] = [2]string{"TerrainDef", d.DefName + suffix}
 		}

@@ -23,6 +23,10 @@ func TestGoldenSavesContent(t *testing.T) {
 		act(func(e *testkit.Env) { e.MustRun("analyze") }),
 		cmd("saves", "show", "Content", "--content"),
 		cmd("saves", "show", "Content", "--content", "--all"),
+		// can I remove this Mod? by packageId, by name, and one the save does not have
+		cmd("saves", "show", "Content", "--mod", "tester.content"),
+		cmd("saves", "show", "Content", "--mod", "Core"),
+		cmd("saves", "show", "Content", "--mod", "tester.nothere"),
 	})
 }
 
@@ -80,5 +84,21 @@ func TestSaveContentTextBudget(t *testing.T) {
 	text = e.MustRun("saves", "show", "Many", "--content", "--all")
 	if !strings.Contains(text, "Content44: 1 recipe") {
 		t.Fatalf("--all omitted Mods:\n%s", text)
+	}
+}
+
+// --mod answers for a save that has only game content too (no "removing a Mod" split).
+func TestSavesShowModGameOnly(t *testing.T) {
+	e := testkit.New(t)
+	e.WriteFile(filepath.Join(e.Game, "Data", "Core", "Defs", "Content.xml"), `<Defs><ThingDef><defName>Gun</defName><category>Item</category><tools><li/></tools></ThingDef></Defs>`)
+	mods := []string{"ludeon.rimworld"}
+	e.WriteModsConfig("1.6.4633 rev1261", mods...)
+	e.AddEnv(false)
+	e.MustRun("scan")
+	e.MustRun("analyze")
+	e.WriteSave("Plain.rws", testkit.SaveSpec{Mods: mods, Body: `<things><li><def>Gun</def></li></things>`})
+	text := e.MustRun("saves", "show", "Plain", "--mod", "ludeon.rimworld")
+	if !strings.Contains(text, "Core (ludeon.rimworld): part of the game") {
+		t.Fatalf("no verdict for the game's own Mod:\n%s", text)
 	}
 }

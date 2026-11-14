@@ -84,7 +84,11 @@ func TestLegacyAliasNoticeAndProtonAdd(t *testing.T) {
 	if len(page.Notices) != 1 || !strings.Contains(page.Notices[0], "legacy, main") {
 		t.Fatalf("notices: %+v", page.Notices)
 	}
-	if err := e.App.Store.SetMeta("notice.shared-game-folder", "seen"); err != nil {
+	// building (drawing) the page is not reading the notice; acknowledging it is
+	if again := view.BuildEnvPage(e.App, nil); len(again.Notices) != 1 {
+		t.Fatal("alias notice gone before it was acknowledged")
+	}
+	if err := e.App.AcknowledgeAliasNotice(); err != nil {
 		t.Fatal(err)
 	}
 	if again := view.BuildEnvPage(e.App, nil); len(again.Notices) != 0 {

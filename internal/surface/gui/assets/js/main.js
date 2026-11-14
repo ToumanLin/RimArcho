@@ -348,9 +348,9 @@ function manageCurrent() {
 
 let lastList = 1;
 
-// The sidebar's entries in shift+1–8 order, Playing then Library (16 §3.5; view.Nav).
-// "plan" is list: like a click on it, the current list (16 §2.1).
-const NAV = ["home", "needs", "log", "plan", "packs", "library", "textures", "env"];
+// The sidebar entry with shift+n (16 §3.5): view.Nav numbers them, so the keys follow the
+// sidebar. "plan" is list: like a click on it, the current list (16 §2.1).
+const navAt = (n) => ((S.shell && S.shell.nav) || []).flatMap((g) => g.items || []).find((it) => it.key === "shift+" + n)?.id;
 const navTarget = (id) => id !== "plan" ? id : ((S.shell && S.shell.plans) || []).find((p) => p.current)?.page || "plans";
 
 // renderWhere: the position line (16 §3.2), the sidebar and the breadcrumb.
@@ -965,7 +965,7 @@ async function cmd(id) {
     case "tech": return verb("full");
     case "tags": return verb("tags");
     case "cli": return commandLine();
-    case "import": return S.screen === "plans" ? planManage.newList("import") : exchange(0);
+    case "import": return S.screen === "plans" ? planManage.newList("import") : exchange();
     case "export": return exportCurrent();
     case "help": return pop.help(S.screen || "plan");
     case "quit": return window.close();
@@ -1005,7 +1005,9 @@ async function useEnv(name) {
 async function refreshEnvironment() {
   S.screenSeq++;
   if (!S.screen) return openPage("plan");
-  if (S.screen && S.screen !== "guide") await openPage(S.screen);
+  // the guide is not reopened (that would restart it); Add Game Config rereads its choices
+  if (S.screen === "guide") await guide.envChanged();
+  else await openPage(S.screen);
 }
 
 function commandLine() {
@@ -1233,7 +1235,8 @@ function onKey(e) {
   const dig = /^Digit([1-9])$/.exec(e.code || "");
   if (dig && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
     e.preventDefault();
-    if (NAV[+dig[1] - 1]) go(navTarget(NAV[+dig[1] - 1]));
+    const id = navAt(dig[1]);
+    if (id) go(navTarget(id));
     return;
   }
   // tab / shift+tab move the focus on every page, as on a web page (16 §3.5); sub-pages are
@@ -1355,7 +1358,7 @@ function onKey(e) {
     S: () => run("sort"), w: () => run("save"), L: () => goLaunch(), u: () => verb("undo"), T: () => verb(S.focus === 2 ? "restore-all" : "stage-all"),
     "/": () => startSearch(), "\\": () => S.bar.toggle(), c: () => go("changes"), l: () => go("log"), R: () => cmd("rescan"), A: () => cmd("analyze"),
     H: () => historyChooser(), C: () => changesOfCursor(), "<": () => widthKey(-1), ">": () => widthKey(1), "=": () => widthKey(0),
-    E: () => go("env"), P: () => plans.chooser(), "?": () => pop.help("plan"), ":": () => commandLine(), i: () => exchange(0), e: () => exportCurrent(),
+    E: () => go("env"), P: () => plans.chooser(), "?": () => pop.help("plan"), ":": () => commandLine(), i: () => exchange(), e: () => exportCurrent(),
     r: () => startRule(actionContext().sel[0]), v: () => switchView(),
   };
   // shift+letter is the capital letter even where the key reports it in lower case
@@ -1427,7 +1430,7 @@ const ui = {
   duplicateList: (id) => planManage.duplicate(id),
   selectedList: () => planManage.selected(),
   resumeGuide: () => guide.resume(),
-  importManagers: () => exchange(true),
+  importManagers: () => exchange(),
   manageLists: (id = 0) => { planManage.select(id); return go("plans"); },
   edited: (call, undoable = true) => edited(call, undoable),
   ruleTarget: () => actionContext().sel[0],
@@ -1511,7 +1514,7 @@ async function start() {
   // the enabled list's head: import / export
   $("#board").addEventListener("click", (e) => {
     const b = e.target.closest(".head [data-cmd]");
-    if (b) { e.stopPropagation(); b.dataset.cmd === "exchange" ? exchange(0) : run(b.dataset.cmd); }
+    if (b) { e.stopPropagation(); b.dataset.cmd === "exchange" ? exchange() : run(b.dataset.cmd); }
   });
   $(".detail .scroll").addEventListener("scroll", () => { if (S.focus === 3) renderWhere(); }, { passive: true });
   $(".detail").addEventListener("mousedown", () => focusArea(3));
@@ -1539,8 +1542,10 @@ async function start() {
     if (!S.screen && ["subscribe", "subscription-from", "subscription-check", "subscription-update", "subscription-remove"].includes(e.detail?.kind)) reload();
   });
   // Menu art is prepared after the first draw, outside the task page (16 §2.14).
+  // The launch page hears it on every page: one that comes before its first read may be
+  // newer than the backdrop read at start.
   on("backgrounds", () => {
-    if (S.screen === "home") homePage.backgroundChanged();
+    homePage.backgroundChanged();
     if (S.screen === "settings") refreshBackgrounds();
   });
   // a task's o on a mod: Mod library searching for it (16 §2.16)
@@ -1590,6 +1595,9 @@ async function start() {
     if (first) { homePage.forgetEarly(); await guide.start("first"); }
     else await go("home");
   } catch (e) { failed(e); }
+  // A first page that did not read the launch page (the guide, a lock, a failure) leaves the
+  // start's reads unused: a later visit reads afresh instead of drawing that old snapshot.
+  homePage.forgetEarly();
   bootDone();
   shell.settle();
   requestAnimationFrame(() => api.Ready().catch(() => {}));
@@ -1615,19 +1623,26 @@ async function goHistory(h) {
   await reload();
 }
 
+// liveShown: what the launch page shows of the live state besides its items: whether a game
+// runs, and whose (the TUI's liveKey also counts owner and blocked).
+// No game is the same before the first poll and after it, so that poll redraws nothing.
+const liveShown = (l) => (l && (l.running || l.blocked) ? JSON.stringify([!!l.running, l.blocked || "", l.owner || ""]) : "");
+
 // pollLive follows the running game every two seconds (16 §2.1): its errors lead Can it run
 // (and its badge), Start says it runs, and launching waits until it exits (09 §4). A new
 // Player.log (the game exited, or ran without RimArcho) is read once when it appears.
 async function pollLive() {
   try {
     const l = await api.Live();
-    const before = JSON.stringify(S.live && S.live.items);
+    const before = JSON.stringify(S.live && S.live.items), shown = liveShown(S.live);
     const was = !!(S.live && S.live.running), hadNew = !!(S.live && S.live.newLog);
     S.live = l;
     if (l.newLog && !hadNew) readNewLog();
     if (JSON.stringify(l.items) !== before) { scr.liveChanged(); shell.sync(); }
     if (l.running) scr.logLive();
-    if (was !== !!l.running) { homePage.liveChanged(); savesPage.liveChanged(!!l.running); }
+    // the launch block also says whose game runs: another Game Config's (blocked) or ours
+    if (shown !== liveShown(l)) homePage.liveChanged();
+    if (was !== !!l.running) savesPage.liveChanged(!!l.running);
     // the game exited: a session that used SteamCMD mods may make a credit question due;
     // an open Can it run reads again, so the full analysis of the run replaces its items
     // (06 §6; VM run 2026-10-28: it kept the run's mid-way time and items)

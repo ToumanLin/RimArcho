@@ -21,6 +21,7 @@ func init() {
 	register(&Command{Name: "saves show", Args: "<save>", Summary: "one save: where it belongs, can it load (each issue with its fix), how its Mods differ from the list, the playthrough", MinArgs: 1, MaxArgs: 1,
 		Flags: []Flag{{Name: "mods", Help: "the save's whole Mod list"}, {Name: "play", Help: "the whole playthrough: every colonist, event and stat"},
 			{Name: "content", Help: "content references by Mod and category, with coverage limits"},
+			{Name: "mod", Value: "<ref>", Help: "what removing this Mod costs the save, why, and which of its Mods need it (implies --content)"},
 			{Name: "current", Help: "check against the current game's current list instead of the list the save matched"},
 			{Name: "all", Help: "no truncation"}}, Run: savesShow})
 	register(&Command{Name: "saves review", Summary: "playthrough review: what the installed Mods add, by category, and how much of it the saves show", MaxArgs: 0,
@@ -584,12 +585,18 @@ func savesShow(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	root.KV("saved", saveTime(c, s)+", "+render.Size(s.Size))
 	root.KV("read", readText(facts, s, ferr))
-	if a.Bool("content") {
+	if a.Bool("content") || a.Str("mod") != "" {
 		content, err := c.App.SaveContent(own)
 		if err != nil {
 			return nil, err
 		}
-		addSaveContent(root, content, all, showRef(own), showLines-docLines(d))
+		var pick []app.SaveNeed
+		if ref := a.Str("mod"); ref != "" && content.Read {
+			if pick, err = saveNeedsOf(c, content.Needs, ref); err != nil {
+				return nil, err
+			}
+		}
+		addSaveContent(root, content, all, showRef(own), showLines-docLines(d), pick)
 		return d, nil
 	}
 

@@ -62,3 +62,51 @@ sv:<Content.rws> Content  [loads with the list]
     Past events are read from the storyteller's record of what it fired; finished quests and past storytellers may leave nothing.
     The original ScenarioDef cannot usually be recovered from a save's scenario name and parts.
 
+$ archo saves show Content --mod tester.content
+sv:<Content.rws> Content  [loads with the list]
+  colony: Content (1 save)
+  game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
+  list: plan:default (same Mods as one of its versions)
+  file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Content.rws
+  saves of: env:main
+  saved: 2026-10-01 09:59, 617 B
+  read: in full
+  content: 5 distinct names; sources use installed Mod versions
+  totals: 1 faction, 1 humanlike race, 1 weapon, 1 recipe
+  removing a Mod: 1 breaks the save
+  Content Mod (tester.content): breaks the save
+    why: the save may not load without it
+    holds: 1 faction, 1 recipe
+  source not found: 1 name
+  limits:
+    Patch-added Defs and Patch changes to existing Defs are not reflected.
+    Terrain and biomes are read from the maps' and the world's grids by Def hash; so are rock, ore and chunks, less surely.
+    Past events are read from the storyteller's record of what it fired; finished quests and past storytellers may leave nothing.
+    The original ScenarioDef cannot usually be recovered from a save's scenario name and parts.
+
+$ archo saves show Content --mod Core
+sv:<Content.rws> Content  [loads with the list]
+  colony: Content (1 save)
+  game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
+  list: plan:default (same Mods as one of its versions)
+  file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Content.rws
+  saves of: env:main
+  saved: 2026-10-01 09:59, 617 B
+  read: in full
+  content: 5 distinct names; sources use installed Mod versions
+  totals: 1 faction, 1 humanlike race, 1 weapon, 1 recipe
+  removing a Mod: 1 breaks the save
+  Core (ludeon.rimworld): part of the game
+    why: always needed
+    holds: 1 humanlike race, 1 weapon
+  source not found: 1 name
+  limits:
+    Patch-added Defs and Patch changes to existing Defs are not reflected.
+    Terrain and biomes are read from the maps' and the world's grids by Def hash; so are rock, ore and chunks, less surely.
+    Past events are read from the storyteller's record of what it fired; finished quests and past storytellers may leave nothing.
+    The original ScenarioDef cannot usually be recovered from a save's scenario name and parts.
+
+$ archo saves show Content --mod tester.nothere
+error: tester.nothere is not one of the save's Mods
+[exit 1]
+

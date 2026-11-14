@@ -103,6 +103,12 @@ func (m *model) homeKey(s string) tea.Cmd {
 		m.tab = tabList
 		return m.requestDetail()
 	case "L", "enter":
+		if why := m.launchRefusal(); why != "" {
+			// the page draws no launch button now; the key does nothing either, and the
+			// editor keeps the list it has open (GUI home.js: running() returns)
+			m.say(sayInfo, why)
+			return nil
+		}
 		if m.launches != "" {
 			// the editor shows another list: launching plays the current one, so the
 			// editor goes back to it first (what plays is what it shows)
@@ -130,6 +136,21 @@ func (m *model) homeKey(s string) tea.Cmd {
 		return m.choosePlan()
 	}
 	return nil
+}
+
+// launchRefusal says why launching is off while a game runs or another Game Config's game
+// blocks it, or "" when L can launch.
+func (m *model) launchRefusal() string {
+	l := m.live
+	switch {
+	case l == nil:
+		return ""
+	case l.Blocked != "":
+		return l.Blocked
+	case l.Running:
+		return Tf("a game is already running (%s)", view.LiveText(l))
+	}
+	return ""
 }
 
 // homeLines draws the page in n lines.
@@ -200,7 +221,7 @@ func (m *model) homeLines(n int) []string {
 			launchLabel, launchStyle = T("launch with limited RAM"), sWarnS
 		}
 	}
-	if m.live != nil && (m.live.Running || m.live.Blocked != "") {
+	if m.launchRefusal() != "" {
 		for _, line := range wrap(view.LiveText(m.live), max(1, m.w-2)) {
 			add("  " + sSecond.Render(line))
 		}
@@ -214,7 +235,10 @@ func (m *model) homeLines(n int) []string {
 }
 
 func (m *model) homePairs() [][2]string {
-	pairs := [][2]string{{"L", T("launch")}}
+	var pairs [][2]string
+	if m.launchRefusal() == "" {
+		pairs = append(pairs, [2]string{"L", T("launch")})
+	}
 	if r := m.homeRow(); r != nil && r.Unsaved > 0 && m.launches == "" {
 		pairs = append(pairs, [2]string{"w", T("save")})
 	}

@@ -156,20 +156,39 @@ function optionList(pop, p, opts, render, pick, input) {
     if (on) owner.setAttribute("aria-activedescendant", on.id); else owner.removeAttribute("aria-activedescendant");
     if (on) on.scrollIntoView({ block: "nearest" });
   };
-  p.redraw = (opts) => { if (opts) { p.opts = opts; p.sel = Math.min(p.sel, Math.max(opts.length - 1, 0)); } draw(); };
+  // the keys pass over disabled options: from `from` toward `step`, the first enabled one,
+  // else the selection stays where it is
+  const enabled = (from, step) => {
+    for (let i = from; i >= 0 && i < p.opts.length; i += step) if (!p.opts[i]?.disabled) return i;
+    return -1;
+  };
+  const moveTo = (i) => { if (i >= 0) p.sel = i; draw(); };
+  p.redraw = (opts) => {
+    if (opts) { p.opts = opts; p.sel = Math.min(p.sel, Math.max(opts.length - 1, 0)); }
+    if (p.opts[p.sel]?.disabled) {
+      const next = enabled(p.sel, 1), back = enabled(p.sel, -1);
+      p.sel = next >= 0 ? next : back >= 0 ? back : p.sel;
+    }
+    draw();
+  };
   p.keys = (e) => {
     if (["ArrowDown", "ArrowRight"].includes(e.key) || (e.key === "Tab" && !p.tab && !e.shiftKey) || (e.ctrlKey && e.key === "n")) {
-      p.sel = Math.min(p.sel + 1, p.opts.length - 1); draw(); e.preventDefault(); return true;
+      moveTo(enabled(p.sel + 1, 1)); e.preventDefault(); return true;
     }
     if (["ArrowUp", "ArrowLeft"].includes(e.key) || (e.key === "Tab" && !p.tab && e.shiftKey) || (e.ctrlKey && e.key === "p")) {
-      p.sel = Math.max(p.sel - 1, 0); draw(); e.preventDefault(); return true;
+      moveTo(enabled(p.sel - 1, -1)); e.preventDefault(); return true;
+    }
+    // Home / End: the first and last enabled options; in a list with a text input they
+    // stay the input's
+    if (!input && (e.key === "Home" || e.key === "End")) {
+      moveTo(e.key === "Home" ? enabled(0, 1) : enabled(p.opts.length - 1, -1)); e.preventDefault(); return true;
     }
     if (e.key === "Tab" && p.tab) { e.preventDefault(); p.tab(); return true; }
     if (e.key === "Enter") { e.preventDefault(); if (p.opts[p.sel]) pick(p.opts[p.sel], p.sel); return true; }
     if (input && document.activeElement !== input) input.focus();
     return false; // typing goes to the input
   };
-  draw();
+  p.redraw();
   if (!input) list.focus({ preventScroll: true, focusVisible: false });
 }
 

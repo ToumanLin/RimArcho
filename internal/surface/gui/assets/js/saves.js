@@ -521,7 +521,7 @@ function loadSection(d) {
     const u = el("div", "sv-unseen");
     u.append(el("span", "t", d.unseen));
     if (d.copyHere) {
-      const b = button(Tf("copy to the saves of %s", d.copyHere), "", () => copyHere(d), "small");
+      const b = button(Tf("copy to the saves of %s", d.copyHere), "", () => copyHere(d), "small", "save-copy-to");
       b.dataset.key = "copy-here";
       b.title = T("copies only the save file; Mods, lists and settings stay as they are");
       u.append(b);
@@ -742,13 +742,36 @@ function modRows(scroll, list, all) {
 function drawRight(keep) {
   if (!rightCard) return;
   const d = X.detail;
+  if (keep && d && !d.loading && redrawAroundFind(d)) return;
   const top = keep ? rightCard.querySelector(".sv-body")?.scrollTop || 0 : 0;
   const focused = rightCard.contains(document.activeElement) ? document.activeElement.dataset?.key || "" : null;
   rightCard.replaceChildren();
   if (!d) return;
-  const p = d.play;
   const b = body();
   b.setAttribute("aria-label", T("the colony and what its save needs"));
+  b.append(rightHead(d));
+  if (d.loading) { rightCard.append(b); return; }
+  b.append(contentBox = contentSection(d));
+  rightCard.append(b);
+  b.scrollTop = top;
+  if (focused !== null) (focused && b.querySelector(`[data-key="${CSS.escape(focused)}"]`) || b).focus({ preventScroll: true });
+}
+
+// redrawAroundFind redraws the right card around the find box while it has the focus:
+// the box itself stays in the page, so its text, caret and an IME composition in progress
+// survive a redraw (a saves-read event, an analysis, a group folded). false: draw it anew.
+function redrawAroundFind(d) {
+  const old = contentBox?.isConnected && contentBox.querySelector('[data-key="need-find"]');
+  if (!old || document.activeElement !== old || content.ref !== d.ref) return false;
+  const head = rightCard.querySelector(".sv-head");
+  if (!head) return false;
+  head.replaceWith(rightHead(d));
+  return redrawContent();
+}
+
+// rightHead is the right card's header: the colony's name and its play facts.
+function rightHead(d) {
+  const p = d.play;
   const head = el("div", "sv-head");
   const row = el("div", "sv-row1");
   row.append(anum(rightCard));
@@ -769,8 +792,8 @@ function drawRight(keep) {
     rn.title = T("name this colony in RimArcho; the save files keep their names");
     row.append(rn);
   }
-  if (d.colonyKey && !d.loading && !d.error) chooseButton(d, true, (label, key, run) => {
-    const b = button(label, "", run, "small sv-colrename");
+  if (d.colonyKey && !d.loading && !d.error) chooseButton(d, true, (label, key, run, k, off, env) => {
+    const b = button(label, "", run, "small sv-colrename", env);
     b.dataset.key = key;
     row.append(b);
     return b;
@@ -784,12 +807,7 @@ function drawRight(keep) {
     if (kv.childNodes.length) head.append(kv);
   }
   if (p?.note) head.append(el("p", "sv-note warn", p.note));
-  b.append(head);
-  if (d.loading) { rightCard.append(b); return; }
-  b.append(contentBox = contentSection(d));
-  rightCard.append(b);
-  b.scrollTop = top;
-  if (focused !== null) (focused && b.querySelector(`[data-key="${CSS.escape(focused)}"]`) || b).focus({ preventScroll: true });
+  return head;
 }
 
 // ---- right: what the save needs of its Mods (12 §4.7) ----
@@ -804,14 +822,33 @@ let content = freshContent("", 0);
 // colony name being typed in the card's header stays.
 let contentBox = null;
 
+// The find box is kept when the new section has one too: the nodes around it are
+// replaced, it is not (moving a focused input blurs it and ends an IME composition).
 function redrawContent() {
   const d = X.detail;
-  if (!d || !contentBox?.isConnected) { drawRight(true); return; }
+  if (!d || !contentBox?.isConnected) { drawRight(true); return false; }
   const key = contentBox.contains(document.activeElement) ? document.activeElement.dataset?.key : "";
   const n = contentSection(d);
-  contentBox.replaceWith(n);
-  contentBox = n;
-  if (key) n.querySelector(`[data-key="${CSS.escape(key)}"]`)?.focus({ preventScroll: true });
+  const old = contentBox.querySelector('[data-key="need-find"]');
+  const nf = n.querySelector('[data-key="need-find"]');
+  if (old && nf && content.ref === d.ref) {
+    const kids = [...n.childNodes], at = kids.indexOf(nf);
+    while (old.previousSibling) old.previousSibling.remove();
+    while (old.nextSibling) old.nextSibling.remove();
+    old.before(...kids.slice(0, at));
+    old.after(...kids.slice(at + 1));
+    // the new section's handler reads its own (detached) box: read the kept one
+    const fill = nf.oninput;
+    old.oninput = () => { nf.value = old.value; fill(); };
+    contentBox.className = n.className;
+  } else {
+    contentBox.replaceWith(n);
+    contentBox = n;
+  }
+  if (key && contentBox.querySelector(`[data-key="${CSS.escape(key)}"]`) !== document.activeElement) {
+    contentBox.querySelector(`[data-key="${CSS.escape(key)}"]`)?.focus({ preventScroll: true });
+  }
+  return true;
 }
 const NEED_FOLD = 8;
 
@@ -1295,7 +1332,8 @@ function chooseButton(d, colony, add) {
   const kind = colony ? "colony" : "save";
   const on = d.chosen === kind;
   const label = on ? "✓ " + T("on Can it run") : colony ? T("check this colony") : T("check this save");
-  const b = add(label, "choose-" + kind, () => choose(d, colony, on));
+  // the choice is the current Game Config's: it waits while the window switches configs
+  const b = add(label, "choose-" + kind, () => choose(d, colony, on), "", "", "save-choice");
   b.setAttribute("aria-pressed", String(on));
   b.title = on ? T("press to check the last loaded save again")
     : colony ? T("Can it run checks this colony's newest save, for the current Game Config") : T("Can it run checks this save, for the current Game Config");

@@ -28,7 +28,8 @@ func (m *model) View() string {
 	body := h - bodyTop - 2 // rows bodyTop … h-3
 	var content []string
 	switch {
-	case m.loadErr != nil:
+	case m.loadErr != nil && m.panel == nil:
+		// (help, the Game Config picker and the command line still open over it: noGameKey)
 		// No game yet is where a new player starts, not an error: the hints below say
 		// what to do (the raw error repeated them in English).
 		first := sBold.Render(fit(T("No game added yet."), m.w-2))
@@ -356,6 +357,9 @@ func (m *model) panelLines(n int) []string {
 			out = append(out, "")
 		}
 		for i, c := range p.choices {
+			if h := p.choiceHeads[i]; h != "" {
+				out = append(out, "  "+sDimS.Render(fit(h, inner)))
+			}
 			if v := p.choiceLabels[c]; v != "" {
 				c = v
 			}

@@ -48,7 +48,7 @@ func uninstallConfirmation(p *app.UninstallPlan) *UninstallConfirmation {
 				row.Size = "≈ " + row.Size
 			}
 			// These plan entries describe metadata operations, not payload byte counts.
-			if action == app.DoUnlink || action == app.DoClean || action == app.DoRestore || action == "forget-accounts" {
+			if action == app.DoUnlink || action == app.DoClean || action == app.DoRestore || action == "forget-accounts" || action == "forget-agent-key" {
 				row.Size = T("size not measured")
 			}
 			method := unVerbs[action]

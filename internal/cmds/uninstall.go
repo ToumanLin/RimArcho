@@ -117,8 +117,8 @@ func uninstallCmd(c *Ctx, a *Args) (*render.Doc, error) {
 
 // unVerb names what happens to an item.
 var unVerb = map[string]string{
-	"forget-accounts": "forget",
-	app.DoUnlink:      "unlink", app.DoClean: "clean", app.DoRestore: "restore", app.DoTrash: "recycle bin", app.DoMove: "move",
+	"forget-accounts": "forget", "forget-agent-key": "forget",
+	app.DoUnlink: "unlink", app.DoClean: "clean", app.DoRestore: "restore", app.DoTrash: "recycle bin", app.DoMove: "move",
 	app.DoKeep: "keep", app.DoDelete: "delete", app.DoLater: "after exit", app.DoLeave: "left alone",
 }
 
@@ -142,6 +142,9 @@ func UninstallStepText(p *app.UninstallPlan, s *app.UninstallStep) string {
 	switch s.Key {
 	case app.UnAccounts:
 		parts = append(parts, "forget account sessions before removing tools or data; external SteamCMD caches stay untouched")
+		if count["forget-agent-key"] > 0 {
+			parts = append(parts, "remove the Archo Agent API key from Windows Credential Manager")
+		}
 	case app.UnLinks:
 		add(app.DoUnlink, "link", "delete {n} in the games' Mods/ (never their targets)")
 		add(app.DoLeave, "folder", "{n} named like one but not a link: left alone")

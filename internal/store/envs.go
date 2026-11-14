@@ -208,8 +208,8 @@ func (s *Store) SourceSemantics(sourceID string) (map[string]map[string][16]byte
 // installation and inventory. Global plans and shared folders stay; no files are touched.
 func (s *Store) DeleteEnv(envID string) error {
 	return s.inTx(func(tx *sql.Tx) error {
-		var gameID string
-		err := tx.QueryRow(`SELECT game_id FROM environment WHERE id=?`, envID).Scan(&gameID)
+		var gameID, name string
+		err := tx.QueryRow(`SELECT game_id,name FROM environment WHERE id=?`, envID).Scan(&gameID, &name)
 		if err == sql.ErrNoRows {
 			return nil
 		}
@@ -225,29 +225,51 @@ func (s *Store) DeleteEnv(envID string) error {
 				return err
 			}
 		}
-		if _, err := tx.Exec(`DELETE FROM meta WHERE (key=? AND value=?) OR key IN (?,?,?)`, metaCurrentEnv, envID, "env:"+envID+":launch_args", "log.selected:"+envID, "log.seen:"+envID); err != nil {
+		if err := deleteEnvMeta(tx, envID, name); err != nil {
 			return err
+		}
+		if _, err := tx.Exec(`DELETE FROM meta WHERE key=? AND value=?`, metaCurrentEnv, envID); err != nil {
+			return err
+		}
+		if wasCurrent {
+			// The next current environment is chosen in the same transaction, so an
+			// interruption never leaves environments without a current one: a sibling of
+			// the same installation first, else the first by name (app.EnvRemoval.Next).
+			if _, err := tx.Exec(`INSERT OR REPLACE INTO meta(key,value) SELECT ?,id FROM environment ORDER BY game_id<>?, name LIMIT 1`, metaCurrentEnv, gameID); err != nil {
+				return err
+			}
 		}
 		var remaining int
 		if err := tx.QueryRow(`SELECT count(*) FROM environment WHERE game_id=?`, gameID).Scan(&remaining); err != nil {
 			return err
 		}
 		if remaining != 0 {
-			if wasCurrent {
-				_, err := tx.Exec(`INSERT INTO meta(key,value) SELECT ?,id FROM environment WHERE game_id=? ORDER BY name LIMIT 1`, metaCurrentEnv, gameID)
-				return err
-			}
 			return nil
 		}
 		if err := deleteInstallation(tx, gameID); err != nil {
 			return err
 		}
-		_, err = tx.Exec(`DELETE FROM meta WHERE key=? AND value=?`, metaCurrentEnv, envID)
-		if err != nil {
-			return err
-		}
 		return pruneFacts(tx, time.Now())
 	})
+}
+
+// deleteEnvMeta forgets the meta values kept per environment (keyed by its ID, or by its
+// name for the Workshop client's update check). Profile import mappings
+// (import:rimcrow:profile:*) stay on purpose: they keep a removed import from returning.
+func deleteEnvMeta(tx *sql.Tx, envID, name string) error {
+	if _, err := tx.Exec(`DELETE FROM meta WHERE key IN (?,?,?,?)`, "env:"+envID+":launch_args", "log.selected:"+envID, "log.seen:"+envID, "ui.columns:"+envID); err != nil {
+		return err
+	}
+	prefix := "memory-estimate:" + envID + ":"
+	if _, err := tx.Exec(`DELETE FROM meta WHERE substr(key,1,length(?))=?`, prefix, prefix); err != nil {
+		return err
+	}
+	// Shared folders' subscription checks use the "shared" scope, which an environment
+	// named "shared" must not take with it.
+	prefix = "subscriptions:check:" + name + ":"
+	_, err := tx.Exec(`DELETE FROM meta WHERE substr(key,1,length(?))=? AND key NOT IN (?,?,?)`, prefix, prefix,
+		"subscriptions:check:shared:steamcmd", "subscriptions:check:shared:git", "subscriptions:check:shared:page")
+	return err
 }
 
 // LiveCounts counts the live instances of each source.

@@ -40,19 +40,23 @@ func (s *API) prepareBackgrounds(fresh bool) {
 	if err != nil || s.bgRead.closed {
 		return
 	}
-	// Per game installation, not per Game Config: the images come from the game folder and
-	// its Mods, which the configs of one installation share, so switching between them
-	// keeps the list (16 §2.14).
+	// The menu art is per game installation, not per Game Config: it comes from the game
+	// folder, which the configs of one installation share, so switching between them keeps
+	// the list shown (16 §2.14). The fallback previews come from the Game Config's own Mods
+	// (BackgroundTargets), so they are part of the job's key: a sibling with other Mods
+	// gets its own job (the extracted art is cached on disk and read again cheaply).
 	game := bgGame(e)
 	base := game + "|" + menubg.InventoryStamp(e.GameRoot) + "|" + view.Lang()
-	if !fresh && s.bgRead.key == base {
-		return
-	}
 	var targets []app.BackgroundTarget
-	if ix, err := s.a.Index(); err == nil {
+	ix, ixErr := s.a.Index()
+	if ixErr == nil {
 		targets = s.a.BackgroundTargets(ix)
 	}
 	key := base + fmt.Sprintf("|%v", targets)
+	// an unreadable index keeps the job shown rather than starting one without previews
+	if !fresh && s.bgRead.key == base && (ixErr != nil || s.bgRead.active == key) {
+		return
+	}
 	if s.bgRead.jobs == nil {
 		s.bgRead.jobs = map[string]*backgroundResult{}
 		s.bgRead.ctx, s.bgRead.cancel = context.WithCancel(context.Background())

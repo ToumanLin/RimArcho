@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
@@ -24,6 +25,11 @@ type SaveChoice struct {
 	Colony string `json:"colony,omitempty"` // the colony's key (ChooseColony)
 	Dir    string `json:"dir"`              // the Saves folder it is in
 	Name   string `json:"name"`             // the save's or colony's name when chosen
+	// Also are the colony's other keys (ChooseColony): the file-name keys of its saves. A
+	// colony's saves group by file name until they are read in full, then by their world
+	// (12 §4.1), so the key changes both ways: a colony chosen before the full read, or a
+	// world colony saved again and not read yet.
+	Also []string `json:"also,omitempty"`
 }
 
 // SaveChoice kinds.
@@ -54,7 +60,7 @@ func (a *App) ChooseSave(envID string, s *Save, colony bool) (*SaveChoice, error
 		if s.Colony == nil {
 			return nil, fmt.Errorf("%s is in no colony", s.Name)
 		}
-		c = &SaveChoice{Kind: ChooseColony, Colony: s.Colony.Key, Dir: filepath.Dir(s.Path), Name: s.Colony.Name}
+		c = &SaveChoice{Kind: ChooseColony, Colony: s.Colony.Key, Also: colonyAliases(s.Colony), Dir: filepath.Dir(s.Path), Name: s.Colony.Name}
 	}
 	b, _ := json.Marshal(c)
 	return c, a.Store.SetMeta(saveChoiceKey(envID), string(b))
@@ -65,13 +71,55 @@ func (a *App) ClearSaveChoice(envID string) error {
 	return a.Store.SetMeta(saveChoiceKey(envID), "")
 }
 
+// ForgetSaveChoice removes a removed Game Config's choice from the store.
+func (a *App) ForgetSaveChoice(envID string) error {
+	_, err := a.Store.DB.Exec(`DELETE FROM meta WHERE key=?`, saveChoiceKey(envID))
+	return err
+}
+
+// SaveChoiceStamp changes when what the Game Config's choice resolves to may have changed:
+// the chosen file, or every save file in the chosen colony's folder (a save written over
+// in place, such as an autosave, need not change the folder's own modification time).
+// "" with no choice.
+func (a *App) SaveChoiceStamp(envID string) string {
+	ch := a.SaveChoiceOf(envID)
+	if ch == nil {
+		return ""
+	}
+	stamp := func(fi os.FileInfo) string {
+		return fmt.Sprintf("%s:%d:%d;", fi.Name(), fi.Size(), fi.ModTime().UnixNano())
+	}
+	if ch.Kind == ChooseSaveFile {
+		fi, err := os.Stat(ch.Path)
+		if err != nil {
+			return ch.Path + ":" + err.Error()
+		}
+		return ch.Path + "|" + stamp(fi)
+	}
+	ents, err := os.ReadDir(ch.Dir)
+	if err != nil {
+		return ch.Dir + ":" + err.Error()
+	}
+	var b strings.Builder
+	b.WriteString(ch.Dir + "|" + ch.Colony + "|")
+	for _, de := range ents {
+		if de.IsDir() || !strings.EqualFold(filepath.Ext(de.Name()), ".rws") {
+			continue
+		}
+		if fi, err := de.Info(); err == nil {
+			b.WriteString(stamp(fi))
+		}
+	}
+	return b.String()
+}
+
 // Chose: s, or its colony (colony), is the Game Config's choice.
 func (c *SaveChoice) Chose(s *Save, colony bool) bool {
 	if c == nil || s == nil {
 		return false
 	}
 	if colony {
-		return c.Kind == ChooseColony && s.Colony != nil && c.Colony == s.Colony.Key
+		return c.Kind == ChooseColony && s.Colony != nil && c.names(s.Colony)
 	}
 	return c.Kind == ChooseSaveFile && env.PathKey(c.Path) == env.PathKey(s.Path)
 }
@@ -136,15 +184,23 @@ func (a *App) ChosenSave(st *LoadoutState) (*SaveCheck, *SaveChoice, error) {
 	for _, s := range probe {
 		m.match(s)
 	}
-	var latest *Save
-	for _, col := range groupColonies(probe) {
-		if col.Key == ch.Colony {
-			latest = col.Latest()
-		}
-	}
-	if latest == nil {
+	col := ch.colonyIn(groupColonies(probe))
+	if col == nil {
 		return nil, ch, nil
 	}
+	if col.By == "world" && col.Key != ch.Colony {
+		// chosen while its saves were grouped by file name: they have been read in full
+		// since and form their world's colony, whose key stays; keep that one
+		moved := *ch
+		moved.Colony, moved.Also = col.Key, colonyAliases(col)
+		if !slices.Contains(moved.Also, ch.Colony) {
+			moved.Also = append(moved.Also, ch.Colony)
+		}
+		if b, err := json.Marshal(&moved); err == nil && a.Store.SetMeta(saveChoiceKey(st.Ix.Env.ID), string(b)) == nil {
+			ch = &moved
+		}
+	}
+	latest := col.Latest()
 	var rest []*Save
 	var sv *Save
 	for _, s := range saves {
@@ -156,6 +212,54 @@ func (a *App) ChosenSave(st *LoadoutState) (*SaveCheck, *SaveChoice, error) {
 	}
 	c, err := a.checkOneSave(st, sv, rest)
 	return c, ch, err
+}
+
+// colonyAliases are a colony's file-name keys (SaveChoice.Also): those it claims
+// (nameKeys, set by ListSaves) and those of its saves saved by hand.
+func colonyAliases(c *Colony) []string {
+	var out []string
+	add := func(k string) {
+		if k != c.Key && !slices.Contains(out, k) {
+			out = append(out, k)
+		}
+	}
+	for _, k := range c.nameKeys {
+		add(k)
+	}
+	if c.By != "rimsaves" {
+		for _, s := range c.Saves {
+			if !s.Auto && s.Folder != nil {
+				add(colonyNameKey(s))
+			}
+		}
+	}
+	return out
+}
+
+// names: c is the colony the choice names, by its key or another key it had (Also).
+func (ch *SaveChoice) names(c *Colony) bool {
+	if c.Key == ch.Colony || slices.Contains(ch.Also, c.Key) {
+		return true
+	}
+	return slices.Contains(c.nameKeys, ch.Colony)
+}
+
+// colonyIn is the colony of cols the choice names: of those with its key or another key
+// it had, or the world colony claiming its key as a file-name key (12 §4.1), the one with
+// the newest save. A world colony saved again groups its new saves by file name until
+// they are read in full, and those saves are its newest.
+func (ch *SaveChoice) colonyIn(cols []*Colony) *Colony {
+	claims := nameClaims(cols)
+	var best *Colony
+	for _, c := range cols {
+		if !ch.names(c) && claims[ch.Colony] != c {
+			continue
+		}
+		if best == nil || c.Latest().ModTime.After(best.Latest().ModTime) {
+			best = c
+		}
+	}
+	return best
 }
 
 func inColony(c *Colony, path string) bool {

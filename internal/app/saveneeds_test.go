@@ -130,3 +130,65 @@ func TestSaveNeeds(t *testing.T) {
 		t.Errorf("gone: %+v", g)
 	}
 }
+
+// A hash in the grids that no Def has makes only the copies it may belong to "could not
+// check" (12 §4.7): those with terrain of their own for an unnamed terrain hash, and for an
+// unnamed compressed thing those with a compressible Def whose own hash is a few places
+// before it. A Mod whose only link to terrain is its natural rock's stone floors, and one
+// whose rock hashes far from the unnamed thing, are safe. A starting pawn the player did
+// not choose is a world pawn of its race's Mod, not a colonist.
+func TestSaveNeedsUnnamedGridOwners(t *testing.T) {
+	e := testkit.New(t)
+	e.WriteFile(filepath.Join(e.Game, "Data", "Core", "Defs", "Races.xml"),
+		"<Defs><ThingDef><defName>Human</defName><race><intelligence>Humanlike</intelligence></race></ThingDef><FactionDef><defName>PlayerColony</defName></FactionDef></Defs>\n")
+	copyFixtureDLL(t, e, "Assembly-CSharp.dll", filepath.Join(e.Game, "RimWorldWin64_Data", "Managed", store.GameMainAssembly))
+	rock := func(name string) map[string]string {
+		return map[string]string{"Defs/R.xml": "<Defs><ThingDef><defName>" + name + "</defName><building><isNaturalRock>true</isNaturalRock></building></ThingDef></Defs>\n"}
+	}
+	// hashes: NearRock 2159 (the save has 2164, five places on), FarRock 13096, Duskstone
+	// 38979; the terrain grid's 12345 is no Def's
+	e.AddWorkshop("3000000021", testkit.Mod{PackageID: "tester.near", Name: "Near", Files: rock("NearRock")})
+	e.AddWorkshop("3000000022", testkit.Mod{PackageID: "tester.far", Name: "Far", Files: rock("FarRock")})
+	e.AddWorkshop("3000000023", testkit.Mod{PackageID: "tester.dusk", Name: "Dusk", Files: rock("Duskstone")})
+	e.AddWorkshop("3000000024", testkit.Mod{PackageID: "tester.tiles", Name: "Tiles", Files: map[string]string{"Defs/F.xml": "<Defs><TerrainDef><defName>PlainTile</defName></TerrainDef></Defs>\n"}})
+	e.AddWorkshop("3000000025", testkit.Mod{PackageID: "tester.kurin", Name: "Kurin", Files: map[string]string{"Defs/K.xml": "<Defs><ThingDef><defName>Kurin_Race</defName><race><intelligence>Humanlike</intelligence></race></ThingDef></Defs>\n"}})
+	mods := []string{"ludeon.rimworld", "tester.near", "tester.far", "tester.dusk", "tester.tiles", "tester.kurin"}
+	e.WriteModsConfig("1.6.4633 rev1261", mods...)
+	e.AddEnv(false)
+	e.MustRun("scan")
+	e.MustRun("analyze")
+	body := `<maps><li><uniqueID>0</uniqueID><terrainGrid><topGrid>OTA5MA==</topGrid></terrainGrid><compressedThingMap>dAh0CA==</compressedThingMap><things>
+<thing Class="Pawn"><def>Human</def><id>Human5</id><faction>Faction_1</faction><kindDef>Colonist</kindDef><story /></thing>
+</things></li></maps>
+<world><worldPawns><pawnsAlive><li><def>Kurin_Race</def><id>Kurin_Race7</id><faction>Faction_1</faction><kindDef>Colonist</kindDef><story /></li></pawnsAlive></worldPawns></world>`
+	writeOwnersSave(t, e, "Grids.rws", testkit.SaveSpec{Mods: mods, Faction: "Colony", Body: body})
+	s, _, err := e.App.FindSave("Grids")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = e.App.SaveFacts(s, true); err != nil {
+		t.Fatal(err)
+	}
+	c, err := e.App.SaveContent(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	by := map[string]app.SaveNeed{}
+	for _, n := range c.Needs {
+		by[n.PackageID] = n
+	}
+	if c.GridUnnamed["TerrainDef"] != 1 || c.GridUnnamed["ThingDef"] != 1 {
+		t.Fatalf("unnamed: %v", c.GridUnnamed)
+	}
+	for pkg, want := range map[string]string{
+		"tester.near": app.NeedUnchecked, "tester.tiles": app.NeedUnchecked,
+		"tester.far": app.NeedSafe, "tester.dusk": app.NeedSafe,
+	} {
+		if got := by[pkg]; got.Verdict != want {
+			t.Errorf("%s: %s, want %s (%+v)", pkg, got.Verdict, want, got)
+		}
+	}
+	if k := by["tester.kurin"]; k.World != 1 || k.Colonists != 0 || k.Verdict != app.NeedBreaks {
+		t.Errorf("kurin: %+v", k)
+	}
+}

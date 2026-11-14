@@ -68,7 +68,7 @@ static class Tests
             new SettingsFile { PackageId = "a.mod", Folder = "!ArchoPack_x_1", Class = "AMod", File = "Mod__ArchoPack_x_1_AMod.xml", Title = "A \"quoted\"", Stored = true },
             new SettingsFile { PackageId = "b.mod", Folder = "2", Class = "BMod", File = "Mod_2_BMod.xml", Title = "", Stored = true },
         });
-        Writer.WriteSettingsWindow(new SettingsFile { PackageId = "a.mod", Folder = "A", Class = "AMod", File = "Mod_A_AMod.xml", Title = "A" },
+        Writer.WriteSettingsWindow(new SettingsFile { PackageId = "a.mod", Folder = "A", Class = "AMod", File = "Mod_A_AMod.xml", Title = "A", Hash = "sha256:ab" },
             new System.Collections.Generic.List<SettingsControl> {
                 new SettingsControl { Kind = "label", Label = "General" },
                 new SettingsControl { Kind = "checkbox", Label = "Raids", Value = "False" },
@@ -130,8 +130,14 @@ static class Tests
         var win = window.GetProperty("context").GetProperty("window");
         var controls = win.GetProperty("controls");
         Check(win.GetProperty("class").GetString() == "AMod" && win.GetProperty("full").GetBoolean() && controls.GetArrayLength() == 3, "window record");
+        Check(win.GetProperty("fileHash").GetString() == "sha256:ab", "window file hash");
         Check(!controls[0].TryGetProperty("value", out _) && controls[0].GetProperty("label").GetString() == "General", "a label has no value");
         Check(controls[2].GetProperty("kind").GetString() == "slider" && controls[2].GetProperty("value").GetString() == "0.75" && controls[2].GetProperty("max").GetString() == "2", "slider range");
+        // FileHash: the settings file as the window opened
+        var cfg = Path.Combine(dir, "Mod_A_AMod.xml");
+        File.WriteAllText(cfg, "abc");
+        Check(SettingsWindow.FileHash(cfg) == "sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "file hash: " + SettingsWindow.FileHash(cfg));
+        Check(SettingsWindow.FileHash(Path.Combine(dir, "missing.xml")) == "none" && SettingsWindow.FileHash("") == null, "no file, unknown path");
         var hugs = JsonDocument.Parse(lines[8]).RootElement;
         Check(hugs.GetProperty("kind").GetString() == "hugslib", "hugslib line: " + lines[8]);
         var pack = hugs.GetProperty("context").GetProperty("hugslib")[0];

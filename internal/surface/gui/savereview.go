@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 	"sync"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -16,23 +18,32 @@ import (
 // Saves › Play review (16 §2.11, 12 §3). The review attributes every save of the colonies
 // asked for, reading first those without a current full read, so it runs in a goroutine
 // on the Saves page's reader and answers with "review" events: a shell, partial pages,
-// then the complete page. A newer request or leaving stops at the next save. The
-// last page of each colony choice is kept while the window is open and served again when
-// no save changed since (the saves' paths, sizes and times, and the parser's version).
+// then the complete page. A newer request or leaving stops at the next save; the request
+// then ends with a "stale" event, so the page lets go of it. The last page of each colony
+// choice is kept, by Game Config, while the window is open and served again when no save
+// changed since (the saves' paths, sizes and times, and the parser's version).
 
 // reviewState is the review's newest request and its kept pages.
 type reviewState struct {
 	mu    sync.Mutex
 	seq   uint64                 // the newest request; 0 after the page was left
-	pages map[string]reviewEntry // by colony key ("*" all)
+	pages map[string]reviewEntry // by context (app.ReviewContextKey) and colony key ("*" all)
+	// contexts are the contexts with kept pages, the one used last at the end.
+	contexts []string
 }
 
 type reviewEntry struct {
 	stamp string
+	// saves is the listed saves' contexts as the page was made (ReviewSavesContextKey);
+	// it depends on the current Game Config, so a mismatch makes the page unusable but
+	// does not drop it: switching back can use it again.
+	saves string
 	page  *view.ReviewPage
 }
 
-// ReviewEvent carries page progress (Done/Total) and a final page or error.
+// ReviewEvent carries page progress (Done/Total) and a final page or error; every request
+// ends with one event that is not Partial, "stale" when a newer request or leaving the page
+// stopped it.
 type ReviewEvent struct {
 	Request uint64           `json:"request"`
 	Partial bool             `json:"partial"`
@@ -50,9 +61,10 @@ func (s *API) SaveReviewRead(request uint64, colony string) bool {
 	s.review.mu.Unlock()
 	go func() {
 		ev := s.runReview(request, colony)
-		if ev != nil && !s.reviewStale(request) {
-			s.send("review", ev)
+		if ev == nil || s.reviewStale(request) {
+			ev = &ReviewEvent{Request: request, Error: "stale"}
 		}
+		s.send("review", ev)
 	}()
 	return true
 }
@@ -120,17 +132,32 @@ func (s *API) runReview(request uint64, colony string) *ReviewEvent {
 		ev.Error = err.Error()
 		return ev
 	}
+	// A save of no Game Config or list of its own is attributed in the current ones, so
+	// each Game Config keeps its own pages.
+	where, err := r.ReviewContextKey()
+	if err != nil {
+		ev.Error = err.Error()
+		return ev
+	}
+	// every listed save's own context too: editing a list some save is attributed under
+	// (not only the current one) makes kept pages stale
+	saves, err := r.ReviewSavesContextKey(l.Colonies)
+	if err != nil {
+		ev.Error = err.Error()
+		return ev
+	}
 	stamp := reviewStamp(l.Colonies) + input
 	s.review.mu.Lock()
-	// Only current pages survive. The keys are bounded by this listing's colonies + All.
+	// Only current pages survive. The keys are bounded by the Game Configs times this
+	// listing's colonies + All.
 	for key, entry := range s.review.pages {
 		if entry.stamp != stamp {
 			delete(s.review.pages, key)
 		}
 	}
-	kept, ok := s.review.pages[colony]
+	kept, ok := s.review.pages[where+"\x00"+colony]
 	s.review.mu.Unlock()
-	if ok && kept.stamp == stamp {
+	if ok && kept.stamp == stamp && kept.saves == saves {
 		ev.Page = kept.page
 		return ev
 	}
@@ -166,6 +193,9 @@ func (s *API) runReview(request uint64, colony string) *ReviewEvent {
 			}
 		}
 		l, stamp = l2, reviewStamp(l2.Colonies)+input
+		if k, err := r.ReviewSavesContextKey(l2.Colonies); err == nil {
+			saves = k
+		}
 	}
 	ev.Page = view.ReviewPageOf(res, l.Colonies, colony, tags)
 	s.review.mu.Lock()
@@ -173,10 +203,30 @@ func (s *API) runReview(request uint64, colony string) *ReviewEvent {
 		s.review.pages = map[string]reviewEntry{}
 	}
 	if request == s.review.seq {
-		s.review.pages[colony] = reviewEntry{stamp: stamp, page: ev.Page}
+		s.review.keep(where, colony, reviewEntry{stamp: stamp, saves: saves, page: ev.Page})
 	}
 	s.review.mu.Unlock()
 	return ev
+}
+
+// reviewContexts is how many contexts (Game Config, version, list) keep pages: switching
+// between two Game Configs serves both, and editing a list does not pile up pages.
+const reviewContexts = 2
+
+// keep stores a page of colony in context where, dropping the pages of the context used
+// least recently beyond reviewContexts. The caller holds mu.
+func (r *reviewState) keep(where, colony string, entry reviewEntry) {
+	r.contexts = append(slices.DeleteFunc(r.contexts, func(c string) bool { return c == where }), where)
+	if len(r.contexts) > reviewContexts {
+		gone := r.contexts[0]
+		r.contexts = r.contexts[1:]
+		for key := range r.pages {
+			if strings.HasPrefix(key, gone+"\x00") {
+				delete(r.pages, key)
+			}
+		}
+	}
+	r.pages[where+"\x00"+colony] = entry
 }
 
 // reviewTags are the player's tags by library copy; none when the library cannot be read.

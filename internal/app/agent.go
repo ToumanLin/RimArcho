@@ -69,7 +69,8 @@ type AgentStatus struct {
 	ConfigDir string        `json:"config_dir"`
 }
 
-// AgentBundlesDir holds installed bundles: <version>/ and current.txt naming the one in use.
+// AgentBundlesDir holds installed bundles: <version>/ (<version>-<n>/ after reinstalling the same
+// version) and current.txt naming the folder in use.
 func (a *App) AgentBundlesDir() string { return filepath.Join(a.LocalDir(), "agent") }
 
 // AgentConfigDir is the agent's own folder in the data directory: Pi's settings, models, MCP server,
@@ -223,22 +224,32 @@ func (a *App) InstallAgent(ctx context.Context, zipPath string, step func(phase 
 		_ = os.RemoveAll(tmp)
 		return m, err
 	}
-	dir := filepath.Join(base, m.Version)
-	if err := os.RemoveAll(dir); err != nil {
+	if strings.ContainsAny(m.Version, `/\:`) {
 		_ = os.RemoveAll(tmp)
-		return m, fmt.Errorf("Archo Agent %s is in use; close it and try again: %w", m.Version, err)
+		return m, fmt.Errorf("archo-agent.json names version %q", m.Version)
 	}
-	if err := os.Rename(tmp, dir); err != nil {
+	// The new bundle goes into a folder nothing points to yet (a reinstall of the same version
+	// gets <version>-<n>); current.txt then switches to it in one write. A crash before that
+	// leaves the bundle in use as it was.
+	name := m.Version
+	for n := 2; ; n++ {
+		if _, err := os.Lstat(filepath.Join(base, name)); os.IsNotExist(err) {
+			break
+		}
+		name = fmt.Sprintf("%s-%d", m.Version, n)
+	}
+	if err := os.Rename(tmp, filepath.Join(base, name)); err != nil {
 		_ = os.RemoveAll(tmp)
 		return m, err
 	}
-	if err := writeFileAtomic(filepath.Join(base, "current.txt"), []byte(m.Version+"\n")); err != nil {
+	if err := writeFileAtomic(filepath.Join(base, "current.txt"), []byte(name+"\n")); err != nil {
+		_ = os.RemoveAll(filepath.Join(base, name))
 		return m, err
 	}
 	// older bundles and the download go; one still running stays until next time
 	entries, _ := os.ReadDir(base)
 	for _, e := range entries {
-		if e.IsDir() && e.Name() != m.Version {
+		if e.IsDir() && e.Name() != name {
 			_ = os.RemoveAll(filepath.Join(base, e.Name()))
 		}
 	}

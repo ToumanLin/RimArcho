@@ -153,6 +153,16 @@ type EnvPage struct {
 	Notices []string       `json:"notices,omitempty"`
 }
 
+// AliasNoticeText is the shared-game-folder notice while the player has not acknowledged it
+// (app.AliasNotice), or "".
+func AliasNoticeText(a *app.App) string {
+	names := a.AliasNotice()
+	if len(names) == 0 {
+		return ""
+	}
+	return Tf("these two Game Configs use the same game folder: %s", strings.Join(names, ", "))
+}
+
 // BuildEnvPage builds the environment page.
 func BuildEnvPage(a *app.App, st *app.LoadoutState) *EnvPage {
 	p := &EnvPage{Groups: EnvGroups(a, st)}
@@ -161,8 +171,8 @@ func BuildEnvPage(a *app.App, st *app.LoadoutState) *EnvPage {
 		cur = st.Ix.Env.ID
 	}
 	p.Envs = EnvironmentRows(a, cur)
-	if names := a.LegacyInstallationAliases(); len(names) > 0 && a.Store.Meta("notice.shared-game-folder") != "seen" {
-		p.Notices = []string{Tf("these two Game Configs use the same game folder: %s", strings.Join(names, ", "))}
+	if text := AliasNoticeText(a); text != "" {
+		p.Notices = []string{text}
 	}
 
 	return p

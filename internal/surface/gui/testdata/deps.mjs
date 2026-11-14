@@ -123,3 +123,15 @@ test("URL editor validates before saving and cancel preserves the complete URL",
   h.popup.querySelector("input").value=next; confirm(); await flush();
   assert.equal(h.calls[0][1], next);
 });
+
+// F14: a dialog opened while the move preview is read is not replaced by its confirmation.
+test("a dialog opened during the move preview keeps the confirmation away", async () => {
+  const h = await setup({label:"lock library",value:"C:/old/locked",valuePath:true,edit:"directory",directory:"locked"});
+  const pending = click(h, "move to…");
+  const other = { kind: "palette" };
+  h.S.popup = other;
+  await pending; await flush();
+  assert.equal(h.calls[0][0], "preview");
+  assert.equal(h.confirmations.length, 0);
+  assert.equal(h.S.popup, other);
+});

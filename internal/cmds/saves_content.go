@@ -8,7 +8,9 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
-func addSaveContent(root *render.Node, c *app.SaveContentResult, all bool, ref string, budget int) {
+// addSaveContent is saves show --content; with pick (--mod) it says what removing those
+// Mods costs in place of the list of every Mod.
+func addSaveContent(root *render.Node, c *app.SaveContentResult, all bool, ref string, budget int, pick []app.SaveNeed) {
 	if !c.Read {
 		root.KV("content", c.Note)
 		return
@@ -34,10 +36,14 @@ func addSaveContent(root *render.Node, c *app.SaveContentResult, all bool, ref s
 	if split := needsSplit(c.Needs); split != "" {
 		root.KV("removing a Mod", split)
 		budget--
-		if b := needsBreaking(c.Needs, all); b != "" {
+		if b := needsBreaking(c.Needs, all); b != "" && pick == nil {
 			root.KV("breaks the save", b)
 			budget--
 		}
+	}
+	// a picked Mod is answered even when the save has only game content
+	for _, m := range pick {
+		addNeed(root, m)
 	}
 	tail := 1 + len(app.ContentLimits)
 	if c.Unknown != nil {
@@ -47,13 +53,15 @@ func addSaveContent(root *render.Node, c *app.SaveContentResult, all bool, ref s
 		tail++
 	}
 	limit := len(c.Mods)
-	if !all {
+	if pick != nil {
+		limit = 0
+	} else if !all {
 		limit = min(limit, max(0, budget-tail-1))
 	}
 	for _, m := range c.Mods[:limit] {
 		root.KV(m.Name, parts(m.Cats))
 	}
-	if limit < len(c.Mods) {
+	if limit < len(c.Mods) && pick == nil {
 		root.Addf("… %d more Mods (archo saves show %s --content --all)", len(c.Mods)-limit, ref)
 	}
 	if c.Unknown != nil {
@@ -128,27 +136,7 @@ func needsBreaking(needs []app.SaveNeed, all bool) string {
 		if m.Game || m.Verdict != app.NeedBreaks {
 			continue
 		}
-		var parts []string
-		if k := m.Colonists + m.Dead; k > 0 {
-			p := render.Plural(k, "colonist")
-			if m.Dead > 0 {
-				p += fmt.Sprintf(" (%d dead)", m.Dead)
-			}
-			parts = append(parts, p)
-		}
-		if k := len(m.Factions); k > 0 {
-			parts = append(parts, render.Plural(k, "faction"))
-		}
-		if k := len(m.Classes); k > 0 {
-			if k == 1 {
-				parts = append(parts, "1 class")
-			} else {
-				parts = append(parts, fmt.Sprintf("%d classes", k))
-			}
-		}
-		if len(m.Weather) > 0 {
-			parts = append(parts, "a map's weather")
-		}
+		parts := needHolds(m)
 		if k := len(m.NeededBy); k > 0 {
 			parts = append(parts, "needed by "+render.Plural(k, "Mod"))
 		}
@@ -161,4 +149,106 @@ func needsBreaking(needs []app.SaveNeed, all bool) string {
 		out = append(out[:6:6], fmt.Sprintf("and %d more (--all)", len(out)-6))
 	}
 	return strings.Join(out, ", ")
+}
+
+// needHolds is what of a Mod makes the save break without it: its pawns, factions, classes
+// and weather.
+func needHolds(m app.SaveNeed) []string {
+	var parts []string
+	if k := m.Colonists + m.Dead; k > 0 {
+		p := render.Plural(k, "colonist")
+		if m.Dead > 0 {
+			p += fmt.Sprintf(" (%d dead)", m.Dead)
+		}
+		parts = append(parts, p)
+	}
+	if m.World > 0 {
+		parts = append(parts, render.Plural(m.World, "world pawn"))
+	}
+	if k := len(m.Factions); k > 0 {
+		parts = append(parts, render.Plural(k, "faction"))
+	}
+	if k := len(m.Classes); k > 0 {
+		if k == 1 {
+			parts = append(parts, "1 class")
+		} else {
+			parts = append(parts, fmt.Sprintf("%d classes", k))
+		}
+	}
+	if len(m.Weather) > 0 {
+		parts = append(parts, "a map's weather")
+	}
+	return parts
+}
+
+// needWhy says what a verdict means for the one Mod (saves show --mod).
+var needWhy = map[string]string{
+	app.NeedBreaks: "the save may not load without it",
+	app.NeedLoses:  "the save loads without it; its things in the world are gone",
+	app.NeedCare:   "research, recipes, appearance and the like reset and the colony goes on",
+	app.NeedSafe:   "nothing of it is in the save and none of the save's Mods needs it, as far as the save can tell",
+}
+
+// addNeed is one Mod's verdict with why and what it holds (saves show --mod).
+func addNeed(root *render.Node, m app.SaveNeed) {
+	verdict := needText[m.Verdict][0]
+	why := needWhy[m.Verdict]
+	switch {
+	case m.Game:
+		verdict, why = "part of the game", "always needed"
+	case m.Verdict == app.NeedUnchecked:
+		why = m.Why
+	case len(m.Cats) == 0 && len(needHolds(m)) == 0 && !m.Grid && len(m.NeededBy) > 0:
+		// nothing of its own in the save: its verdict is that of the Mods needing it
+		if m.Verdict == app.NeedCare {
+			why = "only Mods that are safe to remove need it, but they do not run without it"
+		} else {
+			why += ", as the Mods that need it do not run without it"
+		}
+	}
+	n := root.Add(fmt.Sprintf("%s (%s): %s", m.Name, m.PackageID, verdict))
+	n.KV("why", why)
+	holds := needHolds(m)
+	for _, cat := range m.Cats {
+		if cat.Key == "factions" && len(m.Factions) > 0 || cat.Key == "races" && m.Colonists+m.Dead+m.World > 0 {
+			continue // said above, by the faction and the pawns
+		}
+		holds = append(holds, fmt.Sprintf("%d %s", cat.Count, contentTextLabel(cat.Key, cat.Count)))
+	}
+	if m.Grid {
+		holds = append(holds, "terrain, biomes or rock on a map or the world")
+	}
+	n.KV("holds", strings.Join(holds, ", "))
+	n.KV("needed by", strings.Join(m.NeededBy, ", "))
+}
+
+// saveNeedsOf picks the save's Mods ref names (saves show --mod): by packageId or name,
+// else by what the Mod reference resolves to; an error when none of the save's Mods is it.
+func saveNeedsOf(c *Ctx, needs []app.SaveNeed, ref string) ([]app.SaveNeed, error) {
+	var out []app.SaveNeed
+	want := strings.TrimSpace(ref)
+	if p, ok := app.PackageRef(want); ok && p != "" {
+		want = p
+	}
+	for _, m := range needs {
+		if normPkgID(m.PackageID) == normPkgID(want) || strings.EqualFold(m.Name, strings.TrimSpace(ref)) {
+			out = append(out, m)
+		}
+	}
+	if len(out) > 0 {
+		return out, nil
+	}
+	pkgs, _, err := modFilter(c, ref)
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range needs {
+		if pkgs[normPkgID(m.PackageID)] {
+			out = append(out, m)
+		}
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("%s is not one of the save's Mods", ref)
+	}
+	return out, nil
 }

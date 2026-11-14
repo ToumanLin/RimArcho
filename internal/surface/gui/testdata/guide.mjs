@@ -148,3 +148,80 @@ for (const way of ["throws", "refuses"]) test(`a first scan that ${way} gives ba
   assert.match(h.screen.textContent, way === "throws" ? /scan failed/ : /a scan is already running/);
   if (way === "throws") assert.ok(h.screen.querySelectorAll("button").some(b => b.textContent === "scan again"));
 });
+
+// Add Game Config (S.guideFrom "env"): the current config's choices follow a switch.
+async function addingSetup({ accept = true } = {}) {
+  const screen = new Element("div"), S = { screen: "guide", busy: {}, board: { env: "A", envs: ["A", "B"] } };
+  const listCalls = [], added = [];
+  const games = () => [
+    { name: "1.6-2", game: "D:\A", version: "1.6", launch: "steam", env: "A", known: true, current: S.board.env === "A" },
+    { name: "1.5", game: "D:\B", version: "1.5", launch: "steam", env: "B", known: true, current: S.board.env === "B" },
+  ];
+  const el = (tag, cls, text) => new Element(tag, cls, text);
+  const Tf = (f, ...a) => { let i = 0; return f.replace(/%[sd]/g, () => a[i++]); };
+  let accepting = accept;
+  const guide = await loadModules("./guide.js", {
+    "./fields.js": { copyablePath: (n) => n, editablePath: (n) => n, pathContent: (n) => n },
+    "./state.js": { S, $: () => screen, el, api: {
+      GuideFind: async () => games(), GuideAdd: async (gs) => { added.push(...gs); return gs.map((g) => g.name); },
+      GameConfigLists: async (from) => { listCalls.push(from); return ["list of " + from]; },
+      GuideScan: async () => true, GuideDownloadInfo: async () => info(),
+    }, T: s => s, Tf, errText: String, say() {} },
+    "./screens.js": {
+      page: () => el("div"),
+      button: (label, _, action) => { const b = el("button", "", label); b.onclick = action; return b; },
+      seg: (names) => el("div", "seg", names.join("|")),
+      chooseLocalPath() {}, beginPageRead: () => ({ current: () => true, finish() {}, fail(e) { throw e; } }),
+    },
+    "./exchange.js": { exchange() {}, importFrom() {} },
+    "./environment.js": { withEnvironmentSwitch: async (_, run) => { await run(); return accepting; } },
+    "./api.js": { on() {} },
+  }, { Option: class extends Element { constructor(text, value) { super("option", "", text); this.value = value; } }, setTimeout() {} });
+  const ui = { renderWhere() {}, reload: async () => {}, useEnv: async () => {}, go() {} };
+  guide.initGuide(ui);
+  await guide.start("env");
+  const button = (label) => screen.querySelectorAll("button").find((b) => b.textContent === label);
+  const radios = () => screen.querySelectorAll("input").filter((i) => i.type === "radio");
+  return { screen, S, guide, listCalls, added, button, radios, accept: (v) => { accepting = v; } };
+}
+
+test("Add Game Config rereads the current config after a switch", async () => {
+  const h = await addingSetup();
+  assert.deepEqual(h.listCalls, ["A"]);
+  assert.match(h.screen.textContent, /copy the settings of A/);
+  h.S.board.env = "B";
+  await h.guide.envChanged(); await flush();
+  assert.deepEqual(h.listCalls, ["A", "B"]);
+  assert.match(h.screen.textContent, /copy the settings of B/);
+  assert.match(h.screen.textContent, /list of B/);
+  assert.doesNotMatch(h.screen.textContent, /list of A/);
+  // the previous config's game gives way to the new one's, which copies B
+  assert.ok(h.radios()[1].checked);
+  await h.button("add Game Config").onclick(); await flush();
+  assert.equal(h.added[0].like, "B");
+  // a game picked by hand stays picked across a switch
+  const k = await addingSetup();
+  k.radios()[1].onchange(); await flush();
+  k.S.board.env = "C"; await k.guide.envChanged(); await flush();
+  assert.ok(k.radios()[1].checked);
+});
+
+test("a game folder other than the current config's starts with game defaults", async () => {
+  const h = await addingSetup();
+  h.radios()[1].onchange(); await flush();
+  assert.doesNotMatch(h.screen.textContent, /copy the settings of/);
+  assert.match(h.screen.textContent, /A uses another game folder/);
+  await h.button("add Game Config").onclick(); await flush();
+  assert.equal(h.added[0].game, "D:\B");
+  assert.equal(h.added[0].like, "", "env add --like would refuse another game folder");
+  // the current config's own game copies its settings
+  const k = await addingSetup();
+  await k.button("add Game Config").onclick(); await flush();
+  assert.equal(k.added[0].like, "A");
+});
+
+test("an add superseded by another switch leaves the button usable", async () => {
+  const h = await addingSetup({ accept: false });
+  await h.button("add Game Config").onclick(); await flush();
+  assert.equal(h.button("add Game Config").disabled, false);
+});

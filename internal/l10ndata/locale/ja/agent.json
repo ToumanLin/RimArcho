@@ -21,5 +21,8 @@
   "API key stored in Windows Credential Manager": "API キーを Windows 資格情報マネージャーに保存しました",
   "Remove the Archo Agent API key from Windows Credential Manager.": "Windows 資格情報マネージャーから Archo Agent の API キーを削除します。",
   "Archo Agent %s is up to date": "Archo Agent %s は最新です",
+  "remove the API key": "API キーを削除",
+  "remove the Archo Agent API key from Windows Credential Manager": "Windows 資格情報マネージャーから Archo Agent の API キーを削除",
+  "could not remove the Archo Agent API key from Windows Credential Manager; tools and data were kept; retry": "Windows 資格情報マネージャーから Archo Agent の API キーを削除できませんでした。ツールとデータは保持されます。再試行してください。",
   "RimArcho asks GitHub (ToumanLin/ArchoAgent) for a newer Archo Agent; only if there is one it downloads it (about 70 MB), checks its SHA-256 and replaces this one": "RimArcho は GitHub（ToumanLin/ArchoAgent）に新しい Archo Agent があるか確認し、ある場合のみダウンロード（約 70 MB）して SHA-256 を検証し、現在のものと置き換えます"
 }

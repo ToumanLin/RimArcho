@@ -122,35 +122,87 @@ func (a *App) LaunchWith(dryRun, move bool) (*SaveResult, error) {
 }
 
 func (a *App) startGame(p *LaunchPlan) error {
-	// Unity truncates an explicit -logfile instead of preserving the previous run.
-	for i, arg := range p.Args {
-		if arg == "-logfile" && i+1 < len(p.Args) {
-			path := p.Args[i+1]
-			if _, err := os.Stat(path); err == nil {
-				prev := filepath.Join(filepath.Dir(path), "Player-prev.log")
-				if err := os.Remove(prev); err != nil && !os.IsNotExist(err) {
-					return err
-				}
-				if err := os.Rename(path, prev); err != nil {
-					return err
-				}
-			} else if !os.IsNotExist(err) {
-				return err
-			}
+	// Unity truncates an explicit -logfile instead of preserving the previous run, so the
+	// log moves to Player-prev.log first. A launcher that fails started no game: the logs
+	// go back where they were (03 §6.3).
+	var rotated []*logRotation
+	restore := func() {
+		for i := len(rotated) - 1; i >= 0; i-- {
+			rotated[i].undo()
 		}
 	}
-
+	for i, arg := range p.Args {
+		if arg == "-logfile" && i+1 < len(p.Args) {
+			r, err := rotatePlayerLog(p.Args[i+1])
+			if err != nil {
+				restore()
+				return err
+			}
+			rotated = append(rotated, r)
+		}
+	}
 	launcher := a.Launcher
 	if launcher == nil {
 		launcher = ExecLauncher
 	}
-	return launcher(p.Exe, p.Args, p.Dir)
+	if err := launcher(p.Exe, p.Args, p.Dir); err != nil {
+		restore()
+		return err
+	}
+	for _, r := range rotated {
+		r.done()
+	}
+	return nil
+}
+
+// logRotation is one Player.log moved to Player-prev.log before a launch; the older
+// Player-prev.log waits beside it until the launch is known.
+type logRotation struct{ path, prev, kept string }
+
+// rotatePlayerLog moves path to Player-prev.log beside it (nil when path does not exist).
+func rotatePlayerLog(path string) (*logRotation, error) {
+	dir := filepath.Dir(path)
+	r := &logRotation{path: path, prev: filepath.Join(dir, "Player-prev.log"), kept: filepath.Join(dir, "Player-prev.log.rimarcho-kept")}
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	// A kept log left by an interrupted launch is older than Player-prev.log.
+	if err := os.Remove(r.kept); err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+	if err := os.Rename(r.prev, r.kept); err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+	if err := os.Rename(path, r.prev); err != nil {
+		_ = os.Rename(r.kept, r.prev)
+		return nil, err
+	}
+	return r, nil
+}
+
+// undo puts both logs back after a failed launch.
+func (r *logRotation) undo() {
+	if r == nil {
+		return
+	}
+	if err := os.Rename(r.prev, r.path); err == nil {
+		_ = os.Rename(r.kept, r.prev)
+	}
+}
+
+// done forgets the older log once the game started.
+func (r *logRotation) done() {
+	if r != nil {
+		_ = os.Remove(r.kept)
+	}
 }
 
 // gamePlan is how the environment's game is started with userData as its data folder:
 // Steam or the executable, -savedatafolder when it is not the default, the launch arguments.
 func (a *App) gamePlan(e *env.Environment, userData string) (*LaunchPlan, error) {
-	if err := ValidateLaunchArgs(e.Name, a.LaunchArgs(e.ID)); err != nil {
+	if err := validateStoredLaunchArgs(e.Name, a.LaunchArgs(e.ID)); err != nil {
 		return nil, err
 	}
 	p := &LaunchPlan{Method: e.Launch, Dir: e.GameRoot}
@@ -176,7 +228,7 @@ func (a *App) gamePlan(e *env.Environment, userData string) (*LaunchPlan, error)
 		}
 		extra = append(extra, "-savedatafolder="+userData, "-logfile", filepath.Join(userData, "Player.log"))
 	}
-	argv, err := ParseLaunchArgs(a.LaunchArgs(e.ID))
+	argv, err := storedLaunchArgs(a.LaunchArgs(e.ID))
 	if err != nil {
 		return nil, err
 	}

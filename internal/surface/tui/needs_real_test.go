@@ -102,7 +102,7 @@ func TestT8NeedsReal(t *testing.T) {
 			t.Errorf("fold %q: %d parts, keys %s", it.text, len(it.parts), keyList(it))
 		}
 		m.prob.cursor = i
-		m.needsKey("enter")
+		pressNeed(m, "enter")
 		shown := strings.Join(func() []string {
 			var ls []string
 			for _, l := range m.needLines(4000) {
@@ -115,7 +115,7 @@ func TestT8NeedsReal(t *testing.T) {
 				t.Errorf("enter does not show %q", part)
 			}
 		}
-		m.needsKey("enter")
+		pressNeed(m, "enter")
 	}
 	if folds != 1 {
 		t.Errorf("%d folded items, want 1", folds)
@@ -138,7 +138,7 @@ func TestT8NeedsReal(t *testing.T) {
 				key = " "
 			}
 			wasOpen := m.prob.open[text]
-			m.needsKey(key)
+			pressNeed(m, key)
 			if a := m.armed; a != nil { // a destructive key: the second press (16 §6)
 				if !strings.Contains(m.status, "again") {
 					t.Errorf("%q: armed without saying so: %q", text, m.status)

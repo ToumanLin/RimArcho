@@ -666,7 +666,7 @@ func TestNeedsView(t *testing.T) {
 	if m.prob.cursor < 0 {
 		t.Fatalf("items: %q", needItems(fm3))
 	}
-	m.needsKey(" ")
+	pressNeed(m, " ")
 	if !strings.Contains(activeNames(t, e), "Harmony") {
 		t.Fatal("space did not enable Harmony")
 	}
@@ -718,7 +718,7 @@ func TestChangesView(t *testing.T) {
 		t.Fatalf("items: %q", needItems(m))
 	}
 	m.prob.cursor = i
-	m.needsKey("I")
+	pressNeed(m, "I")
 	st, _ := e.App.Loadout()
 	if st.WS.Conflict != 0 || !strings.Contains(m.status, "ignored") {
 		t.Fatalf("I did not dismiss the conflict: %q", m.status)

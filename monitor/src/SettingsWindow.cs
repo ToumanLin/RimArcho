@@ -138,6 +138,9 @@ namespace ArchoMonitor
                 var f = SettingsRecord.Describe(modField.GetValue(__instance) as Mod);
                 if (f.HasValue)
                 {
+                    var file = f.Value;
+                    file.Hash = FileHash(file.Path);
+                    f = file;
                     // the dialog's own heading is the window's title
                     if (items.Count > 0 && items[0].Kind == "label" && items[0].Label == Clean(f.Value.Title)) items.RemoveAt(0);
                     Writer.WriteSettingsWindow(f.Value, items);
@@ -213,6 +216,27 @@ namespace ArchoMonitor
             }
             if (value.Length > MaxText) value = value.Substring(0, MaxText);
             items.Add(new SettingsControl { Kind = kind, Label = label, Value = value, Min = min, Max = max });
+        }
+
+        // FileHash is the settings file as the window opened, before closing it writes the file
+        // again (Dialog_ModSettings.PreClose → Mod.WriteSettings): "sha256:<hex>", "none" when
+        // there is no file, null when the path is unknown or the file cannot be read. RimArcho
+        // compares it with the file now to tell whether a value changed since (16 §2.9).
+        internal static string FileHash(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+            try
+            {
+                if (!System.IO.File.Exists(path)) return "none";
+                using (var sha = System.Security.Cryptography.SHA256.Create())
+                {
+                    var sum = sha.ComputeHash(System.IO.File.ReadAllBytes(path));
+                    var sb = new System.Text.StringBuilder("sha256:", 7 + 64);
+                    foreach (var b in sum) sb.Append(b.ToString("x2", CultureInfo.InvariantCulture));
+                    return sb.ToString();
+                }
+            }
+            catch { return null; }
         }
 
         static string Clean(string s)

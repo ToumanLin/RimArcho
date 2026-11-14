@@ -47,8 +47,11 @@
   "Proton does not support separate saves folders yet": "Proton 暂不支持独立存档目录",
   "own folder in RimArcho": "RimArcho 中的独立目录",
   "these two Game Configs use the same game folder: %s": "这两个游戏配置使用同一个游戏目录：%s",
+  "got it": "知道了",
+  "x: got it, don't show this again": "x：知道了，不再显示",
   "%d other Game Configs use this folder and will change too: %s": "另有 %d 个游戏配置使用此目录，也将随之更改：%s",
   "only Game Config %s changes game folder; other Game Configs stay": "仅游戏配置 %s 更改游戏目录；其他游戏配置保持不变",
+  "no other Game Config uses %s: its %d Mod inventory records and analysis are removed; no files are deleted": "没有其他游戏配置使用 %s：将移除它的 %d 条 Mod 库记录和分析；不删除任何文件",
   "add a Game Config: archo env add <name> --game <folder> --saves own (or --like <config>)": "添加游戏配置：archo env add <name> --game <folder> --saves own（或 --like <config>）",
   "a command, a mod, a Game Config": "命令、Mod 或游戏配置",
   "lists, Game Configs": "列表、游戏配置",
@@ -94,6 +97,7 @@
   "enter a Game Config name": "请输入游戏配置名称",
   "game defaults": "游戏默认",
   "game defaults; no settings or saves are copied": "使用游戏默认设置；不复制设置和存档",
+  "%s uses another game folder, so its settings cannot be copied; no settings or saves are copied": "%s 使用另一个游戏目录，无法复制它的设置；不复制设置和存档",
   "which game is this Game Config for?": "这个游戏配置用哪份游戏？",
   "has a Game Config": "已有游戏配置"
 }

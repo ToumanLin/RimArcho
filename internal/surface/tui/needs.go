@@ -577,6 +577,8 @@ func (m *model) autoFix() tea.Cmd {
 	return nil
 }
 
+// needsKey: Can it run's page keys. The selected item's keys never reach it: key() asks
+// needItemKey first, once, before the global and the page keys.
 func (m *model) needsKey(s string) tea.Cmd {
 	p := &m.prob
 	switch s {
@@ -616,9 +618,6 @@ func (m *model) needsKey(s string) tea.Cmd {
 	case "l":
 		return m.chooseLog()
 	}
-	if cmd, ok := m.needItemKey(s); ok {
-		return cmd
-	}
 	if s == "u" || s == "ctrl+z" { // undo what an item or F just did, as in the window
 		m.act(T("undid the last change"), "undo")
 		m.prob.loaded = false
@@ -627,8 +626,9 @@ func (m *model) needsKey(s string) tea.Cmd {
 	return nil
 }
 
-// needItemKey runs the selected item's action for the key, if it has one. The item's keys
-// come before the global ones: its R (an enabled Mod replaces it, repair the links,
+// needItemKey runs the selected item's action for the key, if it has one. key() calls it
+// before the global keys (except itemlessKeys) and the page keys (needsKey), so the item's
+// keys come first: its R (an enabled Mod replaces it, repair the links,
 // unhide) is not a rescan (VM 2026-11-10: R did nothing on Can it run).
 func (m *model) needItemKey(s string) (tea.Cmd, bool) {
 	p := &m.prob

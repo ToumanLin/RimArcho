@@ -851,6 +851,9 @@ func (a *App) Uninstall(o UninstallOptions, progress func(UninstallProgress)) (*
 			if err := a.uninstallItem(s.Key, it); err != nil {
 				it.Err = err.Error()
 				failed = true
+				if it.Do == "forget-agent-key" {
+					return p, errors.New("could not remove the Archo Agent API key from Windows Credential Manager; tools and data were kept; retry")
+				}
 				if s.Key == UnAccounts {
 					return p, errors.New("could not forget account sessions; tools and data were kept; close the login window and retry")
 				}

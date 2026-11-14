@@ -103,8 +103,9 @@ type ModSettingsDetail struct {
 type SettingsWindowView struct {
 	Seen string `json:"seen"` // the date it was seen
 	Full bool   `json:"full"` // false: the window drew more than Monitor keeps
-	// Older: the file was written after the window was seen (a value changed in that
-	// opening or here), so the window's values may be out of date.
+	// Older: the file differs from the file as the window opened (a value changed in that
+	// opening or here; app.ModSettingsFile.WindowOutdated), so the window's values may be
+	// out of date.
 	Older    bool        `json:"older"`
 	Controls []WindowRow `json:"controls"`
 }
@@ -160,7 +161,7 @@ func ModSettingsFileDetail(sm *app.ModSettingsMod, class string) *ModSettingsDet
 	}
 	if f.Window != nil {
 		d.Window = windowView(f.Window)
-		d.Window.Older = f.Exists && f.Modified.After(f.Window.Seen)
+		d.Window.Older = f.WindowOutdated()
 	}
 	if !f.Exists {
 		d.Notes = []string{T("no file yet: the Mod uses its defaults until its settings are changed in the game")}

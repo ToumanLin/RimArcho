@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"runtime/debug"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -167,6 +169,33 @@ func (m *model) scanSummary(out string) string {
 	return T("scan complete, nothing changed")
 }
 
+// noGameKey: the keys while no Game Config loads (no game added yet, or the current one
+// fails to open). The screen says what to do; only quit, help, the command line (to add a
+// game) and E (another Game Config) work, and every other key says why it does nothing.
+func (m *model) noGameKey(s string) tea.Cmd {
+	switch s {
+	case "q":
+		m.quitting = true
+		return tea.Quit
+	case "?":
+		return m.helpPage()
+	case ":":
+		return m.openCmdLine()
+	case "E":
+		return m.chooseEnv()
+	}
+	if errors.Is(m.loadErr, app.ErrNoEnv) {
+		m.say(sayInfo, T("No game added yet."))
+	} else {
+		m.say(sayFail, m.humanize(m.loadErr.Error()))
+	}
+	return nil
+}
+
+// itemlessKeys are the global keys a Can it run item can never take: quit, help and the
+// command line.
+var itemlessKeys = map[string]bool{"q": true, "?": true, ":": true}
+
 func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	s := keyName(k) // an input method's full-width punctuation as the US key (imekeys.go)
 	if m.uninstallRun != nil {
@@ -199,7 +228,7 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		return m.menuKey(s)
 	case m.pal != nil:
 		return m.paletteKey(k)
-	case s == "ctrl+k" && m.prompt == nil && !m.editing && m.pos == nil:
+	case s == "ctrl+k" && m.prompt == nil && !m.editing && m.pos == nil && m.loadErr == nil:
 		m.panel, m.insp, m.tags = nil, nil, nil
 		return m.openPalette()
 	case m.tags != nil:
@@ -229,7 +258,12 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	case m.full && s != "?":
 		return m.fullKey(s)
 	}
-	if m.tab == tabProblems && s != "q" && s != "?" && s != ":" {
+	if m.loadErr != nil {
+		return m.noGameKey(s) // nothing below has a list or a Game Config to act on
+	}
+	if m.tab == tabProblems && !itemlessKeys[s] {
+		// Can it run: the selected item's keys come before the global and the page keys
+		// (needsKey does not look at them)
 		if cmd, ok := m.needItemKey(s); ok {
 			return cmd
 		}
@@ -611,6 +645,9 @@ func (m *model) panelKey(s string) tea.Cmd {
 	p := m.panel
 	page := max(m.h-bodyTop-4, 1)
 	if p.choices != nil {
+		if f := p.keys[s]; f != nil {
+			return f(m) // the chooser's own keys (the Game Config picker's x)
+		}
 		switch s {
 		case "up", "k":
 			p.choice = max(0, p.choice-1)
@@ -664,19 +701,42 @@ func (m *model) chooseEnv() tea.Cmd {
 		m.say(sayInfo, T("no Game Configs yet (archo env add)"))
 		return nil
 	}
-	p := &panel{title: T("switch Game Config"), nav: 8, choiceCurrent: map[int]bool{}}
+	p := &panel{title: T("switch Game Config"), nav: 8, choiceCurrent: map[int]bool{}, choiceHeads: map[int]string{}}
 	labels := map[string]string{}
-	for i, e := range envs {
-		p.choices = append(p.choices, e.Name)
-		labels[e.Name] = e.Name + "  " + e.Installation
-		if e.Name == m.envName {
-			p.choice = i
-			p.choiceCurrent[i] = true
+	// grouped by installation, in the order the installations first appear (as env list):
+	// a heading with the game and its folder, then its Game Configs (16 §9.1)
+	var games []string
+	byGame := map[string][]view.EnvRow{}
+	for _, e := range envs {
+		if byGame[e.GameID] == nil {
+			games = append(games, e.GameID)
+		}
+		byGame[e.GameID] = append(byGame[e.GameID], e)
+	}
+	for _, g := range games {
+		rows := byGame[g]
+		p.choiceHeads[len(p.choices)] = strings.TrimSpace(rows[0].Installation + "  " + rows[0].Path)
+		for _, e := range rows {
+			if e.Name == m.envName {
+				p.choice = len(p.choices)
+				p.choiceCurrent[p.choice] = true
+			}
+			p.choices = append(p.choices, e.Name)
+			labels[e.Name] = e.Name
 		}
 	}
-	if names := m.app.LegacyInstallationAliases(); len(names) > 0 && m.app.Store.Meta("notice.shared-game-folder") != "seen" {
-		p.lines = []string{Tf("these two Game Configs use the same game folder: %s", strings.Join(names, ", "))}
-		_ = m.app.Store.SetMeta("notice.shared-game-folder", "seen")
+	// the shared-game-folder notice stays until x acknowledges it: opening the picker (or
+	// the window's Game Config page drawing it) is not reading it
+	if text := view.AliasNoticeText(m.app); text != "" {
+		p.lines = []string{text, T("x: got it, don't show this again")}
+		p.keys = map[string]func(*model) tea.Cmd{"x": func(m *model) tea.Cmd {
+			if err := m.app.AcknowledgeAliasNotice(); err != nil {
+				m.say(sayFail, m.humanize(err.Error()))
+				return nil
+			}
+			m.panel.lines, m.panel.keys = nil, nil
+			return nil
+		}}
 	}
 	p.choiceLabels = labels
 	p.choices = append(p.choices, "+ add-environment")
@@ -754,6 +814,9 @@ func (m *model) hit(x, y int) (colKind, int, bool) {
 func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
 	if m.cmdOn {
 		return nil // the command line takes keys only
+	}
+	if m.loadErr != nil && m.panel == nil && m.menu == nil {
+		return nil // no Game Config: nothing on the screen to click (noGameKey)
 	}
 	wheel := 0
 	switch e.Button {

@@ -271,7 +271,8 @@ func (a *App) LegacyInstallationAliases() []string {
 	return out
 }
 
-// EnvGameChangePreview distinguishes relocating siblings from reattaching one environment.
+// EnvGameChangePreview distinguishes relocating siblings from reattaching one environment,
+// and says when reattaching forgets the inventory of an installation left without one.
 func (a *App) EnvGameChangePreview(name, path string) ([]string, error) {
 	e, err := a.Store.EnvByName(name)
 	if err != nil {
@@ -280,22 +281,39 @@ func (a *App) EnvGameChangePreview(name, path string) ([]string, error) {
 	if e == nil {
 		return nil, fmt.Errorf("no Game Config named %q", name)
 	}
+	if canonicalRoot(path) == canonicalRoot(e.GameRoot) {
+		return nil, nil // nothing changes
+	}
 	other, err := a.envOfGame(path)
 	if err != nil {
 		return nil, err
 	}
-	if other != nil && other.GameID != e.GameID {
-		return []string{"only Game Config " + e.Name + " changes game folder; other Game Configs stay"}, nil
-	}
 	es, err := a.Store.Envs()
 	if err != nil {
 		return nil, err
+	}
+	if other != nil && other.GameID != e.GameID {
+		lines := []string{"only Game Config " + e.Name + " changes game folder; other Game Configs stay"}
+		for _, o := range es {
+			if o.GameID == e.GameID && o.ID != e.ID {
+				return lines, nil
+			}
+		}
+		// Store.MoveRecords forgets an installation no environment uses any more.
+		var mods int
+		if err := a.Store.DB.QueryRow(`SELECT count(*) FROM instance WHERE game_id=? AND status='live'`, e.GameID).Scan(&mods); err != nil {
+			return nil, err
+		}
+		return append(lines, fmt.Sprintf("no other Game Config uses %s: its %d Mod inventory records and analysis are removed; no files are deleted", e.GameRoot, mods)), nil
 	}
 	var names []string
 	for _, o := range es {
 		if o.GameID == e.GameID && o.ID != e.ID {
 			names = append(names, o.Name)
 		}
+	}
+	if len(names) == 0 {
+		return nil, nil
 	}
 	return []string{fmt.Sprintf("%d other Game Configs use this folder and will change too: %s", len(names), strings.Join(names, ", "))}, nil
 }

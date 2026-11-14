@@ -42,6 +42,9 @@ type ScanStats struct {
 	Reused     int            `json:"reused"`
 	Snapshots  int            `json:"snapshots"`
 	DurationMS int64          `json:"duration_ms"`
+	// Partial: some sources were left out (GameOnly, Sources). The first scan that is not
+	// partial is the one that finds the library already installed (NewSince).
+	Partial bool `json:"partial,omitempty"`
 }
 
 // ScanReport is the result of Scan.
@@ -259,7 +262,7 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 		return nil, err
 	}
 
-	st := ScanStats{Events: map[string]int{}, Questions: len(res.Questions)}
+	st := ScanStats{Events: map[string]int{}, Questions: len(res.Questions), Partial: partial}
 	for _, s := range listed {
 		ss := SourceStat{Label: s.Label, Kind: string(s.Kind), Status: s.Status}
 		if x := sstats[s.ID]; x != nil {
