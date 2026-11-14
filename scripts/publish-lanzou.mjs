@@ -91,8 +91,10 @@ async function main() {
   await page.evaluate(() => f_upc());
   await page.waitForSelector("input[type=file][name=file]", { state: "attached", timeout: 15000 });
   await page.setInputFiles("input[type=file][name=file] >> nth=0", [zip.replaceAll("\\", "/")]);
-  await page.waitForSelector("text=开始上传", { timeout: 15000 });
-  await page.click("text=开始上传", { label: "start Lanzou upload" });
+  // The console's "start upload" button, escaped so source files stay free of CJK text.
+  const start = "text=\u5f00\u59cb\u4e0a\u4f20";
+  await page.waitForSelector(start, { timeout: 15000 });
+  await page.click(start, { label: "start Lanzou upload" });
 
   const deadline = Date.now() + 10 * 60 * 1000;
   let uploaded = null;
