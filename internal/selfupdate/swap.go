@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 )
 
 var rename = os.Rename
@@ -19,7 +21,9 @@ type Swap struct {
 	Version string
 	journal string
 	plan    []journalEntry
-	steps   []swapStep
+	// manifest is the installed entries Commit records (ApplyRelease only).
+	manifest []string
+	steps    []swapStep
 }
 
 type swapStep struct {
@@ -46,11 +50,15 @@ type swapJournal struct {
 	Stage   string         `json:"stage"`
 	Old     string         `json:"old"`
 	Entries []journalEntry `json:"entries"`
+	// Manifest is what Commit records as installed (ApplyRelease only).
+	Manifest []string `json:"manifest,omitempty"`
 }
 
 type journalEntry struct {
 	Name   string `json:"name"`
 	HadOld bool   `json:"hadOld,omitempty"`
+	// Remove: the previous release's entry has no successor; it is only moved to Old.
+	Remove bool `json:"remove,omitempty"`
 }
 
 // Apply moves old files aside before installing staged entries, undoing failed replacements.
@@ -62,6 +70,18 @@ func Apply(program, stage, old string) (*Swap, error) {
 // and the version being installed. The caller removes it with Commit once the new files
 // are confirmed; Rollback removes it once the old files are back.
 func ApplyRecorded(program, stage, old, journal, version string) (*Swap, error) {
+	return apply(program, stage, old, journal, version, false)
+}
+
+// ApplyRelease is ApplyRecorded for a self-update: every top-level entry of stage replaces
+// its namesake, and entries the previous release installed (Installed) that stage no
+// longer has are moved to old as well, so Rollback puts them back. Commit then records
+// stage's entries (WriteManifest).
+func ApplyRelease(program, stage, old, journal, version string) (*Swap, error) {
+	return apply(program, stage, old, journal, version, true)
+}
+
+func apply(program, stage, old, journal, version string, release bool) (*Swap, error) {
 	for _, dir := range []string{program, stage} {
 		info, err := os.Stat(dir)
 		if err != nil {
@@ -71,23 +91,38 @@ func ApplyRecorded(program, stage, old, journal, version string) (*Swap, error) 
 			return nil, fmt.Errorf("update path %q is not a directory", dir)
 		}
 	}
+	staged, err := Entries(stage)
+	if err != nil {
+		return nil, err
+	}
 	var entries []journalEntry
-	for _, name := range Files {
-		if _, err := os.Lstat(filepath.Join(stage, name)); errors.Is(err, os.ErrNotExist) {
-			continue
-		} else if err != nil {
-			return nil, err
-		}
+	for _, name := range staged {
 		_, err := os.Lstat(filepath.Join(program, name))
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return nil, err
 		}
 		entries = append(entries, journalEntry{Name: name, HadOld: err == nil})
 	}
+	if release {
+		for _, name := range Installed(program) {
+			if slices.ContainsFunc(staged, func(n string) bool { return strings.EqualFold(n, name) }) {
+				continue
+			}
+			if _, err := os.Lstat(filepath.Join(program, name)); errors.Is(err, os.ErrNotExist) {
+				continue
+			} else if err != nil {
+				return nil, err
+			}
+			entries = append(entries, journalEntry{Name: name, HadOld: true, Remove: true})
+		}
+	}
 	if err := os.Mkdir(old, 0o755); err != nil {
 		return nil, err
 	}
 	s := &Swap{Program: program, Stage: stage, Old: old, Version: version, journal: journal, plan: entries}
+	if release {
+		s.manifest = staged
+	}
 	if err := s.record(SwapReplacing); err != nil {
 		os.Remove(old)
 		return nil, err
@@ -96,7 +131,9 @@ func ApplyRecorded(program, stage, old, journal, version string) (*Swap, error) 
 		if e.HadOld {
 			s.steps = append(s.steps, swapStep{from: filepath.Join(program, e.Name), to: filepath.Join(old, e.Name), undone: true})
 		}
-		s.steps = append(s.steps, swapStep{from: filepath.Join(stage, e.Name), to: filepath.Join(program, e.Name), undone: true})
+		if !e.Remove {
+			s.steps = append(s.steps, swapStep{from: filepath.Join(stage, e.Name), to: filepath.Join(program, e.Name), undone: true})
+		}
 	}
 	if err := s.forward(); err != nil {
 		return nil, errors.Join(err, s.Rollback())
@@ -131,7 +168,7 @@ func (s *Swap) record(state string) error {
 	}
 	dir := filepath.Dir(s.journal)
 	rel := func(p string) (string, error) { return filepath.Rel(dir, p) }
-	j := swapJournal{State: state, Version: s.Version, Entries: s.plan}
+	j := swapJournal{State: state, Version: s.Version, Entries: s.plan, Manifest: s.manifest}
 	var err error
 	if j.Program, err = rel(s.Program); err != nil {
 		return err
@@ -167,6 +204,15 @@ func (s *Swap) record(state string) error {
 // Commit confirms the new files: the journal is removed, the old files stay in Old for
 // the caller's later clean-up.
 func (s *Swap) Commit() error {
+	if s.manifest != nil {
+		if err := WriteManifest(s.Program, s.manifest); err != nil {
+			return err
+		}
+	}
+	return s.removeJournal()
+}
+
+func (s *Swap) removeJournal() error {
 	if s.journal == "" {
 		return nil
 	}
@@ -207,7 +253,7 @@ func (s *Swap) Rollback() error {
 		}
 	}
 	if len(errs) == 0 {
-		errs = append(errs, s.Commit())
+		errs = append(errs, s.removeJournal())
 	}
 	return errors.Join(errs...)
 }
@@ -232,7 +278,7 @@ func Resume(journal string) (*Swap, string, error) {
 		return nil, "", fmt.Errorf("update journal %s has unknown state %q", journal, j.State)
 	}
 	dir := filepath.Dir(journal)
-	s := &Swap{Program: filepath.Join(dir, j.Program), Stage: filepath.Join(dir, j.Stage), Old: filepath.Join(dir, j.Old), Version: j.Version, journal: journal, plan: j.Entries}
+	s := &Swap{Program: filepath.Join(dir, j.Program), Stage: filepath.Join(dir, j.Stage), Old: filepath.Join(dir, j.Old), Version: j.Version, journal: journal, plan: j.Entries, manifest: j.Manifest}
 	exists := func(p string) (bool, error) {
 		_, err := os.Lstat(p)
 		if err == nil {
@@ -253,6 +299,12 @@ func Resume(journal string) (*Swap, string, error) {
 				return nil, "", err
 			}
 			s.steps = append(s.steps, swapStep{from: filepath.Join(s.Program, e.Name), to: filepath.Join(s.Old, e.Name), undone: !moved})
+		}
+		if e.Remove {
+			if !e.HadOld {
+				return nil, "", fmt.Errorf("update journal %s removes %q without moving it", journal, e.Name)
+			}
+			continue
 		}
 		staged, err := exists(filepath.Join(s.Stage, e.Name))
 		if err != nil {

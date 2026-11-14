@@ -305,7 +305,7 @@ func TestSelfUpdateInstallWaitsForOthersThenSwaps(t *testing.T) {
 	e.App.CleanSelfUpdate()
 	left, _ := os.ReadDir(dir)
 	for _, d := range left {
-		if d.Name() != "lock" {
+		if d.Name() != "lock" && d.Name() != "files.json" {
 			t.Fatal("left after clean-up:", d.Name())
 		}
 	}
@@ -491,7 +491,7 @@ func TestSelfUpdateKilledMidSwapIsSettledNextStart(t *testing.T) {
 			}
 			left, _ := os.ReadDir(dir)
 			for _, d := range left {
-				if d.Name() != "lock" {
+				if d.Name() != "lock" && d.Name() != "files.json" {
 					t.Fatal("left after clean-up:", d.Name())
 				}
 			}

@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 
@@ -23,6 +24,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/scan"
 	"github.com/ToumanLin/RimArcho/internal/secret"
+	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
@@ -647,7 +649,13 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 		prog = append(prog, &UninstallItem{Path: filepath.Dir(exe), Do: DoLeave, Note: "a development build: the program is not removed"})
 	case exe != "":
 		dir := filepath.Dir(exe)
-		for _, n := range releaseFiles {
+		names := slices.Clone(releaseFiles)
+		for _, n := range selfupdate.Installed(dir) { // entries later releases added (17 §5.1)
+			if !slices.ContainsFunc(names, func(m string) bool { return strings.EqualFold(m, n) }) {
+				names = append(names, n)
+			}
+		}
+		for _, n := range names {
 			path := filepath.Join(dir, n)
 			fi, err := os.Lstat(path)
 			if err != nil {

@@ -84,7 +84,9 @@ Copy-Item README.md, CHANGELOG.md, LICENSE $out
 
 # README.zh-CN.md and skills/ (agent skills, such as rimworld-probe) from 1.0.6 on: 1.0.0's
 # own update rejects a zip with top-level entries it does not know, and 1.0.5 knows these
-# (selfupdate.Files). Only files tracked by git go in, never local build output.
+# (selfupdate.Files). Updaters up to 1.0.x accept only selfupdate.Files, so the first release
+# after 1.0.x packs nothing else; from the next one a new top-level entry may be added here
+# directly (17 §5.1 step 3). Only files tracked by git go in, never local build output.
 if ([version]($Version -replace '[-+].*$', '') -ge [version]"1.0.6") {
     Copy-Item README.zh-CN.md $out
     $skillFiles = @(git ls-files skills)

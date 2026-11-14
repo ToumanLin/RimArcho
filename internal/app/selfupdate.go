@@ -27,7 +27,7 @@ import (
 // UpdateDirName is the folder inside the program folder that holds the download, the
 // unpacked new files and the old files moved aside; on the program's volume so the swap
 // is renames only (17 §5.1, 02 §1).
-const UpdateDirName = ".archo-update"
+const UpdateDirName = selfupdate.UpdateDir
 
 // UpdatedFromEnv carries the pid of the process that installed an update to the program it
 // restarted: the new one waits for it to exit before removing the old files.
@@ -340,7 +340,7 @@ func (a *App) installSelfUpdate(ctx context.Context, picked string, step func(Se
 	defer swapping.Done()
 	step(SelfUpdateStep{Phase: "replace"})
 	old := filepath.Join(dir, fmt.Sprintf("old-%s-%d", cur, time.Now().UnixNano()))
-	swap, err := selfupdate.ApplyRecorded(program, stage, old, journal, r.Version)
+	swap, err := selfupdate.ApplyRelease(program, stage, old, journal, r.Version)
 	if err != nil {
 		return nil, fmt.Errorf("could not replace the program files; RimArcho %s is unchanged: %w", cur, err)
 	}
@@ -359,7 +359,7 @@ func (a *App) installSelfUpdate(ctx context.Context, picked string, step func(Se
 	return &SelfUpdateResult{From: cur, To: r.Version, Program: program}, nil
 }
 
-// swapJournalName is the swap's record in the update folder (selfupdate.ApplyRecorded):
+// swapJournalName is the swap's record in the update folder (selfupdate.ApplyRelease):
 // present only while program files are being replaced or put back.
 const swapJournalName = "swap.json"
 
