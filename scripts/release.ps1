@@ -47,6 +47,10 @@ $name = "archo-$Version-$GOOS-$GOARCH"
 $OutputDir = [IO.Path]::GetFullPath($OutputDir)
 $out = Join-Path $OutputDir $name
 if (Test-Path $out) { Remove-Item -Recurse -Force $out }
+# A rebuild of the same version (after committing) replaces the archive and its checksum too.
+foreach ($old in "$out.zip", "$out.zip.sha256", "$out.tar.gz", "$out.tar.gz.sha256") {
+    if (Test-Path -LiteralPath $old) { Remove-Item -LiteralPath $old }
+}
 New-Item -ItemType Directory -Force $out | Out-Null
 
 $pkg = "github.com/ToumanLin/RimArcho/internal/buildinfo"
@@ -124,4 +128,20 @@ Get-ChildItem -LiteralPath $out -Recurse -File | ForEach-Object { "  {0}  {1:N0}
 if ($GOOS -eq "windows" -and $env:OS -eq "Windows_NT") { & (Join-Path $out $exe) version }
 if ($GOOS -eq "windows") {
     & $PSCommandPath -Version $Version -GOOS linux -GOARCH $GOARCH -OutputDir $OutputDir -SkipTests
+    # The publishing steps (17 §5 steps 7-10), in order; this script runs none of them.
+    $root = (Get-Location).Path
+    $zip = Join-Path $OutputDir "archo-$Version-windows-amd64.zip"
+    $built = Join-Path $out "archo.exe"
+    $lanzou = "file:///" + ((Join-Path $PSScriptRoot "publish-lanzou.mjs") -replace '\\', '/')
+    Write-Host ""
+    Write-Host "built $Version; to publish (spec 17, section 5), from $root, after committing and pushing:"
+    Write-Host "  7. GitHub:   pwsh scripts/publish-github.ps1 -Version $Version -DryRun   (then without -DryRun)"
+    if ($Version -match '-') {
+        Write-Host "  prerelease: GitHub only; no Lanzou, no Workshop"
+    } else {
+        Write-Host "  8. Lanzou:   ego-browser nodejs -e `"await import('$lanzou`?zip=$($zip -replace '\\', '/')')`""
+        Write-Host "  9. Workshop: $built workshop publish --version $Version --dry-run   (then without --dry-run)"
+        Write-Host " 10. Verify:   an older build's 'archo update --check' lists github, monitor and lanzou with $Version"
+    }
+    if ($commit -match '-dirty') { Write-Host "warning: built from a dirty tree; publish-github.ps1 refuses it. Commit and rebuild." }
 }
