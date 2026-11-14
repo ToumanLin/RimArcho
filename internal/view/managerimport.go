@@ -14,6 +14,12 @@ func init() {
 	}
 }
 
+// ManagerTags names the tags a migration makes for another manager's colour marks and
+// ignored warnings (07 §6.4), in the player's language.
+func ManagerTags() app.ManagerTagNames {
+	return app.ManagerTagNamesIn(Lang())
+}
+
 // ManagerImportText is the preview and result of a player-data migration.
 func ManagerImportText(r *app.RimCrowReport) string { return managerImportText(r, true) }
 
@@ -25,11 +31,15 @@ func managerImportText(r *app.RimCrowReport, profiles bool) string {
 		Tf("aliases: %d new, %d already present", r.AliasNew, r.AliasSame),
 		Tf("notes: %d new, %d already present", r.NoteNew, r.NoteSame),
 		Tf("tags: %d new, %d already present", r.TagNew, r.TagSame),
+		Tf("tag colours: %d", r.TagColors),
 		Tf("rules: %d new, %d already present, %d skipped", r.RuleNew, r.RuleSame, len(r.RulesSkipped)),
 	}
 
+	if r.NotesAndTags {
+		lines = lines[1:4]
+	}
 	if r.DB == "" {
-		lines = lines[3:]
+		lines = lines[4:]
 	} else {
 		lines = append([]string{Tf("mods with data: %d, matched: %d, not matched: %d", r.Records, r.ByPath+r.ByPackage, len(r.Unmapped))}, lines...)
 	}

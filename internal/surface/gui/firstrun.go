@@ -126,6 +126,9 @@ func managerSignature(kind, path string) string {
 	if kind == "rimcrow" {
 		paths = append(paths, path+"-wal", filepath.Join(filepath.Dir(path), "rules", "user_rules.json"))
 	}
+	if kind == "rimsort-aux" {
+		paths = append(paths, path+"-wal")
+	}
 	for _, p := range paths {
 		hash.Write([]byte(p))
 		file, err := os.Open(p)
@@ -147,7 +150,9 @@ func (s *API) managerReport(kind, path string, dry bool) (string, error) {
 	var err error
 	switch kind {
 	case "rimcrow":
-		r, err = s.a.ImportRimCrow(app.RimCrowOptions{DB: path, DryRun: dry})
+		r, err = s.a.ImportRimCrow(app.RimCrowOptions{DB: path, DryRun: dry, Tags: view.ManagerTags()})
+	case "rimsort-aux":
+		r, err = s.a.ImportRimSortAux(app.RimSortAuxOptions{DB: path, DryRun: dry, Tags: view.ManagerTags()})
 	case "rimsort-rules":
 		r, err = s.a.ImportRimSortRules(path, dry)
 	default:
@@ -224,7 +229,7 @@ func (s *API) applyManagerImport(request uint64, ids []string, selected bool) (s
 	}
 	var text string
 	if p.Kind == "rimcrow" && selected {
-		r, e := s.a.ImportRimCrow(app.RimCrowOptions{DB: p.Path, SelectProfiles: true, ProfileIDs: ids})
+		r, e := s.a.ImportRimCrow(app.RimCrowOptions{DB: p.Path, SelectProfiles: true, ProfileIDs: ids, Tags: view.ManagerTags()})
 		err = e
 		if e == nil {
 			text = view.ManagerImportText(r)
@@ -240,6 +245,9 @@ func (s *API) applyManagerImport(request uint64, ids []string, selected bool) (s
 func (s *API) FinishWorkshopRelocation() error { return s.a.FinishWorkshopRelocation() }
 
 func (s *API) ManagerFileKind(path string) string {
+	if strings.EqualFold(filepath.Base(path), "aux_metadata.db") {
+		return "rimsort-aux"
+	}
 	if strings.EqualFold(filepath.Ext(path), ".db") {
 		return "rimcrow"
 	}

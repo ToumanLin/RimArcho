@@ -80,7 +80,7 @@ async function discoverManagers(body) {
     status.textContent = rows?.length ? "" : T("No RimSort, RimCrow or RimPy data found.");
     for (const row of rows || []) {
       const line = el("div", "xc-row");
-      const kind = { list: "list", rimcrow: "player data", "rimsort-rules": "user rules" }[row.kind];
+      const kind = { list: "list", rimcrow: "player data", "rimsort-aux": "player data", "rimsort-rules": "user rules" }[row.kind];
       line.append(button(row.manager, "", () => managerPreview(row)), el("span", "muted xc-kind", T(kind)), copyablePath(el("span", "muted", row.path), row.path));
       candidates.append(line);
     }

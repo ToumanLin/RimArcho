@@ -367,11 +367,14 @@ Profile environments and their independent current plans follow 03 §6.4. The sa
    | RimCrow | RimArcho |
    | --- | --- |
    | Alias, note | Alias, note; do not overwrite differing existing values, report conflicts |
-   | Groups, tags | Tags |
+   | Groups, tags | Tags; a group's colour becomes its tag's colour unless it is RimCrow's default white or the tag already has one |
+   | sign_color (a Mod's colour mark) | A tag `RimCrow colour #rrggbb` with that colour (§6.4) |
+   | ignored_issues (any) | A tag `RimCrow: ignored warnings` (§6.4); the issue IDs themselves are RimCrow's and are not kept |
    | Interlock | `attach` rule |
    | `user_rules.json` loadAfter / loadBefore / incompatibleWith | `after` / `before` / `incompatible` |
    | `user_rules.json` loadTop / loadBottom (`value` true) | `top` / `bottom` (08 §1.5) |
-   | sign_color, user_mod_type, ignored_issues | No equivalent; count only |
+   | user_mod_type; a colour that is not hex | No equivalent; count only |
+   | subscribed collections, GitHub install records, profile inactive/temporary orders, the Workshop cache database | Not read |
 
 5. **Disabled** RimCrow user rules are left out unless `--include-disabled-rules` is given; importing them silently would change sorting.
 6. Report the mapped counts (by path or packageId), imported, already existing and conflicting; list every unmapped or conflicting item, and the count of resources disabled in RimCrow. Count the directories that have only About.xml.disabled, by source, with what to do (rename them back, or enable them again in RimCrow, then `archo scan`; or unsubscribe or delete them; RimArcho's handling: 09 §5).
@@ -383,6 +386,7 @@ The GUI profile checklist selects which RimCrow profiles become Game Configs (03
 The GUI's Import page (16 §2.18) discovers sources read-only with `app.DiscoverManagerImports`:
 
 - RimSort: `%LOCALAPPDATA%\RimSort` (Windows `platformdirs`, `appauthor=False`), with `%APPDATA%\RimSort` as a compatibility candidate; `modlists/`, `dbs/userRules.json`, and `settings.json`'s legacy `config_folder` or each `instances` entry's `config_folder` for ModsConfig.xml. Portable/development candidates also check the program folder and its `data/` child.
+- RimSort's local database: `instances/<instance>/aux_metadata.db` under the RimSort folder (at most 16 instances), `aux_metadata.db` in the folder itself, and `<instance_folder_override>/<instance>/aux_metadata.db` for an instance whose settings move it (§6.4).
 - RimCrow: `<install>/data/mod_manager.db`; also a directly selected/recent data folder's `mod_manager.db`. Saved lists come from `<install>/backups/`, its `today`, `earlier`, `other` children, and up to 16 profile directories under `backups/profile/`.
 - RimPy: `ModLists/` in its data folder, `LocalLow\RimPy Mod Manager` beside `%APPDATA%` (Roaming). Its lists are read as any list (§7.2); the folder's `config.ini` is not read. The file format of RimPy's saved lists is not documented; a synthetic ModsConfig-style list is tested, a real RimPy file is a VM check.
 - Install candidates: running RimCrow/RimModManager/RimSort executable directories; named folders in Program Files, Local AppData/Programs, Local AppData, Downloads, Desktop, Games and beside RimArcho's parent folder; named Start-menu shortcuts and recent-folder shortcuts. Windows shortcut resolution is read-only, hidden and limited to four seconds and 200 shortcuts per root. No registry registration is assumed. Each list folder contributes at most its first 100 entries. Duplicate source paths are suppressed; inaccessible or absent locations are skipped.
@@ -394,6 +398,26 @@ Measured on real data: 18 §3.
 ### 6.3 RimSort user rules
 
 `app.ImportRimSortRules` reads `dbs/userRules.json` (at most 4 MB) without modifying it. Its `rules` map imports loadAfter/loadBefore/incompatibleWith and true loadTop/loadBottom values as after/before/incompatible/top/bottom user rules. A packageId must resolve to one live Lineage; missing or ambiguous packages are skipped and reported. Existing kind + Lineage rules are deduplicated, including repeats in the input; unsupported fields are counted. Preview and confirmation follow 16 §2.15; applying rules does not sort a plan or write ModsConfig.xml. RimSort's application settings and community databases are discovery inputs, not settings to apply to RimArcho.
+
+### 6.4 RimSort local database and colour marks
+
+`archo import rimsort --db <aux_metadata.db> [--dry-run] [--all]`; in the GUI, the Import page's "found on this computer" (16 §2.18) or its file dialog (a file named `aux_metadata.db`).
+
+RimSort keeps one SQLite database per instance (SQLAlchemy). `app.ImportRimSortAux` copies it with its WAL and opens the copy read-only, as §6.2 does. It reads:
+
+| RimSort | RimArcho |
+| --- | --- |
+| `auxiliary_metadata.user_notes` | Note; a differing existing note is kept and reported |
+| `mod_tags` through `tags_table` | Tags |
+| `auxiliary_metadata.color_hex` (QColor `#rrggbb` or `#aarrggbb`) | A tag `RimSort colour #rrggbb` with that colour; another value is counted as not mapped |
+| `auxiliary_metadata.ignore_warnings` true | A tag `RimSort: ignored warnings` |
+| `type`, ACF and Workshop times, `outdated`, `db_time_touched` | Not read: RimSort's own cache |
+
+The preview and report show the Mods with data and how they matched, notes, tags and tag colours; there are no aliases or rules in this source.
+
+A row is keyed by the Mod folder's absolute path: it maps to the Lineage of the live Instance at that path, else to the single Lineage whose Workshop ID is `published_file_id`; otherwise it is reported as not installed or ambiguous. Rows with none of the player's data are not counted. Columns missing in older databases are read as empty.
+
+RimArcho keeps colours on tags (16 §3.8), not on Mods, so a colour mark from either manager (§6.2) becomes a tag named after the manager and the colour, coloured with it; the Mod's rows then take the colour as long as that tag is its first coloured one. "Ignore warnings" becomes a tag so the player keeps the information; it does not hide anything in Can it run. The tag names follow `ui.lang`, from the locale's supplemental table (`app.ManagerTagNamesIn`, keys `@tag.manager-colour` and `@tag.manager-ignore`), so the window and the CLI write the same names; after the language changes, importing again adds the tags under the new names. A tag that already has a colour keeps it. Running the import again changes nothing.
 
 ## 7. List exchange
 

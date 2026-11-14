@@ -29,6 +29,9 @@ type RimCrowReport struct {
 	DB, Rules string
 	Profiles  []RCProfile
 	DryRun    bool
+	// NotesAndTags: the source has only notes and tags (RimSort's local database), so a
+	// report leaves out aliases and rules
+	NotesAndTags bool
 
 	Records, ByPath, ByPackage int // mod records carrying data, and how they mapped
 	Unmapped                   []RCItem
@@ -37,6 +40,7 @@ type RimCrowReport struct {
 	Conflicts                              []RCItem // RimArcho already has a different value
 
 	Groups, Memberships, TagNew, TagSame int
+	TagColors                            int // tags given a colour (a Mod's colour mark, a group's colour)
 
 	RulesTotal, RuleNew, RuleSame int
 	RulesDisabled                 bool // user rules are switched off in RimCrow
@@ -57,6 +61,7 @@ type RimCrowOptions struct {
 	ProfileIDs           []string
 	DryRun               bool
 	IncludeDisabledRules bool
+	Tags                 ManagerTagNames
 }
 
 // openCopy copies a SQLite database (and its WAL) to a temp dir and opens the copy
@@ -102,8 +107,9 @@ func copyPlain(src, dst string) error {
 }
 
 type crowMod struct {
-	alias, note string
-	tags        []string
+	alias, note, color string
+	ignore             bool
+	tags               []string
 }
 
 // ImportRimCrow maps RimCrow's aliases, notes, groups (as tags), tags, interlocks (as
@@ -228,19 +234,20 @@ func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
 		var tl, il []string
 		json.Unmarshal([]byte(tags), &tl)
 		json.Unmarshal([]byte(ign), &il)
-		if strings.TrimSpace(alias) != "" || strings.TrimSpace(note) != "" || len(tl) > 0 {
+		if color != "" && managerHex(color) == "" {
+			rep.NotMapped["sign_color"]++ // not a colour RimArcho can read
+			color = ""
+		}
+		// a colour mark and ignored issues become tags (07 §6.4); RimCrow's issue IDs
+		// themselves have no RimArcho equivalent
+		if strings.TrimSpace(alias) != "" || strings.TrimSpace(note) != "" || len(tl) > 0 || color != "" || len(il) > 0 {
 			m := get(id)
 			m.alias, m.note = strings.TrimSpace(alias), strings.TrimSpace(note)
 			m.tags = append(m.tags, tl...)
-		}
-		if color != "" {
-			rep.NotMapped["sign_color"]++
+			m.color, m.ignore = color, len(il) > 0
 		}
 		if typ != "" {
 			rep.NotMapped["user_mod_type"]++
-		}
-		if len(il) > 0 {
-			rep.NotMapped["ignored_issues"]++
 		}
 		if lock != "" && !contains(interlocks, lock) {
 			interlocks = append(interlocks, lock)
@@ -248,14 +255,18 @@ func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
 	}
 	rows.Close()
 	groups := map[string]string{}
-	rows, err = db.Query(`SELECT group_id, name FROM groupdata`)
+	groupColor := map[string]string{} // group name → its colour (RimCrow's default white left out)
+	rows, err = db.Query(`SELECT group_id, name, coalesce(color,'') FROM groupdata`)
 	if err != nil {
 		return nil, err
 	}
 	for rows.Next() {
-		var id, name string
-		rows.Scan(&id, &name)
+		var id, name, color string
+		rows.Scan(&id, &name, &color)
 		groups[id] = strings.TrimSpace(name)
+		if hex := managerHex(color); hex != "" && hex != "#ffffff" {
+			groupColor[strings.TrimSpace(name)] = hex
+		}
 	}
 	rows.Close()
 	rep.Groups = len(groups)
@@ -275,6 +286,10 @@ func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
 	rows.Close()
 
 	pd, err := a.Store.PlayerDataAll(ix.Env.ID)
+	if err != nil {
+		return nil, err
+	}
+	tagger, err := a.newTagImport(ix.Env.ID, opt.DryRun, rep)
 	if err != nil {
 		return nil, err
 	}
@@ -329,19 +344,25 @@ func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
 			cur.Note = cm.note
 		}
 		for _, t := range cm.tags {
-			if t = strings.TrimSpace(t); t == "" {
-				continue
+			if err := tagger.add(lin, cur, t); err != nil {
+				return nil, err
 			}
-			if containsFold(cur.Tags, t) {
-				rep.TagSame++
-				continue
+			if err := tagger.color(t, groupColor[strings.TrimSpace(t)]); err != nil {
+				return nil, err
 			}
-			cur.Tags = append(cur.Tags, t)
-			rep.TagNew++
-			if !opt.DryRun {
-				if _, err := a.Store.AddTag(ix.Env.ID, lin, t); err != nil {
-					return nil, err
-				}
+		}
+		if hex := managerHex(cm.color); hex != "" {
+			name := opt.Tags.color("RimCrow", hex)
+			if err := tagger.add(lin, cur, name); err != nil {
+				return nil, err
+			}
+			if err := tagger.color(name, hex); err != nil {
+				return nil, err
+			}
+		}
+		if cm.ignore {
+			if err := tagger.add(lin, cur, opt.Tags.ignore("RimCrow")); err != nil {
+				return nil, err
 			}
 		}
 	}

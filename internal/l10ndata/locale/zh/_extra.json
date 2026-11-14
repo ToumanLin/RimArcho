@@ -78,5 +78,7 @@
   "see dependencies (can it run)": "看依赖（能不能跑）",
   "the DDS encoder (todds) is not installed: install it in Library > Texture optimisation": "没有安装 DDS 转换工具（todds）：在 库 › 贴图优化 安装",
   "the choices changed since this count; “count the textures” counts again": "选项改过了，下面是按之前选项的统计；点「扫描统计」重新统计",
-  "the textures changed since this count; “count the textures” counts again": "贴图之后有变化，下面是之前的统计；点「扫描统计」重新统计"
+  "the textures changed since this count; “count the textures” counts again": "贴图之后有变化，下面是之前的统计；点「扫描统计」重新统计",
+  "@tag.manager-colour": "%s 颜色 %s",
+  "@tag.manager-ignore": "%s：忽略的警告"
 }

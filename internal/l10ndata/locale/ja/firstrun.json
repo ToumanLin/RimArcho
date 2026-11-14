@@ -61,5 +61,6 @@
   "more than one installed Mod matches this packageId": "このpackageIdに一致するMODが複数あります",
   "mods with data: %d, matched: %d, not matched: %d": "データのあるMOD：%d件、一致：%d件、不一致：%d件",
   "not installed here": "ここにはインストールされていません",
-  "user rules are switched off in RimCrow (--include-disabled-rules)": "RimCrowでユーザールールが無効です（--include-disabled-rules）"
+  "user rules are switched off in RimCrow (--include-disabled-rules)": "RimCrowでユーザールールが無効です（--include-disabled-rules）",
+  "tag colours: %d": "タグの色：%d"
 }

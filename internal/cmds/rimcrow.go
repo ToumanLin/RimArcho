@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/l10ndata"
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
@@ -20,7 +21,8 @@ func importRimCrowCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if db == "" {
 		return nil, &UsageError{Msg: `--db <path>: RimCrow's database, <RimCrow folder>\data\mod_manager.db`}
 	}
-	rep, err := c.App.ImportRimCrow(app.RimCrowOptions{DB: db, Rules: a.Str("rules"), DryRun: a.Bool("dry-run"), IncludeDisabledRules: a.Bool("include-disabled-rules")})
+	tags := app.ManagerTagNamesIn(l10ndata.ResolveLang(Setting(c.App, "ui.lang")))
+	rep, err := c.App.ImportRimCrow(app.RimCrowOptions{DB: db, Rules: a.Str("rules"), DryRun: a.Bool("dry-run"), IncludeDisabledRules: a.Bool("include-disabled-rules"), Tags: tags})
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +56,7 @@ func importRimCrowCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	root.KV("mods", fmt.Sprintf("%d with data: %d mapped (%d by path, %d by packageId), %d not mapped", rep.Records, mapped, rep.ByPath, rep.ByPackage, len(rep.Unmapped)))
 	root.KV("aliases", fmt.Sprintf("%d new, %d already set", rep.AliasNew, rep.AliasSame))
 	root.KV("notes", fmt.Sprintf("%d new, %d already set", rep.NoteNew, rep.NoteSame))
-	root.KV("tags", fmt.Sprintf("%d new, %d already present (%d groups, %d memberships)", rep.TagNew, rep.TagSame, rep.Groups, rep.Memberships))
+	root.KV("tags", fmt.Sprintf("%d new, %d already present (%d groups, %d memberships), %d tags given a colour", rep.TagNew, rep.TagSame, rep.Groups, rep.Memberships, rep.TagColors))
 	rules := fmt.Sprintf("%d: %d new, %d already present, %d skipped", rep.RulesTotal, rep.RuleNew, rep.RuleSame, len(rep.RulesSkipped))
 	if rep.RulesDisabled {
 		rules += " (user rules are switched off in RimCrow)"

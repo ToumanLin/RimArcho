@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- RimSort's local database is imported too: each instance's notes and tags. A Mod's colour from RimSort or RimCrow becomes a tag with that colour ("RimSort colour #e06c75"), "ignore warnings" in RimSort and ignored issues in RimCrow become a tag, and RimCrow group colours become their tags' colours. The Import page finds each RimSort instance's `aux_metadata.db`. New CLI command `archo import rimsort --db <aux_metadata.db> [--dry-run]`; `archo import rimcrow` (and its MCP tool) reports the tag colours it set.
 - Import has its own entry in the sidebar (under Library). The page first shows what other managers left on this computer, RimSort, RimCrow and now RimPy, then takes a file or pasted text. Its one "choose a file…" accepts lists, saves, packs (.archopack) and RimCrow or RimSort data, and sends each to the right preview. `i`, a dropped file, Settings' import row and the guide's "move over" all open this page.
 - RimPy's saved lists (in `AppData\LocalLow\RimPy Mod Manager\ModLists`) are found and can be imported like RimSort's.
 - Add Game Config is a page again, the guide's page, instead of a dialog: download a version with SteamCMD is back among its ways, and under the game it asks the config's name, whether to copy the current config's settings, the Mod list and the saves folder (shared, own, or a folder you choose). A game another config already uses can be picked; its new config is ready at once, without reading the Mods again.

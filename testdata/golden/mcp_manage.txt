@@ -346,7 +346,7 @@ import rimcrow (dry run: nothing written)
   mods: 1 with data: 1 mapped (0 by path, 1 by packageId), 0 not mapped
   aliases: 1 new, 0 already set
   notes: 1 new, 0 already set
-  tags: 0 new, 0 already present (0 groups, 0 memberships)
+  tags: 0 new, 0 already present (0 groups, 0 memberships), 0 tags given a colour
   rules: 0: 0 new, 0 already present, 0 skipped (no user_rules.json found)
   conflicts: 0 (RimArcho's value kept)
 next:
@@ -358,7 +358,7 @@ import rimcrow
   mods: 1 with data: 1 mapped (0 by path, 1 by packageId), 0 not mapped
   aliases: 1 new, 0 already set
   notes: 1 new, 0 already set
-  tags: 0 new, 0 already present (0 groups, 0 memberships)
+  tags: 0 new, 0 already present (0 groups, 0 memberships), 0 tags given a colour
   rules: 0: 0 new, 0 already present, 0 skipped (no user_rules.json found)
   conflicts: 0 (RimArcho's value kept)
 next:

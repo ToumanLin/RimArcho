@@ -78,5 +78,7 @@
   "see dependencies (can it run)": "依存関係を表示（起動前チェック）",
   "the DDS encoder (todds) is not installed: install it in Library > Texture optimisation": "DDSエンコーダー（todds）がありません。「ライブラリ」→「テクスチャの最適化」から導入してください",
   "the choices changed since this count; “count the textures” counts again": "前回の計測後に設定が変わりました。「テクスチャ数を数える」で再計測してください",
-  "the textures changed since this count; “count the textures” counts again": "前回の計測後にテクスチャが変わりました。「テクスチャ数を数える」で再計測してください"
+  "the textures changed since this count; “count the textures” counts again": "前回の計測後にテクスチャが変わりました。「テクスチャ数を数える」で再計測してください",
+  "@tag.manager-colour": "%s 色 %s",
+  "@tag.manager-ignore": "%s：無視した警告"
 }

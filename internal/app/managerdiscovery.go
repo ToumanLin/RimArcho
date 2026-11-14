@@ -11,7 +11,7 @@ import (
 // ManagerImport is one read-only source offered by the migration flow.
 type ManagerImport struct {
 	Manager string `json:"manager"`
-	Kind    string `json:"kind"` // list, rimcrow, rimsort-rules
+	Kind    string `json:"kind"` // list, rimcrow, rimsort-rules, rimsort-aux
 	Path    string `json:"path"`
 }
 
@@ -79,10 +79,22 @@ func DiscoverManagerImports(loc ManagerLocations) []ManagerImport {
 		rootsSeen[key] = true
 		add("RimSort", "rimsort-rules", filepath.Join(root, "dbs", "userRules.json"))
 		lists("RimSort", filepath.Join(root, "modlists"))
+		// each instance's local database: notes, tags, colours (07 §6.4)
+		instances, _ := os.ReadDir(filepath.Join(root, "instances"))
+		for i, instance := range instances {
+			if i >= 16 {
+				break
+			}
+			if instance.IsDir() {
+				add("RimSort", "rimsort-aux", filepath.Join(root, "instances", instance.Name(), "aux_metadata.db"))
+			}
+		}
+		add("RimSort", "rimsort-aux", filepath.Join(root, "aux_metadata.db")) // before instances
 		var settings struct {
 			Config    string `json:"config_folder"`
 			Instances map[string]struct {
-				Config string `json:"config_folder"`
+				Config   string `json:"config_folder"`
+				Override string `json:"instance_folder_override"`
 			} `json:"instances"`
 		}
 
@@ -95,8 +107,11 @@ func DiscoverManagerImports(loc ManagerLocations) []ManagerImport {
 			continue
 		}
 		configs := []string{settings.Config}
-		for _, instance := range settings.Instances {
+		for name, instance := range settings.Instances {
 			configs = append(configs, instance.Config)
+			if instance.Override != "" && name != "Default" {
+				add("RimSort", "rimsort-aux", filepath.Join(instance.Override, name, "aux_metadata.db"))
+			}
 		}
 		for _, config := range configs {
 			if config == "" {
