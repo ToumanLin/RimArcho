@@ -9,13 +9,15 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 )
 
-// Files lists the top-level entries replaced for the current operating system.
-// An older RimArcho rejects a zip with entries missing from its own list, so a new entry
-// goes here one release before release.ps1 starts packing it (README.zh-CN.md and skills
-// were added in 1.0.5 and are packed from 1.0.6).
+// Files lists the top-level entries every release up to 1.0.x installed. RimArcho before
+// 1.1 rejects a zip with other top-level entries, so a release that 1.0.x must install
+// keeps to these. From 1.1 on, Extract accepts any safe top-level name and the install
+// records what it put in place (Installed, WriteManifest), so later releases may add or
+// drop entries freely; Files stays the baseline for installations without that record.
 var Files = releaseFiles(runtime.GOOS)
 
 func releaseFiles(goos string) []string {
@@ -28,7 +30,7 @@ func releaseFiles(goos string) []string {
 
 // Layout says which top-level entries a zip may have and which files it must contain.
 type Layout struct {
-	Files    []string // allowed top-level entries (files or folders), matched without case
+	Files    []string // allowed top-level entries (files or folders), matched without case; nil allows any safe name
 	Required []string // regular files that must exist after extraction, slash-separated
 }
 
@@ -38,7 +40,7 @@ func Extract(zipPath, dir string) error {
 	if runtime.GOOS == "windows" {
 		programs = []string{"archo.exe", "RimArcho.exe"}
 	}
-	return ExtractLayout(zipPath, dir, Layout{Files: Files, Required: programs})
+	return ExtractLayout(zipPath, dir, Layout{Required: programs})
 }
 
 // ExtractLayout is Extract for another zip's layout (the Archo Agent bundle, 15 §7).
@@ -79,10 +81,16 @@ func ExtractLayout(zipPath, dir string, layout Layout) (err error) {
 	for i, entry := range z.File {
 		name := names[i]
 		if name == "" {
+			if err := checkSkippedEntry(entry); err != nil {
+				return err
+			}
 			continue
 		}
 		target := filepath.Join(dir, filepath.FromSlash(name))
 		if entry.FileInfo().IsDir() || strings.HasSuffix(entry.Name, `\`) {
+			if err := checkSkippedEntry(entry); err != nil {
+				return err
+			}
 			if err := os.MkdirAll(target, 0o755); err != nil {
 				return err
 			}
@@ -102,6 +110,19 @@ func ExtractLayout(zipPath, dir string, layout Layout) (err error) {
 		}
 	}
 	return nil
+}
+
+// Even entries with no output must be read to EOF for archive/zip's CRC check.
+func checkSkippedEntry(entry *zip.File) error {
+	r, err := entry.Open()
+	if err != nil {
+		return err
+	}
+	n, readErr := io.Copy(io.Discard, io.LimitReader(r, maxDownload+1))
+	if n > maxDownload {
+		readErr = errors.Join(readErr, errors.New("zip entry exceeds 200 mb"))
+	}
+	return errors.Join(readErr, r.Close())
 }
 
 // extractName returns the entry's path under the allowed top-level name, or "" for the zip's root folder.
@@ -124,6 +145,12 @@ func extractName(name string, files []string) (string, error) {
 		return "", nil
 	}
 	top, rest, nested := strings.Cut(normal, "/")
+	if files == nil {
+		if !EntryNameOK(top) {
+			return "", fmt.Errorf("zip has unsafe top-level entry %q", top)
+		}
+		files = append(slices.Clone(Files), top) // known names keep their spelling
+	}
 	for _, allowed := range files {
 		if strings.EqualFold(top, allowed) {
 			if nested {

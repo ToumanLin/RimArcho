@@ -8,7 +8,6 @@
   "reduced keeps the window still: the sidebar, lists, pages and status line change without sliding or fading; follow system uses the Windows animation setting": "「少なめ」ではサイドバーやリスト、ページ、状態表示がアニメーションなしで切り替わります。「システムに従う」はWindowsのアニメーション設定を使用します",
   "update source": "更新元",
   "automatic": "自動",
-  "Download RimArcho %s, check it against its SHA-256 and replace the program files, then restart RimArcho. Your data is not changed.": "RimArcho %sをダウンロードしてSHA-256で検証後、プログラムファイルを置き換えて再起動します。ユーザーデータは変更しません。",
   "%d mods in its Data and Mods": "DataとModsにMODが%d件あります",
   "%d other RimArcho are open: the files are replaced once they close.": "別のRimArchoが%d個開いています。すべて終了するとファイルを置き換えます。",
   "%s can be updated": "%sを更新できます",
@@ -23,7 +22,6 @@
   "Archo Monitor is ready": "Archo Monitorを使用できます",
   "Archo Monitor's own error": "Archo Monitor自体のエラー",
   "Discord name or email, so the maintainer can ask you more": "開発者から追加確認ができるよう、Discord名またはメールアドレスを入力",
-  "Download RimArcho %s (%s), check it against its SHA-256 and replace the program files, then restart RimArcho. Your data is not changed.": "RimArcho %s（%s）をダウンロードし、SHA-256で検証後にプログラムを置き換えて再起動します。ユーザーデータは変更しません。",
   "Player.log  %d": "Player.log：%d",
   "RimArcho %s can be updated": "RimArcho %sに更新できます",
   "RimArcho %s can be updated; see Settings": "RimArcho %sに更新できます。設定を確認してください",
@@ -278,5 +276,16 @@
   "GitHub mirror": "GitHubミラー",
   "system follows the Windows proxy (Clash, v2rayN in system proxy mode); off goes direct; or a proxy such as http://127.0.0.1:7890 or socks5://127.0.0.1:7891": "システム設定ではWindowsのプロキシを使用します。オフでは直接接続します。またはhttp://127.0.0.1:7890、socks5://127.0.0.1:7891などを指定できます",
   "tried before GitHub for community data, updates and todds, e.g. https://gh-proxy.org/; empty goes to GitHub directly. Use one you trust: updates come through it": "コミュニティデータ・更新・toddsの取得時にGitHubより先に使用するミラーです（例：https://gh-proxy.org/）。空欄ではGitHubに直接接続します。更新データも経由するため、信頼できるミラーを指定してください",
-  "custom…": "カスタム…"
+  "custom…": "カスタム…",
+  "Download RimArcho %s, verify the archive and replace the program files, then restart RimArcho. Your data is not changed.": "RimArcho %sをダウンロードしてアーカイブを検証後、プログラムファイルを置き換えて再起動します。ユーザーデータは変更しません。",
+  "Download RimArcho %s (%s), verify the archive and replace the program files, then restart RimArcho. Your data is not changed.": "RimArcho %s（%s）をダウンロードし、アーカイブを検証後にプログラムを置き換えて再起動します。ユーザーデータは変更しません。",
+  "automatic download failed": "自動ダウンロードに失敗しました",
+  "open download page": "ダウンロードページを開く",
+  "password %s": "パスワード %s",
+  "install from zip…": "ZIPからインストール…",
+  "Install RimArcho from the chosen zip (%s), replace the program files, then restart RimArcho. Your data is not changed.": "選んだZIP（%s）からRimArchoをインストールし、プログラムファイルを置き換えて再起動します。ユーザーデータは変更しません。",
+  "Workshop": "ワークショップ",
+  "Lanzou": "Lanzou",
+  "%s failed": "%s 失敗",
+  "choose the downloaded RimArcho zip": "ダウンロードしたRimArchoのZIPを選択"
 }

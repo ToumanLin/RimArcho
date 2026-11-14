@@ -64,15 +64,25 @@ type SettingAction struct {
 	Confirm string   `json:"confirm,omitempty"`
 	Task    string   `json:"task,omitempty"`
 	Pending string   `json:"pending,omitempty"`
+	// URL opens a web page instead of running Argv; Note sits beside the button and Copy is
+	// what its copy icon copies (the manual RimArcho update's share and password, 17 §5.1).
+	URL  string `json:"url,omitempty"`
+	Note string `json:"note,omitempty"`
+	Copy string `json:"copy,omitempty"`
+	// Pick "zip": the player chooses a downloaded file, whose path replaces {} in Argv.
+	Pick string `json:"pick,omitempty"`
 }
 
 // SettingTask identifies commands that queue after confirmation (16 §2.14, 16 §2.16).
 func SettingTask(argv []string) string {
 	if len(argv) > 0 && argv[0] == "update" {
-		if len(argv) == 1 {
+		if len(argv) == 1 || len(argv) == 3 && argv[1] == "--from" && argv[2] != "" {
 			return TaskSelfUpdate
 		}
-		return TaskSelfCheck
+		if len(argv) == 2 && argv[1] == "--check" {
+			return TaskSelfCheck
+		}
+		return ""
 	}
 	if len(argv) == 3 && argv[0] == "deps" {
 		if argv[1] == "remove" {
@@ -437,7 +447,7 @@ func SettingCommand(argv []string) error {
 		len(argv) == 3 && argv[0] == "agent" && argv[1] == "run" && argv[2] == "--window" {
 		return nil
 	}
-	if argv[0] == "update" && (len(argv) == 1 || len(argv) == 2 && argv[1] == "--check") {
+	if argv[0] == "update" && (len(argv) == 1 || len(argv) == 2 && argv[1] == "--check" || len(argv) == 3 && argv[1] == "--from" && argv[2] != "") {
 		return nil
 	}
 	return fmt.Errorf("not a settings command: %s", strings.Join(argv, " "))

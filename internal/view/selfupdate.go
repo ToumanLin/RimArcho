@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/lanzou"
 	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 )
 
@@ -45,6 +46,9 @@ func SelfUpdateItem(a *app.App) SettingItem {
 	}
 	info := a.SelfUpdateInfo()
 	it.Note = lastChecked(a, info.Checked)
+	if src := SelfUpdateSources(info); src != "" && it.Note != "" {
+		it.Note += "  " + src
+	}
 	check := SettingAction{Label: T("check for updates"), Argv: []string{"update", "--check"}, Task: TaskSelfCheck, Pending: TaskPending(TaskSelfCheck)}
 	r := a.SelfUpdatePending()
 	if r == nil {
@@ -66,9 +70,9 @@ func SelfUpdateItem(a *app.App) SettingItem {
 		it.Actions = []SettingAction{check}
 		return it
 	}
-	confirm := Tf("Download RimArcho %s, check it against its SHA-256 and replace the program files, then restart RimArcho. Your data is not changed.", r.Version)
+	confirm := Tf("Download RimArcho %s, verify the archive and replace the program files, then restart RimArcho. Your data is not changed.", r.Version)
 	if r.Zip.Size > 0 {
-		confirm = Tf("Download RimArcho %s (%s), check it against its SHA-256 and replace the program files, then restart RimArcho. Your data is not changed.", r.Version, SizeText(r.Zip.Size))
+		confirm = Tf("Download RimArcho %s (%s), verify the archive and replace the program files, then restart RimArcho. Your data is not changed.", r.Version, SizeText(r.Zip.Size))
 	}
 	install := SettingAction{Label: T("install update"), Argv: []string{"update"}, Task: TaskSelfUpdate, Pending: TaskPending(TaskSelfUpdate), Confirm: confirm}
 	if program, err := a.SelfProgramDir(); err == nil {
@@ -77,7 +81,47 @@ func SelfUpdateItem(a *app.App) SettingItem {
 		}
 	}
 	it.Actions = []SettingAction{install, check}
+	if info.Manual == r.Version {
+		// Neither GitHub nor Lanzou gave the zip: the player downloads it in the browser.
+		it.ValueNote += "  " + T("automatic download failed")
+		install.Label = T("try again")
+		it.Actions = append([]SettingAction{install}, SelfUpdateManual(r.Version)...)
+		it.Actions = append(it.Actions, check)
+	}
 	return it
+}
+
+// SelfUpdateManual is the manual update (17 §5.1): open the Lanzou share in the browser
+// (its password beside the button), then choose the downloaded zip.
+func SelfUpdateManual(version string) []SettingAction {
+	return []SettingAction{
+		{Label: T("open download page"), URL: lanzou.DefaultShareURL,
+			Note: Tf("password %s", lanzou.DefaultPassword), Copy: lanzou.DefaultPassword},
+		{Label: T("install from zip…"), Pick: "zip", Argv: []string{"update", "--from", "{}"},
+			Task: TaskSelfUpdate, Pending: TaskPending(TaskSelfUpdate),
+			Confirm: Tf("Install RimArcho from the chosen zip (%s), replace the program files, then restart RimArcho. Your data is not changed.", selfupdate.ZipName(version, "windows", "amd64"))},
+	}
+}
+
+// SelfUpdateSources is the last check's answer from each source, in one short line:
+// "GitHub 1.0.11  Lanzou 1.0.11  Workshop failed". Sources not set up are left out.
+func SelfUpdateSources(info app.SelfUpdate) string {
+	if len(info.Sources) < 2 {
+		return "" // GitHub alone: the row already says what it found
+	}
+	names := map[string]string{"github": "GitHub", "monitor": T("Workshop"), "lanzou": T("Lanzou")}
+	var parts []string
+	for _, s := range info.Sources {
+		name := names[s.Source]
+		switch {
+		case name == "" || s.Status == "unconfigured":
+		case s.Status == "ok":
+			parts = append(parts, name+" "+s.Version)
+		default:
+			parts = append(parts, Tf("%s failed", name))
+		}
+	}
+	return strings.Join(parts, "  ")
 }
 
 func selfCheckText(state string) string {

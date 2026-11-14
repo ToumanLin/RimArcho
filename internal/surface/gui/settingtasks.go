@@ -142,7 +142,7 @@ func (s *API) runSettingTask(a *app.App, id, kind string, argv []string) (string
 	case view.TaskSelfCheck:
 		return s.runSelfCheck(a)
 	case view.TaskSelfUpdate:
-		return s.runSelfUpdate(a, id)
+		return s.runSelfUpdate(a, id, argv)
 	case view.TaskAgentInstall:
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()

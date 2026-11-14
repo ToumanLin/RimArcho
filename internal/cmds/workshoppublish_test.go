@@ -46,6 +46,9 @@ func TestWorkshopPublishDefaultDescriptions(t *testing.T) {
 	if selfupdate.DescriptionVersion(r.Description) != "1.2.3" {
 		t.Fatal("stamp unreadable")
 	}
+	if r.Title != "Archo Monitor" {
+		t.Fatalf("title %q", r.Title)
+	}
 
 	publishRoot(t, "English only", "")
 	r, err = publishOptions(a)
@@ -83,6 +86,7 @@ func TestWorkshopPublishArguments(t *testing.T) {
 		{[]string{"--version", "1.2.3", "--visibility", "public"}, "1.2.3", 0, 0, true},
 		{[]string{"--version", "1.2.3", "--visibility", "friends"}, "1.2.3", 0, 1, true},
 		{[]string{"--version", "1.2.3", "--visibility", "private"}, "1.2.3", 0, 2, true},
+		{[]string{"--version", "1.2.3", "--new-item", "--dry-run"}, "1.2.3", 0, 0, false},
 	} {
 		a, err := parse(workshopPublishCommand, tc.args)
 		if err != nil {
@@ -100,6 +104,8 @@ func TestWorkshopPublishArguments(t *testing.T) {
 		{"--version", "1.2.3-rc1"}, {"--version", "dev"}, {"--version", ""},
 		{"--version", "1.2.3", "--item", "0"}, {"--version", "1.2.3", "--item", "1junk"},
 		{"--version", "1.2.3", "--item", "18446744073709551616"},
+		{"--version", "1.2.3", "--item", "3835688284"},
+		{"--version", "1.2.3", "--item", "81234", "--new-item"},
 		{"--version", "1.2.3", "--visibility", "hidden"},
 		{"--version", "1.2.3", "--note", "bad\x00note"},
 		{"--version", "1.2.3", "--note", strings.Repeat("x", 8001)},

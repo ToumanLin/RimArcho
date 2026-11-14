@@ -51,6 +51,7 @@ func (b *App) ReadOptions(a *App) {
 	b.UninstallExe, b.UninstallKeepBase, b.ArchoProbe = a.UninstallExe, a.UninstallKeepBase, a.ArchoProbe
 	b.UninstallLog, b.AfterExitFunc = a.UninstallLog, a.AfterExitFunc
 	b.SelfUpdateAPI, b.SelfVersion, b.SelfProgram = a.SelfUpdateAPI, a.SelfVersion, a.SelfProgram
+	b.SelfLanzou = a.SelfLanzou
 	b.SelfVersionOf, b.SelfOthers, b.SelfWaitPoll = a.SelfVersionOf, a.SelfOthers, a.SelfWaitPoll
 }
 

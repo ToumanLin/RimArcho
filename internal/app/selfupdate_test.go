@@ -20,10 +20,9 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
-	"github.com/ToumanLin/RimArcho/internal/deps"
+	"github.com/ToumanLin/RimArcho/internal/lanzou"
 	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
-	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 // selfRelease is a fake GitHub (17 §5.1): one release 0.9.1 with its zip and checksum.
@@ -34,6 +33,10 @@ type selfRelease struct {
 	workshopHTTP   int
 	workshopHits   atomic.Int32
 	githubDown     bool // GitHub's release lookups answer 503
+	tagDown        bool
+	sumDown        bool
+	zipDown        bool
+	missingSum     bool
 	stableHits     atomic.Int32
 	srv            *httptest.Server
 	zip            []byte
@@ -69,9 +72,13 @@ func newSelfRelease(t *testing.T) *selfRelease {
 	f.sum = hex.EncodeToString(h[:]) + "  " + zipName + "\n"
 	f.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		release := func(tag string, pre bool) string {
-			return fmt.Sprintf(`{"tag_name":%q,"name":"RimArcho %s","body":"- fixed things\n- new things","html_url":"%s/releases/tag/%s","published_at":"2026-10-30T12:00:00Z","prerelease":%v,
+			metadata := fmt.Sprintf(`{"tag_name":%q,"name":"RimArcho %s","body":"- fixed things\n- new things","html_url":"%s/releases/tag/%s","published_at":"2026-10-30T12:00:00Z","prerelease":%v,
 				"assets":[{"name":%q,"browser_download_url":"%s/dl/zip","size":%d},{"name":%q,"browser_download_url":"%s/dl/sum","size":%d}]}`,
 				tag, tag, f.srv.URL, tag, pre, zipName, f.srv.URL, len(f.zip), zipName+".sha256", f.srv.URL, len(f.sum))
+			if f.missingSum {
+				metadata = strings.ReplaceAll(metadata, zipName+".sha256", "unrelated.sha256")
+			}
+			return metadata
 		}
 		switch r.URL.Path {
 		case "/workshop":
@@ -92,6 +99,10 @@ func newSelfRelease(t *testing.T) *selfRelease {
 			}
 			fmt.Fprint(w, `]}]}}`)
 		case "/releases/tags/v0.9.1":
+			if f.tagDown {
+				http.Error(w, "offline", 503)
+				return
+			}
 			fmt.Fprint(w, release("v0.9.1", false))
 		case "/releases/latest":
 			f.stableHits.Add(1)
@@ -104,9 +115,17 @@ func newSelfRelease(t *testing.T) *selfRelease {
 			f.lists.Add(1)
 			fmt.Fprint(w, "["+release("v0.9.1", false)+"]")
 		case "/dl/sum":
+			if f.sumDown {
+				http.Error(w, "offline", 503)
+				return
+			}
 			fmt.Fprint(w, f.sum)
 		case "/dl/zip":
 			f.zipHits.Add(1)
+			if f.zipDown {
+				http.Error(w, "offline", 503)
+				return
+			}
 			if f.cut {
 				w.Header().Set("Content-Length", strconv.Itoa(len(f.zip)))
 				w.WriteHeader(http.StatusOK)
@@ -142,6 +161,7 @@ func (f *selfRelease) use(a *app.App) {
 	a.SelfVersionOf = func(context.Context, string) (string, error) { return "0.9.1", nil }
 	a.SelfOthers = func(string) []*app.GameRun { return nil }
 	a.SelfWaitPoll = time.Millisecond
+	a.SelfLanzou = &lanzou.Client{ShareURL: "invalid"}
 }
 
 // files reads the program folder's copies of the release files ("old …" or "new …").
@@ -225,205 +245,6 @@ func TestSelfUpdateCheck(t *testing.T) {
 	}
 }
 
-func TestSelfUpdateWorkshopCheck(t *testing.T) {
-	if !app.SelfUpdateSupported() {
-		t.Skip("program replacement and Workshop self-update are Windows-only (D2)")
-	}
-	t.Setenv(app.UpdateWorkshopItemEnv, "8100")
-	for _, mode := range []string{"workshop", "1.0.5 tag", "no version", "bad result", "offline", "empty item", "github", "prerelease"} {
-		t.Run(mode, func(t *testing.T) {
-			e := testkit.New(t)
-			f := newSelfRelease(t)
-			f.use(e.App)
-			e.App.SteamAPI = f.srv.URL + "/workshop"
-			e.App.SteamCMDRun = func(string, []string) (string, error) { t.Fatal("check started SteamCMD"); return "", nil }
-			switch mode {
-			case "1.0.5 tag": // an item published by 1.0.5: no stamp, a v<version> tag
-				f.description, f.tags = "About RimArcho", []string{"Mod", "v0.9.1"}
-			case "no version": // edited on the web: no stamp, and the tags are the game's
-				f.description, f.tags = "About RimArcho, mentioning RimArcho v0.9.1 in a sentence", []string{"Mod", "1.6", "not-a-version"}
-			case "bad result":
-				f.workshopResult = 9
-			case "offline":
-				f.workshopHTTP = 503
-			case "empty item":
-				t.Setenv(app.UpdateWorkshopItemEnv, "")
-			case "github":
-				e.MustRun("config", "set", "updates.source", "github")
-			case "prerelease":
-				e.App.SelfVersion = "0.9.1-rc1"
-			}
-			out := e.MustRun("update", "--check")
-			source := "GitHub"
-			if mode == "workshop" || mode == "1.0.5 tag" {
-				source = "Workshop"
-			}
-			info := e.App.SelfUpdateInfo()
-			if info.Source != source || info.Release == nil || info.Release.Version != "0.9.1" || !strings.Contains(out, "source: "+source) {
-				t.Fatal(info, out)
-			}
-			wantHits := int32(1)
-			if mode == "empty item" || mode == "github" || mode == "prerelease" {
-				wantHits = 0
-			}
-			if f.workshopHits.Load() != wantHits {
-				t.Fatal("Workshop requests", f.workshopHits.Load())
-			}
-			if mode == "workshop" {
-				if f.stableHits.Load() != 0 || info.Release.WorkshopItem != "8100" {
-					t.Fatal(info)
-				}
-				before := e.App.AutomaticStatus("self")
-				e.MustRun("config", "set", "updates.source", "github")
-				e.MustRun("update", "--check")
-				if notice := view.AutomaticNotice(e.App, before, e.App.AutomaticStatus("self")); notice != "" {
-					t.Fatal("repeated notification", notice)
-				}
-			}
-		})
-	}
-}
-
-// A removed item (Web API result 9) leaves its subscribed folder in place, frozen at the
-// last release Steam delivered. The check must not take that folder as the latest release
-// while GitHub has a newer one.
-func TestSelfUpdateRemovedWorkshopItem(t *testing.T) {
-	if !app.SelfUpdateSupported() {
-		t.Skip("program replacement and Workshop self-update are Windows-only (D2)")
-	}
-	t.Setenv(app.UpdateWorkshopItemEnv, "8100")
-	for _, c := range []struct {
-		name, folder string
-		githubDown   bool
-		source, want string
-	}{
-		{"stale folder", "0.9.0", false, "GitHub", "0.9.1"},
-		{"folder as new as GitHub", "0.9.1", false, "Workshop", "0.9.1"},
-		{"GitHub unreachable", "0.9.1", true, "Workshop", "0.9.1"},
-	} {
-		t.Run(c.name, func(t *testing.T) {
-			e := testkit.New(t)
-			f := newSelfRelease(t)
-			f.use(e.App)
-			e.App.SteamAPI = f.srv.URL + "/workshop"
-			e.App.SteamCMDRun = func(string, []string) (string, error) { t.Fatal("check started SteamCMD"); return "", nil }
-			f.workshopResult, f.githubDown = 9, c.githubDown
-			library := filepath.Join(e.Root, "OtherLibrary")
-			e.WriteFile(filepath.Join(e.Steam, "steamapps", "libraryfolders.vdf"), fmt.Sprintf(`"libraryfolders" { "1" { "path" %q } }`, strings.ReplaceAll(library, `\`, `/`)))
-			dir := filepath.Join(library, "steamapps", "workshop", "content", "294100", "8100")
-			zip := selfupdate.ZipName(c.folder, "windows", "amd64")
-			e.WriteFile(filepath.Join(dir, zip), "zip")
-			e.WriteFile(filepath.Join(dir, zip+".sha256"), "sum")
-			if _, _, err := e.App.CheckSelfUpdate(context.Background()); err != nil {
-				t.Fatal(err)
-			}
-			info := e.App.SelfUpdateInfo()
-			if info.Source != c.source || info.Release == nil || info.Release.Version != c.want || f.stableHits.Load() != 1 {
-				t.Fatal(info, f.stableHits.Load())
-			}
-			if c.source == "GitHub" && !strings.Contains(info.Fallback, "subscribed folder holds 0.9.0") {
-				t.Fatal("fallback reason", info.Fallback)
-			}
-		})
-	}
-}
-
-func TestSelfUpdateWorkshopInstall(t *testing.T) {
-	if runtime.GOOS != "windows" || runtime.GOARCH != "amd64" {
-		t.Skip("Workshop carries Windows amd64 only")
-	}
-	t.Setenv(app.UpdateWorkshopItemEnv, "8100")
-	for _, mode := range []string{"subscribed", "steamcmd", "missing tool", "unconfirmed", "missing files", "corrupt", "no matching release"} {
-		t.Run(mode, func(t *testing.T) {
-			e := testkit.New(t)
-			f := newSelfRelease(t)
-			f.use(e.App)
-			e.App.SteamAPI = f.srv.URL + "/workshop"
-			e.MustRun("config", "set", "steamcmd.account", "desktop-player")
-			e.MustRun("config", "set", "updates.source", "auto")
-			if mode == "no matching release" {
-				f.description = selfupdate.Stamp("About RimArcho", "0.9.2")
-			}
-			if _, _, err := e.App.CheckSelfUpdate(context.Background()); err != nil {
-				t.Fatal(err)
-			}
-			put := func(dir string) {
-				e.MkdirAll(dir)
-				e.WriteFile(filepath.Join(dir, selfupdate.ZipName("0.9.1", "windows", "amd64")), string(f.zip))
-				e.WriteFile(filepath.Join(dir, selfupdate.ZipName("0.9.1", "windows", "amd64")+".sha256"), f.sum)
-			}
-			if mode == "subscribed" {
-				// Discover a second Steam library through the existing VDF reader.
-				library := filepath.Join(e.Root, "OtherLibrary")
-				e.WriteFile(filepath.Join(e.Steam, "steamapps", "libraryfolders.vdf"), fmt.Sprintf(`"libraryfolders" { "1" { "path" %q } }`, strings.ReplaceAll(library, `\`, `/`)))
-				put(filepath.Join(library, "steamapps", "workshop", "content", "294100", "8100"))
-				e.App.FindTool = func(string) (string, bool) { t.Fatal("subscribed copy started tool lookup"); return "", false }
-			} else {
-				e.App.FindTool = func(string) (string, bool) {
-					return filepath.Join(e.Root, deps.SteamCMDExecutable()), mode != "missing tool"
-				}
-			}
-			base := filepath.Join(e.App.LocalDir(), "steamcmd-self")
-			calls := 0
-			e.App.SteamCMDRun = func(_ string, args []string) (string, error) {
-				calls++
-				if args[1] != base || args[2] != "+login" || args[3] != "anonymous" {
-					t.Fatal(args)
-				}
-				script, err := os.ReadFile(filepath.Join(e.Root, args[5]))
-				if err != nil || !strings.Contains(string(script), "workshop_download_item 294100 8100") {
-					t.Fatal(string(script), err)
-				}
-				if mode != "missing files" {
-					put(filepath.Join(base, "steamapps", "workshop", "content", "294100", "8100"))
-				}
-				if mode == "unconfirmed" {
-					return "ERROR! Download item 8100 failed (AccessDenied).", nil
-				}
-				if mode == "corrupt" {
-					e.WriteFile(filepath.Join(base, "steamapps", "workshop", "content", "294100", "8100", selfupdate.ZipName("0.9.1", "windows", "amd64")), "broken")
-				}
-				return "Success. Downloaded item 8100", nil
-			}
-			_, err := e.App.InstallSelfUpdate(context.Background(), func(s app.SelfUpdateStep) {
-				if mode == "steamcmd" && s.Phase == "download" && (s.Done != 0 || s.Total != 0) {
-					t.Error("determinate SteamCMD progress", s)
-				}
-			})
-			if mode == "no matching release" {
-				if err == nil || f.files(t) != allWith("old") {
-					t.Fatal("wrong version installed", err)
-				}
-				e.App.CleanSelfUpdate()
-			} else if err != nil || f.files(t) != allWith("new") {
-				t.Fatal(err)
-			}
-			if _, err := os.Stat(base); !os.IsNotExist(err) {
-				t.Fatal("private base retained", err)
-			}
-			if mode == "subscribed" || mode == "steamcmd" {
-				if f.zipHits.Load() != 0 {
-					t.Fatal("unnecessary GitHub download")
-				}
-			} else if mode != "no matching release" && f.zipHits.Load() != 1 {
-				t.Fatal("missing GitHub fallback")
-			}
-			if mode == "steamcmd" && calls != 1 {
-				t.Fatal("SteamCMD calls", calls)
-			}
-			if sources, err := e.App.Store.AllSources(); err != nil {
-				t.Fatal(err)
-			} else {
-				for _, source := range sources {
-					if strings.Contains(source.Root, "steamcmd-self") {
-						t.Fatal("registered updater as Mod source")
-					}
-				}
-			}
-		})
-	}
-}
-
 func TestSelfUpdateInstallWaitsForOthersThenSwaps(t *testing.T) {
 	if !app.SelfUpdateSupported() {
 		t.Skip("program replacement and Workshop self-update are Windows-only (D2)")
@@ -484,7 +305,7 @@ func TestSelfUpdateInstallWaitsForOthersThenSwaps(t *testing.T) {
 	e.App.CleanSelfUpdate()
 	left, _ := os.ReadDir(dir)
 	for _, d := range left {
-		if d.Name() != "lock" {
+		if d.Name() != "lock" && d.Name() != "files.json" {
 			t.Fatal("left after clean-up:", d.Name())
 		}
 	}
@@ -670,7 +491,7 @@ func TestSelfUpdateKilledMidSwapIsSettledNextStart(t *testing.T) {
 			}
 			left, _ := os.ReadDir(dir)
 			for _, d := range left {
-				if d.Name() != "lock" {
+				if d.Name() != "lock" && d.Name() != "files.json" {
 					t.Fatal("left after clean-up:", d.Name())
 				}
 			}

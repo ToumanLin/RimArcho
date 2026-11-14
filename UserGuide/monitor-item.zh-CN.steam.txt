@@ -1,0 +1,20 @@
+Archo Monitor 是 RimArcho 的游戏内辅助 Mod. 它把 Player.log 说不出的事记到存档数据目录下的 ArchoMonitor.log: 报错时正在加载哪个 XML 文件和 Def, 调用栈上的代码和 Harmony 补丁属于哪个 Mod, 以及游戏停止写日志之后的报错次数. RimArcho 读这份日志, 在"能不能跑"里给出证据.
+
+紧跟在 Harmony 之后, Core 之前加载, 才能看到所有 Mod 的加载过程. 开销很小: 重复的消息只做一次哈希查找; 写入有缓冲, 报错立刻落盘.
+
+RimArcho 自带 Archo Monitor, 不订阅也能用; 订阅后由 Steam 保持更新.
+
+[h3]下载 RimArcho[/h3]
+RimArcho 是一款优雅简洁高效占用小的 RimWorld 启动器和 Mod 管理器, 目标很简单: 少纠结Mod, 少查报错, 多玩游戏. 它不在创意工坊里分发, 请从这里下载:
+[list]
+[*]GitHub: [url=https://github.com/ToumanLin/RimArcho/releases/latest]https://github.com/ToumanLin/RimArcho/releases/latest[/url]
+[*]蓝奏云 (国内): [url=https://rimarcho.lanzn.com/b01i608qja]https://rimarcho.lanzn.com/b01i608qja[/url] 密码 ctot
+[/list]
+下载 archo-版本号-windows-amd64.zip, 找个目录解压, 双击 RimArcho.exe. 之后 RimArcho 会自己检查和安装更新.
+exe没有代码签名, 首次运行时Windows可能提示"Windows 已保护你的电脑": 选"更多信息", 再选"仍要运行".
+
+本启动器代码完全开源, 地址在 [url=https://github.com/ToumanLin/RimArcho]https://github.com/ToumanLin/RimArcho[/url]
+
+有问题或建议, 欢迎加入 Discord: [url=https://discord.gg/HF2GVyurQs]https://discord.gg/HF2GVyurQs[/url]
+
+致谢: 思路沿用 RimCrow Companion, 它又致谢了 BetterModSort (Apache-2.0, Yan-Zero), LogAfterDefError (MIT, emipa606), BetterLog (MPL-2.0, bbradson) 和 Mod Error Checker. Archo Monitor 的代码是自己写的, 没有复制它们的代码. MIT 许可证.

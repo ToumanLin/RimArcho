@@ -331,3 +331,88 @@ func mergeStage(program, staged map[string]string) map[string]string {
 	}
 	return out
 }
+
+// A release may add and drop top-level entries (17 §5.1): ApplyRelease installs whatever
+// the stage has, moves aside the previous release's entries it lacks, and leaves files the
+// player put there.
+func TestApplyReleaseAddsAndDropsEntries(t *testing.T) {
+	program := t.TempDir()
+	writeTree(t, program, map[string]string{Files[0]: "old command", "CHANGELOG.md": "old log", "notes.txt": "player's"})
+	install := func(version string, staged map[string]string) *Swap {
+		t.Helper()
+		stage, old := filepath.Join(t.TempDir(), "stage"), filepath.Join(t.TempDir(), "old")
+		writeTree(t, stage, staged)
+		s, err := ApplyRelease(program, stage, old, filepath.Join(t.TempDir(), "swap.json"), version)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	read := func(name string) string {
+		b, err := os.ReadFile(filepath.Join(program, name))
+		if err != nil {
+			return ""
+		}
+		return string(b)
+	}
+
+	// Rollback puts the dropped entry back and records nothing.
+	s := install("1.1.0", map[string]string{Files[0]: "new command", "tools/x.txt": "tool"})
+	if read("CHANGELOG.md") != "" || read("tools/x.txt") != "tool" {
+		t.Fatal("entries not swapped")
+	}
+	if err := s.Rollback(); err != nil {
+		t.Fatal(err)
+	}
+	if read("CHANGELOG.md") != "old log" || read("tools/x.txt") != "" || read(Files[0]) != "old command" {
+		t.Fatal("rollback did not restore", read("CHANGELOG.md"), read(Files[0]))
+	}
+	if _, err := os.Stat(ManifestPath(program)); !os.IsNotExist(err) {
+		t.Fatal("rollback recorded a manifest", err)
+	}
+
+	s = install("1.1.0", map[string]string{Files[0]: "new command", "tools/x.txt": "tool"})
+	if err := s.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(Installed(program), "tools") {
+		t.Fatal("added entry not recorded", Installed(program))
+	}
+	// The next release drops tools/, which only the record knows about.
+	s = install("1.2.0", map[string]string{Files[0]: "newer command"})
+	if err := s.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(program, "tools")); !os.IsNotExist(err) {
+		t.Fatal("dropped entry kept", err)
+	}
+	if read("notes.txt") != "player's" || read(Files[0]) != "newer command" {
+		t.Fatal("unrelated file touched or program not replaced")
+	}
+}
+
+func TestResumeReleaseWithDroppedEntry(t *testing.T) {
+	for n := 1; n <= 6; n++ {
+		t.Run(fmt.Sprintf("rename %d", n), func(t *testing.T) {
+			program := t.TempDir()
+			writeTree(t, program, map[string]string{Files[0]: "old command", "CHANGELOG.md": "old log"})
+			stage, old := filepath.Join(program, "stage"), filepath.Join(program, "old")
+			writeTree(t, stage, map[string]string{Files[0]: "new command", "extra.txt": "new"})
+			journal := filepath.Join(program, "swap.json")
+			if !killAt(t, n, func() { ApplyRelease(program, stage, old, journal, "1.1.0") }) {
+				t.Skip("fewer renames")
+			}
+			s, state, err := Resume(journal)
+			if err != nil || state != SwapReplacing {
+				t.Fatal(state, err)
+			}
+			if err := s.Rollback(); err != nil {
+				t.Fatal(err)
+			}
+			got := tree(t, program)
+			if got[Files[0]] != "old command" || got["CHANGELOG.md"] != "old log" || got["extra.txt"] != "" {
+				t.Fatal("rollback after Resume did not restore", got)
+			}
+		})
+	}
+}

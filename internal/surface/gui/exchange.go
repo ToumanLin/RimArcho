@@ -93,6 +93,15 @@ func (s *API) PickProgram() (string, error) {
 	return s.x.native.openFile(view.T("choose a program"), nil)
 }
 
+// PickUpdateZip chooses a RimArcho release zip the player downloaded in the browser (the
+// manual update, 17 §5.1); "" when it was cancelled.
+func (s *API) PickUpdateZip() (string, error) {
+	if s.x.native == nil {
+		return "", errors.New(view.T("no file dialog here; use the desktop window"))
+	}
+	return s.x.native.openFile(view.T("choose the downloaded RimArcho zip"), [][2]string{{"Zip (*.zip)", "*.zip"}})
+}
+
 // PickImportFile shows the open dialog; "" when it was cancelled or there is none.
 func (s *API) PickImportFile() (string, error) {
 	if s.x.native == nil {

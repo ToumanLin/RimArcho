@@ -38,5 +38,9 @@
   "this copy cannot be used in the current list": "このコピーは現在のリストで使用できません",
   "type": "種類",
   "value": "値",
-  "wait for the dry run": "事前確認の完了を待っています"
+  "wait for the dry run": "事前確認の完了を待っています",
+  "download the zip in the browser, then install it:": "ブラウザでZIPをダウンロードしてからインストール：",
+  "path to the zip": "ZIPのパス",
+  "o: open the download page": "o：ダウンロードページを開く",
+  "opened the download page": "ダウンロードページを開きました"
 }

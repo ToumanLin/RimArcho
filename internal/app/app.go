@@ -26,6 +26,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/perftrace"
 	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/textures"
+	"github.com/ToumanLin/RimArcho/internal/updatechannel"
 )
 
 // Config is config.toml (17 §3). Only keys used by M1 are read.
@@ -177,6 +178,7 @@ type App struct {
 	// SelfVersionOf asking the new program its version, SelfOthers listing the other
 	// RimArcho processes in a folder, SelfWaitPoll how often that is asked while waiting.
 	SelfUpdateAPI string
+	SelfLanzou    updatechannel.LanzouClient // Synthetic tests; nil uses Lanzou's bounded client.
 	SelfVersion   string
 	SelfProgram   string
 	SelfVersionOf func(ctx context.Context, exe string) (string, error)

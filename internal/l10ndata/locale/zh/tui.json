@@ -38,5 +38,9 @@
   "this copy cannot be used in the current list": "这一份不能用在当前列表里",
   "type": "输入",
   "value": "值",
-  "wait for the dry run": "等预览出来"
+  "wait for the dry run": "等预览出来",
+  "download the zip in the browser, then install it:": "在浏览器中下载压缩包，然后安装：",
+  "path to the zip": "压缩包路径",
+  "o: open the download page": "o：打开下载页",
+  "opened the download page": "已打开下载页"
 }
