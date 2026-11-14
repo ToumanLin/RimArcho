@@ -15,14 +15,15 @@ import (
 )
 
 var workshopPublishCommand = &Command{
-	Name: "workshop publish", Summary: "maintainer only: assemble and publish RimArcho from the repository root through the signed-in Steam client",
+	Name: "workshop publish", Summary: "maintainer only: publish the Archo Monitor Workshop item (the built Mod, stamped with the release) from the repository root through the signed-in Steam client",
 	Flags: []Flag{
 		{Name: "version", Value: "X.Y.Z", Help: "stable release version (default: this program's version)"},
-		{Name: "item", Value: "<id>", Help: "Workshop item ID (default: Monitor's PublishedFileId.txt; absent creates an item)"},
+		{Name: "item", Value: "<id>", Help: "Archo Monitor item ID (default: monitor/About/PublishedFileId.txt; absent creates an item; never the retired 3835688284)"},
+		{Name: "new-item", Help: "create the Archo Monitor item, ignoring PublishedFileId.txt (once, when it still names the retired item)"},
 		{Name: "note", Value: "<text>", Help: "Workshop change note"},
 		{Name: "visibility", Value: "public|unlisted|private|friends", Help: "set visibility (default: leave Steam's current/default value)"},
-		{Name: "description", Value: "<file>", Help: "description from a Steam BBCode file, at most 8000 bytes with the version line added (default: UserGuide/release-post.steam.txt)"},
-		{Name: "description-zh", Value: "<file>", Help: "Simplified Chinese description from a Steam BBCode file (default: UserGuide/release-post.zh-CN.steam.txt, else leave it)"},
+		{Name: "description", Value: "<file>", Help: "description from a Steam BBCode file, at most 8000 bytes with the version line added (default: UserGuide/monitor-item.steam.txt)"},
+		{Name: "description-zh", Value: "<file>", Help: "Simplified Chinese description from a Steam BBCode file (default: UserGuide/monitor-item.zh-CN.steam.txt, else leave it)"},
 		{Name: "preview", Value: "<file>", Help: "Workshop page preview (PNG, JPG or GIF, under 1 MB); default: docs/assets/release-post/workshop-preview.gif, else Monitor's About/Preview.png"},
 		{Name: "dry-run", Help: "assemble and validate locally without contacting Steam"},
 	},
@@ -52,7 +53,7 @@ func WorkshopPublishOffline(argv []string) bool {
 }
 
 func publishOptions(a *Args) (steamworks.PublishRequest, error) {
-	r := steamworks.PublishRequest{Version: buildinfo.Version, Title: "RimArcho", Note: a.Str("note")}
+	r := steamworks.PublishRequest{Version: buildinfo.Version, Title: workshoppublish.Title, Note: a.Str("note")}
 	if v := a.Str("version"); v != "" {
 		r.Version = v
 	} else if a.Bool("version") {
@@ -65,6 +66,12 @@ func publishOptions(a *Args) (steamworks.PublishRequest, error) {
 		id, err := workshoppublish.ParseID(a.Str("item"))
 		if err != nil {
 			return r, &UsageError{Msg: err.Error()}
+		}
+		if id == workshoppublish.RetiredItem {
+			return r, &UsageError{Msg: "3835688284 is the retired RimArcho item; pass the Archo Monitor item"}
+		}
+		if a.Bool("new-item") {
+			return r, &UsageError{Msg: "--item and --new-item cannot be used together"}
 		}
 		r.ID = id
 	}
@@ -173,7 +180,7 @@ func workshopPublishCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
-	item, err := workshoppublish.Assemble(root, r.Version, r.ID)
+	item, err := workshoppublish.Assemble(root, r.Version, workshoppublish.Options{ID: r.ID, New: a.Bool("new-item")})
 	if err != nil {
 		return nil, err
 	}
@@ -187,17 +194,20 @@ func workshopPublishCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		if err != nil {
 			return nil, err
 		}
-		d, n := render.New(fmt.Sprintf("ws:%d RimArcho published", id))
+		d, n := render.New(fmt.Sprintf("ws:%d Archo Monitor published", id))
 		n.KV("version", r.Version)
 		n.KV("item", fmt.Sprintf("https://steamcommunity.com/sharedfiles/filedetails/?id=%d", id))
 		if legal {
 			n.KV("action", "accept the Steam Workshop legal agreement on the item page; the item stays hidden until accepted")
 		}
+		if a.Bool("new-item") {
+			n.KV("next", fmt.Sprintf("set updatechannel.MonitorWorkshopItem to %d and commit monitor/About/PublishedFileId.txt before building the next release (17 §5.1)", id))
+		}
 		return d, nil
 	}
-	d, n := render.New("RimArcho Workshop dry run: assembled and validated; Steam was not contacted")
+	d, n := render.New("Archo Monitor Workshop dry run: assembled and validated; Steam was not contacted")
 	n.KV("content", item.Folder)
-	n.KV("release", item.ZipName+" and "+item.ZipName+".sha256")
+	n.KV("monitor", "built Mod from "+item.Monitor+" (no program, archive or checksum)")
 	n.KV("title", r.Title)
 	if r.ID == 0 {
 		n.KV("item", "would create a RimWorld Workshop item (app 294100)")
