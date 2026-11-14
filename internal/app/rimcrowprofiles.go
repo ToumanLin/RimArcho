@@ -25,6 +25,7 @@ type RCProfile struct {
 	list                                                *ImportedList
 	launch                                              string
 	key                                                 string
+	resume                                              *env.Environment // an interrupted import of this profile registered it
 }
 
 func crowEnvironmentName(name string) string {
@@ -97,21 +98,32 @@ func (a *App) importCrowProfiles(db *sql.DB, opt RimCrowOptions, rep *RimCrowRep
 		}
 		p.Environment = crowEnvironmentName(p.Name)
 		p.key = fmt.Sprintf("import:rimcrow:profile:%x", sha256.Sum256([]byte(canonicalRoot(opt.DB)+"\x00"+p.ID)))
+		// The mapping is written before the Game Config is registered, and ":complete"
+		// records the steps done after it ("args", then "yes").
 		if mapped := a.Store.Meta(p.key); mapped != "" {
-			p.Status = "already imported; player edits kept"
 			known, err := a.Store.EnvByID(mapped)
 			if err != nil {
 				return err
 			}
-			if known == nil {
+			switch stage := a.Store.Meta(p.key + ":complete"); {
+			case stage == "yes" && known == nil:
 				p.Status = "previously imported Game Config was removed; not recreated automatically"
-			} else {
+				continue
+			case stage == "yes":
+				p.Status = "already imported; player edits kept"
 				p.Environment = known.Name
+				continue
+			case known != nil:
+				// Interrupted after registering: finish the missing steps on the
+				// registered Game Config, keeping its folders and the player's changes.
+				if a.resumeCrowProfile(p, known, stage) {
+					names[strings.ToLower(p.Environment)] = true
+					pairs[canonicalRoot(p.Game)+"\x00"+canonicalRoot(p.UserData)] = true
+					rep.NotMapped["profile source flags (use_workshop_mods/use_self_mods)"]++
+				}
+				continue
 			}
-			if a.Store.Meta(p.key+":complete") != "yes" {
-				p.Status = "incomplete previous import; inspect the registered Game Config before continuing"
-			}
-			continue
+			// Interrupted before registering (a failed registration is undone): import afresh.
 		}
 		if strings.TrimSpace(p.Game) == "" {
 			p.Status = "skipped: unconfigured game folder"
@@ -144,18 +156,7 @@ func (a *App) importCrowProfiles(db *sql.DB, opt RimCrowOptions, rep *RimCrowRep
 			p.Status = "skipped: Proton requires Steam launch"
 			continue
 		}
-		var argv []string
-		err := json.Unmarshal([]byte(p.Args), &argv)
-		if err != nil {
-			p.Status = "skipped: " + err.Error()
-			continue
-		}
-		if argv == nil {
-			argv = []string{}
-		}
-		data, _ := json.Marshal(argv)
-		p.Args = string(data)
-		if err := ValidateLaunchArgs(p.Environment, p.Args); err != nil {
+		if err := p.normaliseArgs(); err != nil {
 			p.Status = "skipped: " + err.Error()
 			continue
 		}
@@ -238,22 +239,44 @@ func (a *App) importCrowProfiles(db *sql.DB, opt RimCrowOptions, rep *RimCrowRep
 		if p.Status != "ready" {
 			continue
 		}
-		e, _, err := a.EnvAdd(p.Environment, EnvSpec{GameRoot: p.Game, UserDataRoot: p.UserData, Launch: p.launch, deferPlan: true})
-		if err != nil {
-			return fmt.Errorf("profile %s: %w", p.Name, err)
+		e := p.resume
+		if e == nil {
+			// Record the mapping first: an interruption leaves either no Game Config with
+			// this ID (the next import starts afresh) or one the next import resumes.
+			id := a.NewID()
+			if err := a.Store.SetMeta(p.key, id); err != nil {
+				return err
+			}
+			if err := a.Store.SetMeta(p.key+":complete", ""); err != nil {
+				return err
+			}
+			if err := testFault(a, "profile-mapped"); err != nil {
+				return err
+			}
+			var err error
+			e, _, err = a.EnvAdd(p.Environment, EnvSpec{GameRoot: p.Game, UserDataRoot: p.UserData, Launch: p.launch, deferPlan: true, id: id})
+			if err != nil {
+				return fmt.Errorf("profile %s: %w", p.Name, err)
+			}
 		}
-		// Record immediately: a later failure must never create duplicates or overwrite a retry's edits.
-		if err := a.Store.SetMeta(p.key, e.ID); err != nil {
+		if err := testFault(a, "profile-registered"); err != nil {
 			return err
 		}
-		if err := a.SetLaunchArgs(e.ID, p.Args); err != nil {
-			return err
+		if a.Store.Meta(p.key+":complete") == "" {
+			if err := a.SetLaunchArgs(e.ID, p.Args); err != nil {
+				return err
+			}
+			if err := a.Store.SetMeta(p.key+":complete", "args"); err != nil {
+				return err
+			}
 		}
 		reader, err := a.ReadSession()
 		if err != nil {
 			return err
 		}
 		reader.EnvName = e.Name
+		// Read before the first scan below, which may give the Game Config a first list.
+		hadPlan := a.Store.CurrentPlanID(e.ID) != 0
 		err = func() error {
 			defer reader.Close()
 			scan, _, err := reader.LastScan(e.GameID)
@@ -275,6 +298,9 @@ func (a *App) importCrowProfiles(db *sql.DB, opt RimCrowOptions, rep *RimCrowRep
 			if err != nil {
 				return err
 			}
+			if hadPlan {
+				return nil // the interrupted import, or the player, selected its list already
+			}
 			st := &LoadoutState{Ix: ix, Reg: reg}
 			name, err := reader.siblingPlanName(p.Name)
 			if err != nil {
@@ -291,11 +317,14 @@ func (a *App) importCrowProfiles(db *sql.DB, opt RimCrowOptions, rep *RimCrowRep
 			if err != nil {
 				return err
 			}
-			return reader.Store.SetCurrentPlan(e.ID, plan.ID)
+			if err := reader.Store.SetCurrentPlan(e.ID, plan.ID); err != nil {
+				return err
+			}
+			return testFault(a, "profile-plan")
 		}()
 		if err != nil {
 			p.Status = "incomplete: " + err.Error()
-			return fmt.Errorf("profile %s registered but initialization failed; inspect Game Config %s before retrying: %w", p.Name, e.Name, err)
+			return fmt.Errorf("profile %s registered but initialization failed; importing again finishes Game Config %s: %w", p.Name, e.Name, err)
 		}
 		if err := a.Store.SetMeta(p.key+":complete", "yes"); err != nil {
 			return err
@@ -303,4 +332,49 @@ func (a *App) importCrowProfiles(db *sql.DB, opt RimCrowOptions, rep *RimCrowRep
 		p.Status = "imported"
 	}
 	return nil
+}
+
+// normaliseArgs stores RimCrow's run_commands as a JSON argv (03 §6.4) and refuses
+// arguments that override the Game Config's folders.
+func (p *RCProfile) normaliseArgs() error {
+	var argv []string
+	if err := json.Unmarshal([]byte(p.Args), &argv); err != nil {
+		return err
+	}
+	if argv == nil {
+		argv = []string{}
+	}
+	data, _ := json.Marshal(argv)
+	p.Args = string(data)
+	return ValidateLaunchArgs(p.Environment, p.Args)
+}
+
+// resumeCrowProfile prepares an interrupted import of p, registered as known, to finish:
+// the launch arguments when stage says they were not stored yet, and the list from the
+// adopted Config/ModsConfig.xml when the Game Config has no current list. It reports
+// whether the profile is ready.
+func (a *App) resumeCrowProfile(p *RCProfile, known *env.Environment, stage string) bool {
+	p.resume = known
+	p.Environment, p.Game, p.UserData = known.Name, known.GameRoot, known.UserDataRoot
+	if stage == "" {
+		if err := p.normaliseArgs(); err != nil {
+			p.Status = "skipped: " + err.Error()
+			return false
+		}
+	}
+	if a.Store.CurrentPlanID(known.ID) == 0 {
+		raw, err := os.ReadFile(filepath.Join(p.UserData, "Config", "ModsConfig.xml"))
+		if err != nil {
+			p.Status = "skipped: missing or unreadable Config/ModsConfig.xml: " + err.Error()
+			return false
+		}
+		if p.list, err = ParseList(raw); err != nil {
+			p.Status = "skipped: unreadable Config/ModsConfig.xml: " + err.Error()
+			return false
+		}
+		p.ConfigHash = fmt.Sprintf("%x", sha256.Sum256(raw))
+		p.Tokens = append([]string(nil), p.list.Tokens...)
+	}
+	p.Status = "ready"
+	return true
 }

@@ -369,7 +369,10 @@ type SettingsControl struct {
 // opened it, with the Mod's settings file.
 type SettingsWindow struct {
 	SettingsFile
-	Full     bool              `json:"full"` // false: Monitor stopped at its limit
+	Full bool `json:"full"` // false: Monitor stopped at its limit
+	// FileHash is the settings file as the window opened: "sha256:<hex>", "none" without a
+	// file, "" when Monitor did not record it (before 0.11.1, or it could not read the file).
+	FileHash string            `json:"fileHash,omitempty"`
 	Controls []SettingsControl `json:"controls"`
 }
 

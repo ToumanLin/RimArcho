@@ -101,6 +101,20 @@ func TestAgentInstallFromZip(t *testing.T) {
 	if !s.Installed || s.Manifest.Pi != "1.4.0" || !strings.HasPrefix(s.Dir, a.AgentBundlesDir()) {
 		t.Fatalf("status after install: %+v", s)
 	}
+	// reinstalling the same version goes into a fresh folder and switches to it; the old
+	// folder stays in use until the new one is complete
+	first := s.Dir
+	if _, err := a.InstallAgent(ctx, ok, nil); err != nil {
+		t.Fatal(err)
+	}
+	if s := a.AgentStatus(); !s.Installed || s.Dir == first || s.Manifest.Version != "0.1.0" {
+		t.Fatalf("status after reinstall: %+v (first %s)", s, first)
+	}
+	if _, err := os.Stat(first); !os.IsNotExist(err) {
+		t.Fatalf("replaced bundle kept: %v", err)
+	}
+	// a folder left by an interrupted install of the next version does not get in the way
+	os.MkdirAll(filepath.Join(a.AgentBundlesDir(), "0.2.0", "node"), 0o755)
 	// a newer bundle replaces the older one
 	if _, err := a.InstallAgent(ctx, agentZip(t, t.TempDir(), "0.2.0", nil), nil); err != nil {
 		t.Fatal(err)

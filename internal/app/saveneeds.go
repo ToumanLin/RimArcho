@@ -26,8 +26,8 @@ const (
 	NeedWhyGone   = "not installed"
 	NeedWhyNoDefs = "not analysed for this game version"
 	NeedWhyNoCode = "its code is not analysed"
-	// It defines terrain, biomes, rock or chunks, and the save's grids hold some that no Def of the
-	// save's Mods matches (12 §1.4): they may be this Mod's.
+	// The save's grids hold terrain, biomes, rock or chunks that no Def of the save's Mods
+	// matches (12 §1.4), and one may be this Mod's (gridResult.may).
 	NeedWhyGrid = "the save has terrain, biomes or rock that could not be named"
 	// required by a Mod that is itself not checked
 	NeedWhyDependent = "a Mod that needs it could not be checked"
@@ -45,6 +45,9 @@ type SaveNeed struct {
 	Classes         []string // Class="…" values only its assemblies define among the save's Mods
 	Weather         []string // its WeatherDefs a map has now or had last
 	Defs            int      // distinct Defs of it the save references
+	// World: living pawns of the player's faction among the world pawns, of its races: the
+	// starting pawns the player did not choose. They are in the save, but not colonists.
+	World int
 	// Grid: a Def of it is in a map's terrain or compressed things, or on a world tile
 	// (12 §1.4): rock and ore are in no world category, but they are gone without it.
 	Grid bool
@@ -64,7 +67,7 @@ var needWorld = map[string]bool{
 
 // Severe: what the game cannot load the save without.
 func (n *SaveNeed) Severe() bool {
-	return n.Colonists+n.Dead > 0 || len(n.Factions) > 0 || len(n.Classes) > 0 || len(n.Weather) > 0
+	return n.Colonists+n.Dead+n.World > 0 || len(n.Factions) > 0 || len(n.Classes) > 0 || len(n.Weather) > 0
 }
 
 func (n *SaveNeed) verdict() string {
@@ -112,7 +115,7 @@ func (a *App) saveNeeds(f *savefile.Facts, mods []SaveMod, ready map[string]bool
 	if err != nil {
 		return nil, err
 	}
-	type pawns struct{ alive, dead int }
+	type pawns struct{ alive, dead, world int }
 	colonists := map[string]*pawns{}
 	for _, p := range f.Colonists {
 		inst := own.things[p.Race]
@@ -124,9 +127,12 @@ func (a *App) saveNeeds(f *savefile.Facts, mods []SaveMod, ready map[string]bool
 			c = &pawns{}
 			colonists[inst] = c
 		}
-		if p.Dead {
+		switch {
+		case p.Dead:
 			c.dead++
-		} else {
+		case p.Where == savefile.WhereWorld: // as saves show counts them (12 §4.5)
+			c.world++
+		default:
 			c.alive++
 		}
 	}
@@ -163,7 +169,7 @@ func (a *App) saveNeeds(f *savefile.Facts, mods []SaveMod, ready map[string]bool
 				n.Defs += c.Count
 			}
 			if c := colonists[m.Instance]; c != nil {
-				n.Colonists, n.Dead = c.alive, c.dead
+				n.Colonists, n.Dead, n.World = c.alive, c.dead, c.world
 			}
 			n.Factions = factions[m.Instance]
 			n.Classes = classes[m.Instance]
@@ -176,8 +182,9 @@ func (a *App) saveNeeds(f *savefile.Facts, mods []SaveMod, ready map[string]bool
 			if n.Verdict != NeedBreaks && !code[m.Instance] && !n.Game {
 				n.Verdict, n.Why = NeedUnchecked, NeedWhyNoCode
 			}
-			// The save has terrain or biomes nobody could name, and this Mod defines some:
-			// one of them may be its own, under another name then or added by a Patch.
+			// The save has terrain, biomes or rock nobody could name that may be this Mod's
+			// (gridResult.may): under another name then, added by a Patch, or a compressible
+			// Def whose hash was pushed on by Defs not seen.
 			if (n.Verdict == NeedSafe || n.Verdict == NeedCare) && grid[m.Instance] && !n.Game {
 				n.Verdict, n.Why = NeedUnchecked, NeedWhyGrid
 			}

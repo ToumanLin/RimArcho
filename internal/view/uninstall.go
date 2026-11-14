@@ -79,7 +79,7 @@ var unTitles = map[string]string{
 }
 
 var unVerbs = map[string]string{
-	"forget-accounts": "forget sessions", app.DoDDS: "delete recorded DDS directly",
+	"forget-accounts": "forget sessions", "forget-agent-key": "remove the API key", app.DoDDS: "delete recorded DDS directly",
 	app.DoUnlink: "unlink", app.DoClean: "clean", app.DoRestore: "put the backup back", app.DoTrash: "recycle bin", app.DoMove: "move",
 	app.DoKeep: "keep", app.DoDelete: "delete", app.DoLater: "after closing", app.DoLeave: "left alone",
 }
@@ -187,6 +187,9 @@ func uninstallText(p *app.UninstallPlan, s *app.UninstallStep) string {
 	}
 	switch s.Key {
 	case app.UnAccounts:
+		if n["forget-agent-key"] > 0 {
+			return T("forget account sessions first; external SteamCMD caches stay; tools and data stay if this fails") + T("; ") + T("remove the Archo Agent API key from Windows Credential Manager")
+		}
 		return T("forget account sessions first; external SteamCMD caches stay; tools and data stay if this fails")
 	case app.UnTextures:
 		add(app.DoDDS, "delete recorded DDS in %d mod folders; original textures stay")

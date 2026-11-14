@@ -2,8 +2,10 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // A list edit keeps the index key; a write to an index table, by this connection or
@@ -126,4 +128,43 @@ func TestOpenWhileAnotherWrites(t *testing.T) {
 		t.Fatal("open while another connection writes:", err)
 	}
 	other.Close()
+}
+
+// A transaction that reads before it writes waits for another process's write instead of
+// failing with SQLITE_BUSY when that write commits in between (_txlock=immediate).
+func TestReadThenWriteWhileAnotherWrites(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "archo.db")
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	other, err := OpenSession(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer other.Close()
+	read := make(chan struct{})
+	done := make(chan error, 1)
+	err = s.inTx(func(tx *sql.Tx) error {
+		var n int
+		if err := tx.QueryRow(`SELECT count(*) FROM meta`).Scan(&n); err != nil {
+			return err
+		}
+		close(read)
+		go func() { done <- other.SetMeta("concurrent", "1") }()
+		time.Sleep(300 * time.Millisecond) // the other write commits here without the lock
+		_, err := tx.Exec(`INSERT INTO meta(key, value) VALUES('reader', '1')`)
+		return err
+	})
+	<-read
+	if err != nil {
+		t.Fatal("read then write:", err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal("the other write:", err)
+	}
+	if s.Meta("concurrent") != "1" || s.Meta("reader") != "1" {
+		t.Fatal("a write was lost")
+	}
 }

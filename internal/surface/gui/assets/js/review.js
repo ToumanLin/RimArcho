@@ -4,7 +4,8 @@
 // one card each), 2 a map of the colony's Mods (one square a Mod, in two groups), 3 the
 // details of the Mod picked, drawn as Mod library draws them (detail.js detailFrame), and
 // 4 what the saves show of it: each category folded, the names not seen inside. The review runs in the background and arrives as "review"
-// events: progress lines, then the page (16 §8.4).
+// events: the page in parts (their done/total is the progress), then the whole page, or
+// "stale" when a newer request or leaving stopped it (16 §8.4).
 import { S, $, el, api, T, Tf, say } from "./state.js";
 import { on } from "./api.js";
 import { beginPageRead, page, area, button } from "./screens.js";
@@ -16,19 +17,26 @@ import { openLibraryInstance } from "./librarylink.js";
 import { tagColors, tagCSS } from "./tagcolor.js";
 
 // page: the review shown; colony: the colony asked for ("" all); q: the find box; by: how
-// the map is grouped (kind, tags, main); sel: the Mod picked (its package ID); names: the
-// categories (Mod|label) whose names show in full.
-const kept = (k, d) => { try { return localStorage.getItem("review." + k) || d; } catch { return d; } };
+// the map is grouped (kind, tags, main); sel: the Mod picked (its copy, modId); names: the
+// categories (Mod|label) whose names show in full; why: the "not exact" line is open;
+// visit: the navigation (S.screenSeq) open() last reset for. The groupings, sorts and
+// views are the player's; the rest is forgotten when the page is left or the Game Config
+// switches (leave).
+const kept = (k, d, ok) => { try { const v = localStorage.getItem("review." + k); return ok.includes(v) ? v : d; } catch { return d; } };
 const keep = (k, v) => { try { localStorage.setItem("review." + k, v); } catch { /* storage can be off */ } };
-const X = { page: null, colony: "", q: "", by: kept("by", "progress"), sort: kept("sort", "amount"), view: kept("view", "covers"), sel: "", names: new Set(), cats: new Set(), seq: 0, detail: 0 };
-let find = null, cols = null, map = null, ctl = null, dinfo = null, dbody = null, pinfo = null, pwrap = null, shown = "";
+const X = { page: null, colony: "", q: "", by: kept("by", "progress", ["progress", "kind", "tags", "main"]), sort: kept("sort", "amount", ["progress", "amount", "name"]),
+  view: kept("view", "covers", ["covers", "list"]), sel: "", names: new Set(), cats: new Set(), why: false, seq: 0, detail: 0, visit: -1 };
+let find = null, cols = null, map = null, ctl = null, dinfo = null, dbody = null, pinfo = null, pwrap = null, note = null, shown = "";
+let busyText = ""; // the progress this page put on the status line
 const waiting = new Map(); // request → its resolve
 const NAMES = 40; // names not seen shown in a category before "N more"
 const lc = (s) => String(s || "").toLowerCase();
+// A Mod is one installed copy: two copies of a packageId (a pack's and the library's, or
+// two Game Configs' resolving differently) are two tiles, each picked on its own.
+const modId = (m) => m.library || m.packageId;
 
 on("review", (ev) => {
   if (!ev) return;
-  if (ev.line) { if (S.screen === "review" && ev.request === X.seq) say("busy", ev.line); return; }
   const w = waiting.get(ev.request);
   if (!w) return;
   if (ev.partial && ev.page) { w.partial(ev.page); return; }
@@ -36,16 +44,29 @@ on("review", (ev) => {
   w.done(ev);
 });
 
+// unbusy takes this page's progress off the status line, and only it: a message another
+// page or action put there since stays.
+function unbusy() {
+  const st = $("#status");
+  if (busyText && st?.dataset.kind === "busy" && st.dataset.message === busyText) say("", "");
+  busyText = "";
+}
+function busy(text) { busyText = text; say("busy", text); }
+
 // read asks for the review and waits for its last event; a newer request makes it stale.
 // The page comes in parts (16 §3.1 rule 9): at once the colonies, then the Mods of the
-// saves reviewed so far, newest first; partial is called with each.
+// saves reviewed so far, newest first; partial is called with each. Every request ends
+// with an event: "stale" when a newer one or leaving the page stopped it (null here).
 function read(partial) {
   const n = X.seq = Math.max(X.seq + 1, Date.now() * 1000);
   return new Promise((resolve, reject) => {
     waiting.set(n, {
       partial: (p) => { if (n === X.seq) partial(p); },
       done: (ev) => {
+        // a newer request has the status line; the newest one stopped (the page was
+        // left) lets go of it
         if (n !== X.seq) return resolve(null);
+        if (ev.error === "stale") { unbusy(); return resolve(null); }
         if (ev.error) return reject(new Error(ev.error));
         resolve(ev.page);
       },
@@ -57,18 +78,31 @@ function read(partial) {
 
 // progress says how far a running review is; nothing once it is whole.
 function progress(p, partial) {
-  if (partial && p.total > 0) say("busy", Tf("reviewing the saves %d/%d", p.done || 0, p.total));
-  else if ($("#status")?.dataset.kind === "busy") say("", "");
+  if (partial && p.total > 0) busy(Tf("reviewing the saves %d/%d", p.done || 0, p.total));
+  else unbusy();
+}
+
+// leave forgets the last visit (as the Saves page does, 17 §7.3): the review, the colony,
+// the Mod picked, the folds and the find box; a review still on its way to them is
+// dropped by its request number.
+function leave() {
+  X.page = null; X.colony = ""; X.q = ""; X.sel = ""; X.why = false;
+  X.names.clear(); X.cats.clear();
+  X.detail++;
+  find = cols = map = ctl = dinfo = dbody = pinfo = pwrap = note = null;
+  shown = "";
 }
 
 export async function open() {
   const r = beginPageRead("review", { retry: open, label: "reviewing the saves…" });
+  // a new visit, or the Game Config switched (both start a new navigation)
+  if (X.visit !== S.screenSeq) { X.visit = S.screenSeq; leave(); }
   let built = false;
   const show = (p, partial) => {
     if (!r.current()) return;
     X.page = p;
     X.colony = p.colony || "";
-    if (!built) { built = true; build(); r.finish(); } else { drawColonies(); drawMap(); drawRight(); }
+    if (!built) { built = true; build(); r.finish(); } else redraw();
     progress(p, partial);
   };
   let p = null;
@@ -82,30 +116,63 @@ export async function open() {
 // pick reviews another colony behind the page shown.
 async function pick(key) {
   if (key === X.colony) return;
+  const was = X.colony, visit = X.visit;
   X.colony = key;
   X.names.clear(); X.cats.clear();
   drawColonies();
-  say("busy", T("reviewing the saves…"));
+  busy(T("reviewing the saves…"));
+  const here = () => S.screen === "review" && X.visit === visit && S.screenSeq === visit;
   const show = (p, partial) => {
-    if (S.screen !== "review") return;
+    if (!here()) return;
     X.page = p;
     X.colony = p.colony || "";
-    drawColonies(); drawMap(); drawRight();
+    redraw();
     progress(p, partial);
   };
   let p;
-  try { p = await read((part) => show(part, true)); } catch (e) { say("fail", String(e?.message || e)); return; }
+  try { p = await read((part) => show(part, true)); } catch (e) {
+    if (!here()) return;
+    // the colony shown stays marked: its review is still the one on the page
+    if (X.page && (X.page.colony || "") === was) { X.colony = was; drawColonies(); }
+    unbusy(); say("fail", String(e?.message || e)); return;
+  }
   if (p) show(p, false);
 }
 
+// redraw draws a newer review into the page built: the colonies, the map and the right
+// cards, keeping what the player had open, focused and scrolled.
+function redraw() { drawHead(); drawColonies(); drawMap(); drawRight(); }
+
+// drawHead: the page's line says what the review counts, the amber note the saves it
+// could not read (16 §2.11), for the review shown now.
+function drawHead() {
+  const lead = $("#screen .page.review .page-head .lead");
+  if (lead && X.page) lead.textContent = X.page.lead || "";
+  if (note) { note.textContent = X.page?.note || ""; note.hidden = !X.page?.note; }
+}
+
 const mods = () => (X.page?.groups || []).flatMap((g) => g.mods.map((m) => ({ m, mode: g.key })));
-const picked = () => mods().find((x) => x.m.packageId === X.sel) || mods()[0] || null;
+const picked = () => mods().find((x) => modId(x.m) === X.sel) || mods()[0] || null;
+
+// keepFocus runs draw, which rebuilds box, and puts the focus back where it was in box:
+// on the control with the same data-key (and data-cat), or on fallback (an element, or a
+// function giving one after draw). Focus outside box is left alone.
+function keepFocus(box, draw, fallback) {
+  const at = document.activeElement;
+  const inside = !!(box && at && at !== box && box.contains?.(at));
+  const key = inside ? at.dataset?.key : "", cat = inside ? at.dataset?.cat : undefined;
+  draw();
+  if (!inside) return;
+  const again = key && [...box.querySelectorAll("[data-key]")].find((b) => b.dataset.key === key && b.dataset.cat === cat);
+  (again || (typeof fallback === "function" ? fallback() : fallback))?.focus({ preventScroll: true });
+}
 
 function build() {
   const p = X.page;
   const sc = $("#screen");
   sc.innerHTML = "";
-  const w = page("fill review", p.lead);
+  // the line is redrawn with each part of the review (drawHead), so it is there from the start
+  const w = page("fill review", p.lead || " ");
   const grid = el("div", "sv rv");
   const leftCol = el("div", "sv-leftcol");
   const search = el("label", "card sv-find");
@@ -118,6 +185,8 @@ function build() {
   find.autocomplete = "off"; find.spellcheck = false;
   find.oninput = () => { X.q = find.value; drawColonies(); };
   find.onkeydown = (e) => {
+    // an input method's Enter or Escape commits or cancels its text, not the page's keys
+    if (e.isComposing || e.keyCode === 229) { e.stopPropagation(); return; }
     if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); if (X.q) { X.q = find.value = ""; drawColonies(); } else cols.focus({ preventScroll: true }); }
     else if (e.key === "ArrowDown" || e.key === "Enter") { e.preventDefault(); e.stopPropagation(); cols.focus({ preventScroll: true }); }
     else e.stopPropagation(); // typing is not a page key
@@ -166,9 +235,9 @@ function build() {
   map.tabIndex = 0;
   map.setAttribute("aria-label", T("the Mods, one tile each with its picture and name; the bar is how much of it the saves show"));
   map.onkeydown = mapKey;
-  mid.append(midHead);
-  if (p.note) mid.append(el("p", "sv-note warn", p.note));
-  mid.append(map);
+  note = el("p", "sv-note warn", p.note || "");
+  note.hidden = !p.note;
+  mid.append(midHead, note, map);
   // right: the Mod's details as Mod library draws them, above what the saves show of it
   const rightCol = el("div", "rv-right");
   const dcard = el("section", "card rv-detail");
@@ -208,11 +277,15 @@ function build() {
   area(dcard, dhead, () => dbody.focus({ preventScroll: true }));
   area(prog, phead, () => pwrap.querySelector(".sv-body")?.focus({ preventScroll: true }));
   shown = "";
-  drawColonies(); drawMap(); drawRight();
+  redraw();
 }
 
 function drawColonies() {
   if (!cols || !X.page) return;
+  keepFocus(cols, drawColonyCards, cols);
+}
+
+function drawColonyCards() {
   const q = lc(X.q.trim());
   cols.replaceChildren();
   const card = (key, name, line) => {
@@ -285,6 +358,10 @@ function tier(m, mode) {
 
 function drawMap() {
   if (!map || !X.page) return;
+  keepFocus(map, drawTiles, map);
+}
+
+function drawTiles() {
   for (const b of ctl.querySelectorAll("[data-view]")) { b.classList.toggle("on", b.dataset.view === X.view); b.setAttribute("aria-pressed", String(b.dataset.view === X.view)); }
   const top = map.scrollTop;
   map.replaceChildren();
@@ -303,8 +380,8 @@ function drawMap() {
       const b = el("button", "rv-tile " + st + (sel && sel.m === m ? " on" : ""));
       b.type = "button";
       b.tabIndex = -1;
-      b.dataset.mod = m.packageId;
-      b.dataset.key = "review-mod-" + m.packageId;
+      b.dataset.mod = modId(m);
+      b.dataset.key = "review-mod-" + modId(m);
       b.title = m.name + "\n" + m.tip;
       b.setAttribute("aria-label", m.name + T(": ") + m.tip);
       const pic = el("span", "pic");
@@ -324,7 +401,7 @@ function drawMap() {
       bar.append(fill);
       b.append(pic, bar, el("span", "t", m.name));
       if (X.view === "list") b.append(el("span", "n", m.size ? Tf("%d / %d", m.part, m.size) : ""));
-      b.onclick = () => { choose(m.packageId); map.focus({ preventScroll: true }); };
+      b.onclick = () => { choose(modId(m)); map.focus({ preventScroll: true }); };
       tiles.append(b);
     }
     sec.append(h, tiles);
@@ -373,24 +450,36 @@ function mapKey(e) {
 
 // drawRight: the Mod picked. Card 3 is its details as Mod library draws them (the picture,
 // name, authors, facts, fields, description, history); card 4 what the saves show of it.
+// Drawn again with each part of a review, it keeps what the player had: the "not exact"
+// line open, the categories' scroll and the focus (16 §3.1 rule 9).
 function drawRight() {
   if (!dbody) return;
-  const x = picked();
+  const x = picked(), same = !!x && pwrap.dataset.mod === modId(x.m);
+  const top = same ? pwrap.querySelector(".rv-cats")?.scrollTop || 0 : 0;
+  keepFocus(pwrap.parentNode?.parentNode, () => {
+    drawRightCards(x);
+    const body = pwrap.querySelector(".rv-cats");
+    if (body) body.scrollTop = top;
+  }, () => pwrap.querySelector(".rv-cats"));
+}
+
+function drawRightCards(x) {
   dinfo.replaceChildren();
   pinfo.replaceChildren();
   pwrap.replaceChildren();
-  if (!x) { dbody.replaceChildren(); shown = ""; return; }
-  const m = x.m;
+  if (!x) { dbody.replaceChildren(); shown = ""; delete pwrap.dataset.mod; return; }
+  const m = x.m, id = modId(m);
+  pwrap.dataset.mod = id;
   dinfo.append(el("span", "q word-facts", m.name));
   if (m.library) {
     const go = el("button", "editor-full-link", T("show in the mod library"));
     go.type = "button";
-    go.dataset.key = "review-lib-" + m.packageId;
+    go.dataset.key = "review-lib-" + id;
     go.onclick = () => openLibraryInstance(m.library);
     dinfo.append(go);
   }
-  if (shown !== m.packageId) {
-    shown = m.packageId;
+  if (shown !== id) {
+    shown = id;
     const n = ++X.detail;
     const inner = el("div", "mod-detail");
     // the tags and the folder are edited and opened in Mod library: their links go to the copy there
@@ -404,29 +493,30 @@ function drawRight() {
   pinfo.append(meter(m.seen, m.adds, "big"), el("b", "", m.sum), el("span", "muted", m.where));
   // why the numbers are not exact, in a line; the rest on request
   const lim = el("details", "sv-limits rv-why");
-  lim.append(el("summary", "", T("not exact: a save shows only what is in it now")));
+  lim.open = X.why;
+  lim.addEventListener("toggle", () => { X.why = lim.open; });
+  const sum = el("summary", "", T("not exact: a save shows only what is in it now"));
+  sum.dataset.key = "review-why";
+  lim.append(sum);
   lim.append(el("p", "", T("what was used up, sold or lost before the oldest save leaves no trace; bills, filters and research not begun do not count; recipes are not counted; a Mod updated since may have renamed things")));
   const body = el("div", "sv-body rv-cats");
   body.tabIndex = 0;
   body.setAttribute("aria-label", T("what it adds, by category, with the names not seen"));
   for (const c of m.cats || []) {
-    const key = m.packageId + "|" + c.label, open = X.cats.has(key);
+    const key = id + "|" + c.label, open = X.cats.has(key);
     const names = c.names || [];
     const sec = el("section", "rv-cat");
     const h = el("button", "rv-cath");
     h.type = "button";
-    h.dataset.key = "review-cat-" + m.packageId;
+    h.dataset.key = "review-cat-" + id;
     h.dataset.cat = c.label;
     h.setAttribute("aria-expanded", String(open));
     const chv = el("span", "chv" + (open ? " open" : "")); chv.innerHTML = icon.chev;
     h.append(chv, el("span", "l", c.label), meter(c.seen, c.adds), el("span", "k", Tf("%d / %d", c.seen, c.adds) + (c.under ? " " + T("(saves undercount these)") : "")));
     h.onclick = () => {
       if (open) X.cats.delete(key); else X.cats.add(key);
-      const top = body.scrollTop;
+      h.focus({ preventScroll: true }); // a click focuses it too, so drawRight puts it back
       drawRight();
-      const nb = pwrap.querySelector(".rv-cats");
-      if (nb) nb.scrollTop = top;
-      [...pwrap.querySelectorAll(".rv-cath")].find((b) => b.dataset.cat === c.label)?.focus({ preventScroll: true });
     };
     sec.append(h);
     if (open) {
@@ -437,8 +527,9 @@ function drawRight() {
         const p = el("p", "rv-names");
         for (const n of whole ? names : names.slice(0, NAMES)) p.append(el("span", "", n));
         if (!whole) {
-          const all = button(Tf("%d more", names.length - NAMES + (c.more || 0)), "", () => { X.names.add(key); drawRight(); }, "link sv-fold");
-          all.dataset.key = "review-names-" + m.packageId;
+          const all = button(Tf("%d more", names.length - NAMES + (c.more || 0)), "", () => { X.names.add(key); h.focus({ preventScroll: true }); drawRight(); }, "link sv-fold");
+          all.dataset.key = "review-names-" + id;
+          all.dataset.cat = c.label;
           p.append(all);
         } else if (c.more) p.append(el("span", "more", Tf("and %d more", c.more)));
         sec.append(p);

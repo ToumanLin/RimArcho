@@ -195,7 +195,7 @@ func settingsFiles(root *render.Node, sm *app.ModSettingsMod, limit int, expand 
 			n.KV("file key", f.Key())
 		}
 		if f.Window != nil {
-			windowSection(n, f.Window, f.Exists && f.Modified.After(f.Window.Seen), limit, expand)
+			windowSection(n, f.Window, f.WindowOutdated(), limit, expand)
 		}
 		if !f.Exists {
 			n.Add("no file: the Mod uses its defaults until its settings are changed in the game")

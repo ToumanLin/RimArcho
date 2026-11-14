@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -189,6 +190,11 @@ func (a *App) replaceCreditLocked(it store.CreditItem, old, target *store.Mod, u
 	if err != nil {
 		return "", err
 	}
+	// A root that cannot be switched now keeps its obligation (done=0) and the item stays
+	// switching, so the next pass retries it; the roots switched meanwhile stay switched.
+	// Until every root is switched, lists are not remapped and the SteamCMD copy stays.
+	var unfinished []string
+	switched, gone := 0, 0
 	for _, d := range deployments {
 		if err := a.checkNoGame(); err != nil {
 			return "", err
@@ -196,7 +202,11 @@ func (a *App) replaceCreditLocked(it store.CreditItem, old, target *store.Mod, u
 		a.OpenPlan, a.PlanName = d.PlanID, ""
 		st, err := a.creditDeploymentState(d)
 		if err != nil {
-			return "retained: " + err.Error(), nil
+			if errors.As(err, new(creditGone)) {
+				gone++
+			}
+			unfinished = append(unfinished, err.Error())
+			continue
 		}
 		e := st.Ix.Env
 		if !st.Reg.Loadable(target.ID) {
@@ -205,7 +215,8 @@ func (a *App) replaceCreditLocked(it store.CreditItem, old, target *store.Mod, u
 		}
 		// Save owns registry tokens, _steam, link journal, external-edit checks and backups.
 		if st.File == nil {
-			return "", fmt.Errorf("deployment ModsConfig is missing in %s", e.Name)
+			unfinished = append(unfinished, fmt.Sprintf("deployment ModsConfig is missing in %s", e.Name))
+			continue
 		}
 		rec, err := a.Store.ModsConfigStateAt(e.UserDataRoot)
 		if err != nil {
@@ -225,6 +236,15 @@ func (a *App) replaceCreditLocked(it store.CreditItem, old, target *store.Mod, u
 		if err := a.Store.FinishCreditRoot(it, d.RootKey); err != nil {
 			return "", err
 		}
+		switched++
+	}
+	if len(unfinished) > 0 {
+		why := fmt.Sprintf("%d of %d games switched to Workshop; %s", switched, len(deployments), strings.Join(unfinished, "; "))
+		if gone == len(unfinished) {
+			// nothing left can change by waiting: keep the SteamCMD copy for good
+			return "retained: " + why, nil
+		}
+		return "", errors.New(why)
 	}
 	if err := a.checkNoGame(); err != nil {
 		return "", err
@@ -525,14 +545,14 @@ func (a *App) creditGameProjection(st *LoadoutState, rec *store.ModsConfigState,
 // Read the captured root without borrowing a sibling's mutable environment settings.
 func (a *App) creditDeploymentState(d store.CreditDeployment) (*LoadoutState, error) {
 	if d.UserDataRoot == "" {
-		return nil, fmt.Errorf("credit deployment %s has no captured user data root; retain the SteamCMD copy and repair the obligation", d.EnvID)
+		return nil, creditGone{fmt.Sprintf("credit deployment %s has no captured user data root; the SteamCMD copy stays", d.EnvID)}
 	}
 	g, err := a.Store.GameByID(d.GameID)
 	if err != nil {
 		return nil, err
 	}
 	if g == nil {
-		return nil, fmt.Errorf("credit deployment installation %s is unavailable; retain the SteamCMD copy needed by %s", d.GameID, d.UserDataRoot)
+		return nil, creditGone{fmt.Sprintf("credit deployment installation %s is unavailable; the SteamCMD copy stays for %s", d.GameID, d.UserDataRoot)}
 	}
 	e := &env.Environment{ID: d.EnvID, GameID: d.GameID, Name: d.EnvName, GameRoot: g.GameRoot, GameVersion: g.GameVersion, UserDataRoot: d.UserDataRoot}
 	ix, err := a.loadIndex(e)
@@ -548,7 +568,7 @@ func (a *App) creditDeploymentState(d store.CreditDeployment) (*LoadoutState, er
 		return nil, err
 	}
 	if p == nil {
-		return nil, fmt.Errorf("deployment plan %d no longer exists", d.PlanID)
+		return nil, creditGone{fmt.Sprintf("deployment plan %d no longer exists", d.PlanID)}
 	}
 	ws, err := a.planWorkspace(p)
 	if err != nil {
@@ -566,3 +586,10 @@ func (a *App) creditDeploymentState(d store.CreditDeployment) (*LoadoutState, er
 	}
 	return st, nil
 }
+
+// creditGone: a captured root that waiting cannot make switchable (no captured user data
+// root, its installation or deployment plan removed). When only such roots are left the
+// item is retained instead of retried.
+type creditGone struct{ why string }
+
+func (e creditGone) Error() string { return e.why }

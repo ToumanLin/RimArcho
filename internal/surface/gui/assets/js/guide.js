@@ -78,8 +78,9 @@ export async function start(from = "first") {
 }
 
 // find reads the games detection finds and, on a first run, whether the managed folder is
-// still to be chosen: then the guide starts there.
-async function find(first = false) {
+// still to be chosen: then the guide starts there. keep is the game folder Add Game Config
+// keeps picked when it is still found (a reread after a switch).
+async function find(first = false, keep = "") {
   const read = beginPageRead("guide", { replace: true });
   let games, folder = null, lists = [];
   try {
@@ -93,17 +94,39 @@ async function find(first = false) {
   A.lists = lists || [];
   if (!A.list && A.lists.length) A.list = A.lists[0];
   if (adding()) {
-    // one game: the current config's, else the first found
+    // one game: the one kept, else the current config's, else the first found
+    const kept = keep ? G.games.findIndex((g) => g.game === keep) : -1;
     const cur = G.games.findIndex((g) => g.current);
-    if (G.games.length) pickOne(cur >= 0 ? cur : 0);
+    if (G.games.length) pickOne(kept >= 0 ? kept : cur >= 0 ? cur : 0);
   } else G.games.forEach((g, i) => { if (!g.env) G.picked.add(i); });
   draw();
   read.finish();
 }
 
 export function resume() {
+  if (staleConfig()) return reread();
   const read = beginPageRead("guide"); draw(); read.finish();
   if (G.step === 0 && G.way === 1 && !D.run && !D.loading) loadDownload();
+}
+
+// Add Game Config copies from and lists the current Game Config: a switch while its first
+// step is open (the switcher, E, the command palette) leaves A naming the previous one.
+const staleConfig = () => adding() && activeSession !== null && G.step === 0 && !G.added.length && A.from !== (S.board?.env || "");
+
+// envChanged: the current Game Config changed while the guide is shown; Add Game Config's
+// first step reads its lists and games again. A game picked other than the previous
+// config's stays picked; the previous config's game gives way to the new one's. Other
+// steps, and the first run, have nothing that follows the current config.
+export async function envChanged() {
+  if (S.screen === "guide" && staleConfig()) await reread();
+}
+
+async function reread() {
+  const picked = G.games[[...G.picked][0]];
+  const keep = picked && !picked.current ? picked.game : "";
+  A.from = S.board?.env || "";
+  A.copy = !!A.from; A.list = ""; A.lists = [];
+  await find(false, keep);
 }
 
 function draw() {
@@ -288,7 +311,9 @@ function step1(card) {
       const accepted = await withEnvironmentSwitch(games[0].name, async () => {
         names = await api.GuideAdd(games);
       });
-      if (accepted) await added(names || []);
+      // a newer switch took over: the button is usable again
+      if (!accepted) return draw();
+      await added(names || []);
     } catch (e) { G.error = errText(e); draw(); }
   }, "primary");
   next.disabled = !picked.length;
@@ -304,6 +329,10 @@ function pickOne(i) {
   if (g && (!A.saves || (A.saves === "shared" && g.env))) A.saves = g.env ? "own" : "shared";
 }
 
+// canCopy: the current config's settings can be copied into a config of game g, the
+// current config's own game folder.
+const canCopy = (g) => !!g?.current;
+
 // configChoices is Add Game Config's part of step 1 (16 §2.15): the picked game's config
 // name, whether the current config's settings are copied, the Mod list and the saves
 // folder, then Add.
@@ -317,10 +346,15 @@ function configChoices(card) {
   name.disabled = !g;
   name.oninput = () => { if (g) g.name = name.value.trim(); };
   row(T("Game Config name"), name);
-  if (A.from) {
+  // copying needs the copied config's game folder (env add --like refuses another one)
+  const copy = canCopy(g);
+  if (A.from && copy) {
     row(T("start with"), seg([Tf("copy the settings of %s", A.from), T("game defaults")], A.copy ? 0 : 1, (k) => { A.copy = k === 0; draw(); }));
     box.append(el("div", "dl-note muted", A.copy ? T("copies game settings and Mod settings; no Mod files or saves are copied")
       : T("game defaults; no settings or saves are copied")));
+  } else if (A.from && g) {
+    row(T("start with"), el("span", "", T("game defaults")));
+    box.append(el("div", "dl-note muted", Tf("%s uses another game folder, so its settings cannot be copied; no settings or saves are copied", A.from)));
   }
   const list = el("select", "field");
   for (const n of A.lists) list.append(new Option(n, n));
@@ -346,11 +380,12 @@ function configChoices(card) {
     if (A.saves === "custom" && !A.path) { G.error = T("choose a user data folder"); return draw(); }
     add.disabled = true;
     const one = { ...g, addConfig: !!g.env, saves: A.saves, customData: A.saves === "custom" ? A.path : "",
-      like: A.copy ? A.from : "", list: A.list, newList: !A.list };
+      like: A.copy && copy ? A.from : "", list: A.list, newList: !A.list };
     let names;
     try {
       const accepted = await withEnvironmentSwitch(one.name, async () => { names = await api.GuideAdd([one]); });
-      if (!accepted) return;
+      // a newer switch took over: the button is usable again
+      if (!accepted) return draw();
     } catch (e) { G.error = errText(e); return draw(); }
     G.error = "";
     // a game already read is ready at once; a new one is read first (step 2)

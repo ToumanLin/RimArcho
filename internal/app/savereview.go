@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"fmt"
 	"slices"
 	"sort"
 	"strings"
@@ -77,14 +76,9 @@ func (a *App) SaveReview(cols []*Colony, o ReviewOpts) (*SaveReview, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := a.PruneSaveCache(&SaveList{Colonies: cols}); err != nil {
-		return nil, err
-	}
-	// Old rows duplicated full catalogs. Drop that format even for saves outside
-	// this request, while retaining their reusable L1 facts.
-	if err := a.Store.PruneSaveReviewFormat(fmt.Sprintf("review%d:", reviewCacheVersion)); err != nil {
-		return nil, err
-	}
+	// A review only reads: the rows of saves that are gone are tidied by the index (archo
+	// saves index), and obsolete review rows only when this run writes one (reviewSave).
+	run := &reviewRun{input: input, src: src, catalogs: catalogs, lists: map[int64]string{}}
 	// Building a snapshot walks the accumulated catalog, not the saves. Facts and each
 	// compact result fall out of scope before the next save.
 	snapshot := func() *SaveReview { return reviewSnapshot(out, mods, catalog) }
@@ -96,7 +90,7 @@ func (a *App) SaveReview(cols []*Colony, o ReviewOpts) (*SaveReview, error) {
 			if o.Stop != nil && o.Stop() {
 				return nil, context.Canceled
 			}
-			res, cached, err := a.reviewSave(sv, o.Read, input, src, catalogs)
+			res, cached, err := a.reviewSave(sv, o.Read, run)
 			if err != nil {
 				return nil, err
 			}

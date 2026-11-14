@@ -109,7 +109,12 @@ func open(path string, initialise bool, progress func(UpgradeProgress)) (*Store,
 	// Per-connection settings go in the DSN so every connection the pool opens gets them.
 	// journal_size_limit: after a large write the WAL file is cut back to 16 MB when it is
 	// next reset, instead of keeping its largest size while any connection is open (04 §4).
-	dsn := "file:" + filepath.ToSlash(path) + "?_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(1)&_pragma=journal_size_limit(16777216)"
+	// _txlock=immediate: every transaction takes the write lock when it begins, waiting
+	// busy_timeout for another process's write. A deferred one that reads first and writes
+	// later gets SQLITE_BUSY at once when another process committed in between, whatever
+	// busy_timeout says (a scan's ApplyScan while the window saved an analysis). Every
+	// transaction RimArcho begins writes; reads outside transactions are unaffected.
+	dsn := "file:" + filepath.ToSlash(path) + "?_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(1)&_pragma=journal_size_limit(16777216)&_txlock=immediate"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err

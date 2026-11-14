@@ -31,10 +31,13 @@ func (s *Store) LastFinishedScan(gameID string) (*Scan, error) {
 	return list[0], nil
 }
 
-// FirstFinishedScan is the environment's oldest finished scan, or nil.
+// FirstFinishedScan is the installation's oldest finished scan that read every source, or
+// nil. A scan that left sources out (stats "partial": a game-only scan) does not count: the
+// Mods it did not read were not found yet.
 func (s *Store) FirstFinishedScan(gameID string) (*Scan, error) {
 	var id int64
-	err := s.DB.QueryRow(`SELECT id FROM scan WHERE game_id=? AND finished_at IS NOT NULL ORDER BY id LIMIT 1`, gameID).Scan(&id)
+	err := s.DB.QueryRow(`SELECT id FROM scan WHERE game_id=? AND finished_at IS NOT NULL
+		AND coalesce(json_extract(stats, '$.partial'), 0)=0 ORDER BY id LIMIT 1`, gameID).Scan(&id)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

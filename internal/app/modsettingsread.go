@@ -1,6 +1,8 @@
 package app
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -59,6 +61,31 @@ type ModSettingsFile struct {
 	// HugsLib is Archo Monitor's record of a HugsLib pack (titles, defaults); nil when never
 	// recorded.
 	HugsLib *SeenHugsLibPack
+}
+
+// WindowOutdated: a value may have changed since the settings window was recorded, so the
+// window's values may be out of date (16 §2.9). Closing the window writes the file again
+// (Dialog_ModSettings.PreClose → Mod.WriteSettings), so its time says nothing; Archo
+// Monitor records the file's hash as the window opened, and the file is compared with it. A
+// file the game rewrites with the same values has the same bytes. Without a recorded hash,
+// with no file as the window opened, or with no file now, it is false.
+func (f *ModSettingsFile) WindowOutdated() bool {
+	if f.Window == nil || !f.Exists {
+		return false
+	}
+	switch h := f.Window.FileHash; {
+	case h == "" || h == "none":
+		// no hash, or no file as the window opened: closing the window writes the file
+		// whether or not a value changed, so a file that appeared since proves nothing
+		return false
+	default:
+		b, err := os.ReadFile(f.Path)
+		if err != nil {
+			return false
+		}
+		sum := sha256.Sum256(b)
+		return !strings.EqualFold(h, "sha256:"+hex.EncodeToString(sum[:]))
+	}
 }
 
 // Key names f among its Mod's files: the Mod class, or "hugslib:" and the pack's identifier.

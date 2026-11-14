@@ -249,6 +249,16 @@ func envSet(c *Ctx, a *Args) (*render.Doc, error) {
 	if err := app.ValidateLaunchArgs(a.Pos[0], a.Str("launch-args")); err != nil {
 		return nil, err
 	}
+	// What changing the game folder does to other Game Configs and to the installation it
+	// leaves (16 §2.14), read before the change.
+	var gameChange []string
+	if a.Str("game") != "" {
+		lines, err := c.App.EnvGameChangePreview(a.Pos[0], a.Str("game"))
+		if err != nil {
+			return nil, err
+		}
+		gameChange = lines
+	}
 	e, changes, err := c.App.EnvSet(a.Pos[0], specFromArgs(a))
 	if err != nil {
 		return nil, err
@@ -271,6 +281,9 @@ func envSet(c *Ctx, a *Args) (*render.Doc, error) {
 			}
 		}
 		d.Nodes[0].KV("installation Game Configs", strings.Join(names, ", "))
+		for _, line := range gameChange {
+			d.Nodes[0].Add(line)
+		}
 	}
 	return d, nil
 }

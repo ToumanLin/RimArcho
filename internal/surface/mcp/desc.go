@@ -99,6 +99,6 @@ const descMemory = `Estimate resident RAM, loading RAM and VRAM for a plan. Comm
 
 const descListSaves = `Saves of every game and pack by colony, newest first: sv: reference, day, matched list, whether it loads. mod=<ref>: saves using a Mod; attention=true: with warnings or errors; review=true: what Mods add, how much saves show. Read-only.`
 
-const descGetSave = `One save (sv:ref, name or colony/save): load issues with fixes, Mod differences and playthrough (play=true for all colonists/events). content=true shows referenced content by Mod/category, using installed versions, with coverage limits. Read-only.`
+const descGetSave = `One save: load issues with fixes, Mod differences, playthrough (play=true: all colonists, events). content=true: content by Mod; mod=<ref>: can that Mod be removed, why. Read-only.`
 
 const descManageSaves = `Save actions: fix (Mod fixes as one undoable list edit, then subscribes; launch=true runs), rename, copy, copy_to_current, backup, trash, choose, choose_colony, unchoose (what Can it run checks). dry_run previews fix; backup and trash preview unless confirm=true with the preview's token: ask first.`

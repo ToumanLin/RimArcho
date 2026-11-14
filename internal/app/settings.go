@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -154,11 +155,26 @@ func (a *App) SetLaunchArgs(envID, args string) error {
 }
 
 // ValidateLaunchArgs keeps the game's data root under environment control (03 §6.2).
+// It checks arguments the player enters; stored ones are checked with validateStoredLaunchArgs.
 func ValidateLaunchArgs(name, args string) error {
 	argv, err := ParseLaunchArgs(args)
 	if err != nil {
+		return fmt.Errorf("%w; change them with archo env set %s --launch-args <args> or on the Game Config page", err, quoteArg(name))
+	}
+	return checkLaunchArgv(name, argv)
+}
+
+// validateStoredLaunchArgs is ValidateLaunchArgs for stored arguments: text an older
+// version stored splits on whitespace as it did then (storedLaunchArgs).
+func validateStoredLaunchArgs(name, args string) error {
+	argv, err := storedLaunchArgs(args)
+	if err != nil {
 		return err
 	}
+	return checkLaunchArgv(name, argv)
+}
+
+func checkLaunchArgv(name string, argv []string) error {
 	for _, arg := range argv {
 		key := strings.ToLower(strings.Trim(arg, "\"'"))
 		if key == "-logfile" || strings.HasPrefix(key, "-logfile=") {
@@ -176,8 +192,22 @@ func (a *App) checkLaunchArgs() error {
 	if err != nil {
 		return err
 	}
-	return ValidateLaunchArgs(e.Name, a.LaunchArgs(e.ID))
+	return validateStoredLaunchArgs(e.Name, a.LaunchArgs(e.ID))
 }
+
+// storedLaunchArgs parses stored launch arguments for a launch. RimArcho 1.0.9 split them
+// on whitespace, so a stored quote it treated as a plain character (it's, a stray ") never
+// blocks a launch that worked then: text whose quotes do not pair splits on whitespace,
+// as before. JSON argv must still parse.
+func storedLaunchArgs(args string) ([]string, error) {
+	argv, err := ParseLaunchArgs(args)
+	if errors.Is(err, errUnclosedQuote) {
+		return strings.Fields(args), nil
+	}
+	return argv, err
+}
+
+var errUnclosedQuote = errors.New("launch arguments contain an unclosed quote")
 
 // ParseLaunchArgs accepts lossless imported JSON argv or quoted command-line text.
 func ParseLaunchArgs(args string) ([]string, error) {
@@ -224,7 +254,7 @@ func ParseLaunchArgs(args string) ([]string, error) {
 		started = true
 	}
 	if quote != 0 {
-		return nil, fmt.Errorf("launch arguments contain an unclosed quote")
+		return nil, errUnclosedQuote
 	}
 	if started {
 		argv = append(argv, word.String())

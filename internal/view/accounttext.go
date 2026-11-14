@@ -22,6 +22,7 @@ type interfaceFormat struct {
 var interfaceFormats = []interfaceFormat{
 	interfaceFormatFor("%d other Game Configs use this folder and will change too: %s"),
 	interfaceFormatFor("only Game Config %s changes game folder; other Game Configs stay"),
+	interfaceFormatFor("no other Game Config uses %s: its %d Mod inventory records and analysis are removed; no files are deleted"),
 }
 
 func init() {

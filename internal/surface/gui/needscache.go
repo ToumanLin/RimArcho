@@ -61,8 +61,8 @@ func (s *API) needsKeyOfLocked(read []*app.GameLink) (scope, key, index, list st
 	dh := sha256.Sum256(db)
 	// The save Can it run checks (12 §4.8): a chosen colony's newest save changes when a
 	// save is written into its folder; the choice itself is in the store's change key.
-	if ch := s.a.SaveChoiceOf(st.Ix.Env.ID); ch != nil {
-		dh = sha256.Sum256([]byte(string(dh[:]) + fileNeedsStamp(ch.Dir) + fileNeedsStamp(ch.Path)))
+	if cs := s.a.SaveChoiceStamp(st.Ix.Env.ID); cs != "" {
+		dh = sha256.Sum256([]byte(string(dh[:]) + cs))
 	}
 	key = fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%x|%v", scope, s.a.Store.ChangeKey(), list, s.a.AnalysisKey(st, ""), fileNeedsStamp(cur), fileNeedsStamp(prev), fileNeedsStamp(s.a.ProblemLog(st)), lh, err) + fmt.Sprintf("|%x", dh)
 	return

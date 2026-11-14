@@ -174,9 +174,10 @@ func (s *Store) ReviewContentKey() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// Registry deployment preferences come from plan workspaces and aliases.
+	// Aliases change which copy a packageId resolves to. The lists' workspaces do too,
+	// but only for the saves attributed under that list: the app keys each save on its
+	// own list's copies (app.reviewContext), so editing one list keeps every other save.
 	for _, query := range []string{
-		`SELECT plan_id,entries FROM workspace ORDER BY plan_id`,
 		`SELECT instance_id,source_id,rel_path,real_path FROM instance_alias ORDER BY instance_id,source_id,rel_path`,
 	} {
 		rows, err := s.DB.Query(query)

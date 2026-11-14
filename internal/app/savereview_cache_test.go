@@ -275,9 +275,70 @@ func TestSaveReviewCacheInvalidation(t *testing.T) {
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
+	// The review only reads; the index tidies what belonged to a save that is gone.
 	run(0)
 	var n int
+	if err := e.App.Store.DB.QueryRow(`SELECT count(*) FROM save_review_cache`).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("the review tidied: %d %v", n, err)
+	}
+	e.MustRun("saves", "index")
 	if err := e.App.Store.DB.QueryRow(`SELECT count(*) FROM save_review_cache`).Scan(&n); err != nil || n != 0 {
 		t.Fatalf("gone save retained: %d %v", n, err)
 	}
+}
+
+// The kept attributions rest on what each save resolves its Mods with (12 §3.4), not on
+// the Game Config shown or the lists open: switching Game Config back and forth, and
+// editing another list, keep every save's row (one row a save, so a key that named the
+// current Game Config would overwrite it on each switch).
+func TestSaveReviewCacheAcrossGameConfigs(t *testing.T) {
+	e := testkit.New(t)
+	defs := "<Defs><ThingDef><defName>Cap</defName><category>Item</category></ThingDef></Defs>"
+	e.AddWorkshop("3100000000", testkit.Mod{PackageID: "tester.review", Name: "Review", Files: map[string]string{"Defs/Review.xml": defs}})
+	mods := []string{"ludeon.rimworld", "tester.review"}
+	e.WriteModsConfig("1.6.4633 rev1261", mods...)
+	e.AddEnv(false)
+	e.MustRun("scan")
+	e.MustRun("analyze")
+	e.WriteSave("Fort.rws", testkit.SaveSpec{Mods: mods, Faction: "Fort", Seed: "fort", PRV: 1, Body: "<things><li><def>Cap</def></li></things>"})
+	e.WriteSave("Camp.rws", testkit.SaveSpec{Mods: mods, Faction: "Camp", Seed: "camp", PRV: 2, Body: "<things><li><def>Cap</def></li></things>"})
+	// The window's readers name the Game Config they read (gui refreshInventorySession).
+	use := func(name string) {
+		t.Helper()
+		e.MustRun("env", "use", name)
+		e.App.EnvName = name
+	}
+	run := func(step string, want int) {
+		t.Helper()
+		l, err := e.App.ListSaves()
+		if err != nil {
+			t.Fatal(err)
+		}
+		r, err := e.App.SaveReview(l.Colonies, app.ReviewOpts{Read: true})
+		if err != nil || r.Cached != want || r.Saves != 2 {
+			t.Fatalf("%s: cached want %d: %+v, %v", step, want, r, err)
+		}
+	}
+	// Adding a Game Config changes the index (its copies' generation), and its first use
+	// makes its list: before the runs.
+	e.MustRun("env", "add", "sibling", "--game", e.Game, "--saves", "own")
+	use("sibling")
+	e.MustRun("list")
+	use("main")
+	run("first", 0)
+	run("again", 2)
+	use("sibling")
+	run("in the other Game Config", 2)
+	use("main")
+	run("back", 2)
+	use("sibling")
+	run("there again", 2)
+	// a list of the other Game Config changes; the saves do not load it
+	if res, err := e.App.Store.DB.Exec(`UPDATE workspace SET entries='[]' WHERE plan_id IN (SELECT id FROM plan WHERE environment_id<>(SELECT id FROM environment WHERE name='main'))`); err != nil {
+		t.Fatal(err)
+	} else if n, _ := res.RowsAffected(); n == 0 {
+		t.Fatal("no list of the other Game Config to edit")
+	}
+	use("main")
+	run("after editing another list", 2)
 }

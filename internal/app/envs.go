@@ -1,12 +1,14 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/scan"
@@ -44,7 +46,8 @@ type EnvSpec struct {
 	// RemoveSources lists shared folder labels to forget (env set only; = FolderRemove).
 	RemoveSources []string
 	// directoryOnly relocates this game without guessing a new shared Workshop.
-	deferPlan     bool // profile import supplies its own initial plan
+	deferPlan     bool   // profile import supplies its own initial plan
+	id            string // the new environment's ID when the caller recorded it first (profile import)
 	directoryOnly bool
 }
 
@@ -54,6 +57,17 @@ type SourceChange struct {
 	Action  string // added | unchanged | rebound | rebind-pending | removed
 	OldRoot string
 	Rebind  *source.RebindResult
+}
+
+// testFaults holds a failure injector per App for tests (envs_export_test.go): a step
+// that fails stands for an interruption the next run must recover from.
+var testFaults sync.Map
+
+func testFault(a *App, step string) error {
+	if f, ok := testFaults.Load(a); ok {
+		return f.(func(string) error)(step)
+	}
+	return nil
 }
 
 // Detected runs environment detection with the app's options.
@@ -272,7 +286,11 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 	if err := a.checkFolderRoots(spec); err != nil {
 		return nil, nil, err
 	}
-	e := &env.Environment{ID: a.NewID(), Name: name, GameRoot: spec.GameRoot, UserDataRoot: user,
+	id := spec.id
+	if id == "" {
+		id = a.NewID()
+	}
+	e := &env.Environment{ID: id, Name: name, GameRoot: spec.GameRoot, UserDataRoot: user,
 		GameVersion: env.ReadGameVersion(spec.GameRoot), Launch: spec.Launch, CreatedAt: a.Now().UTC()}
 	if e.Launch == "" {
 		e.Launch = "direct"
@@ -301,21 +319,70 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 			return nil, nil, err
 		}
 	}
+	plansBefore, err := a.Store.Plans()
+	if err != nil {
+		return nil, nil, err
+	}
 	if err := a.Store.InsertEnv(e); err != nil {
 		return nil, nil, err
+	}
+	changes, err := a.registerEnv(e, installation, like, selectedPlan, spec)
+	if err != nil {
+		// Registration is all or nothing: a failed step forgets the new environment again
+		// (and the installation records it created) and the list it created. Copied
+		// settings files stay; a retry never overwrites them.
+		if undo := a.Store.DeleteEnv(e.ID); undo != nil {
+			return nil, nil, errors.Join(err, fmt.Errorf("Game Config %s stays registered; remove it with archo env remove %s --yes: %w", name, quoteArg(name), undo))
+		}
+		if undo := a.forgetNewPlans(plansBefore); undo != nil {
+			return nil, nil, errors.Join(err, undo)
+		}
+		return nil, nil, err
+	}
+	return e, changes, nil
+}
+
+// forgetNewPlans deletes the lists created since before (a failed EnvAdd's first list).
+func (a *App) forgetNewPlans(before []*store.Plan) error {
+	had := map[int64]bool{}
+	for _, p := range before {
+		had[p.ID] = true
+	}
+	now, err := a.Store.Plans()
+	if err != nil {
+		return err
+	}
+	for _, p := range now {
+		if !had[p.ID] {
+			if err := a.Store.DeletePlan(p.ID); err != nil {
+				return fmt.Errorf("forget list %s: %w", p.Name, err)
+			}
+		}
+	}
+	return nil
+}
+
+// registerEnv is EnvAdd's steps after the environment row exists: the installation's
+// sources and shared folders, the current environment, the first plan and copied launch
+// arguments.
+func (a *App) registerEnv(e, installation, like *env.Environment, selectedPlan int64, spec EnvSpec) ([]SourceChange, error) {
+	if err := testFault(a, "env-registered"); err != nil {
+		return nil, err
 	}
 	if installation != nil {
 		if !spec.deferPlan {
 			if err := a.initializeSibling(e, like, selectedPlan, spec.NewList); err != nil {
-				return e, nil, err
+				return nil, err
+			}
+			if err := testFault(a, "env-plan"); err != nil {
+				return nil, err
 			}
 		}
-		changes, err := a.foldersFromSpec(e, spec, false, false)
-		return e, changes, err
+		return a.foldersFromSpec(e, spec, false, false)
 	}
 	srcs, err := a.Store.Sources(e.GameID)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	var changes []SourceChange
 	for _, sp := range []source.Spec{{Kind: source.Official, Root: filepath.Join(e.GameRoot, "Data")}, {Kind: source.Local, Root: filepath.Join(e.GameRoot, "Mods")}} {
@@ -324,7 +391,7 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 			s.Status = source.StatusMissing
 		}
 		if err := a.Store.InsertSource(s); err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		srcs = append(srcs, s)
 		changes = append(changes, SourceChange{Source: s, Action: "added"})
@@ -332,19 +399,19 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 	more, err := a.foldersFromSpec(e, spec, true, true)
 	changes = append(changes, more...)
 	if err != nil {
-		return e, changes, err
+		return nil, err
 	}
 	if cur, _ := a.Store.CurrentEnv(); cur == nil {
 		if err := a.Store.SetCurrentEnv(e.ID); err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
 	if !spec.deferPlan {
 		if err := a.initializeSibling(e, like, selectedPlan, spec.NewList); err != nil {
-			return e, changes, err
+			return nil, err
 		}
 	}
-	return e, changes, nil
+	return changes, nil
 }
 
 // envOfGame returns the environment that uses a game folder, or nil.
@@ -664,16 +731,11 @@ func (a *App) EnvRemove(name string) (*EnvRemoval, error) {
 	if g := a.probe()(r.Env.GameRoot); g != nil {
 		return nil, fmt.Errorf("env:%s's game is running (pid %d); close it before removing the Game Config", r.Env.Name, g.PID)
 	}
+	// DeleteEnv selects the next current environment (EnvRemoval.Next) in its transaction.
 	if err := a.Store.DeleteEnv(r.Env.ID); err != nil {
 		return nil, err
 	}
-	if r.Next != "" {
-		if n, err := a.Store.EnvByName(r.Next); err == nil && n != nil {
-			if err := a.Store.SetCurrentEnv(n.ID); err != nil {
-				return nil, err
-			}
-		}
-	}
+	_ = a.ForgetSaveChoice(r.Env.ID) // the config is gone; a leftover choice only takes space
 	return r, nil
 }
 

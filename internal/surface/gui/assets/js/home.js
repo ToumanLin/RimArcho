@@ -22,9 +22,10 @@ let ui = null;
 export function initHome(u) {
   ui = u;
   // Back from a game: the page reads the new Player.log (API.Home reads it when it is newer
-  // than the last one read). A read on its way reads it already, so the focus a new window
-  // gets at start asks for nothing more.
-  addEventListener("focus", () => { if (S.screen === "home" && !homeRun) home(); });
+  // than the last one read). A read on its way may have started before the log was written,
+  // so it is followed by one more (home coalesces them); only the start's read, which the
+  // focus a new window gets at start would repeat, asks for nothing more.
+  addEventListener("focus", () => { if (S.screen === "home" && !(homeRun && homeRunEarly)) home(); });
   addEventListener("resize", () => { if (S.screen === "home") { markY.clear(); placeMarks(); fitHeadline(); } });
 }
 
@@ -48,6 +49,7 @@ let memoryTimer = null, launchPending = false;
 // the window's focus and the menu art coming in read it three times, one after another
 // (1.0.9). Asks while one is on its way make one more read when it ends.
 let homeRun = null, homeAgain = null, homeAgainRun = null;
+let homeRunEarly = false; // the read on its way is the one started at start (readEarly)
 export function home(opts = {}) {
   if (homeRun) {
     homeAgain = { keep: (homeAgain ? homeAgain.keep : true) && !!opts.keep };
@@ -63,9 +65,16 @@ export function home(opts = {}) {
 
 // backgroundChanged: menu art came in (16 §2.14); only the backdrop is read again. In 1.0.9
 // the whole page was, and at start that read went before the page's own.
+// It comes on any page: before the page's first read the backdrop read at start (readEarly)
+// may already hold the art from before it, so that one is asked again (2026-11-14: the
+// launch page stayed without its picture). A later read reads it anyway.
 export async function backgroundChanged() {
+  if (early) {
+    early[1] = api.HomeBackground();
+    early[1].catch(() => {});
+  }
   if (homeRun) await homeRun.catch(() => {});
-  if (!data || S.screen !== "home") return; // the page's first read brings it
+  if (!data || S.screen !== "home") return; // the page's next read brings it
   let b;
   try { b = await api.HomeBackground(); } catch { return; }
   if (S.screen !== "home" || JSON.stringify(b) === JSON.stringify(bg)) return;
@@ -88,6 +97,7 @@ async function readHome({ keep = false } = {}) {
   clearTimeout(homeRetryTimer);
   const read = beginPageRead("home", { keep, retry: () => home() });
   const [homeRead, bgRead] = early || [api.Home(), api.HomeBackground()];
+  homeRunEarly = !!early;
   early = null;
   let next, backdrop, h;
   try {
@@ -131,6 +141,8 @@ function retryHome() {
 
 const rows = () => (data && data.rows) || [];
 const applied = () => (data && data.featured >= 0 ? rows()[data.featured] : null);
+// running: a game runs, this Game Config's or (blocked) another one's on the same
+// installation; the page's one test for it (▶, save, the last game line, L).
 const running = () => !!(S.live && (S.live.running || S.live.blocked));
 const key = (r) => [r.kind, r.envName, r.plan || "", r.kind === "pack" ? r.name : ""].join("|");
 // a game's rows: its lists, then its packs, each by the last time played (view.SortHome)
@@ -601,11 +613,13 @@ function showSwitch(r) {
 // it was last played, each a line that is a link (16 §2.3).
 function activity() {
   const box = el("div", "hm-act");
-  const live = S.live && S.live.running;
+  const live = running();
   if (live || data.lastRun || data.missingLog) {
-    const runText = live ? (S.live.owner || T("the game is running")) + "  " + (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet"))
+    // another Game Config's game: its owner, without this run's errors (they are not ours)
+    const runText = live && S.live.blocked ? S.live.blocked
+      : live ? (S.live.owner || T("the game is running")) + "  " + (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet"))
       : data.missingLog || (data.lastRunDay || data.lastRun) + "  " + (data.lastRunErrors ? Tf("%d errors", data.lastRunErrors) : data.lastRunPending ? T("not checked yet") : T("no errors"));
-    const runGo = live || data.lastRunErrors ? "needs" : "log";
+    const runGo = (live && !S.live.blocked) || data.lastRunErrors ? "needs" : "log";
     box.append(actLine(T("last game"), runText, () => ui.go(runGo)));
   }
   // "nothing changed" tells nothing: the line shows only with changes or before a scan

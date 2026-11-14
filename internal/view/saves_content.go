@@ -213,7 +213,7 @@ func saveNeedsOf(needs []app.SaveNeed) *SaveNeeds {
 		}
 		// heaviest first; Mods with nothing to weigh keep the save's order
 		weight := func(n app.SaveNeed) [3]int {
-			return [3]int{n.Colonists + n.Dead, len(n.Factions) + len(n.Classes) + len(n.Weather), n.Defs}
+			return [3]int{n.Colonists + n.Dead + n.World, len(n.Factions) + len(n.Classes) + len(n.Weather), n.Defs}
 		}
 		sort.SliceStable(ns, func(i, j int) bool {
 			a, b := weight(ns[i]), weight(ns[j])
@@ -286,6 +286,9 @@ func saveNeedMod(n app.SaveNeed) SaveNeedMod {
 		}
 		m.Parts = append(m.Parts, SaveNeedPart{Label: l})
 	}
+	if n.World > 0 {
+		m.Parts = append(m.Parts, SaveNeedPart{Label: count(n.World, "world pawn", "world pawns")})
+	}
 	if k := len(n.Factions); k > 0 {
 		m.Parts = append(m.Parts, SaveNeedPart{Label: Tf("%d %s", k, contentCategoryLabelN("factions", k)), Names: n.Factions})
 	}
@@ -302,7 +305,7 @@ func saveNeedMod(n app.SaveNeed) SaveNeedMod {
 	}
 	for _, c := range n.Cats {
 		// said above by the faction's name and by the colonists
-		if c.Key == "factions" && len(n.Factions) > 0 || c.Key == "races" && n.Colonists+n.Dead > 0 {
+		if c.Key == "factions" && len(n.Factions) > 0 || c.Key == "races" && n.Colonists+n.Dead+n.World > 0 {
 			continue
 		}
 		if c.Key == "other" && len(n.Weather) > 0 {

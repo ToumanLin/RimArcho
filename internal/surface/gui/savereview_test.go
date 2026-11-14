@@ -197,3 +197,88 @@ func TestSaveReviewAPI(t *testing.T) {
 		}
 	}
 }
+
+// A request that a newer one or leaving the page stopped still ends, with "stale": the page
+// lets go of it and of the status line's progress (16 §2.11).
+func TestSaveReviewStaleEnds(t *testing.T) {
+	e, api, events := fixture(t)
+	e.WriteSave("Fort.rws", testkit.SaveSpec{Faction: "Fort", Seed: "fort", PRV: 1})
+	for len(events) > 0 {
+		<-events
+	}
+	api.review.mu.Lock()
+	api.review.seq = 20
+	api.review.mu.Unlock()
+	if !api.SaveReviewRead(19, "") {
+		t.Fatal("not started")
+	}
+	for {
+		var ev string
+		select {
+		case ev = <-events:
+		case <-time.After(10 * time.Second):
+			t.Fatal("a superseded request never ended")
+		}
+		if !strings.HasPrefix(ev, "review ") {
+			continue
+		}
+		var result ReviewEvent
+		if err := json.Unmarshal([]byte(strings.TrimPrefix(ev, "review ")), &result); err != nil {
+			t.Fatal(err)
+		}
+		if result.Request != 19 || result.Partial || result.Error != "stale" || result.Page != nil {
+			t.Fatalf("superseded request: %s", ev)
+		}
+		break
+	}
+}
+
+// Each Game Config keeps its own pages: switching back and forth serves both kept pages.
+func TestSaveReviewPagesByGameConfig(t *testing.T) {
+	e, api, _ := fixture(t)
+	// each Game Config has its list before the runs (its first use makes one)
+	e.MustRun("env", "add", "sibling", "--game", e.Game, "--saves", "own")
+	e.MustRun("env", "use", "sibling")
+	e.MustRun("list")
+	e.MustRun("env", "use", "main")
+	e.WriteSave("Fort.rws", testkit.SaveSpec{Faction: "Fort", Seed: "fort", PRV: 1})
+	n := uint64(0)
+	run := func() *ReviewEvent {
+		t.Helper()
+		n++
+		api.review.mu.Lock()
+		api.review.seq = n
+		api.review.mu.Unlock()
+		ev := api.runReview(n, "")
+		if ev == nil || ev.Error != "" || ev.Page == nil {
+			t.Fatalf("review: %+v", ev)
+		}
+		return ev
+	}
+	main := run()
+	if again := run(); again.Page != main.Page {
+		t.Fatal("not kept")
+	}
+	e.MustRun("env", "use", "sibling")
+	sibling := run()
+	if again := run(); again.Page != sibling.Page {
+		t.Fatal("the other Game Config's page not kept")
+	}
+	e.MustRun("env", "use", "main")
+	if back := run(); back.Page != main.Page {
+		t.Fatal("switching back lost the first Game Config's page")
+	}
+	e.MustRun("env", "use", "sibling")
+	if back := run(); back.Page != sibling.Page {
+		t.Fatal("switching again lost the other page")
+	}
+	// the save is main's: editing main's list while sibling is current makes the kept
+	// page stale too
+	e.MustRun("env", "use", "main")
+	e.MustRun("enable", "pkg:tester.b")
+	e.MustRun("save")
+	e.MustRun("env", "use", "sibling")
+	if after := run(); after.Page == sibling.Page {
+		t.Fatal("a kept page outlived an edit of the list its save is attributed under")
+	}
+}

@@ -64,7 +64,8 @@ type panel struct {
 	off           int
 	choiceLabels  map[string]string
 	choiceCurrent map[int]bool
-	choices       []string // chooser values (env names)
+	choiceHeads   map[int]string // a faint heading above choice i, not a choice (the Game Config picker's installations)
+	choices       []string       // chooser values (env names)
 	choice        int
 	onPick        func(m *model, value string) tea.Cmd
 	// onPickAt: enter on choice i, for choices whose labels may repeat (H's steps)

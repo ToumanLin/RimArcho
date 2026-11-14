@@ -292,13 +292,14 @@ namespace ArchoMonitor
 
         // WriteSettingsWindow writes what a settings window drew when it opened (19 §2): one
         // line, kind settings-window, with context.window naming the Mod's settings file and the
-        // controls in drawing order.
+        // controls in drawing order, and fileHash: the file as the window opened (FileHash).
         internal static void WriteSettingsWindow(SettingsFile f, IList<SettingsControl> controls)
         {
             var j = new Json().Head(DateTime.Now, "INFO", "[Archo Monitor] settings window " + f.Title);
             j.Str("details", "").Num("count", 1);
             j.Raw("context").Open().Raw("window").Open().Str("packageId", f.PackageId).Str("folder", f.Folder).Str("class", f.Class)
                 .Str("file", f.File).Str("title", f.Title).Bool("full", controls.Count < SettingsWindow.MaxControls);
+            if (f.Hash != null) j.Str("fileHash", f.Hash);
             j.Raw("controls").Arr();
             foreach (var c in controls)
             {

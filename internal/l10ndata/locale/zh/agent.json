@@ -21,5 +21,8 @@
   "API key stored in Windows Credential Manager": "API 密钥已存入 Windows 凭据管理器",
   "Remove the Archo Agent API key from Windows Credential Manager.": "从 Windows 凭据管理器中删除 Archo Agent 的 API 密钥。",
   "Archo Agent %s is up to date": "Archo Agent %s 已是最新版本",
+  "remove the API key": "删除 API 密钥",
+  "remove the Archo Agent API key from Windows Credential Manager": "从 Windows 凭据管理器中删除 Archo Agent 的 API 密钥",
+  "could not remove the Archo Agent API key from Windows Credential Manager; tools and data were kept; retry": "无法从 Windows 凭据管理器中删除 Archo Agent 的 API 密钥；已保留工具和数据，请重试",
   "RimArcho asks GitHub (ToumanLin/ArchoAgent) for a newer Archo Agent; only if there is one it downloads it (about 70 MB), checks its SHA-256 and replaces this one": "RimArcho 向 GitHub（ToumanLin/ArchoAgent）查询是否有更新的 Archo Agent；只有有新版本时才下载（约 70 MB），校验 SHA-256 后替换当前版本"
 }

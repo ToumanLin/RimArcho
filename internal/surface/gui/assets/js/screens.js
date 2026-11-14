@@ -1719,7 +1719,8 @@ function directoryPrompt(d, moving, after) {
     const screen = S.screen, epoch = S.screenSeq;
     try {
       const links = await api.DirectoryMovePreview(d.id, path);
-      if (S.screen !== screen || S.screenSeq !== epoch) return;
+      // a dialog opened meanwhile is not replaced by this one (pop.open closes it)
+      if (S.screen !== screen || S.screenSeq !== epoch || S.popup !== popup) return;
       pop.confirm(d.label, [T("move this directory and its files to the new path?"), d.path + " → " + path, ...(links || [])], T("confirm move"), async () => {
         try {
           const lines = await api.ApplySetting(["folder", "move", d.id, "{}"], path);
@@ -1761,6 +1762,8 @@ function settingRunner(again) {
 function renderGroups(w, groups, again) {
   const run = settingRunner(again);
   const ids = new Set();
+  // the window's accent or theme differs from the one set: one reaccent after drawing
+  let restyle = false;
   for (const g of groups) {
     const lab = el("div", "label section", g.title);
     w.append(lab);
@@ -1793,7 +1796,7 @@ function renderGroups(w, groups, again) {
         // so the selected swatch and the colours agree (VM round 2026-11-10).
         const key = it.argv?.[2], shown = String(it.value || "").toLowerCase();
         const applied = String((key === "ui.accent" ? S.start?.accent || "default" : key === "ui.theme" ? S.start?.theme || "auto" : shown) || "").toLowerCase();
-        if ((key === "ui.accent" || key === "ui.theme") && shown && shown !== applied) ui.reaccent();
+        if ((key === "ui.accent" || key === "ui.theme") && shown && shown !== applied) restyle = true;
         right.append(appearanceControl(it, () => ui.reaccent()));
       } else if (it.edit === "choice") {
         const s = choiceControl(it.label, it.choices.map((c, i) => ({ value: c, label: it.choiceLabels?.[i] || c })), it.value);
@@ -1860,6 +1863,7 @@ function renderGroups(w, groups, again) {
     }
     w.append(card);
   }
+  if (restyle) ui.reaccent();
 }
 
 // settingDetails folds text under its row (16 §3.1 rule 7): RimArcho's release notes.
@@ -2035,8 +2039,15 @@ export async function environment() {
     card.append(row);
   }
   w.append(card);
-  for (const notice of p.notices || []) w.append(el("p","notice",notice));
-  if(p.notices?.length) api.AcknowledgeAliasNotice().catch(()=>{});
+  // the shared-game-folder notice stays until the player says got it: drawing it is not
+  // reading it (the TUI's Game Config picker shows the same notice)
+  for (const notice of p.notices || []) {
+    const n = el("p", "notice", notice);
+    n.append(" ", button(T("got it"), "", async () => {
+      try { await api.AcknowledgeAliasNotice(); n.remove(); } catch (e) { say("fail", errText(e)); }
+    }, "quiet"));
+    w.append(n);
+  }
   renderGroups(w, p.groups || [], environment);
   sc.scrollTop = top;
   read.finish();
@@ -2047,7 +2058,9 @@ export async function environment() {
 // guide opens.
 export async function removeEnv(name) {
   let p;
+  const popup = S.popup;
   try { p = await api.EnvRemovePreview(name); } catch (e) { say("fail", errText(e)); return; }
+  if (S.popup !== popup) return; // a dialog opened meanwhile stays
   pop.confirm(p.title, p.lines, T("remove Game Config"), async () => {
     try { say("ok", await api.RemoveEnv(name)); } catch (e) { say("fail", errText(e)); return; }
     for (const c of S.cols) { c.query = ""; c.cursor = 0; c.sel.clear(); }
@@ -2057,11 +2070,16 @@ export async function removeEnv(name) {
   });
 }
 
+// applyPathSetting sets a path setting; a Game Config's game folder is confirmed first with
+// what the change does.
 async function applyPathSetting(it, value, again) {
- const screen = S.screen, epoch = S.screenSeq;
- const run=()=>settingRunner(again)(it.argv,value);
- if(it.argv?.[0]==="env"&&it.argv.includes("--game")) {
-  try {const lines=await api.EnvGameChangePreview(it.argv[2],value);if(S.screen!==screen||S.screenSeq!==epoch)return;pop.confirm(T("game folder"),[...lines,value],T("apply"),run);}
-  catch(e){say("fail",errText(e));}
- } else return run();
+  const screen = S.screen, epoch = S.screenSeq, popup = S.popup;
+  const run = () => settingRunner(again)(it.argv, value);
+  if (it.argv?.[0] !== "env" || !it.argv.includes("--game")) return run();
+  try {
+    const lines = await api.EnvGameChangePreview(it.argv[2], value);
+    // a dialog opened meanwhile is not replaced by this one (pop.open closes it)
+    if (S.screen !== screen || S.screenSeq !== epoch || S.popup !== popup) return;
+    pop.confirm(T("game folder"), [...lines, value], T("apply"), run);
+  } catch (e) { say("fail", errText(e)); }
 }

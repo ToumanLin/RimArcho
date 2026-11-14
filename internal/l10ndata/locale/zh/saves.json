@@ -111,6 +111,8 @@
   "%d other Def uses": "其他 %d 处 Def 引用",
   "%d uses of %s": "%[2]s 引用 %[1]d 处",
   "%d more Def uses": "还有 %d 处 Def 引用",
+  "world pawn": "世界人物",
+  "world pawns": "世界人物",
   "colonist": "殖民者",
   "faction": "派系",
   "class": "类",
