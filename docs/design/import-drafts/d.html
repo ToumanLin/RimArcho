@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>import · D Inbox</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  #page { display: grid; grid-template-columns: minmax(270px, 38%) minmax(0, 1fr); gap: 12px; overflow: hidden; padding-bottom: 12px; }
+  #left, #right { min-height: 0; overflow-y: auto; }
+  .lh { position: sticky; top: 0; background: var(--card); z-index: 1; padding: 10px; border-bottom: var(--hairline) solid var(--line-2); display: grid; gap: 6px; }
+  .grp-h { padding: 12px 12px 4px; font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+  .row { width: 100%; display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 1px 10px; align-items: center; padding: 8px 12px; }
+  .row:hover { background: var(--card-2); }
+  .row.on { background: var(--sel); }
+  .row .t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .s { grid-column: 2; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .st { grid-row: span 2; grid-column: 3; font-size: 11px; height: 18px; padding: 0 6px; border-radius: 5px; display: inline-flex; align-items: center; }
+  .st.new { color: var(--accent); background: var(--accent-soft); }
+  .st.done { color: var(--green); background: var(--green-soft); }
+  .st.changed { color: var(--amber); background: var(--amber-soft); }
+  .fi { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: var(--pill); color: var(--fg-2); }
+  .dh { padding: 16px; border-bottom: var(--hairline) solid var(--line-2); display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; }
+  .dh .mgr, .dh .fi { grid-row: span 2; width: 40px; height: 40px; }
+  .dh h2 { margin: 0; font-size: 16px; }
+  .dh .s { font-size: 12px; color: var(--muted); }
+  .blk { padding: 14px 16px; border-bottom: var(--hairline) solid var(--line-2); }
+  .blk h3 { margin: 0 0 8px; font-size: 13px; }
+  .map { display: grid; grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr); gap: 6px 10px; align-items: center; font-size: 12.5px; }
+  .map .a { color: var(--fg-2); } .map .arrow { color: var(--faint); text-align: center; } .map .b { color: var(--green); }
+  .map .b.no { color: var(--faint); }
+  .lst { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 3px 14px; font-size: 12.5px; }
+  .lst .m { color: var(--muted); text-align: right; }
+</style>
+</head>
+<body>
+<div class="review" id="review"></div>
+<div id="app">
+  <aside id="side"><div class="side-head">RimArcho</div><nav id="nav"></nav></aside>
+  <main id="main">
+    <div id="top"></div><div class="page-head" id="head"></div>
+    <div id="page">
+      <section class="card" id="left"></section>
+      <section class="card" id="right"></section>
+    </div>
+    <div id="bottom"><span id="status">Nothing changes until you confirm.</span><span id="hints"></span></div>
+  </main>
+</div>
+<div id="toast"></div>
+<script src="shared.js"></script>
+<script>
+shell("d", [["↑↓", "pick"], ["enter", "import"], ["ctrl+o", "choose a file"], ["ctrl+v", "paste"]], "");
+
+// Everything that could be imported, in one list, each with whether it already was.
+const ROWS = [
+  ...FOUND.map((m) => ({ id: m.id, grp: "found", m, t: m.name, s: m.things.map((x) => `${x.n} ${x.what.split(" (")[0]}`).join(" · "),
+    st: m.id === "rimsort" ? ["changed", "changed since"] : m.id === "rimcrow" ? ["done", "imported 11-12"] : ["new", "new"] })),
+  { id: "f1", grp: "recent", icon: "list", t: "Main colony.xml", s: "a Mod list from RimSort  ·  Downloads", st: ["done", "imported 11-10"], sample: "list" },
+  { id: "f2", grp: "recent", icon: "pack", t: "Ratkin + 4 races.archopack", s: "a pack  ·  Desktop", st: ["new", "not yet"], sample: "pack" },
+  { id: "f3", grp: "recent", icon: "link", t: "Vanilla Expanded – all", s: "a Steam collection  ·  followed by Main colony", st: ["changed", "3 added"], sample: "code" },
+];
+let cur = "rimsort";
+function drawLeft() {
+  const row = (r) => `<button class="row ${r.id === cur ? "on" : ""}" data-r="${r.id}">${r.m ? mark(r.m, 28) : `<span class="fi">${ic(r.icon)}</span>`}<span class="t">${esc(r.t)}</span><span class="s">${esc(r.s)}</span><span class="st ${r.st[0]}">${r.st[1]}</span></button>`;
+  $("#left").innerHTML = `<div class="lh"><button class="btn primary" data-toast="would open the file dialog: lists, saves, packs, manager data">${ic("file")} choose a file…</button>
+      <div class="paste"><input placeholder="or paste a link, a share code or a list"><button class="btn line" data-r="paste">read</button></div></div>
+    <div class="grp-h">${ic("move")} other managers on this computer</div>${ROWS.filter((r) => r.grp === "found").map(row).join("")}
+    <div class="grp-h">${ic("file")} imported or opened before</div>${ROWS.filter((r) => r.grp === "recent").map(row).join("")}`;
+}
+function drawRight() {
+  const r = ROWS.find((x) => x.id === cur);
+  if (!r) { const s = SAMPLES.code; $("#right").innerHTML = recog(s); return; }
+  if (!r.m) { $("#right").innerHTML = recog(SAMPLES[r.sample], r); return; }
+  const m = r.m;
+  $("#right").innerHTML = `<div class="dh">${mark(m, 40)}<h2>${m.name}</h2><span class="s mono">${esc(m.where)}</span><button class="btn link" style="grid-row:span 2;grid-column:3" data-toast="would open the folder">open folder</button></div>
+    ${r.st[0] === "changed" ? `<div class="blk" style="background:var(--amber-soft)"><b>Changed since you imported it on 11-09:</b> 4 new notes, 1 new list. Importing again adds only what is new.</div>` : ""}
+    <div class="blk"><h3>What comes over</h3><div class="map">${m.things.map((t) => `<span class="a">${ic(t.icon)} ${t.n} ${t.what}</span><span class="arrow">→</span><span class="b">${t.becomes}</span>`).join("")}
+      ${m.id === "rimcrow" ? `<span class="a">Mod types, subscribed collections</span><span class="arrow">→</span><span class="b no">not imported: nothing in RimArcho to keep them</span>` : ""}
+      ${m.id === "rimsort" ? `<span class="a">community rules, Steam database</span><span class="arrow">→</span><span class="b no">not imported: shared data RimArcho downloads itself</span>` : ""}</div></div>
+    ${m.things.filter((t) => t.items).map((t) => `<div class="blk"><h3>${t.n} ${t.what}</h3><div class="lst">${t.items.map(([a, b, c]) => `<span>${esc(a)}</span><span class="m">${b === "" ? "" : t.kind === "configs" ? "RimWorld " + b : b + " Mods"}</span><span class="m ${typeof c === "string" && c !== "ready" ? "warn" : ""}">${c === "" ? "" : typeof c === "number" ? (b - c ? `${b - c} not installed` : "all installed") : c}</span>`).join("")}</div></div>`).join("")}
+    <div class="blk" style="border:0"><div class="acts" style="margin:0"><span class="note">Only read; values you already have stay. Cannot be undone.</span><button class="btn primary" data-toast="would import">${r.st[0] === "changed" ? "import what is new" : r.st[0] === "done" ? "import again" : "import all of it"}</button></div></div>`;
+}
+function recog(s, r) {
+  return `<div class="recog" style="border-bottom:var(--hairline) solid var(--line-2)"><span class="ico">${ic(s.icon)}</span><span class="kind">${s.kind.toLowerCase()}</span><span class="name">${esc(s.name)}</span><span class="facts">${s.facts}</span></div>
+    ${r && r.st[0] === "done" ? `<div class="blk muted">You imported this as the list “Main colony” on 11-10.</div>` : ""}
+    <div class="blk" style="border:0">${s.dest ? destRadios("d", s.follow) : `<p class="becomes">It becomes a pack you can launch; your lists and Mods stay as they are.</p>`}
+    <div class="acts"><button class="btn primary" data-toast="would import">${s.pack ? "add the pack" : "import"}</button></div></div>`;
+}
+drawLeft(); drawRight();
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-r]"); if (b) { cur = b.dataset.r; drawLeft(); drawRight(); } });
+</script>
+</body>
+</html>

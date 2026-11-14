@@ -57,7 +57,8 @@ type TaskItem struct {
 	Got         int64  `json:"got,omitempty"`
 	Size        int64  `json:"size,omitempty"`
 	State       string `json:"state"`
-	Why         string `json:"why,omitempty"` // a failure's reason
+	Why         string `json:"why,omitempty"`  // a failure's reason
+	Note        string `json:"note,omitempty"` // what a done item came to (a migration's part)
 	FailureKind string `json:"failureKind,omitempty"`
 	Permanent   bool   `json:"permanent,omitempty"`
 	Again       string `json:"again,omitempty"` // the task that took this item over (retry, continue the rest)

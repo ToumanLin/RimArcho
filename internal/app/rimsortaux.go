@@ -20,6 +20,7 @@ type RimSortAuxOptions struct {
 	DB     string
 	DryRun bool
 	Tags   ManagerTagNames
+	Parts  map[string]bool // notes, tags, colours, ignored (Part*); nil takes them all
 }
 
 type rimSortMod struct {
@@ -67,8 +68,17 @@ func (a *App) ImportRimSortAux(opt RimSortAuxOptions) (*RimCrowReport, error) {
 			return nil, err
 		}
 		m.note, m.workshop = strings.TrimSpace(m.note), strings.TrimSpace(m.workshop)
+		if !wantPart(opt.Parts, PartNotes) {
+			m.note = ""
+		}
+		if !wantPart(opt.Parts, PartIgnored) {
+			m.ignore = false
+		}
 		if m.color != "" && managerHex(m.color) == "" {
 			rep.NotMapped["color_hex"]++ // not a colour RimArcho can read
+			m.color = ""
+		}
+		if !wantPart(opt.Parts, PartColours) {
 			m.color = ""
 		}
 		mods[m.path] = m
@@ -77,7 +87,7 @@ func (a *App) ImportRimSortAux(opt RimSortAuxOptions) (*RimCrowReport, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	if tags, _ := tableColumns(db, "tags_table"); tags["left_id"] && tags["right_id"] {
+	if tags, _ := tableColumns(db, "tags_table"); tags["left_id"] && tags["right_id"] && wantPart(opt.Parts, PartTags) {
 		rows, err := db.Query(`SELECT t.left_id, g.tag FROM tags_table t JOIN mod_tags g ON g.id = t.right_id ORDER BY g.tag`)
 		if err != nil {
 			return nil, fmt.Errorf("RimSort database: %w", err)
@@ -171,10 +181,13 @@ func (a *App) ImportRimSortAux(opt RimSortAuxOptions) (*RimCrowReport, error) {
 		case m.note == "":
 		case cur.Note == m.note:
 			rep.NoteSame++
+			rep.part(PartNotes).Same++
 		case cur.Note != "":
+			rep.part(PartNotes).Same++ // RimArcho's own note stays
 			rep.Conflicts = append(rep.Conflicts, RCItem{p, fmt.Sprintf("note: RimArcho has %q, RimSort %q (kept RimArcho's)", cur.Note, m.note)})
 		default:
 			rep.NoteNew++
+			rep.part(PartNotes).New++
 			cur.Note = m.note
 			if !opt.DryRun {
 				if err := a.Store.SetNote(ix.Env.ID, lin, m.note); err != nil {
@@ -183,13 +196,13 @@ func (a *App) ImportRimSortAux(opt RimSortAuxOptions) (*RimCrowReport, error) {
 			}
 		}
 		for _, t := range m.tags {
-			if err := tags.add(lin, cur, t); err != nil {
+			if err := tags.add(PartTags, lin, cur, t); err != nil {
 				return nil, err
 			}
 		}
 		if hex := managerHex(m.color); hex != "" {
 			name := opt.Tags.color("RimSort", hex)
-			if err := tags.add(lin, cur, name); err != nil {
+			if err := tags.add(PartColours, lin, cur, name); err != nil {
 				return nil, err
 			}
 			if err := tags.color(name, hex); err != nil {
@@ -197,7 +210,7 @@ func (a *App) ImportRimSortAux(opt RimSortAuxOptions) (*RimCrowReport, error) {
 			}
 		}
 		if m.ignore {
-			if err := tags.add(lin, cur, opt.Tags.ignore("RimSort")); err != nil {
+			if err := tags.add(PartIgnored, lin, cur, opt.Tags.ignore("RimSort")); err != nil {
 				return nil, err
 			}
 		}

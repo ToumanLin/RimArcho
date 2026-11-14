@@ -23,6 +23,8 @@ const (
 	TaskAnalyze          = "analyze"
 	TaskSaves            = "saves" // the Saves page's full read of the saves (16 §2.11, 12 §1.7)
 	TaskPack             = "pack"
+	TaskMigrate          = "migrate"     // moving in from another manager (16 §2.18)
+	TaskPackImport       = "pack-import" // adding a pack from an .archopack file
 	TaskTextures         = OpTextures
 	TaskTexClean         = OpTexClean
 	TaskDownload         = "download"
@@ -178,6 +180,11 @@ func TaskTitle(kind string) string {
 		return T("read the saves")
 	case TaskPack:
 		return T("create a pack")
+	case TaskMigrate:
+		return T("move in from another manager")
+	case TaskPackImport:
+		return T("add a pack")
+
 	case TaskDownload:
 		return T("download the game")
 	case TaskSteamCMD:

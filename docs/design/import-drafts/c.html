@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>import · C Drop anything</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  #page { --pad: max(20px, calc(50% - 500px)); display: flex; flex-direction: column; gap: 12px; }
+  .in { padding: 16px; }
+  .in .drop { padding: 30px 16px; }
+  .try { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 10px; font-size: 12px; color: var(--faint); }
+  .two { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+  @media (max-width: 1000px) { .two { grid-template-columns: 1fr; } }
+  .sec-h { padding: 12px 16px 6px; font-size: 13px; font-weight: 600; color: var(--fg-2); display: flex; gap: 8px; align-items: baseline; }
+  .sec-h .r { margin-left: auto; font-weight: 400; font-size: 12px; color: var(--muted); }
+  .frow { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 1px 10px; align-items: center; padding: 8px 16px; border-top: var(--hairline) solid var(--line-2); }
+  .frow:hover { background: var(--card-2); }
+  .frow .t { font-weight: 500; }
+  .frow .b { grid-column: 2; font-size: 12px; }
+  .frow .btn { grid-row: span 2; grid-column: 3; }
+  .src { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .src td { padding: 8px 16px 8px 0; border-top: var(--hairline) solid var(--line-2); vertical-align: top; }
+  .src td:first-child { padding-left: 16px; width: 26px; color: var(--fg-2); }
+  .src .t { font-weight: 600; }
+  .src .f { color: var(--muted); font-size: 12px; }
+  .back { margin: 0 16px 14px; }
+</style>
+</head>
+<body>
+<div class="review" id="review"></div>
+<div id="app">
+  <aside id="side"><div class="side-head">RimArcho</div><nav id="nav"></nav></aside>
+  <main id="main">
+    <div id="top"></div><div class="page-head" id="head"></div>
+    <div id="page">
+      <section class="card" id="in"></section>
+      <div class="two">
+        <section class="card" id="found"></section>
+        <section class="card" id="kinds"></section>
+      </div>
+    </div>
+    <div id="bottom"><span id="status">Nothing changes until you confirm.</span><span id="hints"></span></div>
+  </main>
+</div>
+<div id="toast"></div>
+<script src="shared.js"></script>
+<script>
+shell("c", [["ctrl+v", "paste"], ["ctrl+o", "choose a file"], ["esc", "start over"]], "");
+
+function drawInput() {
+  $("#in").className = "card in";
+  $("#in").innerHTML = `<button class="drop" data-sample="list">${ic("drop")}<span class="big">Drop a file here, or choose one…</span><span class="small">RimArcho tells you what it is and what it will become before anything changes</span></button>
+    <div class="or">or paste</div>
+    <div class="paste"><input placeholder="a Steam collection or Rentry link, a share code (RC-…), or a copied list"><button class="btn line" data-sample="code">read</button></div>
+    <div class="try">try the example:${Object.keys(SAMPLES).map((k) => `<button class="btn small" data-sample="${k}">${SAMPLES[k].kind.toLowerCase()}</button>`).join("")}</div>`;
+}
+function showSample(k) {
+  const s = SAMPLES[k];
+  $("#in").className = "card";
+  $("#in").innerHTML = `<div class="recog"><span class="ico">${ic(s.icon)}</span><span class="kind">recognised: ${s.kind.toLowerCase()}</span><span class="name">${esc(s.name)}</span><span class="facts">${s.facts}</span></div>
+    <div style="padding:0 16px 4px">${s.dest ? destRadios("d", s.follow)
+      : s.pack ? `<p class="becomes">It becomes a pack you can launch. Your lists and Mods stay as they are.</p>`
+      : `<p class="becomes">Notes and tags on your Mods; colours become coloured tags. Values you already have stay.</p>`}
+    <div class="acts"><button class="btn" data-back>not this one</button><button class="btn primary" data-toast="would import">${s.pack ? "add the pack" : s.manager ? "bring them over" : "import"}</button></div></div>
+    <div class="back"></div>`;
+}
+drawInput();
+
+$("#found").innerHTML = `<div class="sec-h">Found on this computer<span class="r">from RimSort, RimCrow and RimPy; only read</span></div>
+  ${FOUND.flatMap((m) => m.things.map((t) => `<div class="frow">${mark(m, 28)}<span class="t">${m.name}: ${t.n} ${t.what}</span><span class="b becomes">${t.becomes}</span>
+    <button class="btn line small" data-sample="${t.kind === "player" ? "manager" : "list"}">look…</button></div>`)).join("")}
+  <div class="acts" style="padding:0 16px 14px"><button class="btn primary" data-toast="would show one review of everything ticked">bring over everything…</button></div>`;
+
+$("#kinds").innerHTML = `<div class="sec-h">What can come in</div>
+  <table class="src">${SOURCES.map((s) => `<tr><td>${ic(s.icon)}</td><td><div class="t">${s.t}</div><div class="f">${s.from}</div><div class="becomes small">${s.becomes}</div></td></tr>`).join("")}</table>
+  <div style="padding:10px 16px 14px" class="small muted">Not here: the game itself (Game Config › add), Mod files (Mod library › add a subscription), saves (they stay in the game's folder).</div>`;
+
+document.addEventListener("click", (e) => {
+  const s = e.target.closest("[data-sample]"); if (s) { showSample(s.dataset.sample); $("#page").scrollTop = 0; return; }
+  if (e.target.closest("[data-back]")) drawInput();
+});
+</script>
+</body>
+</html>

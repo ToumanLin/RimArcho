@@ -48,6 +48,10 @@ type RimCrowReport struct {
 
 	NotMapped map[string]int // RimCrow fields with no RimArcho equivalent
 
+	// Parts counts each part a migration can bring over on its own (07 §6.5): what is
+	// new and what RimArcho already has.
+	Parts map[string]*PartCount
+
 	// About-disabled (04 §1.2): RimCrow renames About.xml to About.xml.disabled.
 	CrowDisabled  int            // modasset rows with disabled=1
 	AboutDisabled []string       // RimArcho instances marked unloadable: about-disabled
@@ -62,7 +66,40 @@ type RimCrowOptions struct {
 	DryRun               bool
 	IncludeDisabledRules bool
 	Tags                 ManagerTagNames
+	// Parts limits the Mod data and rules to these parts (Part*); nil takes them all, an
+	// empty map none (profiles only).
+	Parts map[string]bool
 }
+
+// The parts of another manager's data that can be brought over one by one (07 §6.5).
+const (
+	PartAliases    = "aliases"
+	PartNotes      = "notes"
+	PartGroups     = "groups"
+	PartTags       = "tags"
+	PartColours    = "colours"
+	PartIgnored    = "ignored"
+	PartRules      = "rules"      // user rules (RimCrow, RimSort)
+	PartRulesOff   = "rules-off"  // RimCrow's user rules while they are switched off there
+	PartInterlocks = "interlocks" // RimCrow's interlocks, as attach rules
+)
+
+// PartCount is one part of a migration: values RimArcho does not have yet, and values it
+// already has.
+type PartCount struct{ New, Same int }
+
+func (r *RimCrowReport) part(p string) *PartCount {
+	if r.Parts == nil {
+		r.Parts = map[string]*PartCount{}
+	}
+	if r.Parts[p] == nil {
+		r.Parts[p] = &PartCount{}
+	}
+	return r.Parts[p]
+}
+
+// wantPart: parts nil takes every part.
+func wantPart(parts map[string]bool, p string) bool { return parts == nil || parts[p] }
 
 // openCopy copies a SQLite database (and its WAL) to a temp dir and opens the copy
 // read-only.
@@ -109,7 +146,7 @@ func copyPlain(src, dst string) error {
 type crowMod struct {
 	alias, note, color string
 	ignore             bool
-	tags               []string
+	tags, groups       []string
 }
 
 // ImportRimCrow maps RimCrow's aliases, notes, groups (as tags), tags, interlocks (as
@@ -124,6 +161,10 @@ func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
 	if err := a.importCrowProfiles(db, opt, rep); err != nil {
 		return nil, err
 	}
+	if opt.Parts != nil && len(opt.Parts) == 0 {
+		return rep, nil // profiles only
+	}
+	want := func(p string) bool { return wantPart(opt.Parts, p) }
 	var assetsTable int
 	if err := db.QueryRow("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='modasset'").Scan(&assetsTable); err != nil {
 		return nil, err
@@ -238,6 +279,21 @@ func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
 			rep.NotMapped["sign_color"]++ // not a colour RimArcho can read
 			color = ""
 		}
+		if !want(PartAliases) {
+			alias = ""
+		}
+		if !want(PartNotes) {
+			note = ""
+		}
+		if !want(PartTags) {
+			tl = nil
+		}
+		if !want(PartColours) {
+			color = ""
+		}
+		if !want(PartIgnored) {
+			il = nil
+		}
 		// a colour mark and ignored issues become tags (07 §6.4); RimCrow's issue IDs
 		// themselves have no RimArcho equivalent
 		if strings.TrimSpace(alias) != "" || strings.TrimSpace(note) != "" || len(tl) > 0 || color != "" || len(il) > 0 {
@@ -249,7 +305,7 @@ func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
 		if typ != "" {
 			rep.NotMapped["user_mod_type"]++
 		}
-		if lock != "" && !contains(interlocks, lock) {
+		if lock != "" && want(PartInterlocks) && !contains(interlocks, lock) {
 			interlocks = append(interlocks, lock)
 		}
 	}
@@ -277,9 +333,9 @@ func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
 	for rows.Next() {
 		var g, id string
 		rows.Scan(&g, &id)
-		if name := groups[g]; name != "" {
+		if name := groups[g]; name != "" && want(PartGroups) {
 			m := get(id)
-			m.tags = append(m.tags, name)
+			m.groups = append(m.groups, name)
 			rep.Memberships++
 		}
 	}
@@ -317,14 +373,18 @@ func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
 			pd[lin] = cur
 		}
 		apply := func(what, v, have string, set func(env, lin, v string) error, n, same *int) error {
+			part := rep.part(map[string]string{"alias": PartAliases, "note": PartNotes}[what])
 			switch {
 			case v == "":
 			case have == v:
 				*same++
+				part.Same++
 			case have != "":
+				part.Same++ // RimArcho's own value stays
 				rep.Conflicts = append(rep.Conflicts, RCItem{"pkg:" + pkg, fmt.Sprintf("%s: RimArcho has %q, RimCrow %q (kept RimArcho's)", what, have, v)})
 			default:
 				*n++
+				part.New++
 				if !opt.DryRun {
 					return set(ix.Env.ID, lin, v)
 				}
@@ -344,7 +404,12 @@ func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
 			cur.Note = cm.note
 		}
 		for _, t := range cm.tags {
-			if err := tagger.add(lin, cur, t); err != nil {
+			if err := tagger.add(PartTags, lin, cur, t); err != nil {
+				return nil, err
+			}
+		}
+		for _, t := range cm.groups {
+			if err := tagger.add(PartGroups, lin, cur, t); err != nil {
 				return nil, err
 			}
 			if err := tagger.color(t, groupColor[strings.TrimSpace(t)]); err != nil {
@@ -353,7 +418,7 @@ func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
 		}
 		if hex := managerHex(cm.color); hex != "" {
 			name := opt.Tags.color("RimCrow", hex)
-			if err := tagger.add(lin, cur, name); err != nil {
+			if err := tagger.add(PartColours, lin, cur, name); err != nil {
 				return nil, err
 			}
 			if err := tagger.color(name, hex); err != nil {
@@ -361,7 +426,7 @@ func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
 			}
 		}
 		if cm.ignore {
-			if err := tagger.add(lin, cur, opt.Tags.ignore("RimCrow")); err != nil {
+			if err := tagger.add(PartIgnored, lin, cur, opt.Tags.ignore("RimCrow")); err != nil {
 				return nil, err
 			}
 		}
@@ -372,7 +437,7 @@ func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
 	if err != nil {
 		return nil, err
 	}
-	addRule := func(kind, pa, pb, label string) error {
+	addRule := func(part, kind, pa, pb, label string) error {
 		rep.RulesTotal++
 		la, _, wa := lineageOf(pa)
 		lb, wb := "", ""
@@ -390,10 +455,12 @@ func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
 		for _, r := range existing {
 			if r.Kind == kind && r.A == la && r.B == lb {
 				rep.RuleSame++
+				rep.part(part).Same++
 				return nil
 			}
 		}
 		rep.RuleNew++
+		rep.part(part).New++
 		r := &store.UserRule{Kind: kind, A: la, B: lb, Note: "imported from RimCrow", Created: a.Now().UTC()}
 		existing = append(existing, r)
 		if opt.DryRun {
@@ -410,7 +477,7 @@ func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
 		var c []string
 		json.Unmarshal([]byte(chain), &c)
 		for i := 1; i < len(c); i++ {
-			if err := addRule(order.RuleAttach, strings.ToLower(c[i]), strings.ToLower(c[i-1]), "interlock "+lock); err != nil {
+			if err := addRule(PartInterlocks, order.RuleAttach, strings.ToLower(c[i]), strings.ToLower(c[i-1]), "interlock "+lock); err != nil {
 				return nil, err
 			}
 		}
@@ -431,6 +498,13 @@ func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
 			return nil, fmt.Errorf("%s: %w", rulesPath, err)
 		}
 		rep.RulesDisabled = f.Settings.Enabled != nil && !*f.Settings.Enabled
+		// with parts chosen, switched-off rules come over only as their own part
+		userPart := PartRules
+		if rep.RulesDisabled {
+			userPart = PartRulesOff
+		}
+		skipUser := opt.Parts != nil && !opt.Parts[userPart]
+		include := opt.IncludeDisabledRules || opt.Parts[PartRulesOff]
 		var as []string
 		for k := range f.ModRules {
 			as = append(as, k)
@@ -454,17 +528,23 @@ func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
 						continue
 					}
 					label := fmt.Sprintf("%s %s", strings.ToLower(pa), k)
-					if rep.RulesDisabled && !opt.IncludeDisabledRules {
+					if skipUser {
+						continue
+					}
+					if rep.RulesDisabled && !include {
 						rep.RulesTotal++
 						rep.RulesSkipped = append(rep.RulesSkipped, RCItem{label, "user rules are switched off in RimCrow (--include-disabled-rules)"})
 						continue
 					}
-					if err := addRule(pos, strings.ToLower(pa), "", label); err != nil {
+					if err := addRule(userPart, pos, strings.ToLower(pa), "", label); err != nil {
 						return nil, err
 					}
 					continue
 				}
 				kind := map[string]string{"loadAfter": order.RuleAfter, "loadBefore": order.RuleBefore, "incompatibleWith": order.RuleIncompatible}[k]
+				if skipUser {
+					continue
+				}
 				if kind == "" {
 					rep.NotMapped["rule "+k]++
 					continue
@@ -478,12 +558,13 @@ func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
 				sort.Strings(bs)
 				for _, pb := range bs {
 					label := fmt.Sprintf("%s %s %s", strings.ToLower(pa), k, strings.ToLower(pb))
-					if rep.RulesDisabled && !opt.IncludeDisabledRules {
+					if rep.RulesDisabled && !include {
 						rep.RulesTotal++
 						rep.RulesSkipped = append(rep.RulesSkipped, RCItem{label, "user rules are switched off in RimCrow (--include-disabled-rules)"})
 						continue
 					}
-					if err := addRule(kind, strings.ToLower(pa), strings.ToLower(pb), label); err != nil {
+					if err := addRule(userPart, kind,
+						strings.ToLower(pa), strings.ToLower(pb), label); err != nil {
 						return nil, err
 					}
 				}

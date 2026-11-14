@@ -87,16 +87,19 @@ func (a *App) newTagImport(env string, dry bool, rep *RimCrowReport) (*tagImport
 	return &tagImport{a: a, env: env, dry: dry, rep: rep, colors: colors}, nil
 }
 
-func (t *tagImport) add(lin string, cur *store.PlayerData, tag string) error {
+// add counts the tag under part, the part of the migration it comes from.
+func (t *tagImport) add(part, lin string, cur *store.PlayerData, tag string) error {
 	if tag = strings.TrimSpace(tag); tag == "" {
 		return nil
 	}
 	if containsFold(cur.Tags, tag) {
 		t.rep.TagSame++
+		t.rep.part(part).Same++
 		return nil
 	}
 	cur.Tags = append(cur.Tags, tag)
 	t.rep.TagNew++
+	t.rep.part(part).New++
 	if t.dry {
 		return nil
 	}

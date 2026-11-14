@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>import · A By what you get</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  #page { --pad: max(20px, calc(50% - 520px)); }
+  .goals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 1100px) { .goals { grid-template-columns: 1fr; } }
+  .goal { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
+  .goal.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .gh { display: flex; gap: 10px; align-items: center; }
+  .gh .gi { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: var(--pill); color: var(--fg-2); }
+  .gh .gi .i { width: 18px; height: 18px; }
+  .gh h3 { margin: 0; font-size: 15px; }
+  .gh p { margin: 0; font-size: 12px; color: var(--muted); }
+  .get { font-size: 12.5px; color: var(--fg-2); padding: 8px 10px; border-radius: 8px; background: var(--card-2); }
+  .get b { color: var(--fg); }
+  .from { display: flex; flex-wrap: wrap; gap: 4px; }
+  .from span { font-size: 11.5px; height: 20px; display: inline-flex; align-items: center; padding: 0 7px; border-radius: 5px; background: var(--pill); color: var(--fg-2); }
+  .goal .drop { padding: 14px; }
+  .grow { flex: 1; }
+  /* a found manager is picked by clicking its row; the tree below then refines it */
+  .mrow { width: 100%; display: grid; grid-template-columns: 16px 32px minmax(0, 1fr); gap: 2px 10px; align-items: center; padding: 8px 10px; border-radius: 8px; border: var(--hairline) solid transparent; }
+  .mrow:hover { background: var(--card-2); }
+  .mrow.on { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+  .mrow .cb, .mrow .mgr { grid-row: span 2; }
+  .mrow .t { font-weight: 600; text-align: left; }
+  .mrow .s { text-align: left; }
+  .mrow .s { grid-column: 3; font-size: 12px; color: var(--muted); }
+  #result { margin-top: 12px; }
+  .stepbar { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: var(--hairline) solid var(--line-2); font-size: 12px; color: var(--muted); }
+  .stepbar b { color: var(--fg); }
+  /* the selection tree: manager > kind of data > item */
+  .tree { padding: 6px 8px 4px; }
+  .tn { display: grid; grid-template-columns: 20px 18px 18px minmax(0, 1fr) auto; gap: 8px; align-items: center; min-height: 32px; padding: 3px 8px 3px calc(8px + var(--lv) * 22px); border-radius: 7px; }
+  .tn:hover { background: var(--card-2); }
+  .tn.lv0 { min-height: 42px; }
+  .tn.lv0 .lb { font-size: 14px; font-weight: 600; }
+  .tn .tw { width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 5px; color: var(--muted); }
+  .tn .tw:hover { background: var(--pill); color: var(--fg); }
+  .tn .tw .i { transition: transform var(--t-press); }
+  .tn.open > .tw .i { transform: rotate(90deg); }
+  /* the check box: RimArcho has none of its own (native boxes elsewhere); this one uses the
+     GUI's tokens and its icon stroke: a 14px rounded box, a 1.5px tick, accent when on */
+  .cb { width: 16px; height: 16px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px;
+    border: 1.5px solid var(--faint); background: transparent; color: var(--accent-fg); transition: background var(--t-press), border-color var(--t-press); }
+  .cb { position: relative; }
+  .cb .i { position: absolute; width: 12px; height: 12px; stroke-width: 2; opacity: 0; transform: scale(.6); transition: opacity var(--t-press), transform var(--t-press) var(--ease); }
+  .cb.on, .cb.part { background: var(--accent); border-color: var(--accent); }
+  .cb.on .i { opacity: 1; transform: none; }
+  .cb.part::after { content: ""; width: 8px; height: 2px; border-radius: 1px; background: var(--accent-fg); }
+  .cb:disabled { border-color: var(--line); background: var(--card-2); }
+  button:hover > .cb:not(.on):not(.part), .cb:hover:not(.on):not(.part):not(:disabled) { border-color: var(--muted); }
+  .tn .ti { color: var(--fg-2); display: inline-flex; }
+  .tn .lb { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tn .lb .m { color: var(--muted); font-size: 12px; margin-left: 6px; }
+  .tn .bc { font-size: 12px; white-space: nowrap; text-align: right; }
+  .tn.off .lb, .tn.off .bc { color: var(--faint); }
+  .tn.dis .lb { color: var(--faint); }
+  .tn .why { color: var(--amber); font-size: 12px; }
+  .tn.lv0 .mgr { grid-column: 3; }
+  .tsum { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 10px 16px; border-top: var(--hairline) solid var(--line-2); font-size: 12px; color: var(--fg-2); }
+  .tsum b { color: var(--fg); }
+  .mrow .pick { grid-column: 3; font-size: 12px; color: var(--accent); }
+  .tree .empty { padding: 14px 16px; color: var(--muted); }
+  /* progress: the tree in place, each chosen part a task item (16 §2.16) */
+  .pbar { height: 4px; border-radius: 2px; background: var(--pill); overflow: hidden; }
+  .pbar > i { display: block; height: 100%; background: var(--accent); border-radius: 2px; transition: width 300ms var(--ease); }
+  .run-h { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; align-items: center; padding: 12px 16px; border-bottom: var(--hairline) solid var(--line-2); }
+  .run-h .t { font-weight: 600; }
+  .run-h .n { font-size: 12px; color: var(--muted); }
+  .run-h .pbar { grid-column: 1 / -1; }
+  .run-h .r { display: flex; gap: 6px; align-items: center; }
+  .pg { padding: 4px 8px 6px; }
+  .pk { padding: 10px 8px 2px calc(8px + var(--lv) * 22px); font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+  .pk .mgr { margin-right: 2px; }
+  .pi { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 8px; align-items: center; min-height: 30px; padding: 2px 8px 2px calc(8px + var(--lv) * 22px); border-radius: 7px; }
+  .pi .lb { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pi .rs { font-size: 12px; text-align: right; white-space: nowrap; }
+  .pi.wait .lb, .pi.wait .rs, .pi.cancel .lb, .pi.cancel .rs { color: var(--faint); }
+  .pi.run { background: var(--card-2); }
+  .pi.run .rs { color: var(--fg-2); }
+  .pi.done .rs { color: var(--green); }
+  .pi.fail .rs { color: var(--amber); }
+  .pi .sub { display: block; font-size: 11.5px; color: var(--muted); }
+  .si { width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; }
+  .si.wait::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--faint); }
+  .si.run::before { content: ""; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--accent-soft); border-top-color: var(--accent); animation: spin 800ms linear infinite; }
+  .si.done { color: var(--green); } .si.fail { color: var(--amber); } .si.cancel { color: var(--faint); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .si.run::before { animation: none; border-color: var(--accent); } }
+  .run-f { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 16px; border-top: var(--hairline) solid var(--line-2); }
+  .run-f .sum { flex: 1; min-width: 0; font-size: 12.5px; color: var(--fg-2); }
+  .run-f .sum b { color: var(--fg); }
+  .mrow .pbar { grid-column: 3; margin-top: 4px; }
+  /* earlier imports: a row says when its source came in and what is new since */
+  .mrow .hist { font-size: 12px; color: var(--muted); }
+  .mrow .t { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+  .mrow .when { font-size: 11.5px; font-weight: 400; color: var(--faint); white-space: nowrap; }
+  .mrow .nline { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .mrow .nt { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--fg-2); }
+  .chip-n { flex: none; font-size: 11px; height: 17px; display: inline-flex; align-items: center; padding: 0 6px; border-radius: 5px; background: var(--accent-soft); color: var(--accent); }
+  .mrow.seen .mgr { opacity: .5; }
+  .mrow.seen .t { color: var(--fg-2); font-weight: 500; }
+  .tn.had .lb, .tn.had .lb .m { color: var(--faint); }
+  .tn.had .ti { color: var(--faint); }
+  .bc.have { color: var(--faint); display: inline-flex; gap: 4px; align-items: center; }
+  .bc.have .i { width: 12px; height: 12px; }
+  .bc b { font-weight: 600; color: var(--fg-2); }
+  .lnk { color: var(--accent); font-size: 12px; padding: 0 3px; margin-left: 4px; border-radius: 4px; }
+  .lnk:hover { text-decoration: underline; }
+  .pill { font-size: 11px; height: 17px; display: inline-flex; align-items: center; padding: 0 6px; margin-left: 6px; border-radius: 5px; vertical-align: 1px; }
+  .pill.new { background: var(--accent-soft); color: var(--accent); }
+  .pill.chg { background: color-mix(in srgb, var(--amber) 16%, transparent); color: var(--amber); }
+</style>
+</head>
+<body>
+<div class="review" id="review"></div>
+<div id="app">
+  <aside id="side"><div class="side-head">RimArcho</div><nav id="nav"></nav></aside>
+  <main id="main">
+    <div id="top"></div><div class="page-head" id="head"></div>
+    <div id="page">
+      <div class="goals" id="goals"></div>
+      <div id="result"></div>
+    </div>
+    <div id="bottom"><span id="status">Nothing changes until you confirm.</span><span id="hints"></span></div>
+  </main>
+</div>
+<div id="toast"></div>
+<script src="shared.js"></script>
+<script>
+shell("a", [["1–3", "pick"], ["ctrl+v", "paste"], ["esc", "back"]], "What do you want to bring in?");
+
+// Example switch in the review bar: a first visit, or a visit after earlier imports.
+$("#review .sp").insertAdjacentHTML("afterend", `<button class="rb" id="histBtn">example: imported before</button>`);
+$("#histBtn").onclick = () => {
+  const b = $("#histBtn"), on = b.dataset.first === "1"; b.dataset.first = on ? "" : "1";
+  useEarlier(on); $("#histBtn").textContent = on ? "example: imported before" : "example: first visit";
+  RUN = null; TREE.flatMap(leaves).forEach((x) => { x.on = false; delete x.mode; }); shown.clear(); drawTree();
+  $$(".goal").forEach((g) => g.classList.remove("on")); $("#status").textContent = "Nothing changes until you confirm.";
+};
+
+// The tree: a manager, its kinds of data, and where a kind has parts, the parts.
+// Nothing is ticked until the player picks a manager; def is what picking turns on.
+const LIST_ITEMS = {
+  "rs-lists": [["Main colony", 214, 198], ["Medieval run", 156, 156], ["Test", 12, 9]],
+  "rc-lists": [["Latest_ModList", 230, 221], ["2026-11-01", 228, 221], ["2026-10-20", 226, 220], ["Ratkin colony", 188, 150], ["Vanilla+", 96, 96], ["old 1.5", 205, 120]],
+  "rp-lists": [["Colony", 188, 170], ["Royalty run", 140, 131], ["Test 2", 30, 30], ["Ideology", 166, 160]],
+};
+const PARTS = {
+  "rs-data": [["notes", 41, "41 notes"], ["tags", 63, "63 tags on your Mods"], ["colours", 12, "12 coloured tags (RimSort colour #…)"], ["ignore warnings", 5, "a tag RimSort: ignored warnings on 5 Mods"]],
+  "rc-data": [["aliases", 52, "52 aliases"], ["notes", 120, "120 notes"], ["groups", 9, "9 tags, on 140 Mods"], ["tags", 31, "31 tags"], ["colour marks", 7, "7 coloured tags (RimCrow colour #…)"], ["ignored issues", 4, "a tag RimCrow: ignored warnings on 4 Mods"]],
+  "rc-rules": [["user rules", 12, "12 load-order rules"], ["interlocks", 6, "6 attach rules"], ["rules switched off in RimCrow", 3, "3 load-order rules", false]],
+};
+function buildTree() {
+  return FOUND.map((m) => ({ id: m.id, lv: 0, m, label: m.name, meta: m.when, open: false, kids: m.things.map((t) => {
+    const n = { id: t.id, lv: 1, icon: t.icon, label: `${t.n} ${t.what}`, becomes: t.becomes, open: false, on: false, def: true };
+    if (t.kind === "configs") n.kids = t.items.map(([a, v, st], i) => ({ id: t.id + i, lv: 2, label: a, meta: "RimWorld " + v, becomes: "a Game Config + its list", on: false, def: st === "ready", dis: st !== "ready" ? st : "" }));
+    else if (LIST_ITEMS[t.id]) n.kids = LIST_ITEMS[t.id].map(([a, all, have], i) => ({ id: t.id + i, lv: 2, label: a, meta: `${all} Mods${all - have ? `, ${all - have} not installed` : ""}`, becomes: "a new list", on: false, def: true }));
+    else if (PARTS[t.id]) n.kids = PARTS[t.id].map(([a, c, b, def = true], i) => ({ id: t.id + i, lv: 2, label: a, meta: String(c), becomes: b, on: false, def }));
+    return n;
+  }) }));
+}
+const TREE = buildTree();
+const leaves = (n) => (n.kids ? n.kids.flatMap(leaves) : [n]);
+(function tagMgr(list, mid) { for (const n of list) { n.mid = mid || n.id; if (n.kids) tagMgr(n.kids, n.mid); } })(TREE);
+
+// ---- earlier imports (example data): what RimArcho recorded the last time each source came in ----
+// A leaf is had (already in RimArcho, nothing new: greyed, cannot be ticked), nw (new since: only the
+// new part comes over), or list (imported before as a list: comes in again only when ticked, as an
+// update of that list or as another copy). A leaf with no record in an imported manager is new.
+const EARLIER = {
+  hist: { rimsort: { when: "11-12" }, rimcrow: { when: "11-09" } },
+  seen: {
+    "rs-lists0": { list: "Main colony" }, "rs-lists1": { list: "Medieval run" }, "rs-lists2": { list: "Test" },
+    "rs-data0": { had: true }, "rs-data1": { had: true }, "rs-data2": { had: true }, "rs-data3": { had: true }, "rs-rules": { had: true },
+    "rc-profiles0": { had: "already the Game Config Vanilla+" }, "rc-profiles1": { had: "already the Game Config Big modpack" },
+    "rc-data0": { had: true }, "rc-data1": { nw: "4 notes", total: 124, n: "4 new", becomes: "4 new notes" }, "rc-data2": { had: true },
+    "rc-data3": { nw: "2 tags", total: 33, n: "2 new", becomes: "2 new tags" }, "rc-data4": { had: true }, "rc-data5": { had: true },
+    "rc-rules0": { nw: "1 rule", total: 13, n: "1 new", becomes: "1 new load-order rule" }, "rc-rules1": { had: true },
+    "rc-lists0": { list: "Latest_ModList", changed: "3 added, 1 removed" }, "rc-lists1": { list: "2026-11-01" }, "rc-lists2": { list: "2026-10-20" },
+    "rc-lists4": { list: "Vanilla+" }, "rc-lists5": { list: "old 1.5" },
+  },
+};
+let HIST = {}, SEEN = {};
+function useEarlier(on) { HIST = on ? structuredClone(EARLIER.hist) : {}; SEEN = on ? structuredClone(EARLIER.seen) : {}; }
+useEarlier(true);
+const had = (x) => !!(SEEN[x.id] && SEEN[x.id].had);
+const opt = (x) => !!(SEEN[x.id] && SEEN[x.id].list);
+const isNew = (x) => !!HIST[x.mid] && !SEEN[x.id] && !x.dis && x.def !== false;
+// toggleable: what a parent's box turns on. usable: what counts towards "N of M" (a list ticked again counts)
+const toggleable = (n) => leaves(n).filter((x) => !x.dis && !had(x) && !opt(x));
+const usable = (n) => leaves(n).filter((x) => !x.dis && !had(x) && (!opt(x) || x.on));
+const picked = (n) => usable(n).filter((x) => x.on).length;
+const pickLine = (n) => {
+  const a = picked(n), b = usable(n).length, h = HIST[n.mid];
+  if (h) {
+    // after an earlier import: what is new, plus lists the player chose to bring in again
+    const tog = toggleable(n), tOn = tog.filter((x) => x.on).length, again = leaves(n).filter((x) => opt(x) && x.on).length;
+    if (!tog.length && !again) return "nothing new";
+    return [tOn && tOn === tog.length ? "everything new" : tOn ? `${tOn} of ${tog.length} new parts` : "",
+      again ? `${again} list${again > 1 ? "s" : ""} again` : ""].filter(Boolean).join(" + ") || "nothing";
+  }
+  return b === 0 ? (h ? "nothing new" : "nothing") : a === b ? (h ? "everything new" : "everything") : a === 0 ? "nothing" : `${a} of ${b} parts`;
+};
+// what a leaf becomes, given what came in before
+function becomesOf(x) {
+  const s = SEEN[x.id];
+  if (s && s.nw) return s.becomes;
+  if (s && s.list) return x.mode === "update" ? `changes to your list ${s.list}: ${s.changed}; undoable` : `another list ${s.list} 2`;
+  return x.becomes;
+}
+function kindBecomes(n) {
+  if (!HIST[n.mid]) return n.becomes;
+  const on = leaves(n).filter((x) => x.on && !x.dis), lists = on.filter((x) => !SEEN[x.id] && x.becomes === "a new list").length;
+  return [...(lists ? [lists === 1 ? "1 new list" : `${lists} new lists`] : []), ...on.filter((x) => SEEN[x.id] || x.becomes !== "a new list").map(becomesOf)].join(", ");
+}
+// what is new in a manager since it was imported, for its card row: [text, changed?] chips
+function news(t) {
+  const out = []; let lists = 0, changed = 0;
+  for (const x of leaves(t)) {
+    if (x.dis) continue;
+    const s = SEEN[x.id];
+    if (!s) { if (x.becomes === "a new list") lists++; else if (x.def !== false) out.push(["+ " + x.label]); }
+    else if (s.nw) out.push(["+" + s.nw]); else if (s.changed) changed++;
+  }
+  const ls = (k) => `${k} list${k > 1 ? "s" : ""}`;
+  if (lists) out.push([ls(lists) + (changed ? `, ${changed} changed` : "")]);
+  else if (changed) out.push([ls(changed) + " changed"]);
+  return out;
+}
+
+const box = (state, attrs = "") => `<span class="cb ${state === "checked" ? "on" : state === "mixed" ? "part" : ""}" ${attrs}>${ic("ok")}</span>`;
+const stateOf = (n) => { const ls = usable(n), a = ls.filter((x) => x.on).length; return a === 0 ? "" : a === ls.length ? "checked" : "mixed"; };
+// changed sources first, never-imported next, nothing new last
+const rank = (t) => (!HIST[t.id] ? 1 : news(t).length ? 0 : 2);
+const moved = () => [...TREE].sort((a, b) => rank(a) - rank(b)).map((t) => {
+  const m = t.m, st = stateOf(t), h = HIST[t.id], nws = h ? news(t) : [], on = shown.has(t.id);
+  const line = RUN && RUN.mgrs.includes(m.id) ? `<span class="pick">${RUN.state === "running" ? `moving in… ${RUN.done} / ${RUN.items.length}` : RUN.state === "stopped" ? `stopped at ${RUN.done} / ${RUN.items.length}` : "moved in"}</span>`
+    : st ? `<span class="pick">bringing over ${pickLine(t)}</span>`
+    : on ? `<span class="hist">nothing new to choose; tick a list below to import it again</span>`
+    : h ? (nws.length ? `<span class="nline" title="${esc(nws.map(([x]) => x).join(", "))}"><span class="chip-n">new</span><span class="nt">${esc(nws.map(([x]) => x.replace(/^\+ ?/, "")).join(" · "))}</span></span>` : `<span class="hist">nothing new since then</span>`)
+    : m.things.map((x) => x.n + " " + x.what.split(" (")[0]).join(" · ");
+  const when = h ? `<span class="when">${h.when === "today" ? "imported today" : `imported ${h.when}`}</span>` : "";
+  return `<button class="mrow ${on ? "on" : ""} ${h && !nws.length && !on ? "seen" : ""}" data-mgr="${m.id}" role="checkbox" aria-checked="${st === "checked" ? "true" : st === "mixed" ? "mixed" : "false"}">${box(st)}${mark(m)}<span class="t">${m.name}${when}</span>
+    <span class="s">${line}</span>
+    ${RUN && RUN.mgrs.includes(m.id) && RUN.state === "running" ? `<span class="pbar"><i style="width:${Math.round((RUN.done / RUN.items.length) * 100)}%"></i></span>` : ""}</button>`;
+}).join("");
+const shown = new Set(); // managers picked above: the tree shows only these
+
+$("#goals").innerHTML = `
+<section class="card goal" id="g-list">
+  <div class="gh"><span class="gi">${ic("list")}</span><div><h3>A Mod list</h3><p>to play a list someone shared, or one from another manager</p></div></div>
+  <div class="get">You get <b>a new list</b>, or <b>changes to one of yours</b>. You see which Mods you have before anything changes.</div>
+  <div class="from"><span>RimSort</span><span>RimCrow</span><span>RimPy</span><span>RimWorld .rml</span><span>ModsConfig.xml</span><span>a save's Mods</span><span>Steam collection</span><span>share code</span><span>Rentry</span></div>
+  <div class="grow"></div>
+  <button class="drop" data-sample="list">${ic("drop")}<span class="big">Drop a file, or choose one…</span><span class="small">a list or a save (.rws)</span></button>
+  <div class="paste"><input placeholder="or paste a link, a share code or a list"><button class="btn line" data-sample="code">read</button></div>
+</section>
+<section class="card goal" id="g-pack">
+  <div class="gh"><span class="gi">${ic("pack")}</span><div><h3>A pack</h3><p>a modpack someone made with RimArcho</p></div></div>
+  <div class="get">You get <b>a pack you can launch</b>: its Mods are copied and checked file by file. Your lists and Mods stay as they are.</div>
+  <div class="from"><span>.archopack</span></div>
+  <div class="grow"></div>
+  <button class="drop" data-sample="pack">${ic("drop")}<span class="big">Choose a pack…</span><span class="small">.archopack</span></button>
+</section>
+<section class="card goal" id="g-move">
+  <div class="gh"><span class="gi">${ic("move")}</span><div><h3>Everything from another manager</h3><p>moving in from RimSort, RimCrow or RimPy</p></div></div>
+  <div class="get">You get their <b>lists</b>, <b>notes and tags</b>, <b>sorting rules</b> and, from RimCrow, <b>Game Configs</b>. Their files are only read.</div>
+  <div class="small muted">found on this computer: pick what to move in from</div>
+  <div id="moved">${moved()}</div>
+  <button class="btn link" data-toast="would open the file dialog for a database or rules file">another folder or file…</button>
+</section>`;
+
+function showSample(k) {
+  const s = SAMPLES[k];
+  $$(".goal").forEach((g) => g.classList.remove("on"));
+  $(k === "pack" ? "#g-pack" : k === "manager" ? "#g-move" : "#g-list").classList.add("on");
+  $("#result").innerHTML = `<section class="card">
+    <div class="stepbar">${ic(s.icon)}<span>${s.pack ? "A pack" : "A Mod list"}</span>${ic("chev")}<b>check what it is, then confirm</b></div>
+    <div class="recog"><span class="ico">${ic(s.icon)}</span><span class="kind">${s.kind}</span><span class="name">${esc(s.name)}</span><span class="facts">${s.facts}</span></div>
+    <div style="padding:0 16px 16px">${s.dest ? destRadios("d", s.follow) : `<p class="muted">It is added to your packs; nothing else changes.</p>`}
+      <div class="acts"><span class="note">${s.pack ? "Copies 2.0 GB into RimArcho's pack folder" : "Writes no game files; undoable"}</span><button class="btn" onclick="document.getElementById('result').innerHTML='';document.querySelectorAll('.goal').forEach(g=>g.classList.remove('on'))">cancel</button>
+      <button class="btn primary" ${s.pack ? "data-pack" : 'data-toast="imported as the new list Main colony; undo in the status line"'}>${s.pack ? "add the pack" : "import"}</button></div></div></section>`;
+  $("#result").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+document.addEventListener("click", (e) => {
+  const s = e.target.closest("[data-sample]"); if (s) return showSample(s.dataset.sample);
+  const m = e.target.closest("[data-mgr]"); if (m) showMgr(m.dataset.mgr);
+});
+function showMgr(id) {
+  if (RUN && RUN.state === "running") return toast("a move is running; stop it or wait");
+  if (RUN) RUN = null;
+  const t = TREE.find((x) => x.id === id);
+  if (shown.has(id)) { leaves(t).forEach((x) => { x.on = false; }); shown.delete(id); }
+  else {
+    // picking a manager turns on only what is new; what came in before stays off
+    leaves(t).forEach((x) => { x.on = !x.dis && !had(x) && !opt(x) && x.def !== false; });
+    shown.add(id); t.open = true;
+    if (HIST[id]) t.kids.forEach((k) => { k.open = !!k.kids && leaves(k).some((x) => isNew(x) || (SEEN[x.id] && (SEEN[x.id].nw || SEEN[x.id].changed))); });
+  }
+  $$(".goal").forEach((g) => g.classList.remove("on"));
+  if (shown.size) $("#g-move").classList.add("on");
+  drawTree();
+  if (shown.size) $("#result").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+function nodeRow(n) {
+  const ls = usable(n), a = ls.filter((x) => x.on).length, s = SEEN[n.id];
+  const state = n.kids ? stateOf(n) : n.on && !n.dis ? "checked" : "";
+  const base = leaves(n).filter((x) => !x.dis && !had(x)), allHad = !n.dis && base.length === 0 && leaves(n).some(had);
+  const off = n.kids ? !toggleable(n).length && !leaves(n).some((x) => x.on) : n.dis || had(n);
+  const tw = n.kids ? `<button class="tw" data-tw="${n.id}" aria-label="${n.open ? "fold" : "unfold"}">${ic("chev")}</button>` : "<span></span>";
+  const icon = n.m ? mark(n.m, 22) : n.icon ? `<span class="ti">${ic(n.icon)}</span>` : "<span></span>";
+  const have = (t) => `<span class="bc have">${ic("ok")}${esc(t)}</span>`;
+  const right = n.dis ? `<span class="why">${esc(n.dis)}</span>`
+    : n.lv === 0 ? `<span class="bc muted">${pickLine(n)}</span>`
+    : allHad ? have(typeof (s && s.had) === "string" ? s.had : "already in RimArcho")
+    : state === "mixed" ? `<span class="bc becomes">${a} of ${ls.length} chosen</span>`
+    : state ? `<span class="bc becomes">${esc(n.kids ? kindBecomes(n) : becomesOf(n))}</span>`
+    : opt(n) ? (s.changed
+        ? `<span class="bc">your list <b>${esc(s.list)}</b>, changed since: ${esc(s.changed)}<button class="lnk" data-upd="${n.id}">update it</button><button class="lnk" data-copy="${n.id}">another copy</button></span>`
+        : `<span class="bc">already the list <b>${esc(s.list)}</b><button class="lnk" data-copy="${n.id}">import another copy</button></span>`)
+    : n.kids && !toggleable(n).length ? `<span class="bc">already your lists; tick one to import it again</span>`
+    : `<span class="bc">not brought over</span>`;
+  const meta = s && s.nw ? String(s.total) : n.lv === 0 && HIST[n.id] ? `${n.meta} · imported ${HIST[n.id].when}` : n.meta;
+  const pill = s && s.nw ? `<span class="pill new">${s.n}</span>` : s && s.changed ? `<span class="pill chg">changed</span>` : !n.kids && isNew(n) ? `<span class="pill new">new</span>` : "";
+  const row = `<div class="tn lv${n.lv} ${n.open ? "open" : ""} ${state ? "" : "off"} ${n.dis ? "dis" : ""} ${allHad ? "had" : ""}" style="--lv:${n.lv}">${tw}
+    <button class="cb ${state === "checked" ? "on" : state === "mixed" ? "part" : ""}" data-ck="${n.id}" role="checkbox" aria-checked="${state === "checked" ? "true" : state === "mixed" ? "mixed" : "false"}" ${off ? "disabled" : ""}>${ic("ok")}</button>
+    ${icon}<span class="lb">${esc(n.label)}${meta ? `<span class="m">${esc(meta)}</span>` : ""}${pill}</span>${right}</div>`;
+  return row + (n.kids && n.open ? n.kids.map(nodeRow).join("") : "");
+}
+function drawTree() {
+  $("#moved").innerHTML = moved();
+  const list = TREE.filter((t) => shown.has(t.id));
+  if (!list.length) { $("#result").innerHTML = ""; return; }
+  const sum = list.filter((t) => picked(t)).map((t) => `<span><b>${t.m.name}</b> ${pickLine(t)}</span>`).join("") || "<span>nothing selected</span>";
+  $("#result").innerHTML = `<section class="card">
+    <div class="stepbar">${ic("move")}<span>Everything from another manager</span>${ic("chev")}<b>what comes over from ${list.map((t) => t.m.name).join(" and ")}</b></div>
+    <div class="tree">${list.map(nodeRow).join("")}</div>
+    <div class="tsum">${sum}</div>
+    <div style="padding:0 16px 16px"><div class="acts"><span class="note">${list.some((t) => HIST[t.id]) ? "What is already in RimArcho is greyed and stays as it is. A list comes in again only if you tick it." : "Only read from RimSort, RimCrow and RimPy. Values you already have stay."} Cannot be undone.</span>
+      <button class="btn" data-close>cancel</button><button class="btn primary" data-run ${list.some(picked) ? "" : "disabled"}>bring over the selected</button></div></div></section>`;
+}
+// ---- the run: one background task, an item per chosen part (16 §2.16) ----
+// Outcomes are example data: most parts finish, one reads the Mods of a game, one fails.
+const OUTCOME = {
+  "rc-profiles0": ["a Game Config Vanilla+, its list has 96 Mods"],
+  "rc-profiles1": ["a Game Config Big modpack, its list has 812 Mods", 3200, "reading the game's Mods"],
+  "rc-data0": ["52 aliases, 2 kept yours"], "rc-data1": ["117 notes, 3 kept yours"], "rc-data2": ["9 tags on 140 Mods"], "rc-data3": ["31 tags"],
+  "rc-data4": ["7 coloured tags"], "rc-data5": ["a tag on 4 Mods"],
+  "rc-rules0": ["12 load-order rules"], "rc-rules1": ["6 attach rules"], "rc-rules2": ["3 load-order rules"],
+  "rc-lists3": [null, 900, "", "the file changed while it was read; try again"],
+  "rs-data0": ["41 notes"], "rs-data1": ["63 tags"], "rs-data2": ["12 coloured tags"], "rs-data3": ["a tag on 5 Mods"], "rs-rules": ["12 load-order rules, 1 already there"],
+};
+var RUN = null; // var: the card rows read it before this line runs
+function startRun() {
+  const list = TREE.filter((t) => shown.has(t.id) && picked(t));
+  const items = [];
+  for (const t of list) for (const k of t.kids) for (const x of leaves(k)) if (x.on && !x.dis) items.push({ x, k, t, st: "wait" });
+  RUN = { items, done: 0, state: "running", mgrs: list.map((t) => t.id), at: 0 };
+  $("#status").textContent = `Moving in from ${list.map((t) => t.m.name).join(" and ")}: a background task; you can leave this page.`;
+  step();
+}
+function step() {
+  if (!RUN || RUN.state !== "running") return;
+  const it = RUN.items[RUN.at];
+  if (!it) { RUN.state = "finished"; $("#status").textContent = "Moved in. Details stay in background tasks."; drawRun(); return; }
+  it.st = "run"; drawRun();
+  const o = OUTCOME[it.x.id] || [];
+  setTimeout(() => {
+    if (!RUN || RUN.state !== "running") return;
+    it.st = o[3] ? "fail" : "done";
+    it.res = o[3] || (SEEN[it.x.id] ? becomesOf(it.x) : o[0]) || (it.x.becomes === "a new list" ? `a new list ${it.x.label}` : it.x.becomes);
+    RUN.done++; RUN.at++; step();
+  }, o[1] || 450 + Math.random() * 400);
+}
+function drawRun() {
+  const r = RUN, pct = Math.round((r.done / r.items.length) * 100);
+  const fails = r.items.filter((i) => i.st === "fail"), left = r.items.filter((i) => i.st === "wait" || i.st === "cancel");
+  const head = r.state === "running" ? `moving in… ${r.done} / ${r.items.length}` : r.state === "stopped" ? `stopped: ${r.done} of ${r.items.length} done` : `done: ${r.done - fails.length} of ${r.items.length} parts${fails.length ? `, ${fails.length} failed` : ""}`;
+  const icon = (st) => `<span class="si ${st}">${st === "done" ? ic("ok") : st === "fail" ? ic("warn") : st === "cancel" ? ic("x") : ""}</span>`;
+  let rows = "", lastT = null, lastK = null;
+  for (const it of r.items) {
+    if (it.t !== lastT) { rows += `<div class="pk" style="--lv:0">${mark(it.t.m, 20)}<b>${it.t.m.name}</b></div>`; lastT = it.t; lastK = null; }
+    const leaf = it.x === it.k;
+    if (!leaf && it.k !== lastK) { rows += `<div class="pk" style="--lv:1">${ic(it.k.icon)} ${esc(it.k.label)}</div>`; lastK = it.k; }
+    const o = OUTCOME[it.x.id] || [];
+    const res = it.st === "wait" ? "waiting" : it.st === "cancel" ? "not done: stopped" : it.st === "run" ? (o[2] ? `${o[2]}…` : "…") : esc(it.res);
+    rows += `<div class="pi ${it.st}" style="--lv:${leaf ? 1 : 2}">${icon(it.st)}<span class="lb">${leaf ? ic(it.k.icon) + " " : ""}${esc(it.x.label)}${it.st === "run" && o[2] ? `<span class="sub">340 / 812 Mods</span>` : ""}</span><span class="rs">${res}</span></div>`;
+  }
+  const acts = r.state === "running"
+    ? `<span class="sum">Running as a background task. You can leave this page; it goes on.</span><button class="btn" data-toast="would open background tasks with this task">background tasks</button><button class="btn line" data-stop>stop</button>`
+    : r.state === "stopped"
+    ? `<span class="sum">Finished parts are kept. <b>${left.length}</b> not done.</span><button class="btn" data-again>choose again</button><button class="btn primary" data-cont>continue ${left.length}</button>`
+    : `<span class="sum">${fails.length ? `<b>${fails.length} failed</b>; the rest is in RimArcho. ` : "Everything is in RimArcho. "}Notes and tags show in the Mod library; lists under lists; Game Configs in the switcher.</span>
+       ${fails.length ? `<button class="btn line" data-retry>retry ${fails.length}</button>` : ""}<button class="btn" data-toast="would open lists">open lists</button><button class="btn primary" data-again>done</button>`;
+  $("#result").innerHTML = `<section class="card">
+    <div class="run-h"><span><span class="t">${r.mgrs.map((id) => FOUND.find((m) => m.id === id).name).join(" and ")}</span> <span class="n">${head}</span></span>
+      <span class="r n">${r.state === "running" ? `${pct}%` : ""}</span><span class="pbar"><i style="width:${pct}%"></i></span></div>
+    <div class="pg">${rows}</div><div class="run-f">${acts}</div></section>`;
+  $("#moved").innerHTML = moved();
+}
+document.addEventListener("click", (e) => {
+  if (e.target.closest("[data-run]")) { startRun(); return; }
+  if (e.target.closest("[data-stop]")) { RUN.state = "stopped"; RUN.items.forEach((i) => { if (i.st === "wait" || i.st === "run") i.st = "cancel"; }); $("#status").textContent = "Stopped. Finished parts are kept."; drawRun(); return; }
+  if (e.target.closest("[data-cont]")) { RUN.items.forEach((i) => { if (i.st === "cancel") i.st = "wait"; }); RUN.at = RUN.items.findIndex((i) => i.st === "wait"); RUN.state = "running"; step(); return; }
+  if (e.target.closest("[data-retry]")) { RUN.items.forEach((i) => { if (i.st === "fail") { i.st = "wait"; delete OUTCOME[i.x.id]; } }); RUN.done -= RUN.items.filter((i) => i.st === "wait").length; RUN.at = RUN.items.findIndex((i) => i.st === "wait"); RUN.state = "running"; step(); return; }
+  if (e.target.closest("[data-again]")) { record(); RUN = null; TREE.flatMap(leaves).forEach((x) => { x.on = false; }); shown.clear(); drawTree(); $$(".goal").forEach((g) => g.classList.remove("on")); $("#status").textContent = "Nothing changes until you confirm."; return; }
+  if (e.target.closest("[data-pack]")) { packRun(); }
+});
+
+// what finished is recorded, so the next visit shows it as imported (the import history)
+function record() {
+  if (!RUN) return;
+  for (const it of RUN.items) {
+    if (it.st !== "done") continue;
+    const x = it.x, s = SEEN[x.id];
+    SEEN[x.id] = s && s.list ? { list: s.list } : x.becomes === "a new list" ? { list: x.label } : { had: true };
+    x.on = false; delete x.mode;
+    HIST[it.t.id] = { when: "today" };
+  }
+}
+
+// ---- the pack: one background task, bytes copied then checked (10 §4) ----
+function packRun() {
+  const total = 2.0, start = Date.now(), dur = 6000;
+  $("#status").textContent = "Adding the pack: a background task; you can leave this page.";
+  const tick = () => {
+    const f = Math.min(1, (Date.now() - start) / dur), copy = Math.min(1, f / 0.75), check = Math.max(0, (f - 0.75) / 0.25);
+    const stage = f < 0.75 ? `copying ${(total * copy).toFixed(1)} / ${total.toFixed(1)} GB` : f < 1 ? `checking files ${Math.round(check * 44670)} / 44,670` : "added";
+    const pct = Math.round(Math.min(f, 0.99) * 100);
+    $("#result").innerHTML = `<section class="card">
+      <div class="run-h"><span><span class="t">Ratkin + 4 races</span> <span class="n">${f < 1 ? stage : "added to your packs: 38 Mods, every file matches"}</span></span>
+        <span class="r n">${f < 1 ? `${pct}%` : ""}</span><span class="pbar"><i style="width:${f < 1 ? pct : 100}%"></i></span></div>
+      <div class="pg">${[["copy the Mods", 0.75], ["check every file against the pack", 1], ["compare with your game", 1]].map(([t, end], i) => {
+        const st = f >= end && (i < 2 || f >= 1) ? "done" : (i === 0 && f < 0.75) || (i === 1 && f >= 0.75 && f < 1) ? "run" : "wait";
+        return `<div class="pi ${st}" style="--lv:0"><span class="si ${st}">${st === "done" ? ic("ok") : ""}</span><span class="lb">${t}</span><span class="rs">${st === "run" ? stage : st === "done" ? (i === 2 ? "RimWorld 1.6: matches" : "done") : "waiting"}</span></div>`; }).join("")}</div>
+      <div class="run-f">${f < 1 ? `<span class="sum">Running as a background task. You can leave this page; it goes on.</span><button class="btn" data-toast="would open background tasks">background tasks</button><button class="btn line" data-toast="would stop and remove the half-copied pack">stop</button>`
+        : `<span class="sum">The pack is ready to launch.</span><button class="btn primary" data-toast="would open the pack">open the pack</button>`}</div></section>`;
+    if (f < 1) requestAnimationFrame(() => setTimeout(tick, 120)); else $("#status").textContent = "Pack added.";
+  };
+  tick();
+}
+
+const find = (id, list = TREE) => { for (const n of list) { if (n.id === id) return n; if (n.kids) { const f = find(id, n.kids); if (f) return f; } } return null; };
+document.addEventListener("click", (e) => {
+  const lk = e.target.closest("[data-copy], [data-upd]");
+  if (lk) { const n = find(lk.dataset.copy || lk.dataset.upd); n.on = true; n.mode = lk.dataset.copy ? "copy" : "update"; drawTree(); return; }
+  const tw = e.target.closest("[data-tw]"); if (tw) { const n = find(tw.dataset.tw); n.open = !n.open; drawTree(); return; }
+  const ck = e.target.closest("[data-ck]");
+  if (ck && !ck.disabled) {
+    // a box turns its whole subtree on, or off when all of it is on
+    // turning on never ticks what came in before; a list imported before is ticked on its own row
+    const n = find(ck.dataset.ck), on = n.kids ? stateOf(n) !== "checked" : !n.on;
+    if (!n.kids) { n.on = on; if (on && opt(n) && !n.mode) n.mode = SEEN[n.id].changed ? "update" : "copy"; }
+    else if (on) toggleable(n).forEach((x) => { x.on = true; });
+    else leaves(n).forEach((x) => { x.on = false; });
+    if (n.lv === 0 && !on) shown.delete(n.id);
+    drawTree(); return;
+  }
+  if (e.target.closest("[data-close]")) { TREE.flatMap(leaves).forEach((x) => { x.on = false; }); shown.clear(); drawTree(); $$(".goal").forEach((g) => g.classList.remove("on")); }
+});
+</script>
+</body>
+</html>

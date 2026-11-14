@@ -381,7 +381,7 @@ Profile environments and their independent current plans follow 03 §6.4. The sa
 7. Running it again gives the same result: identical values are skipped, and rules are deduplicated by kind + Lineage. RimCrow's log tables are not imported.
 8. `--dry-run` only reports and writes nothing. By default 6 details per category; `--all` shows all.
 
-The GUI profile checklist selects which RimCrow profiles become Game Configs (03 §6.5). Unconfigured profiles remain visible and skipped.
+The Import page's tree (§6.5; 16 §2.18) selects which RimCrow profiles become Game Configs (03 §6.5), and which kinds of player data and rules come over. Unconfigured profiles remain visible and skipped.
 
 The GUI's Import page (16 §2.18) discovers sources read-only with `app.DiscoverManagerImports`:
 
@@ -391,7 +391,7 @@ The GUI's Import page (16 §2.18) discovers sources read-only with `app.Discover
 - RimPy: `ModLists/` in its data folder, `LocalLow\RimPy Mod Manager` beside `%APPDATA%` (Roaming). Its lists are read as any list (§7.2); the folder's `config.ini` is not read. The file format of RimPy's saved lists is not documented; a synthetic ModsConfig-style list is tested, a real RimPy file is a VM check.
 - Install candidates: running RimCrow/RimModManager/RimSort executable directories; named folders in Program Files, Local AppData/Programs, Local AppData, Downloads, Desktop, Games and beside RimArcho's parent folder; named Start-menu shortcuts and recent-folder shortcuts. Windows shortcut resolution is read-only, hidden and limited to four seconds and 200 shortcuts per root. No registry registration is assumed. Each list folder contributes at most its first 100 entries. Duplicate source paths are suppressed; inaccessible or absent locations are skipped.
 
-Choosing a candidate does not import it. Lists use §7; RimCrow data uses the existing dry-run report and import above. Original databases, WAL files, settings and rules remain unchanged. The manual file picker remains available when discovery finds nothing.
+Choosing a candidate does not import it. Lists use §7; player data and rules come over part by part (§6.5). Original databases, WAL files, settings and rules remain unchanged. The manual file picker remains available when discovery finds nothing.
 
 Measured on real data: 18 §3.
 
@@ -418,6 +418,18 @@ The preview and report show the Mods with data and how they matched, notes, tags
 A row is keyed by the Mod folder's absolute path: it maps to the Lineage of the live Instance at that path, else to the single Lineage whose Workshop ID is `published_file_id`; otherwise it is reported as not installed or ambiguous. Rows with none of the player's data are not counted. Columns missing in older databases are read as empty.
 
 RimArcho keeps colours on tags (16 §3.8), not on Mods, so a colour mark from either manager (§6.2) becomes a tag named after the manager and the colour, coloured with it; the Mod's rows then take the colour as long as that tag is its first coloured one. "Ignore warnings" becomes a tag so the player keeps the information; it does not hide anything in Can it run. The tag names follow `ui.lang`, from the locale's supplemental table (`app.ManagerTagNamesIn`, keys `@tag.manager-colour` and `@tag.manager-ignore`), so the window and the CLI write the same names; after the language changes, importing again adds the tags under the new names. A tag that already has a colour keeps it. Running the import again changes nothing.
+
+### 6.5 Moving in part by part, and the record of earlier imports
+
+The Import page (16 §2.18) brings another manager's data over one part at a time, so the player chooses what comes over and sees what came in before.
+
+**Parts.** `app.RimCrowOptions.Parts` and `app.RimSortAuxOptions.Parts` limit an import to some parts (`app.Part*`); nil takes them all, as the CLI does. RimCrow: `aliases`, `notes`, `groups` (group memberships and their colours), `tags`, `colours` (colour marks), `ignored` (ignored issues), `interlocks`, and `rules` (user rules), or `rules-off` when user rules are switched off in RimCrow; an empty map imports profiles only. RimSort's local database: `notes`, `tags`, `colours`, `ignored`. RimSort's `userRules.json` is one part. Each profile (`profile:<id>`) and each list file found is a part of its own. Every import counts each part: values RimArcho does not have yet (new) and values it already has (same; a differing value of RimArcho's counts as same, since it stays) in `RimCrowReport.Parts`.
+
+**Survey.** `App.SurveyMigration(found, tags)` groups what discovery found by manager and kind (profiles, player data per source, rules, lists), with a dry run of each source (`IncludeDisabledRules`, so switched-off rules are counted). A part is `new` (something to bring over), `had` (all of it already in RimArcho), `empty` (the source has none; not shown), `blocked` (a profile that cannot come over, with RimCrow's status), or `listed` (a list file imported before whose list still exists). A list file's facts are its Mod count and how many are not installed (by packageId and Workshop ID against live Mods). Switched-off rules are not on by default; everything else that is new is.
+
+**Bringing one part over.** `App.MigratePart(pick, tags)` imports one part: a list file becomes a new list named after the file (or its own title), with ` 2`, ` 3` … when that name is taken (`NewPlanFromImport`, §7), without opening it; a profile, a data part or rules use the imports of §6.2–§6.4 limited to that part. The window's `update` mode replaces the content of the list a file became, as the editor's import does, in one undoable step, without opening that list. The window runs the parts as one background task (16 §2.16), holding its lock for one part at a time.
+
+**The record of earlier imports** is the meta value `import.history`: per source path (lower-cased), the time of the last import, the file's SHA-256 then, and for a list file the list it became (a copy keeps the record's list). A manager's “imported” date is its sources' latest. A list file is `listed` while that list exists, and changed when the file's hash differs. Nothing is recorded for the CLI's whole imports or for list imports from a file or a link; what is already in RimArcho comes from the dry run, not from the record, so the CLI's imports still show as `had`.
 
 ## 7. List exchange
 

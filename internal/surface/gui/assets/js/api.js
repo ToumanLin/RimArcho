@@ -11,7 +11,7 @@ const pending = new Map();
 let actionGuard = () => "";
 export function setEnvironmentGuard(fn) { actionGuard = fn; }
 const writesGame = new Set([
-  "ApplyManagerImport", "ApplyManagerImportProfiles",
+  "ApplyManagerImport", "ApplyManagerImportProfiles", "StartMigration",
   "CompleteDependencies", "ReplaceRecommended", "UseInstalled",
   "Run", "RunAnyway", "RunMoving", "RunCLI", "Toggle", "Stage", "Unstage", "StageAll", "RestoreAll",
   "MoveBy", "MoveShown", "Place", "Swap", "Undo", "Redo", "HistoryGo", "RunOp", "DoAction",
