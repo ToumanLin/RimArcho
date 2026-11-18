@@ -18,7 +18,7 @@ func startWorkshopCMD(exe string, args []string, console bool) (SteamCMDProc, er
 	// An interactive run hands SteamCMD this process's terminal. Without one (`archo mcp`,
 	// whose stdin and stdout are the protocol's pipes, 14 §1) it runs hidden instead:
 	// SteamCMD would read the client's requests and write into the protocol stream.
-	console = console && callerConsole()
+	console = console && (consoleForTest || callerConsole())
 	cmd := exec.Command(exe, args...)
 	cmd.Dir = filepath.Dir(exe)
 	env, err := steamCMDEnv(exe)
@@ -36,6 +36,9 @@ func startWorkshopCMD(exe string, args []string, console bool) (SteamCMDProc, er
 	}
 	return &workshopProcess{Cmd: cmd, group: !console}, nil
 }
+
+// consoleForTest lets a test whose stdout is a file take the console path.
+var consoleForTest bool
 
 // callerConsole reports whether stdin and stdout are a terminal (not pipes or files).
 func callerConsole() bool {
