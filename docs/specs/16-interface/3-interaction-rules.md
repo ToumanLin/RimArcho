@@ -41,6 +41,11 @@ These rules apply in full to the plan editor and Mod library › all mods. The t
 - §3.5: no positive `tabIndex`; tab follows page order.
 - §3.10 and rule 7: no native `<select>` and no native browser dialogs (16 §7.3 "Checks").
 
+The contract checks (`ui_hints_test.go`, `ui_contract_test.go`; all run with `go test -count=1 -run 'TestUI' ./internal/surface/gui/`) add:
+- Rule 4 and §2.2: each hint provider `renderHints` dispatches lists at most 7 actions on every way through it, the last `?` all keys; renderHints trims through `hintLine` (hintline.js), which keeps `?`. Forms whose text field takes `?` are listed with their reason.
+- §3.5: every `view.Commands` ID has a handler in main.js `cmd()`, and `cmd()` handles nothing else. Every page (`openScreen`, `beginPageRead`) has a reference-number prefix in refnums.js, and enters through `beginPageRead`.
+- §3.9: the `createTable` keys equal the tables listed above; other `role="table"` / `"grid"` or `<table>` markup is listed as a plain table with its reason.
+
 Which actions exist and run on both pages is checked by `TestOpsReachable` and `TestOpsRunnable` (rule 6).
 
 **Base state** means the current page with no selection, overlay, or menu, and with collapsed filters. In the editor, the focused list also has no search. Filters that remain effective while collapsed are part of the page state and do not prevent the base state; another `esc` clears them. At most 3 presses of `esc` return to the base state from anywhere (T20, G5):

@@ -42,5 +42,8 @@
   "download the zip in the browser, then install it:": "ブラウザでZIPをダウンロードしてからインストール：",
   "path to the zip": "ZIPのパス",
   "o: open the download page": "o：ダウンロードページを開く",
-  "opened the download page": "ダウンロードページを開きました"
+  "opened the download page": "ダウンロードページを開きました",
+  "enter: stop the update (nothing is changed before the files are replaced); esc: keep going": "Enter：更新を中止（ファイルを置き換えるまでは何も変更されません）／Esc：続行",
+  "enter: install; esc: cancel   :update --check checks again": "Enter：インストール／Esc：キャンセル   :update --check で再確認",
+  "enter: check for updates; esc: cancel": "Enter：更新を確認／Esc：キャンセル"
 }

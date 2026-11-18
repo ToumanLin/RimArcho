@@ -403,5 +403,6 @@
   "Can it run checks the newest save of %s": "能不能跑改为检查 %s 的最新存档",
   "Can it run checks %s": "能不能跑改为检查 %s",
   "copied %s to the saves of %s as %s": "已把 %s 复制到 %s 的存档：%s",
-  "the save is in this Game Config's Saves folder already": "这个存档已经在当前游戏配置的存档文件夹里"
+  "the save is in this Game Config's Saves folder already": "这个存档已经在当前游戏配置的存档文件夹里",
+  "1 Mod adds nothing a save can show (interface, performance, fixes): saves cannot tell whether it was used": "1 个功能型 Mod 不添加存档能显示的内容（界面、性能、修复）：存档说明不了它是否用上了"
 }

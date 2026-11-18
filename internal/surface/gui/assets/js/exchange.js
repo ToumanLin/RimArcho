@@ -43,7 +43,7 @@ export function cancel() {
   return from === "guide" ? ui.resumeGuide() : ui.go(from);
 }
 export function key(e) { if (e.key === "Escape") { e.preventDefault(); cancel(); } }
-export const hintList = () => [{ key: "tab", label: T("import destination") }, { key: "enter", label: T("import") }, { key: "esc", label: T("cancel") }];
+export const hintList = () => [{ key: "tab", label: T("import destination") }, { key: "enter", label: T("import") }, { key: "esc", label: T("cancel") }, { key: "?", label: T("all keys") }];
 
 // The Import page (16 §2.18): the sidebar's Import, `i`, a dropped file, Settings and the guide
 // all open it. Three cards say what the player gets: a Mod list, a pack, or everything from

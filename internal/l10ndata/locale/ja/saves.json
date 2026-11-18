@@ -403,5 +403,6 @@
   "Can it run checks the newest save of %s": "起動前チェックで %s の最新セーブを確認します",
   "Can it run checks %s": "起動前チェックで %s を確認します",
   "copied %s to the saves of %s as %s": "%s を %s のセーブに %s としてコピーしました",
-  "the save is in this Game Config's Saves folder already": "このセーブはすでに現在のゲーム構成のセーブフォルダーにあります"
+  "the save is in this Game Config's Saves folder already": "このセーブはすでに現在のゲーム構成のセーブフォルダーにあります",
+  "1 Mod adds nothing a save can show (interface, performance, fixes): saves cannot tell whether it was used": "1個の機能系MODはセーブに残る内容を追加しません（UI、パフォーマンス、修正）。使われたかどうかはセーブからは分かりません"
 }
