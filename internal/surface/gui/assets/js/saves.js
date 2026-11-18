@@ -28,9 +28,10 @@ export function initSaves(u) { ui = u; }
 // viewing, {kind: "rename"} the save's name field, {kind: "colony"} the colony's (right
 // card), {kind: "confirm", what: "backup" | "recycle", preview, running} the inline
 // confirmation; viewing: the rows whose details View opened (by kind). built: the
-// navigation (S.screenSeq) whose visit drew the page; visit: the one open() last reset for.
+// navigation (S.screenSeq) whose visit drew the page; visit: the one open() last reset for;
+// reading: the full read's last progress ({read, total, line}) while it runs, on any page.
 const X = { page: null, sel: "", open: new Set(), q: "", owner: "", detail: null, mode: null, viewing: new Set(),
-  listSeq: 0, detailSeq: 0, askSeq: 0, busy: false, built: -1, visit: -1 };
+  listSeq: 0, detailSeq: 0, askSeq: 0, busy: false, built: -1, visit: -1, reading: null };
 let leftCard = null, midCard = null, rightCard = null, tree = null, input = null, timer = 0, mods = null;
 const waiting = new Map(); // listing request → its resolve
 const running = new Set(); // actions waiting for their reply: a second click does nothing
@@ -49,6 +50,61 @@ on("saves", (ev) => {
   w(ev);
 });
 on("saves-read", (ev) => news(ev || {}));
+// the first listing's heads, in the loading card while the page waits for it
+on("saves-progress", (ev) => {
+  if (!ev || ev.request !== X.listSeq || S.screen !== "saves") return;
+  const box = $("#screen .page-loading .sv-progress");
+  if (box) setProgress(box, ev.done, ev.total, Tf("listing the saves %d/%d", ev.done, ev.total));
+});
+
+// ---- loading progress (16 §2.11 "Loading"): a bar in the loading card while the first
+// listing reads the saves' heads, and one in the page's head while the full read runs ----
+function progressBox() {
+  const box = el("div", "sv-progress indeterminate");
+  box.setAttribute("role", "progressbar");
+  const track = el("span", "track");
+  track.append(el("span", "fill"));
+  box.append(el("span", "t num"), track);
+  return box;
+}
+// setProgress shows done of total (total 0: not known yet, the bar runs without an end).
+function setProgress(box, done, total, text) {
+  const known = total > 0;
+  box.classList.toggle("indeterminate", !known);
+  box.querySelector(".fill").style.width = known ? Math.min(100, Math.round((done * 100) / total)) + "%" : "";
+  if (known) {
+    box.setAttribute("aria-valuemin", "0");
+    box.setAttribute("aria-valuemax", String(total));
+    box.setAttribute("aria-valuenow", String(done));
+  } else box.removeAttribute("aria-valuenow");
+  box.querySelector(".t").textContent = text;
+  box.setAttribute("aria-label", text);
+  box.title = text;
+}
+// loadingBar puts the listing's bar in the page's loading card, running until the heads'
+// first count arrives.
+function loadingBar() {
+  const card = $("#screen .page-loading");
+  if (!card || card.querySelector(".sv-progress")) return;
+  const box = progressBox();
+  setProgress(box, 0, 0, T("reading the saves…"));
+  (card.querySelector(".loading-side") || card).append(box);
+}
+// readingBar draws the full read's bar in the page's head (X.reading: its last progress),
+// or takes it away when the run has ended.
+function readingBar() {
+  const head = $("#screen .page.saves .page-head");
+  let box = head?.querySelector(".sv-progress");
+  if (!X.reading) { box?.remove(); return; }
+  if (!head) return;
+  if (!box) {
+    box = progressBox();
+    box.classList.add("sv-reading");
+    const acts = head.querySelector(".page-acts");
+    acts ? head.insertBefore(box, acts) : head.append(box);
+  }
+  setProgress(box, X.reading.read, X.reading.total, X.reading.line);
+}
 // a list made from a save to analyse it: the save is checked again with what it indexed
 on("analyze", (ev) => { if (ev?.done && live() && X.detail && !X.detail.loading) showDetail(0); });
 
@@ -56,11 +112,14 @@ on("analyze", (ev) => { if (ev?.done && live() && X.detail && !X.detail.loading)
 // is open (never over a failure or a message with its undo), rows with their day and
 // colonies regrouped, and the selected save's play facts once it is read.
 function news(ev) {
+  if (ev.done) X.reading = null;
+  else if (ev.total) X.reading = { read: ev.read || 0, total: ev.total, line: ev.line || "" };
   if (S.screen !== "saves") return;
   const st = $("#status"), quiet = !st || (st.dataset.kind !== "fail" && !st.querySelector("a"));
   if (ev.line && quiet) say("busy", ev.line);
   if (ev.done && (ev.error || quiet)) say(ev.error ? "fail" : "ok", ev.error || ev.text || "");
   if (!live()) return;
+  if (ev.done || ev.total) readingBar();
   if (ev.page) update(ev.page);
   if (X.sel && (ev.refs || []).includes(X.sel) && X.detail?.ref === X.sel && !X.detail.play && !X.detail.loading) showDetail(0);
   // read again for its content (an older parser's cache): ask for the content again
@@ -104,6 +163,7 @@ function readList() {
 export async function open(want = "") {
   const read = beginPageRead("saves", { retry: () => open(want), label: "reading the saves…" });
   if (X.visit !== S.screenSeq) { X.visit = S.screenSeq; leave(); }
+  loadingBar();
   if (want) selectSave(want);
   let p = null;
   // a newer listing asked for meanwhile makes this one stale: ask again, so this read ends
@@ -227,6 +287,7 @@ function build() {
   grid.append(leftCol, gap1, midCard, gap2, rightCard);
   w.append(grid);
   sc.append(w);
+  readingBar();
   const setVar = (name) => (v) => { if (v) grid.style.setProperty(name, v + "px"); else grid.style.removeProperty(name); };
   const leftRange = () => [200, Math.max(200, Math.min(480, grid.clientWidth - 640))];
   wireSeparator(gap1, { key: "ui.gui.saves.left", range: leftRange,

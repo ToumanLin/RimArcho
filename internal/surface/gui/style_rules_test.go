@@ -257,6 +257,7 @@ var endlessWhileWorking = map[string]string{
 	".hm-go .bar::after":                  "launch block while a list or game is applied",
 	".prog .bar.busy i::after":            "task progress without a value",
 	".page-acts .chip.prob.updating .dot": "problems refresh or analysis running (needsWorkLocked)",
+	".sv-progress.indeterminate .fill":    "saves listing before its first count",
 }
 
 var cssRule = regexp.MustCompile(`([^{}]+)\{([^{}]*)\}`)
