@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// UI rules from 16 §3 and §7 that can be checked mechanically, on top of TestStyleRules.
+// UI rules from 16 §3 (interaction) and §7 (visual design) that can be checked mechanically, on top of TestStyleRules.
 // Each problem names the specification section, so the failure says what to read and why.
 // Exceptions are listed below with their reason; an exception that no longer matches fails,
 // so the lists cannot go stale. Run all UI lint quickly with:
@@ -63,7 +63,31 @@ var (
 	jsKbd    = regexp.MustCompile(`<kbd\b|\b(?:el|createElement)\(\s*["']kbd["']`)
 	jsSelect = regexp.MustCompile(`<select\b|\b(?:el|createElement)\(\s*["']select["']`)
 	jsDialog = regexp.MustCompile(`\bwindow\.(?:alert|confirm|prompt)\(|(?:^|[^.\w])alert\(`)
+
+	jsMouseOnly = regexp.MustCompile(`\bon(?:dblclick|contextmenu|dragstart)\s*=|addEventListener\(\s*["'](?:dblclick|contextmenu|dragstart)["']`)
+	jsKeysNote  = regexp.MustCompile(`//.*\bkeys:\s*\S`)
+	jsHistory   = regexp.MustCompile(`\bhistory\.(?:pushState|replaceState|back|forward|go)\(|\blocation\.(?:hash|href)\s*=[^=]`)
+	jsTabIndex  = regexp.MustCompile(`\btabIndex\s*=\s*[1-9]|\btabindex=["']?[1-9]|setAttribute\(\s*["']tabindex["']\s*,\s*["']?[1-9]`)
+	jsSplit     = regexp.MustCompile(`\bel\(\s*["']div["']\s*,\s*["']split\b`)
+	jsClipboard = regexp.MustCompile(`\bclipboard\.writeText\(|execCommand\(\s*["']copy["']`)
 )
+
+// user-select: none is for controls only (16 §3.1 rule 13); every selector that takes it is
+// listed here. A body.<state> rule that stops selection during a drag or resize is allowed.
+var unselectableAllowed = map[string]string{
+	"button": "control", "select": "control", "kbd": "key cap", "svg": "icon",
+	"#side": "sidebar", "#crumbs": "breadcrumbs", ".envchip": "Game Config switcher", "#hints": "hint line",
+	".area .head": "area heading", ".hbar": "area heading bar", ".split": "splitter", ".lib-th": "table header",
+	".row": "multi-select row", ".lib-row": "multi-select row", ".tk-row": "multi-select row",
+	".fbar-chip": "filter chip", ".drop-tip": "drag hint", ".archo-slot": "Archo's figure",
+	".color-pop": "colour picker", ".sv-col": "saves tree row", ".sv-save": "saves tree row",
+	".sv-chartscroll.drag": "chart while dragged", ".badge-pop .bp-hint": "key hint in a popover",
+	".badge-pop .bp-acts": "action buttons in a popover", ".refnum > span": "reference-number label",
+	".filesearch .fs-code-number": "line numbers, so a copy takes only the code",
+	".choice-control":             "control", ".choice-menu": "menu",
+}
+
+var cssBodyState = regexp.MustCompile(`^body\.[\w-]+(?: \*)?$`)
 
 func TestUIRules(t *testing.T) {
 	t.Parallel()
@@ -91,7 +115,7 @@ func TestUIRules(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, list := range []map[string]string{italicAllowed, underlineAllowed, motionAllowed, hexAllowed, nativeDialogAllowed} {
+	for _, list := range []map[string]string{italicAllowed, underlineAllowed, motionAllowed, hexAllowed, nativeDialogAllowed, unselectableAllowed} {
 		for k := range list {
 			if !used[k] {
 				t.Errorf("%s: listed as a UI rule exception but nothing needs it any more; remove it from ui_rules_test.go", k)
@@ -162,6 +186,13 @@ func uiStyleProblems(source string, used map[string]bool) []string {
 			if p := motionProblem(d.value); p != "" {
 				report(d, p)
 			}
+		case d.name == "user-select" && d.value == "none":
+			for _, part := range splitStyleShadows(d.sel) {
+				part = strings.TrimSpace(part)
+				if !cssBodyState.MatchString(part) && !allowed(unselectableAllowed, part) {
+					report(d, "16 §3.1 rule 13: text stays selectable; user-select: none only on controls (add "+part+" to unselectableAllowed only if it is one)")
+				}
+			}
 		case cssHex.MatchString(d.value) && !strings.HasPrefix(d.sel, ":root") && !strings.HasPrefix(d.name, "mask") && !allowed(hexAllowed, d.sel):
 			report(d, "16 §7: colours come from the variables in :root; name a token there instead of a literal")
 		}
@@ -204,12 +235,29 @@ func underlineOnInteraction(sel string) bool {
 
 func uiScriptProblems(name, source string, used map[string]bool) []string {
 	var problems []string
-	for i, line := range strings.Split(source, "\n") {
+	lines := strings.Split(source, "\n")
+	wired := strings.Contains(source, "wireSeparator(")
+	for i, line := range lines {
 		if strings.HasPrefix(strings.TrimSpace(line), "//") {
 			continue
 		}
 		report := func(rule string) {
 			problems = append(problems, fmt.Sprintf("assets/%s:%d: %s breaks %s", name, i+1, strings.TrimSpace(line), rule))
+		}
+		if jsMouseOnly.MatchString(line) && !jsKeysNote.MatchString(line) && (i == 0 || !jsKeysNote.MatchString(lines[i-1])) {
+			report("16 §3.1 rule 6: a double-click, right-click or drag needs a keyboard path; implement it and name it in a `// keys: …` comment on this line or the line above")
+		}
+		if jsHistory.MatchString(line) {
+			report("16 §3.1 rule 11: back and forward go through go() and the app's own history, never the browser's history or address")
+		}
+		if jsTabIndex.MatchString(line) {
+			report("16 §3.5: tab moves through controls in page order; no positive tabIndex")
+		}
+		if jsSplit.MatchString(line) && !wired {
+			report("16 §3.1 rule 10: a card gap is a splitter; wire it with wireSeparator (separator.js) for drag, keys and reset")
+		}
+		if jsClipboard.MatchString(line) && name != "js/fields.js" {
+			report("16 §3.1 rule 12: copy through copy() in fields.js (the window's clipboard first, with feedback), not the page clipboard")
 		}
 		if jsKbd.MatchString(line) && name != "js/state.js" {
 			report("16 §7.3 rule 13: show keys with keyCaps (state.js), not a hand-made <kbd>")
@@ -243,6 +291,8 @@ func TestUIRulesDetection(t *testing.T) {
 		{".a:hover, .b { text-decoration: underline; }", 1},
 		{".a { transition: opacity .12s; } .b { animation: fade var(--t-enter) ease-out; } .c { animation: fade var(--t-enter) var(--ease) 60ms; animation-delay: 60ms; }", 2},
 		{".a { backdrop-filter: blur(8px); color: #fde68a; }", 2},
+		{"button, .row { user-select: none; } body.dragging, body.dragging * { user-select: none; } .b { user-select: text; }", 0},
+		{".desc, .row { user-select: none; }", 1},
 		{"@media (prefers-reduced-motion: reduce) {\n.a { transition: color 1s; }\n}", 1},
 	} {
 		if got := uiStyleProblems(tc.css, map[string]bool{}); len(got) != tc.want {
@@ -263,6 +313,14 @@ func TestUIRulesDetection(t *testing.T) {
 		{"js/x.js", "q.append(el(\"kbd\", \"\", \"↵\"));\nreturn `<button>${t}<kbd>u</kbd></button>`;", 2},
 		{"js/x.js", `const s = el("select", "field"); const h = "<select>";`, 1},
 		{"js/x.js", "window.prompt(\"path\");\nalert(\"x\");\nwindow.confirm(\"y\");", 3},
+		{"js/x.js", "r.ondblclick = () => open(); // keys: enter\n// keys: Menu, shift+F10\nr.oncontextmenu = (e) => menu(e);", 0},
+		{"js/x.js", "r.ondblclick = () => open();\nbox.addEventListener(\"contextmenu\", m);\nc.ondragstart = (e) => {};", 3},
+		{"js/x.js", "history.pushState({}, \"\", \"#x\");\nlocation.hash = \"#y\";\nif (location.hash == \"#y\") go();", 2},
+		{"js/x.js", "b.tabIndex = -1; c.tabIndex = 0; d.tabIndex = 2;", 1},
+		{"js/x.js", "const gap = el(\"div\", \"split x-split\");", 1},
+		{"js/x.js", "const gap = el(\"div\", \"split x-split\");\nwireSeparator(gap, {});", 0},
+		{"js/x.js", "navigator.clipboard.writeText(t); const p = await navigator.clipboard.readText();", 1},
+		{"js/fields.js", "await navigator.clipboard.writeText(text);", 0},
 	} {
 		if got := uiScriptProblems(tc.name, tc.js, map[string]bool{}); len(got) != tc.want {
 			t.Errorf("%s: %s: got %v; want %d failures", tc.name, tc.js, got, tc.want)

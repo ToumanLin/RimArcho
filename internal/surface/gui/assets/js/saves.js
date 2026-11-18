@@ -245,7 +245,7 @@ function build() {
     const c = e.target.closest("[data-colony]");
     if (c) clickColony(c.dataset.colony);
   };
-  tree.ondblclick = (e) => { if (e.target.closest("[data-save]")) startRename(); };
+  tree.ondblclick = (e) => { if (e.target.closest("[data-save]")) startRename(); }; // keys: F2
   drawLeft();
   drawDetail();
 }
@@ -437,7 +437,7 @@ function drawMid(keep) {
   if (X.mode?.kind === "rename" && X.mode.ref === d.ref && !d.loading && !d.error) row1.append(renameField(d, X.mode));
   else {
     const h = el("h2", "sv-name", d.name);
-    h.ondblclick = () => startRename();
+    h.ondblclick = () => startRename(); // keys: F2
     row1.append(h);
   }
   const acts = el("div", "sv-acts");
@@ -780,7 +780,7 @@ function rightHead(d) {
     // name its saves give it stays on hover
     const h = el("h2", "sv-name", d.colony || "");
     if (d.colonyGame) h.title = Tf("its saves name it %s", d.colonyGame);
-    if (d.colonyKey) h.ondblclick = () => startColonyRename();
+    if (d.colonyKey) h.ondblclick = () => startColonyRename(); // keys: the rename button beside the name
     row.append(h);
   }
   if (p) row.append(el("span", "muted", [p.day, p.date].filter(Boolean).join("  ")));

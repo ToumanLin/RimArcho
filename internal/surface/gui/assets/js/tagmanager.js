@@ -59,7 +59,7 @@ function tagHead(d, g, info, ctx) {
   const row = el("div", "tm-titlerow");
   const h = el("h1", "tm-name", info.tag);
   h.title = T("rename") + T("; ") + "F2";
-  h.ondblclick = () => startRename(d, g, ctx);
+  h.ondblclick = () => startRename(d, g, ctx); // keys: F2
   const pin = el("button", "fact", info.pinned ? T("stop keeping on top") : T("keep on top"));
   pin.onclick = () => act(ctx, api.PinTag(info.tag, !info.pinned), g.key);
   row.append(h, pin);

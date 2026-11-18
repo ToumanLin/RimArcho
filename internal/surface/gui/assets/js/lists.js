@@ -493,11 +493,11 @@ export function wireLists(ui) {
       ui.click(k, +r.dataset.i, e);
       box.focus({ preventScroll: true });
     });
-    box.addEventListener("dblclick", (e) => {
+    box.addEventListener("dblclick", (e) => { // keys: space
       const r = e.target.closest(".row");
       if (r && !r.classList.contains("group-head")) ui.verb("toggle");
     });
-    box.addEventListener("contextmenu", (e) => {
+    box.addEventListener("contextmenu", (e) => { // keys: Menu, shift+F10 (menuAtCursor in main.js)
       e.preventDefault();
       const r = e.target.closest(".row");
       if (!r) return;

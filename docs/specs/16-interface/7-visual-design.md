@@ -198,7 +198,7 @@ Launch (§2.3) is an exception: its sizes, rules, and radii follow its own desig
 
 **Checks** enforce the rules:
 - The GUI TestStyleRules reads `style.css`. It permits only var(--r-lg), var(--r-sm), 50%, 999px, inherit, and the calculated inner choice radii; only the table's font sizes; and only var(--hairline), with 0 or none to remove a line. It reports the source line and invalid value. It prohibits border-left, border-right, or `box-shadow: inset` accent bars.
-- The GUI TestUIRules reads `style.css` and every page script. It enforces these rules:
+- The GUI TestUIRules reads `style.css` and every page script. It also checks the interaction rules listed in §3.1 "Checks". For visual design it enforces these rules:
   - no `text-transform: uppercase` (rule 8)
   - no italics, and underline only on `:hover` or `:focus-visible` (§7 principle 5)
   - no `backdrop-filter` (§7.1)

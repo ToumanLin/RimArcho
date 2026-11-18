@@ -170,6 +170,7 @@ export function fieldList(fields, acts = {}) {
 const copyTimers = new WeakMap();
 
 // Copy feedback stays inside address buttons; other copy actions keep their text tip.
+// Without a node the caller says what was copied. Every copy in the window goes through here.
 export async function copy(text, node) {
   let ok = false;
   // the window's own clipboard (Wails), else the page's, else the old way
@@ -187,6 +188,7 @@ export async function copy(text, node) {
     focused?.focus({ preventScroll: true });
   }
   if (!ok) { say("fail", T("could not copy")); return false; }
+  if (!node) return true;
   if (node.classList.contains("address-copy")) {
     clearTimeout(copyTimers.get(node));
     node.innerHTML = icon.ok;

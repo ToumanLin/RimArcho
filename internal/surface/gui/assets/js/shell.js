@@ -111,7 +111,7 @@ function kidMenu(b, keys) {
 
 function planMenuButton(b, id) {
   pop.menuOpener(b);
-  b.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); ui.planMenu(id, e.clientX, e.clientY, b, e.button === 0); };
+  b.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); ui.planMenu(id, e.clientX, e.clientY, b, e.button === 0); }; // keys: Menu, shift+F10 on the button (below)
   b.addEventListener("keydown", e => {
     if (e.key !== "ContextMenu" && !(e.key === "F10" && e.shiftKey)) return;
     e.preventDefault(); e.stopPropagation(); const r = b.getBoundingClientRect();

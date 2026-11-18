@@ -58,7 +58,7 @@ export function tagOrderChips(tags, onOrder, cls = "chip", onOpen = null) {
       };
       if (many) {
         c.draggable = true;
-        c.ondragstart = (e) => { from = i; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", t); c.classList.add("dragging"); };
+        c.ondragstart = (e) => { from = i; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", t); c.classList.add("dragging"); }; // keys: ctrl+← / ctrl+→ (16 §3.8)
         c.ondragend = () => { from = -1; c.classList.remove("dragging"); clear(); };
         c.ondragover = (e) => {
           if (from < 0) return;
