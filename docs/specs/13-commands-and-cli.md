@@ -57,6 +57,8 @@ The following table maps player actions to tools. Missing tools are marked **not
 | Import and export lists and compare Workshop collections (07 §7) | Complete | `exchange_list`; importing is one undoable plan edit. |
 | List and delete user rules | Complete | `manage_rules` |
 | Restore visibility or recycle hidden Mods (09 §5, 02 §3) | Complete | `manage_hidden`, `destructiveHint: true` |
+| Check and repair RimArcho's links in game `Mods/` folders (09 §3) | Complete | Read-only `check_links` (`links check --json`); `repair_links`, `destructiveHint: true`, previews with `dry_run` and repairs only with `confirm` (14 §2). |
+| Convert Mods' textures to DDS, show their state, or remove the DDS RimArcho wrote (10 §2) | Complete | `manage_textures`, `destructiveHint: true` because optimize and clean write into Mod folders. Downloading the encoder (`textures tool --install`) has no tool. |
 | Manage environments and settings | Complete | Read-only queries are part of `status` (`show=envs/folders/settings/data/db/cache`). Changes are player-only because they affect RimArcho's own configuration broadly. |
 | Update community data, import RimCrow data, maintain and vacuum the database, and run gc | Complete | `maintenance`, `destructiveHint: true` |
 | Update RimArcho (17 §5.1) | Complete | There is no tool: replacing the program is a player decision, like uninstalling. The `automatic checks` line of `status` reports a new version and the sources that named it (`RimArcho <version> available (<sources>)`). |
@@ -346,7 +348,7 @@ Run `archo workshop publish` from the repository root after building the release
 - English output keywords, such as `depends:`, `evidence:`, `next:`, and finding codes, are part of the interface. Record changes in CHANGELOG (17 §5).
 - Reference formats are stable. Instance IDs are independent of paths and package IDs (04); `p:` references are stable across analyses. A log finding key keeps only the last three segments of the absolute path, so its references and ignore records stay valid after the library directory moves. Pattern references `pattern:g:<id>` and `pattern:m:<packageId>:<hash>` are stable within a dataset version. Generic IDs persist across versions; a Mod-specific hash comes from its template and stays the same while the template does.
 - New fields are appended without changing the meaning of existing lines.
-- When renaming an MCP tool, keep the old name as an alias for at least one minor version.
+- MCP tools have no aliases (14 §3): renaming a tool removes the old name, which becomes an unknown tool. Record the rename in CHANGELOG.
 - Moving a tool between the core and all groups (14 §1) changes what a default session lists: record it in CHANGELOG like a rename.
 
 ## 6. Acceptance
