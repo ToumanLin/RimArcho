@@ -13,6 +13,7 @@ import { editablePath, copyablePath, pathContent } from "./fields.js";
 // the Mod list and the saves folder. A game no config uses yet is read (step 2); another
 // config of a game already read is ready at once. There is no step 3: the list is chosen.
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
+import { choiceControl } from "./choices.js";
 import { page, button, seg, chooseLocalPath, beginPageRead } from "./screens.js";
 import { exchange, importFrom } from "./exchange.js";
 import { withEnvironmentSwitch } from "./environment.js";
@@ -356,17 +357,12 @@ function configChoices(card) {
     row(T("start with"), el("span", "", T("game defaults")));
     box.append(el("div", "dl-note muted", Tf("%s uses another game folder, so its settings cannot be copied; no settings or saves are copied", A.from)));
   }
-  const list = el("select", "field");
-  for (const n of A.lists) list.append(new Option(n, n));
-  list.append(new Option(T("New empty list"), ""));
-  list.value = A.list;
+  const list = choiceControl(T("Mod list"), [...A.lists.map((n) => ({ value: n, label: n })), { value: "", label: T("New empty list") }], A.list);
   list.onchange = () => { A.list = list.value; };
   row(T("Mod list"), list);
-  const saves = el("select", "field");
-  const opts = [["own", T("own folder in RimArcho")], ["custom", T("a folder you choose")]];
+    const opts = [["own", T("own folder in RimArcho")], ["custom", T("a folder you choose")]];
   if (g && !g.env) opts.unshift(["shared", T("shared (the game's default folder)")]);
-  for (const [v, t] of opts) saves.append(new Option(t, v));
-  saves.value = A.saves;
+  const saves = choiceControl(T("saves folder"), opts.map(([value, label]) => ({ value, label })), A.saves);
   saves.onchange = () => { A.saves = saves.value; draw(); };
   const savesRow = row(T("saves folder"), saves);
   if (A.saves === "custom") {

@@ -6,7 +6,8 @@
 // until it is read. The listing reads every save's head, which can
 // take a while on a cold library, so it arrives as a "saves" event (16 §8.4); the full read
 // runs as a background task and its news arrives as "saves-read" events.
-import { S, $, el, api, T, Tf, errText, say } from "./state.js";
+import { S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
+import { choiceControl } from "./choices.js";
 import { on } from "./api.js";
 import { beginPageRead, page, area, act, button, hintsChanged, openGameLog } from "./screens.js";
 import { wireSeparator } from "./separator.js";
@@ -200,7 +201,7 @@ function build() {
     else if (e.key === "ArrowDown" || e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusTree(); }
     else e.stopPropagation(); // typing is not a page key
   };
-  search.append(input, el("kbd", "", "/"));
+  search.append(input, keyCaps("/"));
   leftCard = el("section", "card sv-left");
   const treeHead = el("div", "sv-cardhead");
   treeHead.append(el("span", "", T("colonies")));
@@ -208,11 +209,8 @@ function build() {
   // narrows the tree, and shows when saves come from two or more configs or packs
   if (!(p.owners || []).includes(X.owner)) X.owner = "";
   if (p.owners?.length) {
-    const sel = el("select", "sv-owner-filter");
-    sel.setAttribute("aria-label", T("whose saves"));
-    sel.append(new Option(T("all Game Configs"), ""));
-    for (const o of p.owners) sel.append(new Option(o, o));
-    sel.value = X.owner;
+    const sel = choiceControl(T("whose saves"), [{ value: "", label: T("all Game Configs") }, ...p.owners.map((o) => ({ value: o, label: o }))], X.owner);
+    sel.classList.add("sv-owner-filter");
     sel.onchange = () => { X.owner = sel.value; drawLeft(); };
     treeHead.append(sel);
   }
@@ -537,7 +535,7 @@ function loadSection(d) {
     sw.setAttribute("aria-label", w.text);
     sw.append(el("span", "t", w.text));
     const b = fixButton(d, { action: "switch", label: w.label }, true);
-    b.append(el("kbd", "", "↵"));
+    b.append(keyCaps("enter"));
     sw.append(b);
     s.append(sw, el("p", "sv-cur", d.against));
   }
@@ -549,7 +547,7 @@ function loadSection(d) {
   bar.append(el("span", "t", d.verdict));
   if (d.quick) {
     const q = fixButton(d, d.quick, true);
-    q.append(el("kbd", "", "↵"));
+    q.append(keyCaps("enter"));
     bar.append(q);
   }
   s.append(bar);

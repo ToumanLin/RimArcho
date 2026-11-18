@@ -1,6 +1,6 @@
 // The three lists (16 §2.5): virtual rows, the cursor, selection, search, dragging. The
 // board has three columns: Not enabled | Enabled | details, with Staging and history folded under details.
-import { factText, S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H, slideThumb } from "./state.js";
+import { factText, S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H, slideThumb, keyCaps } from "./state.js";
 import { icon, sourceIcon, statusIcon } from "./icons.js";
 import { wireBadges, rowDrag } from "./badgepop.js";
 import { listGeometry, rowAt } from "./listgeometry.js";
@@ -268,8 +268,8 @@ function syncViewControls() {
 // listActions: undo and sort sit in the enabled list's head, since they change that list;
 // the list's other actions are in the top bar. main.js runs them by data-cmd.
 function listActions() {
-  return `<span class="acts"><button class="btn small" data-cmd="undo" data-env-write="undo" title="u">${esc(T("undo"))}<kbd>u</kbd></button>` +
-    `<button class="btn small" data-cmd="sort" data-env-write="sort" title="S">${esc(T("sort"))}<kbd>S</kbd></button></span>`;
+  return `<span class="acts"><button class="btn small" data-cmd="undo" data-env-write="undo" title="u">${esc(T("undo"))}${keyCaps("u").outerHTML}</button>` +
+    `<button class="btn small" data-cmd="sort" data-env-write="sort" title="S">${esc(T("sort"))}${keyCaps("S").outerHTML}</button></span>`;
 }
 
 const pools = [new Map(), new Map(), new Map()];
