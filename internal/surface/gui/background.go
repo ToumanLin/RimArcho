@@ -60,7 +60,7 @@ func (s *API) bgSettingLocked() BgSetting {
 // must not trigger folder discovery or rebuild the board under the shared lock.
 func (s *API) bgListLocked() []app.Background {
 	var out []app.Background
-	if e, err := s.a.Env(); err == nil && s.bgsEnv == e.ID {
+	if e, err := s.a.Env(); err == nil && s.bgsGame == bgGame(e) {
 		out = slices.Clone(s.bgs)
 	}
 	for _, f := range s.bgSettingLocked().Files {

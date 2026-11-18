@@ -15,12 +15,12 @@ import (
 )
 
 // BeginScan records the start of a scan and returns its ID.
-func (s *Store) BeginScan(envID string, started time.Time, full bool) (int64, error) {
+func (s *Store) BeginScan(gameID string, started time.Time, full bool) (int64, error) {
 	f := 0
 	if full {
 		f = 1
 	}
-	res, err := s.DB.Exec(`INSERT INTO scan(environment_id, started_at, full) VALUES(?,?,?)`, envID, started.Unix(), f)
+	res, err := s.DB.Exec(`INSERT INTO scan(game_id, started_at, full) VALUES(?,?,?)`, gameID, started.Unix(), f)
 	if err != nil {
 		return 0, err
 	}
@@ -92,7 +92,7 @@ func insertSnapshot(tx *sql.Tx, instanceID string, scanID int64, ob *scan.Observ
 }
 
 // ApplyScan persists one reconciliation result in a single transaction.
-func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identity.Result, scanned []string) (err error) {
+func (s *Store) ApplyScan(gameID string, scanID int64, now time.Time, res *identity.Result, scanned []string) (err error) {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return err
@@ -104,9 +104,9 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 	}()
 	ts := now.Unix()
 	// An instance belongs where its source does: a shared mod folder's to every environment
-	// (environment_id ''), Data/ and Mods/ to the environment (03 §2).
+	// (game_id ''), Data/ and Mods/ to the installation (03 §2).
 	srcEnv := map[string]string{}
-	if err = eachRow(tx, `SELECT id, environment_id FROM source`, func(r *sql.Rows) error {
+	if err = eachRow(tx, `SELECT id, game_id FROM source`, func(r *sql.Rows) error {
 		var id, e string
 		if err := r.Scan(&id, &e); err != nil {
 			return err
@@ -144,14 +144,14 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 		}
 		unloadable := ob.Unloadable
 		if a.Known == nil {
-			if _, err = tx.Exec(`INSERT INTO instance(id, environment_id, lineage_id, lineage_basis, source_id, rel_path, real_path, status,
+			if _, err = tx.Exec(`INSERT INTO instance(id, game_id, lineage_id, lineage_basis, source_id, rel_path, real_path, status,
 				residue, unloadable, first_seen, last_seen) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
 				a.InstanceID, instEnv[a.InstanceID], a.LineageID, a.LineageBasis, ob.Loc.SourceID, ob.Loc.Rel, ob.RealPath, identity.Live, residue, unloadable, ts, ts); err != nil {
 				return err
 			}
 		} else {
 			// An unreadable workshop manifest says nothing about subscriptions: keep the stored residue.
-			if _, err = tx.Exec(`UPDATE instance SET environment_id=?, source_id=?, rel_path=?, real_path=?, status=?,
+			if _, err = tx.Exec(`UPDATE instance SET game_id=?, source_id=?, rel_path=?, real_path=?, status=?,
 				residue=CASE WHEN ? THEN residue ELSE ? END, unloadable=?, last_seen=?, tombstone_at=NULL WHERE id=?`,
 				instEnv[a.InstanceID], ob.Loc.SourceID, ob.Loc.Rel, ob.RealPath, identity.Live, ob.ResidueUnknown, residue, unloadable, ts, a.InstanceID); err != nil {
 				return err
@@ -217,7 +217,7 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 	questionIDs := map[*identity.Question]int64{}
 	for _, q := range res.Questions {
 		var inserted sql.Result
-		if inserted, err = tx.Exec(`INSERT INTO identity_question(environment_id, scan_id, instance_id, observation_snapshot_id, candidate_instance_id, score)
+		if inserted, err = tx.Exec(`INSERT INTO identity_question(game_id, scan_id, instance_id, observation_snapshot_id, candidate_instance_id, score)
 			VALUES(?,?,?,?,?,?)`, instEnv[q.New.InstanceID], scanID, q.New.InstanceID, snapOf[q.New], q.Candidate.ID, q.Score); err != nil {
 			return err
 		}
@@ -229,12 +229,12 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 			return err
 		}
 	}
-	removed, checkErr := recheckQuestions(tx, envID)
+	removed, checkErr := recheckQuestions(tx, gameID)
 	if checkErr != nil {
 		return checkErr
 	}
 	res.Questions = slices.DeleteFunc(res.Questions, func(q *identity.Question) bool { return removed[questionIDs[q]] })
-	if err = recomputePrimaries(tx, envID); err != nil {
+	if err = recomputePrimaries(tx, gameID); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -243,8 +243,8 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 // recomputePrimaries sets each lineage's primary instance (04 §3): a live instance before a
 // tombstone, then a workshop-like source, then the earliest first_seen. Empty lineages are
 // deleted. Lineages are shared by every environment (03 §2), so this runs over all of them;
-// envID is kept for the callers.
-func recomputePrimaries(tx *sql.Tx, envID string) error { return recomputeAllPrimaries(tx) }
+// gameID is kept for the callers.
+func recomputePrimaries(tx *sql.Tx, gameID string) error { return recomputeAllPrimaries(tx) }
 
 func recomputeAllPrimaries(tx *sql.Tx) error {
 	return recomputePrimary(tx, "")
@@ -309,12 +309,12 @@ func recomputePrimary(tx *sql.Tx, lineage string) error {
 }
 
 // RecomputePrimaries is recomputePrimaries in its own transaction.
-func (s *Store) RecomputePrimaries(envID string) error {
+func (s *Store) RecomputePrimaries(gameID string) error {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return err
 	}
-	if err := recomputePrimaries(tx, envID); err != nil {
+	if err := recomputePrimaries(tx, gameID); err != nil {
 		tx.Rollback()
 		return err
 	}

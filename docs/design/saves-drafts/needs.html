@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>saves · right card: what this save needs</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* A gallery of the right card only. Example data; nothing is read or written. */
+  html, body { height: auto; }
+  body { display: block; overflow: auto; padding: 18px 20px 28px; }
+  .intro { max-width: 900px; color: var(--fg-2); margin: 0 0 16px; }
+  .intro b { color: var(--fg); }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin: 0 0 18px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  #gallery { display: flex; gap: 18px; align-items: flex-start; overflow-x: auto; padding-bottom: 12px; }
+  .col { flex: none; width: 404px; }
+  .cap { height: 92px; }
+  .cap b { font-size: 14px; }
+  .cap p { margin: 3px 0 0; font-size: 12px; color: var(--muted); }
+  .card.right { height: 800px; overflow-y: auto; }
+
+  .ph { position: sticky; top: 0; z-index: 2; background: var(--card); padding: 12px 16px; border-bottom: var(--hairline) solid var(--line-2); }
+  .ph .row1 { display: flex; align-items: baseline; gap: 8px; }
+  .ph h2 { margin: 0; font-size: 15px; }
+  .ph .facts { margin-top: 4px; font-size: 12px; color: var(--muted); }
+  .sect h3 .n { font-weight: 400; color: var(--faint); font-size: 12px; }
+
+  /* stake marks: how much of the save a Mod holds. Red is kept for "not in the current list". */
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block; }
+  .dot.w { background: var(--accent); }
+  .dot.m { background: color-mix(in srgb, var(--accent) 38%, var(--card)); }
+  .dot.z { background: none; box-shadow: inset 0 0 0 1.5px var(--faint); }
+  .dot.b { background: var(--red); } .dot.c { background: var(--amber); }
+  .bar .b { background: var(--red); } .bar .c { background: var(--amber); }
+  .dot.q { background: none; box-shadow: inset 0 0 0 1.5px var(--amber); }
+
+  .tier { padding: 12px 16px 8px; border-top: var(--hairline) solid var(--line-2); }
+  .tier:first-of-type { border-top: 0; }
+  .th { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .th .k { font-weight: 400; color: var(--faint); font-size: 12px; }
+  .th .chv, .mrow .chv { color: var(--faint); display: inline-flex; margin-left: auto; }
+  .ts { font-size: 12px; color: var(--muted); margin: 1px 0 6px 16px; }
+  .mrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 10px; align-items: baseline; min-height: 26px; padding: 3px 8px; margin: 0 -8px; border-radius: 6px; font-size: 12.5px; }
+  .mrow:hover { background: var(--pill); }
+  .mrow .n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); }
+  .mrow .c { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .mrow.gone .n { color: var(--red); }
+  .mrow.open { background: var(--card-2); }
+  .mrow.tagged .lead { grid-column: 1 / -1; } .mrow.tagged .c { grid-column: 1 / -1; }
+  .mrow .lead { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+  .detail { grid-column: 1 / -1; margin: 4px 0 4px; padding: 0; list-style: none; font-size: 12px; color: var(--fg-2); }
+  .detail li { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 8px; padding: 1px 0; }
+  .detail li span:first-child { color: var(--muted); }
+  .more { font-size: 12px; color: var(--muted); padding: 4px 0 2px; }
+  .foot { padding: 10px 16px 14px; border-top: var(--hairline) solid var(--line-2); font-size: 12px; color: var(--muted); }
+  .game { font-size: 12px; color: var(--muted); padding: 2px 0 6px; }
+
+  .find { display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: var(--hairline) solid var(--line); border-radius: 8px; color: var(--muted); font-size: 12.5px; }
+  .seg { display: flex; gap: 2px; margin: 8px 0 4px; font-size: 12px; flex-wrap: wrap; }
+  .seg span { height: 24px; display: inline-flex; align-items: center; gap: 5px; padding: 0 9px; border-radius: 6px; color: var(--ctl-fg); }
+  .seg span.on { background: var(--sel); color: var(--fg); font-weight: 600; }
+  .seg i { font-style: normal; color: var(--faint); font-weight: 400; }
+
+  .loss { padding: 2px 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 10px; font-size: 12.5px; align-items: baseline; }
+  .loss .what { color: var(--fg); min-width: 0; }
+  .loss .by { color: var(--muted); font-size: 12px; text-align: right; }
+  .loss.gone .by { color: var(--red); }
+  .loss .q { color: var(--muted); }
+
+  .bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; gap: 2px; margin: 4px 0 8px; }
+  .bar i { display: block; height: 100%; }
+  .bar .w { background: var(--accent); } .bar .m { background: color-mix(in srgb, var(--accent) 38%, var(--card)); }
+  .bar .z { background: var(--pill-hover); } .bar .q { background: var(--amber); }
+  .keys { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 12px; color: var(--fg-2); }
+  .keys span { display: inline-flex; align-items: center; gap: 6px; }
+  .keys b { font-weight: 600; color: var(--fg); }
+  .verdict { padding: 9px 12px; border-radius: 10px; background: var(--red-soft); font-size: 12.5px; }
+  .verdict b { display: block; }
+  .sign { font: 600 12px var(--code); width: 12px; text-align: center; flex: none; }
+  .sign.m { color: var(--red); } .sign.p { color: var(--green); }
+
+  /* middle + right, one candidate at a time */
+  .sw { display: flex; gap: 4px; margin: 0 0 10px; flex-wrap: wrap; }
+  .sw button { height: 28px; padding: 0 12px; border-radius: 7px; color: var(--ctl-fg); border: var(--hairline) solid var(--line); background: var(--card); }
+  .sw button.on { color: var(--accent); background: var(--accent-soft); border-color: transparent; font-weight: 600; }
+  #cap { max-width: 1180px; margin: 0 0 12px; font-size: 12.5px; color: var(--fg-2); min-height: 58px; }
+  #cap b { color: var(--fg); } #cap .mc { color: var(--muted); margin-top: 3px; }
+  #stage { display: grid; grid-template-columns: minmax(0, 11fr) minmax(0, 9fr); gap: 12px; max-width: 1180px; }
+  #stage .card { height: 820px; overflow-y: auto; }
+  .ph .acts { margin-left: auto; display: flex; gap: 2px; }
+  .kv { display: grid; grid-template-columns: 78px 1fr; gap: 4px 10px; font-size: 12.5px; margin: 10px 0 0; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; color: var(--fg-2); min-width: 0; overflow-wrap: anywhere; }
+  .fixbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 10px; background: var(--red-soft); }
+  .fixbar .t { flex: 1 1 200px; font-weight: 600; }
+  .iss { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 2px 8px; align-items: baseline; padding: 9px 0 0; margin-top: 8px; }
+  .iss .h { font-weight: 600; } .iss .c { grid-column: 2; color: var(--fg-2); font-size: 12.5px; }
+  .iss .f { grid-row: 1; grid-column: 3; display: flex; gap: 4px; }
+  .iss .c a, .chg a { color: var(--accent); text-decoration: none; cursor: default; }
+  .chg { display: flex; align-items: baseline; gap: 8px; height: 24px; font-size: 12.5px; }
+  .chg .n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chg.gone .n { color: var(--red); } .chg.add .n { color: var(--green); }
+  .chg .c { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .subh { font-size: 12px; color: var(--muted); margin: 12px 0 0; }
+  .chart { width: 100%; height: 150px; display: block; }
+  .moved { border: 1px dashed var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<p class="intro"><b>Right card: what this save needs.</b> The page answers "can this save load?". The middle card checks it against the current list; the right card says which Mods the save itself depends on and what leaves the colony when one goes (12 §4.6, for every Mod of the save instead of only the missing ones). Six candidates, same example save; pick one above the cards or press <b>1</b>–<b>6</b>. Each shows the middle card as it would change.</p>
+<div class="legend">
+  <span><i class="dot w"></i>holds things in the world (pawns, buildings, items, running code)</span>
+  <span><i class="dot m"></i>leaves a mark (research, recipes, hair, backstories)</span>
+  <span><i class="dot z"></i>not in the save</span>
+  <span><i class="dot q"></i>could not check</span>
+  <span class="err">red: not in the current list (1–5)</span>
+  <span><i class="dot b"></i>6: breaks the save</span>
+  <span><i class="dot c"></i>6: loses content</span>
+</div>
+<div class="sw" id="sw"></div>
+<div id="cap"></div>
+<div id="stage"></div>
+
+<script>
+const chv = '<svg class="i" viewBox="0 0 16 16"><path d="M6 4l4 4-4 4"/></svg>';
+const chvD = '<svg class="i" viewBox="0 0 16 16"><path d="M4 6l4 4 4-4"/></svg>';
+const srch = '<svg class="i" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>';
+
+const WORLD = [
+  { n: "Cutting out Head Alt - Decapitate (1.6)", c: "2 buildings, 1 map component", gone: true },
+  { n: "Kurin HAR Edition", c: "1 colonist, 12 apparel" },
+  { n: "Vanilla Factions Expanded - Vikings", c: "1 faction, 4 pawns, 23 items", open: true },
+  { n: "Vanilla Furniture Expanded", c: "64 buildings" },
+  { n: "Moyo-From the depth", c: "1 colonist, 3 items" },
+  { n: "Caravan Adventures", c: "1 faction, 1 item, 4 quests" },
+  { n: "Ancient urban ruins", c: "1 faction, 1 apparel" },
+  { n: "JumpLifter", c: "1 mechanoid" },
+  { n: "Furnace", c: "2 buildings" },
+];
+const MARK = [
+  { n: "Before the Crash: Backstories", c: "44 backstories" },
+  { n: "Kawaii Hair pack 1.6", c: "3 hairstyles" },
+  { n: "Better Beggars (Continued)", c: "2 quests" },
+];
+const UNKNOWN = [
+  { n: "VCE Canned Fruit Dessert Patch", c: "no data", gone: true },
+  { n: "VCE Soup Variants Patch", c: "no data", gone: true },
+];
+const DETAIL = '<ul class="detail"><li><span>faction</span><span>Viking clan</span></li><li><span>pawns</span><span>2 prisoners, 2 visitors on the map</span></li><li><span>items</span><span>Mead ×14, Viking helmet ×3, Longship plank ×2, 4 more</span></li><li><span></span><span><button class="btn link">show in the mod library</button></span></li></ul>';
+
+const head = () => '<div class="ph"><div class="row1"><h2>J&amp;Y</h2><span class="muted">day 379</span><button class="btn line small" style="margin-left:auto">rename</button></div><div class="facts">Cassandra Classic · adventure story · 56h 08m played</div></div>';
+const tag = (t, k) => ' <span class="tagx ' + (k || "") + '">' + t + '</span>';
+function mrow(m, dot, o = {}) {
+  const lead = '<span class="lead">' + (dot ? '<i class="dot ' + dot + '"></i>' : "") + '<span class="n">' + m.n + '</span>' + (m.gone && o.tag !== false ? tag("not in the current list", "broken") : "") + '</span>';
+  return '<div class="mrow' + (m.gone ? " gone" : "") + (m.gone && o.tag !== false ? " tagged" : "") + (m.open && o.detail !== false ? " open" : "") + '">' + lead + '<span class="c">' + m.c + '</span>' + (m.open && o.detail !== false ? DETAIL : "") + '</div>';
+}
+const tier = (dot, title, k, sub, body, open) => '<div class="tier"><div class="th"><i class="dot ' + dot + '"></i>' + title + ' <span class="k">' + k + '</span><span class="chv">' + (open ? chvD : chv) + '</span></div><div class="ts">' + sub + '</div>' + (body || "") + '</div>';
+const GAME = '<div class="game">the game and its DLC (Core, Royalty, Ideology, Biotech) are always needed</div>';
+const FOOT = '<div class="foot">34 Defs in the save come from no installed Mod: a Mod that was updated or is not installed. <button class="btn link">show</button></div>';
+
+const BREAK = [
+  { n: "Kurin HAR Edition", c: "1 colonist of its race" },
+  { n: "Moyo-From the depth", c: "1 colonist of its race" },
+  { n: "Vanilla Factions Expanded - Vikings", c: "1 faction, 4 pawns" },
+  { n: "Caravan Adventures", c: "1 faction" },
+  { n: "Cutting out Head Alt - Decapitate (1.6)", c: "1 map component" },
+  { n: "JumpLifter", c: "1 mechanoid" },
+];
+const LOSE = [
+  { n: "Vanilla Furniture Expanded", c: "64 buildings" },
+  { n: "Furnace", c: "2 buildings" },
+  { n: "Evangelion NERV Suits", c: "1 apparel" },
+];
+const V = [
+{ id: "1", t: "Three tiers", p: "Mods grouped by what dropping them costs, heaviest group open. One line per Mod, written as the consequence. Whatever the Mod count, the card is three headings.",
+  h: () => head() + '<div class="sect" style="padding-bottom:4px"><h3>what this save needs <span class="r">482 Mods</span></h3>' + GAME + '</div>'
+    + tier("w", "holds things in the world", "38", "dropping one deletes these from the colony", WORLD.map(m => mrow(m)).join("") + '<div class="more"><button class="btn link">29 more</button></div>', true)
+    + tier("m", "leaves a mark", "61", "research, recipes, hair, backstories: reset once, the colony goes on", MARK.slice(0, 2).map(m => mrow(m)).join("") + '<div class="more"><button class="btn link">59 more</button></div>', true)
+    + tier("z", "not in the save", "349", "interface, performance and patch Mods; safe as far as the save can tell")
+    + tier("q", "could not check", "3", "no data on these Mods: they were never installed here", UNKNOWN.map(m => mrow(m)).join(""), true)
+    + FOOT },
+
+{ id: "2", t: "One list, find first", p: "The player comes with one Mod in mind: \"can I drop this?\". A find box, a filter with counts, and one flat list sorted by weight. No groups to open.",
+  h: () => head() + '<div class="sect" style="padding-bottom:6px"><h3>what this save needs <span class="r">482 Mods</span></h3>'
+    + '<div class="find">' + srch + ' find a Mod to see what it holds<kbd style="margin-left:auto">f</kbd></div>'
+    + '<div class="seg"><span class="on">in the save <i>99</i></span><span><i class="dot w"></i>world <i>38</i></span><span><i class="dot m"></i>mark <i>61</i></span><span><i class="dot z"></i>none <i>349</i></span><span><i class="dot q"></i>unchecked <i>3</i></span></div></div>'
+    + '<div class="sect" style="padding-top:6px">' + WORLD.map(m => mrow(m, "w")).join("") + '<div class="more">29 more holding things</div>' + MARK.map(m => mrow(m, "m")).join("") + '<div class="more">58 more leaving a mark</div></div>' + FOOT },
+
+{ id: "3", t: "By what would be lost", p: "Starts from the colony, not from the Mods: its people, buildings, gear and running code, each with the Mod it needs. Reads as \"what do I lose\", and a missing Mod shows where it hurts.",
+  h: () => { const L = (w, by, g) => '<div class="loss' + (g ? " gone" : "") + '"><span class="what">' + w + '</span><span class="by">' + by + '</span></div>';
+    const S = (t, n, b) => '<div class="sect"><h3>' + t + ' <span class="n">' + n + '</span></h3>' + b + '</div>';
+    return head() + '<div class="sect" style="padding-bottom:6px"><h3>what this save needs <span class="r">99 of 482 Mods</span></h3><div class="game" style="padding:0">a line names what is in the colony and the Mod it comes from; the rest needs only the game</div></div>'
+    + S("people", "9 colonists, 3 prisoners", L("Yuni <span class='q'>· Kurin</span>", "Kurin HAR Edition") + L("Mei <span class='q'>· Moyo</span>", "Moyo-From the depth") + L("2 prisoners, 2 visitors", "VFE - Vikings") + L("1 mechanoid", "JumpLifter") + '<div class="more">7 colonists need only the game</div>')
+    + S("buildings", "268", L("64 furniture", "Vanilla Furniture Expanded") + L("2 head trophies", "Cutting out Head Alt" + tag("not in the list", "broken"), true) + L("2 furnaces", "Furnace") + '<div class="more"><button class="btn link">11 more Mods</button> · 181 need only the game</div>')
+    + S("gear and items", "283", L("12 apparel", "Kurin HAR Edition") + L("23 items", "VFE - Vikings") + '<div class="more"><button class="btn link">19 more Mods</button></div>')
+    + S("factions", "21", L("Viking clan", "VFE - Vikings") + L("Ruin dwellers", "Ancient urban ruins") + L("Caravan guild", "Caravan Adventures"))
+    + S("running code", "4 components", L("1 map component", "Cutting out Head Alt" + tag("not in the list", "broken"), true) + L("3 game components", "3 Mods"))
+    + S("marks only", "61 Mods", '<div class="more" style="padding:0">research, recipes, hair, backstories <button class="btn link">show</button></div>') + FOOT; } },
+
+{ id: "4", t: "The page's one Mod list", p: "Merges the middle card's Mod changes into this card: the save's Mods against the current list, differences first, each with its weight. The middle card keeps only the verdict and the fixes.",
+  h: () => { const R = (s, m, dot) => '<div class="mrow' + (s === "−" ? " gone" : "") + '"><span class="lead"><span class="sign ' + (s === "−" ? "m" : "p") + '">' + s + '</span><i class="dot ' + dot + '"></i><span class="n">' + m.n + '</span></span><span class="c">' + m.c + '</span></div>';
+    return head() + '<div class="sect" style="padding-bottom:6px"><h3>this save\'s Mods <span class="r">against the current list J&amp;Y</span></h3></div>'
+    + '<div class="tier" style="border-top:0;padding-top:0"><div class="th err">the list lacks <span class="k">3</span></div><div class="ts" style="margin-left:0">loading without them loses what they hold</div>' + R("−", WORLD[0], "w") + R("−", UNKNOWN[0], "q") + R("−", UNKNOWN[1], "q") + '</div>'
+    + '<div class="tier"><div class="th ok">the list adds <span class="k">2</span></div><div class="ts" style="margin-left:0">new to this save; nothing of theirs is in it yet</div>' + R("+", { n: "Vanilla Weapons Expanded", c: "" }, "z") + R("+", { n: "Dubs Mint Menus", c: "" }, "z") + '</div>'
+    + '<div class="tier"><div class="th">in both <span class="k">477</span></div><div class="ts" style="margin-left:0">by what the save holds of each</div>' + WORLD.slice(1, 7).map(m => mrow(m, "w", { detail: false })).join("") + '<div class="more"><button class="btn link">31 more holding things</button> · <button class="btn link">61 leaving a mark</button> · <button class="btn link">349 not in the save</button></div></div>' + FOOT; } },
+
+{ id: "5", t: "Summary and what matters now", p: "The smallest card. A bar says how the 482 Mods split; below it only the Mods the current list touches. Everything else is one click or a find away.",
+  h: () => head() + '<div class="sect"><h3>what this save needs <span class="r">482 Mods</span></h3>'
+    + '<div class="bar"><i class="w" style="flex:38"></i><i class="m" style="flex:61"></i><i class="z" style="flex:349"></i><i class="q" style="flex:6"></i></div>'
+    + '<div class="keys"><span><i class="dot w"></i><b>38</b> hold things in the world</span><span><i class="dot m"></i><b>61</b> leave a mark</span><span><i class="dot z"></i><b>349</b> not in the save</span><span><i class="dot q"></i><b>3</b> could not check</span></div></div>'
+    + '<div class="sect"><h3>the current list drops 3 of them</h3><div class="verdict"><b>2 buildings and 1 map component go with them</b>2 more could not be checked</div><div style="margin-top:8px">' + mrow(WORLD[0], "w", { tag: false }) + UNKNOWN.map(m => mrow(m, "q", { tag: false })).join("") + '</div></div>'
+    + '<div class="sect"><h3>before you change the list</h3><div class="find">' + srch + ' find a Mod to see what it holds<kbd style="margin-left:auto">f</kbd></div><div class="more" style="margin-top:8px">heaviest: Vanilla Furniture Expanded (64 buildings), VFE - Vikings (1 faction, 4 pawns, 23 items), Kurin HAR Edition (1 colonist, 12 apparel) <button class="btn link">all 38</button></div></div>' + FOOT },
+{ id: "6", t: "Breaks, loses, care, safe", p: "The save as it is, whatever the current list: every Mod gets one of four verdicts, the first two in the colours of Can it load?'s verdicts, with the evidence in the line under it. A bar for the split, a find box for \"can I drop this one?\".",
+  h: () => { const plain = m => mrow(Object.assign({}, m, { gone: false, open: false }));
+    return head() + '<div class="sect"><h3>what this save needs <span class="r">482 Mods</span></h3>'
+    + '<div class="bar"><i class="b" style="flex:14"></i><i class="c" style="flex:24"></i><i class="m" style="flex:61"></i><i class="z" style="flex:349"></i><i class="q" style="flex:6"></i></div>'
+    + '<div class="find">' + srch + ' find a Mod: can it be removed?<kbd style="margin-left:auto">f</kbd></div></div>'
+    + tier("b", "breaks the save", "14", "removing one can stop the save loading: its pawns, factions or running code are in it", BREAK.map(plain).join("") + '<div class="more"><button class="btn link">8 more</button></div>', true)
+    + tier("c", "loses content", "24", "the save loads without it; its buildings, items and apparel are gone", LOSE.map(plain).join("") + '<div class="more"><button class="btn link">21 more</button></div>', true)
+    + tier("m", "remove with care", "61", "only research, recipes, hair or backstories: they reset, the colony goes on")
+    + tier("z", "safe to remove", "349", "nothing of theirs is in the save, as far as the save can tell")
+    + tier("q", "could not check", "3", "no data on these Mods: they were never installed here")
+    + FOOT; } },
+];
+// The middle card, changed as each candidate needs.
+const NAMES = ["Cutting out Head Alt - Decapitate (1.6)", "VCE Canned Fruit Dessert Patch", "VCE Soup Variants Patch"];
+const ADDS = ["Vanilla Weapons Expanded", "Dubs Mint Menus"];
+const midHead = () => '<div class="ph"><div class="row1"><h2>Yuni and Jason 42</h2><span class="acts">' + ["rename", "copy", "back up", "make a list", "recycle…"].map(b => '<button class="btn line small">' + b + '</button>').join("") + '</span></div><dl class="kv"><dt>game</dt><dd>1.6.4871 <span class="chip">steam 1.6</span></dd><dt>list</dt><dd><b>J&amp;Y</b> <span class="muted">the same Mods as a version of this list</span></dd><dt>location</dt><dd><code>…\\Saves\\J&amp;Y#§#Yuni and Jason 42.rws</code> <button class="btn link">open location</button></dd></dl></div>';
+const overTime = () => '<div class="sect"><h3>over time <span class="r">a point opens its save</span></h3><svg class="chart" viewBox="0 0 600 150" preserveAspectRatio="none"><path d="M0 140 L60 132 L150 126 L240 118 L290 70 L310 62 L340 86 L420 82 L470 66 L540 56 L580 52 L600 30 L600 150 L0 150Z" fill="var(--accent-soft)"/><path d="M0 140 L60 132 L150 126 L240 118 L290 70 L310 62 L340 86 L420 82 L470 66 L540 56 L580 52 L600 30" fill="none" stroke="var(--accent)" stroke-width="1.5"/></svg><div class="more">wealth · colonists · no colonist has died</div></div>';
+const issue = (h, c, f) => '<div class="iss"><span class="sign m">−</span><span class="h">' + h + '</span><span class="f">' + f.map((b, k) => '<button class="btn ' + (k ? "line" : "primary") + ' small">' + b + '</button>').join("") + '</span><span class="c">' + c + '</span></div>';
+const load = body => '<div class="sect"><h3>can it load? <span class="r">against the current list J&amp;Y</span></h3><div class="fixbar"><span class="t">will not load cleanly</span></div>' + body + '</div>';
+const chg = (sign, n, o = {}) => '<div class="chg ' + (sign === "−" ? "gone" : "add") + '"><span class="sign ' + (sign === "−" ? "m" : "p") + '">' + sign + '</span>' + (o.dot ? '<i class="dot ' + o.dot + '"></i>' : "") + '<span class="n">' + (o.link ? '<a>' + n + '</a>' : n) + '</span>' + (o.c ? '<span class="c">' + o.c + '</span>' : "") + '</div>';
+const changes = (o = {}) => '<div class="sect"><h3>mod changes <span class="r">against the current list J&amp;Y</span></h3><div class="more" style="padding-top:0">3 the list lacks · 2 the list adds</div>'
+  + chg("−", NAMES[0], { link: o.link, dot: o.w && "w", c: o.w && "2 buildings, 1 map component" }) + chg("−", NAMES[1], { link: o.link, dot: o.w && "q", c: o.w && "no data" }) + chg("−", NAMES[2], { link: o.link, dot: o.w && "q", c: o.w && "no data" })
+  + ADDS.map(n => chg("+", n, { link: o.link, dot: o.w && "z", c: o.w && "new to this save" })).join("") + '<div class="more"><button class="btn link">show the full list (482 Mods)</button></div></div>';
+const M = {
+  1: { mc: "Middle: the issue row loses its class names and Def counts (they are the open row on the right) and says only what goes. Mod changes stays as it is.",
+       h: () => load(issue("the list lacks 3 Mods this save uses", "2 buildings and 1 map component go with them; 2 of the Mods could not be checked", ["add them to the list", "show on the right"])) + overTime() + changes() },
+  2: { mc: "Middle: every Mod name is a link that puts it in the right card's find box. The issue row and Mod changes keep their shape.",
+       h: () => load(issue("the list lacks 3 Mods this save uses", NAMES.map(n => '<a>' + n + '</a>').join(", ") + '<br>2 buildings and 1 map component go with them', ["add them to the list"])) + overTime() + changes({ link: true }) },
+  3: { mc: "Middle: the right card no longer lists Mods, so Mod changes carries each Mod's weight; the issue row points at the red lines on the right.",
+       h: () => load(issue("the list lacks 3 Mods this save uses", "what goes with them is marked red on the right: 2 head trophies, 1 map component", ["add them to the list"])) + overTime() + changes({ w: true }) },
+  4: { mc: "Middle: Mod changes is gone and the Mod rows under Can it load? become one line with the fix. The middle card is the verdict, the fixes and Over time.",
+       h: () => load(issue("the list lacks 3 Mods this save uses", "listed first on the right, with what each holds", ["add them to the list", "make a list from this save"])) + overTime() + '<div class="sect"><div class="moved">Mod changes moved to the right card</div></div>' },
+  5: { mc: "Middle: the consequence moves to the right card's \"the current list drops 3 of them\"; the middle keeps the verdict, the fix and the plain Mod changes list.",
+       h: () => load('<div class="iss"><span></span><span class="c" style="grid-row:1">the list lacks 3 Mods this save uses; what goes with them is on the right</span><span class="f"><button class="btn primary small">add them to the list</button></span></div>') + overTime() + changes() },
+  6: { mc: "Middle: unchanged from the app today. It says what the current list's changes cost; the right card never mentions the current list.",
+       h: () => load('<div class="subh">Mod list changes</div>' + issue(NAMES[1] + ", " + NAMES[2] + ", " + NAMES[0], "loading without them loses 7 classes (FixesForSBZFridge.CacheMapComponent, RWBeheading.Building_AnimatronicDoll, RWBeheading.Building_HeadTrophy, 4 more), 339 other Def uses; the database has no data on these 3 Mods", ["view"])) + overTime() + changes() },
+};
+let cur = +(location.hash.slice(1)) || 1;
+function draw() {
+  const v = V[cur - 1], m = M[cur];
+  document.getElementById("sw").innerHTML = V.map((x, k) => '<button class="' + (k + 1 === cur ? "on" : "") + '" data-v="' + (k + 1) + '">' + x.id + ' · ' + x.t + '</button>').join("");
+  document.getElementById("cap").innerHTML = '<div><b>' + v.id + ' · ' + v.t + '.</b> ' + v.p + '</div><div class="mc">' + m.mc + '</div>';
+  document.getElementById("stage").innerHTML = '<div class="card">' + midHead() + m.h() + '</div><div class="card">' + v.h() + '</div>';
+  history.replaceState(null, "", "#" + cur);
+}
+document.getElementById("sw").onclick = e => { const b = e.target.closest("button"); if (b) { cur = +b.dataset.v; draw(); } };
+addEventListener("keydown", e => { if (e.key >= "1" && e.key <= "6") { cur = +e.key; draw(); } });
+draw();
+</script>
+</body>
+</html>

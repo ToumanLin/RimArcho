@@ -133,7 +133,7 @@ func TestCarryModSettingsDirs(t *testing.T) {
 		t.Fatalf("test copy %q", a)
 	}
 	if _, err := os.Stat(filepath.Join(envCfg, "Mod__ArchoPack_p_1001_A.xml")); !os.IsNotExist(err) {
-		t.Fatal("a test run wrote the environment's Config")
+		t.Fatal("a test run wrote the Game Config's Config")
 	}
 }
 

@@ -8,6 +8,16 @@ var locales = l10ndata.Locales
 
 func localeExtra(lang, key string) string { return l10ndata.Extra(lang, key) }
 
+// localeFormat is the current locale's supplemental format (dates, counts); English has none.
+func localeFormat(key string) (string, bool) {
+	if lang := Lang(); lang != "en" {
+		if format := localeExtra(lang, key); format != key {
+			return format, true
+		}
+	}
+	return "", false
+}
+
 func languageChoices() []string {
 	choices := []string{"auto", "zh", "en"}
 	for _, code := range l10ndata.LanguageCodes() {
@@ -19,7 +29,9 @@ func languageChoices() []string {
 }
 
 func languageLabels() []string {
-	labels := []string{T("follow system"), l10ndata.ChineseLanguageName, "English"}
-	labels = append(labels, languageChoices()[3:]...)
+	labels := []string{T("follow system"), l10ndata.LanguageName("zh"), "English"}
+	for _, code := range languageChoices()[3:] {
+		labels = append(labels, l10ndata.LanguageName(code))
+	}
 	return labels
 }

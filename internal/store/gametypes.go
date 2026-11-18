@@ -5,9 +5,9 @@ import (
 	"strings"
 )
 
-// The game's own managed assemblies (Assembly-CSharp.dll …) are indexed per environment at
-// each scan, keyed by the environment's game major.minor, so lookups for Store.MM never mix
-// 1.6 and 1.7 types (05 §5.3). Unlike Mod facts they have no fact set: an environment has
+// The game's own managed assemblies (Assembly-CSharp.dll …) are indexed per installation at
+// each scan, keyed by the installation's game major.minor, so lookups for Store.MM never mix
+// 1.6 and 1.7 types (05 §5.3). Unlike Mod facts they have no fact set: an installation has
 // one game folder, and a row is replaced when its file changes.
 
 // GameMainAssembly is the game's own code; it defines every Verse and RimWorld type.
@@ -15,7 +15,7 @@ const GameMainAssembly = "Assembly-CSharp.dll"
 
 // GameAssembly is one indexed managed assembly of an environment's game folder.
 type GameAssembly struct {
-	EnvID, File string
+	EnvID, File string // EnvID holds GameID (legacy field name).
 	MM          string // game major.minor when it was read
 	Path        string
 	Size        int64
@@ -46,15 +46,15 @@ CREATE INDEX game_type_named ON game_type(name,assembly_id);`)
 }
 
 // GameAssemblies returns the environment's indexed game assemblies by file name.
-func (s *Store) GameAssemblies(envID string) (map[string]*GameAssembly, error) {
-	rows, err := s.DB.Query(`SELECT file, game_mm, path, size, mtime, reader, types, error FROM game_assembly WHERE environment_id=?`, envID)
+func (s *Store) GameAssemblies(gameID string) (map[string]*GameAssembly, error) {
+	rows, err := s.DB.Query(`SELECT file, game_mm, path, size, mtime, reader, types, error FROM game_assembly WHERE game_id=?`, gameID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	out := map[string]*GameAssembly{}
 	for rows.Next() {
-		g := &GameAssembly{EnvID: envID}
+		g := &GameAssembly{EnvID: gameID}
 		if err := rows.Scan(&g.File, &g.MM, &g.Path, &g.Size, &g.MTime, &g.Reader, &g.Types, &g.Err); err != nil {
 			return nil, err
 		}
@@ -68,10 +68,10 @@ func (s *Store) GameAssemblies(envID string) (map[string]*GameAssembly, error) {
 func (s *Store) SaveGameAssembly(g *GameAssembly, types []string) error {
 	g.Types = len(types)
 	return s.inTx(func(tx *sql.Tx) error {
-		if _, err := tx.Exec(`DELETE FROM game_assembly WHERE environment_id=? AND file=?`, g.EnvID, g.File); err != nil {
+		if _, err := tx.Exec(`DELETE FROM game_assembly WHERE game_id=? AND file=?`, g.EnvID, g.File); err != nil {
 			return err
 		}
-		r, err := tx.Exec(`INSERT INTO game_assembly(environment_id, file, game_mm, path, size, mtime, reader, types, error) VALUES(?,?,?,?,?,?,?,?,?)`,
+		r, err := tx.Exec(`INSERT INTO game_assembly(game_id, file, game_mm, path, size, mtime, reader, types, error) VALUES(?,?,?,?,?,?,?,?,?)`,
 			g.EnvID, g.File, g.MM, g.Path, g.Size, g.MTime, g.Reader, g.Types, g.Err)
 		if err != nil {
 			return err
@@ -96,8 +96,8 @@ func (s *Store) SaveGameAssembly(g *GameAssembly, types []string) error {
 }
 
 // DeleteGameAssembly removes the environment's row for file and its type names.
-func (s *Store) DeleteGameAssembly(envID, file string) error {
-	_, err := s.DB.Exec(`DELETE FROM game_assembly WHERE environment_id=? AND file=?`, envID, file)
+func (s *Store) DeleteGameAssembly(gameID, file string) error {
+	_, err := s.DB.Exec(`DELETE FROM game_assembly WHERE game_id=? AND file=?`, gameID, file)
 	return err
 }
 

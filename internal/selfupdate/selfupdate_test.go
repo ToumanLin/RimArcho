@@ -135,6 +135,38 @@ func TestPlatformDefaults(t *testing.T) {
 	}
 }
 
+func TestVersionExactAndChecksumWithoutZip(t *testing.T) {
+	for _, tc := range []struct {
+		want, tag string
+		pre, fail bool
+	}{
+		{"1.2.3", "v1.2.3", false, false},
+		{"1.2.3-rc1", "v1.2.3-rc1", true, false},
+		{"1.2.3", "v1.2.4", false, true},
+		{"1.2.3", "v1.2.3", true, true},
+	} {
+		t.Run(tc.want+tc.tag, func(t *testing.T) {
+			name := ZipName(tc.want, "windows", "amd64")
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/releases/tags/v"+tc.want {
+					t.Error(r.URL)
+				}
+				_ = json.NewEncoder(w).Encode(map[string]any{"tag_name": tc.tag, "prerelease": tc.pre,
+					"assets": []map[string]any{{"name": name + ".sha256", "browser_download_url": "https://example.test/sum"}}})
+			}))
+			defer server.Close()
+			client := Client{API: server.URL, HTTP: server.Client(), GOOS: "windows", GOARCH: "amd64"}
+			r, err := client.Version(context.Background(), tc.want)
+			if (err != nil) != tc.fail {
+				t.Fatal(r, err)
+			}
+			if err == nil && (r.Sum.URL == "" || r.Zip.URL != "") {
+				t.Fatal("lost checksum-only asset", r)
+			}
+		})
+	}
+}
+
 func TestCompare(t *testing.T) {
 	for _, tc := range []struct {
 		a, b string

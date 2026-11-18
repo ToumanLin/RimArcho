@@ -31,6 +31,7 @@ Investigations, measurements and open questions; once a report's conclusions are
 
 | Document | What it is | Status |
 | --- | --- | --- |
+| [2026-11-12_update-channel.md](2026-11-12_update-channel.md) | Parallel version checks, unchanged release pairs and Lanzou probes | Unwired prototype; listing-only checks and browser fallback |
 | [2026-11-05_workshop-distribution.md](2026-11-05_workshop-distribution.md) | Publishing RimArcho on the Workshop and updating from it with anonymous SteamCMD | Open (ToDo); tests in §4 |
 | [2026-10-26_steamcmd-parallel-downloads.md](2026-10-26_steamcmd-parallel-downloads.md) | Parallel and batched SteamCMD downloads, shared-library races | Batching in 11 §1; kept as evidence for the Workshop distribution research |
 | [2026-10-24_login-sessions-loverslab-steamcmd.md](2026-10-24_login-sessions-loverslab-steamcmd.md) | LoversLab and SteamCMD login sessions: mechanisms and boundaries | Implemented (11 §3, §4); kept as evidence for the Workshop distribution research |
@@ -57,3 +58,4 @@ Investigations, measurements and open questions; once a report's conclusions are
 | [2026-11-09_linux-support-plan.md](2026-11-09_linux-support-plan.md) | Linux support in phases: native CLI/TUI/MCP, GUI on WebKitGTK, `.tar.gz`/`.deb`/`.rpm`/AUR, Proton installs | Plan decided (§8); not started |
 | [2026-11-09_save-content-attribution.md](2026-11-09_save-content-attribution.md) | Save Def reference forms, attribution limits, content categories and synthetic costs | Research proposal; decisions in E; exact-build and real-save checks pending in VM |
 | [2026-11-09_tui-redesign.md](2026-11-09_tui-redesign.md) | TUI looks and navigation: today's problems, a shared visual system, three top-bar options | Option A (two-row top) chosen and implemented (16 §9.6); P17 open |
+| [2026-11-11_environments-share-a-game.md](2026-11-11_environments-share-a-game.md) | Several environments (game + user data folder) on one game install, as RimCrow profiles: store split, migration, run attribution, RimCrow import | Decided (§10), specified in 03 §6; not implemented; log locations need the VM |

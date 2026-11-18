@@ -23,7 +23,7 @@
   "Create a pack to keep Mod versions fixed and play with its own saves.": "创建整合包，固定 Mod 版本，并使用独立存档。",
   "Press Shift+E on a pack's page to export its list without the Mod files.": "在整合包页面按 Shift+E，只导出列表，不带 Mod 文件。",
   "Use Export in All lists to copy a share code for a friend.": "在全部列表中选择导出，复制分享码发给朋友。",
-  "Choose move over from RimSort or RimCrow in the guide to import your lists.": "在引导中选择“从 RimSort、RimCrow 搬过来”，导入已有列表。",
+  "Import in the sidebar brings over your lists from RimSort, RimCrow or RimPy.": "侧栏的“导入”可以把 RimSort、RimCrow 或 RimPy 的列表搬过来。",
   "Tick several detected games in the guide to add them together.": "在引导中勾选多个检测到的游戏，一起添加。",
   "Choose the game's current list in the guide to start with your enabled Mods.": "在引导中选择游戏当前的列表，从已启用的 Mod 开始。",
   "In the guide, open a pack file or paste a Steam Workshop collection link.": "在引导中打开整合包文件，或粘贴创意工坊合集链接。",

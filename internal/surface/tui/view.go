@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -26,9 +28,16 @@ func (m *model) View() string {
 	body := h - bodyTop - 2 // rows bodyTop … h-3
 	var content []string
 	switch {
-	case m.loadErr != nil:
-		content = []string{"", "  " + sErrS.Render(fit(T("error: ")+m.loadErr.Error(), m.w-2)),
-			"  " + sSecond.Render(fit(T("Add a game first: archo env detect, archo env add <name> --detected"), m.w-2))}
+	case m.loadErr != nil && m.panel == nil:
+		// (help, the Game Config picker and the command line still open over it: noGameKey)
+		// No game yet is where a new player starts, not an error: the hints below say
+		// what to do (the raw error repeated them in English).
+		first := sBold.Render(fit(T("No game added yet."), m.w-2))
+		if !errors.Is(m.loadErr, app.ErrNoEnv) {
+			first = sErrS.Render(fit(T("error: ")+view.Humanize(nil, m.loadErr.Error()), m.w-2))
+		}
+		content = []string{"", "  " + first,
+			"  " + sSecond.Render(fit(T("Add a game first: archo env detect, archo env add <name> --detected (or --game <dir> to name the game folder yourself)"), m.w-2))}
 		if windowNextToUs() {
 			content = append(content, "  "+sSecond.Render(fit(T("Or open RimArcho.exe in this folder: the window has a guide that finds your games."), m.w-2)))
 		}
@@ -139,7 +148,7 @@ func (m *model) statusLine() string {
 func (m *model) liveStatus() (string, int) {
 	l := m.live
 	switch {
-	case l != nil && l.Running:
+	case l != nil && (l.Running || l.Blocked != ""):
 		t := view.LiveText(l)
 		s, w := sOK.Render(ic.unsaved)+" "+sSecond.Render(t), 2+width.StringWidth(t)
 		if l.Errors > 0 {
@@ -216,7 +225,7 @@ func (m *model) hintLine() string {
 	case m.panel != nil && m.panel.choices != nil:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("confirm")}, {"esc", T("back")}}
 		if m.panel.onDelete != nil {
-			pairs = append(pairs, [2]string{"d", T("remove the game")})
+			pairs = append(pairs, [2]string{"d", T("remove Game Config")})
 		}
 	case m.tags != nil:
 		pairs = [][2]string{{"←→", T("choose")}, {"enter", T("apply")}, {"esc", T("close")}, {"←", T("type a new tag")}}
@@ -348,6 +357,15 @@ func (m *model) panelLines(n int) []string {
 			out = append(out, "")
 		}
 		for i, c := range p.choices {
+			if h := p.choiceHeads[i]; h != "" {
+				out = append(out, "  "+sDimS.Render(fit(h, inner)))
+			}
+			if v := p.choiceLabels[c]; v != "" {
+				c = v
+			}
+			if p.choiceCurrent[i] {
+				c += "  " + T("in use")
+			}
 			if i == p.choice {
 				out = append(out, "  "+sAccent.Render(markSel+" ")+sSel.Render(fit(c, inner-2)))
 			} else {

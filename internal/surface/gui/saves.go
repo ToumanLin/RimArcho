@@ -265,8 +265,101 @@ func (s *API) SaveDetail(ref string) (*view.SaveDetail, error) {
 	g, _ := r.RunningGame()
 	current := target.Plan != nil && target.Env != nil && r.Store.CurrentPlanID(target.Env.ID) == target.Plan.ID
 	d := view.SaveDetailAgainst(c, g != nil, current, sv, own)
+	folderFacts(r, d, sv, target)
 	s.savePlay(r, sv, d, asked)
 	return d, nil
+}
+
+// folderFacts fills where the save's folder belongs (12 §4.8): who saves there, whether
+// the game started with what the Launch page applied (target's game and pack) lists it,
+// whether Steam Cloud syncs it, and whether Can it run checks it.
+func folderFacts(r *app.App, d *view.SaveDetail, sv, target *app.Save) {
+	f := sv.Folder
+	if f == nil || target.Env == nil {
+		return
+	}
+	// The header's game line names the save's own Game Config already: "saves of" only
+	// when the folder is a pack's or shared by several configs.
+	if f.Pack != "" || len(f.Envs) != 1 || sv.Env == nil || f.Envs[0].ID != sv.Env.ID {
+		d.Owner = view.FolderOwner(f)
+	}
+	cur := target.Env
+	switch {
+	case target.Pack != "" && f.Pack != target.Pack:
+		d.Unseen = view.UnseenText(f, view.Tf("pack %s", target.Pack))
+	case target.Pack == "" && !sv.SeenBy(cur):
+		d.Unseen = view.UnseenText(f, cur.Name)
+		d.CopyHere = cur.Name
+	}
+	d.NoCloud = f.Pack != "" || len(f.Envs) > 0
+	for _, e := range f.Envs {
+		if r.Saves(e) == app.SavesShared {
+			d.NoCloud = false
+		}
+	}
+	ch := r.SaveChoiceOf(cur.ID)
+	switch {
+	case ch.Chose(sv, true):
+		d.Chosen = app.ChooseColony
+	case ch.Chose(sv, false):
+		d.Chosen = app.ChooseSaveFile
+	}
+}
+
+// SaveChoose makes the save (colony: its colony, whose newest save counts) what Can it
+// run checks for the current Game Config (12 §4.8); clear goes back to the last loaded save.
+func (s *API) SaveChoose(ref string, colony, clear bool) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, err := s.a.Env()
+	if err != nil {
+		return "", err
+	}
+	if e == nil {
+		return "", app.ErrNoEnv
+	}
+	if clear {
+		if err := s.a.ClearSaveChoice(e.ID); err != nil {
+			return "", err
+		}
+		return view.T("Can it run checks the last loaded save again"), nil
+	}
+	sv, err := s.findSave(ref)
+	if err != nil {
+		return "", err
+	}
+	ch, err := s.a.ChooseSave(e.ID, sv, colony)
+	if err != nil {
+		return "", err
+	}
+	if colony {
+		return view.Tf("Can it run checks the newest save of %s", ch.Name), nil
+	}
+	return view.Tf("Can it run checks %s", ch.Name), nil
+}
+
+// SaveCopyTo copies a save into the current Game Config's Saves folder (12 §4.4), so the
+// game started with it lists the save; only the file is copied.
+func (s *API) SaveCopyTo(ref string) (*SaveFileReply, error) {
+	sv, err := s.findSave(ref)
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, err := s.a.Env()
+	if err != nil {
+		return nil, err
+	}
+	if e == nil {
+		return nil, app.ErrNoEnv
+	}
+	to, err := s.a.CopySaveTo(sv, e)
+	if err != nil {
+		return nil, saveErr(err)
+	}
+	_, shown := app.SplitSaveName(filepath.Base(to))
+	return &SaveFileReply{Text: view.Tf("copied %s to the saves of %s as %s", sv.Name, e.Name, shown), Ref: app.SaveRef(to)}, nil
 }
 
 // appliedTarget is what the Saves page checks a save against (16 §2.11): what the Launch
@@ -534,6 +627,9 @@ func (s *API) OpenSaveFolder(ref string) error {
 func saveErr(err error) error {
 	if errors.Is(err, app.ErrGameRunning) {
 		return errors.New(view.T("the game is running: close it first"))
+	}
+	if errors.Is(err, app.ErrPreviewChanged) {
+		return errors.New(view.T("the saves changed since you were shown them; press it again to see them as they are now"))
 	}
 	return errors.New(view.Humanize(nil, err.Error()))
 }

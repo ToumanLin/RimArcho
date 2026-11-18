@@ -30,14 +30,14 @@ func (a *App) FileSearchLibrary() (*Library, error) {
 	if plan == nil {
 		plan = &store.Plan{Name: "current list"}
 	}
-	aliases, err := a.Store.AllAliases(ix.Env.ID)
+	aliases, err := a.Store.AllAliases(ix.Env.GameID)
 	if err != nil {
 		return nil, err
 	}
 	all := Candidates(ix, aliases)
 	reg := loadout.NewRegistry(all)
 	st := &LoadoutState{Ix: ix, Plan: plan, Reg: reg, Aliases: aliases, cands: all, MM: a.GameVersion,
-		localize: a.localizer(ix.Env.ID, reg, ix)}
+		localize: a.localizer(ix.Env.GameID, reg, ix)}
 	entries, err := a.planList(plan)
 	if err != nil {
 		return nil, err

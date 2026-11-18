@@ -5,7 +5,7 @@ import { choiceControl } from "./choices.js";
 // follows (07 §7.6) and how to share it (export, pack). The export is a sub-page of its own
 // (Library / Lists / <list> / export). Editing what a list holds stays in the editor (16 §2.5).
 // Data: API.PlanManage (view.BuildPlanManage), API.PlanExport (view.BuildPlanExport).
-import { pathContent, copyablePath, editablePath } from "./fields.js";
+import { pathContent, copyablePath, editablePath, copy as copyText } from "./fields.js";
 import { S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { openScreen, page, button, act, area, seg, beginPageRead } from "./screens.js";
 import { icon } from "./icons.js";
@@ -138,7 +138,7 @@ function listCard(d) {
       b.append(use);
     }
     b.onclick = () => pick(r.id);
-    b.ondblclick = () => ui.go(r.page);
+    b.ondblclick = () => ui.go(r.page); // keys: enter edits the picked list
     box.append(b);
   }
   card.append(box);
@@ -167,7 +167,7 @@ function detailCard(p) {
   else {
     const h = el("h2", "pm-title", p.name);
     h.title = T("double-click to rename");
-    h.ondblclick = () => startRename(p.id);
+    h.ondblclick = () => startRename(p.id); // keys: F2
     n.append(h);
   }
   if (p.mark) { const m = el("span", "adot"); m.title = p.mark; n.append(m); }
@@ -507,7 +507,7 @@ function newForm() {
 // a file reads it at once; pasted text is read with preview (links go to Steam or Rentry).
 function inlineImport(draft, active, updateButtons) {
   const box = el("div", "pm-inline-import"), imp = draft.import;
-  box.append(el("div", "pm-note", T("bring in a list from RimSort, RimCrow, RimWorld or another RimArcho, a save, a share code or a Steam collection; you see which mods you have before anything is created")));
+  box.append(el("div", "pm-note", T("bring in a list from RimSort, RimCrow, RimPy, RimWorld or another RimArcho, a save, a share code or a Steam collection; you see which mods you have before anything is created")));
   // the file: one button, then its name; the path is never typed
   const drop = el("div", "pm-drop");
   const file = el("input"); file.type = "file"; file.hidden = true; file.accept = ".xml,.rml,.json,.txt,.rws";
@@ -526,7 +526,7 @@ function inlineImport(draft, active, updateButtons) {
   box.append(drop);
   box.append(el("div", "pm-or", T("or paste")));
   const text = el("textarea", "xc-text"); text.value = imp.text; text.spellcheck = false;
-  text.placeholder = T("a share code (RC-…), a Steam Workshop collection link, a Rentry link, or a list copied from RimSort or RimCrow");
+  text.placeholder = T("a share code (RC-…), a Steam Workshop collection link, a Rentry link, or a list copied from RimSort, RimCrow or RimPy");
   text.setAttribute("aria-label", T("paste"));
   box.append(text);
   const status = el("div", "pm-note", draft.importing ? T("reading the list…") : ""); status.setAttribute("role", draft.importing ? "progressbar" : "status");
@@ -1060,7 +1060,7 @@ async function copy(out) {
   let c;
   try { c = await api.PlanExportCopy(X.id, X.format); } catch (e) { return result(out, false, errText(e)); }
   let ok = c.copied;
-  if (!ok && navigator.clipboard) { try { await navigator.clipboard.writeText(c.text); ok = true; } catch { /* shown below */ } }
+  if (!ok) ok = await copyText(c.text);
   if (ok) return result(out, true, c.line);
   out.className = "xc-out";
   out.textContent = T("copy it from here:");

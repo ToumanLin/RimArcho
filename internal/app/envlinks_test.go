@@ -125,7 +125,7 @@ func TestEnvUseRollsBackFailedLinks(t *testing.T) {
 		t.Fatalf("switch error: %v", err)
 	}
 	if cur, _ := e.App.Store.CurrentEnv(); cur == nil || cur.Name != "main" {
-		t.Fatalf("failed switch changed current environment: %+v", cur)
+		t.Fatalf("failed switch changed current Game Config: %+v", cur)
 	}
 	entries, err := os.ReadDir(filepath.Join(g2, "Mods"))
 	if err != nil || len(entries) != 0 {
@@ -215,7 +215,7 @@ func TestEnvUseMonitorKeepsSharedIdentityAcrossSwitches(t *testing.T) {
 	}
 	aliases, err := e.App.Store.Aliases(monitorID)
 	if err != nil || len(aliases) != 2 {
-		t.Fatalf("scanning one environment lost the other's Monitor alias: %+v, %v", aliases, err)
+		t.Fatalf("scanning one Game Config lost the other's Monitor alias: %+v, %v", aliases, err)
 	}
 	st, _ := e.App.Loadout()
 	link := filepath.Join(st.Ix.Env.GameRoot, "Mods", app.DeployName(st.Ix.ByID[monitorID]))
@@ -273,7 +273,7 @@ func TestEnvUseRepairsLegacyLocalMonitorReferences(t *testing.T) {
 			local := sourcesOf(t, e)["local"]
 			// Reproduce the record created by the old game-only scan. The same
 			// directory has a second identity, selected by its environment's plans.
-			if _, err := e.App.Store.DB.Exec(`INSERT INTO instance(id,environment_id,lineage_id,source_id,rel_path,real_path,status,current_snapshot_id,first_seen,last_seen)
+			if _, err := e.App.Store.DB.Exec(`INSERT INTO instance(id,game_id,lineage_id,source_id,rel_path,real_path,status,current_snapshot_id,first_seen,last_seen)
 				VALUES(?,?,?,?,?,?,?,?,?,?)`, legacyID, st.Ix.Env.ID, m.LineageID, local.ID, app.DeployName(m), m.RealPath, status, m.SnapID, m.FirstSeen.Unix(), m.LastSeen.Unix()); err != nil {
 				t.Fatal(err)
 			}

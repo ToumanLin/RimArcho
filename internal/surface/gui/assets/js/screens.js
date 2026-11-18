@@ -569,7 +569,7 @@ function drawNeeds() {
   // a question whose item is gone (resolved by a refresh) is no question: enter must not run it
   if (!askShown) N.ask = null;
   if (!N.cols[0].length && !d.lastSave) lbox.append(el("section", "card empty-state", "✓ " + T("nothing here")));
-  if (!N.cols[1].length) rbox.append(el("div", "need-empty", T("no errors in the last run")));
+  if (!N.cols[1].length) rbox.append(el("div", "need-empty", N.data.missingLog || T("no errors in the last run")));
   // what other pages handle: one line each (16 §2.4)
   for (const e of d.elsewhere || []) {
     const b = el("button", "need-away", "→ " + e.text);
@@ -598,8 +598,10 @@ function drawNeeds() {
 // Saves, where each row has its fix.
 function lastSaveCard(v) {
   const sec = el("section", "sec need-save");
-  const h = el("h2", "label word-facts", T("your last save"));
+  // the save the last run loaded, or the save or colony the player chose on Saves (12 §4.8)
+  const h = el("h2", "label word-facts", v.title || T("your last save"));
   if (v.loaded) h.append(el("span", "muted", Tf("loaded %s", v.loaded)));
+  else if (v.saved) h.append(el("span", "muted", Tf("saved %s", v.saved)));
   sec.append(h);
   const card = el("div", "card need-list");
   const lvl = v.gone ? "warn" : v.level === "error" ? "err" : v.level === "warning" ? "warn" : v.level === "writing" ? "" : "ok";
@@ -616,11 +618,22 @@ function lastSaveCard(v) {
     if (v.more) ul.append(el("li", "muted", Tf("and %d more", v.more)));
     row.append(ul);
   }
+  if (v.unseen) row.append(el("p", "need-save-unseen muted", v.unseen));
+  const acts = el("div", "need-save-acts");
   if (v.ref) {
     const b = button(T("open in saves"), "", () => ui.go("save:" + v.ref), "small need-save-open");
     b.title = v.command ? "archo " + v.command : "";
-    row.append(b);
+    acts.append(b);
   }
+  if (v.chosen) {
+    const b = button(T("check the last loaded save"), "", async () => {
+      try { say("ok", await api.SaveChoose("", false, true)); } catch (e) { say("fail", errText(e)); return; }
+      needs(true);
+    }, "small");
+    b.title = T("the save was chosen on Saves; this goes back to the save the last run loaded");
+    acts.append(b);
+  }
+  if (acts.childNodes.length) row.append(acts);
   card.append(row);
   sec.append(card);
   return sec;
@@ -1706,7 +1719,8 @@ function directoryPrompt(d, moving, after) {
     const screen = S.screen, epoch = S.screenSeq;
     try {
       const links = await api.DirectoryMovePreview(d.id, path);
-      if (S.screen !== screen || S.screenSeq !== epoch) return;
+      // a dialog opened meanwhile is not replaced by this one (pop.open closes it)
+      if (S.screen !== screen || S.screenSeq !== epoch || S.popup !== popup) return;
       pop.confirm(d.label, [T("move this directory and its files to the new path?"), d.path + " → " + path, ...(links || [])], T("confirm move"), async () => {
         try {
           const lines = await api.ApplySetting(["folder", "move", d.id, "{}"], path);
@@ -1723,7 +1737,7 @@ function settingPathPicker(row, it, again) {
   if (it.edit !== "directory" && it.edit !== "path") return;
   const choose = it.edit === "directory"
     ? () => directoryPrompt({ id: it.directory, label: it.label, path: it.value }, false, async () => { await ui.reload(); again(); })
-    : () => chooseLocalPath(it.editValue ?? it.value ?? "", value => settingRunner(again)(it.argv, value), { file: !!it.file });
+    : () => chooseLocalPath(it.editValue ?? it.value ?? "", value => applyPathSetting(it, value, again), { file: !!it.file });
   editablePath(row.querySelector(".setting-value"), choose, !!it.file);
   if (it.file) editablePath(row.querySelector(".setting-note"), choose, true);
 }
@@ -1733,7 +1747,7 @@ function settingRunner(again) {
   return async (argv, value, after, background = false, field = null) => {
     const screen = S.screen, epoch = S.screenSeq;
     try {
-      const out = argv[0] === "account" ? (argv[1] === "steamcmd" && argv[2] === "login" ? await api.SteamLogin(value) : await api.AccountAction(argv[1], argv[2])) : await api.ApplySetting(argv, value || "");
+      const out = argv[0] === "agent" && argv[1] === "key" ? await api.SetAgentKey(value || "") : argv[0] === "account" ? (argv[1] === "steamcmd" && argv[2] === "login" ? await api.SteamLogin(value) : await api.AccountAction(argv[1], argv[2])) : await api.ApplySetting(argv, value || "");
       say("ok", (out && out[0]) || T("done"));
     } catch (e) { if (S.screen === screen && S.screenSeq === epoch) { say("fail", errText(e)); if (field) fieldStatusError(field, $("#status")); } return; }
     if (S.screen !== screen || S.screenSeq !== epoch) return;
@@ -1748,6 +1762,8 @@ function settingRunner(again) {
 function renderGroups(w, groups, again) {
   const run = settingRunner(again);
   const ids = new Set();
+  // the window's accent or theme differs from the one set: one reaccent after drawing
+  let restyle = false;
   for (const g of groups) {
     const lab = el("div", "label section", g.title);
     w.append(lab);
@@ -1776,6 +1792,11 @@ function renderGroups(w, groups, again) {
       const right = el("div", "r");
       if (it.edit === "swatches" || it.edit === "segments") {
         row.classList.add("appearance-row");
+        // Set outside the window (archo config set): the window takes it when Settings shows it,
+        // so the selected swatch and the colours agree (VM round 2026-11-10).
+        const key = it.argv?.[2], shown = String(it.value || "").toLowerCase();
+        const applied = String((key === "ui.accent" ? S.start?.accent || "default" : key === "ui.theme" ? S.start?.theme || "auto" : shown) || "").toLowerCase();
+        if ((key === "ui.accent" || key === "ui.theme") && shown && shown !== applied) restyle = true;
         right.append(appearanceControl(it, () => ui.reaccent()));
       } else if (it.edit === "choice") {
         const s = choiceControl(it.label, it.choices.map((c, i) => ({ value: c, label: it.choiceLabels?.[i] || c })), it.value);
@@ -1784,8 +1805,15 @@ function renderGroups(w, groups, again) {
           s.setAttribute("aria-describedby", note.id);
         }
         // A new language: the page's text again, in place (main.js relang).
-        s.onchange = () => run(it.argv, s.value,
-          it.argv[2] === "ui.lang" ? () => ui.relang() : it.argv[2] === "ui.accent" ? () => ui.reaccent() : null);
+        s.onchange = () => {
+          // a Game Config's saves in a folder the player chooses: pick it, then env set
+          // --user-data; the choice shows what is set until then (16 §2.8)
+          if (it.key === "environment.saves" && s.value === "custom") {
+            s.value = it.value;
+            return chooseLocalPath(it.note || "", (path) => run(["env", "set", it.argv[2], "--user-data", "{}"], path));
+          }
+          run(it.argv, s.value, it.argv[2] === "ui.lang" ? () => ui.relang() : it.argv[2] === "ui.accent" ? () => ui.reaccent() : null);
+        };
         right.append(s);
       } else if (it.edit === "directory") {
         const value = factText(el("span", "muted setting-value"), { text: it.value, paths: [it.value] });
@@ -1797,7 +1825,7 @@ function renderGroups(w, groups, again) {
         right.append(factText(el("span", "muted setting-value"), { text: it.value || "", paths: it.valuePath ? [it.value] : [] }));
         const adding = it.argv[0] === "folder" && it.argv[1] === "add";
         right.append(button(T(adding ? "add…" : "change…"), "", () => chooseLocalPath(it.editValue ?? it.value ?? "",
-          value => run(it.argv, value), { file: !!it.file }), "", "apply-setting"));
+          value => applyPathSetting(it, value, again), { file: !!it.file }), "", "apply-setting"));
       } else if (it.edit === "url") {
         right.append(factText(el("span", "muted setting-value"), { text: it.value, paths: [it.value] }),
           button(T("change…"), "", () => urlPrompt(it.label, it.value, value => run(it.argv, value)), "", "apply-setting"));
@@ -1805,6 +1833,8 @@ function renderGroups(w, groups, again) {
         for (const link of it.links) right.append(button(link.label, "", () => api.OpenURL(link.url).catch(e => say("fail", errText(e))), "community-link"));
       } else if (it.edit) {
         const inp = el("input", "field");
+        // a secret (Archo Agent's API key) is typed into a password field and never shown back
+        if (it.edit === "secret") { inp.type = "password"; inp.autocomplete = "off"; }
         inp.value = it.editValue ?? it.value ?? "";
         inp.spellcheck = false;
         inp.setAttribute("aria-labelledby", label.id);
@@ -1833,6 +1863,7 @@ function renderGroups(w, groups, again) {
     }
     w.append(card);
   }
+  if (restyle) ui.reaccent();
 }
 
 // settingDetails folds text under its row (16 §3.1 rule 7): RimArcho's release notes.
@@ -1853,6 +1884,35 @@ function settingDetails(d) {
 
 function renderSettingActions(right, actions, run, item) {
   for (const a of actions || []) {
+    // A web page for the player to use (the manual RimArcho update, 17 §5.1): the button
+    // opens it in the browser; its note (the share's password) can be copied beside it.
+    if (a.url) {
+      const b = button(a.label, "", () => api.OpenURL(a.url).catch(e => say("fail", errText(e))), "", "open-url");
+      b.title = a.url;
+      b.dataset.settingAction = "open " + a.url;
+      right.append(b);
+      if (a.note) right.append(a.copy ? copyablePath(el("span", "muted", a.note), a.copy) : el("span", "muted", a.note));
+      continue;
+    }
+    // A file the player downloaded: the native dialog picks it, then {} in argv is its path.
+    if (a.pick) {
+      const b = button(a.label, "", async () => {
+        let path = "";
+        try { path = await api.PickUpdateZip(); } catch (e) { say("fail", errText(e)); return; }
+        if (!path) return;
+        const argv = a.argv.map(x => x === "{}" ? path : x);
+        const go = () => {
+          if (a.task) { b.disabled = true; b.textContent = a.pending; }
+          return run(argv, "", null, !!a.task);
+        };
+        if (a.confirm) pop.confirm(a.label, [a.confirm, path], a.label, go); else go();
+      }, "", a.argv.join(" "));
+      b.dataset.settingAction = a.argv.join(" ");
+      if (a.task) { b.dataset.settingTask = a.task; b.dataset.label = a.label; b.dataset.pending = a.pending; }
+      right.append(b);
+      continue;
+    }
+    if(a.argv[0]==="env"&&a.argv[1]==="remove"){right.append(button(a.label,"",()=>removeEnv(a.argv[2]),"quiet danger","remove-env"));continue;}
     if (a.argv[0] === "import-managers") {
       right.append(button(a.label, "", () => ui.importManagers())); continue;
     }
@@ -1986,14 +2046,16 @@ export async function environment() {
   const sc = S.screen === "env" ? $("#screen") : openScreen("env");
   const top = sc.scrollTop;
   sc.innerHTML = "";
-  const w = page("env", "", act(T("add a game"), "plus", () => ui.go("guide")), rescanButton());
+  const current=(p.envs||[]).find(e=>e.current);
+  const w = page("env", "", act(T("Add Game Config"), "plus", () => ui.go("guide")), rescanButton());
   sc.append(w);
-  const envLab = el("div", "label section", T("every game"));
+  const envLab = el("div", "label section", T("all Game Configs"));
   w.append(envLab);
   const card = el("section", "card");
   area(card, envLab);
   for (const e of p.envs || []) {
     const row = el("div", "envrow" + (e.current ? " on" : ""));
+    row.id = "environment-row-" + encodeURIComponent(e.name);
     const l = el("div", "l");
     l.append(el("div", "name", e.name), factText(el("div", "sub"), { text: e.game, paths: [e.path] }));
     row.append(l);
@@ -2004,10 +2066,19 @@ export async function environment() {
     } else {
       row.append(button(T("use this one"), "", () => ui.useEnv(e.name)));
     }
-    row.append(button(T("remove the game"), "", () => removeEnv(e.name), "quiet danger", "remove-env"));
+    row.append(button(T("remove Game Config"), "", () => removeEnv(e.name), "quiet danger", "remove-env"));
     card.append(row);
   }
   w.append(card);
+  // the shared-game-folder notice stays until the player says got it: drawing it is not
+  // reading it (the TUI's Game Config picker shows the same notice)
+  for (const notice of p.notices || []) {
+    const n = el("p", "notice", notice);
+    n.append(" ", button(T("got it"), "", async () => {
+      try { await api.AcknowledgeAliasNotice(); n.remove(); } catch (e) { say("fail", errText(e)); }
+    }, "quiet"));
+    w.append(n);
+  }
   renderGroups(w, p.groups || [], environment);
   sc.scrollTop = top;
   read.finish();
@@ -2018,12 +2089,28 @@ export async function environment() {
 // guide opens.
 export async function removeEnv(name) {
   let p;
+  const popup = S.popup;
   try { p = await api.EnvRemovePreview(name); } catch (e) { say("fail", errText(e)); return; }
-  pop.confirm(p.title, p.lines, T("remove the game"), async () => {
+  if (S.popup !== popup) return; // a dialog opened meanwhile stays
+  pop.confirm(p.title, p.lines, T("remove Game Config"), async () => {
     try { say("ok", await api.RemoveEnv(name)); } catch (e) { say("fail", errText(e)); return; }
     for (const c of S.cols) { c.query = ""; c.cursor = 0; c.sel.clear(); }
     await ui.reload();
     if (!(S.board && S.board.envs && S.board.envs.length)) return ui.go("guide");
     if (S.screen === "env") environment();
   });
+}
+
+// applyPathSetting sets a path setting; a Game Config's game folder is confirmed first with
+// what the change does.
+async function applyPathSetting(it, value, again) {
+  const screen = S.screen, epoch = S.screenSeq, popup = S.popup;
+  const run = () => settingRunner(again)(it.argv, value);
+  if (it.argv?.[0] !== "env" || !it.argv.includes("--game")) return run();
+  try {
+    const lines = await api.EnvGameChangePreview(it.argv[2], value);
+    // a dialog opened meanwhile is not replaced by this one (pop.open closes it)
+    if (S.screen !== screen || S.screenSeq !== epoch || S.popup !== popup) return;
+    pop.confirm(T("game folder"), [...lines, value], T("apply"), run);
+  } catch (e) { say("fail", errText(e)); }
 }

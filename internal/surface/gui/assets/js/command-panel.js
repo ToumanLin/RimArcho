@@ -28,7 +28,7 @@ export function buildCommandPanel(pop, p, { close, pick, reload, uninstall }) {
   input.setAttribute("aria-autocomplete", "list"); input.setAttribute("aria-expanded", "false");
   dismiss.setAttribute("aria-label", T("close")); dismiss.onclick = close;
   output.tabIndex = 0; input.spellcheck = false; input.value = draft;
-  input.placeholder = T("a command, a mod, a game"); input.setAttribute("aria-label", input.placeholder);
+  input.placeholder = T("a command, a mod, a Game Config"); input.setAttribute("aria-label", input.placeholder);
   foot.setAttribute("role", "status"); row.append(el("span", "pr", "❯"), input);
   pop.append(head, output, list, row, foot);
   let options = [], selected = 0, sequence = 0, historyAt = -1, historyDraft = "", completion = null, error = "";
@@ -75,14 +75,14 @@ export function buildCommandPanel(pop, p, { close, pick, reload, uninstall }) {
       item.setAttribute("role", "option"); item.setAttribute("aria-selected", String(i === selected));
       item.setAttribute("aria-posinset", String(i + 1)); item.setAttribute("aria-setsize", String(options.length));
       item.append(el("span", "", o.name));
-      if (o.desc) {
+      if (o.desc && o.kind !== 2) {
         const desc = el("span", "d", o.desc);
         if (o.desc === o.name) desc.setAttribute("aria-hidden", "true");
         item.append(desc);
       }
       item.onclick = () => choose(o); item.onmousemove = () => { if (selected !== i) { selected = i; draw(); } }; list.append(item);
     });
-    const active = list.children[selected];
+    const active = list.querySelector("#command-result-" + selected);
     input.setAttribute("aria-expanded", String(options.length > 0));
     if (active) input.setAttribute("aria-activedescendant", active.id); else input.removeAttribute("aria-activedescendant");
     active?.scrollIntoView({ block: "nearest" });

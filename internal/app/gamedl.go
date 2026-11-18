@@ -462,7 +462,7 @@ func (a *App) CheckDownloadDir(dir string) (string, error) {
 	if e, err := a.envOfGame(dir); err != nil {
 		return "", err
 	} else if e != nil {
-		return "", fmt.Errorf("environment %s already uses %s", e.Name, dir)
+		return "", fmt.Errorf("Game Config %s already uses %s", e.Name, dir)
 	}
 	return dir, nil
 }
@@ -510,7 +510,7 @@ func (a *App) FetchGame(spec DownloadSpec, progress func(DownloadProgress)) (str
 			return "", err
 		}
 		if e, _ := a.Store.EnvByName(spec.Name); e != nil {
-			return "", fmt.Errorf("environment %q already exists", spec.Name)
+			return "", fmt.Errorf("Game Config %q already exists", spec.Name)
 		}
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -590,7 +590,7 @@ func (a *App) FetchGame(spec DownloadSpec, progress func(DownloadProgress)) (str
 	return dir, nil
 }
 
-// AddDownloaded adds a downloaded game folder as an environment named spec.Name, else after
+// AddDownloaded adds a downloaded game folder as a environment named spec.Name, else after
 // its version ("1.6").
 func (a *App) AddDownloaded(spec DownloadSpec, dir string) (*SourceChangeEnv, error) {
 	name := spec.Name
@@ -604,13 +604,13 @@ func (a *App) AddDownloaded(spec DownloadSpec, dir string) (*SourceChangeEnv, er
 	return &SourceChangeEnv{Env: e, Changes: changes}, nil
 }
 
-// SourceChangeEnv is an environment just added with what happened to its sources.
+// SourceChangeEnv is a environment just added with what happened to its sources.
 type SourceChangeEnv struct {
 	Env     *env.Environment
 	Changes []SourceChange
 }
 
-// freeEnvName is base ("1.6"), or base-2… when an environment has it.
+// freeEnvName is base ("1.6"), or base-2… when a environment has it.
 func (a *App) freeEnvName(base string) string {
 	if base == "" {
 		base = "rimworld"
@@ -666,7 +666,13 @@ func startSteamCMD(exe string, args []string, console bool) (SteamCMDProc, error
 	}
 	cmd := exec.Command(exe, args...)
 	cmd.Dir = filepath.Dir(exe)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	if callerConsole() {
+		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	} else {
+		// The GUI has no console, so SteamCMD would open one; under `archo mcp`, stdin
+		// and stdout carry the protocol (14 §1). Run it hidden; its log is read instead.
+		hideWindow(cmd)
+	}
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}

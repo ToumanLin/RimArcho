@@ -181,8 +181,17 @@ func (a *App) DependencyStandIn(st *LoadoutState, dep scan.Dependency) (*store.M
 // community observations. A duplicate declaration can supply a missing name or URL. An
 // enabled stand-in (alternative or replacement, standIns) meets the dependency.
 func (ix *dependencyIndex) missing(m *store.Mod) []scanDep {
+	return ix.missingOf(requiredDeps(m, ix.st.GameMM()))
+}
+
+// requiredDeps is m's About.xml dependencies for game version mm ("1.6").
+func requiredDeps(m *store.Mod, mm string) []scanDep {
 	d := m.Decl()
-	deps := append(toDeps(d.Dependencies), toDeps(d.DependenciesByVersion["v"+ix.st.GameMM()])...)
+	return append(toDeps(d.Dependencies), toDeps(d.DependenciesByVersion["v"+mm])...)
+}
+
+// missingOf is which of deps no enabled mod or stand-in meets, each package once.
+func (ix *dependencyIndex) missingOf(deps []scanDep) []scanDep {
 	var out []scanDep
 	seen := map[string]int{}
 	for _, dep := range deps {
@@ -363,59 +372,92 @@ func (a *App) CompleteDependencies() (*DependencyCompletion, error) {
 // DependentsOf lists the enabled mods that would be left without a required mod if the
 // instances ids were disabled, in load order: first those that require one of them (with
 // no other enabled mod or stand-in meeting it), then the mods that require those, and so
-// on. A dependency already missing before does not count.
+// on. A dependency already missing before does not count. To ask more than once about one
+// state, use NewDependents.
 func (a *App) DependentsOf(st *LoadoutState, ids []string) ([]*store.Mod, error) {
-	off := map[string]bool{}
-	for _, id := range ids {
-		off[id] = true
+	d, err := a.NewDependents(st)
+	if err != nil {
+		return nil, err
 	}
-	var active []*store.Mod
+	return d.Of(ids), nil
+}
+
+// Dependents answers DependentsOf for one state many times. Each enabled mod's
+// requirements are read once, and so is what is missing with everything enabled. In 1.0.9
+// every question read them all again, and the launch page, which builds every plan's
+// problems, took seconds with a thousand mods enabled.
+type Dependents struct {
+	ix     *dependencyIndex // installed mods and rules; activeByPkg changes per question
+	active []*store.Mod
+	reqs   map[string][]scanDep
+	base   map[string][]string
+}
+
+// NewDependents reads st's enabled mods' requirements.
+func (a *App) NewDependents(st *LoadoutState) (*Dependents, error) {
+	d := &Dependents{reqs: map[string][]scanDep{}}
 	seen := map[string]bool{}
 	for _, e := range st.List {
 		if m := st.Ix.ByID[e.Instance]; m != nil && !seen[m.ID] {
 			seen[m.ID] = true
-			active = append(active, m)
+			d.active = append(d.active, m)
 		}
 	}
-	if err := a.Store.LoadDecls(active); err != nil {
+	if err := a.Store.LoadDecls(d.active); err != nil {
 		return nil, err
 	}
-	missing := func(off map[string]bool) map[string][]string {
-		byPkg := map[string][]*store.Mod{}
-		for _, m := range active {
-			if !off[m.ID] {
-				p := dependencyPackage(m.PackageID)
-				byPkg[p] = append(byPkg[p], m)
-			}
-		}
-		ix := a.newDependencyIndex(st, byPkg)
-		out := map[string][]string{}
-		for _, m := range active {
-			if !off[m.ID] {
-				for _, d := range ix.missing(m) {
-					out[m.ID] = append(out[m.ID], d.pkg)
-				}
-			}
-		}
-		return out
+	for _, m := range d.active {
+		d.reqs[m.ID] = requiredDeps(m, st.GameMM())
 	}
-	base := missing(nil)
+	d.ix = a.newDependencyIndex(st, nil)
+	d.base = d.missing(nil)
+	return d, nil
+}
+
+// missing is what each enabled mod lacks with the instances in off disabled.
+func (d *Dependents) missing(off map[string]bool) map[string][]string {
+	byPkg := map[string][]*store.Mod{}
+	for _, m := range d.active {
+		if !off[m.ID] {
+			p := dependencyPackage(m.PackageID)
+			byPkg[p] = append(byPkg[p], m)
+		}
+	}
+	ix := *d.ix
+	ix.activeByPkg, ix.activeByWS, ix.activeByLin, ix.loadable = byPkg, nil, nil, nil
+	out := map[string][]string{}
+	for _, m := range d.active {
+		if !off[m.ID] {
+			for _, dep := range ix.missingOf(d.reqs[m.ID]) {
+				out[m.ID] = append(out[m.ID], dep.pkg)
+			}
+		}
+	}
+	return out
+}
+
+// Of is DependentsOf(ids) for this state.
+func (d *Dependents) Of(ids []string) []*store.Mod {
+	off := map[string]bool{}
+	for _, id := range ids {
+		off[id] = true
+	}
 	var out []*store.Mod
 	for {
-		now, more := missing(off), false
-		for _, m := range active {
+		now, more := d.missing(off), false
+		for _, m := range d.active {
 			if off[m.ID] {
 				continue
 			}
 			for _, p := range now[m.ID] {
-				if !slices.Contains(base[m.ID], p) {
+				if !slices.Contains(d.base[m.ID], p) {
 					out, off[m.ID], more = append(out, m), true, true
 					break
 				}
 			}
 		}
 		if !more {
-			return out, nil
+			return out
 		}
 	}
 }

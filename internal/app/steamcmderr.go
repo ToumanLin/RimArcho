@@ -34,3 +34,10 @@ func steamCMDStartError(exe, output string, err error) error {
 	}
 	return &steamCMDLibraryError{cause: err}
 }
+
+// steamCMDUpdatedItself: SteamCMD exits 7 from the run in which it updated itself, even
+// though the script ran (the first download after installing it; VM round 2026-11-10).
+func steamCMDUpdatedItself(err error) bool {
+	var exit interface{ ExitCode() int }
+	return errors.As(err, &exit) && exit.ExitCode() == 7
+}

@@ -17,6 +17,8 @@ import (
 // allowed values; the first is the default.
 var configKeys = map[string][]string{
 	"updates.source":   {"auto", "github"},
+	"agent.api":        app.AgentAPIs,
+	"agent.thinking":   {"high", "medium", "low", "off"},
 	"updates.auto":     {"on", "off"},
 	"updates.interval": {"normal", "frequent", "relaxed"},
 	"ui.accent":        {"default", "indigo", "blue", "cyan", "teal", "green", "grass", "orange", "amber", "red", "crimson", "pink", "plum", "purple", "violet", "iris"},
@@ -37,6 +39,9 @@ var configKeys = map[string][]string{
 	"ui.archo.motion": {"live", "still", "off"},
 	// 16 §2.14, §7.1: reduced stills the window as Windows' animation setting does
 	"ui.motion": {"auto", "reduced"},
+	// 16 §2.14: the window's interface size in percent (WebView2's zoom), for high-resolution
+	// screens at 100% Windows scaling
+	"ui.zoom": {"100", "110", "125", "150"},
 }
 
 // customValues are settings that take a free form besides their named choices, normalized
@@ -107,6 +112,14 @@ var freeKeys = map[string]struct {
 	"network.proxy": {"system", netcfg.CheckProxy},
 	// a GitHub mirror tried before GitHub itself; "" is direct
 	"network.github_mirror": {"", netcfg.CheckMirror},
+	// Archo Agent's model (15 §7.2); the API key is not a setting (archo agent key)
+	"agent.base_url": {"", app.CheckAgentBaseURL},
+	"agent.model": {"", func(v string) error {
+		if len(v) > 200 || strings.ContainsAny(v, "\r\n\"") {
+			return fmt.Errorf("agent.model must be a model ID on one line")
+		}
+		return nil
+	}},
 	"steamcmd-mods.dir": {"", func(v string) error {
 		if !filepath.IsAbs(v) {
 			return fmt.Errorf("steamcmd-mods.dir must be an absolute folder path")
@@ -164,7 +177,7 @@ func SettingKeys() []string {
 
 func init() {
 	register(&Command{Name: "config get", Args: "[<key>]", Summary: "show settings", MaxArgs: 1, Run: configGetCmd})
-	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (local.dir: unused managed-folder root; updates.source: auto|github; updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris or a #rrggbb colour; ui.icons: compat|nerd; ui.mouse: on|off; ui.tui.theme: auto|dark|light; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; ui.archo.motion: off|still|live; ui.motion: auto|reduced; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; network.proxy: system|off|a proxy URL; network.github_mirror: empty or a mirror prefix such as https://gh-proxy.org/)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
+	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (local.dir: unused managed-folder root; updates.source: auto|github; updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris or a #rrggbb colour; ui.icons: compat|nerd; ui.mouse: on|off; ui.tui.theme: auto|dark|light; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; ui.archo.motion: off|still|live; ui.motion: auto|reduced; ui.zoom: 100|110|125|150 (the window's interface size in percent); tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; network.proxy: system|off|a proxy URL; network.github_mirror: empty or a mirror prefix such as https://gh-proxy.org/; agent.api: openai-completions|anthropic-messages|openai-responses|google-generative-ai; agent.base_url: the model API's base URL; agent.model: a model ID; agent.thinking: high|medium|low|off)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
 }
 
 // ConfigValue returns a setting, or its default.

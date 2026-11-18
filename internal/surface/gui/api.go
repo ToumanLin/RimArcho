@@ -75,12 +75,12 @@ type API struct {
 	// removedRule is the rule the editor removed last, for its undo (rules.go).
 	removedRule *store.UserRule
 	free        releaser // returns memory to the OS after heavy work (memory.go)
-	// bgs are the environment bgsEnv's backgrounds; bgPick the image rotation chose for
+	// bgs are the game installation bgsGame's backgrounds; bgPick the image rotation chose for
 	// this window (background.go)
-	bgs    []app.Background
-	bgsEnv string
-	bgPick string
-	bgRead backgroundReader
+	bgs     []app.Background
+	bgsGame string
+	bgPick  string
+	bgRead  backgroundReader
 	// Exe runs the scan, analysis and pack build children; "" is this executable (the
 	// development harness points it at archo.exe).
 	Exe string
@@ -92,6 +92,7 @@ type API struct {
 	autoWG          sync.WaitGroup
 	quit            func()        // closes the window (nil in the harness and in tests)
 	windowTheme     func(bool)    // synchronises the native frame with the resolved page scheme
+	zoom            windowZoom    // settings › interface size (zoom.go)
 	memTarget       *memoryTarget // WebView2's memory target (winmem_policy.go); nil off Windows and in tests
 	// tasks is the Background tasks record and its lanes (tasks.go, 16 §2.16)
 	tasks        *app.Tasks
@@ -118,7 +119,8 @@ type API struct {
 	llFiles       map[string]loverDownload
 
 	uninstall      uninstallState
-	saves          savesState // the Saves page's reader and listing (saves.go)
+	saves          savesState  // the Saves page's reader and listing (saves.go)
+	review         reviewState // Saves › Play review (savereview.go)
 	uninstallSizes app.UninstallSizeCache
 	uninstallRead  logReader
 
@@ -222,6 +224,7 @@ type Start struct {
 
 // Init returns the page's start data.
 func (s *API) Init() *Start {
+	s.zoom.apply(ZoomFactor(s.a)) // the window opens zoomed; a change in Settings reaches it here (reaccent)
 	defer perftrace.Span("Init")()
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -236,14 +239,15 @@ type Board struct {
 	*view.Board
 	Status map[string]int `json:"status"` // row icons (16 §7)
 	// Reasons are the items behind each row icon, for its hover / pinned popover (16 §4.2).
-	Reasons   map[string][]view.Reason `json:"reasons,omitempty"`
-	Needs     int                      `json:"needs"` // the top bar's number
-	Stamp     string                   `json:"stamp"` // the database state: the page reloads when it changes
-	Envs      []string                 `json:"envs"`
-	Error     string                   `json:"error,omitempty"`
-	Scanning  bool                     `json:"scanning"`
-	Analyzing bool                     `json:"analyzing"`
-	Never     bool                     `json:"neverScanned"`
+	Reasons         map[string][]view.Reason `json:"reasons,omitempty"`
+	Needs           int                      `json:"needs"` // the top bar's number
+	Stamp           string                   `json:"stamp"` // the database state: the page reloads when it changes
+	EnvironmentRows []view.EnvRow            `json:"environmentRows"`
+	Envs            []string                 `json:"envs"`
+	Error           string                   `json:"error,omitempty"`
+	Scanning        bool                     `json:"scanning"`
+	Analyzing       bool                     `json:"analyzing"`
+	Never           bool                     `json:"neverScanned"`
 }
 
 // Board builds the columns (16 §2.5) and the counts from the workspace.
@@ -275,11 +279,18 @@ func (s *API) boardLocked() *Board {
 		out.Error = err.Error()
 		return out
 	}
-	for _, e := range envs {
+	cur, _ := s.a.Env()
+	current := ""
+	if cur != nil {
+		current = cur.ID
+	}
+	out.EnvironmentRows = view.EnvironmentRows(s.a, current)
+	out.Envs = make([]string, 0, len(envs))
+	for _, e := range out.EnvironmentRows {
 		out.Envs = append(out.Envs, e.Name)
 	}
 	if e, err := s.a.Env(); err == nil {
-		sc, _, _ := s.a.LastScan(e.ID)
+		sc, _, _ := s.a.LastScan(e.GameID)
 		out.Never = sc == nil
 	}
 	n := s.needsLocked()
@@ -558,6 +569,7 @@ func (s *API) Settings() []view.SettingGroup {
 	}
 	defer r.Close()
 	defer s.free.soon()
+	// The Game Config's own settings are on the Game Config page (16 §2.8), not here.
 	return view.SettingsPage(r, nil)
 }
 
@@ -1217,7 +1229,7 @@ func (s *API) Needs() *view.Needs {
 	if sameNeedsList(st, current) {
 		// The eager pass may have saved a parsed log report. Read its ProblemSet again.
 		ps, _ = r.Problems(false, nil)
-		s.saveNeedsLocked(ps, n, true)
+		s.saveFreshNeedsLocked(ps, n, true)
 		if (n.Stale || n.Never) && !s.busy["analyze"] {
 			s.startAnalyze()
 		}
@@ -1295,7 +1307,7 @@ func (s *API) needsLocked() *view.Needs {
 		return &view.Needs{Status: map[string]int{}, Error: "could not read list problems"}
 	}
 	n := view.BuildNeeds(s.a, ps.State, ps)
-	s.saveNeedsLocked(ps, n, false)
+	s.saveFreshNeedsLocked(ps, n, false)
 	return n
 }
 
@@ -1715,11 +1727,13 @@ func (s *API) Palette(query string) []view.PalEntry {
 	if s.board != nil {
 		cur = s.board.EnvName
 	}
-	if envs, err := s.a.Store.Envs(); err == nil {
+	if envs := view.EnvironmentRows(s.a, ""); len(envs) > 0 {
 		for _, e := range envs {
-			if e.Name != cur {
-				all = append(all, view.PalEntry{Kind: view.PalEnv, ID: e.Name, Name: view.Tf("switch to %s", e.Name), Alias: e.Name, Desc: "env"})
+			label := view.Tf("switch to %s", e.Name) + "  " + e.Installation
+			if e.Name == cur {
+				label = e.Name + "  " + e.Installation + "  " + view.T("current")
 			}
+			all = append(all, view.PalEntry{Kind: view.PalEnv, ID: e.Name, Name: label, Alias: e.Name})
 		}
 	}
 	if rows, err := view.PlanRows(s.a); err == nil {
@@ -1804,4 +1818,56 @@ func firstLine(s string) string {
 		return s[:i]
 	}
 	return s
+}
+
+// GameConfigLists returns every global list, with the source config's current list first.
+func (s *API) GameConfigLists(from string) ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, err := s.a.Store.EnvByName(from)
+	if err != nil {
+		return nil, err
+	}
+	if e == nil {
+		return nil, fmt.Errorf("Game Config %s not found", from)
+	}
+	current, err := s.a.Store.CurrentPlan(e.ID)
+	if err != nil {
+		return nil, err
+	}
+	plans, err := s.a.Store.Plans()
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	if current != nil {
+		names = append(names, current.Name)
+	}
+	for _, p := range plans {
+		if current == nil || p.ID != current.ID {
+			names = append(names, p.Name)
+		}
+	}
+	return names, nil
+}
+
+func (s *API) EnvGameChangePreview(name, path string) ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	lines, err := s.a.EnvGameChangePreview(name, path)
+	if err != nil {
+		return nil, err
+	}
+	for i, line := range lines {
+		lines[i] = view.Text(line)
+	}
+	return lines, nil
+}
+
+// AcknowledgeAliasNotice: the player dismissed the shared-game-folder notice on the Game
+// Config page ("got it"); drawing the notice does not call it.
+func (s *API) AcknowledgeAliasNotice() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.a.AcknowledgeAliasNotice()
 }

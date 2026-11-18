@@ -75,6 +75,7 @@ func Run(o Options) error {
 	win := w.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: "RimArcho", Width: 1440, Height: 880, MinWidth: 720, MinHeight: 480, URL: perfURL(),
 		Frameless:        runtime.GOOS == "windows",
+		Zoom:             ZoomFactor(a), // settings › interface size (16 §2.14)
 		BackgroundColour: frame.background,
 		Windows:          frame.options,
 		// The page draws its own menus. Without the `production` build tag Wails ignores this,
@@ -86,6 +87,7 @@ func Run(o Options) error {
 	win.OnWindowEvent(events.Common.WindowShow, func(*application.WindowEvent) { perftrace.Mark("window-show") })
 	win.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) { perftrace.Mark("webview-runtime-ready") })
 	api.windowTheme = frame.bind(win)
+	api.zoom.last, api.zoom.set = ZoomFactor(a), func(f float64) { win.SetZoom(f) }
 	api.memTarget = lowMemoryWhenAway(win)
 	perftrace.Mark("window-run")
 	return w.Run()
@@ -148,7 +150,11 @@ func handler(api *API, files fs.FS) http.Handler {
 		var path string
 		var err error = app.ErrNoPreview
 		if target != nil {
-			path, _, _, err = previewOf(api.a, *target)
+			if r.URL.Query().Get("w") == "thumb" {
+				path, err = api.a.PreviewThumbOf(*target)
+			} else {
+				path, _, _, err = previewOf(api.a, *target)
+			}
 		}
 		serveFile(w, r, path, err)
 	})

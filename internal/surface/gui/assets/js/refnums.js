@@ -21,7 +21,9 @@ const PREFIX = {
   home: "hom", library: "lib", changes: "chg", subscribe: "sub", log: "log", needs: "run",
   plans: "lst", "plan-import": "imp", "plan-export": "exp", packs: "pak", build: "bld",
   textures: "tex", env: "env", settings: "set", tasks: "tsk", full: "ful", guide: "gui",
-  uninstall: "del", feedback: "fbk", "mod-settings": "mst", saves: "sav",
+  uninstall: "del", feedback: "fbk", "mod-settings": "mst", saves: "sav", review: "rev",
+  // the first three letters, as these pages were numbered before they had an entry here
+  search: "sea", "uninstall-progress": "uni",
 };
 const EDITOR = "edt"; // the plan editor (S.screen is null)
 const SETTING = "ui.gui.refnums";

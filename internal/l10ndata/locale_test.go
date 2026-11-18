@@ -2,6 +2,8 @@ package l10ndata
 
 import (
 	"reflect"
+	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -126,5 +128,59 @@ func TestLanguageChoicesIncludeBundledDirectories(t *testing.T) {
 		if !found {
 			t.Fatalf("locale directory %s is not selectable", code)
 		}
+	}
+}
+
+// Chinese is the reference locale: every other bundled locale carries the same keys, with
+// the same placeholders, so a string added to Chinese and not to the others fails here.
+func TestLocalesMatchChinese(t *testing.T) {
+	zh := Locales["zh"]()
+	verbs := regexp.MustCompile(`%(\[\d+\])?[-+# 0]*\d*(\.\d+)?[a-zA-Z%]`)
+	placeholders := func(s string) string {
+		var out []string
+		for _, v := range verbs.FindAllString(s, -1) {
+			if v != "%%" {
+				out = append(out, regexp.MustCompile(`\[\d+\]`).ReplaceAllString(v, ""))
+			}
+		}
+		sort.Strings(out)
+		return strings.Join(out, ",")
+	}
+	for code, load := range Locales {
+		if code == "zh" {
+			continue
+		}
+		table := load()
+		for _, pair := range []struct {
+			name      string
+			want, got map[string]string
+		}{{"text", zh.Text, table.Text}, {"extra", zh.ExtraText, table.ExtraText}} {
+			for key, reference := range pair.want {
+				value, ok := pair.got[key]
+				switch {
+				case !ok || strings.TrimSpace(value) == "":
+					t.Errorf("%s %s lacks %q", code, pair.name, key)
+				case pair.name == "text" && placeholders(value) != placeholders(reference):
+					t.Errorf("%s %q: placeholders %q, Chinese has %q", code, key, placeholders(value), placeholders(reference))
+				}
+			}
+			for key := range pair.got {
+				if _, ok := pair.want[key]; !ok {
+					t.Errorf("%s %s has %q, which Chinese no longer has", code, pair.name, key)
+				}
+			}
+		}
+	}
+}
+
+func TestResolveLangKeepsTheLanguage(t *testing.T) {
+	t.Setenv("ARCHO_LANG", "")
+	for input, want := range map[string]string{"ja": "ja", "ja-JP": "ja", "ja_JP.UTF-8": "ja", "zh-Hans-CN": "zh", "zh_CN": "zh", "en-US": "en", "fr-FR": "en"} {
+		if got := ResolveLang(input); got != want {
+			t.Errorf("ResolveLang(%q) = %q, want %q", input, got, want)
+		}
+	}
+	if LanguageName("ja") == "ja" || LanguageName("zh") == "zh" || LanguageName("xx") != "xx" {
+		t.Error("language names come from name.txt, falling back to the code")
 	}
 }

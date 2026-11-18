@@ -6,6 +6,7 @@
 //   4. the hint line lists what you can do with the object now;
 //   5. few popups, each closed with esc, never nested.
 import { phase as perfPhase } from "./perf.js";
+import { hintLine } from "./hintline.js";
 import { api, on, setText } from "./api.js";
 import "./window-theme.js";
 import { blockNativeMenu } from "./nativemenu.js";
@@ -49,6 +50,7 @@ import * as problems from "./problems.js";
 import * as fileSearch from "./filesearch.js";
 import * as modSettings from "./modsettings.js";
 import * as savesPage from "./saves.js";
+import * as reviewPage from "./review.js";
 import { initRules, refreshRules, startRule, showRules } from "./rules.js";
 import { setMode as setArchoMode, bootLive, bootDone } from "./archo.js";
 
@@ -347,9 +349,9 @@ function manageCurrent() {
 
 let lastList = 1;
 
-// The sidebar's entries in shift+1–8 order, Playing then Library (16 §3.5; view.Nav).
-// "plan" is list: like a click on it, the current list (16 §2.1).
-const NAV = ["home", "needs", "log", "plan", "packs", "library", "textures", "env"];
+// The sidebar entry with shift+n (16 §3.5): view.Nav numbers them, so the keys follow the
+// sidebar. "plan" is list: like a click on it, the current list (16 §2.1).
+const navAt = (n) => ((S.shell && S.shell.nav) || []).flatMap((g) => g.items || []).find((it) => it.key === "shift+" + n)?.id;
 const navTarget = (id) => id !== "plan" ? id : ((S.shell && S.shell.plans) || []).find((p) => p.current)?.page || "plans";
 
 // renderWhere: the position line (16 §3.2), the sidebar and the breadcrumb.
@@ -390,39 +392,32 @@ function renderWhere() {
   factText($("#where"), s);
 }
 
-// actions: what can be done with the object now (the hint line and the context menu).
+// actions: what can be done with the object now, for the hint line: at most 7, ending with
+// ? all keys (16 §2.2); the rest (ctrl+s, J K, x …) are in ? (view.KeyHelp).
 function actions() {
+  const help = { key: "?", label: T("all keys") };
   if (S.focus > 2) return [
-    { key: "PgDn", label: T("scroll") }, { key: "enter", label: T("full details"), run: () => verb("full") },
-    { key: "ctrl+o", label: T("open the folder"), run: () => verb("folder") }, { key: "ctrl+w", label: T("Workshop page"), run: () => verb("workshop-id") },
-    { key: "ctrl+s", label: T("steam page"), run: () => verb("steam") },
-    { key: "g", label: T("tags"), run: () => verb("tags") },
+    { key: "PgDn", label: T("scroll") }, { key: "enter", label: T("full details") },
+    { key: "ctrl+o", label: T("open the folder") }, { key: "ctrl+w", label: T("Workshop page") },
+    { key: "ctrl+s", label: T("steam page") }, { key: "g", label: T("tags") }, help,
   ];
   const sel = selection();
   const k = S.focus;
   const group = headOf(col(), col().view[col().cursor]);
-  if (group && !sel.length && !group.none) return [{ key: "← →", label: T("collapse / expand the group"), run: () => toggleGroup() },
-    { key: "F2", label: T("rename"), run: () => startRename(tagBox(), group, tagCtx) }, { key: "M", label: T("merge into…"), run: () => pickMerge(group.tag, tagCtx) },
-    { key: "Del", label: T("delete tag"), run: () => confirmDelete([group.tag], tagCtx) },
-    { key: "v", label: T("individual"), run: () => switchView() }, { key: "ctrl+k", label: T("commands"), run: () => pop.palette() }];
-  if (group && !sel.length) return [{ key: "← →", label: T("collapse / expand the group"), run: () => toggleGroup() },
-    { key: "v", label: T("individual"), run: () => switchView() }, { key: "/", label: T("search"), run: () => startSearch() }, { key: "ctrl+k", label: T("commands"), run: () => pop.palette() }];
-  if (!sel.length) return [{ key: "/", label: T("search"), run: () => startSearch() }, { key: "ctrl+k", label: T("commands"), run: () => pop.palette() }];
-  const out = [];
-  if (k === 0) out.push({ key: "space", label: T("enable"), run: () => verb("toggle") });
-  if (k === 1) out.push({ key: "space", label: T("disable"), run: () => verb("toggle") });
-  if (k === 2) out.push({ key: "space", label: T("put back"), run: () => verb("toggle") });
-  out.push({ key: "t", label: k === 2 ? T("put back") : T("stage"), run: () => verb("stage") });
-  out.push({ key: "m", label: k === 1 ? T("move to…") : T("enable at…"), run: () => verb("move") });
+  if (group && !sel.length && !group.none) return [{ key: "← →", label: T("collapse / expand the group") },
+    { key: "F2", label: T("rename") }, { key: "M", label: T("merge into…") }, { key: "Del", label: T("delete tag") },
+    { key: "v", label: T("individual") }, { key: "ctrl+k", label: T("commands") }, help];
+  if (group && !sel.length) return [{ key: "← →", label: T("collapse / expand the group") },
+    { key: "v", label: T("individual") }, { key: "/", label: T("search") }, { key: "ctrl+k", label: T("commands") }, help];
+  if (!sel.length) return [{ key: "/", label: T("search") }, { key: "ctrl+k", label: T("commands") }, help];
+  const out = [{ key: "space", label: [T("enable"), T("disable"), T("put back")][k] }];
+  out.push({ key: "t", label: k === 2 ? T("put back") : T("stage") });
+  out.push({ key: "m", label: k === 1 ? T("move to…") : T("enable at…") });
+  out.push({ key: "g", label: T("tags") });
+  if (sel.length === 1) out.push({ key: "enter", label: T("full details") });
   // ctrl+o / ctrl+w: the folder and the Workshop page of the cursor's mod (16 §3.5)
-  if (sel.length === 1 && sel[0].id) out.push({ key: "ctrl+o", label: T("open the folder"), run: () => verb("folder") }, { key: "ctrl+w", label: T("Workshop page"), run: () => verb("workshop-id") });
-  if (sel.length === 1 && sel[0].id) out.push({ key: "ctrl+s", label: T("steam page"), run: () => verb("steam") });
-  if (k === 1) out.push({ key: "J K", label: T("down / up"), run: null });
-  out.push({ key: "g", label: T("tags"), run: () => verb("tags") });
-  if (sel.length === 1) {
-    out.push({ key: "enter", label: T("full details"), run: () => verb("full") });
-    if (k === 1 && sel[0].id) out.push({ key: "x", label: T("switch version…"), run: () => verb("swap") });
-  }
+  if (sel.length === 1 && sel[0].id) out.push({ key: "ctrl+o", label: T("open the folder") }, { key: "ctrl+w", label: T("Workshop page") });
+  out.push(help);
   return out;
 }
 
@@ -436,6 +431,7 @@ function renderHints() {
   else if (S.screen === "search") list = fileSearch.hintList();
   else if (S.screen === "mod-settings") list = modSettings.hintList();
   else if (S.screen === "saves") list = savesPage.hintList();
+  else if (S.screen === "review") list = reviewPage.hintList();
   else if (S.screen === "changes") list = scr.changesHints();
   else if (S.screen === "log") list = scr.logHints();
   else if (S.screen === "subscribe") list = scr.addHints();
@@ -447,17 +443,13 @@ function renderHints() {
   if (scr.changesFiltered()) list = [{ key: "esc", label: T("every mod") }, ...list];
   list = foldShortcuts(list);
   const c = S.focus < 3 ? col() : null;
-  if (c && c.sel.size && !S.screen) h.append(el("span", "accent", Tf("%d selected", c.sel.size)));
-  list.slice(0, 7).forEach((a) => {
+  const selected = c && c.sel.size && !S.screen;
+  if (selected) h.append(el("span", "accent", Tf("%d selected", c.sel.size)));
+  hintLine(list, selected ? [{ key: "esc", label: T("clear the selection") }] : []).forEach((a) => {
     const group = el("span", "hint-group");
     group.append(keyCaps(a.key), " " + a.label);
     h.append(group);
   });
-  if (c && c.sel.size && !S.screen) {
-    const group = el("span", "hint-group");
-    group.append(keyCaps("esc"), " " + T("clear the selection"));
-    h.append(group);
-  }
 }
 
 // foldShortcuts: ctrl+o and ctrl+w share one place in the hint line.
@@ -938,7 +930,7 @@ async function cmd(id) {
   if (uninst.locked()) return;
   if (environmentReason() && ["launch", "sort", "save", "undo", "redo", "restore-all", "stage-all", "rescan", "analyze"].includes(id)) return say("busy", environmentReason());
   // A page replaces the page shown once its data is in: the mod list never shows between.
-  const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", subscribe: "subscribe", library: "library", log: "log", settings: "settings", packs: "packs", build: "build", "env-page": "env", uninstall: "uninstall", feedback: "feedback", textures: "textures", tasks: "tasks", "search-files": "search", "mod-settings": "mod-settings" };
+  const pages = { needs: "needs", changes: "changes", subscribe: "subscribe", library: "library", log: "log", settings: "settings", packs: "packs", uninstall: "uninstall", feedback: "feedback", textures: "textures", tasks: "tasks", "search-files": "search", "mod-settings": "mod-settings" };
   if (pages[id]) return go(pages[id]);
   // the list's own actions show the list; the rest work on any page
   if (["filter", "details", "tech", "tags", "rules"].includes(id) && scr.closeScreen()) renderWhere();
@@ -963,18 +955,25 @@ async function cmd(id) {
     case "tech": return verb("full");
     case "tags": return verb("tags");
     case "cli": return commandLine();
-    case "import": return S.screen === "plans" ? planManage.newList("import") : exchange(0);
+    case "import": return S.screen === "plans" ? planManage.newList("import") : exchange();
     case "export": return exportCurrent();
+    // the RimArcho row of settings › About, its check or install focused (as the TUI's panel)
+    case "update": return selfUpdate.goSelfUpdate();
     case "help": return pop.help(S.screen || "plan");
     case "quit": return window.close();
   }
 }
 
 async function chooseEnv() {
-  const envs = (S.board && S.board.envs) || [];
-  if (!envs.length) return say("", T("no games yet (archo env add)"));
-  pop.choose(T("switch game"), envs, (i) => useEnv(envs[i]),
-    Math.max(0, envs.indexOf(S.board.env)), { key: "Delete", label: T("remove the game"), envWrite: "remove-env", run: (i) => scr.removeEnv(envs[i]) });
+  const rows = S.board?.environmentRows || [];
+  if (!rows.length) return say("", T("no Game Configs yet (archo env add)"));
+  const labels = rows.map(e => e.name + "  " + e.installation + (e.current ? "  " + T("in use") : ""));
+  labels.push("+ " + T("Add Game Config"));
+  pop.choose(T("switch Game Config"), labels, (i) => {
+    // Add Game Config is a page (16 §2.15), not a dialog
+    if (i === rows.length) return go("guide");
+    return useEnv(rows[i].name);
+  }, Math.max(0, rows.findIndex(e => e.current)), { key:"Delete", label:T("remove Game Config"), envWrite:"remove-env", run:i => { if(i<rows.length) scr.removeEnv(rows[i].name); } });
 }
 
 async function useEnv(name) {
@@ -998,7 +997,9 @@ async function useEnv(name) {
 async function refreshEnvironment() {
   S.screenSeq++;
   if (!S.screen) return openPage("plan");
-  if (S.screen && S.screen !== "guide") await openPage(S.screen);
+  // the guide is not reopened (that would restart it); Add Game Config rereads its choices
+  if (S.screen === "guide") await guide.envChanged();
+  else await openPage(S.screen);
 }
 
 function commandLine() {
@@ -1226,7 +1227,8 @@ function onKey(e) {
   const dig = /^Digit([1-9])$/.exec(e.code || "");
   if (dig && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
     e.preventDefault();
-    if (NAV[+dig[1] - 1]) go(navTarget(NAV[+dig[1] - 1]));
+    const id = navAt(dig[1]);
+    if (id) go(navTarget(id));
     return;
   }
   // tab / shift+tab move the focus on every page, as on a web page (16 §3.5); sub-pages are
@@ -1262,6 +1264,7 @@ function onKey(e) {
     if (S.screen === "search") return fileSearch.key(e);
     if (S.screen === "mod-settings") return modSettings.key(e);
     if (S.screen === "saves") return savesPage.key(e);
+    if (S.screen === "review") return reviewPage.key(e);
     if (S.screen === "log" || S.screen === "changes") return scr.logsKey(e);
     // add a subscription: the form takes its keys; esc outside it goes back to updates
     if (S.screen === "subscribe") { if (k === "Escape") { e.preventDefault(); go("changes"); } return; }
@@ -1347,7 +1350,7 @@ function onKey(e) {
     S: () => run("sort"), w: () => run("save"), L: () => goLaunch(), u: () => verb("undo"), T: () => verb(S.focus === 2 ? "restore-all" : "stage-all"),
     "/": () => startSearch(), "\\": () => S.bar.toggle(), c: () => go("changes"), l: () => go("log"), R: () => cmd("rescan"), A: () => cmd("analyze"),
     H: () => historyChooser(), C: () => changesOfCursor(), "<": () => widthKey(-1), ">": () => widthKey(1), "=": () => widthKey(0),
-    E: () => go("env"), P: () => plans.chooser(), "?": () => pop.help("plan"), ":": () => commandLine(), i: () => exchange(0), e: () => exportCurrent(),
+    E: () => go("env"), P: () => plans.chooser(), "?": () => pop.help("plan"), ":": () => commandLine(), i: () => exchange(), e: () => exportCurrent(),
     r: () => startRule(actionContext().sel[0]), v: () => switchView(),
   };
   // shift+letter is the capital letter even where the key reports it in lower case
@@ -1419,7 +1422,7 @@ const ui = {
   duplicateList: (id) => planManage.duplicate(id),
   selectedList: () => planManage.selected(),
   resumeGuide: () => guide.resume(),
-  importManagers: () => exchange(true),
+  importManagers: () => exchange(),
   manageLists: (id = 0) => { planManage.select(id); return go("plans"); },
   edited: (call, undoable = true) => edited(call, undoable),
   ruleTarget: () => actionContext().sel[0],
@@ -1503,7 +1506,7 @@ async function start() {
   // the enabled list's head: import / export
   $("#board").addEventListener("click", (e) => {
     const b = e.target.closest(".head [data-cmd]");
-    if (b) { e.stopPropagation(); b.dataset.cmd === "exchange" ? exchange(0) : run(b.dataset.cmd); }
+    if (b) { e.stopPropagation(); b.dataset.cmd === "exchange" ? exchange() : run(b.dataset.cmd); }
   });
   $(".detail .scroll").addEventListener("scroll", () => { if (S.focus === 3) renderWhere(); }, { passive: true });
   $(".detail").addEventListener("mousedown", () => focusArea(3));
@@ -1531,8 +1534,10 @@ async function start() {
     if (!S.screen && ["subscribe", "subscription-from", "subscription-check", "subscription-update", "subscription-remove"].includes(e.detail?.kind)) reload();
   });
   // Menu art is prepared after the first draw, outside the task page (16 §2.14).
+  // The launch page hears it on every page: one that comes before its first read may be
+  // newer than the backdrop read at start.
   on("backgrounds", () => {
-    if (S.screen === "home") homePage.home({ keep: true });
+    homePage.backgroundChanged();
     if (S.screen === "settings") refreshBackgrounds();
   });
   // a task's o on a mod: Mod library searching for it (16 §2.16)
@@ -1563,7 +1568,8 @@ async function start() {
   try { if (await uninst.restore()) { bootDone(); shell.settle(); return; } } catch (e) { failed(e); }
   // The start page needs only Workspace's shell and board. The editor behind it gets its
   // filter answer (the bar's first one reads every mod's content) and its rows afterwards,
-  // so the first page does not wait for them.
+  // so the first page does not wait for them. The launch page's own read starts now too.
+  homePage.readEarly();
   let shellIn;
   const shellRead = new Promise((r) => { shellIn = r; });
   reload(null, { current: () => true, commit(apply) { apply(); shellIn(); return true; } })
@@ -1578,9 +1584,12 @@ async function start() {
   // No environment yet: the first-run guide (16 §2.15); else the home page (16 §2.3).
   const first = !S.shell || !S.shell.envs;
   try {
-    if (first) await guide.start("first");
+    if (first) { homePage.forgetEarly(); await guide.start("first"); }
     else await go("home");
   } catch (e) { failed(e); }
+  // A first page that did not read the launch page (the guide, a lock, a failure) leaves the
+  // start's reads unused: a later visit reads afresh instead of drawing that old snapshot.
+  homePage.forgetEarly();
   bootDone();
   shell.settle();
   requestAnimationFrame(() => api.Ready().catch(() => {}));
@@ -1606,19 +1615,26 @@ async function goHistory(h) {
   await reload();
 }
 
+// liveShown: what the launch page shows of the live state besides its items: whether a game
+// runs, and whose (the TUI's liveKey also counts owner and blocked).
+// No game is the same before the first poll and after it, so that poll redraws nothing.
+const liveShown = (l) => (l && (l.running || l.blocked) ? JSON.stringify([!!l.running, l.blocked || "", l.owner || ""]) : "");
+
 // pollLive follows the running game every two seconds (16 §2.1): its errors lead Can it run
 // (and its badge), Start says it runs, and launching waits until it exits (09 §4). A new
 // Player.log (the game exited, or ran without RimArcho) is read once when it appears.
 async function pollLive() {
   try {
     const l = await api.Live();
-    const before = JSON.stringify(S.live && S.live.items);
+    const before = JSON.stringify(S.live && S.live.items), shown = liveShown(S.live);
     const was = !!(S.live && S.live.running), hadNew = !!(S.live && S.live.newLog);
     S.live = l;
     if (l.newLog && !hadNew) readNewLog();
     if (JSON.stringify(l.items) !== before) { scr.liveChanged(); shell.sync(); }
     if (l.running) scr.logLive();
-    if (was !== !!l.running) { homePage.liveChanged(); savesPage.liveChanged(!!l.running); }
+    // the launch block also says whose game runs: another Game Config's (blocked) or ours
+    if (shown !== liveShown(l)) homePage.liveChanged();
+    if (was !== !!l.running) savesPage.liveChanged(!!l.running);
     // the game exited: a session that used SteamCMD mods may make a credit question due;
     // an open Can it run reads again, so the full analysis of the run replaces its items
     // (06 §6; VM run 2026-10-28: it kept the run's mid-way time and items)

@@ -474,3 +474,20 @@ func TestSavesAgainstCurrentList(t *testing.T) {
 		t.Fatalf("fix --current:\n%s", out)
 	}
 }
+
+func TestSavesLaunchRootSnapshot(t *testing.T) {
+	t.Parallel()
+	e := savesFixture(t)
+	if _, err := e.App.Store.DB.Exec("UPDATE launch SET user_data_root=?", filepath.Join(e.Root, "old-data")); err != nil {
+		t.Fatal(err)
+	}
+	l, err := e.App.ListSaves()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range l.Saves() {
+		if s.Match == app.MatchLaunch {
+			t.Fatalf("launch from another data folder claimed %s", s.Name)
+		}
+	}
+}

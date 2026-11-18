@@ -235,10 +235,10 @@ func packLaunchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		n.Truncate(10, "")
 	}
-	root.KV("list", fmt.Sprintf("%s (%d entries; the environment's ModsConfig.xml is not touched)", r.ModsConfig, len(r.Tokens)))
+	root.KV("list", fmt.Sprintf("%s (%d entries; the Game Config's ModsConfig.xml is not touched)", r.ModsConfig, len(r.Tokens)))
 	root.KV("saves", r.UserData)
 	if len(r.Copied) > 0 {
-		root.KV("settings", "copied from the environment: "+strings.Join(r.Copied, ", "))
+		root.KV("settings", "copied from the Game Config: "+strings.Join(r.Copied, ", "))
 	}
 	settingsKV(root, r.Settings, r.DryRun)
 	root.KV("command", r.Plan.Command())

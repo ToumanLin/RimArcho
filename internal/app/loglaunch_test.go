@@ -155,7 +155,7 @@ func TestLogBelongsToLaunch(t *testing.T) {
 		t.Fatal(err)
 	}
 	if ps := problems(t, e); len(ps.Logs) != 0 {
-		t.Fatalf("other environment's log must be excluded: %+v", ps.Logs)
+		t.Fatalf("other Game Config's log must be excluded: %+v", ps.Logs)
 	}
 }
 
@@ -269,19 +269,19 @@ func TestRunningGameNamesThePlan(t *testing.T) {
 	running := map[string]*app.GameRun{}
 	e.App.GameProbe = func(root string) *app.GameRun { return running[env.PathKey(root)] }
 	running[env.PathKey(e.Game)] = &app.GameRun{PID: 7, Exe: filepath.Join(e.Game, "RimWorldWin64.exe"), Started: e.Now().Add(20 * time.Second), ArgsKnown: true}
-	if out, code := e.Run("launch"); code == 0 || !strings.Contains(out, "environment main is running plan:default (pid 7") {
+	if out, code := e.Run("launch"); code == 0 || !strings.Contains(out, "Game Config main is running plan:default (pid 7") {
 		t.Fatalf("exit %d\n%s", code, out)
 	}
-	if out := e.MustRun("status"); !strings.Contains(out, "game: running plan:default for") {
+	if out := e.MustRun("status"); !strings.Contains(out, "game: Game Config main is running plan:default") {
 		t.Fatal(out)
 	}
 
 	e.App.Store.DB.Exec(`DELETE FROM launch`)
-	if out, _ := e.Run("launch"); !strings.Contains(out, "environment main is running plan:default (last saved) (pid 7") {
+	if out, _ := e.Run("launch"); !strings.Contains(out, "Game Config main is running plan:default (last saved) (pid 7") {
 		t.Fatal(out)
 	}
 	e.App.Store.DB.Exec(`DELETE FROM modsconfig_state`)
-	if out, _ := e.Run("launch"); !strings.Contains(out, "environment main is running its list (pid 7") {
+	if out, _ := e.Run("launch"); !strings.Contains(out, "Game Config main is running its list (pid 7") {
 		t.Fatal(out)
 	}
 }

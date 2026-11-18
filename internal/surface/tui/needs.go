@@ -245,13 +245,20 @@ func lastSaveLine(v *view.LastSaveView) string {
 	if v == nil {
 		return ""
 	}
-	l := T("your last save") + "  " + v.Name + T(": ") + v.Verdict
+	title := v.Title // the last loaded save, or the save or colony chosen on Saves (12 §4.8)
+	if title == "" {
+		title = T("your last save")
+	}
+	l := title + "  " + v.Name + T(": ") + v.Verdict
 	if len(v.Lines) > 0 {
 		l += " (" + strings.Join(v.Lines, "; ")
 		if v.More > 0 {
 			l += "; " + Tf("and %d more", v.More)
 		}
 		l += ")"
+	}
+	if v.Unseen != "" {
+		l += " (" + v.Unseen + ")"
 	}
 	if v.Command != "" {
 		l += "  archo " + v.Command
@@ -304,6 +311,12 @@ func (m *model) needLines(n int) []string {
 	}
 	if l := lastSaveLine(p.lastSave); l != "" {
 		out = append(out, "  "+sSecond.Render(fit(l, w-2)), "")
+	}
+	if p.missingLog != "" {
+		for _, line := range wrap(p.missingLog, w-2) {
+			out = append(out, "  "+sSecond.Render(line))
+		}
+		out = append(out, "")
 	}
 	if len(items) == 0 {
 		out = append(out, "  "+sOK.Render(markOK)+" "+sSecond.Render(fit(T("nothing needs your attention"), w-4)))
@@ -564,6 +577,8 @@ func (m *model) autoFix() tea.Cmd {
 	return nil
 }
 
+// needsKey: Can it run's page keys. The selected item's keys never reach it: key() asks
+// needItemKey first, once, before the global and the page keys.
 func (m *model) needsKey(s string) tea.Cmd {
 	p := &m.prob
 	switch s {
@@ -603,20 +618,29 @@ func (m *model) needsKey(s string) tea.Cmd {
 	case "l":
 		return m.chooseLog()
 	}
-	if s == " " {
-		s = "space"
-	}
-	if p.cursor < len(p.items) {
-		for _, k := range p.items[p.cursor].keys {
-			if k.key == s {
-				return k.run(m)
-			}
-		}
-	}
 	if s == "u" || s == "ctrl+z" { // undo what an item or F just did, as in the window
 		m.act(T("undid the last change"), "undo")
 		m.prob.loaded = false
 		return m.ensureProblems()
 	}
 	return nil
+}
+
+// needItemKey runs the selected item's action for the key, if it has one. key() calls it
+// before the global keys (except itemlessKeys) and the page keys (needsKey), so the item's
+// keys come first: its R (an enabled Mod replaces it, repair the links,
+// unhide) is not a rescan (VM 2026-11-10: R did nothing on Can it run).
+func (m *model) needItemKey(s string) (tea.Cmd, bool) {
+	p := &m.prob
+	if s == " " {
+		s = "space"
+	}
+	if p.cursor < len(p.items) {
+		for _, k := range p.items[p.cursor].keys {
+			if k.key == s {
+				return k.run(m), true
+			}
+		}
+	}
+	return nil, false
 }

@@ -68,16 +68,28 @@ static class Tests
             new SettingsFile { PackageId = "a.mod", Folder = "!ArchoPack_x_1", Class = "AMod", File = "Mod__ArchoPack_x_1_AMod.xml", Title = "A \"quoted\"", Stored = true },
             new SettingsFile { PackageId = "b.mod", Folder = "2", Class = "BMod", File = "Mod_2_BMod.xml", Title = "", Stored = true },
         });
-        Writer.WriteSettingsWindow(new SettingsFile { PackageId = "a.mod", Folder = "A", Class = "AMod", File = "Mod_A_AMod.xml", Title = "A" },
+        Writer.WriteSettingsWindow(new SettingsFile { PackageId = "a.mod", Folder = "A", Class = "AMod", File = "Mod_A_AMod.xml", Title = "A", Hash = "sha256:ab" },
             new System.Collections.Generic.List<SettingsControl> {
                 new SettingsControl { Kind = "label", Label = "General" },
                 new SettingsControl { Kind = "checkbox", Label = "Raids", Value = "False" },
                 new SettingsControl { Kind = "slider", Label = "Scale", Value = "0.75", Min = "0", Max = "2" },
             });
+        // Recording a window: a text field drawn with null text (Alpha Animals' search box,
+        // 1.0.9 VM round) records "" and does not throw into the Mod's window.
+        var drawn = SettingsWindow.Recorded(() =>
+        {
+            SettingsWindow.Add("label", "Search:", ""); SettingsWindow.Leave();
+            SettingsWindow.Add("text", "", null); SettingsWindow.Leave();
+            SettingsWindow.Add("checkbox", null, "True", null, null); SettingsWindow.Leave();
+        });
+        Check(drawn != null && drawn.Count == 2, "null text recorded: " + (drawn == null ? "dropped" : drawn.Count.ToString()));
+        Check(drawn != null && drawn[0].Kind == "text" && drawn[0].Label == "Search:" && drawn[0].Value == "", "null text takes its label");
+        Check(drawn != null && drawn[1].Label == "" && drawn[1].Value == "True" && drawn[1].Min == "", "null label and range");
         Writer.WriteHugsLib(new System.Collections.Generic.List<HugsLibPack> {
             new HugsLibPack { Id = "APack", PackageId = "a.mod", Folder = "A", Title = "A mod", Handles = new System.Collections.Generic.List<HugsLibHandle> {
                 new HugsLibHandle { Name = "raids", Title = "Raids", Description = "More raids", Value = "True", Default = "False", Type = "Boolean" },
                 new HugsLibHandle { Name = "seen", Value = "3", Default = "0", Type = "Int32", Hidden = true },
+                new HugsLibHandle { Name = "news", Title = "Show news", Value = "False", Default = "False", Type = "Boolean", Unsaved = true },
                 new HugsLibHandle { Name = "mode", Title = "Mode", Value = "Hard", Default = "Normal", Type = "Mode", Choices = new[] { "Easy", "Normal", "Hard" } },
             } },
         });
@@ -118,16 +130,23 @@ static class Tests
         var win = window.GetProperty("context").GetProperty("window");
         var controls = win.GetProperty("controls");
         Check(win.GetProperty("class").GetString() == "AMod" && win.GetProperty("full").GetBoolean() && controls.GetArrayLength() == 3, "window record");
+        Check(win.GetProperty("fileHash").GetString() == "sha256:ab", "window file hash");
         Check(!controls[0].TryGetProperty("value", out _) && controls[0].GetProperty("label").GetString() == "General", "a label has no value");
         Check(controls[2].GetProperty("kind").GetString() == "slider" && controls[2].GetProperty("value").GetString() == "0.75" && controls[2].GetProperty("max").GetString() == "2", "slider range");
+        // FileHash: the settings file as the window opened
+        var cfg = Path.Combine(dir, "Mod_A_AMod.xml");
+        File.WriteAllText(cfg, "abc");
+        Check(SettingsWindow.FileHash(cfg) == "sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "file hash: " + SettingsWindow.FileHash(cfg));
+        Check(SettingsWindow.FileHash(Path.Combine(dir, "missing.xml")) == "none" && SettingsWindow.FileHash("") == null, "no file, unknown path");
         var hugs = JsonDocument.Parse(lines[8]).RootElement;
         Check(hugs.GetProperty("kind").GetString() == "hugslib", "hugslib line: " + lines[8]);
         var pack = hugs.GetProperty("context").GetProperty("hugslib")[0];
         var handles = pack.GetProperty("settings");
-        Check(pack.GetProperty("id").GetString() == "APack" && pack.GetProperty("packageId").GetString() == "a.mod" && pack.GetProperty("full").GetBoolean() && handles.GetArrayLength() == 3, "hugslib pack");
+        Check(pack.GetProperty("id").GetString() == "APack" && pack.GetProperty("packageId").GetString() == "a.mod" && pack.GetProperty("full").GetBoolean() && handles.GetArrayLength() == 4, "hugslib pack");
         Check(handles[0].GetProperty("title").GetString() == "Raids" && handles[0].GetProperty("default").GetString() == "False" && !handles[0].TryGetProperty("hidden", out _), "hugslib setting");
         Check(!handles[1].TryGetProperty("title", out _) && handles[1].GetProperty("hidden").GetBoolean() && handles[1].GetProperty("type").GetString() == "Int32", "hidden hugslib setting");
-        Check(!handles[0].TryGetProperty("choices", out _) && handles[2].GetProperty("choices").GetArrayLength() == 3 && handles[2].GetProperty("choices")[2].GetString() == "Hard", "enum choices");
+        Check(handles[2].GetProperty("unsaved").GetBoolean() && !handles[0].TryGetProperty("unsaved", out _), "unsaved hugslib setting");
+        Check(!handles[0].TryGetProperty("choices", out _) && handles[3].GetProperty("choices").GetArrayLength() == 3 && handles[3].GetProperty("choices")[2].GetString() == "Hard", "enum choices");
         var exit = JsonDocument.Parse(lines[9]).RootElement;
         Check(exit.GetProperty("kind").GetString() == "exit", "exit line");
         Directory.Delete(dir, true);

@@ -30,7 +30,7 @@ func TestEnvDetectListsUnmanagedProtonLibrary(t *testing.T) {
 		t.Fatalf("unmanaged library not detected: %+v", all)
 	}
 	out := e.MustRun("env", "detect")
-	for _, want := range []string{e.Game, "another detected environment", game, "user-data: " + ud, "--game"} {
+	for _, want := range []string{e.Game, "another detected Game Config", game, "user-data: " + ud, "--game"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q:\n%s", want, out)
 		}
@@ -40,6 +40,6 @@ func TestEnvDetectListsUnmanagedProtonLibrary(t *testing.T) {
 	}
 	registered, err := e.App.Store.Envs()
 	if err != nil || len(registered) != 0 {
-		t.Fatalf("detect registered an environment: %+v %v", registered, err)
+		t.Fatalf("detect registered a Game Config: %+v %v", registered, err)
 	}
 }

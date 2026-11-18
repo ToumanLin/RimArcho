@@ -73,12 +73,12 @@ export function wireSeparator(handle, opts) {
     };
     addEventListener("mousemove", move); addEventListener("mouseup", up);
   });
-  handle.addEventListener("dblclick", reset);
+  handle.addEventListener("dblclick", reset); // keys: enter resets (16 §3.1 rule 10)
   // A late setting read must not overwrite a keyboard or mouse adjustment.
   let touched = false;
   handle.addEventListener("keydown", () => { touched = true; });
   handle.addEventListener("mousedown", () => { touched = true; });
-  handle.addEventListener("dblclick", () => { touched = true; });
+  handle.addEventListener("dblclick", () => { touched = true; }); // keys: none; it only marks the size as set
   // (after the caller's own setup, still before the first drawing)
   const early = opts.restore ? cached() : null;
   if (early) queueMicrotask(() => { if (!touched) opts.restore(early); });

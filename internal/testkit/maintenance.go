@@ -25,11 +25,11 @@ func MaintenanceHistory(t testing.TB, s *store.Store, instance string, versions,
 		id, _ := r.LastInsertId()
 		return id
 	}
-	exec(`INSERT INTO instance(id,environment_id,lineage_id,source_id,rel_path,status,first_seen,last_seen) VALUES(?,'',?,'',?,'live',?,?)`, instance, instance, instance, Start.Unix(), Start.Unix())
+	exec(`INSERT INTO instance(id,game_id,lineage_id,source_id,rel_path,status,first_seen,last_seen) VALUES(?,'',?,'',?,'live',?,?)`, instance, instance, instance, Start.Unix(), Start.Unix())
 	exec(`INSERT INTO lineage(id,environment_id,created_at) VALUES(?,'',?)`, instance, Start.Unix())
 	var ids []int64
 	for v := 0; v < versions; v++ {
-		scan := exec(`INSERT INTO scan(environment_id,started_at,finished_at) VALUES('',?,?)`, Start.Unix()+int64(v), Start.Unix()+int64(v))
+		scan := exec(`INSERT INTO scan(game_id,started_at,finished_at) VALUES('',?,?)`, Start.Unix()+int64(v), Start.Unix()+int64(v))
 		id := exec(`INSERT INTO snapshot(instance_id,scan_id,snapshot_hash,file_count,semantic_count,total_size) VALUES(?,?,?, ?,?,?)`, instance, scan, []byte{byte(v)}, files, (files+3)/4, files*100)
 		exec(`WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<?)
 		 INSERT INTO snapshot_file(snapshot_id,rel_path,size,mtime,hash)

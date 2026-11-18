@@ -211,7 +211,7 @@ func TestTestRunPlanConfigVisibilityAndReport(t *testing.T) {
 	}
 	after, err := e.App.Loadout()
 	if err != nil || after.Plan.ID != beforePlan || after.List.Index(st.List[0].Instance) < 0 || e.App.EnvName != "" {
-		t.Fatalf("current plan/environment changed: %+v, %v", after, err)
+		t.Fatalf("current plan/Game Config changed: %+v, %v", after, err)
 	}
 	b, err := os.ReadFile(filepath.Join(r.RunDir, "report.json"))
 	wantJSON, marshalErr := json.MarshalIndent(r, "", "  ")

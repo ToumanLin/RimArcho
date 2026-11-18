@@ -148,7 +148,7 @@ launch: dry run (steam), nothing written
     moved    #qfph         X                   5 → 7
     added    #z3bw         Beta                at 8
   history: a new version (source launch)
-  command: $ROOT/Steam/steam.exe -applaunch 294100 "-savedatafolder=$ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios"
+  command: $ROOT/Steam/steam.exe -applaunch 294100
   checks: declarations only: the def and patch layers were never analysed (archo analyze)
 next:
   archo launch
@@ -232,7 +232,7 @@ launch: dry run (steam), nothing written
     added    pkg:gone.mod  (missing)  at 7
     removed  #z3bw         Beta       was 8
   history: a new version (source launch)
-  command: $ROOT/Steam/steam.exe -applaunch 294100 "-savedatafolder=$ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios"
+  command: $ROOT/Steam/steam.exe -applaunch 294100
   checks: declarations only: the def and patch layers were never analysed (archo analyze)
 next:
   archo launch
@@ -254,7 +254,7 @@ launch: dry run (steam), nothing written
   entries: 8
   changes: 0 since v2
   history: same as v2, no new version
-  command: $ROOT/Steam/steam.exe -applaunch 294100 "-savedatafolder=$ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios"
+  command: $ROOT/Steam/steam.exe -applaunch 294100
   checks: declarations only: the def and patch layers were never analysed (archo analyze)
 next:
   archo launch

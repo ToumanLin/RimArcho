@@ -51,3 +51,31 @@ func TestUninstallConfirmation(t *testing.T) {
 		}
 	}
 }
+
+// The Archo Agent key item has its own method, no measured size, and its step says so.
+func TestUninstallAgentKeyRow(t *testing.T) {
+	t.Setenv("ARCHO_LANG", "")
+	old := Lang()
+	defer SetLang(old)
+	for _, lang := range []string{"en", "zh", "ja"} {
+		SetLang(lang)
+		p := &app.UninstallPlan{Steps: []*app.UninstallStep{{Key: app.UnAccounts, Items: []*app.UninstallItem{
+			{Do: "forget-accounts"}, {Do: "forget-agent-key", Path: "Windows Credential Manager: RimArcho/agent-api-key"},
+		}}}}
+		pg := UninstallView(p, false)
+		c := pg.Confirmation
+		if c == nil || len(c.Changes) != 2 {
+			t.Fatalf("%s: bad groups: %+v", lang, c)
+		}
+		row := c.Changes[1]
+		if row.Method == "" || row.Method != T("remove the API key") || row.Size != T("size not measured") {
+			t.Fatalf("%s: key row = %+v", lang, row)
+		}
+		if lang != "en" && row.Method == "remove the API key" {
+			t.Fatalf("%s: key method not translated", lang)
+		}
+		if txt := uninstallText(p, p.Steps[0]); !strings.Contains(txt, T("remove the Archo Agent API key from Windows Credential Manager")) {
+			t.Fatalf("%s: step text %q", lang, txt)
+		}
+	}
+}

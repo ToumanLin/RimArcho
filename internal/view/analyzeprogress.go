@@ -22,6 +22,9 @@ func AnalyzeProgress(line string) string {
 				args = append(args, s)
 			}
 		}
+		if p.format == "%s" {
+			return T(m[1])
+		}
 		return Tf(p.format, args...)
 	}
 	return line
@@ -37,4 +40,5 @@ var analyzeLines = []struct {
 	{regexp.MustCompile(`^patches: (\d+) files, (\d+) operations$`), "patches: %d files, %d operations"},
 	{regexp.MustCompile(`^patches: (\d+)/(\d+) operations$`), "patches: %d/%d operations"},
 	{regexp.MustCompile(`^done: (\d+) failed operations, (\d+) findings, (\S+)$`), "done: %d failed operations, %d findings, %s"},
+	{regexp.MustCompile(`^(indexing def references)$`), "%s"},
 }

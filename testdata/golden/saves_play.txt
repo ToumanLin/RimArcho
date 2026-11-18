@@ -16,6 +16,7 @@ sv:<Rimward 2.rws> Rimward 2  [loads with the list]
   game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
   list: plan:default (same Mods as one of its versions)
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Rimward 2.rws
+  saves of: env:main
   saved: 2026-10-01 06:00, 6.9 KB
   read: in full
   play: Iron Pact, day 25 (11th of Jugust, 5500), 3h 25m played
@@ -64,6 +65,7 @@ sv:<Rimward 2.rws> Rimward 2  [loads with the list]
   game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
   list: plan:default (same Mods as one of its versions)
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Rimward 2.rws
+  saves of: env:main
   saved: 2026-10-01 06:00, 6.9 KB
   read: in full
   play: Iron Pact, day 25 (11th of Jugust, 5500), 3h 25m played
@@ -86,6 +88,7 @@ sv:<Rimward 2.rws> Rimward 2  [loads with the list]
   game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
   list: plan:default (same Mods as one of its versions)
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Rimward 2.rws
+  saves of: env:main
   saved: 2026-10-01 06:00, 6.9 KB
   read: in full
   play: Iron Pact, day 25 (11th of Jugust, 5500), 3h 25m played
@@ -125,6 +128,7 @@ sv:<Rimward 2.rws> Rimward 2  [loads with the list]
   game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
   list: plan:default (same Mods as one of its versions)
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Rimward 2.rws
+  saves of: env:main
   saved: 2026-10-01 06:00, 6.9 KB
   read: in full
   play: Iron Pact, day 25 (11th of Jugust, 5500), 3h 25m played
@@ -167,6 +171,7 @@ sv:<Rimward.rws> Rimward  [loads with the list]
   game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
   list: plan:default (same Mods as one of its versions)
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Rimward.rws
+  saves of: env:main
   saved: 2026-10-01 05:00, 3.5 KB
   read: in full
   play: New Arrivals, day 20 (6th of Jugust, 5500), 2h 05m played
@@ -195,6 +200,7 @@ sv:<Glacier.rws> Glacier  [will not load cleanly]
   game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
   list: plan:default (same Mods as one of its versions)
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Glacier.rws
+  saves of: env:main
   saved: 2026-10-01 04:00, 767 B
   read: stopped at line 11, byte 724: end tag </things> does not match <thing> (the facts below are from before that point)
   play: Glacier Folk, day 10 (11th of Aprimay, 5500)
@@ -215,21 +221,22 @@ sv:<Autosave-1.rws> Autosave-1  [being written]
   game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
   list: plan:default (same Mods as one of its versions)
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Autosave-1.rws
+  saves of: env:main
   saved: 2026-10-01 09:59, 6.9 KB
   read: not yet: the file is being written
   can it load: no verdict: the file is being written; show it again when the game has saved
 
 $ archo saves list
 saves: 6 saves in 4 colonies
-  Iron Pact  3 saves, latest 2026-10-01 09:59
+  Iron Pact  3 saves, latest 2026-10-01 09:59  [saves of env:main]
     sv:<Autosave-1.rws>  Autosave-1  2026-10-01 09:59  meta only  plan:default (same-mods)  being written
     sv:<Rimward 2.rws>  Rimward 2   2026-10-01 06:00  day 25     plan:default (same-mods)  loads with the list
     sv:<Rimward.rws>  Rimward     2026-10-01 05:00  day 20     plan:default (same-mods)  loads with the list
-  Outpost  1 save, latest 2026-10-01 09:00  [matches no list]
+  Outpost  1 save, latest 2026-10-01 09:00  [saves of env:main]  [matches no list]
     sv:<Outpost.rws>  Outpost     2026-10-01 09:00  meta only  no list                   loads with the list
-  Glacier Folk  1 save, latest 2026-10-01 04:00
+  Glacier Folk  1 save, latest 2026-10-01 04:00  [saves of env:main]
     sv:<Glacier.rws>  Glacier     2026-10-01 04:00  malformed  plan:default (same-mods)  will not load cleanly
-  Rimward  1 save, latest 2026-10-01 03:00
+  Rimward  1 save, latest 2026-10-01 03:00  [saves of pack P1]
     sv:<pack:Rimward.rws>  Rimward     2026-10-01 03:00  meta only  pack P1                   loads, but content will be lost
   note: 3 saves are meta only: only the head is read, so no in-game day yet; archo saves index reads them in full
 next:

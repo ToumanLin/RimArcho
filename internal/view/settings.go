@@ -2,6 +2,7 @@ package view
 
 import (
 	"fmt"
+	"github.com/ToumanLin/RimArcho/internal/env"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -63,15 +64,25 @@ type SettingAction struct {
 	Confirm string   `json:"confirm,omitempty"`
 	Task    string   `json:"task,omitempty"`
 	Pending string   `json:"pending,omitempty"`
+	// URL opens a web page instead of running Argv; Note sits beside the button and Copy is
+	// what its copy icon copies (the manual RimArcho update's share and password, 17 §5.1).
+	URL  string `json:"url,omitempty"`
+	Note string `json:"note,omitempty"`
+	Copy string `json:"copy,omitempty"`
+	// Pick "zip": the player chooses a downloaded file, whose path replaces {} in Argv.
+	Pick string `json:"pick,omitempty"`
 }
 
 // SettingTask identifies commands that queue after confirmation (16 §2.14, 16 §2.16).
 func SettingTask(argv []string) string {
 	if len(argv) > 0 && argv[0] == "update" {
-		if len(argv) == 1 {
+		if len(argv) == 1 || len(argv) == 3 && argv[1] == "--from" && argv[2] != "" {
 			return TaskSelfUpdate
 		}
-		return TaskSelfCheck
+		if len(argv) == 2 && argv[1] == "--check" {
+			return TaskSelfCheck
+		}
+		return ""
 	}
 	if len(argv) == 3 && argv[0] == "deps" {
 		if argv[1] == "remove" {
@@ -83,6 +94,9 @@ func SettingTask(argv []string) string {
 	}
 	if len(argv) > 0 && argv[0] == "gc" {
 		return TaskGC
+	}
+	if len(argv) == 2 && argv[0] == "agent" && argv[1] == "install" {
+		return TaskAgentInstall
 	}
 	if len(argv) < 2 {
 		return ""
@@ -109,7 +123,7 @@ func TaskPending(kind string) string {
 		return T("removing…")
 	case TaskData:
 		return T("updating…")
-	case TaskSelfUpdate:
+	case TaskSelfUpdate, TaskAgentInstall:
 		return T("installing…")
 	case TaskSelfCheck:
 		return T("checking…")
@@ -132,18 +146,31 @@ type SettingGroup struct {
 
 // EnvRow is an environment on the environment page.
 type EnvRow struct {
-	Name    string `json:"name"`
-	Path    string `json:"path"`
-	Game    string `json:"game"` // "1.6.4633  D:\…\RimWorld"
-	Current bool   `json:"current"`
+	Installation string `json:"installation"`
+	GameID       string `json:"gameID"`
+	Name         string `json:"name"`
+	Path         string `json:"path"`
+	Game         string `json:"game"` // "1.6.4633  D:\…\RimWorld"
+	Current      bool   `json:"current"`
 }
 
 // EnvPage is the environment page: the environments, and the current one's game folder,
 // version, launch and saves (what belongs to one game, 03 §2; the mod folders every game
 // shares are on the settings page).
 type EnvPage struct {
-	Envs   []EnvRow       `json:"envs"`
-	Groups []SettingGroup `json:"groups"`
+	Envs    []EnvRow       `json:"envs"`
+	Groups  []SettingGroup `json:"groups"`
+	Notices []string       `json:"notices,omitempty"`
+}
+
+// AliasNoticeText is the shared-game-folder notice while the player has not acknowledged it
+// (app.AliasNotice), or "".
+func AliasNoticeText(a *app.App) string {
+	names := a.AliasNotice()
+	if len(names) == 0 {
+		return ""
+	}
+	return Tf("these two Game Configs use the same game folder: %s", strings.Join(names, ", "))
 }
 
 // BuildEnvPage builds the environment page.
@@ -153,11 +180,11 @@ func BuildEnvPage(a *app.App, st *app.LoadoutState) *EnvPage {
 	if st != nil {
 		cur = st.Ix.Env.ID
 	}
-	if envs, err := a.Store.Envs(); err == nil {
-		for _, e := range envs {
-			p.Envs = append(p.Envs, EnvRow{Name: e.Name, Game: e.GameVersion + "  " + e.GameRoot, Path: e.GameRoot, Current: e.ID == cur})
-		}
+	p.Envs = EnvironmentRows(a, cur)
+	if text := AliasNoticeText(a); text != "" {
+		p.Notices = []string{text}
 	}
+
 	return p
 }
 
@@ -171,21 +198,23 @@ func EnvGroups(a *app.App, st *app.LoadoutState) []SettingGroup {
 	if version == "" {
 		version = T("unknown")
 	}
-	saves := SettingItem{Label: T("saves"), Value: a.Saves(e), Edit: "choice", Choices: []string{app.SavesShared, app.SavesOwn},
-		ChoiceLabels: []string{T("shared (the game's default folder)"), T("its own")}, Argv: []string{"env", "set", e.Name, "--saves", "{}"}, Note: e.UserDataRoot, NotePaths: []string{e.UserDataRoot}}
-	if saves.Value == app.SavesCustom {
-		saves.Choices = append([]string{app.SavesCustom}, saves.Choices...)
-		saves.ChoiceLabels = append([]string{T("a folder you chose")}, saves.ChoiceLabels...)
+	current := ""
+	if p, _ := a.Store.CurrentPlan(e.ID); p != nil {
+		current = p.Name
 	}
-	return []SettingGroup{{Title: T("this game"), Items: []SettingItem{
-		{Label: T("game folder"), Value: e.GameRoot, ValuePath: true, Edit: "path", Argv: []string{"env", "set", e.Name, "--game", "{}"},
-			Note: T("RimArcho checks that the mods are still the same before it moves them over")},
-		{Key: "game.version", Label: T("game version"), Value: version},
-		{Label: T("start the game through"), Value: e.Launch, Edit: "choice", Choices: []string{"steam", "direct"},
-			ChoiceLabels: []string{"Steam", T("the game's own exe")}, Argv: []string{"env", "set", e.Name, "--launch", "{}"}},
-		saves,
-		{Label: T("extra arguments"), Value: a.LaunchArgs(e.ID), Edit: "text", Argv: []string{"env", "set", e.Name, "--launch-args", "{}"},
-			Note: T("for example -popupwindow")},
+	return []SettingGroup{{Title: T("Game Config"), Items: []SettingItem{
+		{Key: "environment.name", Label: T("name"), Value: e.Name, Edit: "text", Argv: []string{"env", "set", e.Name, "--name", "{}"}},
+		{Label: T("game folder"), Value: e.GameRoot, ValuePath: true, Note: version, Edit: "path", Argv: []string{"env", "set", e.Name, "--game", "{}"}},
+		// shared / own / a folder the player chooses (custom: the page asks for the folder,
+		// then runs env set --user-data); the folder itself is the note
+		{Key: "environment.saves", Label: T("saves folder"), Value: a.Saves(e), Edit: "choice",
+			Choices:      []string{app.SavesShared, app.SavesOwn, app.SavesCustom},
+			ChoiceLabels: []string{T("shared (the game's default folder)"), T("own folder in RimArcho"), T("a folder you choose")},
+			Argv:         []string{"env", "set", e.Name, "--saves", "{}"}, Note: e.UserDataRoot, NotePaths: []string{e.UserDataRoot}},
+		{Key: "environment.list", Label: T("Mod list"), Value: current},
+		{Label: T("start the game through"), Value: e.Launch, Edit: "choice", Choices: []string{"steam", "direct"}, ChoiceLabels: []string{"Steam", T("the game's own exe")}, Argv: []string{"env", "set", e.Name, "--launch", "{}"}},
+		{Label: T("extra arguments"), Value: app.DisplayLaunchArgs(a.LaunchArgs(e.ID)), Edit: "text", Argv: []string{"env", "set", e.Name, "--launch-args", "{}"}},
+		{Key: "environment.remove", Label: T("remove Game Config"), Actions: []SettingAction{{Label: T("remove Game Config"), Argv: []string{"env", "remove", e.Name}}}},
 	}}}
 }
 
@@ -265,6 +294,10 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		{Label: T("language"), Value: cmds.Setting(a, "ui.lang"), Edit: "choice", Choices: languageChoices(), ChoiceLabels: languageLabels(), Argv: []string{"config", "set", "ui.lang", "{}"}},
 		{Label: T("day/night theme"), Value: cmds.Setting(a, "ui.theme"), Edit: "segments", Choices: cmds.SettingChoices("ui.theme"),
 			ChoiceLabels: []string{T("follow system"), T("light"), T("dark")}, Argv: []string{"config", "set", "ui.theme", "{}"}},
+		{Label: T("interface size"), Value: cmds.Setting(a, "ui.zoom"), Edit: "segments", Choices: cmds.SettingChoices("ui.zoom"),
+			ChoiceLabels: []string{"100%", "110%", "125%", "150%"},
+			Hover:        T("makes text and controls larger together; for 2K and 4K screens at 100% Windows scaling"),
+			Argv:         []string{"config", "set", "ui.zoom", "{}"}},
 		{Label: T("accent colour"), Value: cmds.Setting(a, "ui.accent"), Edit: "swatches", Choices: cmds.SettingChoices("ui.accent"),
 			ChoiceLabels: []string{T("default"), T("indigo"), T("blue"), T("cyan"), T("teal"), T("green"), T("grass"), T("orange"), T("amber"), T("red"), T("crimson"), T("pink"), T("plum"), T("purple"), T("violet"), T("iris")},
 			Custom:       T("custom…"),
@@ -308,7 +341,11 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	} else {
 		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon}})
 	}
-	out = append(out, NetworkGroup(a), DependencyGroup(a))
+	out = append(out, NetworkGroup(a))
+	if g, ok := AgentGroup(a); ok {
+		out = append(out, g)
+	}
+	out = append(out, DependencyGroup(a))
 
 	data := SettingGroup{Title: T("community data")}
 	status := a.DataStatus()
@@ -344,7 +381,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 			{Label: T("compact"), Argv: []string{"db", "vacuum"}},
 			{Label: T("remove old tombstones"), Argv: []string{"gc"}, Confirm: T("mods gone for longer than the tombstone time are forgotten")},
 		}},
-		{Key: "import.managers", Label: T("import from RimSort or RimCrow"), Actions: []SettingAction{{Label: T("import…"), Argv: []string{"import-managers"}}}},
+		{Key: "import.managers", Label: T("import from RimSort, RimCrow or RimPy"), Actions: []SettingAction{{Label: T("import…"), Argv: []string{"import-managers"}}}},
 	}}
 	for _, c := range a.Caches() {
 		storage.Items = append(storage.Items, SettingItem{Label: T(c.Desc), Value: Tf("%s  %d items", SizeText(c.Bytes), c.Files),
@@ -412,8 +449,30 @@ func SettingCommand(argv []string) error {
 	if argv[0] == "gc" {
 		return nil
 	}
-	if argv[0] == "update" && (len(argv) == 1 || len(argv) == 2 && argv[1] == "--check") {
+	// Archo Agent (15 §7); the key has its own call (API.SetAgentKey), never a command line
+	if len(argv) == 2 && argv[0] == "agent" && (argv[1] == "install" || argv[1] == "remove") ||
+		len(argv) == 3 && argv[0] == "agent" && argv[1] == "run" && argv[2] == "--window" {
+		return nil
+	}
+	if argv[0] == "update" && (len(argv) == 1 || len(argv) == 2 && argv[1] == "--check" || len(argv) == 3 && argv[1] == "--from" && argv[2] != "") {
 		return nil
 	}
 	return fmt.Errorf("not a settings command: %s", strings.Join(argv, " "))
+}
+
+// EnvironmentRows returns flat config metadata without loading any inventories.
+func EnvironmentRows(a *app.App, current string) []EnvRow {
+	es, err := a.Store.Envs()
+	if err != nil {
+		return nil
+	}
+	var out []EnvRow
+	for _, e := range es {
+		title := "RimWorld"
+		if v := env.MajorMinor(e.GameVersion); v != "" {
+			title += " " + v
+		}
+		out = append(out, EnvRow{Name: e.Name, GameID: e.GameID, Installation: title, Path: e.GameRoot, Game: e.GameVersion + "  " + e.GameRoot, Current: e.ID == current})
+	}
+	return out
 }

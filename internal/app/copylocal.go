@@ -201,6 +201,7 @@ func gitBaseline(dir, name, origin string) error {
 	run := func(args ...string) error {
 		cmd := exec.Command("git", append([]string{"-c", "core.autocrlf=false", "-c", "user.name=RimArcho", "-c", "user.email=rimarcho@localhost", "-c", "commit.gpgsign=false"}, args...)...)
 		cmd.Dir = dir
+		hideWindow(cmd)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("git %s: %v: %s", args[0], err, strings.TrimSpace(string(out)))
 		}

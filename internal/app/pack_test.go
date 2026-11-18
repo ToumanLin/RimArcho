@@ -100,13 +100,13 @@ func TestPackBuildAndLaunch(t *testing.T) {
 		}
 	}
 	if e.ReadModsConfig() != envCfg {
-		t.Fatal("K4: the environment's ModsConfig.xml changed")
+		t.Fatal("K4: the Game Config's ModsConfig.xml changed")
 	}
 	packCfg, err := os.ReadFile(filepath.Join(dir, "userdata", "Config", "ModsConfig.xml"))
 	if err != nil || !strings.Contains(string(packCfg), "<li>tester.versions</li>") || !strings.Contains(string(packCfg), "<li>tester.a</li>") {
 		t.Fatalf("pack list: %v\n%s", err, packCfg)
 	}
-	if len(e.Launched) != 1 || !strings.Contains(e.Launched[0], "-savedatafolder="+filepath.Join(dir, "userdata")) {
+	if len(e.Launched) != 1 || !strings.Contains(e.Launched[0], "-savedatafolder="+filepath.Join(dir, "userdata")) || !strings.Contains(e.Launched[0], "-logfile") || !strings.Contains(e.Launched[0], filepath.Join(dir, "userdata", "Player.log")) {
 		t.Fatalf("launched: %v", e.Launched)
 	}
 	if out := e.MustRun("pack", "list"); !strings.Contains(out, "first") || strings.Contains(out, "never played") {

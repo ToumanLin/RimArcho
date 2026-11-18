@@ -131,7 +131,7 @@ func (a *App) Analyze(progress func(string)) (*AnalyzeReport, error) {
 		return nil, err
 	}
 	in = analyze.Input{} // release the declarations before writing
-	id, err := a.Store.SaveAnalysis(st.Ix.Env.ID, SetFingerprint(st.List), key, st.GameMM(), a.planSetKeys(st), out, started, a.Now())
+	id, err := a.Store.SaveAnalysis(st.Ix.Env.GameID, SetFingerprint(st.List), key, st.GameMM(), a.planSetKeys(st), out, started, a.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -161,9 +161,9 @@ func (a *App) Analysis(st *LoadoutState) (*AnalysisState, error) { return a.anal
 // rows: another plan's run says nothing about this one).
 func (a *App) analysisOf(st *LoadoutState, newest bool) (*AnalysisState, error) {
 	a.Store.MM = st.GameMM()
-	r, err := a.Store.LatestAnalysis(st.Ix.Env.ID, SetFingerprint(st.List))
+	r, err := a.Store.LatestAnalysis(st.Ix.Env.GameID, SetFingerprint(st.List))
 	if err == nil && r == nil && newest {
-		r, err = a.Store.NewestAnalysis(st.Ix.Env.ID)
+		r, err = a.Store.NewestAnalysis(st.Ix.Env.GameID)
 	}
 	if err != nil {
 		return nil, err

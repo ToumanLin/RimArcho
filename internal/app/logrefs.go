@@ -456,7 +456,7 @@ func (cx *attrCtx) textureProviders(qs []*refQuery) {
 	if len(need) == 0 {
 		return
 	}
-	files, err := cx.a.Store.InstanceFiles(cx.st.Ix.Env.ID, "%Textures/%")
+	files, err := cx.a.Store.InstanceFiles(cx.st.Ix.Env.GameID, "%Textures/%")
 	if err != nil {
 		return
 	}
@@ -601,7 +601,7 @@ func (cx *attrCtx) missingAssembly(lc *LogCluster, name string) {
 		}
 		return
 	}
-	files, _ := cx.a.Store.InstanceFiles(cx.st.Ix.Env.ID, "%"+name+".dll")
+	files, _ := cx.a.Store.InstanceFiles(cx.st.Ix.Env.GameID, "%"+name+".dll")
 	var ids []string
 	for id := range files {
 		ids = append(ids, id)

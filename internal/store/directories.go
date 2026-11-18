@@ -89,9 +89,29 @@ type SourceMove struct {
 func (s *Store) MoveRecords(e *env.Environment, moves []SourceMove, meta map[string]string) error {
 	err := s.inTx(func(tx *sql.Tx) error {
 		if e != nil {
-			if _, err := tx.Exec(`UPDATE environment SET name=?, game_root=?, user_data_root=?, game_version=?, launch=? WHERE id=?`,
-				e.Name, e.GameRoot, e.UserDataRoot, e.GameVersion, e.Launch, e.ID); err != nil {
+			var gameName, previousGame string
+			if err := tx.QueryRow(`SELECT name FROM game WHERE id=?`, e.GameID).Scan(&gameName); err != nil {
 				return err
+			}
+			if err := tx.QueryRow(`SELECT game_id FROM environment WHERE id=?`, e.ID).Scan(&previousGame); err != nil {
+				return err
+			}
+			if err := updateGame(tx, &Game{ID: e.GameID, Name: gameName, GameRoot: e.GameRoot, GameVersion: e.GameVersion}); err != nil {
+				return err
+			}
+			if _, err := tx.Exec(`UPDATE environment SET name=?, user_data_root=?, launch=?, game_id=? WHERE id=?`, e.Name, e.UserDataRoot, e.Launch, e.GameID, e.ID); err != nil {
+				return err
+			}
+			if previousGame != e.GameID {
+				var n int
+				if err := tx.QueryRow(`SELECT count(*) FROM environment WHERE game_id=?`, previousGame).Scan(&n); err != nil {
+					return err
+				}
+				if n == 0 {
+					if err := deleteInstallation(tx, previousGame); err != nil {
+						return err
+					}
+				}
 			}
 		}
 		for _, m := range moves {
@@ -100,7 +120,7 @@ func (s *Store) MoveRecords(e *env.Environment, moves []SourceMove, meta map[str
 			case m.Rebind != "":
 				err = rebindSource(tx, m.Src, m.Rebind)
 			case m.Insert:
-				_, err = tx.Exec(`INSERT INTO source(id,environment_id,kind,label,root,status,pending_root) VALUES(?,?,?,?,?,?,?)`,
+				_, err = tx.Exec(`INSERT INTO source(id,game_id,kind,label,root,status,pending_root) VALUES(?,?,?,?,?,?,?)`,
 					m.Src.ID, m.Src.EnvID, string(m.Src.Kind), m.Src.Label, m.Src.Root, m.Src.Status, m.Src.PendingRoot)
 			default:
 				_, err = tx.Exec(`UPDATE source SET root=?, status=?, pending_root=?, label=? WHERE id=?`,

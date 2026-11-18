@@ -8,7 +8,7 @@ For what RimArcho is and the decisions behind it, see [00 · Top-level design](.
 | [01 · Scope and status](01-scope-and-status.md) | Version scope, capabilities, exclusions, work still open |
 | [02 · File writes and uninstall](02-file-writes-and-uninstall.md) | Every file RimArcho writes (the safety boundary), uninstall, the recycle bin |
 | **What is installed** | |
-| [03 · Environments and sources](03-environments-and-sources.md) | Terms, environments (one game directory each), Mod sources, links and aliases |
+| [03 · Environments and sources](03-environments-and-sources.md) | Terms, environments and shared game installations (§6), Mod sources, links and aliases |
 | [04 · Scanning and identity](04-scanning-and-identity.md) | Scanning, reconciliation, Lineage, change events, storage |
 | [05 · Facts and findings](05-facts-and-findings.md) | Effective content, fact types, the finding catalog, Def / Patch / Harmony analysis |
 | [06 · Game log](06-game-log.md) | Log parsing, attribution, which launch owns a log, live tracking, companion logs, error patterns |
@@ -45,7 +45,7 @@ Use `NN §x.y` references between specifications and in code comments (for examp
 - **Write each fact in one place.** Elsewhere, reference `NN §x.y` instead of copying it. Copies will eventually diverge.
 - **Update the specification with behavior changes, in the same commit.** Changes to responsibilities, interfaces, storage formats, state transitions, file writes, failure handling, or compatibility rules must update the section that owns them. Refactoring that changes none of these needs no specification update.
 - **Describe the current state.** Describe implemented behavior as it is; label unfinished work "not implemented", "draft", or "undecided", or put it in 01 §4. Do not record when something was decided or changed, what it used to be called, or how it was before: that history lives in git and `CHANGELOG.md`. Ideas without a decision belong in research/ or design/, not specifications. Decision rationale belongs in 00 §6; specifications record only the conclusions.
-- **Use the glossary's terms.** Documentation, the CLI and MCP say plan, environment and Instance; quote the interface's own words ("list", "game") only when describing a control or page (`docs/glossary.md`).
+- **Use the glossary's terms.** Documentation, the CLI and MCP say plan, environment and Instance; quote the interface's own words ("list", "game installation") only when describing a control or page (`docs/glossary.md`).
 - **Point to code; do not repeat it.** Name files, types, and functions (for example, `view.Nav`), and describe meanings and constraints their signatures cannot express. Omit implementation details that change often.
 - **Keep measurements in 18.** Other specifications state targets and reference 18 for measured values; they do not narrate earlier timings.
 - **Split files that grow too long.** If a file exceeds about 500 lines or 60 KB, or covers unrelated areas, split it into a directory with the same name: put status, basis, and a file table in `README.md`; split other files by section, with filenames starting with their first section number (for example, `2.9-mod-library-and-game-logs.md`). Keep section numbers unchanged. Start each file with a line naming its parent specification.

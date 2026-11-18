@@ -7,12 +7,16 @@ import (
 
 // ParserVersion is the version of Scan's output. Bump it whenever Facts changes meaning
 // (a field added, removed or computed differently): caches of Facts key on it (12 §1.7).
-const ParserVersion = 2
+const ParserVersion = 8
 
 // MinParserVersion is the oldest version whose Facts mean what this version's do, except
-// for fields added since (2 added DefRefs). Lists, grouping, play facts and Can it load use
+// for fields added since (2 added DefRefs, 3 the weather references in them, 4 GridDefs, 5 the compressed things in them, 6 the storyteller's record of fired incidents and quests in DefRefs, 7 ConfigRefs, taken out of DefRefs, 8 things' styles and ideoligions' style categories in DefRefs). Lists, grouping, play facts and Can it load use
 // a row this old; a reader of a newer field reads the save again (12 §1.7). Raise it to
-// ParserVersion when a change alters what an existing field means.
+// ParserVersion when a change alters what an existing field those readers use means.
+// DefRefs, ConfigRefs and GridDefs changed meaning in 3 to 8 without raising it: their
+// only reader, the content attribution (app saveContent: what a save needs, Play review),
+// accepts only a row of ParserVersion and reads an older one again, so an old row never
+// counts references it no longer would. A new reader of them must do the same.
 const MinParserVersion = 1
 
 // Limits on the lists Facts keeps; counts beyond them are still exact.
@@ -81,8 +85,16 @@ type Facts struct {
 	// References for the checks of 12 §4.3 and §4.6.
 	Defs    map[string]int            `json:"defs,omitempty"`    // text of every <def> element → occurrences (12 §1.4)
 	DefRefs map[string]map[string]int `json:"defRefs,omitempty"` // Def type (empty when unknown) → name → references, excluding configuration/help links
-	Classes map[string]int            `json:"classes,omitempty"` // every Class="…" attribute value → occurrences
-	Refs    Refs                      `json:"refs"`
+	// ConfigRefs are references that only set something up or name what may come: a bill's
+	// recipe, the incident or quest a quest part or scenario part would fire, and research
+	// with no progress. Same shape as DefRefs, which has none of them (12 §1.4).
+	ConfigRefs map[string]map[string]int `json:"configRefs,omitempty"`
+	Classes    map[string]int            `json:"classes,omitempty"` // every Class="…" attribute value → occurrences
+	// GridDefs are the Defs the save stores by short hash in grids: Def type (TerrainDef for
+	// the maps' terrain grids, BiomeDef for the world's tiles, ThingDef for the maps'
+	// compressed things) → short hash → cells (12 §1.4).
+	GridDefs map[string]map[uint16]int `json:"gridDefs,omitempty"`
+	Refs     Refs                      `json:"refs"`
 
 	// Events are the letters in the game's archive, newest first, at most MaxEvents.
 	Events []Event `json:"events,omitempty"`

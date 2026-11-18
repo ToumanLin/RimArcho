@@ -202,7 +202,7 @@ func TestGUIFileBatchUsesAppLifecycle(t *testing.T) {
 			}
 			env, _ := e.App.Store.EnvByName("incoming")
 			if scan, _, err := e.App.LastScan(env.ID); err != nil || scan == nil {
-				t.Fatalf("incoming environment was not scanned: %v", err)
+				t.Fatalf("incoming Game Config was not scanned: %v", err)
 			}
 		})
 	}

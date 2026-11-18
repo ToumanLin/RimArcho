@@ -20,8 +20,10 @@ The domain/UI distinction follows [03 §1](specs/03-environments-and-sources.md#
 | 共用来源 | shared source |  | A source shared across game environments. |
 | 官方来源 | official source | official | The game's Data directory containing Core and DLC. |
 | 后补订阅 | subscribe after downloading |  | Download with SteamCMD now, subscribe through Steam later to credit authors (11 §1); distinguish subscribing from downloading. |
-| 环境 | environment | game | An Environment owns one game directory and its save configuration. |
-| 环境来源 | environment source |  | An official or local source belonging to one environment. |
+| 游戏配置 | environment | Game Config | A play context selecting a game installation, user data directory and current plan; Japanese UI: ゲーム構成. |
+| 游戏本体 | game installation | internal only | One physical installed game; not a player-facing layer. |
+| 游戏目录 | game folder | | The installation directory; Japanese: ゲームフォルダー. |
+| 环境来源 | environment source |  | An official or local source belonging to one game installation. |
 | 快照 | snapshot |  | Metadata and content fingerprints from one scan of an instance. |
 | 来源 | source | mod folders; source | A registered Mod root directory; filters use its source role. |
 | 来源重新绑定 | source rebinding |  | Change the root path while preserving source identity. |

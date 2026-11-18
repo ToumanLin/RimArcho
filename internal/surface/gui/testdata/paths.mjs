@@ -34,6 +34,9 @@ test("fallback recognises rooted paths and complete URLs without treating keys o
     assert.equal(h.pathContent(h.el("div"), path).querySelector(".path-copy").dataset.path, path);
   }
   assert.equal(h.pathContent(h.el("div"), "backup written to C:\\data\\archo.db").querySelector(".path-copy").dataset.path, "C:\\data\\archo.db");
+  // A clause after "; " is not part of the path (VM round 2026-11-10: a refused move into the
+  // lock library copied "...\ArchoTest_LogLib; nothing was moved").
+  assert.equal(h.pathContent(h.el("div"), "could not be written in C:\\Mods\\A B; nothing was moved: denied").querySelector(".path-copy").dataset.path, "C:\\Mods\\A B");
   // A Markdown link's ")" and a sentence's full stop are not part of the address; a balanced
   // pair inside it is (VM round 2026-11-05: release notes copied ".../CHANGELOG.md)").
   for (const [text, url] of [["[notes](https://github.com/a/b/blob/v1/CHANGELOG.md)", "https://github.com/a/b/blob/v1/CHANGELOG.md"],

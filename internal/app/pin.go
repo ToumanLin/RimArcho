@@ -285,11 +285,13 @@ func (ix *Index) ModAt(dir string) *store.Mod {
 }
 
 // swapBlocker is why in cannot replace out in the list (whyNotLoadable), judged as the game
-// would see it after the swap: out's own registration (e.g. its _Archo_ link, which the
-// next save removes) does not count against in.
+// would see it after the swap: out's own registration does not count against in. Its
+// _Archo_ link goes on the next save; a plain Mods/ folder is moved into the lock library by
+// save or launch --move-duplicates (07 §5.2 step 6) and aside during a test run (20 §1).
+// VM 2026-11-10: pinning a Mod whose original is a Mods/ folder left the plan unchanged.
 func swapBlocker(st *LoadoutState, in, out *store.Mod) string {
 	why := whyNotLoadable(st, in)
-	if why == "" || !strings.HasPrefix(why, "pkg.duplicate-installed") || !st.Deployed(out) {
+	if why == "" || !strings.HasPrefix(why, "pkg.duplicate-installed") {
 		return why
 	}
 	var cs []loadout.Candidate

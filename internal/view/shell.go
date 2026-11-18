@@ -15,6 +15,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/finding"
 	"github.com/ToumanLin/RimArcho/internal/modchanges"
 	"github.com/ToumanLin/RimArcho/internal/perftrace"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // The window's shell (16 §2.1–§2.3, §2.15): the sidebar, the home page and the first-run
@@ -61,7 +62,7 @@ func LastRunErrors(n *Needs) int {
 // EnvChip is an environment as a chip: "steam · 1.6".
 func EnvChip(name, gameVersion string) string {
 	if name == "" {
-		return T("no game")
+		return T("no Game Config")
 	}
 	if mm := env.MajorMinor(gameVersion); mm != "" {
 		return name + "  " + mm
@@ -84,6 +85,8 @@ const (
 	PageLog      = "log"
 	PageSettings = "settings"
 	PageTextures = "textures" // Texture optimisation (10 §2), under Library
+	// PageImport: Library › Import, where every import starts (16 §2.18)
+	PageImport = "import"
 	// PageSubscribe: Mod library › add a subscription (16 §2.9)
 	PageSubscribe = "subscribe"
 	// PageSearch: Mod library › Search files (16 §2.9)
@@ -186,20 +189,22 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	library := []NavItem{
 		{ID: PagePlan, Label: T("lists"), Kids: planKids},
 		{ID: PagePacks, Label: T("packs"), Kids: packKids},
-		// Saves (16 §2.11), after the packs since 2026-11-04. Its own name: the plain
-		// "saves" key is translated for settings rows; the sidebar's name is longer.
-		{ID: PageSaves, Label: extraName("@nav.saves", "saves")},
 		// Below the packs (2026-10-28). The entry opens All, its first sub-entry (16 §2.9).
 		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all mods")}, {ID: PageChanges, Label: T("updates")}, {ID: PageSubscribe, Label: T("add a subscription")}, {ID: PageSearch, Label: T("search files")}, {ID: PageModSettings, Label: T("mod settings")}}},
 		// what the game loads faster (10 §2)
 		{ID: PageTextures, Label: T("texture optimisation")},
-		{ID: PageEnv, Label: T("game")},
+		{ID: PageEnv, Label: T("Game Config")},
+		// every import in one place: lists, packs, saves and other managers' data (16 §2.18)
+		{ID: PageImport, Label: T("import")},
 	}
-	groups := []NavGroup{{Title: T("playing"), Items: playing}, {Title: T("library"), Items: library}}
+	// Saves is a group of its own since 2026-11-11 (16 §2.11): the saves, and the play
+	// review (12 §3). Its own name: the plain "saves" key is translated for settings rows.
+	saves := []NavItem{{ID: PageSaves, Label: T("all saves")}, {ID: PageReview, Label: T("play review")}}
+	groups := []NavGroup{{Title: T("playing"), Items: playing}, {Title: extraName("@nav.saves", "saves"), Items: saves}, {Title: T("library"), Items: library}}
 	n := 0
 	for g := range groups {
 		for i := range groups[g].Items {
-			if groups[g].Items[i].ID == PageSaves {
+			if id := groups[g].Items[i].ID; id == PageSaves || id == PageReview || id == PageImport {
 				continue // no shift key: shift+1–8 stay the eight pages the TUI also has (16 §3.5)
 			}
 			n++
@@ -308,7 +313,8 @@ type Home struct {
 	LastRunDay    string `json:"lastRunDay,omitempty"`
 	LastRunErrors int    `json:"lastRunErrors"`
 	// LastRunPending: the last run's log is not analysed yet (no count to show).
-	LastRunPending bool `json:"lastRunPending,omitempty"`
+	LastRunPending bool   `json:"lastRunPending,omitempty"`
+	MissingLog     string `json:"missingLog,omitempty"`
 	// Changes is the current plan's changes since it was last played (16 §2.3): one
 	// sentence that opens Updates with that scope and time.
 	Changes *modchanges.Home `json:"changes,omitempty"`
@@ -390,6 +396,7 @@ func buildHome(a *app.App, st *app.LoadoutState, n *Needs, plans []PlanRow, pack
 	}
 	SortHome(h.Rows)
 	h.LastRun, h.LastRunDay, h.LastRunErrors, h.LastRunPending = n.LastRun, n.LastRunDay, LastRunErrors(n), n.LastRunPending
+	h.MissingLog = n.MissingLog
 	h.Launch = n.Launch
 	if !launchOnly {
 		h.Changes = ChangeHome(a, st)
@@ -531,6 +538,38 @@ type GameFound struct {
 	UserData string `json:"userData,omitempty"`
 	// Env is the environment that already uses this folder ("" when none).
 	Env string `json:"env,omitempty"`
+	// Known: a Game Config already uses this game folder, so its Mods are read; Current:
+	// it is the current config's game (Add Game Config picks it first).
+	Known   bool `json:"known,omitempty"`
+	Current bool `json:"current,omitempty"`
+
+	// The Add Game Config page's choices (16 §2.15; none on the first run). AddConfig adds
+	// a Game Config for a folder another config already uses. Saves is "shared" (the
+	// game's default folder, UserData), "own" (RimArcho's own folder for this config) or
+	// "custom" (CustomData); "" is shared. Like copies that config's game and Mod settings
+	// (no Mod files, no saves). List selects a global list; NewList makes a Core and DLC
+	// list named after the config; neither keeps what env add does by default.
+	AddConfig  bool   `json:"addConfig,omitempty"`
+	Saves      string `json:"saves,omitempty"`
+	CustomData string `json:"customData,omitempty"`
+	Like       string `json:"like,omitempty"`
+	List       string `json:"list,omitempty"`
+	NewList    bool   `json:"newList,omitempty"`
+}
+
+// spec is the env add of a found game with the page's choices.
+func (g GameFound) spec() app.EnvSpec {
+	sp := app.EnvSpec{GameRoot: g.Game, UserDataRoot: g.UserData, Launch: g.Launch, Like: g.Like, List: g.List, NewList: g.NewList}
+	switch g.Saves {
+	case app.SavesOwn:
+		sp.UserDataRoot, sp.Saves = "", app.SavesOwn
+	case "custom":
+		sp.UserDataRoot = g.CustomData
+	}
+	if g.Like != "" {
+		sp.Launch = "" // the copied config's launch
+	}
+	return sp
 }
 
 // FindGames lists the installs detection finds (03 §3.2), each with a free name; the
@@ -540,17 +579,45 @@ func FindGames(a *app.App) []GameFound {
 	used := map[string]string{}
 	taken := map[string]bool{}
 	for _, e := range envs {
-		used[env.PathKey(e.GameRoot)] = e.Name
+		if store.UserDataKey(e.UserDataRoot) == store.UserDataKey(a.DefaultUserData(e.GameRoot)) {
+			used[env.PathKey(e.GameRoot)] = e.Name
+		}
 		taken[e.Name] = true
 	}
+	known := map[string]bool{}
+	for _, e := range envs {
+		known[env.PathKey(e.GameRoot)] = true
+	}
+	cur := ""
+	if e, err := a.Env(); err == nil && e != nil {
+		cur = env.PathKey(e.GameRoot)
+	}
 	var out []GameFound
-	for _, d := range env.DetectAll(a.Detect) {
-		g := GameFound{Game: d.GameRoot, Version: d.GameVersion, Launch: d.Launch, Workshop: d.WorkshopRoot, UserData: d.UserDataRoot, Env: used[env.PathKey(d.GameRoot)]}
-		if g.Env == "" {
-			g.Name = freeName(env.MajorMinor(d.GameVersion), taken)
-			taken[g.Name] = true
+	seen := map[string]bool{}
+	add := func(g GameFound) {
+		k := env.PathKey(g.Game)
+		if seen[k] {
+			return
 		}
+		seen[k] = true
+		g.Env, g.Known, g.Current = used[k], known[k], k == cur
+		// a used folder gets a name too: Add Game Config may add another config for it
+		g.Name = freeName(env.MajorMinor(g.Version), taken)
+		taken[g.Name] = true
 		out = append(out, g)
+	}
+	// The games Game Configs use first (detection may not find a game in a folder of the
+	// player's own), the current config's at the top; then what detection finds.
+	for _, e := range envs {
+		if env.PathKey(e.GameRoot) == cur {
+			add(GameFound{Game: e.GameRoot, Version: e.GameVersion, Launch: e.Launch, UserData: a.DefaultUserData(e.GameRoot)})
+		}
+	}
+	for _, e := range envs {
+		add(GameFound{Game: e.GameRoot, Version: e.GameVersion, Launch: e.Launch, UserData: a.DefaultUserData(e.GameRoot)})
+	}
+	for _, d := range env.DetectAll(a.Detect) {
+		add(GameFound{Game: d.GameRoot, Version: d.GameVersion, Launch: d.Launch, Workshop: d.WorkshopRoot, UserData: d.UserDataRoot})
 	}
 	return out
 }
@@ -574,16 +641,14 @@ func GameAt(a *app.App, path string, pending ...string) (*GameFound, error) {
 	}
 	for _, e := range envs {
 		taken[e.Name] = true
-		if env.PathKey(e.GameRoot) == env.PathKey(path) {
+		if env.PathKey(e.GameRoot) == env.PathKey(path) && store.UserDataKey(e.UserDataRoot) == store.UserDataKey(g.UserData) {
 			g.Env = e.Name
 		}
 	}
 	if ws := env.WorkshopRootFor(path); ws != "" && dirExists(ws) {
 		g.Workshop, g.Launch = ws, "steam"
 	}
-	if g.Env == "" {
-		g.Name = freeName(env.MajorMinor(g.Version), taken)
-	}
+	g.Name = freeName(env.MajorMinor(g.Version), taken)
 	return g, nil
 }
 
@@ -622,11 +687,14 @@ func CreateGames(a *app.App, games []GameFound) ([]string, error) {
 	}
 	var out []string
 	for _, g := range games {
-		if g.Env != "" {
+		if g.Env != "" && !g.AddConfig {
 			continue
 		}
 		name := strings.TrimSpace(g.Name)
-		if _, _, err := a.EnvAdd(name, app.EnvSpec{GameRoot: g.Game, UserDataRoot: g.UserData, Launch: g.Launch}); err != nil {
+		if g.Saves == "custom" && strings.TrimSpace(g.CustomData) == "" {
+			return out, errors.New(T("choose a user data folder"))
+		}
+		if _, _, err := a.EnvAdd(name, g.spec()); err != nil {
 			return out, err
 		}
 		out = append(out, name)
@@ -639,7 +707,7 @@ func CreateGames(a *app.App, games []GameFound) ([]string, error) {
 func checkGameNames(a *app.App, games []GameFound) error {
 	seen := map[string]bool{}
 	for _, g := range games {
-		if g.Env != "" {
+		if g.Env != "" && !g.AddConfig {
 			continue
 		}
 		name := strings.TrimSpace(g.Name)

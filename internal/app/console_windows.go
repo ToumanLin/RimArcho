@@ -17,6 +17,14 @@ func startConsole(exe string, args []string) (SteamCMDProc, error) {
 	return createSteamProcess(exe, args, windows.CREATE_NEW_CONSOLE, false)
 }
 
+// callerConsole reports whether stdin and stdout are a console the player can type into.
+// The GUI has none; `archo mcp` has pipes that carry the protocol (14 §1).
+func callerConsole() bool {
+	var mode uint32
+	return windows.GetConsoleMode(windows.Handle(os.Stdin.Fd()), &mode) == nil &&
+		windows.GetConsoleMode(windows.Handle(os.Stdout.Fd()), &mode) == nil
+}
+
 // A job owns just this invocation and descendants, including updater children.
 // Assign before resuming so cancellation cannot race a spawned child.
 func startWorkshopCMD(exe string, args []string, console bool) (SteamCMDProc, error) {
@@ -124,11 +132,18 @@ func (p *consoleProcess) Wait() error {
 		var code uint32
 		p.err = windows.GetExitCodeProcess(p.handle, &code)
 		if p.err == nil && code != 0 {
-			p.err = fmt.Errorf("process exited with code %d", code)
+			p.err = processExit(code)
 		}
 	})
 	return p.err
 }
+
+// processExit is a non-zero exit code; it keeps the code for callers that read it
+// (steamCMDUpdatedItself), as exec.ExitError does.
+type processExit uint32
+
+func (e processExit) Error() string { return fmt.Sprintf("process exited with code %d", uint32(e)) }
+func (e processExit) ExitCode() int { return int(e) }
 
 func (p *consoleProcess) Kill() error {
 	p.mu.Lock()

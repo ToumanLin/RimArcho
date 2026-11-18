@@ -346,6 +346,9 @@ func (m *model) cmdSubmit() tea.Cmd {
 	case len(argv) == 1 && argv[0] == "update":
 		m.remember(line)
 		return m.selfUpdatePanel() // installs, then restarts this TUI (17 §5.1)
+	case len(argv) == 3 && argv[0] == "update" && argv[1] == "--from":
+		m.remember(line)
+		return m.startSelfUpdateFrom(argv[2])
 	}
 	m.cmdBusy = line // the status line says so while it runs (statusText)
 	snap := m.snapshot()

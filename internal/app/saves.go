@@ -734,7 +734,7 @@ func (m *saveMatcher) match(s *Save) {
 		for _, e := range f.Envs {
 			ids = append(ids, e.ID)
 		}
-		if r, err := m.a.Store.LaunchRecordBefore(ids, s.ModTime); err == nil && r != nil && r.Pack() == "" && m.plans[r.PlanID] != nil {
+		if r, err := m.a.Store.LaunchRecordBefore(ids, s.ModTime); err == nil && r != nil && r.Pack() == "" && m.plans[r.PlanID] != nil && (r.UserDataRoot == "" || samePath(r.UserDataRoot, filepath.Dir(f.Dir))) {
 			s.Plan, s.Match, s.Env = m.plans[r.PlanID], MatchLaunch, m.envFor(f, r.EnvID)
 			return
 		}

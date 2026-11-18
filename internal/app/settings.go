@@ -2,11 +2,14 @@ package app
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
 )
 
 // What the settings page (16 §2.14) shows and changes besides environments and config keys:
@@ -138,5 +141,138 @@ func (a *App) LaunchArgs(envID string) string { return a.Store.Meta("env:" + env
 
 // SetLaunchArgs stores them ("" removes them).
 func (a *App) SetLaunchArgs(envID, args string) error {
+	e, err := a.Store.EnvByID(envID)
+	if err != nil {
+		return err
+	}
+	if e == nil {
+		return fmt.Errorf("Game Config %s not found", envID)
+	}
+	if err := ValidateLaunchArgs(e.Name, args); err != nil {
+		return err
+	}
 	return a.Store.SetMeta("env:"+envID+":launch_args", strings.TrimSpace(args))
+}
+
+// ValidateLaunchArgs keeps the game's data root under environment control (03 §6.2).
+// It checks arguments the player enters; stored ones are checked with validateStoredLaunchArgs.
+func ValidateLaunchArgs(name, args string) error {
+	argv, err := ParseLaunchArgs(args)
+	if err != nil {
+		return fmt.Errorf("%w; change them with archo env set %s --launch-args <args> or on the Game Config page", err, quoteArg(name))
+	}
+	return checkLaunchArgv(name, argv)
+}
+
+// validateStoredLaunchArgs is ValidateLaunchArgs for stored arguments: text an older
+// version stored splits on whitespace as it did then (storedLaunchArgs).
+func validateStoredLaunchArgs(name, args string) error {
+	argv, err := storedLaunchArgs(args)
+	if err != nil {
+		return err
+	}
+	return checkLaunchArgv(name, argv)
+}
+
+func checkLaunchArgv(name string, argv []string) error {
+	for _, arg := range argv {
+		key := strings.ToLower(strings.Trim(arg, "\"'"))
+		if key == "-logfile" || strings.HasPrefix(key, "-logfile=") {
+			return fmt.Errorf("launch argument %q overrides the Game Config's log file; remove -logfile from the launch arguments; RimArcho manages Player.log in the user data folder", arg)
+		}
+		if key == "-savedatafolder" || strings.HasPrefix(key, "-savedatafolder=") {
+			return fmt.Errorf("launch argument %q overrides the Game Config's user data folder; use archo env set %s --user-data <dir> and remove -savedatafolder from the launch arguments", arg, quoteArg(name))
+		}
+	}
+	return nil
+}
+
+func (a *App) checkLaunchArgs() error {
+	e, err := a.Env()
+	if err != nil {
+		return err
+	}
+	return validateStoredLaunchArgs(e.Name, a.LaunchArgs(e.ID))
+}
+
+// storedLaunchArgs parses stored launch arguments for a launch. RimArcho 1.0.9 split them
+// on whitespace, so a stored quote it treated as a plain character (it's, a stray ") never
+// blocks a launch that worked then: text whose quotes do not pair splits on whitespace,
+// as before. JSON argv must still parse.
+func storedLaunchArgs(args string) ([]string, error) {
+	argv, err := ParseLaunchArgs(args)
+	if errors.Is(err, errUnclosedQuote) {
+		return strings.Fields(args), nil
+	}
+	return argv, err
+}
+
+var errUnclosedQuote = errors.New("launch arguments contain an unclosed quote")
+
+// ParseLaunchArgs accepts lossless imported JSON argv or quoted command-line text.
+func ParseLaunchArgs(args string) ([]string, error) {
+	if strings.HasPrefix(strings.TrimSpace(args), "[") {
+		var argv []string
+		if err := json.Unmarshal([]byte(args), &argv); err != nil {
+			return nil, fmt.Errorf("launch arguments must be a JSON array of strings: %w", err)
+		}
+		return argv, nil
+	}
+	var argv []string
+	var word strings.Builder
+	var quote rune
+	started := false
+	runes := []rune(args)
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+		if r == '\\' && i+1 < len(runes) && quote == '"' && (runes[i+1] == '"' || runes[i+1] == '\\') {
+			i++
+			word.WriteRune(runes[i])
+			started = true
+			continue
+		}
+		if r == '"' || r == '\'' {
+			if quote == 0 {
+				quote = r
+				started = true
+				continue
+			}
+			if quote == r {
+				quote = 0
+				continue
+			}
+		}
+		if unicode.IsSpace(r) && quote == 0 {
+			if started {
+				argv = append(argv, word.String())
+				word.Reset()
+				started = false
+			}
+			continue
+		}
+		word.WriteRune(r)
+		started = true
+	}
+	if quote != 0 {
+		return nil, errUnclosedQuote
+	}
+	if started {
+		argv = append(argv, word.String())
+	}
+	return argv, nil
+}
+
+// DisplayLaunchArgs hides the import storage format from editable player fields.
+func DisplayLaunchArgs(args string) string {
+	if !strings.HasPrefix(strings.TrimSpace(args), "[") {
+		return args
+	}
+	argv, err := ParseLaunchArgs(args)
+	if err != nil {
+		return args
+	}
+	for i, arg := range argv {
+		argv[i] = `"` + strings.ReplaceAll(strings.ReplaceAll(arg, `\`, `\\`), `"`, `\"`) + `"`
+	}
+	return strings.Join(argv, " ")
 }

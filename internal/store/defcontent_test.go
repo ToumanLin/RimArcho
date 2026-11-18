@@ -1,6 +1,7 @@
 package store_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/store"
@@ -8,6 +9,7 @@ import (
 
 func TestUpgradeDefContentKeepsFacts(t *testing.T) {
 	s, path := openTemp(t)
+	legacyGameSchema(t, s)
 	for _, q := range []string{
 		`ALTER TABLE def_fact DROP COLUMN content_fields`,
 		`ALTER TABLE fact_set DROP COLUMN def_content_version`,
@@ -28,7 +30,7 @@ func TestUpgradeDefContentKeepsFacts(t *testing.T) {
 	}
 	defer u.Close()
 	u.MM = "1.6"
-	if u.Meta("schema_version") != "35" {
+	if u.Meta("schema_version") != fmt.Sprint(store.SchemaVersion) {
 		t.Fatal("not migrated")
 	}
 	defs, err := u.DefDefiners([]string{"Old"})

@@ -25,16 +25,31 @@ func TestDiscoverManagerImports(t *testing.T) {
 	e.WriteFile(filepath.Join(config, "ModsConfig.xml"), "synthetic current list")
 	e.WriteFile(filepath.Join(crow, "data", "mod_manager.db"), "synthetic database")
 	e.WriteFile(filepath.Join(crow, "backups", "Latest_ModList.rml"), "synthetic saved list")
+	// RimPy's saved lists: a synthetic ModsConfig-style XML in LocalLow\RimPy Mod Manager\ModLists
+	rimpy := filepath.Join(e.Root, "LocalLow", "RimPy Mod Manager")
+	rimpyList := filepath.Join(rimpy, "ModLists", "colony.xml")
+	e.WriteFile(rimpyList, `<?xml version="1.0" encoding="utf-8"?><ModsConfigData><version>1.6.4633 rev1261</version><activeMods><li>ludeon.rimworld</li><li>tester.alpha</li></activeMods></ModsConfigData>`)
+	e.WriteFile(filepath.Join(rimpy, "config.ini"), "synthetic settings")
 	before, _ := os.ReadFile(filepath.Join(sort, "settings.json"))
-	found := app.DiscoverManagerImports(app.ManagerLocations{RimSort: []string{sort, sort}, Installs: []string{crow, filepath.Join(e.Root, "absent")}})
-	if len(found) != 5 {
+	found := app.DiscoverManagerImports(app.ManagerLocations{RimSort: []string{sort, sort}, Installs: []string{crow, filepath.Join(e.Root, "absent")}, RimPy: []string{rimpy}})
+	if len(found) != 6 {
 		t.Fatalf("candidates: %+v", found)
+	}
+	rimpyFound := false
+	for _, f := range found {
+		rimpyFound = rimpyFound || f.Manager == "RimPy" && f.Kind == "list" && f.Path == rimpyList
+	}
+	if !rimpyFound {
+		t.Fatalf("RimPy list not found: %+v", found)
+	}
+	if l, err := app.ReadLoadoutFile(rimpyList); err != nil || len(l.Tokens) != 2 || l.Tokens[1] != "tester.alpha" {
+		t.Fatalf("RimPy list: %+v %v", l, err)
 	}
 	kinds := map[string]int{}
 	for _, f := range found {
 		kinds[f.Kind]++
 	}
-	if kinds["list"] != 3 || kinds["rimcrow"] != 1 || kinds["rimsort-rules"] != 1 {
+	if kinds["list"] != 4 || kinds["rimcrow"] != 1 || kinds["rimsort-rules"] != 1 {
 		t.Fatal(kinds)
 	}
 	after, _ := os.ReadFile(filepath.Join(sort, "settings.json"))

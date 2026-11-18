@@ -22,8 +22,10 @@ let ui = null;
 export function initHome(u) {
   ui = u;
   // Back from a game: the page reads the new Player.log (API.Home reads it when it is newer
-  // than the last one read).
-  addEventListener("focus", () => { if (S.screen === "home") home(); });
+  // than the last one read). A read on its way may have started before the log was written,
+  // so it is followed by one more (home coalesces them); only the start's read, which the
+  // focus a new window gets at start would repeat, asks for nothing more.
+  addEventListener("focus", () => { if (S.screen === "home" && !(homeRun && homeRunEarly)) home(); });
   addEventListener("resize", () => { if (S.screen === "home") { markY.clear(); placeMarks(); fitHeadline(); } });
 }
 
@@ -43,12 +45,63 @@ const markY = new Map();
 let homeRetries = 0, homeRetryTimer = null;
 let drawnSig = ""; // the last read drawn (home)
 let memoryTimer = null, launchPending = false;
-export async function home({ keep = false } = {}) {
+// One read at a time: API.Home waits for the one before it, so at start the page opening,
+// the window's focus and the menu art coming in read it three times, one after another
+// (1.0.9). Asks while one is on its way make one more read when it ends.
+let homeRun = null, homeAgain = null, homeAgainRun = null;
+let homeRunEarly = false; // the read on its way is the one started at start (readEarly)
+export function home(opts = {}) {
+  if (homeRun) {
+    homeAgain = { keep: (homeAgain ? homeAgain.keep : true) && !!opts.keep };
+    return homeAgainRun ??= homeRun.catch(() => {}).then(() => {
+      const again = homeAgain;
+      homeAgain = homeAgainRun = null;
+      return S.screen === "home" ? home(again) : undefined;
+    });
+  }
+  homeRun = readHome(opts).finally(() => { homeRun = null; });
+  return homeRun;
+}
+
+// backgroundChanged: menu art came in (16 §2.14); only the backdrop is read again. In 1.0.9
+// the whole page was, and at start that read went before the page's own.
+// It comes on any page: before the page's first read the backdrop read at start (readEarly)
+// may already hold the art from before it, so that one is asked again (2026-11-14: the
+// launch page stayed without its picture). A later read reads it anyway.
+export async function backgroundChanged() {
+  if (early) {
+    early[1] = api.HomeBackground();
+    early[1].catch(() => {});
+  }
+  if (homeRun) await homeRun.catch(() => {});
+  if (!data || S.screen !== "home") return; // the page's next read brings it
+  let b;
+  try { b = await api.HomeBackground(); } catch { return; }
+  if (S.screen !== "home" || JSON.stringify(b) === JSON.stringify(bg)) return;
+  bg = b;
+  setBackdrop(bg);
+  if (drawnSig) drawnSig = JSON.stringify([data, bg, hidden || ""]);
+}
+
+// At start the window reads this page alongside Workspace's shell instead of after it
+// (main.js); the first read takes that answer.
+let early = null;
+export function readEarly() {
+  early = [api.Home(), api.HomeBackground()];
+  for (const p of early) p.catch(() => {}); // the read that takes it says what failed
+}
+// forgetEarly: the window opened another page first (the first-run guide).
+export function forgetEarly() { early = null; }
+
+async function readHome({ keep = false } = {}) {
   clearTimeout(homeRetryTimer);
   const read = beginPageRead("home", { keep, retry: () => home() });
+  const [homeRead, bgRead] = early || [api.Home(), api.HomeBackground()];
+  homeRunEarly = !!early;
+  early = null;
   let next, backdrop, h;
   try {
-    [next, backdrop, h] = await Promise.all([api.Home(), api.HomeBackground(), hidden == null ? api.Setting(HIDDEN_KEY).catch(() => "") : hidden]);
+    [next, backdrop, h] = await Promise.all([homeRead, bgRead, hidden == null ? api.Setting(HIDDEN_KEY).catch(() => "") : hidden]);
   } catch (e) { read.fail(e); retryHome(); return; }
   if (!read.current()) return;
   // An empty page while games exist is a read that failed (a background job holding the
@@ -88,6 +141,8 @@ function retryHome() {
 
 const rows = () => (data && data.rows) || [];
 const applied = () => (data && data.featured >= 0 ? rows()[data.featured] : null);
+// running: a game runs, this Game Config's or (blocked) another one's on the same
+// installation; the page's one test for it (▶, save, the last game line, L).
 const running = () => !!(S.live && (S.live.running || S.live.blocked));
 const key = (r) => [r.kind, r.envName, r.plan || "", r.kind === "pack" ? r.name : ""].join("|");
 // a game's rows: its lists, then its packs, each by the last time played (view.SortHome)
@@ -154,7 +209,7 @@ export function homeKey(e) {
 
 // (w, save, is on its button while there is something to save: the line holds seven)
 export function hintList() {
-  return [{ key: "1–3", label: T("column") }, { key: "↑↓", label: T("list") }, { key: "←→", label: T("game") }, { key: "enter", label: T("edit") }, { key: "L", label: T("launch") },
+  return [{ key: "1–3", label: T("column") }, { key: "↑↓", label: T("list") }, { key: "←→", label: T("Game Config") }, { key: "enter", label: T("edit") }, { key: "L", label: T("launch") },
     { key: "shift+1–8", label: T("pages") }, { key: "?", label: T("all keys") }];
 }
 
@@ -215,9 +270,9 @@ function draw() {
   const f = applied();
   if (!rows().length) {
     const e = el("div", "hm-empty");
-    const add = el("button", "btn", T("add a game"));
+    const add = el("button", "btn", T("Add Game Config"));
     add.onclick = () => ui.go("env");
-    e.append(el("h1", "", T("no game yet: add one on the games page")), add);
+    e.append(el("h1", "", T("no Game Config yet: add one on the Game Configs page")), add);
     w.append(e);
     return;
   }
@@ -337,7 +392,7 @@ function step(n, cls, title) {
 // pick, else its most recently played). Each says its short version unless its name
 // already does ("1.6"); the full build is on hover.
 function gameStep(env) {
-  const s = step("01", "hm-s1", T("game"));
+  const s = step("01", "hm-s1", T("Game Config"));
   const list = el("div", "hm-picks");
   list.append(el("span", "hm-mark"));
   for (const g of shownFirst(games(), (g) => g.name === env)) {
@@ -392,14 +447,14 @@ function launchStep(f) {
   b.dataset.envWrite = "launch";
   arrived = false;
   const top = el("div", "top");
-  const title = el("span", "title", live ? T("the game is running") : starting ? T("starting…") : T(severity === "severe" ? "launch with RAM risk" : severity === "warning" ? "launch with limited RAM" : "launch the game"));
+  const title = el("span", "title", live ? (S.live.blocked || S.live.owner || T("the game is running")) : starting ? T("starting…") : T(severity === "severe" ? "launch with RAM risk" : severity === "warning" ? "launch with limited RAM" : "launch the game"));
   if (live) title.prepend(el("span", "dot"));
   top.append(title);
   if (!live) top.append(keyCaps("L"));
   // 01 and 02 already say what starts; the block adds only the edits that launching saves,
   // and they can be saved alone: save sits in the block's corner, beside it, not in it
   const saving = !starting && canSave(f);
-  const sub = live ? (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet")) : f && f.unsaved && !saving ? Tf("%d unsaved", f.unsaved) : "";
+  const sub = live && S.live.blocked ? "" : live ? (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet")) : f && f.unsaved && !saving ? Tf("%d unsaved", f.unsaved) : "";
   const bottom = el("div", "bottom");
   bottom.append(el("span", "sub num", sub));
   if (!live) bottom.append(el("span", "arrow", "→"));
@@ -558,11 +613,13 @@ function showSwitch(r) {
 // it was last played, each a line that is a link (16 §2.3).
 function activity() {
   const box = el("div", "hm-act");
-  const live = S.live && S.live.running;
-  if (live || data.lastRun) {
-    const runText = live ? T("the game is running") + "  " + (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet"))
-      : (data.lastRunDay || data.lastRun) + "  " + (data.lastRunErrors ? Tf("%d errors", data.lastRunErrors) : data.lastRunPending ? T("not checked yet") : T("no errors"));
-    const runGo = live || data.lastRunErrors ? "needs" : "log";
+  const live = running();
+  if (live || data.lastRun || data.missingLog) {
+    // another Game Config's game: its owner, without this run's errors (they are not ours)
+    const runText = live && S.live.blocked ? S.live.blocked
+      : live ? (S.live.owner || T("the game is running")) + "  " + (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet"))
+      : data.missingLog || (data.lastRunDay || data.lastRun) + "  " + (data.lastRunErrors ? Tf("%d errors", data.lastRunErrors) : data.lastRunPending ? T("not checked yet") : T("no errors"));
+    const runGo = (live && !S.live.blocked) || data.lastRunErrors ? "needs" : "log";
     box.append(actLine(T("last game"), runText, () => ui.go(runGo)));
   }
   // "nothing changed" tells nothing: the line shows only with changes or before a scan

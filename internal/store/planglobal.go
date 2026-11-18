@@ -19,12 +19,12 @@ func UniquePlanName(base string, taken func(string) bool) string {
 	}
 }
 
-// keepLists rewrites the entries naming envID's own instances (its Data/ and Mods/) as
+// keepLists rewrites the entries naming gameID's own instances (its Data/ and Mods/) as
 // their packageIds in every list, version and undo step, before that game is removed: the
 // lists stay, and the game that reads them next finds its own copy (07 §1.1).
-func keepLists(tx *sql.Tx, envID string) error {
+func keepLists(tx *sql.Tx, gameID string) error {
 	rows, err := tx.Query(`SELECT i.id, lower(coalesce(n.package_id, '')) FROM instance i LEFT JOIN snapshot n ON n.id = i.current_snapshot_id
-		WHERE i.environment_id = ?`, envID)
+		WHERE i.game_id = ?`, gameID)
 	if err != nil {
 		return err
 	}
@@ -92,9 +92,9 @@ func keepLists(tx *sql.Tx, envID string) error {
 // ElsewhereMods lists the other games' own Mods/ instances, leaving out links
 // RimArcho made there (_Archo_*). Tombstones keep a plan's deleted copy missing
 // instead of healing its packageId to another installed copy (16 §2.9, 07 §1.7).
-func (s *Store) ElsewhereMods(envID string) ([]*Mod, error) {
-	rows, err := s.DB.Query(`SELECT `+modColsLite+modFrom+` WHERE i.environment_id NOT IN ('', ?) AND s.kind = 'local'
-		AND substr(lower(i.rel_path), 1, 7) <> '_archo_' ORDER BY i.id`, envID)
+func (s *Store) ElsewhereMods(gameID string) ([]*Mod, error) {
+	rows, err := s.DB.Query(`SELECT `+modColsLite+modFrom+` WHERE i.game_id NOT IN ('', ?) AND s.kind = 'local'
+		AND substr(lower(i.rel_path), 1, 7) <> '_archo_' ORDER BY i.id`, gameID)
 	if err != nil {
 		return nil, err
 	}
@@ -120,17 +120,17 @@ type ForeignInstance struct {
 
 // ForeignInstances describes those of ids that are another game's own instances (its
 // Data/ or Mods/).
-func (s *Store) ForeignInstances(envID string, ids []string) (map[string]ForeignInstance, error) {
+func (s *Store) ForeignInstances(gameID string, ids []string) (map[string]ForeignInstance, error) {
 	out := map[string]ForeignInstance{}
 	for len(ids) > 0 {
 		n := min(len(ids), 500)
-		args := []any{envID}
+		args := []any{gameID}
 		for _, id := range ids[:n] {
 			args = append(args, id)
 		}
 		rows, err := s.DB.Query(`SELECT i.id, lower(coalesce(n.package_id, '')), i.real_path, s.kind FROM instance i
 			JOIN source s ON s.id = i.source_id LEFT JOIN snapshot n ON n.id = i.current_snapshot_id
-			WHERE i.environment_id NOT IN ('', ?) AND i.id IN (?`+strings.Repeat(",?", n-1)+`)`, args...)
+			WHERE i.game_id NOT IN ('', ?) AND i.id IN (?`+strings.Repeat(",?", n-1)+`)`, args...)
 		if err != nil {
 			return nil, err
 		}

@@ -201,3 +201,45 @@ func (a *App) removeTestLinks(base string) error {
 	}
 	return os.Remove(path)
 }
+
+// An interrupted journal belongs to physical Mods/, even if its environment was removed.
+func (a *App) recoverInstallationTestLinks(mods string, dryRun bool) error {
+	bases, err := os.ReadDir(filepath.Join(a.Home, "tests"))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	for _, de := range bases {
+		if !de.IsDir() {
+			continue
+		}
+		base := filepath.Join(a.Home, "tests", de.Name())
+		path := filepath.Join(base, testLinksFile)
+		b, err := os.ReadFile(path)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		var rec testLinks
+		if err := json.Unmarshal(b, &rec); err != nil {
+			return fmt.Errorf("test run journal %s: %w", path, err)
+		}
+		if canonicalRoot(rec.Mods) != canonicalRoot(mods) {
+			continue
+		}
+		if dryRun {
+			return fmt.Errorf("interrupted test run in %s needs recovery before changing Mods/; run archo test run to recover it", base)
+		}
+		if err := a.checkNoGame(); err != nil {
+			return err
+		}
+		if err := a.removeTestLinks(base); err != nil {
+			return err
+		}
+	}
+	return nil
+}

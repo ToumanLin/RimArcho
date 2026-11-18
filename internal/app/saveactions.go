@@ -352,17 +352,29 @@ func (a *App) CopySave(s *Save) (string, error) {
 	if s.Writing {
 		return "", fmt.Errorf("%s is being written; try again when the game has saved", s.Name)
 	}
-	base := s.Name + " (copy)"
-	for n := 1; ; n++ {
-		name := base
-		if n > 1 {
+	return copySaveInto(s, filepath.Dir(s.Path), false)
+}
+
+// copySaveInto copies s into dir as "<name> (copy)", "<name> (copy 2)"… (plainFirst: its
+// own name first), keeping a RimSaves prefix and the modification time; never overwrites.
+func copySaveInto(s *Save, dir string, plainFirst bool) (string, error) {
+	for n := 0; ; n++ {
+		var name string
+		switch {
+		case n == 0 && !plainFirst:
+			continue
+		case n == 0:
+			name = s.Name
+		case n == 1:
+			name = s.Name + " (copy)"
+		default:
 			name = fmt.Sprintf("%s (copy %d)", s.Name, n)
 		}
 		file := name + ".rws"
 		if s.Prefix != "" {
 			file = s.Prefix + rimSavesSep + file
 		}
-		to := filepath.Join(filepath.Dir(s.Path), file)
+		to := filepath.Join(dir, file)
 		err := copyFileExcl(s.Path, to)
 		if errors.Is(err, os.ErrExist) {
 			continue

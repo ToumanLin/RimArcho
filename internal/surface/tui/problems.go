@@ -35,7 +35,8 @@ type probState struct {
 	open   map[string]bool // folded items shown open (enter), by text
 	base   []view.Need     // the analysis' items; the running game's lead them (16 §2.1)
 	// lastRun says which run the last-run section is from ("the list · Sep 29 19:41")
-	lastRun string
+	lastRun    string
+	missingLog string
 	// lastSave is Before you start's last-save line (view.Needs.LastSave); nil none.
 	lastSave *view.LastSaveView
 	// elsewhere is what this page leaves to another page (view.Needs.Elsewhere, 16 §2.4)
@@ -127,6 +128,7 @@ func (m *model) loadProblems() {
 	p.countsKey = m.app.Store.ChangeKey()
 	if err != nil {
 		p.base, p.items, p.need, p.status, p.lastRun, p.elsewhere = nil, nil, 0, map[string]int{}, "", nil
+		p.missingLog = ""
 		m.say(sayFail, err.Error())
 		return
 	}
@@ -149,6 +151,7 @@ func (m *model) setNeeds(vn *view.Needs) {
 	p.loaded, p.countsKey = true, m.app.Store.ChangeKey()
 	p.never, p.stale = vn.Never, vn.Stale
 	p.base, p.status, p.need, p.lastRun, p.elsewhere = vn.Items, vn.Status, vn.Count, vn.LastRun, vn.Elsewhere
+	p.missingLog = vn.MissingLog
 	p.lastSave = vn.LastSave
 	m.composeNeeds()
 }

@@ -26,6 +26,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/perftrace"
 	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/textures"
+	"github.com/ToumanLin/RimArcho/internal/updatechannel"
 )
 
 // Config is config.toml (17 §3). Only keys used by M1 are read.
@@ -145,7 +146,9 @@ type App struct {
 	// SteamSignedIn replaces asking which account the running Steam client is signed in
 	// with (env.SteamSignedIn); tests fake it.
 	SteamSignedIn func() (account string, ok bool)
-	HTTP          *http.Client
+	// SteamSignedInID replaces env.SteamSignedInID (the Archo Agent's redaction list); tests fake it.
+	SteamSignedInID func() uint64
+	HTTP            *http.Client
 	// FindTool delegates dependency lookup; subscriptions never install tools.
 	FindTool func(name string) (path string, ok bool)
 	pageRepo func(string) string // resolved-repository override in local tests
@@ -175,6 +178,7 @@ type App struct {
 	// SelfVersionOf asking the new program its version, SelfOthers listing the other
 	// RimArcho processes in a folder, SelfWaitPoll how often that is asked while waiting.
 	SelfUpdateAPI string
+	SelfLanzou    updatechannel.LanzouClient // Synthetic tests; nil uses Lanzou's bounded client.
 	SelfVersion   string
 	SelfProgram   string
 	SelfVersionOf func(ctx context.Context, exe string) (string, error)
@@ -317,11 +321,11 @@ func LoadConfig(path string) (Config, error) {
 	return c, sc.Err()
 }
 
-// NewID mints an Instance/Lineage/Environment/Source ID.
+// NewID mints an Instance/Lineage/environment/Source ID.
 func (a *App) NewID() string { return ids.New(a.Rand) }
 
 // ErrNoEnv is returned when no environment has been configured.
-var ErrNoEnv = errors.New("no environment configured (archo env detect, then archo env add <name> --detected)")
+var ErrNoEnv = errors.New("no Game Config configured (archo env detect, then archo env add <name> --detected; or give the game folder yourself: archo env add <name> --game <dir>)")
 
 // Env returns the environment for this invocation: --env, else the current one.
 func (a *App) Env() (*env.Environment, error) {
@@ -331,7 +335,7 @@ func (a *App) Env() (*env.Environment, error) {
 			return nil, err
 		}
 		if e == nil {
-			return nil, fmt.Errorf("no environment named %q (archo env list)", a.EnvName)
+			return nil, fmt.Errorf("no Game Config named %q (archo env list)", a.EnvName)
 		}
 		return e, nil
 	}

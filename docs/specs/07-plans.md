@@ -54,8 +54,8 @@ The GUI gathers these actions on all lists (16 §2.17). Commands: `archo plan li
 
 - When an environment is read and has no current plan (`environment.current_plan = 0`):
   - If ModsConfig.xml still matches a plan's last write (its hash equals the write record), make that plan current; create none.
-  - If ModsConfig.xml is absent (for example, a new game with its own saves) and plans exist, make the most recently edited plan current; create none.
-  - Otherwise read ModsConfig.xml and create a plan: v1 has source `import` and note `ModsConfig.xml` (absent file: an empty list with note `no ModsConfig.xml`). It is named `default`; if that is taken, the environment's name, then numbered (`1.6 2`). The first-run guide also offers "move over from RimSort or RimCrow" and "open a pack or a Steam collection" (16 §2.15).
+  - If ModsConfig.xml is absent for own saves, create a separate plan with Core and installed DLC in release order. Other environments without the file may adopt the most recently edited global plan.
+  - Otherwise read ModsConfig.xml and create a plan: v1 has source `import` and note `ModsConfig.xml` (absent file: an empty list with note `no ModsConfig.xml`). It is named `default`; if that is taken, the environment's name, then numbered (`1.6 2`). The first-run guide also offers "move over from RimSort, RimCrow or RimPy" and "open a pack or a Steam collection" (16 §2.15).
 
 ### 1.5 Archo Monitor added by default
 
@@ -89,6 +89,8 @@ Each plan records **allowed game versions** (major.minor, such as 1.5, 1.6, 1.7)
 - **Warning counts**: `PlanVersions.Missing` and the version notices in all lists leave out ignored version warnings and list them separately as `Muted` (05 §4.2). If all are ignored, say "no version warnings", never "every Mod supports it". `Common`, defaults, allowed versions and player selections still use the actual declarations: ignoring a warning does not count as support.
 
 ### 1.7 Plans shared across all games
+
+Sibling environments share installation inventory, not current-plan selection. `env add --like` selects the source environment's current global plan under 03 §6.2; adding an environment never copies a plan.
 
 A plan is only "what is enabled and in what order", independent of game directories, and allowed game versions (§1.6) say which versions it is meant for. So plans do not belong to environments.
 
@@ -351,9 +353,11 @@ Storage: `lineage_data` (environment, Lineage, alias, note), `lineage_tag` (envi
 
 **Whole-tag edits** (`cmds.RenameTag`, `MergeTags`, `DeleteTags`, `SetTagNote`; each one store transaction): a merge gives every Mod carrying one of the source tags the target tag (new or existing; an existing target keeps its spelling) and removes the sources; their notes are appended to the target's. A rename is a merge into a new name and may change only the case; a name another tag already has is refused, because that is a merge (a pinned tag no Mod carries does not count, so a tag can take a preset name). A delete removes the tags and their notes and touches nothing else. `tags.pinned` (16 §3.8) follows: a renamed or merged tag takes the source's pinned place unless the target is pinned already, a deleted tag leaves the list, and an unchanged list is not written, so the preset stays a preset. Removing the last pinned tag stores `,` (none pinned), since an empty value would bring the preset back. These edits are player data, outside the undo history (16 §3.8). Test: `TestTagEdits`.
 
-### 6.2 One-time RimCrow import
+### 6.2 RimCrow import
 
 `archo import rimcrow --db <path> [--rules <path>] [--dry-run] [--include-disabled-rules] [--all]`
+
+Profile environments and their independent current plans follow 03 §6.4. The same preview/apply path is used by CLI, first-run and Settings; the preview lists installation groups, profile destinations, argv and list tokens, including the shared-folder/deletion warning. Profile conflicts never replace an existing current plan.
 
 1. `--db` is required: RimCrow keeps its database at `<installation directory>/data/mod_manager.db`, which cannot be found through the registry or a configuration file. `--rules` defaults to `data\rules\user_rules.json` beside the database.
 2. Copy the database and WAL into a temporary `rimcrow-*` directory under RimArcho's data, open the copy read-only, and delete it afterwards. RimCrow's originals are never opened for writing.
@@ -363,30 +367,69 @@ Storage: `lineage_data` (environment, Lineage, alias, note), `lineage_tag` (envi
    | RimCrow | RimArcho |
    | --- | --- |
    | Alias, note | Alias, note; do not overwrite differing existing values, report conflicts |
-   | Groups, tags | Tags |
+   | Groups, tags | Tags; a group's colour becomes its tag's colour unless it is RimCrow's default white or the tag already has one |
+   | sign_color (a Mod's colour mark) | A tag `RimCrow colour #rrggbb` with that colour (§6.4) |
+   | ignored_issues (any) | A tag `RimCrow: ignored warnings` (§6.4); the issue IDs themselves are RimCrow's and are not kept |
    | Interlock | `attach` rule |
    | `user_rules.json` loadAfter / loadBefore / incompatibleWith | `after` / `before` / `incompatible` |
    | `user_rules.json` loadTop / loadBottom (`value` true) | `top` / `bottom` (08 §1.5) |
-   | sign_color, user_mod_type, ignored_issues | No equivalent; count only |
+   | user_mod_type; a colour that is not hex | No equivalent; count only |
+   | subscribed collections, GitHub install records, profile inactive/temporary orders, the Workshop cache database | Not read |
 
 5. **Disabled** RimCrow user rules are left out unless `--include-disabled-rules` is given; importing them silently would change sorting.
 6. Report the mapped counts (by path or packageId), imported, already existing and conflicting; list every unmapped or conflicting item, and the count of resources disabled in RimCrow. Count the directories that have only About.xml.disabled, by source, with what to do (rename them back, or enable them again in RimCrow, then `archo scan`; or unsubscribe or delete them; RimArcho's handling: 09 §5).
 7. Running it again gives the same result: identical values are skipped, and rules are deduplicated by kind + Lineage. RimCrow's log tables are not imported.
 8. `--dry-run` only reports and writes nothing. By default 6 details per category; `--all` shows all.
 
-The GUI's shared manager-import flow (16 §2.15) discovers sources read-only with `app.DiscoverManagerImports`:
+The Import page's tree (§6.5; 16 §2.18) selects which RimCrow profiles become Game Configs (03 §6.5), and which kinds of player data and rules come over. Unconfigured profiles remain visible and skipped.
+
+The GUI's Import page (16 §2.18) discovers sources read-only with `app.DiscoverManagerImports`:
 
 - RimSort: `%LOCALAPPDATA%\RimSort` (Windows `platformdirs`, `appauthor=False`), with `%APPDATA%\RimSort` as a compatibility candidate; `modlists/`, `dbs/userRules.json`, and `settings.json`'s legacy `config_folder` or each `instances` entry's `config_folder` for ModsConfig.xml. Portable/development candidates also check the program folder and its `data/` child.
+- RimSort's local database: `instances/<instance>/aux_metadata.db` under the RimSort folder (at most 16 instances), `aux_metadata.db` in the folder itself, and `<instance_folder_override>/<instance>/aux_metadata.db` for an instance whose settings move it (§6.4).
 - RimCrow: `<install>/data/mod_manager.db`; also a directly selected/recent data folder's `mod_manager.db`. Saved lists come from `<install>/backups/`, its `today`, `earlier`, `other` children, and up to 16 profile directories under `backups/profile/`.
+- RimPy: `ModLists/` in its data folder, `LocalLow\RimPy Mod Manager` beside `%APPDATA%` (Roaming). Its lists are read as any list (§7.2); the folder's `config.ini` is not read. The file format of RimPy's saved lists is not documented; a synthetic ModsConfig-style list is tested, a real RimPy file is a VM check.
 - Install candidates: running RimCrow/RimModManager/RimSort executable directories; named folders in Program Files, Local AppData/Programs, Local AppData, Downloads, Desktop, Games and beside RimArcho's parent folder; named Start-menu shortcuts and recent-folder shortcuts. Windows shortcut resolution is read-only, hidden and limited to four seconds and 200 shortcuts per root. No registry registration is assumed. Each list folder contributes at most its first 100 entries. Duplicate source paths are suppressed; inaccessible or absent locations are skipped.
 
-Choosing a candidate does not import it. Lists use §7; RimCrow data uses the existing dry-run report and import above. Original databases, WAL files, settings and rules remain unchanged. The manual file picker remains available when discovery finds nothing.
+Choosing a candidate does not import it. Lists use §7; player data and rules come over part by part (§6.5). Original databases, WAL files, settings and rules remain unchanged. The manual file picker remains available when discovery finds nothing.
 
 Measured on real data: 18 §3.
 
 ### 6.3 RimSort user rules
 
 `app.ImportRimSortRules` reads `dbs/userRules.json` (at most 4 MB) without modifying it. Its `rules` map imports loadAfter/loadBefore/incompatibleWith and true loadTop/loadBottom values as after/before/incompatible/top/bottom user rules. A packageId must resolve to one live Lineage; missing or ambiguous packages are skipped and reported. Existing kind + Lineage rules are deduplicated, including repeats in the input; unsupported fields are counted. Preview and confirmation follow 16 §2.15; applying rules does not sort a plan or write ModsConfig.xml. RimSort's application settings and community databases are discovery inputs, not settings to apply to RimArcho.
+
+### 6.4 RimSort local database and colour marks
+
+`archo import rimsort --db <aux_metadata.db> [--dry-run] [--all]`; in the GUI, the Import page's "found on this computer" (16 §2.18) or its file dialog (a file named `aux_metadata.db`).
+
+RimSort keeps one SQLite database per instance (SQLAlchemy). `app.ImportRimSortAux` copies it with its WAL and opens the copy read-only, as §6.2 does. It reads:
+
+| RimSort | RimArcho |
+| --- | --- |
+| `auxiliary_metadata.user_notes` | Note; a differing existing note is kept and reported |
+| `mod_tags` through `tags_table` | Tags |
+| `auxiliary_metadata.color_hex` (QColor `#rrggbb` or `#aarrggbb`) | A tag `RimSort colour #rrggbb` with that colour; another value is counted as not mapped |
+| `auxiliary_metadata.ignore_warnings` true | A tag `RimSort: ignored warnings` |
+| `type`, ACF and Workshop times, `outdated`, `db_time_touched` | Not read: RimSort's own cache |
+
+The preview and report show the Mods with data and how they matched, notes, tags and tag colours; there are no aliases or rules in this source.
+
+A row is keyed by the Mod folder's absolute path: it maps to the Lineage of the live Instance at that path, else to the single Lineage whose Workshop ID is `published_file_id`; otherwise it is reported as not installed or ambiguous. Rows with none of the player's data are not counted. Columns missing in older databases are read as empty.
+
+RimArcho keeps colours on tags (16 §3.8), not on Mods, so a colour mark from either manager (§6.2) becomes a tag named after the manager and the colour, coloured with it; the Mod's rows then take the colour as long as that tag is its first coloured one. "Ignore warnings" becomes a tag so the player keeps the information; it does not hide anything in Can it run. The tag names follow `ui.lang`, from the locale's supplemental table (`app.ManagerTagNamesIn`, keys `@tag.manager-colour` and `@tag.manager-ignore`), so the window and the CLI write the same names; after the language changes, importing again adds the tags under the new names. A tag that already has a colour keeps it. Running the import again changes nothing.
+
+### 6.5 Moving in part by part, and the record of earlier imports
+
+The Import page (16 §2.18) brings another manager's data over one part at a time, so the player chooses what comes over and sees what came in before.
+
+**Parts.** `app.RimCrowOptions.Parts` and `app.RimSortAuxOptions.Parts` limit an import to some parts (`app.Part*`); nil takes them all, as the CLI does. RimCrow: `aliases`, `notes`, `groups` (group memberships and their colours), `tags`, `colours` (colour marks), `ignored` (ignored issues), `interlocks`, and `rules` (user rules), or `rules-off` when user rules are switched off in RimCrow; an empty map imports profiles only. RimSort's local database: `notes`, `tags`, `colours`, `ignored`. RimSort's `userRules.json` is one part. Each profile (`profile:<id>`) and each list file found is a part of its own. Every import counts each part: values RimArcho does not have yet (new) and values it already has (same; a differing value of RimArcho's counts as same, since it stays) in `RimCrowReport.Parts`.
+
+**Survey.** `App.SurveyMigration(found, tags)` groups what discovery found by manager and kind (profiles, player data per source, rules, lists), with a dry run of each source (`IncludeDisabledRules`, so switched-off rules are counted). A part is `new` (something to bring over), `had` (all of it already in RimArcho), `empty` (the source has none; not shown), `blocked` (a profile that cannot come over, with RimCrow's status), or `listed` (a list file imported before whose list still exists). A list file's facts are its Mod count and how many are not installed (by packageId and Workshop ID against live Mods). Switched-off rules are not on by default; everything else that is new is.
+
+**Bringing one part over.** `App.MigratePart(pick, tags)` imports one part: a list file becomes a new list named after the file (or its own title), with ` 2`, ` 3` … when that name is taken (`NewPlanFromImport`, §7), without opening it; a profile, a data part or rules use the imports of §6.2–§6.4 limited to that part. The window's `update` mode replaces the content of the list a file became, as the editor's import does, in one undoable step, without opening that list. The window runs the parts as one background task (16 §2.16), holding its lock for one part at a time.
+
+**The record of earlier imports** is the meta value `import.history`: per source path (lower-cased), the time of the last import, the file's SHA-256 then, and for a list file the list it became (a copy keeps the record's list). A manager's “imported” date is its sources' latest. A list file is `listed` while that list exists, and changed when the file's hash differs. Nothing is recorded for the CLI's whole imports or for list imports from a file or a link; what is already in RimArcho comes from the dry run, not from the record, so the CLI's imports still show as `had`.
 
 ## 7. List exchange
 
@@ -416,7 +459,7 @@ Formats are detected by content, not by extension (except `.rws`, read as a save
 | --- | --- | --- |
 | RimArcho list (`.archolist.json`) | Starts `{`, has `entries` array and numeric `format` | `pack.json` format (10 §1): `name` is list name, `game`, `entries[]` fields `package_id`, `name`, `workshop_id`, `hash`; reject newer `format`. Read pack-directory `pack.json` the same way |
 | Text list | Other text | One packageId per line (`author.name`), `#` comments, skip headings/prose |
-| ModsConfig.xml / RimSort exported list | Root `ModsConfigData` | `version`, `activeMods/li` |
+| ModsConfig.xml / RimSort or RimPy saved list | Root `ModsConfigData` | `version`, `activeMods/li` |
 | Save | `.rws` or `<savegame` in first 4096 bytes | `gameVersion`, `modIds`, `modNames` under `<meta>`; stop at `</meta>` (saves are tens of MB); names label missing entries |
 | RimWorld `.rml` (in-game "save Mod list", also written by RimCrow) | Root `savedModList` | Prefer `modList/ids` and `names`, else `meta/modIds`, `modNames`; matching `meta/modSteamIds` supplies Workshop IDs |
 | RimCrow `ModList.xml` | Root `ModList` | Parallel `modIds`, `modNames`, `modSteamWorkshopIds` (`0` = none) |
@@ -429,7 +472,7 @@ Formats are detected by content, not by extension (except `.rws`, read as a save
 
 - JSON entries may be strings or objects with `packageId` / `package_id` / `packageid` / `id`, `name`, `workshopId` / `workshop_id` / `publishedFileId`.
 - Of duplicate packageIds, the first is kept. UTF-16 and UTF-8 BOMs are detected and the text is normalized to UTF-8; files under 16 MB are read whole.
-- If no Mods are found, the error is "no mods found in it: a list from RimSort, RimCrow or RimWorld, a share code, packageIds or workshop links".
+- If no Mods are found, the error is "no mods found in it: a list from RimSort, RimCrow, RimPy or RimWorld, a share code, packageIds or workshop links".
 - Pasting one line in the UI: an existing file path reads the file; a Rentry link fetches `https://rentry.co/<id>/raw` (at most 4 MB; on failure, suggest opening the page, copying the list and pasting it); a Workshop link or a number of 6 or more digits reads a Steam collection (§7.5). Only the last two use the network.
 - Pack (`.archopack`) import: 10 §4. A pack's exported list is a RimArcho list, imported here.
 

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"runtime/debug"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -167,8 +169,35 @@ func (m *model) scanSummary(out string) string {
 	return T("scan complete, nothing changed")
 }
 
+// noGameKey: the keys while no Game Config loads (no game added yet, or the current one
+// fails to open). The screen says what to do; only quit, help, the command line (to add a
+// game) and E (another Game Config) work, and every other key says why it does nothing.
+func (m *model) noGameKey(s string) tea.Cmd {
+	switch s {
+	case "q":
+		m.quitting = true
+		return tea.Quit
+	case "?":
+		return m.helpPage()
+	case ":":
+		return m.openCmdLine()
+	case "E":
+		return m.chooseEnv()
+	}
+	if errors.Is(m.loadErr, app.ErrNoEnv) {
+		m.say(sayInfo, T("No game added yet."))
+	} else {
+		m.say(sayFail, m.humanize(m.loadErr.Error()))
+	}
+	return nil
+}
+
+// itemlessKeys are the global keys a Can it run item can never take: quit, help and the
+// command line.
+var itemlessKeys = map[string]bool{"q": true, "?": true, ":": true}
+
 func (m *model) key(k tea.KeyMsg) tea.Cmd {
-	s := k.String()
+	s := keyName(k) // an input method's full-width punctuation as the US key (imekeys.go)
 	if m.uninstallRun != nil {
 		if s == "ctrl+c" || s == "q" || s == "esc" {
 			m.say(sayBusy, T("uninstalling; you can close RimArcho when it finishes"))
@@ -199,7 +228,7 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		return m.menuKey(s)
 	case m.pal != nil:
 		return m.paletteKey(k)
-	case s == "ctrl+k" && m.prompt == nil && !m.editing && m.pos == nil:
+	case s == "ctrl+k" && m.prompt == nil && !m.editing && m.pos == nil && m.loadErr == nil:
 		m.panel, m.insp, m.tags = nil, nil, nil
 		return m.openPalette()
 	case m.tags != nil:
@@ -228,6 +257,16 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		return m.barOpenKey(k)
 	case m.full && s != "?":
 		return m.fullKey(s)
+	}
+	if m.loadErr != nil {
+		return m.noGameKey(s) // nothing below has a list or a Game Config to act on
+	}
+	if m.tab == tabProblems && !itemlessKeys[s] {
+		// Can it run: the selected item's keys come before the global and the page keys
+		// (needsKey does not look at them)
+		if cmd, ok := m.needItemKey(s); ok {
+			return cmd
+		}
 	}
 	switch s {
 	case "q":
@@ -606,6 +645,9 @@ func (m *model) panelKey(s string) tea.Cmd {
 	p := m.panel
 	page := max(m.h-bodyTop-4, 1)
 	if p.choices != nil {
+		if f := p.keys[s]; f != nil {
+			return f(m) // the chooser's own keys (the Game Config picker's x)
+		}
 		switch s {
 		case "up", "k":
 			p.choice = max(0, p.choice-1)
@@ -654,19 +696,57 @@ func (m *model) panelKey(s string) tea.Cmd {
 }
 
 func (m *model) chooseEnv() tea.Cmd {
-	envs, err := m.app.Store.Envs()
-	if err != nil || len(envs) == 0 {
-		m.say(sayInfo, T("no games yet (archo env add)"))
+	envs := view.EnvironmentRows(m.app, "")
+	if len(envs) == 0 {
+		m.say(sayInfo, T("no Game Configs yet (archo env add)"))
 		return nil
 	}
-	p := &panel{title: T("switch game"), nav: 8}
-	for i, e := range envs {
-		p.choices = append(p.choices, e.Name)
-		if e.Name == m.envName {
-			p.choice = i
+	p := &panel{title: T("switch Game Config"), nav: 8, choiceCurrent: map[int]bool{}, choiceHeads: map[int]string{}}
+	labels := map[string]string{}
+	// grouped by installation, in the order the installations first appear (as env list):
+	// a heading with the game and its folder, then its Game Configs (16 §9.1)
+	var games []string
+	byGame := map[string][]view.EnvRow{}
+	for _, e := range envs {
+		if byGame[e.GameID] == nil {
+			games = append(games, e.GameID)
+		}
+		byGame[e.GameID] = append(byGame[e.GameID], e)
+	}
+	for _, g := range games {
+		rows := byGame[g]
+		p.choiceHeads[len(p.choices)] = strings.TrimSpace(rows[0].Installation + "  " + rows[0].Path)
+		for _, e := range rows {
+			if e.Name == m.envName {
+				p.choice = len(p.choices)
+				p.choiceCurrent[p.choice] = true
+			}
+			p.choices = append(p.choices, e.Name)
+			labels[e.Name] = e.Name
 		}
 	}
+	// the shared-game-folder notice stays until x acknowledges it: opening the picker (or
+	// the window's Game Config page drawing it) is not reading it
+	if text := view.AliasNoticeText(m.app); text != "" {
+		p.lines = []string{text, T("x: got it, don't show this again")}
+		p.keys = map[string]func(*model) tea.Cmd{"x": func(m *model) tea.Cmd {
+			if err := m.app.AcknowledgeAliasNotice(); err != nil {
+				m.say(sayFail, m.humanize(err.Error()))
+				return nil
+			}
+			m.panel.lines, m.panel.keys = nil, nil
+			return nil
+		}}
+	}
+	p.choiceLabels = labels
+	p.choices = append(p.choices, "+ add-environment")
+	p.choiceLabels["+ add-environment"] = "+ " + T("Add Game Config")
 	p.onPick = func(m *model, name string) tea.Cmd {
+		if name == "+ add-environment" {
+			cmd := m.openCmdLine()
+			m.cmdl.info = T("add a Game Config: archo env add <name> --game <folder> --saves own (or --like <config>)")
+			return cmd
+		}
 		m.app.EnvName = ""
 		if m.act(Tf("switched to %s", name), "env", "use", name) {
 			for k := range m.cols {
@@ -678,7 +758,12 @@ func (m *model) chooseEnv() tea.Cmd {
 		}
 		return m.requestDetail()
 	}
-	p.onDelete = func(m *model, name string) tea.Cmd { m.removeEnv(name); return nil }
+	p.onDelete = func(m *model, name string) tea.Cmd {
+		if name != "+ add-environment" {
+			m.removeEnv(name)
+		}
+		return nil
+	}
 	m.panel = p
 	return nil
 }
@@ -690,7 +775,7 @@ func (m *model) removeEnv(name string) {
 		m.say(sayFail, m.humanize(err.Error()))
 		return
 	}
-	lines := append(view.EnvRemovalLines(r), "", Tf("enter: %s, esc: cancel", T("remove the game")))
+	lines := append(view.EnvRemovalLines(r), "", Tf("enter: %s, esc: cancel", T("remove Game Config")))
 	m.panel = &panel{title: view.EnvRemovalTitle(r), lines: lines,
 		onEnter: func(m *model) tea.Cmd {
 			m.app.EnvName = ""
@@ -729,6 +814,9 @@ func (m *model) hit(x, y int) (colKind, int, bool) {
 func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
 	if m.cmdOn {
 		return nil // the command line takes keys only
+	}
+	if m.loadErr != nil && m.panel == nil && m.menu == nil {
+		return nil // no Game Config: nothing on the screen to click (noGameKey)
 	}
 	wheel := 0
 	switch e.Button {

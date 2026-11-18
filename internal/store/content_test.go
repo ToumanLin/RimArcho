@@ -60,7 +60,7 @@ func TestContentKindsScopedSnapshots(t *testing.T) {
 	if err != nil || len(empty) != 0 {
 		t.Fatalf("empty scope: %v, %v", empty, err)
 	}
-	if _, err := s.DB.Exec(`INSERT INTO instance(id, environment_id, lineage_id, source_id, rel_path, real_path, status, current_snapshot_id, first_seen, last_seen)
+	if _, err := s.DB.Exec(`INSERT INTO instance(id, game_id, lineage_id, source_id, rel_path, real_path, status, current_snapshot_id, first_seen, last_seen)
 		VALUES('a', '', 'l', 's', 'a', 'a', 'live', 1, 1, 1), ('b', '', 'l', 's', 'b', 'b', 'live', 999, 1, 1), ('c', '', 'l', 's', 'c', 'c', 'live', NULL, 1, 1)`); err != nil {
 		t.Fatal(err)
 	}

@@ -20,7 +20,9 @@ export function setNeedRunner(run, write) { runNeed = run; needWrite = write; }
 // reasonsOf: the items behind a row's icon; a missing entry or an unloadable mod without
 // one says what the icon itself means.
 function reasonsOf(it, st) {
-  const rs = (it.id && S.board && S.board.reasons && S.board.reasons[it.id]) || [];
+  // a missing entry has no instance: its reasons are keyed by its pkg: ref (view.Needs.Reasons)
+  const k = it.id || (it.missing && it.ref);
+  const rs = (k && S.board && S.board.reasons && S.board.reasons[k]) || [];
   if (rs.length) return rs;
   if (it.missing) return [{ status: st, text: T("not installed") }];
   if (st === 1) return [{ status: st, text: T("the game cannot load it") }];

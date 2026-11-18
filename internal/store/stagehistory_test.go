@@ -13,7 +13,7 @@ func TestStageHistoryRemapItemsAndAnchors(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	if _, err := s.DB.Exec(`INSERT INTO environment(id,name,game_root,user_data_root,created_at) VALUES('e','e','g','u',0)`); err != nil {
+	if _, err := s.DB.Exec(`INSERT INTO game(id,name,game_root,game_root_key,created_at) VALUES('e','e','g','g',0); INSERT INTO environment(id,name,game_id,user_data_root,created_at) VALUES('e','e','e','u',0)`); err != nil {
 		t.Fatal(err)
 	}
 	p, err := s.CreatePlan("e", "test", fixed)
@@ -51,7 +51,7 @@ func TestStageHistoryWaitsForBackgroundWriter(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	if _, err := s.DB.Exec(`INSERT INTO environment(id,name,game_root,user_data_root,created_at) VALUES('e','e','g','u',0)`); err != nil {
+	if _, err := s.DB.Exec(`INSERT INTO game(id,name,game_root,game_root_key,created_at) VALUES('e','e','g','g',0); INSERT INTO environment(id,name,game_id,user_data_root,created_at) VALUES('e','e','e','u',0)`); err != nil {
 		t.Fatal(err)
 	}
 	p, err := s.CreatePlan("e", "test", fixed)

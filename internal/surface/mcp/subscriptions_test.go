@@ -93,6 +93,9 @@ func TestManageSubscriptions(t *testing.T) {
 		got, isErr := call(t, cs, "manage_subscriptions", args)
 		cli := st.cli(sc)
 		want, code := sc.e.Run(cli...)
+		if len(cli) == 1 && strings.Contains(cli[0], " ") { // the argv builder's refusal
+			want, code = "error: "+cli[0]+"\n", cmds.ExitUsage
+		}
 		if sm.scrub(got) != sc.scrub(want) {
 			t.Errorf("%v: MCP text differs from `archo %s`:\n--- mcp\n%s\n--- cli\n%s", args, strings.Join(cli, " "), got, want)
 		}

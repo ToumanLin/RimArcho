@@ -3,12 +3,14 @@ package app
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 
+	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/source"
@@ -188,34 +190,33 @@ func (a *App) replaceCreditLocked(it store.CreditItem, old, target *store.Mod, u
 	if err != nil {
 		return "", err
 	}
+	// A root that cannot be switched now keeps its obligation (done=0) and the item stays
+	// switching, so the next pass retries it; the roots switched meanwhile stay switched.
+	// Until every root is switched, lists are not remapped and the SteamCMD copy stays.
+	var unfinished []string
+	switched, gone := 0, 0
 	for _, d := range deployments {
-		e, err := a.Store.EnvByID(d.EnvID)
-		if err != nil {
-			return "", err
-		}
-		if e == nil {
-			return "", fmt.Errorf("deployment environment %s no longer exists", d.EnvID)
-		}
-		if p, err := a.Store.PlanByID(d.PlanID); err != nil {
-			return "", err
-		} else if p == nil {
-			return "", fmt.Errorf("deployment plan %d no longer exists", d.PlanID)
-		}
-		a.EnvName, a.OpenPlan, a.PlanName = e.Name, d.PlanID, ""
 		if err := a.checkNoGame(); err != nil {
 			return "", err
 		}
-		st, err := a.Loadout()
+		a.OpenPlan, a.PlanName = d.PlanID, ""
+		st, err := a.creditDeploymentState(d)
 		if err != nil {
-			return "", err
+			if errors.As(err, new(creditGone)) {
+				gone++
+			}
+			unfinished = append(unfinished, err.Error())
+			continue
 		}
+		e := st.Ix.Env
 		if !st.Reg.Loadable(target.ID) {
 			blocked = append(blocked, fmt.Sprintf("Workshop copy cannot be loaded in deployed game %s", e.Name))
 			continue
 		}
 		// Save owns registry tokens, _steam, link journal, external-edit checks and backups.
 		if st.File == nil {
-			return "", fmt.Errorf("deployment ModsConfig is missing in %s", e.Name)
+			unfinished = append(unfinished, fmt.Sprintf("deployment ModsConfig is missing in %s", e.Name))
+			continue
 		}
 		rec, err := a.Store.ModsConfigStateAt(e.UserDataRoot)
 		if err != nil {
@@ -232,9 +233,18 @@ func (a *App) replaceCreditLocked(it store.CreditItem, old, target *store.Mod, u
 		if _, err := a.writeGame(st, false, false, false, old); err != nil {
 			return "", err
 		}
-		if err := a.Store.FinishCreditDeployment(it, d.EnvID); err != nil {
+		if err := a.Store.FinishCreditRoot(it, d.RootKey); err != nil {
 			return "", err
 		}
+		switched++
+	}
+	if len(unfinished) > 0 {
+		why := fmt.Sprintf("%d of %d games switched to Workshop; %s", switched, len(deployments), strings.Join(unfinished, "; "))
+		if gone == len(unfinished) {
+			// nothing left can change by waiting: keep the SteamCMD copy for good
+			return "retained: " + why, nil
+		}
+		return "", errors.New(why)
 	}
 	if err := a.checkNoGame(); err != nil {
 		return "", err
@@ -531,3 +541,55 @@ func (a *App) creditGameProjection(st *LoadoutState, rec *store.ModsConfigState,
 	}
 	return projection, nil
 }
+
+// Read the captured root without borrowing a sibling's mutable environment settings.
+func (a *App) creditDeploymentState(d store.CreditDeployment) (*LoadoutState, error) {
+	if d.UserDataRoot == "" {
+		return nil, creditGone{fmt.Sprintf("credit deployment %s has no captured user data root; the SteamCMD copy stays", d.EnvID)}
+	}
+	g, err := a.Store.GameByID(d.GameID)
+	if err != nil {
+		return nil, err
+	}
+	if g == nil {
+		return nil, creditGone{fmt.Sprintf("credit deployment installation %s is unavailable; the SteamCMD copy stays for %s", d.GameID, d.UserDataRoot)}
+	}
+	e := &env.Environment{ID: d.EnvID, GameID: d.GameID, Name: d.EnvName, GameRoot: g.GameRoot, GameVersion: g.GameVersion, UserDataRoot: d.UserDataRoot}
+	ix, err := a.loadIndex(e)
+	if err != nil {
+		return nil, err
+	}
+	reg, aliases, cands, deploy, err := a.registry(ix)
+	if err != nil {
+		return nil, err
+	}
+	p, err := a.Store.PlanByID(d.PlanID)
+	if err != nil {
+		return nil, err
+	}
+	if p == nil {
+		return nil, creditGone{fmt.Sprintf("deployment plan %d no longer exists", d.PlanID)}
+	}
+	ws, err := a.planWorkspace(p)
+	if err != nil {
+		return nil, err
+	}
+	latest, err := a.Store.LatestVersion(p.ID)
+	if err != nil {
+		return nil, err
+	}
+	st := &LoadoutState{Ix: ix, Reg: reg, Aliases: aliases, cands: cands, deploy: deploy, Plan: p, WS: ws, Latest: latest, localize: a.localizer(e.GameID, reg, ix), FilePath: env.ModsConfigPath(e.UserDataRoot)}
+	st.List = st.readList(ws.Entries)
+	st.File, st.FileErr = loadout.ReadModsConfig(st.FilePath)
+	if st.FileErr != nil {
+		return nil, st.FileErr
+	}
+	return st, nil
+}
+
+// creditGone: a captured root that waiting cannot make switchable (no captured user data
+// root, its installation or deployment plan removed). When only such roots are left the
+// item is retained instead of retried.
+type creditGone struct{ why string }
+
+func (e creditGone) Error() string { return e.why }

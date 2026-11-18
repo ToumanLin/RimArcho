@@ -46,7 +46,7 @@ func (a *App) ManagedDirectories() ([]ManagedDirectory, error) {
 			d.Status, d.Note = "changed", "This directory no longer looks like a RimWorld installation. Choose its current location."
 		}
 		for _, s := range ss {
-			if s.EnvID == e.ID && s.Status == source.StatusRebindPending {
+			if s.EnvID == e.GameID && s.Status == source.StatusRebindPending {
 				d.Status, d.Note = "rebind-pending", "A game folder change is waiting for confirmation. Set its current location to keep the same records."
 			}
 		}
@@ -209,8 +209,12 @@ func (a *App) validateDirectory(d *ManagedDirectory, path string) error {
 		if (d.ID == "lock" && (s.Label == LockLabel || a.IsLockSource(s))) || (d.ID == "monitor" && s.Label == MonitorLabel) || (d.ID == SubscribedLabel && s.Label == SubscribedLabel) {
 			continue
 		}
-		if d.Kind == "game" && s.EnvID == strings.TrimPrefix(d.ID, "game:") {
-			continue
+		if d.Kind == "game" {
+			if e, err := a.Store.EnvByID(strings.TrimPrefix(d.ID, "game:")); err != nil {
+				return err
+			} else if e != nil && s.EnvID == e.GameID {
+				continue
+			}
 		}
 		if (d.Kind == "game" || d.ID == "steamcmd-tool") && source.Within(s.Root, d.Path) {
 			continue
@@ -299,7 +303,7 @@ func (a *App) setDirectoryRecords(d *ManagedDirectory, path string) error {
 		if e, err = a.Store.EnvByID(strings.TrimPrefix(d.ID, "game:")); err != nil {
 			return err
 		} else if e == nil {
-			return fmt.Errorf("no environment for %s", d.ID)
+			return fmt.Errorf("no Game Config for %s", d.ID)
 		}
 		if !env.LooksLikeGameRoot(path) {
 			return fmt.Errorf("%s does not look like a RimWorld installation", path)
@@ -307,7 +311,7 @@ func (a *App) setDirectoryRecords(d *ManagedDirectory, path string) error {
 		if o, err := a.envOfGame(path); err != nil {
 			return err
 		} else if o != nil && o.ID != e.ID {
-			return fmt.Errorf("environment %s already uses %s; one environment per game folder", o.Name, path)
+			return fmt.Errorf("Game Config %s already uses %s; one Game Config per game folder", o.Name, path)
 		}
 		if err := a.checkRoots(path, filepath.Join(path, "Data"), filepath.Join(path, "Mods")); err != nil {
 			return err
@@ -319,7 +323,7 @@ func (a *App) setDirectoryRecords(d *ManagedDirectory, path string) error {
 				continue
 			}
 			root := ""
-			if s.EnvID == e.ID && (s.Kind == source.Official || s.Kind == source.Local) {
+			if s.EnvID == e.GameID && (s.Kind == source.Official || s.Kind == source.Local) {
 				root = filepath.Join(path, map[source.Kind]string{source.Official: "Data", source.Local: "Mods"}[s.Kind])
 				have[s.Kind] = true
 			}
@@ -333,7 +337,7 @@ func (a *App) setDirectoryRecords(d *ManagedDirectory, path string) error {
 		}
 		for kind, dir := range map[source.Kind]string{source.Official: "Data", source.Local: "Mods"} {
 			if !have[kind] {
-				s := &source.Source{ID: a.NewID(), EnvID: e.ID, Kind: kind, Label: nextLabel(ss, kind), Root: filepath.Join(path, dir), Status: source.StatusOK}
+				s := &source.Source{ID: a.NewID(), EnvID: e.GameID, Kind: kind, Label: nextLabel(ss, kind), Root: filepath.Join(path, dir), Status: source.StatusOK}
 				moves = append(moves, store.SourceMove{Src: s, Insert: true})
 				ss = append(ss, s)
 			}

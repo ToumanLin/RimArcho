@@ -191,7 +191,7 @@
   "an exception while ticking a pawn, thing or the world": "更新小人、物品或世界时出错",
   "an inherited definition is missing": "继承的定义不存在",
   "applied the previewed link repair": "已执行预览中的链接修复",
-  "apply the repair shown above?": "修复上面标着“将删除”的链接？",
+  "apply the repair shown above?": "按上面的预览修复链接？",
   "as patch.xpath, for the operation named": "同“补丁没找到节点”，针对写出的那个操作",
   "as patch.xpath: target inactive, renamed or loading later": "同“补丁没找到节点”：目标没启用、改了名或加载得更晚",
   "assemblies": "程序集",
@@ -227,6 +227,7 @@
   "do not warn again about %s": "不再提醒 %s",
   "done: %d failed operations, %d findings, %s": "完成：%d 个操作失败，%d 个发现，用时 %s",
   "duplicate entry": "重复入口",
+  "indexing def references": "正在为 Def 引用建索引",
   "duplicate key in a dictionary": "字典里有重复的键",
   "duplicate think-node keys": "思考树节点的键重复",
   "edit the mod's files (lock its version first)": "改 Mod 的文件（先锁定版本）",
@@ -480,5 +481,6 @@
   "The game keeps only what fits this card; about %s of textures load from the disk cache when drawn, which may stutter but does not stop the game.": "游戏只在显存里保留这张显卡放得下的贴图；约 %s 的贴图画到时才从磁盘缓存载入，可能会卡顿，但不影响进游戏。",
   "RAM: loading needs %s; available memory and total capacity are unavailable": "内存：载入时需要 %s；无法读取当前可用内存和总容量",
   "RAM: loading needs %s; available memory is unavailable; total capacity %s": "内存：载入时需要 %s；无法读取当前可用内存；总容量 %s",
-  "VRAM: estimated %s; dedicated capacity is unknown": "显存：预计 %s；显卡专用显存容量未知"
+  "VRAM: estimated %s; dedicated capacity is unknown": "显存：预计 %s；显卡专用显存容量未知",
+  "the mod's files changed after RimArcho wrote its DDS": "RimArcho 写 DDS 之后，Mod 的文件更新过"
 }

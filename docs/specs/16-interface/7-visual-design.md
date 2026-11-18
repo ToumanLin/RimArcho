@@ -8,8 +8,8 @@
 1. **The TUI has no borders.** Blank space, two-cell indentation, and muted subheadings separate areas; there are no boxes or rules. The GUI uses magpie cards: a quiet base with hairline borders (`--hairline`, §7.3) and 12px corners.
 2. **Use one accent.** The palette has an accent, success green, error red, and warning amber. The accent marks what the player is operating: the cursor, selected name, focused heading, or input prompt.
 3. **Most text is gray.** Most characters use the secondary or faint color; only the object being operated is bright.
-4. **The cursor uses a faint background and a changed text color; selection uses a faint accent background.** The cursor row has a faint background, and its name becomes accent-colored when focused; the TUI also adds ▸. Selected rows use a faint accent background. Solid backgrounds are reserved for pills, such as the current environment or focused filter. **Do not add a left vertical line or color strip to any box, row, or card to indicate selection, the cursor, or emphasis.** The TUI follows the same rule: selected rows have a full-row accent tint, with a deeper tint for the selected cursor row.
-5. **Bold indicates identity only**, such as Mod names and headings. Do not use italics, underlining, or inverted colors.
+4. **The cursor uses a faint background and a changed text color; selection uses a faint accent background.** The cursor row has a faint background, and its name becomes accent-colored when focused; the TUI also adds ▸. Selected rows use a faint accent background. Solid backgrounds are reserved for pills, such as the current Game Config or focused filter. **Do not add a left vertical line or color strip to any box, row, or card to indicate selection, the cursor, or emphasis.** The TUI follows the same rule: selected rows have a full-row accent tint, with a deeper tint for the selected cursor row.
+5. **Bold indicates identity only**, such as Mod names and headings. Do not use italics, underlining, or inverted colors. A link may underline on hover or keyboard focus. The exceptions underlined at rest are the coloured first tag (§3.8), Mod-name links inside Can it run text, and the identity question's text-styled answers. A Mod log keeps its own `<i>` markup.
 6. **Hide developer terms.** Finding codes, #id, decl, and lineage belong only in technical information, the CLI, or MCP. The exception is the package ID, shown in details by default. See §7.2 for interface names.
 7. **Keep the interface still.** The TUI has no animations or spinners; the status line uses … for work in progress. GUI motion only explains what changed or where something went (§7.1). It is brief and is disabled under `prefers-reduced-motion`. The one exception is Archo's figure while the player waits (§7.1 "Archo figure"): it moves continuously on one canvas, only during a wait, and becomes a still under `prefers-reduced-motion`, without hardware WebGL2, or when the player chooses still or off.
 8. **Each TUI row occupies one line**, with no line spacing. Ellipsize overflow and state the hidden count, for example 12 more. Detail text wraps (§4.1).
@@ -38,7 +38,7 @@ Both palettes draw text on the terminal's own background. Each role also names a
 
 **Card spacing:** all horizontal and vertical gaps between rounded cards use `--card-gap`, 4px, with no other value. This covers the editor columns; details, staging, and history in the third column; left filters and the list or details below them; Mod library filters and table; log and change-history columns; task columns and right-side cards; and All lists columns. **Gaps between cards sharing a fixed space are draggable** (§3.1 rule 10). Double-clicking resets them, and sizes persist in `ui.gui.<page>.*`. New cards of this kind must include splitters. Gaps between content-height cards stacked down the page are not draggable: Can it run sections, settings groups, and the six full-detail sections. A draggable gap remains visibly 4px wide, but its hit area extends `--grab`, 3px, into each card, for about 10px total. The resize cursor, the accent hairline on hover (§7.3), and double-click reset still apply. The sidebar's right-edge hit area is 6px, inside the sidebar.
 
-**Fonts:** see §7.3 for sizes. The TUI uses the player's terminal font (§9.2). The GUI uses the system fonts Segoe UI Variable Text, Segoe UI, and Microsoft YaHei UI, with tabular numbers and Cascadia Mono for code.
+**Fonts:** see §7.3 for sizes. The TUI uses the player's terminal font (§9.2). The GUI uses the system fonts Segoe UI Variable Text, Segoe UI, and Microsoft YaHei UI, with tabular numbers and Cascadia Mono for code. In Japanese (`<html lang="ja">`) Yu Gothic UI and Meiryo UI take YaHei's place, so kanji are drawn in their Japanese shapes.
 
 **Wording** follows these rules:
 - The Chinese UI uses short sentences beginning with a verb, for example enable Vehicle Framework rather than perform enable operation.
@@ -46,7 +46,7 @@ Both palettes draw text on the terminal's own background. Each role also names a
 - An empty state has one sentence that identifies the key to use, for example staging is empty; t stages selected mods.
 - Do not use middle-dot separators (§7.3).
 - An unknown value appears as a faint — rather than the word unknown.
-- Every UI string has a Chinese translation; GUI tests check every string used by the pages.
+- Every UI string has a Chinese translation; GUI tests check every string used by the pages. Chinese is the reference locale: every other bundled locale (Japanese, `locale/ja/`) has exactly its keys with the same placeholders (`l10ndata.TestLocalesMatchChinese`), so a new string needs its Japanese text in the same commit. Dates and counts use the locale's `@date.short`, `@date.long` and `@plural` from `_extra.json` when it has them, English formats otherwise.
 
 **Icons:** the TUI defaults to the compatibility Unicode characters below. With ui.icons nerd, it uses Nerd Font's Font Awesome 4 range, U+F000–U+F2E0, which all Nerd Fonts include (§9.3). The GUI uses simple custom SVGs in `js/icons.js`, with the same meanings.
 
@@ -60,6 +60,7 @@ Both palettes draw text on the terminal's own background. Each role also names a
 | Error causing load failure | times-circle `U+F057` | `⨯` U+2A2F | Error red |
 | Warning of a possible issue | exclamation-triangle `U+F071` | `!` | Amber |
 | Corpus hint; counting follows §5 | info-circle `U+F05A` | `ⓘ` U+24D8 | Secondary; a circled i in the GUI |
+| Only the game's version is not declared (`StatusVersion`, §5) | clock-o `U+F017` | `◷` U+25F7 | Muted; a clock in the GUI |
 | Last-run error | bug `U+F188` | `◍` U+25CD | Error red |
 | Unloadable disabled residue | ban `U+F05E` | `◌` U+25CC | Faint |
 | No problem | Hidden | Hidden | — |
@@ -86,7 +87,7 @@ Both palettes draw text on the terminal's own background. Each role also names a
 
 ### 7.1 Motion (GUI)
 
-Four durations are defined in `style.css` :root. Entry and movement use the ease-out curve `--ease`, cubic-bezier(.2, .8, .2, 1), with a 250ms base. Exits are faster and use `--ease-in`, cubic-bezier(.4, 0, 1, 1).
+Five durations are defined in `style.css` :root. Entry and movement use the ease-out curve `--ease`, cubic-bezier(.2, .8, .2, 1), with a 250ms base. Exits are faster and use `--ease-in`, cubic-bezier(.4, 0, 1, 1).
 
 | Variable | Duration | Use |
 | --- | --- | --- |
@@ -94,6 +95,9 @@ Four durations are defined in `style.css` :root. Entry and movement use the ease
 | `--t-enter` | 200ms | Page, menu, and status entry |
 | `--t-exit` | 150ms | Menu close and card collapse, with ease-in |
 | `--t-layout` | 250ms | Row movement, sidebar highlight, expansion, number pulse |
+| `--t-flash` | 400ms | The fading flash on changed rows and Launch's arrival |
+
+A delay after the duration is free, for staggered entries. Endless loops (spinners, shimmer) set their own period and follow `endlessWhileWorking`. A few animations keep their own timing by design, such as a Can it run item's 1.6s highlight after a jump and Launch's fill; the checks list each one.
 
 Menu closing and card-content collapse use the exit duration and ease-in curve. Layout movement and FLIP in `motion.js` share the 250ms timing.
 
@@ -101,7 +105,7 @@ The motions are implemented in `js/motion.js` and the motion section of `style.c
 - **Page entry** fades in and rises 4px. A redraw of the same page after an action or subview switch has no motion. A page that replaces its loading placeholder also enters this way (`screens.js` `page`); the editor's lists and head do the same when they replace theirs (`lists.js` `openEditor`). A fast read therefore fades in from the emptied page in one step.
 - **The sidebar highlight** slides from the old entry to the new one. Its size changes immediately; only its position is animated. Children have their own highlight that slides within the same entry.
 - **Sidebar children** expand their grid row from 0fr to 1fr using the layout duration, fade in using the entry duration, and rotate the arrow 90°. The old children collapse while the new children expand, and following entries move smoothly. The highlight slides directly to the final destination that motion.js computes from the expanding and collapsing children. Collapsed children are excluded from the tab order.
-- **List changes** include enabling, disabling, moving, sorting, undoing, and dragging. Before an action, the visible Mod rows' positions are recorded. After redraw, surviving rows move from their old positions using FLIP. Affected rows flash a soft accent and fade over about 400ms; if the affected rows are unknown, moved or new rows flash. Only the rendered virtual rows, a few dozen, are processed, with one style calculation per batch.
+- **List changes** include enabling, disabling, moving, sorting, undoing, and dragging. Before an action, the visible Mod rows' positions are recorded. After redraw, surviving rows move from their old positions using FLIP. Affected rows flash a soft accent and fade over `--t-flash`; if the affected rows are unknown, moved or new rows flash. Only the rendered virtual rows, a few dozen, are processed, with one style calculation per batch.
 - **Numbers** softly pulse on change: sidebar badges and counts, list headings, Can it run section counts, and the unsaved count.
 - **The status line** fades each new sentence in, in place; it does not slide (sliding moved the bar on every message).
 - **Loading placeholders** shimmer in lazily loaded game logs, log details, and full-detail pages without loading… text. Screen readers retain the original text.
@@ -124,11 +128,11 @@ The following rules apply:
 
 ### 7.2 Interface wording
 
-Both languages of the GUI and TUI use the player's wording. Code, the CLI, MCP, and specifications keep domain names such as plan, environment, and Instance. A plan in the specification is therefore a list in the UI.
+Both languages of the GUI and TUI use the player's wording. Code and specifications keep internal names such as environment and Instance; CLI/MCP prose says Game Config. Stable command and protocol keys do not change. A plan in the specification is therefore a list in the UI.
 
 English UI text is the translation lookup key, so changing it also requires changing the callers. Keys that app and modchanges supply in CLI wording, such as the current plan, keep that wording; `view.enText` overrides how the UI shows them. History operation names such as checkout, swap, and restore come from app operation codes and are mapped to player wording by stepWords.
 
-`TestWording` in `internal/surface/cli` (`view.WordingProblems`) checks the language resources and command names. It fails if a Chinese text contains a term from the Avoid column below (its Chinese forms are the `@retired.` entries in the zh language resources, each with its replacement), or if the English contains plan, environment, upstream, workspace, swap, pinned, checkout, not written, light pack, or full pack (`retiredEn`). A key translated differently within one JSON file or across files also fails, including supplemental resources; identical duplicates are allowed. English interface overrides live in `view.enText`. Necessary exceptions are listed in `wordingExempt`, for example decompilation.
+`TestWording` in `internal/surface/cli` (`view.WordingProblems`) checks the language resources and command names. It fails if a Chinese text contains a term from the Avoid column below (its Chinese forms are the `@retired.` entries in the zh language resources, each with its replacement), or if the English contains plan, upstream, workspace, swap, pinned, checkout, not written, light pack, or full pack (`retiredEn`). A key translated differently within one JSON file or across files also fails, including supplemental resources; identical duplicates are allowed. English interface overrides live in `view.enText`. Necessary exceptions are listed in `wordingExempt`, for example decompilation.
 
 | Domain concept | UI wording | English | Avoid |
 | --- | --- | --- | --- |
@@ -140,7 +144,8 @@ English UI text is the translation lookup key, so changing it also requires chan
 | save | Save; the editor button says Save changes / no changes, the count says N unsaved, and versions are saved versions | save; save changes / no changes; N unsaved; saved versions | write to game, unwritten, not yet written, written versions |
 | checkout | Go back to this version; history step go back | go back to this version | load version, load list |
 | External ModsConfig changes | Use outside change | use the outside change | load into list |
-| Environment | Game; `env remove` removes the game without changing files | game; remove the game | environment, delete environment |
+| Environment (internal) | A play context with its own user data and current list | Game Config (Chinese and Japanese: see glossary); remove Game Config | environment; game when referring to this context |
+| Game installation (internal only) | The physical installed game | game folder | showing an installation layer or grouping |
 | Source | Mod folders in settings, source in filters and details, such as Workshop or local | mod folders; source | — |
 | Instance | This one, another copy, N copies | this one, another copy | instance, Instance |
 | Lineage | Copies of same Mod | copies of the same mod | Lineage |
@@ -193,6 +198,20 @@ Launch (§2.3) is an exception: its sizes, rules, and radii follow its own desig
 
 **Checks** enforce the rules:
 - The GUI TestStyleRules reads `style.css`. It permits only var(--r-lg), var(--r-sm), 50%, 999px, inherit, and the calculated inner choice radii; only the table's font sizes; and only var(--hairline), with 0 or none to remove a line. It reports the source line and invalid value. It prohibits border-left, border-right, or `box-shadow: inset` accent bars.
+- The GUI TestUIRules reads `style.css` and every page script. It also checks the interaction rules listed in §3.1 "Checks". For visual design it enforces these rules:
+  - no `text-transform: uppercase` (rule 8)
+  - no italics, and underline only on `:hover` or `:focus-visible` (§7 principle 5)
+  - no `backdrop-filter` (§7.1)
+  - transition and animation durations only as the `--t-*` tokens, and easing only as `var(--ease)` or `var(--ease-in)` (§7.1)
+  - no literal colours outside `:root` token definitions and `:root[…]` theme overrides (§7)
+  - no hand-made `<kbd>` outside `keyCaps` (rule 13)
+  - no native `<select>`; use `choiceControl` (§3.10)
+  - no `window.alert`, `confirm` or `prompt` (§3.1 rule 7)
+
+  Each failure names the rule's section. Exceptions sit in maps in `ui_rules_test.go`, each with its reason, and a listed exception that no longer matches fails. To add one, the specification must allow the exception first.
+- **Run them while working:** `go test -count=1 -run 'TestStyleRules|TestUI|TestEndlessAnimations' ./internal/surface/gui/` takes a few seconds. In Claude Code, `.claude/settings.json` runs it after every Edit or Write under `internal/surface/gui/assets/` (`scripts/lint-hook.mjs`) and hands any failure back to the agent. Edits made through a shell skip the hook, so run the command yourself. The other static checks are in 17 §4 "Static checks".
+- A rule that can be checked by reading the source belongs in these tests, not only in prose. When a new visual or interaction rule is added here, add its check in the same commit if it can be expressed as one.
+- The `TestUI*` contract checks (§3.1 "Checks" lists the interaction ones) also require: the scrollers §7.1 names keep `scrollbar-gutter: stable` (the test maps each name to its selector); every Go `T` / `Tf` literal in view, the TUI and the GUI has Chinese text (pure formats and names listed apart); each `Tf` in JS and Go gets one value per placeholder (or up to its highest `%[n]`); page scripts call only `gui.API` methods, with uncalled methods listed and why; every event the page listens to has a Go sender.
 - TestWording (§7.2) also rejects middle dots in translation maps and `view.Text` (`view.WordingTextProblems`), including GUI literals. The approved Search files summary and UTF-8 file-type labels (§2.9) are narrow exceptions.
 
 ### 7.4 Accent themes (GUI)

@@ -1,15 +1,15 @@
 $ archo help
 archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
   commands:
-    env list                                  list environments (one per game folder) and the shared mod folders
+    env list                                  list Game Configs (grouped by installation) and the shared mod folders
     env detect                                detect game, user data and workshop paths (suggestion only)
-    env add <name>                            add an environment: one game folder
-    env set <name>                            change an environment's game folder, saves or launch (re-binds a moved game)
-    env use <name>                            select the current environment
+    env add <name>                            add a Game Config with separate saves and settings
+    env set <name>                            change a Game Config's game folder, saves or launch (re-binds a moved game)
+    env use <name>                            select the current Game Config
     env rebind <src:label> yes|no             answer a pending source re-binding
-    env remove <name>                         forget an environment (RimArcho data only; no game files)
+    env remove <name>                         forget a Game Config (RimArcho data only; no game files)
     scan                                      scan sources and reconcile identities
-    status                                    overview of the current environment
+    status                                    overview of the current Game Config
     list                                      list mods
     find <words…>                             search by name, package id, author, workshop id, folder
     mod <ref>                                 mod details
@@ -49,7 +49,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     loadout use-installed <packageId…>        restore missing entries using installed copies in one undo step
     loadout export                            write the workspace as a list file: a RimArcho list (each mod with its version), text, ModsConfig.xml (rimsort), RimWorld's .rml, or a RimCrow share code
     loadout import <file|share code> [<name>]  replace the workspace with a list (RimArcho, text, ModsConfig.xml, save, .rml, RimSort, RimCrow, workshop IDs; undoable), or with --new make it a new plan
-    plan list                                 list the environment's plans
+    plan list                                 list the Game Config's plans
     plan new <name>                           create a plan: empty, or from the current plan, one of its versions, or a list file
     plan use <name>                           make a plan current (writes no game file)
     plan rename <old> <new>                   rename a plan (its history stays)
@@ -61,7 +61,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     stage restore [<ref…>]                    enable staged mods again at their old place (--all: every staged mod)
     pin <ref>                                 lock a mod: copy it into the lock library (origin marker) and use the copy in the current plan
     copy-local <ref>                          alias of pin
-    import rimcrow                            one-time import of RimCrow's aliases, notes, groups (as tags) and user rules; repeatable
+    import rimcrow                            import RimCrow profiles, aliases, notes, groups (as tags) and user rules; repeatable
     alias <ref> [<name>]                      set the name RimArcho shows for a mod (all its copies)
     note <ref> [<text>]                       attach a plain-text note to a mod (all its copies), or with --copy to this copy only
     tag add|remove <ref> <tag…> | list | rename <tag> <new> | merge <tag…> --into <tag> | delete <tag…> | note <tag> [<text>] | color <tag> <colour> | order <ref> <tag…>  tags for filtering (list --filter tag:<tag>); rename, merge, delete, note and color apply to the tag on every mod; color marks its mods in the lists (blue, cyan, teal, grass, orange, pink, plum, violet, #rrggbb or none); order sets a mod's tag order (its first tag's colour marks it)
@@ -79,7 +79,12 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     lineage merge <ref> <ref>                 merge the second lineage into the first
     gc                                        remove expired tombstones and superseded snapshots
     config get [<key>]                        show settings
-    config set <key> <value>                  change a setting (local.dir: unused managed-folder root; updates.source: auto|github; updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris or a #rrggbb colour; ui.icons: compat|nerd; ui.mouse: on|off; ui.tui.theme: auto|dark|light; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; ui.archo.motion: off|still|live; ui.motion: auto|reduced; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; network.proxy: system|off|a proxy URL; network.github_mirror: empty or a mirror prefix such as https://gh-proxy.org/)
+    config set <key> <value>                  change a setting (local.dir: unused managed-folder root; updates.source: auto|github; updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris or a #rrggbb colour; ui.icons: compat|nerd; ui.mouse: on|off; ui.tui.theme: auto|dark|light; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; ui.archo.motion: off|still|live; ui.motion: auto|reduced; ui.zoom: 100|110|125|150 (the window's interface size in percent); tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; network.proxy: system|off|a proxy URL; network.github_mirror: empty or a mirror prefix such as https://gh-proxy.org/; agent.api: openai-completions|anthropic-messages|openai-responses|google-generative-ai; agent.base_url: the model API's base URL; agent.model: a model ID; agent.thinking: high|medium|low|off)
+    agent status                              show whether Archo Agent is installed and how its model is set (15 §7)
+    agent install                             download, verify and install the latest Archo Agent, or install a downloaded bundle zip
+    agent key                                 store the model API key in Windows Credential Manager, read from one line of standard input; --clear removes it
+    agent run                                 start Archo Agent in this terminal (the GUI opens it in a window of its own)
+    agent remove                              delete the installed Archo Agent; its settings, key and conversations stay
     guide [<topic>]                           the agent guide behind the MCP tools: a workflow (diagnose, errors, plans, rebuild, words) or one tool's full reference
     mcp                                       serve the MCP tools over stdio (for Claude Code, Codex and other agents)
     gui                                       open the desktop window (RimArcho.exe does this on a double click)
@@ -92,17 +97,17 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     deps install <name>                       download todds or steamcmd into RimArcho's own folder
     deps remove <name>                        remove only RimArcho's own downloaded dependency
     env branches                              list RimWorld's Steam branches (versions) SteamCMD can download
-    env download <branch>                     download a RimWorld version with SteamCMD and add it as an environment (anonymous by default)
+    env download <branch>                     download a RimWorld version with SteamCMD and add it as a Game Config (anonymous by default)
     folder check                              check all managed directories, including games, the lock library and packs
     folder set <directory-id> <dir>           locate a directory you moved; keep its mods and lists
     folder move <directory-id> <dir>          move a managed directory to a new location
-    folder list                               list the mod folders every environment shares (Workshop, SteamCMD, others)
+    folder list                               list the mod folders every Game Config shares (Workshop, SteamCMD, others)
     folder add workshop|steamcmd|extra <dir>  add a shared mod folder (a second Workshop folder replaces the first)
     folder remove <src:label>                 forget a shared mod folder (its files stay)
     unhide <ref>                              rename About.xml.disabled back to About.xml so the game sees the mod again
     unpin <ref>                               use a locked mod's upstream again in the current plan (a RimCrow-style lock also gets its About.xml back); the copy stays
     trash <ref>                               move a hidden or unsubscribed workshop folder to the recycle bin
-    history                                   the workspace's unsaved edits (undo/redo) and the saved versions
+    history                                   the workspace's edits (undo/redo) and the saved versions
     links check                               check RimArcho links without changing files
     links repair                              preview or confirm link repair and unfinished-operation recovery
     mod-settings set <ref> [<name>=<value>…]  change a Mod's simple settings values (on/off, numbers, one line of text, a HugsLib choice) with the game closed; backs the file up first
@@ -124,13 +129,16 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     plan sync <name> [<collection>]           catch a plan up with a collection it follows (one undoable edit; uses the network)
     problems mute-version <mod>…              ignore version warnings for these packages in every list and game; survives updates
     problems unmute-version <mod>…            restore version warnings for these packages
+    import rimsort                            import RimSort's notes, tags, colours and ignored warnings (as tags) from an instance's aux_metadata.db; repeatable
     saves list                                colonies and their saves, newest first, each with its list and whether it loads with it
     saves show <save>                         one save: where it belongs, can it load (each issue with its fix), how its Mods differ from the list, the playthrough
+    saves review                              playthrough review: what the installed Mods add, by category, and how much of it the saves show
     saves fix <save>                          the save's Mod fixes as one undoable edit of its list, then Workshop subscriptions; --launch starts it
     saves index [<save…>]                     read new and changed saves in full into the cache, the named ones first (the Saves page runs it as a child process)
     saves rename <save> <name>                rename a save in its folder (keeps a RimSaves folder; refused while the game runs or when the name exists)
     saves rename-colony <colony|save> [<name>]  name a colony in RimArcho (without a name: back to its saves' name; save files and the game keep theirs)
-    saves copy <save>                         copy a save beside itself as <name> (copy), never overwriting
+    saves copy <save>                         copy a save beside itself as <name> (copy), never overwriting; --to-current into the current Game Config's Saves folder
+    saves choose [<save|colony>]              which save Can it run checks for the current Game Config: this save, a colony's newest save (--colony), or the last loaded (--clear); no argument shows the choice
     saves backup <save…>                      copy saves into RimArcho's backups folder (confirm with --yes)
     saves trash <save…>                       move saves to the recycle bin (confirm with --yes; refused while the game runs)
     db status                                 the database: path, size, backups
@@ -159,16 +167,16 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     workshop subscribe <ref…>                 subscribe again in Steam to an unsubscribed leftover
     workshop resubscribe <ref…>               resubscribe and wait for Steam to download mods; local edits are lost (refused while the game runs)
     workshop state <ref…>                     ask Steam for item state; without Steam, show local folders with account state unknown
-    workshop publish                          maintainer only: assemble and publish RimArcho from the repository root through the signed-in Steam client
+    workshop publish                          maintainer only: publish the Archo Monitor Workshop item (the built Mod, stamped with the release) from the repository root through the signed-in Steam client
   references: #<id> instance, L#<id> lineage, pkg:<packageId> or the bare packageId, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>, pattern:<id> error pattern
-  global flags: --env <name> (use another environment for this command)
+  global flags: --env <name> (use another Game Config for this command)
 
 $ archo status
-error: no environment configured (archo env detect, then archo env add <name> --detected)
+error: no Game Config configured (archo env detect, then archo env add <name> --detected; or give the game folder yourself: archo env add <name> --game <dir>)
 [exit 1]
 
 $ archo env detect
-detected environment (suggestion, not saved)
+detected Game Config (suggestion, not saved)
   game: $ROOT/Steam/steamapps/common/RimWorld
   version: 1.6.4633 rev1261
   launch: steam
@@ -193,16 +201,17 @@ next:
   archo scan
 
 $ archo env list
-environments: 1
-  env:main  1.6.4633 rev1261  [current]
+Game Configs: 1
+  main  1.6.4633 rev1261
     game: $ROOT/Steam/steamapps/common/RimWorld
-    saves: shared
-    user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
-    launch: steam
     sources:
       src:official  $ROOT/Steam/steamapps/common/RimWorld/Data
       src:local     $ROOT/Steam/steamapps/common/RimWorld/Mods
-  mod folders (every environment):
+    env:main  [current]
+      saves: shared
+      user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
+      launch: steam
+  mod folders (every Game Config):
     src:workshop  $ROOT/Steam/steamapps/workshop/content/294100
 
 $ archo scan

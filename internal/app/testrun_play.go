@@ -89,8 +89,17 @@ func (a *App) testRunSave(st *LoadoutState, ref string) (*TestRunSave, error) {
 		}
 	}
 	if len(lacking) > 0 {
-		return nil, fmt.Errorf("test run: save %s uses %d Mods the plan does not have: %s. Loading it without them logs their missing data, not the plan's errors; test a plan with the save's Mods (get_save compares them)",
-			name, len(lacking), strings.Join(lacking, ", "))
+		// The first few: a save of a big list named all 474 on one line (VM 2026-11-10).
+		const shown = 8
+		list, mods := lacking, "Mods"
+		if len(lacking) == 1 {
+			mods = "Mod"
+		}
+		if len(list) > shown {
+			list = append(list[:shown:shown], fmt.Sprintf("and %d more", len(lacking)-shown))
+		}
+		return nil, fmt.Errorf("test run: save %s uses %d %s the plan does not have: %s. Loading it without them logs their missing data, not the plan's errors; test a plan with the save's Mods (get_save compares them)",
+			name, len(lacking), mods, strings.Join(list, ", "))
 	}
 	r := &TestRunSave{Name: name, Path: path, GameVersion: h.GameVersion}
 	var common []string

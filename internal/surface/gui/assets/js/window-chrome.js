@@ -71,7 +71,7 @@ function createControls() {
   }
   act(sync)();
   // Wails owns dragging and resizing; only a double-click on a drag surface is ours.
-  $("#app").addEventListener("dblclick", e => {
+  $("#app").addEventListener("dblclick", e => { // keys: win+↑ / win+↓ (Windows)
     if (getComputedStyle(e.target).getPropertyValue("--wails-draggable").trim() !== "drag") return;
     e.preventDefault();
     act(() => win.ToggleMaximise())();

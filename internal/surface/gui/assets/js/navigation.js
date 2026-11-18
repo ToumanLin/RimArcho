@@ -22,6 +22,7 @@ import * as tasksPage from "./tasks.js";
 import * as fileSearch from "./filesearch.js";
 import * as modSettings from "./modsettings.js";
 import * as savesPage from "./saves.js";
+import * as reviewPage from "./review.js";
 
 let ui;
 // The displayed shell can still name the previous plan while OpenPlan is in flight:
@@ -84,7 +85,7 @@ export async function openPage(id, plan = null, entry = null, save = "", guideFr
     case "needs": return scr.needs();
     case "packs": return packsPage.list();
     case "plans": return planManage.open();
-    case "plan-import": return exchange();
+    case "plan-import": case "import": return exchange();
     case "plan-export": return planManage.exportOf(entry?.planExport?.id || planManage.exportPlan(), entry?.planExport?.from || planManage.exportFrom());
     case "build": return packsPage.build();
     case "env": return scr.environment();
@@ -100,6 +101,7 @@ export async function openPage(id, plan = null, entry = null, save = "", guideFr
     case "search": return fileSearch.open();
     case "mod-settings": return modSettings.open();
     case "saves": return savesPage.open(save);
+    case "review": return reviewPage.open();
     case "guide": return entry ? guide.resume() : guide.start(guideFrom || (S.board && S.board.envs && S.board.envs.length ? "env" : "first"));
   }
 }

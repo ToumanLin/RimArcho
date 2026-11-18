@@ -5,7 +5,7 @@
 // sidebar's foot line and ctrl+j bring them back here. "tasks" events say the record
 // changed; a lane task that ended also brings its result for the status line.
 import { progress } from "./feedbacksemantics.js";
-import { pathContent } from "./fields.js";
+import { pathContent, copy as copyText } from "./fields.js";
 import { factText, S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { beginPageRead, page, act as pageAct, area } from "./screens.js";
 import { createBar } from "./filterbar.js";
@@ -525,7 +525,7 @@ function wireItems() {
     X.icur = +r.dataset.i;
     drawItems();
   });
-  els.ibody.addEventListener("contextmenu", (e) => {
+  els.ibody.addEventListener("contextmenu", (e) => { // keys: Menu, shift+F10 (itemsKey)
     const r = e.target.closest(".tk-irow");
     if (!r) return;
     e.preventDefault();
@@ -548,7 +548,7 @@ function itemMenu(x, y, keys) {
   pop.menu(x, y, acts, keys, { name: it.name, opener: els.iscroll });
 }
 function copy(text) {
-  navigator.clipboard.writeText(text).then(() => say("ok", Tf("copied %s", text))).catch(() => {});
+  copyText(text).then((ok) => { if (ok) say("ok", Tf("copied %s", text)); });
 }
 function toLibrary(name) {
   document.dispatchEvent(new CustomEvent("library-search", { detail: name || "" }));
@@ -567,8 +567,8 @@ function wireList(rows) {
     }
     moveTo(id);
   });
-  rows.addEventListener("dblclick", (e) => { if (e.target.closest(".tk-row")) focusItems(); });
-  rows.addEventListener("contextmenu", (e) => {
+  rows.addEventListener("dblclick", (e) => { if (e.target.closest(".tk-row")) focusItems(); }); // keys: 3 focuses the items
+  rows.addEventListener("contextmenu", (e) => { // keys: Menu, shift+F10
     const r = e.target.closest(".tk-row");
     e.preventDefault();
     if (!r) return;

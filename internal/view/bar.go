@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/ToumanLin/RimArcho/internal/app"
 )
 
 // The filter bar of the plan editor (16 §2.5, §3.7): one search box and one set of filters
@@ -16,7 +18,7 @@ import (
 // of 16 §3.7 and may hold tag: type: has: version: words of its own.
 
 // BarKeys are the editor bar's groups in the order shown.
-var BarKeys = []string{"lists", "tag", "source", "location", "version", "content", "has"}
+var BarKeys = []string{"lists", "tag", "source", "location", "version", "content", "has", "added"}
 
 // barValues are the fixed values of a group, in the order shown (tags and versions come
 // from the rows).
@@ -24,6 +26,7 @@ var barValues = map[string][]string{
 	"source":  {"workshop", "steamcmd", "local", "locked", "official", "other"},
 	"content": {"assembly", "xml", "language"},
 	"has":     {"problem", "error", "note", "alias"},
+	"added":   app.LibAdded,
 }
 
 // BarFilter is the bar's result: the matching rows of Not enabled and Enabled (indexes into the
@@ -268,7 +271,7 @@ func sortBar(k string, vs []LibChoice) {
 }
 
 func barKeyTitle(k string) string {
-	return map[string]string{"lists": T("lists"), "tag": T("tags"), "source": T("library source"), "location": T("location"), "version": T("supported versions"), "content": T("content"), "has": T("has")}[k]
+	return map[string]string{"lists": T("lists"), "tag": T("tags"), "source": T("library source"), "location": T("location"), "version": T("supported versions"), "content": T("content"), "has": T("has"), "added": T("added")}[k]
 }
 
 func barValueText(k, v string) string {
@@ -281,6 +284,8 @@ func barValueText(k, v string) string {
 		return T(map[string]string{"assembly": "with a DLL", "xml": "XML only", "language": "language pack"}[v])
 	case "has":
 		return T(map[string]string{"problem": "a problem", "error": "an error", "note": "a note", "alias": "an alias"}[v])
+	case "added":
+		return addedText(v)
 	}
 	return v
 }

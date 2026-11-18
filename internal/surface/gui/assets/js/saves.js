@@ -6,7 +6,8 @@
 // until it is read. The listing reads every save's head, which can
 // take a while on a cold library, so it arrives as a "saves" event (16 §8.4); the full read
 // runs as a background task and its news arrives as "saves-read" events.
-import { S, $, el, api, T, Tf, errText, say } from "./state.js";
+import { S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
+import { choiceControl } from "./choices.js";
 import { on } from "./api.js";
 import { beginPageRead, page, area, act, button, hintsChanged, openGameLog } from "./screens.js";
 import { wireSeparator } from "./separator.js";
@@ -22,13 +23,13 @@ let ui = null;
 export function initSaves(u) { ui = u; }
 
 // page: the listing; sel: the selected save's ref; open: the colonies shown open; q: the
-// search (colony and save names); detail: the middle and right cards' data (for
+// search (colony and save names); owner: the Game Config filter ("" all, 12 §4.8); detail: the middle and right cards' data (for
 // detail.ref); mode: what the player is editing, tied to a save (mode.ref): null when only
 // viewing, {kind: "rename"} the save's name field, {kind: "colony"} the colony's (right
 // card), {kind: "confirm", what: "backup" | "recycle", preview, running} the inline
 // confirmation; viewing: the rows whose details View opened (by kind). built: the
 // navigation (S.screenSeq) whose visit drew the page; visit: the one open() last reset for.
-const X = { page: null, sel: "", open: new Set(), q: "", detail: null, mode: null, viewing: new Set(),
+const X = { page: null, sel: "", open: new Set(), q: "", owner: "", detail: null, mode: null, viewing: new Set(),
   listSeq: 0, detailSeq: 0, askSeq: 0, busy: false, built: -1, visit: -1 };
 let leftCard = null, midCard = null, rightCard = null, tree = null, input = null, timer = 0, mods = null;
 const waiting = new Map(); // listing request → its resolve
@@ -126,7 +127,7 @@ function leave() {
   timeRO?.disconnect();
   timeRO = timeBox = contentBox = null;
   zoom.clear(); // kept per colony while the page is open
-  content = { ref: "", seq: content.seq + 1, data: null, error: "", cat: "", opened: new Set(), all: false };
+  content = freshContent("", content.seq + 1);
   X.page = null; X.detail = null; X.mode = null; X.viewing = new Set();
   X.detailSeq++; X.askSeq++;
   leftCard = midCard = rightCard = tree = input = null;
@@ -200,10 +201,19 @@ function build() {
     else if (e.key === "ArrowDown" || e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusTree(); }
     else e.stopPropagation(); // typing is not a page key
   };
-  search.append(input, el("kbd", "", "/"));
+  search.append(input, keyCaps("/"));
   leftCard = el("section", "card sv-left");
   const treeHead = el("div", "sv-cardhead");
   treeHead.append(el("span", "", T("colonies")));
+  // every Game Config's saves are listed, whichever is current (12 §4.8); the filter only
+  // narrows the tree, and shows when saves come from two or more configs or packs
+  if (!(p.owners || []).includes(X.owner)) X.owner = "";
+  if (p.owners?.length) {
+    const sel = choiceControl(T("whose saves"), [{ value: "", label: T("all Game Configs") }, ...p.owners.map((o) => ({ value: o, label: o }))], X.owner);
+    sel.classList.add("sv-owner-filter");
+    sel.onchange = () => { X.owner = sel.value; drawLeft(); };
+    treeHead.append(sel);
+  }
   tree = el("div", "sv-tree");
   tree.setAttribute("role", "tree");
   tree.setAttribute("aria-label", T("colonies and their saves"));
@@ -235,7 +245,7 @@ function build() {
     const c = e.target.closest("[data-colony]");
     if (c) clickColony(c.dataset.colony);
   };
-  tree.ondblclick = (e) => { if (e.target.closest("[data-save]")) startRename(); };
+  tree.ondblclick = (e) => { if (e.target.closest("[data-save]")) startRename(); }; // keys: F2
   drawLeft();
   drawDetail();
 }
@@ -266,7 +276,8 @@ function focusTree() {
 
 const lc = (s) => String(s || "").toLowerCase();
 function saveMatch(c, s) { return !X.q || lc(c.name).includes(X.q) || lc(s.name).includes(X.q); }
-function colonyMatch(c) { return !X.q || lc(c.name).includes(X.q) || (c.game && lc(c.game).includes(X.q)) || c.saves.some((s) => lc(s.name).includes(X.q)); }
+function colonyMatch(c) { return (!X.owner || c.owner === X.owner) && colonyMatchQ(c); }
+function colonyMatchQ(c) { return !X.q || lc(c.name).includes(X.q) || (c.game && lc(c.game).includes(X.q)) || c.saves.some((s) => lc(s.name).includes(X.q)); }
 
 function setQuery(v) {
   X.q = lc(v.trim());
@@ -299,7 +310,9 @@ function drawLeft() {
     row.setAttribute("aria-expanded", String(opened));
     row.setAttribute("aria-level", "1");
     const chv = el("span", "chv"); chv.innerHTML = icon.chev;
-    row.append(chv, mark(c.name), el("span", "k", String(c.saves.length)));
+    row.append(chv, mark(c.name));
+    if (X.page.owners?.length && c.owner) row.append(el("span", "o", c.owner));
+    row.append(el("span", "k", String(c.saves.length)));
     row.setAttribute("aria-label", Tf("%s, %d saves", c.name, c.saves.length));
     if (c.game) row.title = Tf("its saves name it %s", c.game);
     tree.append(row);
@@ -424,7 +437,7 @@ function drawMid(keep) {
   if (X.mode?.kind === "rename" && X.mode.ref === d.ref && !d.loading && !d.error) row1.append(renameField(d, X.mode));
   else {
     const h = el("h2", "sv-name", d.name);
-    h.ondblclick = () => startRename();
+    h.ondblclick = () => startRename(); // keys: F2
     row1.append(h);
   }
   const acts = el("div", "sv-acts");
@@ -441,6 +454,7 @@ function drawMid(keep) {
   add(T("copy"), "copy", () => copySave(), "", noFile);
   add(T("back up"), "backup", () => askFiles("backup"), "", noFile);
   if (d.newList) add(T("make a list"), "new-list", () => newList(d, false), "", "", "new-plan").title = d.newList.command;
+  if (!noFile) chooseButton(d, false, add);
   const rec = add(T("recycle…"), "recycle", () => askFiles("recycle"), "", locked || noFile);
   rec.classList.add("danger");
   row1.append(acts);
@@ -462,6 +476,9 @@ function drawMid(keep) {
     open.title = d.folder;
     loc.append(open);
     kv.append(el("dt", "", T("location")), loc);
+    // whose Saves folder, when the game line does not say it (a pack's, a shared folder)
+    if (d.owner) fact(T("saves of"), d.owner);
+    if (d.noCloud) loc.append(el("span", "muted sv-match", T("Steam Cloud does not sync this folder")));
     head.append(kv);
   }
   b.append(head);
@@ -496,6 +513,19 @@ function loadSection(d) {
   const h = el("h3", "", T("can it load?"));
   h.append(el("span", "r", d.switch ? "" : d.against || ""));
   s.append(h);
+  // in another Game Config's or a pack's Saves folder: the game started now does not list
+  // it (12 §4.8); Copy to … puts the file into the current config's folder
+  if (d.unseen) {
+    const u = el("div", "sv-unseen");
+    u.append(el("span", "t", d.unseen));
+    if (d.copyHere) {
+      const b = button(Tf("copy to the saves of %s", d.copyHere), "", () => copyHere(d), "small", "save-copy-to");
+      b.dataset.key = "copy-here";
+      b.title = T("copies only the save file; Mods, lists and settings stay as they are");
+      u.append(b);
+    }
+    s.append(u);
+  }
   // The save's own game and list, when the Launch page applied others: how it loads with
   // them, and Switch and launch; the bar and the rows below are then the current ones'.
   if (d.switch) {
@@ -505,7 +535,7 @@ function loadSection(d) {
     sw.setAttribute("aria-label", w.text);
     sw.append(el("span", "t", w.text));
     const b = fixButton(d, { action: "switch", label: w.label }, true);
-    b.append(el("kbd", "", "↵"));
+    b.append(keyCaps("enter"));
     sw.append(b);
     s.append(sw, el("p", "sv-cur", d.against));
   }
@@ -517,7 +547,7 @@ function loadSection(d) {
   bar.append(el("span", "t", d.verdict));
   if (d.quick) {
     const q = fixButton(d, d.quick, true);
-    q.append(el("kbd", "", "↵"));
+    q.append(keyCaps("enter"));
     bar.append(q);
   }
   s.append(bar);
@@ -704,20 +734,42 @@ function modRows(scroll, list, all) {
   return { draw, destroy() { cancelAnimationFrame(frame); ro.disconnect(); scroll.removeEventListener("scroll", later); } };
 }
 
-// drawRight is the colony and the content its save references (16 §2.11 "Right"): the
-// colony, its day and date, storyteller, difficulty and play time; then the Defs the save
-// references, by the Mod providing them and by content category (12 §1.4, §1.5, §2).
-// Skeletons while the save is read.
+// drawRight is the colony and what its save needs (16 §2.11 "Right"): the colony, its day
+// and date, storyteller, difficulty and play time; then the save's Mods by what removing
+// one costs (12 §4.7). Skeletons while the save is read.
 function drawRight(keep) {
   if (!rightCard) return;
   const d = X.detail;
+  if (keep && d && !d.loading && redrawAroundFind(d)) return;
   const top = keep ? rightCard.querySelector(".sv-body")?.scrollTop || 0 : 0;
   const focused = rightCard.contains(document.activeElement) ? document.activeElement.dataset?.key || "" : null;
   rightCard.replaceChildren();
   if (!d) return;
-  const p = d.play;
   const b = body();
-  b.setAttribute("aria-label", T("the colony and its content"));
+  b.setAttribute("aria-label", T("the colony and what its save needs"));
+  b.append(rightHead(d));
+  if (d.loading) { rightCard.append(b); return; }
+  b.append(contentBox = contentSection(d));
+  rightCard.append(b);
+  b.scrollTop = top;
+  if (focused !== null) (focused && b.querySelector(`[data-key="${CSS.escape(focused)}"]`) || b).focus({ preventScroll: true });
+}
+
+// redrawAroundFind redraws the right card around the find box while it has the focus:
+// the box itself stays in the page, so its text, caret and an IME composition in progress
+// survive a redraw (a saves-read event, an analysis, a group folded). false: draw it anew.
+function redrawAroundFind(d) {
+  const old = contentBox?.isConnected && contentBox.querySelector('[data-key="need-find"]');
+  if (!old || document.activeElement !== old || content.ref !== d.ref) return false;
+  const head = rightCard.querySelector(".sv-head");
+  if (!head) return false;
+  head.replaceWith(rightHead(d));
+  return redrawContent();
+}
+
+// rightHead is the right card's header: the colony's name and its play facts.
+function rightHead(d) {
+  const p = d.play;
   const head = el("div", "sv-head");
   const row = el("div", "sv-row1");
   row.append(anum(rightCard));
@@ -728,7 +780,7 @@ function drawRight(keep) {
     // name its saves give it stays on hover
     const h = el("h2", "sv-name", d.colony || "");
     if (d.colonyGame) h.title = Tf("its saves name it %s", d.colonyGame);
-    if (d.colonyKey) h.ondblclick = () => startColonyRename();
+    if (d.colonyKey) h.ondblclick = () => startColonyRename(); // keys: the rename button beside the name
     row.append(h);
   }
   if (p) row.append(el("span", "muted", [p.day, p.date].filter(Boolean).join("  ")));
@@ -738,6 +790,12 @@ function drawRight(keep) {
     rn.title = T("name this colony in RimArcho; the save files keep their names");
     row.append(rn);
   }
+  if (d.colonyKey && !d.loading && !d.error) chooseButton(d, true, (label, key, run, k, off, env) => {
+    const b = button(label, "", run, "small sv-colrename", env);
+    b.dataset.key = key;
+    row.append(b);
+    return b;
+  });
   head.append(row);
   if (p) {
     const kv = el("dl", "sv-kv");
@@ -747,39 +805,55 @@ function drawRight(keep) {
     if (kv.childNodes.length) head.append(kv);
   }
   if (p?.note) head.append(el("p", "sv-note warn", p.note));
-  b.append(head);
-  if (d.loading) { rightCard.append(b); return; }
-  b.append(contentBox = contentSection(d));
-  rightCard.append(b);
-  b.scrollTop = top;
-  if (focused !== null) (focused && b.querySelector(`[data-key="${CSS.escape(focused)}"]`) || b).focus({ preventScroll: true });
+  return head;
 }
 
-// ---- right: the content the save references (12 §1.4, §1.5, §2) ----
+// ---- right: what the save needs of its Mods (12 §4.7) ----
 
-// content: the selected save's content (API.SaveContent) once asked for; cat: the category
-// the Mods are filtered to; opened: the Mods (by packageId, "?" for source not found)
-// whose names are shown; all: every Mod is listed, not the first CONTENT_FOLD.
-let content = { ref: "", seq: 0, data: null, error: "", cat: "", opened: new Set(), all: false };
+// content: the selected save's content (API.SaveContent) once asked for; q: the find
+// box's text; open: the verdict groups unfolded; all: the groups listing every Mod, not the
+// first NEED_FOLD; opened: the Mods (by packageId, "?" for the Defs of no installed Mod)
+// whose names are shown.
+const freshContent = (ref, seq) => ({ ref, seq, data: null, error: "", q: "", open: new Set(["breaks", "loses"]), all: new Set(), opened: new Set() });
+let content = freshContent("", 0);
 // contentBox is the section in the right card, redrawn on its own (redrawContent) so a
 // colony name being typed in the card's header stays.
 let contentBox = null;
 
+// The find box is kept when the new section has one too: the nodes around it are
+// replaced, it is not (moving a focused input blurs it and ends an IME composition).
 function redrawContent() {
   const d = X.detail;
-  if (!d || !contentBox?.isConnected) { drawRight(true); return; }
+  if (!d || !contentBox?.isConnected) { drawRight(true); return false; }
   const key = contentBox.contains(document.activeElement) ? document.activeElement.dataset?.key : "";
   const n = contentSection(d);
-  contentBox.replaceWith(n);
-  contentBox = n;
-  if (key) n.querySelector(`[data-key="${CSS.escape(key)}"]`)?.focus({ preventScroll: true });
+  const old = contentBox.querySelector('[data-key="need-find"]');
+  const nf = n.querySelector('[data-key="need-find"]');
+  if (old && nf && content.ref === d.ref) {
+    const kids = [...n.childNodes], at = kids.indexOf(nf);
+    while (old.previousSibling) old.previousSibling.remove();
+    while (old.nextSibling) old.nextSibling.remove();
+    old.before(...kids.slice(0, at));
+    old.after(...kids.slice(at + 1));
+    // the new section's handler reads its own (detached) box: read the kept one
+    const fill = nf.oninput;
+    old.oninput = () => { nf.value = old.value; fill(); };
+    contentBox.className = n.className;
+  } else {
+    contentBox.replaceWith(n);
+    contentBox = n;
+  }
+  if (key && contentBox.querySelector(`[data-key="${CSS.escape(key)}"]`) !== document.activeElement) {
+    contentBox.querySelector(`[data-key="${CSS.escape(key)}"]`)?.focus({ preventScroll: true });
+  }
+  return true;
 }
-const CONTENT_FOLD = 40;
+const NEED_FOLD = 8;
 
 // loadContent asks for the save's content after its check: attributing thousands of Defs
 // is a separate call, so the cards above never wait for it.
 async function loadContent(ref) {
-  if (content.ref !== ref) content = { ref, seq: content.seq, data: null, error: "", cat: "", opened: new Set(), all: false };
+  if (content.ref !== ref) content = freshContent(ref, content.seq);
   const n = ++content.seq;
   let c, err = "";
   try { c = await api.SaveContent(ref); } catch (e) { err = errText(e); }
@@ -789,120 +863,170 @@ async function loadContent(ref) {
   redrawContent();
 }
 
+// contentSection says what the save needs of each of its Mods, whatever list it is checked
+// against: a bar for how the Mods split, a find box, then the Mods by what removing one
+// costs, heaviest group first.
 function contentSection(d) {
   const s = el("div", "sv-sect sv-content");
   const c = content.ref === d.ref ? content.data : null;
-  const h = el("h3", "", T("content in this save"));
+  const h = el("h3", "", T("what this save needs"));
   s.append(h);
   if (content.ref === d.ref && content.error) { s.append(el("p", "err", content.error)); return s; }
   if (!c || c.stale || (!c.read && d.reading)) {
     s.append(shimmer(c?.stale ? T("reading the save for its content…") : d.reading ? T("reading the save…") : T("finding the Mods of its content…"), 5));
     return s;
   }
-  if (!c.read) {
+  const nd = c.needs;
+  if (!c.read || !nd) {
     // why it is not read (it failed, the game is writing it) before "not read yet"
     s.append(el("p", "sv-note muted", d.playNote || c.note || T("the save is not read in full yet")));
     return s;
   }
-  const mods = c.mods || [];
-  h.append(el("span", "r", Tf("%d Defs from %d Mods", c.defs, mods.length)));
+  h.append(el("span", "r", Tf("%d Mods", nd.mods)));
   if (c.note) s.append(el("p", "sv-note warn", c.note));
-  // the categories over all Mods: one filters the Mods to it and shows its names
-  const totals = c.totals || [];
-  if (totals.length) {
-    const cats = el("div", "sv-cats");
-    cats.setAttribute("role", "group");
-    cats.setAttribute("aria-label", T("content categories"));
-    for (const t of totals) {
-      const on = content.cat === t.key;
-      const b = el("button", "sv-cat" + (on ? " on" : "") + (t.key === "other" ? " other" : ""));
-      b.type = "button";
-      b.dataset.key = "cat-" + t.key;
-      b.setAttribute("aria-pressed", String(on));
-      b.append(el("span", "n", String(t.count)), el("span", "l", t.label + (t.under ? " *" : "")));
-      b.title = [t.under ? T("may be underestimated: it leaves few traces in a save") : "", t.hidden ? Tf("%d hidden", t.hidden) : "", Tf("%d uses", t.uses)].filter(Boolean).join("  ");
-      b.onclick = () => { content.cat = on ? "" : t.key; redrawContent(); };
-      cats.append(b);
-    }
-    s.append(cats);
+  const groups = nd.groups || [];
+  const bar = el("div", "sv-nbar");
+  bar.setAttribute("role", "img");
+  bar.setAttribute("aria-label", groups.map((g) => Tf("%d %s", g.mods.length, g.label)).join(T(", ")));
+  for (const g of groups) {
+    const i = el("i", "k-" + g.key);
+    i.style.flex = String(g.mods.length);
+    i.title = Tf("%d %s", g.mods.length, g.label);
+    bar.append(i);
   }
-  s.append(el("p", "sv-note muted", T("a Def in the save means it was present, not how much it was played")));
-  // what this version cannot see in a save (12 §2): said, so no Mod looks unused for it
-  if (c.limits?.length) {
-    const ul = el("ul", "sv-limits");
-    ul.setAttribute("aria-label", T("not covered yet"));
-    for (const l of c.limits) ul.append(el("li", "", l));
-    s.append(ul);
-  }
-  const shownMods = content.cat ? mods.filter((m) => (m.cats || []).some((x) => x.key === content.cat)) : mods;
-  const list = el("ul", "sv-cmods");
-  list.setAttribute("aria-label", T("Mods by their content in this save"));
-  const cut = content.all || content.cat ? shownMods.length : Math.min(shownMods.length, CONTENT_FOLD);
-  for (const m of shownMods.slice(0, cut)) list.append(contentMod(m, m.packageId, m.name, m.library, m.defs, m.cats || []));
-  if (c.unknown && (!content.cat || content.cat === "unknown")) {
-    const u = c.unknown;
-    const li = contentMod(u, "?", T("source not found"), "", u.count, [u]);
-    li.classList.add("unknown");
-    li.title = T("no installed Mod of this save defines them: a Mod update removed them, or their Mod is not installed");
-    list.append(li);
-  }
-  if (!list.childElementCount) s.append(el("p", "sv-none", T("no Mod of this save has content in this category")));
-  else s.append(list);
-  if (shownMods.length > cut) {
-    const more = button(Tf("show all %d Mods", shownMods.length), "", () => { content.all = true; redrawContent(); }, "link sv-fold");
-    more.dataset.key = "content-all";
-    const f = el("p", "sv-folds");
-    f.append(more);
-    s.append(f);
-  }
-  if (c.unchecked?.length) {
-    // their Defs lack the category fields (an older analysis, another game or
-    // environment): left out, not counted as source not found. Analysing a list made from
-    // the save reads them; the card asks again when the analysis is done.
-    const p = el("p", "sv-note warn", Tf("not analysed yet: %s. What they add is left out until a list with them is analysed.", namesOf(c.unchecked, 6)) + " ");
-    const go = button(T("make a list from this save and analyse it"), "", () => newList(d, true), "link sv-fold", "new-plan");
-    go.dataset.key = "content-analyse";
-    p.append(go);
+  s.append(bar);
+  const find = el("input", "sv-nfind");
+  find.type = "search";
+  find.placeholder = T("find a Mod: can it be removed?");
+  find.setAttribute("aria-label", find.placeholder);
+  find.dataset.key = "need-find";
+  find.value = content.q;
+  const list = el("div", "sv-needs");
+  list.setAttribute("aria-label", T("the save's Mods by what removing one costs"));
+  // typing redraws only the groups, so the box keeps its focus and caret
+  find.oninput = () => { content.q = find.value; fillNeeds(list, d, groups); };
+  s.append(find, list);
+  fillNeeds(list, d, groups);
+  if (nd.game) s.append(el("p", "sv-note muted", Tf("part of the game, always needed: %s", nd.game)));
+  if (c.unknown) {
+    // Defs no installed Mod of the save defines (12 §1.5)
+    const u = c.unknown, open = content.opened.has("?");
+    const p = el("p", "sv-note muted", Tf("%d Defs in the save come from no installed Mod", u.count) + " ");
+    p.title = T("no installed Mod of this save defines them: a Mod update removed them, or their Mod is not installed");
+    const tg = button(open ? T("hide the names") : T("show the names"), "", () => { if (open) content.opened.delete("?"); else content.opened.add("?"); redrawContent(); }, "link sv-fold");
+    tg.dataset.key = "need-unknown";
+    tg.setAttribute("aria-expanded", String(open));
+    p.append(tg);
     s.append(p);
+    if (open) {
+      const names = u.names || [];
+      s.append(el("p", "sv-lost", names.join(T(", ")) + (u.count > names.length ? " " + Tf("and %d more", u.count - names.length) : "")));
+    }
   }
-  // the save's Mods with nothing in it: code, UI and patch Mods leave no Def (12 §3.3)
-  const none = (d.mods || []).filter((m) => !m.missing).length - mods.length - (c.unchecked?.length || 0);
-  if (none > 0 && !content.cat) s.append(el("p", "sv-note muted", Tf("%d of the save's Mods have no Def in it: code, interface and patch Mods leave none", none)));
+  // what a save cannot tell (12 §2.3): said, folded, so no verdict reads as more than it is
+  const lim = el("details", "sv-limits");
+  lim.append(el("summary", "", T("what a save cannot tell")));
+  const ul = el("ul");
+  for (const l of [T("a Def in the save means it was present, not how much it was played"), ...(c.limits || [])]) ul.append(el("li", "", l));
+  lim.append(ul);
+  s.append(lim);
   return s;
 }
 
-function namesOf(names, max) {
-  return names.slice(0, max).join(T(", ")) + (names.length > max ? " " + Tf("and %d more", names.length - max) : "");
+// fillNeeds draws the verdict groups; with text in the find box, only the Mods it matches,
+// every group unfolded.
+function fillNeeds(list, d, groups) {
+  list.replaceChildren();
+  const q = lc(content.q.trim());
+  for (const g of groups) {
+    const mods = q ? g.mods.filter((m) => lc(m.name).includes(q) || lc(m.packageId).includes(q)) : g.mods;
+    if (q && !mods.length) continue;
+    const open = !!q || content.open.has(g.key);
+    const sec = el("section", "sv-need k-" + g.key);
+    const hd = el("button", "gh");
+    hd.type = "button";
+    hd.dataset.key = "need-" + g.key;
+    hd.setAttribute("aria-expanded", String(open));
+    const chv = el("span", "chv" + (open ? " open" : "")); chv.innerHTML = icon.chev;
+    hd.append(el("i", "dot"), el("span", "l", g.label), el("span", "k", String(mods.length)), chv);
+    hd.onclick = () => {
+      if (q) return; // a search shows every group it matches
+      if (content.open.has(g.key)) content.open.delete(g.key); else content.open.add(g.key);
+      redrawContent();
+    };
+    sec.append(hd, el("p", "hint", g.hint));
+    if (open) {
+      const ul = el("ul", "sv-nmods");
+      const cut = q || content.all.has(g.key) ? mods.length : Math.min(mods.length, NEED_FOLD);
+      for (const m of mods.slice(0, cut)) ul.append(needMod(m));
+      sec.append(ul);
+      const folds = el("p", "sv-folds");
+      if (mods.length > cut) {
+        const more = button(Tf("%d more", mods.length - cut), "", () => { content.all.add(g.key); redrawContent(); }, "link sv-fold");
+        more.dataset.key = "need-all-" + g.key;
+        folds.append(more);
+      }
+      if (g.key === "unchecked") {
+        // analysing a list made from the save reads its Mods; the card asks again when
+        // the analysis is done
+        const go = button(T("make a list from this save and analyse it"), "", () => newList(d, true), "link sv-fold", "new-plan");
+        go.dataset.key = "content-analyse";
+        folds.append(go);
+      }
+      if (folds.childElementCount) sec.append(folds);
+    }
+    list.append(sec);
+  }
+  if (!list.childElementCount) list.append(el("p", "sv-none", q ? T("no Mod of this save matches") : T("this save names no Mod besides the game")));
 }
 
-// contentMod is one Mod (or source not found) with its categories; opening it, or
-// filtering to a category, shows the Defs' names.
-function contentMod(m, id, name, library, defs, cats) {
-  const li = el("li", "sv-cmod");
-  const open = content.opened.has(id);
-  const tg = el("button", "h");
-  tg.type = "button";
-  tg.dataset.key = "content-" + id;
-  tg.setAttribute("aria-expanded", String(open || !!content.cat));
-  const chv = el("span", "chv" + (open || content.cat ? " open" : "")); chv.innerHTML = icon.chev;
-  tg.append(chv, el("span", "n", name), el("span", "k", String(defs)));
-  if (m.packageId) tg.title = m.packageId;
-  tg.onclick = () => { if (content.opened.has(id)) content.opened.delete(id); else content.opened.add(id); redrawContent(); };
-  li.append(tg);
-  if (id !== "?") li.append(el("p", "sum", cats.map((x) => Tf("%d %s", x.count, x.label) + (x.under ? " *" : "")).join(T(", "))));
-  const shown = content.cat ? cats.filter((x) => x.key === content.cat) : open ? cats : [];
-  if (shown.length || (open && library)) {
+// needMod is one Mod with what it holds in the save; opening it shows the names.
+function needMod(m) {
+  const li = el("li", "sv-nmod");
+  const open = content.opened.has(m.packageId);
+  const more = (m.parts || []).length > 0;
+  // a row of text, not a button, so its name and summary can be selected; the chevron
+  // opens it and the name is the link to the library
+  const row = el("div", "h");
+  if (more) {
+    const tg = el("button", "tg" + (open ? " open" : ""));
+    tg.type = "button";
+    tg.innerHTML = icon.chev;
+    tg.dataset.key = "need-mod-" + m.packageId;
+    tg.title = open ? T("hide what it holds") : T("show what it holds");
+    tg.setAttribute("aria-label", tg.title + T(": ") + m.name);
+    tg.setAttribute("aria-expanded", String(open));
+    tg.onclick = () => {
+      if (open) content.opened.delete(m.packageId); else content.opened.add(m.packageId);
+      redrawContent();
+    };
+    row.append(tg);
+  }
+  let name;
+  if (m.library) {
+    name = el("a", "n lk", m.name);
+    name.setAttribute("role", "link");
+    name.tabIndex = 0;
+    name.dataset.key = "need-lib-" + m.packageId;
+    name.title = m.packageId + "  " + T("show in the mod library");
+    // a drag over the name selects it; a plain click follows it
+    name.onclick = () => { if (String(getSelection()) === "") openLibraryInstance(m.library); };
+    name.onkeydown = (e) => { if (e.key === "Enter") openLibraryInstance(m.library); };
+  } else {
+    name = el("span", "n", m.name);
+    name.title = m.packageId;
+  }
+  const sum = el("span", "c", m.sum || "");
+  if (m.sum) sum.title = m.sum; // the line may be cut short
+  row.append(name, sum);
+  li.append(row);
+  if (open && more) {
     const box = el("div", "sv-details");
-    for (const x of shown) {
+    for (const x of m.parts || []) {
       const p = el("p", "sv-lost");
       const names = x.names || [];
-      p.append(el("b", "", Tf("%d %s", x.count, x.label)), " " + names.join(T(", ")) + (x.count > names.length ? " " + Tf("and %d more", x.count - names.length) : ""));
+      p.append(el("b", "", x.label), names.length ? " " + names.join(T(", ")) + (x.more ? " " + Tf("and %d more", x.more) : "") : "");
       box.append(p);
-    }
-    if (open && library) {
-      const lk = button(T("show in the mod library"), "", () => openLibraryInstance(library), "link");
-      lk.dataset.key = "content-lib-" + id;
-      box.append(lk);
     }
     li.append(box);
   }
@@ -1197,6 +1321,42 @@ async function once(key, run) {
   if (running.has(key)) return;
   running.add(key);
   try { await run(); } finally { running.delete(key); }
+}
+
+// chooseButton is Check on Can it run (12 §4.8): this save, or (colony) its colony's newest
+// save, becomes what Can it run checks for the current Game Config; pressed again, Can it
+// run goes back to the last loaded save.
+function chooseButton(d, colony, add) {
+  const kind = colony ? "colony" : "save";
+  const on = d.chosen === kind;
+  const label = on ? "✓ " + T("on Can it run") : colony ? T("check this colony") : T("check this save");
+  // the choice is the current Game Config's: it waits while the window switches configs
+  const b = add(label, "choose-" + kind, () => choose(d, colony, on), "", "", "save-choice");
+  b.setAttribute("aria-pressed", String(on));
+  b.title = on ? T("press to check the last loaded save again")
+    : colony ? T("Can it run checks this colony's newest save, for the current Game Config") : T("Can it run checks this save, for the current Game Config");
+  return b;
+}
+
+async function choose(d, colony, clear) {
+  await once("choose", async () => {
+    let text;
+    try { text = await api.SaveChoose(d.ref, colony, clear); } catch (e) { say("fail", errText(e)); return; }
+    say("ok", text);
+    if (live() && X.detail?.ref === d.ref) {
+      X.detail.chosen = clear ? "" : colony ? "colony" : "save";
+      drawDetail(true);
+    }
+  });
+}
+
+async function copyHere(d) {
+  await once("copy-here", async () => {
+    let r;
+    try { r = await api.SaveCopyTo(d.ref); } catch (e) { say("fail", errText(e)); return; }
+    say("ok", r.text);
+    await reread(X.sel === d.ref ? r.ref : "");
+  });
 }
 
 async function copySave() {

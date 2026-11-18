@@ -450,8 +450,8 @@ func TestLaunchPlans(t *testing.T) {
 	if !strings.Contains(out, "steam.exe") || !strings.Contains(out, "-applaunch 294100") || len(e.Launched) != 0 {
 		t.Fatalf("steam plan:\n%s", out)
 	}
-	if !strings.Contains(out, "-savedatafolder=") {
-		t.Fatalf("non-default user data must be passed:\n%s", out)
+	if strings.Contains(out, "-savedatafolder") || strings.Contains(out, "-logfile") {
+		t.Fatalf("default user data must keep the game's defaults:\n%s", out)
 	}
 	e.MustRun("env", "set", "main", "--launch", "direct")
 	e.MustRun("enable", refOf(t, e, "B", ""))

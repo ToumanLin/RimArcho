@@ -6,11 +6,12 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/l10ndata"
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
 func init() {
-	register(&Command{Name: "import rimcrow", Summary: "one-time import of RimCrow's aliases, notes, groups (as tags) and user rules; repeatable", MaxArgs: 0, Run: importRimCrowCmd,
+	register(&Command{Name: "import rimcrow", Summary: "import RimCrow profiles, aliases, notes, groups (as tags) and user rules; repeatable", MaxArgs: 0, Run: importRimCrowCmd,
 		Flags: []Flag{{Name: "db", Value: "<path>", Help: `RimCrow's data\mod_manager.db (read from a copy)`}, {Name: "rules", Value: "<path>", Help: `default: data\rules\user_rules.json next to the database`},
 			{Name: "dry-run", Help: "report what would be imported; write nothing"}, {Name: "include-disabled-rules", Help: "also import user rules that are switched off in RimCrow"}, {Name: "all"}}})
 }
@@ -20,25 +21,42 @@ func importRimCrowCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if db == "" {
 		return nil, &UsageError{Msg: `--db <path>: RimCrow's database, <RimCrow folder>\data\mod_manager.db`}
 	}
-	rep, err := c.App.ImportRimCrow(app.RimCrowOptions{DB: db, Rules: a.Str("rules"), DryRun: a.Bool("dry-run"), IncludeDisabledRules: a.Bool("include-disabled-rules")})
+	tags := app.ManagerTagNamesIn(l10ndata.ResolveLang(Setting(c.App, "ui.lang")))
+	rep, err := c.App.ImportRimCrow(app.RimCrowOptions{DB: db, Rules: a.Str("rules"), DryRun: a.Bool("dry-run"), IncludeDisabledRules: a.Bool("include-disabled-rules"), Tags: tags})
 	if err != nil {
 		return nil, err
 	}
-	ix, err := c.App.Index()
-	if err != nil {
-		return nil, err
-	}
+	var ix *app.Index
 	head := "import rimcrow"
 	if rep.DryRun {
 		head += " (dry run: nothing written)"
 	}
 	d, root := render.New(head)
 	root.KV("database", rep.DB+" (read from a copy)")
+	groups := map[string]*render.Node{}
+	for _, p := range rep.Profiles {
+		group := groups[p.Game]
+		if group == nil {
+			group = root.Section("game installation: " + p.Game)
+			groups[p.Game] = group
+		}
+		n := group.Add(p.Name + " → " + p.Environment + ": " + p.Status)
+		n.KV("user-data", p.UserData)
+		n.KV("launch-args", p.Args)
+		n.KV("list", strings.Join(p.Tokens, ", "))
+		if len(p.Unresolved) > 0 {
+			n.KV("not-installed", strings.Join(p.Unresolved, ", "))
+		}
+	}
+	if len(rep.Profiles) > 0 {
+		root.Add("folders stay shared with RimCrow; launching writes their Config and saves; deleting the profile in RimCrow deletes its saves")
+		root.Add("profile source flags are not imported; list entries decide what loads; check unresolved Mods and which copies are selected")
+	}
 	mapped := rep.ByPath + rep.ByPackage
 	root.KV("mods", fmt.Sprintf("%d with data: %d mapped (%d by path, %d by packageId), %d not mapped", rep.Records, mapped, rep.ByPath, rep.ByPackage, len(rep.Unmapped)))
 	root.KV("aliases", fmt.Sprintf("%d new, %d already set", rep.AliasNew, rep.AliasSame))
 	root.KV("notes", fmt.Sprintf("%d new, %d already set", rep.NoteNew, rep.NoteSame))
-	root.KV("tags", fmt.Sprintf("%d new, %d already present (%d groups, %d memberships)", rep.TagNew, rep.TagSame, rep.Groups, rep.Memberships))
+	root.KV("tags", fmt.Sprintf("%d new, %d already present (%d groups, %d memberships), %d tags given a colour", rep.TagNew, rep.TagSame, rep.Groups, rep.Memberships, rep.TagColors))
 	rules := fmt.Sprintf("%d: %d new, %d already present, %d skipped", rep.RulesTotal, rep.RuleNew, rep.RuleSame, len(rep.RulesSkipped))
 	if rep.RulesDisabled {
 		rules += " (user rules are switched off in RimCrow)"
@@ -75,6 +93,10 @@ func importRimCrowCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	list("rules-skipped", rep.RulesSkipped)
 	// 04 §1.2: mods RimCrow switched off by renaming About.xml.
 	if len(rep.AboutDisabled) > 0 || rep.CrowDisabled > 0 {
+		ix, err = c.App.Index()
+		if err != nil {
+			return nil, err
+		}
 		var kinds []string
 		for k, n := range rep.DisabledKinds {
 			kinds = append(kinds, fmt.Sprintf("%d %s", n, k))

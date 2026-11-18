@@ -9,8 +9,8 @@ This specification defines environments and sources: the terms, what an environm
 
 | Term | Definition | UI name (16 §7.2) |
 | --- | --- | --- |
-| Environment | One game directory plus its save mode (user data directory). A player may have several, such as a licensed 1.7 and a 1.5 downloaded with SteamCMD | game |
-| Source | A root directory that holds Mods. A game's `Data` and `Mods` belong to its environment; the others are **Mod folders**, shared by all environments | mod folders; source in filters |
+| Environment | One play context selecting an installation and a separate user data directory | environment |
+| Source | A root directory that holds Mods. An installation's `Data` and `Mods` belong to that installation; the others are **Mod folders**, shared by all environments | mod folders; source in filters |
 | Instance | One Mod copy on disk, with an ID RimArcho assigns | this one |
 | Snapshot | An Instance's metadata and content fingerprint from one scan | — |
 | Lineage | A family of "the same Mod": the Workshop original, a locked version, the Mod before and after a rename | copies of the same mod |
@@ -22,23 +22,24 @@ A plan (07) is a **list** in the interface; for other interface terms see 16 §7
 
 **IDs**: Instance, Lineage, environment and source IDs are random 128-bit values in lowercase base32 (alphabet `a–z2–7`, no padding, 26 characters). Output shows the shortest unique prefix among the Instances this environment sees (shared folders and its own), at least 4 characters; Instance and Lineage prefixes are computed separately. Reference syntax (`#a3f9`, `L#7c2e`, `pkg:`, `ws:`, `q:`, `src:`, `scan:`, `env:`) and ambiguity handling are in 13 §2. Databases and event details store full IDs; only output shortens them.
 
-## 2. One environment per game directory
+## 2. Installations and environments
 
-An environment owns one game directory. The Workshop directory, SteamCMD directories, extra folders, the Archo Monitor directory and the lock library are shared by all games: keeping them per environment would only create several records for the same Mod. What belongs where:
+An environment selects one game installation and one user data directory. Several environments may share one installation under §6. The Workshop directory, SteamCMD directories, extra folders, the Archo Monitor directory and the lock library are shared by all games: keeping them per environment would only create several records for the same Mod. What belongs where:
 
 | Ownership | Contents |
 | --- | --- |
-| Environment (one game directory) | Its own `Data` (official) and `Mods` (local) sources, game version, launch method, launch arguments, current plan, launch records, `_Archo_` deployment links, save mode |
+| Game installation | Its own `Data` (official) and `Mods` (local) sources, game version, scans, identity questions, analysis slots, game assemblies and physical deployment links |
+| Environment | Installation reference, user data directory, launch method, launch arguments, current plan, launch records, finding ignores |
 | Global (shared by all environments) | **Plans** (07 §1.7); **Mod folders**: the Workshop directory (found through Steam), SteamCMD directories, extra folders, the Archo Monitor directory, the lock library. Their Instances and Lineages, tags, notes, aliases, copy notes, history, user rules |
 | By game version | Analysis slots and fact views; identical fact sets are shared across versions (05 §3) |
 | By user data directory | ModsConfig.xml write records (§3.4, 07 §4.3) |
 
 **Rules**:
-1. **Shared sources**: `source.environment_id = ''`, and so is their Instances' `environment_id`; environment-owned official and local sources and their Instances keep their environment ID. All Lineages are global (`environment_id = ''`), so locked copies in `Mods/` and Workshop originals still share one Lineage.
+1. **Shared sources**: `source.game_id = ''`, and so is their Instances' `game_id`; installation-owned official and local sources and their Instances keep their GameID. All Lineages are global (`environment_id = ''`), so locked copies in `Mods/` and Workshop originals still share one Lineage.
 2. **Labels**: shared source labels are globally unique (deployment link names contain them, 09 §3). Environment sources have only the labels official and local (plus retired names), which are also unique within "shared + this environment".
 3. **Workshop directory**: at most one active directory. Adding another Workshop directory with `folder add` changes the existing one's path by rebinding (§4.2). When an environment is added whose game is in a Steam library and no Workshop directory exists yet, that library's Workshop directory is added automatically ("find through Steam").
    **A game's own Workshop directory is a SteamCMD directory.** A game downloaded with SteamCMD has `steamapps\workshop\content\294100` inside its game directory (`force_install_dir`). When it exists and is not the Steam client's Workshop directory, it is registered as a shared steamcmd source, shown in Settings "mod folders" like a folder the player added, and deployed through `_Archo_` links when enabled (09 §3). It is registered on `env add` (including "download a version"), on `env set` changing the game directory, and by a check across all environments before every scan (which also covers environments added earlier). It is **never** treated as a Workshop directory, so it never counts as "a second Workshop directory means changing the path"; `--workshop` pointing there also adds it as a SteamCMD directory. The pre-scan check does not add again a directory registered before, including one the player removed (retired): removed stays removed. **Explicitly adding the game** (`env add`, also re-adding a removed game) or pointing `env set` at it does restore the retired directory: the original source record comes back (same ID, label assigned again from steamcmd), so its returning Mods keep their Instances, lists, tags and notes. `folder add` of a retired directory (same path and kind) also restores the record instead of creating one. Test: `TestGameWorkshopIsSteamCMD`.
-4. **One game directory belongs to only one environment**: `env add` refuses a game directory another environment uses.
+4. **One installation, separate user data**: sibling environments reuse the installation and inventory; user data roots must differ under §6.1.
 5. **Saves**: `--saves shared` (the default: the game's default user data directory) or `--saves own` (RimArcho creates `<data-directory>/userdata/<environment-name>` and passes `-savedatafolder` on launch, 09 §2). There is no separate field; the mode is inferred from `user_data_root`: equal to the game's default means "shared default", under `<data-directory>/userdata/` means "own", anything else means "custom" (`--user-data` remains available). The data directory check (§3.1) allows own saves because RimArcho owns that directory.
 6. **User rules are global, by Lineage**: rules describe relationships between Mods (load after, incompatible) that do not depend on the game being played. Global rules fit "one record per Mod", so the player states each rule once. A rule applies only when both Mods are enabled, so it has no effect in another game.
 7. **Finding ignores are per environment**: a finding judges "this game, this version, these Mods together" (missing 1.7 support, a conflict with another Mod); accepting it in a 1.6 game does not make it safe in 1.7. Ignores already expire when the Mods change; sharing them across games would hide real findings. Lineage IDs in ignores are rewritten when Lineages merge (§2.1).
@@ -48,7 +49,7 @@ An environment owns one game directory. The Workshop directory, SteamCMD directo
 11. **Mod library**: it covers the whole machine, including other games' own `Mods/` (07 §1.7), where each game's `Mods/` has the source value `local-<environment-name>` (`local-main`, `local-1.6`) and `source:local` matches all of them (`app.LocalValue`, `app.LocalMatches`).
 12. **Commands**: `archo env add <name> --game <directory> [--saves shared|own] [--launch …]` and the group `archo folder list|add|remove` (MCP reads them with `status show=folders`; changing environments and settings stays with the player). `env add/set` `--workshop`, `--steamcmd` and `--extra` remain as aliases of `folder add`; `--remove-source` on a shared source equals `folder remove`. Full syntax: §3.1, 13 §4.
 13. **Interface**: the "mod folders" settings group; the environment page shows only the game directory, version, launch method, saves and arguments; the first-run guide's step for adding an environment offers "a game you have" and "download a version" (SteamCMD, 11 §3).
-14. **Links on environment switch**: `env use` (also the GUI and TUI switches) first creates missing `Mods/` links according to the target environment's ModsConfig.xml and current plan, then scans its `Data/` and `Mods/`, then makes it current. Shared sources such as Monitor use normal deployment links; the previous environment's local Mods get `_Archo_env_<Instance ID>` links to their real directories, which stay local Mods of the target environment and are not deleted on save or disable. If the target `Mods/` already contains the same package ID, that copy stays and no duplicate link is made; own saves without a list do not inherit one. Switching does not write ModsConfig.xml. It reports an error if links are needed while the target game runs; when creating links fails, the new links are rolled back and the original environment stays current. Tests: `TestEnvUse*`.
+14. **Links on environment switch**: Same-installation switches bypass this work entirely (§6.1). For a different installation, `env use` (also the GUI and TUI switches) first creates missing `Mods/` links according to the target environment's ModsConfig.xml and current plan, then scans its `Data/` and `Mods/`, then makes it current. Shared sources such as Monitor use normal deployment links; the previous environment's local Mods get `_Archo_env_<Instance ID>` links to their real directories, which stay local Mods of the target environment and are not deleted on save or disable. If the target `Mods/` already contains the same package ID, that copy stays and no duplicate link is made; own saves without a list do not inherit one. Switching does not write ModsConfig.xml. It reports an error if links are needed while the target game runs; when creating links fails, the new links are rolled back and the original environment stays current. Tests: `TestEnvUse*`.
 
 Creating and rolling back the links of item 14 writes the persistent ledger first; only healthy links are kept. Inbound links across all games are maintained before targets are moved or deleted; failure and restart recovery: §4.3, 09 §3.
 
@@ -70,7 +71,7 @@ In the interface, `source:` means the registered directory role: official, works
 | --- | --- |
 | `id` | Random ID |
 | `name` | Chosen by the player; not empty, no spaces, `:` or `#` |
-| `game_root` | Game installation directory. Valid if it contains `RimWorldWin64.exe`, `RimWorld.exe`, `RimWorldWin.exe`, `RimWorldLinux`, `RimWorldMac.app` or `Data/Core`. One game directory belongs to only one environment (`env add` refuses a directory another environment uses) |
+| `game_root` | Game installation directory. Valid if it contains `RimWorldWin64.exe`, `RimWorld.exe`, `RimWorldWin.exe`, `RimWorldLinux`, `RimWorldMac.app` or `Data/Core`. Several environments may select the same installation with distinct user data roots (§6.1) |
 | `user_data_root` | User data directory (containing `Config/ModsConfig.xml`), set by the save mode: **shared default** (`--saves shared`, the default: the game's default user data directory, which other environments may share, §3.4), **own** (`--saves own`: RimArcho creates `<data-directory>/userdata/<environment-name>` and passes `-savedatafolder`, 09 §2), or a **custom directory** from `--user-data`. Inferred from the path, with no separate field |
 | `game_version` | The first line of `<game_root>/Version.txt` (UTF-8 BOM and surrounding whitespace stripped), **kept complete**, such as `1.6.4633 rev1261` or `1.7.4985 rev1269`. Comparisons use only major.minor (`1.6`; "Full game version" below). Reread on each scan and updated if changed |
 | `launch` | direct or steam. Without an explicit choice at `env add`: steam for a game in a Steam library (`…/steamapps/common/RimWorld`), otherwise direct; specifying a Workshop directory does not change this default; the player may still choose the launch method explicitly |
@@ -84,17 +85,19 @@ In the interface, `source:` means the registered directory role: official, works
 - **Short values from outside**: RimArcho's own database stores whole lines (`environment.game_version` is reread on each scan; plan versions record the ModsConfig.xml version, which is the whole line). Only outside values may be short: lists from other tools, a save's `gameVersion`, a handwritten `pack.json`. They are kept unchanged and treated as "unknown build" under the rules above.
 
 Environment commands (full syntax in 13 §4):
-- `archo env list` (environments and shared Mod folders), `env detect` (detection suggestions only), `env add <name> --detected` or `env add <name> --game <directory> [--saves shared|own | --user-data <directory>] [--launch direct|steam]`. When the game is in a Steam library and no Workshop directory exists, `env add` also adds that library's Workshop directory as a Mod folder (§3.2 item 3).
-- `archo env set <name> --game/--saves/--user-data/--launch/--launch-args`. Changing `--game` rebinds official and local by §4.2; if the new game is in another Steam library, the Workshop directory changes too.
+- `archo env list` (environments grouped by installation, then shared Mod folders), `env detect` (detection suggestions only), `env add <name> --detected` or `env add <name> --game <directory> [--saves shared|own | --user-data <directory>] [--launch direct|steam]`. When the game is in a Steam library and no Workshop directory exists, `env add` also adds that library's Workshop directory as a Mod folder (§3.2 item 3).
+- `archo env set <name> --game/--saves/--user-data/--launch/--launch-args`. Changing `--game` relocates the installation for all its environments or reattaches only this environment to an existing installation (§6.2); if the new game is in another Steam library, the Workshop directory changes too.
 - Alias syntax: `env add/set` `--workshop`, `--steamcmd` and `--extra` equal `archo folder add workshop|steamcmd|extra <directory>`; `--remove-source src:<label>` equals `archo folder remove` (§4.1).
 - `archo env branches`, `archo env download <branch> --to <directory> [--account <account-name-or-anonymous>]`: download a game version with SteamCMD and add an environment for it (11 §3).
 - `archo env use <name>` switches the current environment; the first environment added becomes current automatically; the global `--env <name>` switches for one command only.
-- `archo env remove <name> --yes`: delete this environment's own database data (`Data` / `Mods` Instances and their history, launch records, analysis, finding ignores); keep the globally shared plans, rewriting entries that point to its Instances as `packageId` (07 §1.7); keep the Instances of shared Mod folders and the player's Mod data; delete Lineages left empty, with their player data and rules. Game and Mod files are not touched. Without `--yes` it refuses (exit code 2).
+- `archo env remove <name> --yes`: delete this environment's launch records, settings and finding ignores; remove inventory and analysis only with the last sibling (§6.2); keep the globally shared plans, rewriting entries that point to its Instances as `packageId` (07 §1.7); keep the Instances of shared Mod folders and the player's Mod data; delete Lineages left empty, with their player data and rules. Game and Mod files are not touched. Without `--yes` it previews the removal.
 - `archo env rebind src:<label> yes|no`: see §4.2.
 
-**Data directory check**: `env add`, `env set`, `folder add` and `scan` check that RimArcho's data directory, game directories, user data directories and all source roots **do not contain one another**, and refuse when one does. Reason: RimArcho reads these directories, and writes only to the locations listed in 02 §1; putting its data directory inside them would break that boundary. The only exception is own saves, `<data-directory>/userdata/<environment-name>`, which RimArcho owns.
+**Data directory check**: root checks keep RimArcho's data directory separate from game and Mod source roots and custom user data. Registration and root edits also reject game/user-data overlap and nested user-data roots; identical data roots remain allowed across different installations (§3.4). Reason: RimArcho reads these directories, and writes only to the locations listed in 02 §1; putting its data directory inside them would break that boundary. The only exception is own saves, `<data-directory>/userdata/<environment-name>`, which RimArcho owns.
 
 ### 3.2 Automatic detection
+
+A detected default-root pair is already registered only when an environment uses both that installation and its default data root; an own-saves sibling does not make the default pair unavailable.
 
 Try in order, stopping at the first match in each step:
 1. **Game directory**: first find the Steam roots (Windows: the registry, then `C:\Program Files (x86)\Steam`, `C:\Program Files\Steam`; macOS: `~/Library/Application Support/Steam`; Linux: `~/.steam/steam`, `~/.steam/root`, `~/.local/share/Steam`, Flatpak `~/.var/app/com.valvesoftware.Steam/.local/share/Steam` and `~/.var/app/com.valvesoftware.Steam/data/Steam`, Snap `~/snap/steam/common/.local/share/Steam`). Off Windows, resolve symlinks and discard duplicate roots and libraries. Read each root's `steamapps/libraryfolders.vdf` (or `config/libraryfolders.vdf`; old formats such as `"1" "D:\\SteamLibrary"` are supported) and search each library for `steamapps/common/RimWorld`. A match uses steam launch. A RimWorld executable or `Data/Core` identifies the game (`env.LooksLikeGameRoot`); no `appmanifest_294100.acf` is required, including for unmanaged Proton copies in an extra library.
@@ -117,7 +120,9 @@ Detection results are only suggestions: `env detect` prints the first match, the
 
 ### 3.3 Player.log location
 
-- RimWorld 1.7 and later: `<user_data_root>/Logs/Player.log`
+Redirected plan and pack logs follow §6.3. For the game's default user data folder, the reader checks these layouts:
+
+- RimWorld 1.7 and later: `<user_data_root>/Logs/Player.log`, or `<user_data_root>/Player.log` written by a redirected launch (§6.3); the newer wins.
 - Earlier versions: `<user_data_root>/Player.log`
 - Unknown version: check both and take the newer mtime. The previous run's log is `Player-prev.log` in the same directory.
 - Version components compare as numbers (`1.10` is later than `1.9`).
@@ -207,3 +212,78 @@ The lifecycle of links RimArcho creates is separate from scan aliases: `managed_
 | A30 | Save modes | `--saves own` creates `<data-directory>/userdata/<environment-name>` and launches with `-savedatafolder`; `--saves shared` restores the default; `--saves` together with `--user-data` is refused | `TestEnvModelSaves` | Pass |
 | A31 | Add and remove Mod folders | Adding an existing directory changes nothing; containment and a game's `Mods` are refused; only shared folders can be removed, and their Instances disappear on the next scan; a second Workshop directory means rebinding, with Instances unchanged | `TestFolderCommands` | Pass |
 | A32 | Linux Steam roots, external libraries, native / Proton / Flatpak games together, manual games and symlink aliases | Each game has its own default data and Player.log path; aliases produce one suggestion | `TestLinuxDetection` | Synthetic; Linux VM pending |
+
+## 6. Environments sharing a game installation
+
+> Status: installation/environment separation and CLI/core sibling workflows are implemented. The interface and RimCrow profile import (§6.4–§6.5) are implemented; legacy aliases are notice-only and log-path validation remains VM work (§6.3).
+
+**Why.** RimCrow players keep several profiles on one game install, each with its own user data folder (saves, `Config/` with ModsConfig.xml and Mod settings), launched with `-savedatafolder` (RimCrow `GameProfile`). RimArcho adopts the same meaning: **an environment is one game installation plus one user data folder**, and several environments may share an installation. To the player each environment is a separate copy of the game: what they see or change in one applies to it only.
+
+### 6.1 Model
+
+The store uses `game` and `environment.game_id`; `env.Environment` joins installation fields for reads and exposes `GameID` internally. Installation writes use `Store.InsertGame` / `UpdateGame`, with registration and moves composing game and environment writes in one transaction. Game-owned selectors take GameID; launch, current-plan and finding-ignore selectors retain the environment ID. Stored global sentinel columns and provenance retain their existing meanings. Migration and compatibility: 04 §4.
+
+`game.name` starts with the existing environment name and remains stable across sibling changes, preserving `local-<name>` filters and labels. Automatic installation naming belongs to the unimplemented interface phase.
+
+| Layer | Owns |
+| --- | --- |
+| **Game installation** (one per canonical game directory) | Game directory and full version; its `Data` and `Mods` sources and their Instances; scans, change events, identity questions; analysis slots; the game assembly and type index; the physical `Mods/` directory and its link ledger |
+| **Environment** | Name, its installation, user data folder, current plan, launch method, launch arguments, launch records, finding ignores, log selection |
+| By user data folder (unchanged) | ModsConfig.xml write records (§3.4), saves, Config and HugsLib files, Archo Monitor records |
+| Global (unchanged, §2) | Plans, shared Mod folders, Lineages, player data, user rules, facts |
+
+Rules for multiple environments:
+1. One game installation per canonical directory (resolved links, short paths and case). Environment names stay unique.
+2. Two environments of one installation may not use the same user data folder. Environments of **different** installations may still share one (§3.4).
+3. Switching between environments of one installation scans nothing, creates no Instances, changes no links and writes no ModsConfig.xml; it selects the environment's current plan and user data folder. The next save or launch deploys that plan (09 §2). Environments isolate saves and settings, not the physical `Mods/`.
+4. Finding ignores belong to the environment (§2 item 7 already keeps them per environment; they are not shared by installation).
+5. Packs show in every environment whose game version is compatible (10 §3), labelled with the environment that built them; `pack.json` `env` stays origin metadata.
+6. Proton (09 §2) cannot redirect saves, so a Proton installation has one environment; "add environment" for it is disabled with that reason.
+
+`env set --name <name>` renames only that environment, retaining its existing user data path, current plan and historical launch names.
+
+`env add/set --launch-args` refuses `-savedatafolder` under the launch validation rules (09 §2); use `--user-data` instead.
+
+Registration already enforces the Proton redirection restriction for both own and custom user data folders (`TestProtonRegistrationUserData`, `TestLinuxLaunch`); a second Proton environment cannot satisfy the distinct-root requirement.
+
+### 6.2 Adding, moving and removing
+
+- **Add** (`archo env add <name> --game <dir> --saves own | --user-data <dir>`, or `--like <environment>`, with optional `--list <plan> | --new-list`): a taken game directory is accepted when the user data folder differs; bare `--game` on a taken directory whose default pair exists is refused with the existing environment's name and the `--saves own` hint.
+  - **Copy this environment** (default in the GUI for the current environment's own game directory, `--like`; another `--game` is refused, 16 §2.15): copies `Config/*.xml` except ModsConfig.xml and `HugsLib/` (the pack rules, 10 §3 step 4). No Mod files, saves, logs, history, undo, staging or finding ignores are copied. Copying never overwrites destination files; failures are reported. Extra arguments are copied except `-savedatafolder` and its value, reporting the omission.
+  - **Empty**: no settings files; the game creates its defaults.
+  - **Plan selection is separate**: `--list` selects an existing global plan; `--new-list` creates Core and installed DLC in release order. These flags are mutually exclusive. With neither, `--like` selects the source environment's current plan, irrespective of the editor's open plan. Without `--like`, first-use behavior follows 07 §1.4. No plan is copied when adding an environment.
+  - The GUI's Mod list selector defaults to the current environment's current plan and offers every other global plan and New empty list, independently of settings copying. New empty plans use the plain environment name (control characters replaced, leading hyphens removed, trimmed to 56 characters; empty becomes `environment`), with ` 2`, ` 3`, etc. for case-insensitive collisions.
+  - Adding is all or nothing: if a step after registration fails, the environment, any installation records it created and the list it created are removed again; copied settings files and added shared folders stay (copying never overwrites).
+- **Move the installation** (`env set --game` on a relocated install): one rebinding (§4.2) updates every environment of that installation; the confirmation names them. Pointing **one** environment at another installation changes only that environment. If no other environment then uses the old installation, its inventory and analysis are removed (no files); the confirmation and `env set` output say so.
+- **Remove an environment**: deletes its own rows (launch records, ignores, settings); the installation's inventory and analysis stay while another environment uses it. Removing the **last** environment of an installation also removes the installation's records (§3.1). Removing the current environment selects the next one (a sibling first, else the first by name) in the same transaction. Its per-environment meta values go with it (launch arguments, selected/seen log, column widths, memory estimates, Workshop-client update checks). Files are never touched.
+- **Running game**: the game is identified first by installation, then by the effective user data folder from `-savedatafolder` (absent means the installation's default folder, not the selected environment's), then by launch records of all environments of that installation; when still ambiguous the interface says the installation runs with an unknown environment (09 §4).
+
+### 6.3 Logs
+
+Each environment's log page shows only its own runs. Every plan launch whose effective user data root differs from the game's default adds `-logfile <user-data>/Player.log`; this applies to existing and new environments. Packs use the same argument with their own userdata. Default-folder environments add no `-logfile` and keep the game's normal behavior. Before starting a redirected run, RimArcho moves `Player.log` to `Player-prev.log`, keeping the older `Player-prev.log` aside until the launcher returns. A launcher that fails puts both back. Dry runs never rotate files, and a rotation that fails is refused before starting the process.
+
+Windows RimWorld 1.6 does not move Unity's log with `-savedatafolder`: sibling launches overwrite the default LocalLow file and rotate each other's logs. Evidence: the [Game Config VM round](../research/2026-11-12_game-configs-vm-round.md#playerlog-answer-03-63). Unity truncates explicit `-logfile` output, so RimArcho preserves the previous generation itself. For 1.7 Waylith, `-logfile` may be ignored (20 §2); normal plan and pack launches do not capture stdout. If their own file is absent, report the missing log and the path checked, never a clean run. Do not borrow the default folder's log for an own-folder environment.
+
+File selection and launch attribution are in 06 §4. Extra launch arguments cannot override either `-savedatafolder` or `-logfile` (09 §2).
+
+### 6.4 RimCrow profiles
+
+Implemented by `app.importCrowProfiles` and the existing CLI/GUI manager import.
+
+The RimCrow import (07 §6.2) also reads `GameProfile`. Each profile becomes an environment, grouped by installation (`game_install_path`, added as an installation if new and scanned once). `user_data_path` is **adopted in place**, not copied; an empty path means the installation's default folder; an empty `game_install_path` is skipped as unconfigured. `<root>/Config/ModsConfig.xml` becomes a new plan named after the profile (plain profile name, made unique under §6.2), current for that environment. `prefer_steam_launch` → launch method; `run_commands` → launch arguments, kept as separate arguments (a `-savedatafolder` among them is refused). `use_workshop_mods` / `use_self_mods` are not imported: the plan's entries decide what loads. The preview groups profiles by installation, marks conflicts, and states that the folders stay shared with RimCrow, so removing a profile there removes its saves. The import itself writes nothing to RimCrow's files.
+
+Profile import preflights every row before registration. Invalid/relative paths, overlapping roots, existing installation/data pairs, environment name collisions, missing or unreadable Config, and unsupported Proton combinations are skipped with a reason. Whitespace and reserved characters in profile names become hyphens; collisions require renaming the source profile. Existing pairs are not adopted or given a new current plan implicitly. Source database canonical path plus profile ID identifies a mapping in `meta`; repeat imports keep player edits, renamed environments and removals. The mapping is recorded before the environment is registered. An interrupted import resumes on the next import: with no registered environment it imports afresh, otherwise it finishes only the missing steps (launch arguments, the list when the environment has none) and keeps the player's changes.
+
+Launch arguments retain JSON string arrays for lossless argv storage and import. Player fields show command-line text; quotes preserve spaces within an argument, and quoted backslashes and double quotes round-trip. Newly entered text must pair its quotes; stored text whose quotes do not pair (from 1.0.9) splits on whitespace at launch. Copying an environment preserves that representation. Profile source flags are reported and not imported; unresolved package tokens stay in the new plan. The GUI preview detects changes to the source DB/WAL and each eligible profile's Config before applying. Import itself writes no profile files; later explicit launches write the adopted root.
+
+### 6.5 Interface
+
+The player-facing term is **Game Config** (16 §7.2). A config acts as a separate copy of the game: its settings and saves apply only to it; its selected Mod list is global (07 §1.7). Installations remain an internal sharing mechanism with no settings of their own; only the TUI's picker groups configs by installation (16 §9.1).
+
+Game Config is display text only: protocol events, storage keys and identifiers retain environment terminology. Generic game labels describe RimWorld itself.
+
+The window's pickers are flat: config name, RimWorld major.minor version, current marker, then + Add Game Config. Selection and removal use the same ordered rows as the picker labels. The config's settings are one section on the Game Config page (not repeated in Settings): name, game folder with version, saves folder (shared, own or a chosen folder), Mod list, launch method and arguments, remove. Relocating a shared game folder previews the count and names of the other affected configs. Adding is a page (the first-run guide's, 16 §2.8, §2.15) with SteamCMD download still among its ways; it defaults to copying the current config's settings, says no Mod files and no saves are copied, and selects the Mod list and the saves folder (shared, own or chosen).
+
+Legacy aliases remain separate. A notice says that two Game Configs use the same game folder until the player dismisses it (16 §2.8). There is no merge feature or merge command.
+
+The RimCrow GUI import presents a checklist of profile names, game folders and saves locations. Eligible profiles are checked; unconfigured or conflicting profiles remain visible, unchecked and skipped. Applying imports only checked profiles, alongside existing manager-data imports, with the shared-folder warning visible (16 §2.15).

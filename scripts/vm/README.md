@@ -65,7 +65,7 @@ How the round runs:
 
 A failed round kills the game and takes one guest screenshot (`failure.png`, `-NoShot` for none) for a person to look at. The driver acts only when `ArchoDrive.txt` is there and moves it away on start, so the next launch is not driven.
 
-The guest's saves sync to the player's real Steam Cloud when the game exits. So while a script runs, autosave is off; the game's Prefs are not changed. The standard round deletes its save before it quits. When a round fails, `round.ps1` deletes the round's saves before it stops the game.
+The guest's saves sync to the player's real Steam Cloud when the game exits. So while a script runs, autosave is off; the game's Prefs are not changed. The standard round deletes its save before it quits. When a round fails, `round.ps1` deletes the round's saves, and the saves its `delete` steps name, before it stops the game. It answers a mods mismatch with "Load anyway" (the message box of 1.5 and the 1.6 window).
 
 Round script, one step per line (`drive/src/Script.cs`):
 
@@ -101,7 +101,7 @@ A script that does not end with `quit` leaves the game running when its last ste
 
 `<ip>` is the guest IP from `status`; it comes from DHCP, so don't hard-code it.
 
-DevTools is on only because `launch` sets `RIMARCHO_DEVTOOLS_PORT`; players never set it, so nothing listens. CDP key presses and clicks go to the page, not to Windows. For anything that needs Windows input, use the input agent below. The game is not one of these: use `round.ps1`.
+DevTools is on only because `launch` sets `RIMARCHO_DEVTOOLS_PORT`; players never set it, so nothing listens. CDP key presses and clicks go to the page, not to Windows. A CDP key sends no character event, so Enter on a focused button does not press it; use `input.mjs key enter` for that. For anything that needs Windows input, use the input agent below. The game is not one of these: use `round.ps1`.
 
 ## Real mouse and keyboard
 
@@ -124,7 +124,7 @@ pwsh scripts/vm/vm.ps1 input stop
 | Keys, to whatever window has focus | `node scripts/vm/input.mjs <ip> key ctrl+shift+k [repeat]` (also `win+up`, `alt+f4`, `KeyK`, `Digit2`) |
 | Type text (Unicode, Chinese too; bypasses the IME) | `node scripts/vm/input.mjs <ip> type "plan new 测试 列表"` |
 | Read / set the clipboard | `node scripts/vm/input.mjs <ip> clip` · `setclip <text>` |
-| The text a window shows through UI Automation (Windows Terminal: the TUI screen) | `node scripts/vm/input.mjs <ip> text WindowsTerminal` |
+| The text a window shows through UI Automation (Windows Terminal: the TUI screen). Windows Terminal can report the screen before a key's redraw, even seconds later: a panel the key opened may show only after the next key. Read again after a harmless key (a page key such as shift+4 back and forth) before calling a key dead | `node scripts/vm/input.mjs <ip> text WindowsTerminal` |
 
 In a test script, `connectReal(ip)` from `input.mjs` gives both connections and a calibration: `real.click(sel, { mods: ['ctrl'] })`, `real.drag(from, to, { holdMs, during })`, `real.input.key('esc')`, `real.cdp.evaluate(...)`. Calibration moves the real cursor to two points in RimArcho's window and reads where the page saw them, so page zoom, display scaling and the frameless frame need no special handling; call `real.recalibrate()` after moving or resizing the window. Read results with `cdp.mjs text` and `input.mjs text`, not screenshots.
 

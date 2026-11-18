@@ -34,6 +34,10 @@ const (
 // StatusHint is informational and sorts below warnings without changing existing wire values.
 const StatusHint = -1
 
+// StatusVersion marks a row whose only reminder is that it does not declare the game's
+// version (version.unsupported, 16 §5): a quieter icon than a warning, below hints.
+const StatusVersion = -2
+
 // Item is one row of a column.
 type Item struct {
 	Lists       []string          `json:"-"`
@@ -63,6 +67,10 @@ type Item struct {
 	Location    string            `json:"-"` // the registered source root, including for linked mods
 
 	Lower string `json:"-"` // sort key
+	// New: a scan first found the Mod within app.NewFor, after the game's first scan
+	// (16 §2.5); added are its added: values.
+	New   bool `json:"new,omitempty"`
+	added []string
 	// search fields (16 §3.7), lower case
 	names, author, text string
 }
@@ -154,6 +162,7 @@ func BuildBoard(a *app.App) (*Board, error) {
 			}
 		}
 	}
+	added, newSince, now := app.Added(st), a.NewSince(st.Ix.Env.GameID), a.Now()
 	for k := range b.Cols {
 		for i := range b.Cols[k] {
 			it := &b.Cols[k][i]
@@ -162,6 +171,8 @@ func BuildBoard(a *app.App) (*Board, error) {
 			if m == nil {
 				continue
 			}
+			it.New = app.IsNew(added[m.LineageID], newSince)
+			it.added = app.AddedValues(added[m.LineageID], it.New, now)
 			if k == int(Inactive) {
 				it.Name = names[it.Lineage]
 				it.Lower = strings.ToLower(it.Name)
@@ -178,8 +189,12 @@ func BuildBoard(a *app.App) (*Board, error) {
 			}
 		}
 	}
+	// New Mods first, so a Mod just subscribed is at the top of Not enabled (16 §2.5).
 	ina := b.Cols[Inactive]
 	sort.SliceStable(ina, func(i, j int) bool {
+		if ina[i].New != ina[j].New {
+			return ina[i].New
+		}
 		if c := order.CompareOfficial(ina[i].Package, ina[j].Package); c != 0 {
 			return c < 0
 		}
@@ -194,10 +209,10 @@ func BuildBoard(a *app.App) (*Board, error) {
 	if c, err := a.Store.TagColors(); err == nil && len(c) > 0 {
 		b.TagColors = c
 	}
-	if qs, err := a.Store.Questions(st.Ix.Env.ID, false); err == nil {
+	if qs, err := a.Store.Questions(st.Ix.Env.GameID, false); err == nil {
 		b.Questions = len(qs)
 	}
-	if sc, ss, _ := a.LastScan(st.Ix.Env.ID); sc != nil && ss != nil {
+	if sc, ss, _ := a.LastScan(st.Ix.Env.GameID); sc != nil && ss != nil {
 		b.LastEvents = ss.Events
 		for _, n := range ss.Events {
 			b.Changes += n

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -403,23 +404,7 @@ func ChildSavesIndexContext(ctx context.Context, exe, home string, first []strin
 	}
 	// why is the child's own words for a failure, not its closing "next:" hint: its first
 	// error line, else its last line that is neither progress nor a hint
-	var why, errLine string
-	sc := bufio.NewScanner(out)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if progress != nil {
-			progress(line)
-		}
-		switch {
-		case line == "" || strings.HasPrefix(line, "progress:") || strings.HasPrefix(line, "next:"):
-		case strings.HasPrefix(line, "error:"):
-			if errLine == "" {
-				errLine = strings.TrimSpace(strings.TrimPrefix(line, "error:"))
-			}
-		default:
-			why = line
-		}
-	}
+	why, errLine := readSavesIndexOutput(out, progress)
 	if err := cmd.Wait(); err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -430,6 +415,30 @@ func ChildSavesIndexContext(ctx context.Context, exe, home string, first []strin
 		return &SavesIndexError{Err: err, Why: why, Fatal: errLine != ""}
 	}
 	return nil
+}
+
+// readSavesIndexOutput reads the child's output: why is its last line that is neither
+// progress nor a hint, errLine its first unindented "error:" line (the run itself failed).
+// A save it could not read is an indented "error:" under the summary, so it is not fatal.
+func readSavesIndexOutput(out io.Reader, progress func(string)) (why, errLine string) {
+	sc := bufio.NewScanner(out)
+	for sc.Scan() {
+		raw := sc.Text()
+		line := strings.TrimSpace(raw)
+		if progress != nil {
+			progress(line)
+		}
+		switch {
+		case line == "" || strings.HasPrefix(line, "progress:") || strings.HasPrefix(line, "next:"):
+		case strings.HasPrefix(raw, "error:"):
+			if errLine == "" {
+				errLine = strings.TrimSpace(strings.TrimPrefix(raw, "error:"))
+			}
+		default:
+			why = line
+		}
+	}
+	return why, errLine
 }
 
 // SavesIndexError is a failed `archo saves index` child: its exit and its own words.

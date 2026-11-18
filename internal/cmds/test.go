@@ -16,7 +16,7 @@ import (
 func init() {
 	register(&Command{Name: "test run", Args: "[<plan>]", Summary: "run the game with isolated data, capture startup errors, then stop it", MaxArgs: 1,
 		Flags: []Flag{
-			{Name: "env", Value: "<name>", Help: "test another environment"},
+			{Name: "env", Value: "<name>", Help: "test another Game Config"},
 			{Name: "map", Help: "load a quick test map instead of the main menu"},
 			{Name: "save", Value: "<save>", Help: "load this save (a saves list reference, name or .rws path) in the run's own data and play --ticks (default 4000)"},
 			{Name: "ticks", Value: "<n>", Help: "with --map or --save: play this many ticks (60 a second at normal speed), then stop"},
@@ -190,7 +190,11 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 		}
 	}
 	if b := r.Baseline; b != nil {
-		root.Addf("compared with run %s (%s): %d new, %d present, %d gone", filepath.Base(b.RunDir), b.Status, b.New, b.Present, b.Gone)
+		line := fmt.Sprintf("compared with run %s (%s): %d new, %d present, %d gone", filepath.Base(b.RunDir), b.Status, b.New, b.Present, b.Gone)
+		if b.Unreached > 0 {
+			line += fmt.Sprintf(", %d not reached by this run", b.Unreached)
+		}
+		root.Addf("%s", line)
 		gone := root.Section(fmt.Sprintf("gone: %d", b.Gone))
 		for _, cluster := range r.Gone {
 			testClusterMods(gone.Addf("%s x%d: %s", cluster.Class, cluster.Count, cluster.Message), cluster)

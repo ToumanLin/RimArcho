@@ -102,7 +102,7 @@ func TestForeignLogExcludedBeforeAnalysis(t *testing.T) {
 		t.Fatalf("foreign log page %+v, %v, %d analyses", p, err, runs)
 	}
 	var count int
-	if err := e.App.Store.DB.QueryRow(`SELECT count(*) FROM analysis WHERE environment_id=? AND game_mm='1.7'`, st.Ix.Env.ID).Scan(&count); err != nil || count != 0 {
+	if err := e.App.Store.DB.QueryRow(`SELECT count(*) FROM analysis WHERE game_id=? AND game_mm='1.7'`, st.Ix.Env.ID).Scan(&count); err != nil || count != 0 {
 		t.Fatalf("foreign analysis slots: %d, %v", count, err)
 	}
 
@@ -217,7 +217,7 @@ func TestOwnLogBeforeGameUpgrade(t *testing.T) {
 		return inner(name, progress)
 	}
 	out := e.MustRun("log")
-	if !strings.Contains(out, "analysed: as 1.6 (log version); environment is 1.7") || len(runs) != 1 || runs[0] != "1.6" {
+	if !strings.Contains(out, "analysed: as 1.6 (log version); Game Config is 1.7") || len(runs) != 1 || runs[0] != "1.6" {
 		t.Fatalf("old own log did not use 1.6 analysis: runs %v\n%s", runs, out)
 	}
 }
@@ -265,7 +265,7 @@ func TestUnknownGameLogAttributedHere(t *testing.T) {
 	inner := e.App.AnalyzeRunner
 	e.App.AnalyzeRunner = func(name string, progress func(string)) error { runs++; return inner(name, progress) }
 	out := e.MustRun("log")
-	want := "game: log game path " + elsewhere + " is not this environment's game; attributed against env:main"
+	want := "game: log game path " + elsewhere + " is not this Game Config's game; attributed against env:main"
 	if runs != 1 || !strings.Contains(out, want) || strings.Contains(out, "not analysed yet") {
 		t.Fatalf("unknown game folder: %d analyses\n%s", runs, out)
 	}
@@ -276,7 +276,7 @@ func TestUnknownGameLogAttributedHere(t *testing.T) {
 	// Still not counted (no launch or write maps it to this plan), and the folded row
 	// says why and how to list it from MCP too.
 	probs := e.MustRun("problems")
-	if !strings.Contains(probs, "stale log (source unknown: its game path "+elsewhere+" is not this environment's game)") ||
+	if !strings.Contains(probs, "stale log (source unknown: its game path "+elsewhere+" is not this Game Config's game)") ||
 		!strings.Contains(probs, "not counted  (archo problems --code log --all; MCP: list_problems code=log)") {
 		t.Fatal(probs)
 	}
@@ -291,10 +291,33 @@ func TestUnknownGameLogAttributedHere(t *testing.T) {
 		t.Fatal(err)
 	}
 	runs = 0
-	if err := e.App.EnsureAttributionAnalysis(st, p, "", nil); err == nil || !strings.Contains(err.Error(), "environment other") || runs != 0 {
-		t.Fatalf("another environment's log: %v, %d analyses", err, runs)
+	if err := e.App.EnsureAttributionAnalysis(st, p, "", nil); err == nil || !strings.Contains(err.Error(), "Game Config other") || runs != 0 {
+		t.Fatalf("another Game Config's log: %v, %d analyses", err, runs)
 	}
 	if out, code := e.Run("log"); code == 0 || strings.Contains(out, "attributed against") {
-		t.Fatalf("another environment's log attributed here:\n%s", out)
+		t.Fatalf("another Game Config's log attributed here:\n%s", out)
+	}
+}
+
+func TestLogInstallationHeaderDoesNotProveSibling(t *testing.T) {
+	e := testkit.New(t)
+	e.HarmonyLogFixture()
+	main, _ := e.App.Env()
+	sibling := *main
+	sibling.ID, sibling.Name, sibling.UserDataRoot = e.App.NewID(), "sibling", filepath.Join(e.Root, "sibling-data")
+	if err := e.App.Store.InsertEnv(&sibling); err != nil {
+		t.Fatal(err)
+	}
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(e.UserData, "Player.log")
+	writeLogAt(t, e, path, fmt.Sprintf("Mono path[0] = '%s/RimWorldWin64_Data/Managed'\n", filepath.ToSlash(e.Game)), e.Now())
+	if err := e.App.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: sibling.ID, GameID: sibling.GameID, UserDataRoot: sibling.UserDataRoot, Started: e.Now().Add(-time.Minute), Method: "direct"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.App.CheckLogOwner(st, path); err == nil || !strings.Contains(err.Error(), "sibling") {
+		t.Fatalf("same installation proved own log: %v", err)
 	}
 }

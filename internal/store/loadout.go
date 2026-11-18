@@ -322,9 +322,9 @@ func (s *Store) RemoveRule(envID string, id int64) (bool, error) {
 }
 
 // AllAliases maps instance ID → alias locations for an environment.
-func (s *Store) AllAliases(envID string) (map[string][]Alias, error) {
+func (s *Store) AllAliases(gameID string) (map[string][]Alias, error) {
 	rows, err := s.DB.Query(`SELECT a.instance_id, a.source_id, s.label, a.rel_path, a.real_path FROM instance_alias a
-		JOIN source s ON s.id=a.source_id JOIN instance i ON i.id=a.instance_id WHERE i.environment_id IN ('', ?) ORDER BY s.label, a.rel_path`, envID)
+		JOIN source s ON s.id=a.source_id JOIN instance i ON i.id=a.instance_id WHERE i.game_id IN ('', ?) ORDER BY s.label, a.rel_path`, gameID)
 	if err != nil {
 		return nil, err
 	}

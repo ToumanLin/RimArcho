@@ -185,9 +185,9 @@ func TestSubscriptionInventoryReuseAndInvalidation(t *testing.T) {
 	changed("game version", func() { e.App.GameVersion = "1.7" })
 	e.MustRun("env", "add", "other", "--game", e.OtherGame("Other", "1.6.4633 rev1261"), "--saves", "own")
 	read(false, "")
-	changed("environment option", func() { e.App.EnvName = "other" })
+	changed("Game Config option", func() { e.App.EnvName = "other" })
 	if api.subRead.lib.Env.Name != "other" {
-		t.Fatal("stale environment")
+		t.Fatal("stale Game Config")
 	}
 }
 
@@ -510,7 +510,7 @@ func TestSubscriptionReaderReleasesInventory(t *testing.T) {
 	released() // No subscription request in the new environment is needed to release it.
 	read()
 	if api.subRead.lib.Env.Name != "other" {
-		t.Fatal("wrong rebuilt environment")
+		t.Fatal("wrong rebuilt Game Config")
 	}
 	api.Close()
 	released()

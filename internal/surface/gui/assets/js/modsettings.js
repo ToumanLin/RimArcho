@@ -5,6 +5,7 @@
 // follows 16 §3.9; the gap between the cards drags (16 §3.1).
 import { pathContent } from "./fields.js";
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
+import { choiceControl } from "./choices.js";
 import { beginPageRead, page, area, act } from "./screens.js";
 import { createTable } from "./datatable.js";
 import { modSettingsColumns } from "./tabledefs.js";
@@ -169,6 +170,7 @@ function drawDetail(d, keep = false) {
   // the game's window as Archo Monitor saw it, then what the file stores
   if (d.window) {
     body.append(el("h3", "ms-sub", Tf("in the game's window (%s)", d.window.seen)));
+    if (d.window.older) body.append(el("p", "ms-note muted", T("changed since: the values stored in the file are the current ones")));
     const kv = el("dl", "ms-values ms-window");
     for (const c of d.window.controls) {
       if (c.kind === "label") { kv.append(el("dt", "ms-head", c.label)); continue; }
@@ -221,15 +223,9 @@ function editor(d, v) {
     return b;
   }
   if (v.edit === "choice") {
-    const s = el("select", "ms-edit ms-choice");
-    s.setAttribute("aria-label", v.key);
+    const s = choiceControl(v.key, (v.choices || []).map((c) => ({ value: c, label: c })), v.value);
+    s.classList.add("ms-edit", "ms-choice");
     s.dataset.name = name;
-    for (const c of v.choices || []) {
-      const o = el("option", "", c);
-      o.value = c;
-      s.append(o);
-    }
-    s.value = v.value;
     s.onchange = () => change(d, v, s.value);
     return s;
   }

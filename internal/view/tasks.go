@@ -23,6 +23,8 @@ const (
 	TaskAnalyze          = "analyze"
 	TaskSaves            = "saves" // the Saves page's full read of the saves (16 §2.11, 12 §1.7)
 	TaskPack             = "pack"
+	TaskMigrate          = "migrate"     // moving in from another manager (16 §2.18)
+	TaskPackImport       = "pack-import" // adding a pack from an .archopack file
 	TaskTextures         = OpTextures
 	TaskTexClean         = OpTexClean
 	TaskDownload         = "download"
@@ -51,7 +53,7 @@ const (
 // IsSettingTask identifies maintenance tasks shared by settings and the guide.
 func IsSettingTask(kind string) bool {
 	switch kind {
-	case TaskSourceDecompile, TaskSourceClean, TaskSourceCheck, TaskWorkshopUpdate, TaskSubscribe, TaskSubscriptionFrom, TaskSteamCMD, TaskTodds, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC, TaskSelfUpdate, TaskSelfCheck:
+	case TaskSourceDecompile, TaskSourceClean, TaskSourceCheck, TaskWorkshopUpdate, TaskSubscribe, TaskSubscriptionFrom, TaskSteamCMD, TaskTodds, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC, TaskSelfUpdate, TaskSelfCheck, TaskAgentInstall:
 		return true
 	}
 	return false
@@ -178,6 +180,11 @@ func TaskTitle(kind string) string {
 		return T("read the saves")
 	case TaskPack:
 		return T("create a pack")
+	case TaskMigrate:
+		return T("move in from another manager")
+	case TaskPackImport:
+		return T("add a pack")
+
 	case TaskDownload:
 		return T("download the game")
 	case TaskSteamCMD:
@@ -188,6 +195,8 @@ func TaskTitle(kind string) string {
 		return T("update RimArcho")
 	case TaskSelfCheck:
 		return T("check for RimArcho updates")
+	case TaskAgentInstall:
+		return T("install Archo Agent")
 	case TaskDepRemove:
 		return T("remove external tool")
 	case TaskData:
@@ -394,13 +403,15 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 		case t.State == app.TaskStopped:
 			result = Tf("%d done, %d left untouched", c[app.ItemOK], c[app.ItemSkip])
 		case c[app.ItemOK] == 0 && len(t.Items) == 1:
-			result = t.Items[0].Why
+			result = Humanize(nil, t.Items[0].Why) // as its row says it
 		default:
 			result = Tf("%d done, %d failed", c[app.ItemOK], c[app.ItemFail])
 		}
 	}
 	if t.Closed && t.Detached {
-		result = joinFacts(T("went on in the background when the window closed"), result)
+		// its own process went on; this record cannot know how it ended (16 §2.16)
+		r.StateText = T("went on in the background")
+		result = T("the window closed; the Packs page shows how it ended")
 	} else if t.Closed {
 		result = joinFacts(T("stopped when the window closed"), result)
 	}
@@ -439,6 +450,8 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 				st = app.ItemOK
 			case i == at && t.State == app.TaskRunning:
 				st = app.ItemRun
+			case t.Closed && t.Detached:
+				st = app.ItemWait
 			case i == at:
 				st = app.ItemFail
 			}
@@ -561,7 +574,7 @@ func TaskTargetName(target string) string {
 	case target == PageTextures:
 		return T("texture optimisation")
 	case target == PageEnv:
-		return T("game")
+		return T("Game Config")
 	case target == PageSettings:
 		return T("settings")
 	case target == PageSaves:

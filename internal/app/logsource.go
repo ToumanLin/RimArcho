@@ -2,6 +2,7 @@ package app
 
 import (
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
@@ -52,15 +53,19 @@ func (a *App) sharedEnvs(e *env.Environment) []string {
 // environment's (10 §3). reg reads a written version's list for its fingerprint (nil:
 // not needed).
 func (a *App) sourceAt(e *env.Environment, reg *loadout.Registry, t time.Time, plansOnly bool) *RunSource {
+	return a.sourceAtIDs(e, reg, t, plansOnly, a.sharedEnvs(e), true)
+}
+
+func (a *App) sourceAtIDs(e *env.Environment, reg *loadout.Registry, t time.Time, plansOnly bool, ids []string, matchRoot bool) *RunSource {
 	src := &RunSource{}
-	ids := a.sharedEnvs(e)
 	var l *store.LaunchRecord
 	for at := t; ; {
 		r, err := a.Store.LaunchRecordBefore(ids, at)
 		if err != nil || r == nil {
 			break
 		}
-		if !plansOnly || r.Pack() == "" {
+		redirectedElsewhere := strings.Contains(strings.ToLower(r.Command), "-logfile") && !samePath(r.UserDataRoot, e.UserDataRoot)
+		if (!plansOnly || r.Pack() == "") && !redirectedElsewhere && (!matchRoot || r.UserDataRoot == "" || samePath(r.UserDataRoot, e.UserDataRoot)) {
 			l = r
 			break
 		}
@@ -94,12 +99,26 @@ func (a *App) sourceAt(e *env.Environment, reg *loadout.Registry, t time.Time, p
 	return src
 }
 
-// logSource is sourceAt for a log file: a log under a Logs/ folder of the user data
-// folder (1.7 and later) cannot come from a pack's game.
+// logSource uses records for this data root for redirected logs. Default-folder logs
+// also retain legacy shared-log attribution for launches without an explicit logfile.
 func (a *App) logSource(st *LoadoutState, path string, mod time.Time) *RunSource {
 	root := st.Ix.Env.UserDataRoot
-	plansOnly := root != "" && path != "" && env.PathKey(filepath.Dir(path)) == env.PathKey(filepath.Join(root, "Logs"))
-	src := a.sourceAt(st.Ix.Env, st.Reg, mod, plansOnly)
+	plansOnly := root != "" && path != "" && (!samePath(root, a.DefaultUserData(st.Ix.Env.GameRoot)) || samePath(filepath.Dir(path), filepath.Join(root, "Logs")))
+	ids := a.sharedEnvs(st.Ix.Env)
+	if es, err := a.Store.Envs(); err == nil {
+		for _, e := range es {
+			if samePath(root, a.DefaultUserData(st.Ix.Env.GameRoot)) && e.GameID == st.Ix.Env.GameID && e.ID != st.Ix.Env.ID {
+				ids = append(ids, e.ID)
+			}
+		}
+	}
+	src := a.sourceAtIDs(st.Ix.Env, st.Reg, mod, plansOnly, ids, !samePath(root, a.DefaultUserData(st.Ix.Env.GameRoot)))
+	if len(ids) > len(a.sharedEnvs(st.Ix.Env)) && src.Launch == nil {
+		return &RunSource{Unknown: true}
+	}
+	if src.Launch != nil && src.EnvID == st.Ix.Env.ID && src.Launch.UserDataRoot != "" && !samePath(src.Launch.UserDataRoot, root) {
+		return &RunSource{Unknown: true}
+	}
 	// An explicit startup path can contradict a time-matched launch (Steam/external
 	// launches have no record). Do not assign that run to the recorded plan.
 	if root := logGameRoot(path); root != "" && src.EnvID != "" {

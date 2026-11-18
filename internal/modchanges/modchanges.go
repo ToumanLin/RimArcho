@@ -148,7 +148,7 @@ func Build(a *app.App, st *app.LoadoutState, o Opts, tx Text) (*Page, error) {
 	if len(o.Of) > 0 {
 		p.Of = o.Of[0]
 	}
-	scans, err := a.Store.Scans(ix.Env.ID, 1<<30)
+	scans, err := a.Store.Scans(ix.Env.GameID, 1<<30)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +191,7 @@ func Build(a *app.App, st *app.LoadoutState, o Opts, tx Text) (*Page, error) {
 			}
 		}
 	}
-	evs, err := a.Store.Events(store.EventFilter{EnvID: ix.Env.ID, MinScan: minScan, InstanceIDs: o.Of})
+	evs, err := a.Store.Events(store.EventFilter{EnvID: ix.Env.GameID, MinScan: minScan, InstanceIDs: o.Of})
 	if err != nil {
 		return nil, err
 	}

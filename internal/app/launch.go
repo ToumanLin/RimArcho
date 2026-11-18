@@ -67,6 +67,9 @@ func (a *App) LaunchWith(dryRun, move bool) (*SaveResult, error) {
 		return nil, err
 	}
 	defer unlock()
+	if err := a.checkLaunchArgs(); err != nil {
+		return nil, err
+	}
 	if err := a.checkNoGame(); err != nil {
 		return nil, err
 	}
@@ -79,7 +82,7 @@ func (a *App) LaunchWith(dryRun, move bool) (*SaveResult, error) {
 		return nil, err
 	}
 	if e.UserDataRoot == "" {
-		return nil, errors.New("the environment has no user data directory; set one with archo env set --user-data <dir>")
+		return nil, errors.New("the Game Config has no user data directory; set one with archo env set --user-data <dir>")
 	}
 	// The command first: a missing Steam or executable refuses before anything is written.
 	p, err := a.gamePlan(e, e.UserDataRoot)
@@ -103,7 +106,7 @@ func (a *App) LaunchWith(dryRun, move bool) (*SaveResult, error) {
 	if r.Unchanged && st.Latest != nil {
 		vn = st.Latest.N
 	}
-	record := &store.LaunchRecord{EnvID: e.ID, PlanID: st.Plan.ID, Started: a.Now().UTC(),
+	record := &store.LaunchRecord{EnvID: e.ID, GameID: e.GameID, UserDataRoot: e.UserDataRoot, EnvName: e.Name, PlanID: st.Plan.ID, Started: a.Now().UTC(),
 		Method: p.Method, Command: p.Command(), Fingerprint: ListFingerprint(st.List), VersionN: vn}
 	if err := a.Store.AddLaunchRecord(record); err != nil {
 		return r, err
@@ -119,23 +122,96 @@ func (a *App) LaunchWith(dryRun, move bool) (*SaveResult, error) {
 }
 
 func (a *App) startGame(p *LaunchPlan) error {
+	// Unity truncates an explicit -logfile instead of preserving the previous run, so the
+	// log moves to Player-prev.log first. A launcher that fails started no game: the logs
+	// go back where they were (03 §6.3).
+	var rotated []*logRotation
+	restore := func() {
+		for i := len(rotated) - 1; i >= 0; i-- {
+			rotated[i].undo()
+		}
+	}
+	for i, arg := range p.Args {
+		if arg == "-logfile" && i+1 < len(p.Args) {
+			r, err := rotatePlayerLog(p.Args[i+1])
+			if err != nil {
+				restore()
+				return err
+			}
+			rotated = append(rotated, r)
+		}
+	}
 	launcher := a.Launcher
 	if launcher == nil {
 		launcher = ExecLauncher
 	}
-	return launcher(p.Exe, p.Args, p.Dir)
+	if err := launcher(p.Exe, p.Args, p.Dir); err != nil {
+		restore()
+		return err
+	}
+	for _, r := range rotated {
+		r.done()
+	}
+	return nil
+}
+
+// logRotation is one Player.log moved to Player-prev.log before a launch; the older
+// Player-prev.log waits beside it until the launch is known.
+type logRotation struct{ path, prev, kept string }
+
+// rotatePlayerLog moves path to Player-prev.log beside it (nil when path does not exist).
+func rotatePlayerLog(path string) (*logRotation, error) {
+	dir := filepath.Dir(path)
+	r := &logRotation{path: path, prev: filepath.Join(dir, "Player-prev.log"), kept: filepath.Join(dir, "Player-prev.log.rimarcho-kept")}
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	// A kept log left by an interrupted launch is older than Player-prev.log.
+	if err := os.Remove(r.kept); err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+	if err := os.Rename(r.prev, r.kept); err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+	if err := os.Rename(path, r.prev); err != nil {
+		_ = os.Rename(r.kept, r.prev)
+		return nil, err
+	}
+	return r, nil
+}
+
+// undo puts both logs back after a failed launch.
+func (r *logRotation) undo() {
+	if r == nil {
+		return
+	}
+	if err := os.Rename(r.prev, r.path); err == nil {
+		_ = os.Rename(r.kept, r.prev)
+	}
+}
+
+// done forgets the older log once the game started.
+func (r *logRotation) done() {
+	if r != nil {
+		_ = os.Remove(r.kept)
+	}
 }
 
 // gamePlan is how the environment's game is started with userData as its data folder:
 // Steam or the executable, -savedatafolder when it is not the default, the launch arguments.
 func (a *App) gamePlan(e *env.Environment, userData string) (*LaunchPlan, error) {
+	if err := validateStoredLaunchArgs(e.Name, a.LaunchArgs(e.ID)); err != nil {
+		return nil, err
+	}
 	p := &LaunchPlan{Method: e.Launch, Dir: e.GameRoot}
 	goos := a.Detect.GOOS
 	if goos == "" {
 		goos = runtime.GOOS
 	}
 	proton := goos == "linux" && env.IsProtonGame(e.GameRoot)
-	defaultUserData := env.DefaultUserDataRoot()
+	defaultUserData := a.DefaultUserData(e.GameRoot)
 	if goos == "linux" {
 		defaultUserData = a.DefaultUserData()
 		if e.Launch == "steam" || proton {
@@ -150,9 +226,13 @@ func (a *App) gamePlan(e *env.Environment, userData string) (*LaunchPlan, error)
 		if proton {
 			return nil, fmt.Errorf("%w: Proton games do not support own or custom saves yet; use archo env set --saves shared", ErrLaunchBlocked)
 		}
-		extra = append(extra, "-savedatafolder="+userData)
+		extra = append(extra, "-savedatafolder="+userData, "-logfile", filepath.Join(userData, "Player.log"))
 	}
-	extra = append(extra, strings.Fields(a.LaunchArgs(e.ID))...) // 16 §2.14
+	argv, err := storedLaunchArgs(a.LaunchArgs(e.ID))
+	if err != nil {
+		return nil, err
+	}
+	extra = append(extra, argv...) // 16 §2.14
 	if proton {
 		for _, arg := range extra {
 			if strings.HasPrefix(strings.ToLower(arg), "-savedatafolder") {

@@ -134,8 +134,8 @@ func TestFactPruneVisibilitySlotsAndEnvRemoval(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Shared, private to this game, and private to a different game.
-	if _, err := s.DB.Exec(`INSERT INTO environment(id,name,game_root,game_version,created_at) VALUES('other','other','other','1.7.5000',1);
- INSERT INTO instance(id,environment_id,lineage_id,source_id,rel_path,status,first_seen,last_seen) VALUES
+	if _, err := s.DB.Exec(`INSERT INTO game(id,name,game_root,game_root_key,game_version,created_at) VALUES('other','other','other','other','1.7.5000',1); INSERT INTO environment(id,name,game_id,created_at) VALUES('other','other','other',1);
+ INSERT INTO instance(id,game_id,lineage_id,source_id,rel_path,status,first_seen,last_seen) VALUES
  ('shared','','l','x','shared','live',1,1),('own',?,'l','x','own','live',1,1),('private','other','l','x','private','live',1,1)`, st.Ix.Env.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -246,7 +246,7 @@ func TestFactSetsEmptyAssemblyViewReplacesOld(t *testing.T) {
 	e.MustRun("analyze")
 	s := e.App.Store
 	var inst, envID string
-	if err := s.DB.QueryRow(`SELECT id,environment_id FROM instance WHERE rel_path='ModA'`).Scan(&inst, &envID); err != nil {
+	if err := s.DB.QueryRow(`SELECT id,game_id FROM instance WHERE rel_path='ModA'`).Scan(&inst, &envID); err != nil {
 		t.Fatal(err)
 	}
 	old, err := s.Assemblies(inst)
@@ -278,7 +278,7 @@ func TestMaintainPrunesFacts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.DB.Exec(`INSERT INTO instance(id,environment_id,lineage_id,source_id,rel_path,status,first_seen,last_seen) VALUES('own',?,'l','x','own','live',1,1)`, st.Ix.Env.ID); err != nil {
+	if _, err := s.DB.Exec(`INSERT INTO instance(id,game_id,lineage_id,source_id,rel_path,status,first_seen,last_seen) VALUES('own',?,'l','x','own','live',1,1)`, st.Ix.Env.ID); err != nil {
 		t.Fatal(err)
 	}
 	now := e.App.Now()
@@ -329,7 +329,7 @@ func TestDefsNamedOrderIndependentOfWrites(t *testing.T) {
 	}
 	ids := []string{"zz-provider", "aa-provider", "mm-provider"}
 	for _, id := range ids {
-		if _, err := s.DB.Exec(`INSERT INTO instance(id,environment_id,lineage_id,source_id,rel_path,status,first_seen,last_seen) VALUES(?,?,'l','x',?,'live',1,1)`, id, st.Ix.Env.ID, id); err != nil {
+		if _, err := s.DB.Exec(`INSERT INTO instance(id,game_id,lineage_id,source_id,rel_path,status,first_seen,last_seen) VALUES(?,?,'l','x',?,'live',1,1)`, id, st.Ix.Env.ID, id); err != nil {
 			t.Fatal(err)
 		}
 	}

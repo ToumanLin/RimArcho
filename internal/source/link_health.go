@@ -29,7 +29,48 @@ type LinkInfo struct {
 	physicalParent string
 }
 
-func ReadLink(path string) (*LinkInfo, error) {
+func ReadLink(path string) (*LinkInfo, error) { return (*LinkReader)(nil).Read(path) }
+
+// LinkReader reads the links of a few folders: a folder's real path and identity are
+// taken once, not once per link. A checked removal reads the link again and compares, so
+// a folder replaced after the reading is still caught. The zero value is ready to use.
+type LinkReader struct {
+	parents map[string]linkParent
+}
+
+type linkParent struct {
+	physical string
+	info     os.FileInfo
+	err      error
+}
+
+func (r *LinkReader) parent(dir string) (string, os.FileInfo, error) {
+	if r != nil {
+		if c, ok := r.parents[dir]; ok {
+			return c.physical, c.info, c.err
+		}
+	}
+	physical, err := RealPath(dir)
+	var info os.FileInfo
+	if err == nil {
+		info, err = os.Stat(physical)
+	}
+	// Windows FileInfo may load its file ID lazily. Freeze it now, while taking the
+	// preview, so a later SameFile cannot inspect the replacement.
+	if err == nil && !os.SameFile(info, info) {
+		err = fmt.Errorf("cannot read link or parent identity: %s", dir)
+	}
+	if r != nil {
+		if r.parents == nil {
+			r.parents = map[string]linkParent{}
+		}
+		r.parents[dir] = linkParent{physical, info, err}
+	}
+	return physical, info, err
+}
+
+// Read is ReadLink.
+func (r *LinkReader) Read(path string) (*LinkInfo, error) {
 	p, err := filepath.Abs(path)
 	if err != nil {
 		return nil, err
@@ -49,17 +90,12 @@ func ReadLink(path string) (*LinkInfo, error) {
 		l.Kind = "plain"
 		return l, nil
 	}
-	l.physicalParent, err = RealPath(filepath.Dir(p))
+	l.physicalParent, l.parent, err = r.parent(filepath.Dir(p))
 	if err != nil {
 		return unknown(err)
 	}
-	l.parent, err = os.Stat(l.physicalParent)
-	if err != nil {
-		return unknown(err)
-	}
-	// Windows FileInfo may load its file ID lazily. Freeze both IDs now, while
-	// taking the preview, so a later SameFile cannot inspect the replacement.
-	if !os.SameFile(l.parent, l.parent) || !os.SameFile(l.entry, l.entry) {
+	// As for the parent: freeze the entry's ID now.
+	if !os.SameFile(l.entry, l.entry) {
 		return unknown(fmt.Errorf("cannot read link or parent identity: %s", p))
 	}
 	l.Kind, l.RawTarget, err = rawLink(p)

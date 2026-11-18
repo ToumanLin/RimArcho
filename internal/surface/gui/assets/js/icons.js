@@ -12,6 +12,8 @@ export const icon = {
   err: svg('<circle cx="8" cy="8" r="6"/><path d="M5.8 5.8l4.4 4.4M10.2 5.8l-4.4 4.4"/>', "err"),
   warn: svg('<path d="M8 2.2l6.2 11H1.8z"/><path d="M8 6.6v3M8 11.4v.2"/>', "warn"),
   hint: svg('<circle cx="8" cy="8" r="6"/><path d="M8 7v4M8 4.6v.2"/>', "hint"),
+  // only the game's version is not declared (view.StatusVersion, 16 §5): quiet, not a warning
+  vers: svg('<circle cx="8" cy="8" r="5.8"/><path d="M8 4.9V8l2.1 1.5"/>', "vers"),
   log: svg('<rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5 6h6M5 8.5h6M5 11h3.5"/>', "log"),
   unloadable: svg('<circle cx="8" cy="8" r="5.6" stroke-dasharray="2.2 2"/>', "dim"),
   rescan: svg('<path d="M13.2 8a5.2 5.2 0 1 1-1.6-3.8"/><path d="M13.4 2.6v2.8h-2.8"/>'),
@@ -24,6 +26,8 @@ export const icon = {
   packs: svg('<path d="M2.4 5L8 2.4 13.6 5v6L8 13.6 2.4 11z"/><path d="M2.4 5L8 7.6 13.6 5M8 7.6v6"/>'),
   // Saves (16 §2.11): a save file
   saves: svg('<path d="M3 2.6h7.8l2.6 2.6v8.2H2.6V3z"/><path d="M5.2 2.6v3.2h5V2.6M5 13.4V9.2h6v4.2"/>'),
+  // Play review (16 §2.11): looking back over a playthrough
+  review: svg('<path d="M2.6 8a5.4 5.4 0 1 0 1.6-3.8"/><path d="M2.4 2.4v2.4h2.4M8 5v3.2l2.2 1.4"/>'),
   search: svg('<circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2l3.2 3.2"/>'),
   env: svg('<rect x="2" y="2.8" width="12" height="8.4" rx="1.6"/><path d="M5.6 13.6h4.8M8 11.2v2.4"/>'),
   library: svg('<rect x="2.4" y="2.6" width="3" height="10.8" rx=".8"/><rect x="6.5" y="2.6" width="3" height="10.8" rx=".8"/><path d="M11 3.4l2.6-.6 1.4 10-2.6.6z"/>'),
@@ -49,9 +53,10 @@ export const icon = {
 
 export function sourceIcon(kind) { return icon[kind] || icon.local; }
 
-// statusIcon: view.Status* (none, unloadable, warn, log, err).
+// statusIcon: view.Status* (none, unloadable, warn, log, err; hint -1, version -2).
 export function statusIcon(s) {
   if (s === -1) return icon.hint;
+  if (s === -2) return icon.vers;
   return ["", icon.unloadable, icon.warn, icon.log, icon.err][s] || "";
 }
 

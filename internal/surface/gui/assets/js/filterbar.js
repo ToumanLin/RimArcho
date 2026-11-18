@@ -445,7 +445,7 @@ export function createBar(opts) {
         x.dataset.at = gi + ":" + vi;
         x.tabIndex = -1;
         x.onclick = () => b.set(v.filter, v.on === 1 ? 0 : 1, g);
-        x.oncontextmenu = (e) => {
+        x.oncontextmenu = (e) => { // keys: x, -, Del exclude the focused value
           e.preventDefault();
           b.set(v.filter, v.on === -1 ? 0 : -1, g);
         };

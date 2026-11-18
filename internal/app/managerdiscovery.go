@@ -11,12 +11,14 @@ import (
 // ManagerImport is one read-only source offered by the migration flow.
 type ManagerImport struct {
 	Manager string `json:"manager"`
-	Kind    string `json:"kind"` // list, rimcrow, rimsort-rules
+	Kind    string `json:"kind"` // list, rimcrow, rimsort-rules, rimsort-aux
 	Path    string `json:"path"`
 }
 
 // ManagerLocations separates discovery from machine locations for synthetic tests.
-type ManagerLocations struct{ RimSort, Installs []string }
+// RimPy is RimPy's data folders (AppData\LocalLow\RimPy Mod Manager): its saved lists
+// are in ModLists.
+type ManagerLocations struct{ RimSort, Installs, RimPy []string }
 
 // DiscoverManagerImports checks bounded, explicit locations, never whole drives.
 func DiscoverManagerImports(loc ManagerLocations) []ManagerImport {
@@ -77,10 +79,22 @@ func DiscoverManagerImports(loc ManagerLocations) []ManagerImport {
 		rootsSeen[key] = true
 		add("RimSort", "rimsort-rules", filepath.Join(root, "dbs", "userRules.json"))
 		lists("RimSort", filepath.Join(root, "modlists"))
+		// each instance's local database: notes, tags, colours (07 §6.4)
+		instances, _ := os.ReadDir(filepath.Join(root, "instances"))
+		for i, instance := range instances {
+			if i >= 16 {
+				break
+			}
+			if instance.IsDir() {
+				add("RimSort", "rimsort-aux", filepath.Join(root, "instances", instance.Name(), "aux_metadata.db"))
+			}
+		}
+		add("RimSort", "rimsort-aux", filepath.Join(root, "aux_metadata.db")) // before instances
 		var settings struct {
 			Config    string `json:"config_folder"`
 			Instances map[string]struct {
-				Config string `json:"config_folder"`
+				Config   string `json:"config_folder"`
+				Override string `json:"instance_folder_override"`
 			} `json:"instances"`
 		}
 
@@ -93,8 +107,11 @@ func DiscoverManagerImports(loc ManagerLocations) []ManagerImport {
 			continue
 		}
 		configs := []string{settings.Config}
-		for _, instance := range settings.Instances {
+		for name, instance := range settings.Instances {
 			configs = append(configs, instance.Config)
+			if instance.Override != "" && name != "Default" {
+				add("RimSort", "rimsort-aux", filepath.Join(instance.Override, name, "aux_metadata.db"))
+			}
 		}
 		for _, config := range configs {
 			if config == "" {
@@ -106,6 +123,9 @@ func DiscoverManagerImports(loc ManagerLocations) []ManagerImport {
 			add("RimSort", "list", filepath.Join(config, "ModsConfig.xml"))
 			add("RimSort", "list", filepath.Join(config, "Config", "ModsConfig.xml"))
 		}
+	}
+	for _, root := range loc.RimPy {
+		lists("RimPy", filepath.Join(root, "ModLists"))
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Manager != out[j].Manager {
@@ -124,6 +144,10 @@ func FindManagerImports() []ManagerImport {
 	}
 	if roaming != "" {
 		loc.RimSort = append(loc.RimSort, filepath.Join(roaming, "RimSort"))
+	}
+	if roaming != "" {
+		// RimPy keeps its data beside Roaming, in LocalLow
+		loc.RimPy = append(loc.RimPy, filepath.Join(filepath.Dir(roaming), "LocalLow", "RimPy Mod Manager"))
 	}
 	home, _ := os.UserHomeDir()
 	roots := []string{os.Getenv("ProgramFiles"), os.Getenv("ProgramFiles(x86)"), filepath.Join(local, "Programs"), local, filepath.Join(home, "Downloads"), filepath.Join(home, "Desktop"), filepath.Join(home, "Games")}

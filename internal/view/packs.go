@@ -43,6 +43,9 @@ func PackRows(a *app.App) (out []PackRow, others int, err error) {
 func packRows(a *app.App, ps []*app.PackInfo) (out []PackRow) {
 	for _, p := range ps {
 		r := PackRow{Name: p.Name, Mods: len(p.Entries), Size: SizeText(p.Bytes), Bytes: p.Bytes, Versions: PackVersions(a, p.Pack), Facts: Tf("%d mods  %s  %s  created %s", len(p.Entries), SizeText(p.Bytes), p.Game, ShortDate(p.Created)), Played: T("never played")}
+		if p.Env != "" {
+			r.Facts += "  env:" + p.Env
+		}
 		if !p.LastPlayed.IsZero() {
 			r.Played = Tf("played %s", ShortDate(p.LastPlayed))
 			r.PlayedAt = p.LastPlayed

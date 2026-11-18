@@ -70,7 +70,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 				r("S / w / L", "sort, save, to the launch page (the palette previews them)"),
 				r(pick("i / e", "e"), pick("import, export the mod list", "export the mod list")),
 				r("R / A", "rescan, check the files again"),
-				r("P / E", "lists, games"),
+				r("P / E", "lists, Game Configs"),
 				r(":", "run an archo command"),
 				r("H", "the history: steps and versions"),
 				r("C", "this mod's changes"),
@@ -231,6 +231,14 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("F2", "rename the save"),
 		)
 	}
+	if page == PageReview && !tui { // Saves › Play review (16 §2.11)
+		out = append(out,
+			r("/", "find a colony"),
+			r("↑↓", "colony"),
+			r("←→↑↓ / Home End", "Mod, in the map"),
+			r("enter", "fold a category"),
+		)
+	}
 	if !tui && (page == LibraryPage || page == "packs" || page == "textures" || page == PageModSettings) {
 		out = append(out, r("s / < > =", "the headers: sort and columns; < > = changes or resets the sorted column's width"))
 	}
@@ -243,6 +251,8 @@ func KeyHelp(page string, tui bool) []KeyRow {
 		out = append(out, r("L / enter", "launch the game"),
 			r("w", "save the current list's edits to the game without launching (while there are any)"),
 			r("P", "lists"), r("esc", "back"))
+	} else if page == PageReview && !tui {
+		out = append(out, r("1–4", "focus the page's areas (the numbers in their headings)"))
 	} else if page != EditorPage && page != RulesPage { // Load-order rules is one list
 		out = append(out, r("1–9", "focus the page's areas (the numbers in their headings)"))
 	}

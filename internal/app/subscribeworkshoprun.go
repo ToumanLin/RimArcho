@@ -202,7 +202,7 @@ func (a *App) runWorkshopBatches(exe, base, account string, ids []string, transf
 					retry = append(retry, id)
 				}
 			}
-			if err != nil && confirmed == len(pending) {
+			if err != nil && confirmed == len(pending) && !steamCMDUpdatedItself(err) {
 				processErrors = append(processErrors, errors.New("SteamCMD did not exit successfully; confirmed items were retained"))
 			}
 			if w.ctx.Err() != nil {

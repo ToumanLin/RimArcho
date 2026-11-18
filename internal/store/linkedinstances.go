@@ -25,7 +25,7 @@ func (s *Store) MergeLinkedInstances(replace map[string]string) error {
 		lineages := map[string]string{}
 		for old, keep := range replace {
 			var oldReal, newReal, oldLineage, newLineage, oldKind, newEnv string
-			if err := tx.QueryRow(`SELECT o.real_path, n.real_path, o.lineage_id, n.lineage_id, os.kind, ns.environment_id
+			if err := tx.QueryRow(`SELECT o.real_path, n.real_path, o.lineage_id, n.lineage_id, os.kind, ns.game_id
 				FROM instance o JOIN instance n ON n.id=? JOIN source os ON os.id=o.source_id JOIN source ns ON ns.id=n.source_id WHERE o.id=?`, keep, old).
 				Scan(&oldReal, &newReal, &oldLineage, &newLineage, &oldKind, &newEnv); err != nil {
 				if err == sql.ErrNoRows {

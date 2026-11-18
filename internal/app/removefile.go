@@ -56,7 +56,7 @@ func (a *App) scanLinkedEnvironments(ix *Index, m *store.Mod, links []*GameLink)
 	var report *ScanReport
 	for _, e := range envs {
 		affected := false
-		if s := ix.Source(m.SourceID); s != nil && s.EnvID == e.ID {
+		if s := ix.Source(m.SourceID); s != nil && s.EnvID == e.GameID {
 			affected = true
 		}
 		for _, l := range links {

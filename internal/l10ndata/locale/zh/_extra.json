@@ -5,7 +5,7 @@
   "@palette.changes": "更新",
   "@palette.cli": "运行 archo 命令",
   "@palette.details": "详情",
-  "@palette.env": "切换游戏",
+  "@palette.env": "切换游戏配置",
   "@palette.export": "导出列表",
   "@palette.feedback": "反馈",
   "@palette.filter": "筛选这一列",
@@ -66,7 +66,6 @@
   "@retired.方案": "列表",
   "@retired.替换实例": "切换版本…",
   "@retired.未写入": "未保存",
-  "@retired.环境": "游戏",
   "@retired.编译": "创建",
   "@retired.轻包": "RimArcho 列表（导出整合包的列表）",
   "@retired.载入列表": "回到这一版 / 采用外部修改",
@@ -79,5 +78,7 @@
   "see dependencies (can it run)": "看依赖（能不能跑）",
   "the DDS encoder (todds) is not installed: install it in Library > Texture optimisation": "没有安装 DDS 转换工具（todds）：在 库 › 贴图优化 安装",
   "the choices changed since this count; “count the textures” counts again": "选项改过了，下面是按之前选项的统计；点「扫描统计」重新统计",
-  "the textures changed since this count; “count the textures” counts again": "贴图之后有变化，下面是之前的统计；点「扫描统计」重新统计"
+  "the textures changed since this count; “count the textures” counts again": "贴图之后有变化，下面是之前的统计；点「扫描统计」重新统计",
+  "@tag.manager-colour": "%s 颜色 %s",
+  "@tag.manager-ignore": "%s：忽略的警告"
 }

@@ -296,7 +296,7 @@ func (cx *attrCtx) assemblyRules(lc *LogCluster) (skipProviders bool) {
 		}
 		if len(ids) == 0 {
 			// Who ships it anywhere (inactive version folders, disabled mods)?
-			files, _ := cx.a.Store.InstanceFiles(cx.st.Ix.Env.ID, "%"+name+".dll")
+			files, _ := cx.a.Store.InstanceFiles(cx.st.Ix.Env.GameID, "%"+name+".dll")
 			var where []string
 			var keys []string
 			for id := range files {

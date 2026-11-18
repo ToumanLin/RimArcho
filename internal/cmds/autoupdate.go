@@ -24,7 +24,11 @@ func automaticStatus(c *Ctx, root *render.Node) {
 		if kind == "self" {
 			// worked out against the running version: a record from before an update is stale
 			if r := c.App.SelfUpdatePending(); r != nil {
-				pending = append(pending, "RimArcho "+r.Version+" available")
+				line := "RimArcho " + r.Version + " available"
+				if source := c.App.SelfUpdateInfo().Source; source != "" {
+					line += " (" + source + ")"
+				}
+				pending = append(pending, line)
 			}
 			continue
 		}

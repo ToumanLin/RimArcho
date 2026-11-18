@@ -17,10 +17,10 @@ func init() {
 			{Name: "dry-run", Help: "show the plan (the default)"},
 			{Name: "yes", Help: "run it: refused while a game or another RimArcho runs"},
 			{Name: "keep-locked", Help: "move the lock library's copies into a game's Mods/ as ordinary mods (default: recycle bin)"},
-			{Name: "locked-to", Value: "<env>", Help: "the environment whose Mods/ gets them (default: the current one)"},
+			{Name: "locked-to", Value: "<env>", Help: "the Game Config whose Mods/ gets them (default: the current one)"},
 			{Name: "remove-packs", Help: "packs to the recycle bin (default: kept, moved out of the data folder)"},
 			{Name: "packs-to", Value: "<dir>", Help: "where kept packs go (default: Documents\\RimArcho packs)"},
-			{Name: "remove-saves", Help: "the environments' own save folders to the recycle bin (default: moved out)"},
+			{Name: "remove-saves", Help: "the Game Configs' own save folders to the recycle bin (default: moved out)"},
 			{Name: "saves-to", Value: "<dir>", Help: "where they go (default: Documents\\RimArcho saves)"},
 			{Name: "remove-games", Help: "game folders downloaded with SteamCMD to the recycle bin (default: kept)"},
 			{Name: "restore-modsconfig-backup", Help: "put ModsConfig.xml.rimarcho.bak back instead of cleaning the current list"},
@@ -117,8 +117,8 @@ func uninstallCmd(c *Ctx, a *Args) (*render.Doc, error) {
 
 // unVerb names what happens to an item.
 var unVerb = map[string]string{
-	"forget-accounts": "forget",
-	app.DoUnlink:      "unlink", app.DoClean: "clean", app.DoRestore: "restore", app.DoTrash: "recycle bin", app.DoMove: "move",
+	"forget-accounts": "forget", "forget-agent-key": "forget",
+	app.DoUnlink: "unlink", app.DoClean: "clean", app.DoRestore: "restore", app.DoTrash: "recycle bin", app.DoMove: "move",
 	app.DoKeep: "keep", app.DoDelete: "delete", app.DoLater: "after exit", app.DoLeave: "left alone",
 }
 
@@ -142,11 +142,14 @@ func UninstallStepText(p *app.UninstallPlan, s *app.UninstallStep) string {
 	switch s.Key {
 	case app.UnAccounts:
 		parts = append(parts, "forget account sessions before removing tools or data; external SteamCMD caches stay untouched")
+		if count["forget-agent-key"] > 0 {
+			parts = append(parts, "remove the Archo Agent API key from Windows Credential Manager")
+		}
 	case app.UnLinks:
 		add(app.DoUnlink, "link", "delete {n} in the games' Mods/ (never their targets)")
 		add(app.DoLeave, "folder", "{n} named like one but not a link: left alone")
 	case app.UnModsConfig:
-		add(app.DoClean, "user data folder", "keep the ModsConfig.xml list of {n} without Archo Monitor and the mods only reached through a removed link; remove RimArcho's backup")
+		add(app.DoClean, "user data folder", "keep the ModsConfig.xml list of {n} without Archo Monitor and the mods only reached through a removed link; remove RimArcho's backups of the list and of Mod settings (the settings stay)")
 		add(app.DoRestore, "user data folder", "put the ModsConfig.xml backup back in {n}")
 	case app.UnLocked:
 		add(app.DoTrash, "lock library copy", "{n} to the recycle bin"+size+" (--keep-locked: into a game's Mods/)")

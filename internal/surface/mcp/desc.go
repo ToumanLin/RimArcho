@@ -97,8 +97,8 @@ const descUninstall = `Preview what uninstalling RimArcho would delete, move or 
 
 const descMemory = `Estimate resident RAM, loading RAM and VRAM for a plan. Commit room below loading low is severe, free RAM below high warning, else ok; unknown stays unknown. 1.7 textures cap at the card (texturesOnDemand); only 1.6 warns on VRAM. Reads headers, caches estimates. Limits: guide estimate_memory.`
 
-const descListSaves = `Saves of every game and pack, grouped by colony, newest first: each with its sv: reference, in-game day, the list it matches and whether it loads with that list. mod=<ref> finds the saves that use a Mod; attention=true keeps those with warnings or errors. Read-only.`
+const descListSaves = `Saves of every game and pack by colony, newest first: sv: reference, day, matched list, whether it loads. mod=<ref>: saves using a Mod; attention=true: with warnings or errors; review=true: what Mods add, how much saves show. Read-only.`
 
-const descGetSave = `One save (sv:ref, name or colony/save): load issues with fixes, Mod differences and playthrough (play=true for all colonists/events). content=true shows referenced content by Mod/category, using installed versions, with coverage limits. Read-only.`
+const descGetSave = `One save: load issues with fixes, Mod differences, playthrough (play=true: all colonists, events). content=true: content by Mod; mod=<ref>: can that Mod be removed, why. Read-only.`
 
-const descManageSaves = `Save actions: fix (its Mod fixes as one undoable list edit, subscribing Workshop Mods; launch=true then starts it), rename, copy, backup, trash (recycle bin). dry_run=true previews fix; backup and trash only preview unless confirm=true with the preview's token: ask the player first.`
+const descManageSaves = `Save actions: fix (Mod fixes as one undoable list edit, then subscribes; launch=true runs), rename, copy, copy_to_current, backup, trash, choose, choose_colony, unchoose (what Can it run checks). dry_run previews fix; backup and trash preview unless confirm=true with the preview's token: ask first.`

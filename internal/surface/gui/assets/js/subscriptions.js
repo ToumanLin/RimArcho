@@ -552,21 +552,19 @@ async function changeAct(r, kind) {
 
 // ---- keys and hints ----
 
+// changesHints: the cursor's two most useful actions, then the page's, then ? (at most 7
+// with renderHints' esc for one Mod, 16 §2.2). ctrl+o, ctrl+w, a and + are in ?.
 export function changesHints() {
   const it = selected();
   const out = [{ key: "↑↓", label: T("move") }];
-  if (["pending", "gone"].includes(it?.t)) out.push({ key: "p", label: T("lock this version") }, { key: "l", label: T("show in the mod library") });
-  if (it?.t === "sources" || it?.t === "group") out.push({ key: "tab", label: T("the next field or button") }, { key: "enter", label: T("open") });
-  if (it?.t === "pending") out.push({ key: "u", label: T("update") }, ...(it.r.opens ? [{ key: "ctrl+w", label: T("open the source page") }] : []));
-  if (it?.t === "change") {
+  if (it?.t === "pending") out.push({ key: "u", label: T("update") }, { key: "p", label: T("lock this version") });
+  else if (it?.t === "gone") out.push({ key: "p", label: T("lock this version") }, { key: "l", label: T("show in the mod library") });
+  else if (it?.t === "sources" || it?.t === "group") out.push({ key: "enter", label: T("open") }, { key: "tab", label: T("the next field or button") });
+  else if (it?.t === "change") {
     if (hasFiles(it.r)) out.push({ key: "i", label: T("files") });
-    out.push({ key: "ctrl+o", label: T("open the folder") });
-    for (const a of it.r.actions || []) out.push({ key: a.key, label: a.label });
-  }
-  if (it?.t === "day") out.push({ key: "enter", label: T("open") });
-  out.push({ key: "U", label: T("update all") }, { key: "K", label: T("check for updates") });
-  if (!V.of) out.push({ key: "a", label: V.library ? T("the current list") : T("every mod") });
-  out.push({ key: "+", label: T("add a subscription") });
+    for (const a of it.r.actions || []) if (out.length < 3) out.push({ key: a.key, label: a.label });
+  } else if (it?.t === "day") out.push({ key: "enter", label: T("open") });
+  out.push({ key: "U", label: T("update all") }, { key: "K", label: T("check for updates") }, { key: "?", label: T("all keys") });
   return out;
 }
 

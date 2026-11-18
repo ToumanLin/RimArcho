@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -206,5 +207,25 @@ func TestTestRunComparisonBaselineSelection(t *testing.T) {
 				t.Fatalf("ineligible baseline: %+v", r.Baseline)
 			}
 		})
+	}
+}
+
+// A run that stops before its target lacks the earlier run's clusters because it never got
+// there: they are not reached, not gone (VM 2026-11-10: a 30 s timeout listed a start-up
+// texture as gone).
+func TestTestRunTimeoutGoneIsUnreached(t *testing.T) {
+	t.Parallel()
+	e := testRunEnv(t)
+	first := testRunWith(t, e, "menu", comparisonLog("Early", "Late"))
+	if first.Status != "menu" || first.ClustersTotal != 2 {
+		t.Fatalf("first run: %+v", first)
+	}
+	e.App.TestGameStart = fakeTestGame(t, "idle", "Loading\n")
+	r, err := e.App.TestRun(context.Background(), app.TestRunOptions{Timeout: 700 * time.Millisecond})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b := r.Baseline; r.Status != "timeout" || b == nil || b.RunDir != first.RunDir || b.Gone != 0 || b.Unreached != 2 || len(r.Gone) != 0 {
+		t.Fatalf("timeout run: status %s, baseline %+v, gone %+v", r.Status, r.Baseline, r.Gone)
 	}
 }

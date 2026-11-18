@@ -144,6 +144,7 @@ function optionList(pop, p, opts, render, pick, input) {
       d.id = "popup-option-" + i;
       d.setAttribute("role", "option");
       d.setAttribute("aria-selected", String(i === p.sel));
+      if(o.disabled)d.setAttribute("aria-disabled","true");
       d.setAttribute("aria-posinset", String(i + 1));
       d.setAttribute("aria-setsize", String(p.opts.length));
       render(d, o);
@@ -151,24 +152,43 @@ function optionList(pop, p, opts, render, pick, input) {
       d.onclick = () => pick(o, i);
       list.append(d);
     });
-    const on = list.children[p.sel];
+    const on = list.querySelector("#popup-option-" + p.sel);
     if (on) owner.setAttribute("aria-activedescendant", on.id); else owner.removeAttribute("aria-activedescendant");
     if (on) on.scrollIntoView({ block: "nearest" });
   };
-  p.redraw = (opts) => { if (opts) { p.opts = opts; p.sel = Math.min(p.sel, Math.max(opts.length - 1, 0)); } draw(); };
+  // the keys pass over disabled options: from `from` toward `step`, the first enabled one,
+  // else the selection stays where it is
+  const enabled = (from, step) => {
+    for (let i = from; i >= 0 && i < p.opts.length; i += step) if (!p.opts[i]?.disabled) return i;
+    return -1;
+  };
+  const moveTo = (i) => { if (i >= 0) p.sel = i; draw(); };
+  p.redraw = (opts) => {
+    if (opts) { p.opts = opts; p.sel = Math.min(p.sel, Math.max(opts.length - 1, 0)); }
+    if (p.opts[p.sel]?.disabled) {
+      const next = enabled(p.sel, 1), back = enabled(p.sel, -1);
+      p.sel = next >= 0 ? next : back >= 0 ? back : p.sel;
+    }
+    draw();
+  };
   p.keys = (e) => {
     if (["ArrowDown", "ArrowRight"].includes(e.key) || (e.key === "Tab" && !p.tab && !e.shiftKey) || (e.ctrlKey && e.key === "n")) {
-      p.sel = Math.min(p.sel + 1, p.opts.length - 1); draw(); e.preventDefault(); return true;
+      moveTo(enabled(p.sel + 1, 1)); e.preventDefault(); return true;
     }
     if (["ArrowUp", "ArrowLeft"].includes(e.key) || (e.key === "Tab" && !p.tab && e.shiftKey) || (e.ctrlKey && e.key === "p")) {
-      p.sel = Math.max(p.sel - 1, 0); draw(); e.preventDefault(); return true;
+      moveTo(enabled(p.sel - 1, -1)); e.preventDefault(); return true;
+    }
+    // Home / End: the first and last enabled options; in a list with a text input they
+    // stay the input's
+    if (!input && (e.key === "Home" || e.key === "End")) {
+      moveTo(e.key === "Home" ? enabled(0, 1) : enabled(p.opts.length - 1, -1)); e.preventDefault(); return true;
     }
     if (e.key === "Tab" && p.tab) { e.preventDefault(); p.tab(); return true; }
     if (e.key === "Enter") { e.preventDefault(); if (p.opts[p.sel]) pick(p.opts[p.sel], p.sel); return true; }
     if (input && document.activeElement !== input) input.focus();
     return false; // typing goes to the input
   };
-  draw();
+  p.redraw();
   if (!input) list.focus({ preventScroll: true, focusVisible: false });
 }
 
@@ -350,8 +370,9 @@ export async function libraryConfirm(kind, refs, label, done) {
   const fast = el("input");
   fast.type = "checkbox";
   if (kind === "subscription-remove") {
-    const choice = el("label");
-    choice.append(fast, document.createTextNode(" " + T("quick delete (cannot be undone)")));
+    // the box beside its words (VM round 2026-11-10: the page's input width put it on a line of its own)
+    const choice = el("label", "check-row");
+    choice.append(fast, document.createTextNode(T("quick delete (cannot be undone)")));
     body.append(choice, el("p", "muted", T("Quick delete skips the recycle bin. Deleted files cannot be restored.")));
   }
   let ready = false, go = refs;
@@ -491,7 +512,7 @@ export async function identity(question, run) {
 export function choose(title, labels, pick, current = 0, other = null) {
   open("choose", title, (pop, p) => {
     pop.append(el("div", "ttl", title));
-    optionList(pop, p, labels.map((l, i) => ({ l, i })), (d, o) => d.append(el("span", "word-facts", o.l)), (o) => { close(); pick(o.i); });
+    optionList(pop, p, labels.map((l, i) => ({ l, i, disabled:typeof l === "object" && l.disabled })), (d, o) => d.append(el("span", "word-facts", typeof o.l === "string" ? o.l : o.l.name)), (o) => { if(o.disabled)return;close(); pick(o.i); });
     if (other) {
       const btns = el("div", "btns");
       const b = el("button", "", other.label);

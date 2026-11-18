@@ -39,6 +39,7 @@ func (b *App) ReadOptions(a *App) {
 	b.LazyLog, b.LogCacheOnly = a.LazyLog, a.LogCacheOnly
 	b.GameProbe, b.LockBase, b.MonitorBundle = a.GameProbe, a.LockBase, a.MonitorBundle
 	b.HTTP, b.SteamAPI = a.HTTP, a.SteamAPI
+	b.SteamSignedIn, b.SteamSignedInID = a.SteamSignedIn, a.SteamSignedInID
 	b.FindTool, b.SteamWorker, b.TrashFunc = a.FindTool, a.SteamWorker, a.TrashFunc
 	b.SteamWorkerStream = a.SteamWorkerStream
 	b.LaunchWait = a.LaunchWait
@@ -50,6 +51,7 @@ func (b *App) ReadOptions(a *App) {
 	b.UninstallExe, b.UninstallKeepBase, b.ArchoProbe = a.UninstallExe, a.UninstallKeepBase, a.ArchoProbe
 	b.UninstallLog, b.AfterExitFunc = a.UninstallLog, a.AfterExitFunc
 	b.SelfUpdateAPI, b.SelfVersion, b.SelfProgram = a.SelfUpdateAPI, a.SelfVersion, a.SelfProgram
+	b.SelfLanzou = a.SelfLanzou
 	b.SelfVersionOf, b.SelfOthers, b.SelfWaitPoll = a.SelfVersionOf, a.SelfOthers, a.SelfWaitPoll
 }
 
@@ -96,7 +98,7 @@ func (a *App) AdoptLibrary(lib *Library) {
 	ix := *st.Ix
 	ix.store = a.Store
 	st.Ix = &ix
-	st.localize = a.localizer(ix.Env.ID, st.Reg, &ix)
+	st.localize = a.localizer(ix.Env.GameID, st.Reg, &ix)
 	lib.St = &st
 }
 

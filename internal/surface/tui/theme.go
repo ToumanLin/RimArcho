@@ -107,7 +107,7 @@ func rowBackground(st lipgloss.Style, selected, cursor bool) lipgloss.Style {
 // icons is one icon set (16 §7).
 type icons struct {
 	official, workshop, local, localCopy, git string
-	err, warn, logErr, unloadable, hint       string
+	err, warn, logErr, unloadable, hint, ver  string
 	unsaved, lock, update, dep, staging       string
 	play, save, sort, search, fail            string
 	// the evidence chips of Can it run (16 §2.4): declared, inferred, log, community, your rule,
@@ -118,7 +118,7 @@ type icons struct {
 // Nerd Font: the Font Awesome 4 range, in every Nerd Font.
 var nerdIcons = icons{
 	official: "", workshop: "", local: "", localCopy: "", git: "",
-	err: "", warn: "", logErr: "", unloadable: "", hint: "",
+	err: "", warn: "", logErr: "", unloadable: "", hint: "", ver: "",
 	unsaved: "", lock: "", update: "", dep: "", staging: "",
 	play: "", save: "", sort: "", search: "", fail: "",
 	evDeclared: "", evInferred: "", evLog: "", evCommunity: "", evRule: "", evCorpus: "",
@@ -127,7 +127,7 @@ var nerdIcons = icons{
 // Compatibility: East Asian width "neutral", present in Cascadia Mono, 1 cell (V0).
 var compatIcons = icons{
 	official: "⬥", workshop: "◉", local: "▢", localCopy: "⬦", git: "∆",
-	err: "⨯", warn: "!", logErr: "◍", unloadable: "◌", hint: "ⓘ",
+	err: "⨯", warn: "!", logErr: "◍", unloadable: "◌", hint: "ⓘ", ver: "◷",
 	unsaved: "⬤", lock: "", update: "⇣", dep: "›", staging: "◫",
 	play: "►", save: "↲", sort: "↨", search: "/", fail: "⨯",
 	evDeclared: "≣", evInferred: "◊", evLog: "◍", evCommunity: "⬡", evRule: "⌂", evCorpus: "◔",

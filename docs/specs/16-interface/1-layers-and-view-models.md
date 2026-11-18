@@ -36,7 +36,7 @@ surface/tui   (Bubble Tea)        surface/gui   (Wails services + assets/*.html|
 | `palette.go` | Command table (names in the interface language, English aliases, **command IDs rather than keys**), scoring and ranking (§3.5) | `Commands`, `CommandEntries`, `PalScore`, `PalRank` |
 | `packs.go`, `packpage.go` | Pack list, each pack's page, create-a-pack page (four choices, summary, reasons for disabled controls), build progress, unfinished builds (§2.6, §2.7) | `PackRows`, `BuildPackPage`, `BuildPageOf`, `DefaultPackName`, `ProgressOf`, `UnfinishedRows` |
 | `logpage.go`, `monitorlog.go` | Game log page and its companion log area (§2.10) | `LogFiles`, `BuildLogPage`, `MonitorOf`, `LiveMonitor`, `MonitorKind`, `MonitorAdd` |
-| `settings.go` | Settings and environment pages (§2.8, §2.14) | `SettingsPage`, `BuildEnvPage`, `EnvGroups`, `SettingCommand` |
+| `settings.go` | Settings and Game Config pages (§2.8, §2.14) | `SettingsPage`, `BuildEnvPage`, `EnvGroups`, `SettingCommand` |
 | `feedback.go` | Settings community links and feedback page (§2.14): attachments, body, links, preview, sending (`internal/feedback` assembles the body and links) | `CommunityLinks`, `FeedbackAttachments`, `ComposeFeedback`, `FeedbackPreview`, `SendFeedback` |
 | `exchange.go` | List import and export (07 §7) | `ReadImport`, `PreviewImport`, `ApplyImport`, `ExportFormats`, `ExportText`, `ExportTo`, `DefaultExportDir` |
 

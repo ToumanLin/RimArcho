@@ -79,7 +79,7 @@ var unTitles = map[string]string{
 }
 
 var unVerbs = map[string]string{
-	"forget-accounts": "forget sessions", app.DoDDS: "delete recorded DDS directly",
+	"forget-accounts": "forget sessions", "forget-agent-key": "remove the API key", app.DoDDS: "delete recorded DDS directly",
 	app.DoUnlink: "unlink", app.DoClean: "clean", app.DoRestore: "put the backup back", app.DoTrash: "recycle bin", app.DoMove: "move",
 	app.DoKeep: "keep", app.DoDelete: "delete", app.DoLater: "after closing", app.DoLeave: "left alone",
 }
@@ -187,6 +187,9 @@ func uninstallText(p *app.UninstallPlan, s *app.UninstallStep) string {
 	}
 	switch s.Key {
 	case app.UnAccounts:
+		if n["forget-agent-key"] > 0 {
+			return T("forget account sessions first; external SteamCMD caches stay; tools and data stay if this fails") + T("; ") + T("remove the Archo Agent API key from Windows Credential Manager")
+		}
 		return T("forget account sessions first; external SteamCMD caches stay; tools and data stay if this fails")
 	case app.UnTextures:
 		add(app.DoDDS, "delete recorded DDS in %d mod folders; original textures stay")
@@ -194,7 +197,7 @@ func uninstallText(p *app.UninstallPlan, s *app.UninstallStep) string {
 		add(app.DoUnlink, "delete %d links in the games' Mods folders; the folders they point to stay")
 		add(app.DoLeave, "%d folders named like them are not links: left alone")
 	case app.UnModsConfig:
-		add(app.DoClean, "keep each game's current list (%d), without Archo Monitor and the mods only there through a link; RimArcho's backup is deleted")
+		add(app.DoClean, "keep each game's current list (%d), without Archo Monitor and the mods only there through a link; RimArcho's backups of the list and of Mod settings are deleted (the settings stay)")
 		add(app.DoRestore, "put back the list from before RimArcho's last save (%d)")
 	case app.UnLocked:
 		add(app.DoTrash, "%d copies to the recycle bin")

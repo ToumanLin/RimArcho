@@ -7,6 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/analyze"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/savefile"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // SaveContentResult is selected-save L2 evidence, using cached L1 and installed Def
@@ -22,13 +23,35 @@ type SaveContentResult struct {
 	Mods      []SaveContentMod
 	Unknown   *SaveContentCategory
 	Unchecked []string
+	// Needs is every Mod of the save, in the save's order, with what removing it costs
+	// (12 §4.7).
+	Needs []SaveNeed
+	// GridUnnamed is, by Def type, how many distinct terrain, biome or compressed-thing hashes in the save's
+	// grids no Def of the save's Mods has (12 §1.4).
+	GridUnnamed map[string]int
+
+	// For the playthrough review (savereview.go): the save's Mods, and by instance and
+	// category every name attributed to it, uncut.
+	mods  []SaveMod
+	names map[string]map[string][]SaveContentName
+}
+
+// contentOpts are what the playthrough review asks of the attribution (12 §3).
+type contentOpts struct {
+	// facts supplies this save's just-read facts without a second cache decode.
+	facts *savefile.Facts
+	// seen: count only what is there (DefRefs and the grids), not what is only set up
+	// (ConfigRefs).
+	seen bool
+	// src, when not nil, keeps the Defs in memory between saves.
+	src *defSource
 }
 
 // ContentLimits describes the supported reference forms, not a claim of play depth.
 var ContentLimits = []string{
 	"Patch-added Defs and Patch changes to existing Defs are not reflected.",
-	"Terrain grids and world biomes are not decoded; only named references are included.",
-	"Past events, quests and storytellers may leave no surviving references; indexed history maps are not decoded.",
+	"Terrain and biomes are read from the maps' and the world's grids by Def hash; so are rock, ore and chunks, less surely.",
+	"Past events are read from the storyteller's record of what it fired; finished quests and past storytellers may leave nothing.",
 	"The original ScenarioDef cannot usually be recovered from a save's scenario name and parts.",
 }
 
@@ -55,7 +78,7 @@ var ContentCategoryOrder = []string{"factions", "races", "animals", "mechanoids"
 
 func contentUnder(k string) bool {
 	switch k {
-	case "events", "quests", "scenarios", "storytellers", "biomes", "terrain":
+	case "quests", "scenarios", "storytellers":
 		return true
 	}
 	return false
@@ -63,13 +86,25 @@ func contentUnder(k string) bool {
 
 // SaveContent never opens the save. A missing/currently invalid L1 cache yields Read=false.
 func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
+	return a.saveContent(sv, contentOpts{})
+}
+
+func (a *App) saveContent(sv *Save, o contentOpts) (*SaveContentResult, error) {
 	oldMM := a.Store.MM
 	defer func() { a.Store.MM = oldMM }()
-	f, err := a.SaveFacts(sv, false)
+	f := o.facts
+	var err error
+	if f == nil {
+		f, err = a.SaveFacts(sv, false)
+	}
 	if err != nil {
 		return nil, err
 	}
 	out := &SaveContentResult{Totals: []SaveContentCategory{}, Mods: []SaveContentMod{}}
+	if f == nil && sv.Head == nil { // its start could not be read: a full read cannot either
+		out.Note = "The save's Mod list could not be read."
+		return out, nil
+	}
 	if f == nil {
 		out.Note = "This save has not been read yet."
 		return out, nil
@@ -91,6 +126,7 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 	// A pack's save loads the pack's own copies; the library's copy of the same packageId
 	// stands in while the pack's has no content facts.
 	packCopy := map[string]string{}
+	deps := map[string][]scanDep{} // by instance: what its About.xml requires (12 §4.7)
 	if sv.Pack != "" {
 		if p, err := a.ReadPack(sv.Pack); err == nil {
 			for _, e := range p.Entries {
@@ -134,6 +170,18 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 			}
 			mods = append(mods, SaveMod{Name: name, PackageID: pkg, Instance: inst, Library: inst})
 		}
+		var installed []*store.Mod
+		for _, m := range mods {
+			if im := st.Ix.ByID[m.Instance]; im != nil {
+				installed = append(installed, im)
+			}
+		}
+		if err := a.Store.LoadDecls(installed); err != nil {
+			return err
+		}
+		for _, im := range installed {
+			deps[im.ID] = requiredDeps(im, st.GameMM())
+		}
 		return nil
 	})
 	if err != nil {
@@ -163,8 +211,36 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 			out.Unchecked = append(out.Unchecked, m.Name)
 		}
 	}
+	// The Defs the grids hold by hash count as typed references (12 §1.4).
+	activePkg := func(p string) bool { return active[normPkg(p)] }
+	grids, err := a.gridRefs(f, insts, activePkg)
+	if err != nil {
+		return nil, err
+	}
+	grid := grids.refs
+	// So do the references that only set something up (bills, quest parts, research not
+	// begun): the save names those Defs too, and loading without them drops what named them.
+	defRefs := f.DefRefs
+	config := f.ConfigRefs
+	if o.seen {
+		config = nil
+	}
+	if len(grid)+len(config) > 0 {
+		defRefs = map[string]map[string]int{}
+		for _, more := range []map[string]map[string]int{f.DefRefs, config, grid} {
+			for typ, refs := range more {
+				if defRefs[typ] == nil {
+					defRefs[typ] = map[string]int{}
+				}
+				for name, k := range refs {
+					defRefs[typ][name] += k
+				}
+			}
+		}
+	}
+	out.GridUnnamed = grids.left
 	names := map[string]bool{}
-	for _, refs := range f.DefRefs {
+	for _, refs := range defRefs {
 		for name := range refs {
 			names[name] = true
 		}
@@ -179,7 +255,7 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 			n = impliedBase(n)
 		}
 	}
-	resolver, err := a.contentResolver(insts, pos, active, lookup)
+	resolver, err := a.contentResolver(o.src, insts, pos, active, lookup)
 	if err != nil {
 		return nil, err
 	}
@@ -188,10 +264,12 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 		name, key                 string
 		uses                      int
 		hidden, inferred, unknown bool
+		weather                   bool
+		grid                      bool // in a map's or the world's grid
 	}
 	entries := map[string]*entry{}
 	unmatched := map[string]int{}
-	for typ, refs := range f.DefRefs {
+	for typ, refs := range defRefs {
 		for name, uses := range refs {
 			// Minified things serialize their contained object separately.
 			if name == "MinifiedThing" || name == "MinifiedTree" {
@@ -225,6 +303,8 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 					entries[id] = e
 				}
 				e.uses += uses
+				e.weather = e.weather || typ == "WeatherDef"
+				e.grid = e.grid || grid[typ][name] > 0 || grid[typ][target.name] > 0
 			}
 		}
 	}
@@ -249,6 +329,24 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 		at[id] = len(byMod[inst][e.key])
 		byMod[inst][e.key] = append(byMod[inst][e.key], SaveContentName{Name: e.name, Uses: e.uses, Hidden: e.hidden, Inferred: e.inferred, Unclassified: e.unknown})
 	}
+	own := needOwners{things: map[string]string{}, factions: map[string]string{}, weather: map[string][]string{}, grid: map[string]bool{}}
+	for _, e := range entries {
+		inst := e.node.fact.Instance
+		if e.node.fact.Type == "ThingDef" {
+			own.things[e.name] = inst
+		}
+		if e.key == "factions" {
+			own.factions[e.name] = inst
+		}
+		if e.grid {
+			own.grid[inst] = true
+		}
+		if e.weather {
+			own.weather[inst] = append(own.weather[inst], e.name)
+		}
+	}
+	out.mods, out.names = mods, byMod
+	catsOf := map[string][]SaveContentCategory{}
 	totals := map[string]*SaveContentCategory{}
 	for _, m := range mods {
 		groups := byMod[m.Instance]
@@ -274,6 +372,7 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 			t.Hidden += cat.Hidden
 		}
 		out.Mods = append(out.Mods, v)
+		catsOf[m.Instance] = v.Cats
 	}
 	for _, key := range ContentCategoryOrder {
 		if t := totals[key]; t != nil {
@@ -287,6 +386,9 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 		}
 		cat := finishContentCat("unknown", ns)
 		out.Unknown = &cat
+	}
+	if out.Needs, err = a.saveNeeds(f, mods, ready, catsOf, own, deps, grids); err != nil {
+		return nil, err
 	}
 	return out, nil
 }

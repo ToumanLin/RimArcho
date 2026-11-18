@@ -266,12 +266,12 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 // The selected environment and its current plan stay unchanged.
 func (a *App) scanAfterFileOp(ix *Index, m *store.Mod) (*ScanReport, error) {
 	if s := ix.Source(m.SourceID); s != nil && s.Kind == source.Elsewhere {
-		e, err := a.Store.EnvByID(s.EnvID)
+		e, err := a.Store.EnvForGame(s.EnvID)
 		if err != nil {
 			return nil, err
 		}
 		if e == nil {
-			return nil, fmt.Errorf("environment %s no longer exists", s.EnvID)
+			return nil, fmt.Errorf("Game Config %s no longer exists", s.EnvID)
 		}
 		if _, err := a.scanEnvironment(e, ScanOptions{GameOnly: true}); err != nil {
 			return nil, err

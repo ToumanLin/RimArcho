@@ -172,7 +172,7 @@ func (a *App) moveToLibrary(st *LoadoutState, m *store.Mod, dryRun bool) (result
 	undoOrigin := func() {}
 	if r.Origin {
 		if err := a.writeOrigin(st.Ix, m, from); err != nil {
-			return nil, fmt.Errorf(".rimarcho/origin.json could not be written in %s; nothing was moved: %v", from, err)
+			return nil, fmt.Errorf(".rimarcho/origin.json could not be written in %s; nothing was moved: %w", from, err)
 		}
 		undoOrigin = func() {
 			os.Remove(filepath.Join(from, filepath.FromSlash(scan.OriginFile)))

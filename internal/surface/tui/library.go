@@ -797,7 +797,7 @@ func (m *model) libRowLine(i, w, right int) string {
 	x := l.flat[i]
 	r := l.page.Rows[x.row]
 	cells := r.LibCells
-	var name string
+	var name, dim string
 	sel := m.libRowSelected(i)
 	mark := "  "
 	if i == l.cursor && !l.detail {
@@ -807,12 +807,20 @@ func (m *model) libRowLine(i, w, right int) string {
 	case x.lone:
 		cells = r.Insts[0].LibCells
 		name = "  " + r.Name
+		if r.New {
+			dim = T("new")
+			name += "  " + dim
+		}
 	case x.inst < 0:
 		chev := "▸ "
 		if l.open[r.ID] || len(r.Insts) < r.Copies {
 			chev = "▾ "
 		}
-		name = chev + r.Name + "  " + sDimS.Render(Tf("%d copies", r.Copies))
+		dim = Tf("%d copies", r.Copies)
+		if r.New {
+			dim = T("new") + "  " + dim
+		}
+		name = chev + r.Name + "  " + dim
 	default:
 		in := r.Insts[x.inst]
 		cells = in.LibCells
@@ -827,7 +835,7 @@ func (m *model) libRowLine(i, w, right int) string {
 			info = append(info, c)
 		}
 	}
-	line := mark + fit(name, w-right-4) + "  " + fit(strings.Join(info, "  "), right)
+	line := mark + fitDim(name, dim, w-right-4) + "  " + fit(strings.Join(info, "  "), right)
 	st := plainStyle
 	switch {
 	case i == l.cursor:
@@ -905,4 +913,18 @@ func (m *model) libPairs() [][2]string {
 	}
 	pairs = append(pairs, [2]string{"enter", T("details")}, [2]string{"F10", T("menu")}, [2]string{"/", T("search")}, [2]string{"?", T("all keys")})
 	return pairs
+}
+
+// fitDim fits s to w cells and greys its suffix dim when it is still whole. fit measures
+// plain text: styling inside it counted the escape codes as cells, which cut the copies
+// count and left the row short, pulling the details column left (VM round 2026-11-10).
+func fitDim(s, dim string, w int) string {
+	out := fit(s, w)
+	if dim == "" {
+		return out
+	}
+	if i := strings.LastIndex(out, dim); i >= 0 {
+		return out[:i] + sDimS.Render(dim) + out[i+len(dim):]
+	}
+	return out
 }

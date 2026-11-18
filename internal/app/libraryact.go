@@ -155,7 +155,7 @@ func (a *App) MoveToLockedFor(ref string, dryRun bool, reason string) (*MoveResu
 		return r, err
 	}
 	// The copy's note starts from this, unless RimArcho recorded how it made it before.
-	notes, err := a.Store.CopyNotes(st.Ix.Env.ID)
+	notes, err := a.Store.CopyNotes(st.Ix.Env.GameID)
 	if err != nil {
 		return r, err
 	}

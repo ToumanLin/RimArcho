@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
@@ -164,6 +165,7 @@ type Need struct {
 
 	linkProblems []*app.Problem // original subjects and targets, retained through folding for name links
 	rowReasons   map[string]Reason
+	refReasons   map[string]Reason // by a missing entry's pkg: ref (16 §5 row icons)
 }
 
 // Needs is the screen's content and what it means for the rest of the interface.
@@ -193,6 +195,8 @@ type Needs struct {
 	LastRunDay string `json:"lastRunDay,omitempty"` // its day: "Oct 21"
 	// LastRunPending: that log is not analysed yet, so its errors are not counted.
 	LastRunPending bool `json:"lastRunPending,omitempty"`
+	// MissingLog explains why no clean last-run verdict is available.
+	MissingLog string `json:"missingLog,omitempty"`
 	// Elsewhere: what is not on Can it run but handled on another page (SectionElsewhere),
 	// one line each at the bottom of the page (16 §2.4).
 	Elsewhere []Elsewhere `json:"elsewhere,omitempty"`
@@ -208,13 +212,21 @@ type LastSaveView struct {
 	Name    string   `json:"name"`
 	Colony  string   `json:"colony,omitempty"`
 	Loaded  string   `json:"loaded,omitempty"` // when it was loaded: "Oct 28 18:13"
+	Saved   string   `json:"saved,omitempty"`  // a chosen save: when it was written
 	Level   string   `json:"level"`            // "" loads, warning, error, writing
 	Verdict string   `json:"verdict"`
 	Lines   []string `json:"lines,omitempty"` // the warning and error rows' headings, LastSaveLines at most
 	More    int      `json:"more,omitempty"`  // rows not in Lines
 	Command string   `json:"command"`         // the archo command that shows the whole check
-	// Gone: the run named a save that is no longer in the Saves folder.
+	// Gone: the run named a save (or the player chose one) that is no longer there.
 	Gone bool `json:"gone,omitempty"`
+	// Chosen: the player chose this save ("save") or its colony ("colony") on Saves
+	// (12 §4.8); "" it is the save the last run loaded. Title is the card's heading.
+	Chosen string `json:"chosen,omitempty"`
+	Title  string `json:"title"`
+	// Unseen: the save is in another Game Config's (or a pack's) Saves folder, so the game
+	// started with this config does not list it: the sentence saying so.
+	Unseen string `json:"unseen,omitempty"`
 }
 
 // LastSaveLines is how many rows the last save's card names.
@@ -223,11 +235,32 @@ const LastSaveLines = 3
 // lastSaveView checks the save the newest run loaded against st's list (nil: none named,
 // or it could not be checked).
 func lastSaveView(a *app.App, st *app.LoadoutState, runs []*app.LogRun) *LastSaveView {
+	if c, ch, err := a.ChosenSave(st); err == nil && ch != nil {
+		v := &LastSaveView{Chosen: ch.Kind}
+		if ch.Kind == app.ChooseColony {
+			v.Title = Tf("the newest save of %s", ch.Name)
+		} else {
+			v.Title = T("the save you chose")
+		}
+		if c == nil {
+			v.Name, v.Gone = ch.Name, true
+			v.Verdict = T("not in its Saves folder any more")
+			return v
+		}
+		fillLastSave(v, c)
+		if t := c.Save.ModTime; !t.IsZero() {
+			v.Saved = ShortDate(t) + " " + t.In(a.Loc).Format("15:04")
+		}
+		if !c.Save.SeenBy(st.Ix.Env) {
+			v.Unseen = UnseenText(c.Save.Folder, st.Ix.Env.Name)
+		}
+		return v
+	}
 	c, run, err := a.LastLoadedSave(st, runs)
 	if err != nil || run == nil {
 		return nil
 	}
-	v := &LastSaveView{}
+	v := &LastSaveView{Title: T("your last save")}
 	at := run.ModTime
 	for _, p := range run.Marks {
 		if p != nil && p.Name == "save" && !p.At.IsZero() {
@@ -242,6 +275,11 @@ func lastSaveView(a *app.App, st *app.LoadoutState, runs []*app.LogRun) *LastSav
 		v.Verdict = T("not in the Saves folder any more")
 		return v
 	}
+	fillLastSave(v, c)
+	return v
+}
+
+func fillLastSave(v *LastSaveView, c *app.SaveCheck) {
 	d := SaveDetailOf(c, false, true)
 	v.Ref, v.Name, v.Colony, v.Level, v.Verdict = d.Ref, d.Name, d.Colony, d.Level, d.Verdict
 	v.Command = "saves show " + d.Ref
@@ -255,7 +293,28 @@ func lastSaveView(a *app.App, st *app.LoadoutState, runs []*app.LogRun) *LastSav
 		}
 		v.Lines = append(v.Lines, is.Head)
 	}
-	return v
+}
+
+// UnseenText says a save in folder f is not listed by the game started with cur (a Game
+// Config, or "pack X"; 12 §4.8): the folder is another config's, or a pack's.
+func UnseenText(f *app.SaveFolder, cur string) string {
+	return Tf("in the Saves folder of %s: the game started with %s does not list it", FolderOwner(f), cur)
+}
+
+// FolderOwner names who saves in a Saves folder: "pack X", the Game Configs using it
+// ("A, C"), or that none does any more.
+func FolderOwner(f *app.SaveFolder) string {
+	if f.Pack != "" {
+		return Tf("pack %s", f.Pack)
+	}
+	var names []string
+	for _, e := range f.Envs {
+		names = append(names, e.Name)
+	}
+	if len(names) == 0 {
+		return T("no Game Config saves here")
+	}
+	return strings.Join(names, ", ")
 }
 
 // Related points at an item of the other column: its ID and a line naming it.
@@ -347,6 +406,18 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 		}
 		break
 	}
+	if n.LastRun == "" && st.Ix.Env.UserDataRoot != "" {
+		cur, prev := a.LogPaths(st)
+		if cur == "" && prev == "" {
+			path := filepath.Join(st.Ix.Env.UserDataRoot, "Player.log")
+			if same := a.DefaultUserData(st.Ix.Env.GameRoot); env.PathKey(same) == env.PathKey(st.Ix.Env.UserDataRoot) {
+				if mm := env.MajorMinor(st.Ix.Env.GameVersion); mm != "" && !env.VersionLess(mm, "1.7") {
+					path = filepath.Join(st.Ix.Env.UserDataRoot, "Logs", "Player.log")
+				}
+			}
+			n.MissingLog = Tf("the last run's log was not found: %s", path)
+		}
+	}
 	n.LastSave = lastSaveView(a, st, ps.Logs)
 	indexNeeds(n)
 	return n
@@ -379,16 +450,28 @@ func indexNeeds(n *Needs) {
 		if len(it.rowReasons) == 0 {
 			common = Reason{Status: it.Status, Text: text, Why: it.Why, Content: reasonContent(it), Evidence: it.Evidence, Section: it.Section, Actions: popActions(it.Actions)}
 		}
+		// A row that only lacks the game's version gets the quiet version icon, so the rows
+		// that need something done stand out (16 §5); the item itself stays a warning.
+		rowStatus := it.Status
+		if it.code == "version.unsupported" {
+			rowStatus = StatusVersion
+		}
 		for _, id := range icons {
-			if n.Status[id] == StatusNone || it.Status > n.Status[id] {
-				n.Status[id] = it.Status
+			if n.Status[id] == StatusNone || rowStatus > n.Status[id] {
+				n.Status[id] = rowStatus
 			}
 			r := common
 			if own, ok := it.rowReasons[id]; ok {
 				r = own
 				r.Section = it.Section
 			}
+			r.Status = rowStatus
 			n.Reasons[id] = append(n.Reasons[id], r)
+		}
+		// rows with no installed mod (missing list entries) are keyed by their pkg: ref
+		for ref, r := range it.refReasons {
+			r.Section = it.Section
+			n.Reasons[ref] = append(n.Reasons[ref], r)
 		}
 	}
 	for _, rs := range n.Reasons {
@@ -406,6 +489,19 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			}
 		}
 		return name
+	}
+	// what disabling one of two conflicting mods leaves without a requirement (disableOne),
+	// read once for all of them
+	var deps *app.Dependents
+	dependents := func(id string) []*store.Mod {
+		if deps == nil {
+			d, err := a.NewDependents(st)
+			if err != nil {
+				return nil
+			}
+			deps = d
+		}
+		return deps.Of([]string{id})
 	}
 	var out []Need
 	cur := "" // the code of the problem being turned into an item
@@ -443,6 +539,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 	// a mod needing one of them is covered by the same item.
 	type missingEntry struct {
 		pkg, ws, name string
+		ref           string // the list row's ref (pkg:<entry>), which keys its icon's reason
 		n             Need
 	}
 	missingInfo := map[string]app.MissingMod{}
@@ -539,7 +636,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 					look.Label, look.URL = T("open it in the Workshop"), u
 				}
 			}
-			me := missingEntry{pkg: pkg, name: pkg, n: Need{rank: 4, Group: GroupList, code: p.Code, Text: Tf("the list has %s, but it is not installed", pkg),
+			me := missingEntry{pkg: pkg, name: pkg, ref: x, n: Need{rank: 4, Group: GroupList, code: p.Code, Text: Tf("the list has %s, but it is not installed", pkg),
 				Actions: []Action{look, disable(st, "pkg:"+pkg, T("remove it from the list"))}, Counted: true, Status: s,
 				Title: Tf("not installed: %s", pkg), Why: T("the list has it, but no mod folder does"), Evidence: ev}}
 			me.n.linkProblems = []*app.Problem{p}
@@ -598,7 +695,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			}
 		case "combo.known-bad":
 			if y != "" {
-				add(Need{Group: GroupConflict, Text: Tf("%s and %s often produce errors together (seen in shared logs)", nm(x), nm(y)), Actions: []Action{disableOne(a, st, x, y)}, Counted: true, Mods: ids, Status: s,
+				add(Need{Group: GroupConflict, Text: Tf("%s and %s often produce errors together (seen in shared logs)", nm(x), nm(y)), Actions: []Action{disableOne(st, dependents, x, y)}, Counted: true, Mods: ids, Status: s,
 					Title: Tf("%s and %s often fail together", nm(x), nm(y)), Why: T("in shared logs this pair produces errors far more often than either one alone. Disable one if you see errors."), Evidence: ev})
 			} else {
 				add(Need{Group: GroupConflict, Text: Tf("this version of %s often produces errors (seen in shared logs); other versions did not", nm(x)), Actions: []Action{disable(st, x, Tf("disable %s", nm(x)))}, Counted: true, Mods: ids, Status: s,
@@ -615,7 +712,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 				Actions: []Action{enable(st, y), problemAction(p.Ref)}, Counted: true, Mods: ids, Status: s,
 				Title: Tf("part of %s does not take effect", nm(x)), Why: Tf("it changes things %s adds, and %s is not enabled.", nm(y), nm(y)), Evidence: ev})
 		case "incompat.active":
-			add(Need{Group: GroupConflict, Text: Tf("%s is incompatible with %s", nm(x), nm(y)), Actions: []Action{disableOne(a, st, x, y)}, Counted: true, Mods: ids, Status: s,
+			add(Need{Group: GroupConflict, Text: Tf("%s is incompatible with %s", nm(x), nm(y)), Actions: []Action{disableOne(st, dependents, x, y)}, Counted: true, Mods: ids, Status: s,
 				Why: T("one of them says so; with both enabled the game misbehaves. Disable one."), Evidence: ev})
 		case "mod.pinned":
 			add(Need{Group: GroupHidden, Text: Tf("%s is locked to another copy, and the workshop version has been updated since", nm(x)),
@@ -693,6 +790,10 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			{Kind: ActUseInstalled, Key: "space", Label: T("use installed copies"), Refs: packages, Undo: true, Done: T("using installed copies")},
 			{Kind: ActFold, Key: "f", Label: T("show which")},
 		}
+		f.refReasons = map[string]Reason{}
+		for _, m := range installed {
+			f.refReasons[m.ref] = missingRowReason(m.n, f.Actions[0])
+		}
 		add(f)
 	}
 	switch len(missing) {
@@ -702,6 +803,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 		if ws := missing[0].ws; ws != "" {
 			n.Actions = append([]Action{subscribeAction([]string{ws}, T("subscribe to it"))}, n.Actions...)
 		}
+		n.refReasons = map[string]Reason{missing[0].ref: missingRowReason(n)}
 		add(n)
 	default:
 		f := Need{rank: 4, Group: GroupList, Counted: true, Status: missing[0].n.Status, Fold: true, code: "entry.missing",
@@ -726,9 +828,15 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			}
 			f.Actions = append(f.Actions, subscribeAction(ws, label))
 		}
-		f.Actions = append(f.Actions,
-			Action{Kind: ActDisable, Key: "x", Label: T("remove them from the list"), Refs: refs, Done: Tf("removed %d mods from the list", len(refs))},
-			Action{Kind: ActFold, Key: "f", Label: T("show which")})
+		removeAll := Action{Kind: ActDisable, Key: "x", Label: T("remove them from the list"), Refs: refs, Done: Tf("removed %d mods from the list", len(refs))}
+		f.Actions = append(f.Actions, removeAll, Action{Kind: ActFold, Key: "f", Label: T("show which")})
+		// Each row's icon offers its own fixes and removing every entry that is not
+		// installed, so clearing a list after unsubscribing is one click from any row.
+		removeAll.Label = Tf("remove all %d not installed", len(refs))
+		f.refReasons = map[string]Reason{}
+		for _, m := range missing {
+			f.refReasons[m.ref] = missingRowReason(m.n, removeAll)
+		}
 		add(f)
 	}
 	for _, k := range mergeKeys {
@@ -863,7 +971,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 		}
 	}
 	// Needs your answer: identity questions and an external change of the list.
-	if qs, err := a.Store.Questions(ix.Env.ID, false); err == nil {
+	if qs, err := a.Store.Questions(ix.Env.GameID, false); err == nil {
 		for _, q := range qs {
 			out = append(out, questionNeed(st, q))
 		}
@@ -1103,7 +1211,7 @@ func disable(st *app.LoadoutState, tok, label string) Action {
 // enabled mods would be left without a required mod (app.DependentsOf), and the one fewer
 // mods need comes first: disabling a library to settle a conflict breaks everything built
 // on it.
-func disableOne(a *app.App, st *app.LoadoutState, x, y string) Action {
+func disableOne(st *app.LoadoutState, dependents func(id string) []*store.Mod, x, y string) Action {
 	type opt struct {
 		o    Option
 		need int
@@ -1113,7 +1221,7 @@ func disableOne(a *app.App, st *app.LoadoutState, x, y string) Action {
 		name := TokName(st, tok)
 		o := opt{o: Option{Label: Tf("disable %s", name), Refs: []string{TokRef(st, tok)}, Done: Tf("disabled %s", name)}}
 		if id := finding.InstID(tok); id != "" {
-			if deps, err := a.DependentsOf(st, []string{id}); err == nil && len(deps) > 0 {
+			if deps := dependents(id); len(deps) > 0 {
 				o.need = len(deps)
 				o.o.Label = Tf("disable %s (%d enabled mods need it: %s)", name, len(deps), modNames(deps, 3))
 				o.o.Done = Tf("disabled %s; %d mods that need it lack it now", name, len(deps))
@@ -1422,14 +1530,32 @@ func Humanize(st *app.LoadoutState, s string) string {
 // ShortDate: a locale-appropriate short date, such as "Oct 17".
 func ShortDate(t time.Time) string {
 	t = t.Local()
-	if Lang() == "zh" {
-		return fmt.Sprintf(localeExtra("zh", "@date.short"), int(t.Month()), t.Day())
+	if format, ok := localeFormat("@date.short"); ok {
+		return fmt.Sprintf(format, int(t.Month()), t.Day())
 	}
 	return t.Format("Jan 2")
 }
 
 // popActions are an item's actions as the badge popover offers them: all but "fold" (the
 // popover has no parts to unfold).
+// missingRowReason explains a missing list entry's row icon (16 §5): the entry's own
+// sentence and fixes, then the group's (group) when several entries share them.
+func missingRowReason(n Need, group ...Action) Reason {
+	acts := popActions(n.Actions)
+	switch {
+	case len(group) == 0:
+	case group[0].Kind == ActDisable: // remove this one, then all of them
+		acts = append(acts, group...)
+	default: // use the installed copies first
+		acts = append(append([]Action{}, group...), acts...)
+	}
+	text := n.Title
+	if text == "" {
+		text = n.Text
+	}
+	return Reason{Status: StatusErr, Text: text, Why: n.Why, Evidence: n.Evidence, Actions: acts}
+}
+
 func popActions(as []Action) []Action {
 	var out []Action
 	for _, a := range as {

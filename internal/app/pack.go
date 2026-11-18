@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -657,17 +656,8 @@ func (a *App) PacksOf(e *env.Environment) (mine []*PackInfo, others int, err err
 	if err != nil {
 		return nil, 0, err
 	}
-	known := map[string]bool{}
-	if envs, err := a.Store.Envs(); err == nil {
-		for _, x := range envs {
-			known[x.Name] = true
-		}
-	}
 	for _, p := range all {
-		ok := p.Env == e.Name
-		if !ok && !known[p.Env] {
-			ok = env.MajorMinor(p.Game) == env.MajorMinor(e.GameVersion)
-		}
+		ok := env.MajorMinor(p.Game) != "" && env.MajorMinor(p.Game) == env.MajorMinor(e.GameVersion)
 		if ok {
 			mine = append(mine, p)
 		} else {
@@ -798,6 +788,9 @@ func (a *App) LaunchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 }
 
 func (a *App) launchPackWith(name string, dryRun, move bool) (*PackLaunch, error) {
+	if err := a.checkLaunchArgs(); err != nil {
+		return nil, err
+	}
 	if err := a.checkNoGame(); err != nil { // one game at a time (09 §1)
 		return nil, err
 	}
@@ -813,6 +806,9 @@ func (a *App) launchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 		return nil, err
 	}
 	e := st.Ix.Env
+	if err := a.recoverInstallationTestLinks(modsDir(st.Ix), dryRun); err != nil {
+		return nil, err
+	}
 	check := a.CheckPack(p, e, nil)
 	if err := a.refuseUnhealthyLinks(modsDir(st.Ix)); err != nil {
 		return nil, err
@@ -822,7 +818,7 @@ func (a *App) launchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 	}
 	mods := modsDir(st.Ix)
 	if mods == "" {
-		return nil, fmt.Errorf("%w: the environment has no Mods/ folder", ErrLaunchBlocked)
+		return nil, fmt.Errorf("%w: the Game Config has no Mods/ folder", ErrLaunchBlocked)
 	}
 	dir := a.packPath(name)
 	r := &PackLaunch{Pack: p, Check: check, UserData: filepath.Join(dir, "userdata"), DryRun: dryRun}
@@ -959,30 +955,13 @@ func (a *App) launchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 	if err := a.applyLinks(mods, r.Links); err != nil {
 		return nil, err
 	}
-	// First run: the pack starts with the environment's settings (not its mod list).
-	cfg := filepath.Join(r.UserData, "Config")
-	if _, err := os.Stat(cfg); os.IsNotExist(err) && e.UserDataRoot != "" {
-		if src, err := os.ReadDir(filepath.Join(e.UserDataRoot, "Config")); err == nil {
-			os.MkdirAll(cfg, 0o755)
-			for _, f := range src {
-				if f.IsDir() || strings.EqualFold(f.Name(), "ModsConfig.xml") || !strings.EqualFold(filepath.Ext(f.Name()), ".xml") {
-					continue
-				}
-				if fi, err := f.Info(); err == nil && copyFile(filepath.Join(e.UserDataRoot, "Config", f.Name()), filepath.Join(cfg, f.Name()), fi) == nil {
-					r.Copied = append(r.Copied, f.Name())
-				}
-			}
-		}
+	// First run: seed settings with the same rules as --like (10 §3 step 4).
+	_, cfgErr := os.Stat(filepath.Join(r.UserData, "Config"))
+	copied, err := seedSettings(e.UserDataRoot, r.UserData, os.IsNotExist(cfgErr))
+	if err != nil {
+		return r, fmt.Errorf("pack %s: copying settings: %w", name, err)
 	}
-	// Settings follow the Mod (10 §3 step 4): HugsLib's while the pack has none, and each
-	// Mod's under the name its link gives it.
-	if e.UserDataRoot != "" {
-		hl, err := copyHugsLib(e.UserDataRoot, r.UserData)
-		if err != nil {
-			log.Printf("pack %s: copying HugsLib settings: %v", name, err)
-		}
-		r.Copied = append(r.Copied, hl...)
-	}
+	r.Copied = append(r.Copied, copied...)
 	r.Settings = carryModSettings(settings, nil)
 	var known []string
 	for _, m := range installedOfficial(st.Ix.Mods) {
@@ -1014,7 +993,7 @@ func (a *App) launchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 	b, _ := json.Marshal(packState{LastPlayed: a.Now().UTC()})
 	os.WriteFile(filepath.Join(dir, "state.json"), b, 0o644)
 	// A pack's launch has no plan; its fingerprint is the pack's list (09 §1).
-	return r, a.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: e.ID, Started: a.Now().UTC(), Method: "pack:" + name,
+	return r, a.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: e.ID, GameID: e.GameID, UserDataRoot: r.UserData, EnvName: e.Name, Started: a.Now().UTC(), Method: "pack:" + name,
 		Command: r.Plan.Command(), Fingerprint: TokenFingerprint(r.Tokens)})
 }
 

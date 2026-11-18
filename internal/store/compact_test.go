@@ -2,6 +2,8 @@ package store
 
 import (
 	"bytes"
+	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -96,7 +98,8 @@ func TestTruncateWAL(t *testing.T) {
 	}
 	defer r.Close()
 	bigWrite(t, s, 330000)
-	tx, err := r.DB.Begin()
+	// read only: a transaction that may write takes the write lock (_txlock=immediate)
+	tx, err := r.DB.BeginTx(context.Background(), &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		t.Fatal(err)
 	}

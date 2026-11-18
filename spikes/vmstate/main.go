@@ -163,6 +163,18 @@ func rows(db *sql.DB, q string, args ...any) []map[string]any {
 	check(r.Err())
 	return out
 }
+
+// environmentView keeps baseline observations compatible with databases from before
+// the identity split. Observing a baseline must never upgrade it.
+func environmentView(db *sql.DB) (string, string) {
+	var split int
+	check(db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='game'`).Scan(&split))
+	if split == 0 {
+		return "environment", "environment_id"
+	}
+	return `(SELECT e.id,e.name,g.game_root,e.user_data_root,g.game_version,e.current_plan FROM environment e JOIN game g ON g.id=e.game_id)`, "game_id"
+}
+
 func snapshot(home string, openPlan ...string) any {
 	// Opening App would perform startup recovery. This observer opens SQLite read-only instead.
 	db, err := sql.Open("sqlite", "file:"+filepath.ToSlash(filepath.Join(home, "archo.db"))+"?mode=ro")
@@ -180,8 +192,9 @@ func snapshot(home string, openPlan ...string) any {
 			break
 		}
 	}
-	envs := rows(db, "SELECT id,name,game_root,user_data_root,game_version,current_plan FROM environment ORDER BY name")
-	sources := rows(db, "SELECT id,environment_id,kind,label,root,status,pending_root FROM source ORDER BY kind,label")
+	envView, scope := environmentView(db)
+	envs := rows(db, "SELECT id,name,game_root,user_data_root,game_version,current_plan FROM "+envView+" ORDER BY name")
+	sources := rows(db, "SELECT id,"+scope+" AS environment_id,kind,label,root,status,pending_root FROM source ORDER BY kind,label")
 	plans := rows(db, "SELECT id,name,created_game,versions FROM plan ORDER BY name")
 	ids := map[string]string{}
 	roots := map[string]string{home: "HOME"}
@@ -197,7 +210,7 @@ func snapshot(home string, openPlan ...string) any {
 	for _, p := range plans {
 		ids["plan:"+fmt.Sprint(p["id"])] = "plan:" + fmt.Sprint(p["name"])
 	}
-	instances := rows(db, `SELECT i.id,i.lineage_id,i.environment_id,i.source_id,i.rel_path,i.status,i.residue,i.unloadable,s.package_id,s.snapshot_hash FROM instance i LEFT JOIN snapshot s ON s.id=i.current_snapshot_id ORDER BY i.source_id,i.rel_path`)
+	instances := rows(db, `SELECT i.id,i.lineage_id,i.`+scope+` AS environment_id,i.source_id,i.rel_path,i.status,i.residue,i.unloadable,s.package_id,s.snapshot_hash FROM instance i LEFT JOIN snapshot s ON s.id=i.current_snapshot_id ORDER BY i.source_id,i.rel_path`)
 	for _, m := range instances {
 		key := ids[fmt.Sprint(m["source_id"])] + "/" + fmt.Sprint(m["rel_path"]) + "|" + fmt.Sprint(m["package_id"]) + "|" + fmt.Sprint(m["snapshot_hash"])
 		ids[fmt.Sprint(m["id"])] = key
@@ -298,7 +311,7 @@ func snapshot(home string, openPlan ...string) any {
 	for _, table := range []string{"lineage_data", "lineage_tag", "instance_note", "plan_collection", "user_rule"} {
 		out[table] = norm(rows(db, "SELECT * FROM "+table))
 	}
-	out["problemCounts"] = norm(rows(db, "SELECT a.environment_id,f.severity,count(*) AS count FROM finding f JOIN analysis a ON a.id=f.analysis_id GROUP BY a.environment_id,f.severity ORDER BY a.environment_id,f.severity"))
+	out["problemCounts"] = norm(rows(db, "SELECT a."+scope+" AS environment_id,f.severity,count(*) AS count FROM finding f JOIN analysis a ON a.id=f.analysis_id GROUP BY a."+scope+",f.severity ORDER BY a."+scope+",f.severity"))
 	configs := map[string]any{}
 	configContents := map[string]any{}
 	links := map[string]any{}
@@ -319,7 +332,7 @@ func snapshot(home string, openPlan ...string) any {
 	}
 	out["modsConfigHashes"] = configs
 	out["modsConfig"] = configContents
-	for _, e := range rows(db, "SELECT name,game_root FROM environment ORDER BY name") {
+	for _, e := range rows(db, "SELECT name,game_root FROM "+envView+" ORDER BY name") {
 		path := filepath.Join(fmt.Sprint(e["game_root"]), "Mods")
 		items, err := os.ReadDir(path)
 		check(err)
@@ -336,6 +349,17 @@ func snapshot(home string, openPlan ...string) any {
 		links[fmt.Sprint(e["name"])] = entries
 	}
 	out["links"] = links
+	if scope == "environment_id" {
+		// Adapt only this read-only connection for the current store's joined reads.
+		// TEMP views do not change the baseline or its schema version.
+		_, err := db.Exec(`CREATE TEMP VIEW game AS SELECT id,name,game_root,'' AS game_root_key,game_version,created_at FROM main.environment;
+CREATE TEMP VIEW environment AS SELECT id,name,id AS game_id,user_data_root,launch,created_at,current_plan FROM main.environment;`)
+		check(err)
+		for _, table := range []string{"source", "instance", "scan", "identity_question", "analysis", "game_assembly"} {
+			_, err := db.Exec(`CREATE TEMP VIEW ` + table + ` AS SELECT *,environment_id AS game_id FROM main.` + table)
+			check(err)
+		}
+	}
 	// Compute declaration + stored-analysis problems through the normal app/view code,
 	// with a read-only DB and persisted-workspace mode: no startup/import/recovery writes.
 	a := &app.App{Home: home, Store: &store.Store{DB: db}, Now: time.Now, Rand: rand.Reader, Loc: time.UTC, LazyLog: true, LogCacheOnly: true, MonitorBundle: app.MonitorNone}
@@ -390,7 +414,8 @@ func audit(home, root string) {
 	db, err := sql.Open("sqlite", "file:"+filepath.ToSlash(filepath.Join(home, "archo.db"))+"?mode=ro")
 	check(err)
 	defer db.Close()
-	queries := []string{"SELECT game_root AS path FROM environment UNION SELECT user_data_root AS path FROM environment", "SELECT root AS path FROM source UNION SELECT pending_root AS path FROM source", "SELECT real_path AS path FROM instance WHERE status='live'", "SELECT value AS path FROM meta WHERE key IN ('cfg:lock.dir','cfg:monitor.dir','cfg:pack.dir','cfg:subscribed.dir')"}
+	envView, _ := environmentView(db)
+	queries := []string{"SELECT game_root AS path FROM " + envView + " UNION SELECT user_data_root AS path FROM environment", "SELECT root AS path FROM source UNION SELECT pending_root AS path FROM source", "SELECT real_path AS path FROM instance WHERE status='live'", "SELECT value AS path FROM meta WHERE key IN ('cfg:lock.dir','cfg:monitor.dir','cfg:pack.dir','cfg:subscribed.dir')"}
 	for _, q := range queries {
 		for _, r := range rows(db, q) {
 			path := fmt.Sprint(r["path"])

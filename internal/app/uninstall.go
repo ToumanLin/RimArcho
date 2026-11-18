@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 
@@ -22,6 +23,8 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/scan"
+	"github.com/ToumanLin/RimArcho/internal/secret"
+	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
@@ -265,7 +268,11 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 			p.Steps = append(p.Steps, &UninstallStep{Key: key, Items: items})
 		}
 	}
-	add(UnAccounts, []*UninstallItem{{Path: a.AccountsDir(), Do: "forget-accounts", Note: "Forget account sessions: delete site sessions and temporary login folders, and clear known authentication caches for all accounts in managed SteamCMD. External caches stay under their owner's control. This cannot be undone and does not sign out other devices."}})
+	accountItems := []*UninstallItem{{Path: a.AccountsDir(), Do: "forget-accounts", Note: "Forget account sessions: delete site sessions and temporary login folders, and clear known authentication caches for all accounts in managed SteamCMD. External caches stay under their owner's control. This cannot be undone and does not sign out other devices."}}
+	if a.AgentStatus().HasKey {
+		accountItems = append(accountItems, &UninstallItem{Path: "Windows Credential Manager: " + secret.Prefix + AgentKeyName, Do: "forget-agent-key", Note: "Remove the Archo Agent API key from Windows Credential Manager."})
+	}
+	add(UnAccounts, accountItems)
 
 	// Where kept lock library copies go: a game that is not itself removed.
 	var lockEnv *env.Environment
@@ -284,7 +291,7 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 		}
 		switch {
 		case lockEnv == nil && o.LockedTo != "":
-			p.Problem = fmt.Sprintf("no environment named %q with a game folder (archo env list)", o.LockedTo)
+			p.Problem = fmt.Sprintf("no Game Config named %q with a game folder (archo env list)", o.LockedTo)
 		case lockEnv == nil:
 			p.Problem = "no game folder to move the lock library's copies into; remove them instead"
 		case o.RemoveGames && downloadedGame(lockEnv.GameRoot):
@@ -642,7 +649,13 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 		prog = append(prog, &UninstallItem{Path: filepath.Dir(exe), Do: DoLeave, Note: "a development build: the program is not removed"})
 	case exe != "":
 		dir := filepath.Dir(exe)
-		for _, n := range releaseFiles {
+		names := slices.Clone(releaseFiles)
+		for _, n := range selfupdate.Installed(dir) { // entries later releases added (17 §5.1)
+			if !slices.ContainsFunc(names, func(m string) bool { return strings.EqualFold(m, n) }) {
+				names = append(names, n)
+			}
+		}
+		for _, n := range names {
 			path := filepath.Join(dir, n)
 			fi, err := os.Lstat(path)
 			if err != nil {
@@ -687,9 +700,9 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 
 // modsFolder is an environment's Mods/ folder: its local source's root, else <game>/Mods.
 func (a *App) modsFolder(e *env.Environment) string {
-	if srcs, err := a.Store.Sources(e.ID); err == nil {
+	if srcs, err := a.Store.Sources(e.GameID); err == nil {
 		for _, s := range srcs {
-			if s.Kind == source.Local && s.Status != source.StatusRetired && s.EnvID == e.ID {
+			if s.Kind == source.Local && s.Status != source.StatusRetired && s.EnvID == e.GameID {
 				return s.Root
 			}
 		}
@@ -709,7 +722,7 @@ func (a *App) presentPackages(envs []*env.Environment, udKey string) (map[string
 		if store.UserDataKey(e.UserDataRoot) != udKey {
 			continue
 		}
-		mods, err := a.Store.UninstallMods(e.ID)
+		mods, err := a.Store.UninstallMods(e.GameID)
 		if err != nil {
 			return nil, err
 		}
@@ -846,6 +859,9 @@ func (a *App) Uninstall(o UninstallOptions, progress func(UninstallProgress)) (*
 			if err := a.uninstallItem(s.Key, it); err != nil {
 				it.Err = err.Error()
 				failed = true
+				if it.Do == "forget-agent-key" {
+					return p, errors.New("could not remove the Archo Agent API key from Windows Credential Manager; tools and data were kept; retry")
+				}
 				if s.Key == UnAccounts {
 					return p, errors.New("could not forget account sessions; tools and data were kept; close the login window and retry")
 				}
@@ -904,6 +920,8 @@ func (a *App) uninstallItem(step string, it *UninstallItem) error {
 	switch it.Do {
 	case "forget-accounts":
 		return a.ForgetAccounts()
+	case "forget-agent-key":
+		return SetAgentKey("")
 	case DoKeep, DoLeave:
 		return nil
 	case DoUnlink:
@@ -1113,7 +1131,7 @@ type partlyRemovedError struct {
 }
 
 func (e *partlyRemovedError) Error() string {
-	return fmt.Sprintf("%s was only partly deleted (%v); the game links to it were removed, delete the rest yourself", e.path, e.err)
+	return fmt.Sprintf("%s: only part of it was deleted (%s); the game links to it were removed, delete the rest yourself", e.path, e.err)
 }
 
 func (e *partlyRemovedError) Unwrap() error { return e.err }

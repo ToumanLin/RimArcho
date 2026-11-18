@@ -1,0 +1,20 @@
+Archo Monitor is RimArcho's in-game companion Mod. It records what Player.log cannot say in ArchoMonitor.log in the save data folder: the XML file and Def being loaded when an error happens, which Mods own the code and Harmony patches on the stack, and how many errors came after the game stopped logging. RimArcho reads it to show the evidence for each problem in Can it run.
+
+Load it right after Harmony and before Core so it sees every Mod load. It is cheap by design: a repeated message costs one hash lookup; writes are buffered and errors reach the disk at once.
+
+RimArcho ships Archo Monitor and installs it itself, so you don't need to subscribe; subscribing lets Steam keep it up to date.
+
+[h3]Download RimArcho[/h3]
+RimArcho is a clean, fast, lightweight RimWorld launcher and Mod manager with a simple goal: less fussing with Mods, less digging through errors, more playing. It is not distributed on the Workshop; download it here:
+[list]
+[*]GitHub: [url=https://github.com/ToumanLin/RimArcho/releases/latest]https://github.com/ToumanLin/RimArcho/releases/latest[/url]
+[*]Lanzou (mirror for mainland China): [url=https://rimarcho.lanzn.com/b01i608qja]https://rimarcho.lanzn.com/b01i608qja[/url] password ctot
+[/list]
+Download archo-<version>-windows-amd64.zip, unzip it into any folder and double-click RimArcho.exe. From then on RimArcho checks for and installs its own updates.
+The executables are not code-signed, so the first time you run one Windows may say "Windows protected your PC": choose More info, then Run anyway.
+
+RimArcho is fully open source: [url=https://github.com/ToumanLin/RimArcho]https://github.com/ToumanLin/RimArcho[/url]
+
+Questions or suggestions? Join us on Discord: [url=https://discord.gg/HF2GVyurQs]https://discord.gg/HF2GVyurQs[/url]
+
+Credits: the approach follows RimCrow Companion, which in turn credits BetterModSort (Apache-2.0, Yan-Zero), LogAfterDefError (MIT, emipa606), BetterLog (MPL-2.0, bbradson) and Mod Error Checker. Archo Monitor's code is its own; none of theirs is copied. MIT License.

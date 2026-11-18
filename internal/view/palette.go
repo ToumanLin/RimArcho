@@ -47,7 +47,7 @@ var Commands = []Command{
 	{"rescan", "@palette.rescan", "rescan", "R scan"},
 	{"analyze", "@palette.analyze", "check the files again", "A analyze"},
 	{"log", "@palette.log", "game log", "l Player.log choose a log"},
-	{"env", "@palette.env", "switch game", "E env environment"},
+	{"env", "@palette.env", "switch Game Config", "E env environment Game Config"},
 	{"plans", "@palette.plans", "lists", "P switch, new, rename, delete a list"},
 	{"new-plan", "@palette.new-plan", "new list", "+ list copy import"},
 	{"restore-all", "@palette.restore-all", "put all back", "T staging"},

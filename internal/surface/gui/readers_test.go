@@ -148,6 +148,6 @@ func TestLogPageSwitchesEnvironmentAndRejectsPreviousPath(t *testing.T) {
 		t.Fatal(r.Error)
 	}
 	if p, err := api.LogPage(next); err != nil || p.Path != "" || len(p.Files) != 0 {
-		t.Fatalf("empty environment retained old log: %+v, %v", p, err)
+		t.Fatalf("empty Game Config retained old log: %+v, %v", p, err)
 	}
 }

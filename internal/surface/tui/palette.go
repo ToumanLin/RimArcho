@@ -259,13 +259,14 @@ func (m *model) palCommands() []palItem {
 // palAll: commands, then the other environments, then every mod.
 func (m *model) palAll() []palItem {
 	out := m.palCommands()
-	if envs, err := m.app.Store.Envs(); err == nil {
+	if envs := view.EnvironmentRows(m.app, ""); len(envs) > 0 {
 		for _, e := range envs {
-			if e.Name == m.envName {
-				continue
-			}
 			name := e.Name
-			out = append(out, palItem{kind: palEnv, name: Tf("switch to %s", name), alias: name, desc: "env", run: func(m *model) tea.Cmd {
+			label := Tf("switch to %s", name) + "  " + e.Installation
+			if name == m.envName {
+				label = name + "  " + e.Installation + "  " + T("current")
+			}
+			out = append(out, palItem{kind: palEnv, name: label, alias: name, run: func(m *model) tea.Cmd {
 				m.app.EnvName = ""
 				if m.act(Tf("switched to %s", name), "env", "use", name) {
 					for k := range m.cols {
@@ -375,7 +376,7 @@ func (m *model) paletteLines(n int) []string {
 	// the input's cursor is the filter bar's ▌ (one cursor style, 16 §7)
 	out := []string{"  " + sAccent.Render(markPrompt+" ") + sText.Render(p.query) + sDimS.Render(fit("▌", max(w-4-width.StringWidth(p.query), 1))), ""}
 	// commands are what the palette is for and carry no tag; a Mod, game or list says so
-	kinds := map[palKind]string{palMod: "Mod", palEnv: T("game"), palPlan: T("list")}
+	kinds := map[palKind]string{palMod: "Mod", palEnv: T("Game Config"), palPlan: T("list")}
 	rows := max(n-len(out), 1)
 	off := max(0, p.sel-rows+1)
 	for i := off; i < len(p.results) && len(out) < n; i++ {
@@ -383,6 +384,7 @@ func (m *model) paletteLines(n int) []string {
 		tag := kinds[it.kind]
 		tw := width.StringWidth(tag)
 		name := it.name
+
 		if it.kind == palCommand && it.alias != "" && it.alias != it.name {
 			name += "  " + sDimS.Render(it.alias)
 		}

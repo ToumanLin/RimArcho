@@ -93,12 +93,33 @@ func (s *API) PickProgram() (string, error) {
 	return s.x.native.openFile(view.T("choose a program"), nil)
 }
 
+// PickUpdateZip chooses a RimArcho release zip the player downloaded in the browser (the
+// manual update, 17 §5.1); "" when it was cancelled.
+func (s *API) PickUpdateZip() (string, error) {
+	if s.x.native == nil {
+		return "", errors.New(view.T("no file dialog here; use the desktop window"))
+	}
+	return s.x.native.openFile(view.T("choose the downloaded RimArcho zip"), [][2]string{{"Zip (*.zip)", "*.zip"}})
+}
+
 // PickImportFile shows the open dialog; "" when it was cancelled or there is none.
 func (s *API) PickImportFile() (string, error) {
 	if s.x.native == nil {
 		return "", nil
 	}
 	return s.x.native.openFile(view.T("import a mod list"), listFilters)
+}
+
+// PickAnyImport is the Import page's one file dialog: lists, saves, packs and other
+// managers' data (16 §2.18); "" when it was cancelled or there is no window.
+func (s *API) PickAnyImport() (string, error) {
+	if s.x.native == nil {
+		return "", nil
+	}
+	return s.x.native.openFile(view.T("import"), [][2]string{
+		{"Lists, saves, packs, manager data (*.xml;*.rml;*.json;*.txt;*.rws;*.archopack;*.db)", "*.xml;*.rml;*.json;*.txt;*.rws;*.archopack;*.db"},
+		{"All files (*.*)", "*.*"},
+	})
 }
 
 // PickPackFile selects an archive for the guide; cancellation leaves the guide unchanged.

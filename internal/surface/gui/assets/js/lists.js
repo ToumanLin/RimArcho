@@ -1,6 +1,6 @@
 // The three lists (16 §2.5): virtual rows, the cursor, selection, search, dragging. The
 // board has three columns: Not enabled | Enabled | details, with Staging and history folded under details.
-import { factText, S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H, slideThumb } from "./state.js";
+import { factText, S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H, slideThumb, keyCaps } from "./state.js";
 import { icon, sourceIcon, statusIcon } from "./icons.js";
 import { wireBadges, rowDrag } from "./badgepop.js";
 import { listGeometry, rowAt } from "./listgeometry.js";
@@ -268,8 +268,8 @@ function syncViewControls() {
 // listActions: undo and sort sit in the enabled list's head, since they change that list;
 // the list's other actions are in the top bar. main.js runs them by data-cmd.
 function listActions() {
-  return `<span class="acts"><button class="btn small" data-cmd="undo" data-env-write="undo" title="u">${esc(T("undo"))}<kbd>u</kbd></button>` +
-    `<button class="btn small" data-cmd="sort" data-env-write="sort" title="S">${esc(T("sort"))}<kbd>S</kbd></button></span>`;
+  return `<span class="acts"><button class="btn small" data-cmd="undo" data-env-write="undo" title="u">${esc(T("undo"))}${keyCaps("u").outerHTML}</button>` +
+    `<button class="btn small" data-cmd="sort" data-env-write="sort" title="S">${esc(T("sort"))}${keyCaps("S").outerHTML}</button></span>`;
 }
 
 const pools = [new Map(), new Map(), new Map()];
@@ -330,7 +330,10 @@ export function renderRows(k) {
     const st = S.board && S.board.status ? rowStatus(it) : 0;
     d.className = "row" + (i === c.cursor ? " cur" : "") + (c.sel.has(key(it)) ? " sel" : "") + (it.dim || it.missing ? " dimmed" : "");
     d.innerHTML = `<span class="m"></span>` + (k === 1 ? `<span class="p">${it.pos || ""}</span>` : "") +
-      `<span class="k">${it.missing ? "" : sourceIcon(it.kind)}</span><span class="t">${esc(it.name)}</span>` +
+      // no source icon in Disabled (16 §2.5): the copy shows in details and source: filters
+      (k === 0 ? "" : `<span class="k">${it.missing ? "" : sourceIcon(it.kind)}</span>`) + `<span class="t">${esc(it.name)}</span>` +
+      // a Mod a scan found in the last week (16 §2.5)
+      (it.new && !(k === 0 && it.copyCount > 1 && it.copyLabel) ? `<span class="nw">${esc(T("new"))}</span>` : "") +
       // what the row is short of, or which copy it is, sits on the name's line
       (it.missing || it.gone ? `<span class="src">${esc(T(it.canUse ? "installed copy available" : "not installed"))}</span>` : k === 1 && it.copyCount > 1 && it.copyLabel ? `<span class="src">${esc(it.copyLabel)}</span>` : "") +
       (it.unsaved ? `<span class="u" title="${esc(T("unsaved"))}"></span>` : "") + `<span class="s">${statusIcon(st)}</span>`;
@@ -338,7 +341,12 @@ export function renderRows(k) {
     if (k === 0 && it.copyCount > 1 && it.copyLabel) {
       d.classList.add("copy-item");
       $(".t",d).textContent="└ " + it.copyLabel;
-      if (layout.heads[i]) { d.classList.add("copy-group-start"); d.prepend(el("span","editor-copy-head",it.name)); }
+      if (layout.heads[i]) {
+        d.classList.add("copy-group-start");
+        const head = el("span","editor-copy-head",it.name);
+        if (it.new) head.append(el("span","nw",T("new")));
+        d.prepend(head);
+      }
     }
     $(".t", d).id = d.id + "-name";
     // A grouped copy shows only "└ <copy>"; its name carries the Mod, as the group head does.
@@ -426,7 +434,7 @@ function historyPanel() {
 
 function rowSig(k, i, it) {
   const c = S.cols[k];
-  return [key(it), it.pos, it.unsaved, it.dim, it.gone, it.canUse, (it.tags || []).join(","), i === c.cursor, c.sel.has(key(it)), rowStatus(it), it.name, it.copyLabel, it.copyCount, it.lineage].join("|");
+  return [key(it), it.pos, it.unsaved, it.dim, it.gone, it.canUse, (it.tags || []).join(","), it.new, i === c.cursor, c.sel.has(key(it)), rowStatus(it), it.name, it.copyLabel, it.copyCount, it.lineage].join("|");
 }
 
 // rowStatus mirrors view.RowStatus (missing entries are errors, unloadable rows dim).
@@ -485,11 +493,11 @@ export function wireLists(ui) {
       ui.click(k, +r.dataset.i, e);
       box.focus({ preventScroll: true });
     });
-    box.addEventListener("dblclick", (e) => {
+    box.addEventListener("dblclick", (e) => { // keys: space
       const r = e.target.closest(".row");
       if (r && !r.classList.contains("group-head")) ui.verb("toggle");
     });
-    box.addEventListener("contextmenu", (e) => {
+    box.addEventListener("contextmenu", (e) => { // keys: Menu, shift+F10 (menuAtCursor in main.js)
       e.preventDefault();
       const r = e.target.closest(".row");
       if (!r) return;

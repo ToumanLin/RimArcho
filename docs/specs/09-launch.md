@@ -9,7 +9,7 @@ Every action that writes to disk follows 02 §1: RimArcho writes only to the loc
 
 ## 1. Launch model
 
-**One game at a time.** Before launching, RimArcho checks for game processes across all environments (§4). If any game is running, it refuses the launch and names the environment and the plan or pack being played. Environments and plans share ModsConfig.xml and the save directory, so two games running at once would overwrite each other's files.
+**One game at a time.** Before launching, RimArcho checks for game processes across all environments (§4). If any game is running, it refuses the launch and names the environment and the plan or pack being played. Sibling environments have separate user data but share physical Mods/ deployment; concurrent runs are still refused.
 
 **Write on launch.** ModsConfig.xml is a projection of a plan, not the source of truth (00a §1). Plan edits are saved in RimArcho's database at once (07 §1). They reach the game only when:
 
@@ -20,16 +20,18 @@ Every action that writes to disk follows 02 §1: RimArcho writes only to the loc
 
 **Pack exception.** A pack uses its own user data directory (`-savedatafolder`, 10 §3) and leaves the environment's ModsConfig.xml and saves untouched.
 
-**Launch records.** Every plan or pack launch records the environment, the plan or pack, the time, the launch method, the full command line and the fingerprint of the enabled list. Logs are matched to the latest launch by their write time (06 §4). Save management uses these records to identify the plan (12 §4).
-The table is `launch(environment_id, started_at, method, command, plan_id, fingerprint, version_n)`. `method` is `steam`, `direct` or `pack:<pack name>`. A plan launch records the plan, the fingerprint of its enabled list (`ListFingerprint`, also used for stale detection) and the version played. A pack launch has no plan and records the fingerprint of the pack's list.
+**Launch records.** New records capture installation ID, effective user data root and environment name at launch; changing a root or name does not rewrite those snapshots. Upgraded records retain an unknown root.  Every plan or pack launch records the environment, the plan or pack, the time, the launch method, the full command line and the fingerprint of the enabled list. Logs are matched to the latest launch by their write time (06 §4). Save management uses these records to identify the plan (12 §4).
+The table is `launch(environment_id, started_at, method, command, plan_id, fingerprint, version_n, game_id, user_data_root, env_name)`. `method` is `steam`, `direct` or `pack:<pack name>`. A plan launch records the plan, the fingerprint of its enabled list (`ListFingerprint`, also used for stale detection) and the version played. A pack launch has no plan and records the fingerprint of the pack's list.
 
 ## 2. Launching a plan
+
+**Managed log arguments.** Plan and pack redirection and rotation follow 03 §6.3. User-supplied `-logfile` (separate, `=`, quoted or mixed-case forms) is refused in both typed and stored extra arguments before writes, like `-savedatafolder`. The refusal tells the player to remove the override; RimArcho manages the log path.
 
 `archo launch [--dry-run]` launches the current plan. See 13 §4 for arguments that name a plan and for other reference forms. The UI entry points are the launch control in the top bar, "launch the game" on the Launch page, and `L` (16 §2.1, §2.3). One click launches, and the status line reports the result. If step 1 or 2 below refuses the launch, the status line gives the reason and commands that can resolve it (16 §6). The command panel's "preview the launch" is read-only.
 
 **Steps** (if any step fails, stop without executing the later steps):
 
-1. **Check.** No game may be running (§1, §4). The environment must have a user data directory; otherwise, suggest `archo env set --user-data <dir>`. If an existing ModsConfig.xml cannot be read, refuse and ask the player to repair or delete it first.
+1. **Check.** Extra launch arguments containing `-savedatafolder` (case-insensitive, including quoted and separate-value forms) are refused before any write for plan, pack and test launches. The refusal names the argument and gives `archo env set <name> --user-data <dir>`; stored arguments remain untouched. No game may be running (§1, §4). The environment must have a user data directory; otherwise, suggest `archo env set --user-data <dir>`. If an existing ModsConfig.xml cannot be read, refuse and ask the player to repair or delete it first.
 2. **Handle outside changes.** If the file differs from the last write, first attribute the change to the last plan that wrote it, under 07 §4.3. Load the change if possible, then continue. If it creates a conflict (an outside version has not been loaded), refuse and offer commands to view the diff, load the change or ignore it (07 §4.1 item 1). This prevents the write from silently overwriting edits made in the game's Mod menu.
 3. **Synchronize `_Archo_` links** (§3): create any missing links that the plan needs, and remove extra links or links with the wrong targets.
 4. **Remove all `!ArchoPack_` links** (10 §3): the game must not see pack copies when playing a plan. Steps 3 and 4 run as one operation plan that removes links before creating them.
@@ -48,11 +50,11 @@ The links are handled before ModsConfig.xml is written. If a link operation fail
 | `direct` | The first executable found in the game directory: `RimWorldWin64.exe`, `RimWorld.exe`, `RimWorldLinux`, `RimWorldMac.app`; Linux tries `RimWorldLinux` first | The extra arguments |
 
 - Both methods append `-savedatafolder=<path>` when the user data directory differs from the local default, using normalized paths for the comparison. On Linux Steam launches use the game's default (03 §3.2); direct native launches use the host default, so a native Flatpak game launched directly receives its Flatpak data path explicitly.
-- The player enters "extra arguments" in the "this game" group in settings (16 §2.14). They are stored as `env:<environmentID>:launch_args`, split on whitespace and appended last.
+- The player enters "extra arguments" in the "this game" group in settings (16 §2.14). They are stored as `env:<environmentID>:launch_args`, parsed as quoted command-line text or imported JSON argv and appended last.
 - The working directory is the game directory. Arguments containing spaces or tabs are displayed in double quotes.
 - If Steam is missing, refuse and suggest `archo env set --launch direct` for a native game; for Proton, explain that Steam is required. If the game executable is missing, refuse and name the directory that was searched. Scripts inside a Flatpak Steam root are launched through Flatpak, not directly on the host.
 
-**Proton games on Linux** (03 §3.2) launch only through Steam. Direct launch is refused in one sentence. Own saves (`env add/set --saves own`) are refused; launch also refuses a custom data directory or a `-savedatafolder` extra argument. Proton save redirection is not implemented until Linux phase 2. These checks precede game-file writes, including pack launch; isolated test runs are refused before preparing their data (20 §2). A native game supports both launch methods and save redirection.
+**Proton games on Linux** (03 §3.2) launch only through Steam. Direct launch is refused in one sentence. `env add/set` refuse own saves and custom data directories; explicitly naming the game's default directory with `--user-data` is allowed. Changing the game directory also validates the retained user data directory. Registration refusals precede record changes and data-folder creation. Launch also refuses a custom data directory left in an existing database or a `-savedatafolder` extra argument. Proton save redirection is not implemented until Linux phase 2. These checks precede game-file writes, including pack launch; isolated test runs are refused before preparing their data (20 §2). A native game supports both launch methods and save redirection.
 
 **`--dry-run` shows** the `_Archo_` and `!ArchoPack_` links to create or remove (`+ name` / `- name`), the ModsConfig.xml path, whether `version` will be rewritten from X to Y, the numbers of entries to write and missing entries, and the full launch command. It does not write to disk or launch the game. `save --dry-run` shows the same preview without the launch command.
 
@@ -89,7 +91,7 @@ Mods may live in directories the game does not read: SteamCMD download directori
 
 **Settings follow the Mod** (`app/modsettings.go`). The game names a Mod's settings file after the folder it sees the Mod under: `Config/Mod_<folder>_<Mod class>.xml` (`Verse.LoadedModManager.GetSettingsFilename`, identical in 1.6 and 1.7). The whole name goes through `GenText.SanitizeFilename`, which turns each run of `"<>|:*?\/{}!@#$%^&` or control characters into one `_`, so a pack link `!ArchoPack_x_…` reads `Mod__ArchoPack_x_….xml` (`app.SettingsFile`). A Mod that moves between its Workshop folder, a `Mods/` copy, an `_Archo_` link and a pack link would otherwise read a new file and start with its defaults. So each write to the game (save and launch, after ModsConfig.xml) checks every Mod the registry loads: for each Mod class that has a settings file under another folder name of the same package (lower case, without `_steam`) but none under the current one, copy the newest such file to the current name. A package's folder names are those of its installed and former copies: Workshop and `Mods/` folders, other tools' links (aliases), another game's `Mods/` folder, and `_Archo_` deployment names, plus every folder Archo Monitor recorded the package under in that save-data root (19 §2, 06 §7 `kind:settings`), which also covers copies since deleted or renamed. Both parts of a file name may contain underscores, so a file belongs to the longest known folder name it starts with. Never overwrite a file, change or delete the original, or ask. Copies keep the source's modification time. A failed copy is listed with its reason and does not stop the write; `--dry-run` lists what would be copied. Settings stored elsewhere are untouched: HugsLib keys its file by Mod, Mod Settings Framework uses a fixed file, and XML Extensions keeps its client Mods' settings in its own standard file, which follows XML Extensions. Known limit: a player who deletes the current file to reset a Mod gets the old one back on the next write while that file exists. Packs follow 10 §3 step 4, test runs §7.
 
-**Environment switching.** Before scanning or resolving the list, fill in the target list's missing shared-Mod links (such as Monitor) and local-Mod links from the previous environment; see 03 §2 item 14. Local Mods use `_Archo_env_<Instance ID>`. These links represent installed local Mods. An ordinary save retains healthy links with known types and existing targets. Anomalies require inspection and confirmed repair. Uninstalling still removes these links under the `_Archo_` rules.
+**Environment switching.** Between siblings, select context only (03 §6.1); no scan, link work or ModsConfig.xml write. Between installations, before scanning or resolving the list, fill in the target list's missing shared-Mod links (such as Monitor) and local-Mod links from the previous environment; see 03 §2 item 14. Local Mods use `_Archo_env_<Instance ID>`. These links represent installed local Mods. An ordinary save retains healthy links with known types and existing targets. Anomalies require inspection and confirmed repair. Uninstalling still removes these links under the `_Archo_` rules.
 
 **Pre-enable checks** (perform these while editing the plan, rather than waiting for a write):
 
@@ -117,6 +119,8 @@ Mods may live in directories the game does not read: SteamCMD download directori
 
 ## 4. Running-game detection
 
+Running-game detection first identifies the installation. Readable arguments select the environment by effective `-savedatafolder`; absence means the installation's default root. Otherwise recent launch records across all siblings may identify the environment. An unresolved sibling is reported as "installation running, environment unknown" and still blocks unsafe operations. The selected environment never supplies a missing command-line root.
+
 **Discovery.** On Windows, `CreateToolhelp32Snapshot` lists processes whose executable names start with `rimworld`, and `QueryFullProcessImageName` obtains their full paths. A path under an environment's game directory identifies that environment's game. Also read:
 
 - The start time (`GetProcessTimes`).
@@ -137,9 +141,9 @@ Detection is not implemented on other systems, where games are always considered
 
 **Display.** Show "not running" or "running", with the PID and start time when running.
 
-- `archo status` displays `game: running the list for 12m (pid 1234; archo log --follow)`. For a pack, it uses `pack <pack name>`; an inferred pack adds `(from the launch records)`.
-- In the GUI, the disabled block on the Launch page says "the game is running" and shows the error count for this run. The "last game" control at the top right does the same. Errors enter Can it run and its badge (16 §2.1, §2.3).
-- The TUI displays the same information in its status bar (16 §9).
+- `archo status` uses `RunningGame.Describe`, the same attribution as launch refusals: for example, `game: Game Config Steam is running plan:default (pid 1234, since 12:00)`. Unknown ownership explicitly names the installation and says "Game Config unknown". For a pack, it uses `pack <pack name>`; an inferred pack adds `(from the launch records)`. The game of a test run (its data folder is under RimArcho's `tests/`, 20 §1) is `a test run`, here and in refusals that name a running game.
+- In the GUI, the disabled block on the Launch page names the actual running Game Config or says its owner is unknown. It never labels the selected sibling as running. Only a run attributed to the selected config supplies its live error count. The "last game" control at the top right does the same. Errors enter Can it run and its badge (16 §2.1, §2.3).
+- The TUI displays the same owner in its status bar and Start page (16 §9). CLI status, GUI and TUI all use `RunningGame` attribution (installation, effective data root, then launch records).
 - On exit, stop following the log, perform a full analysis (06 §6), and suggest log analysis under §2.
 
 ## 5. Hidden Mods
@@ -197,7 +201,7 @@ Test runs and probe runs launch a plan with isolated data and report its errors;
 
 | # | Scenario | Expected | Status |
 | --- | --- | --- | --- |
-| J1 | `launch --dry-run` with Steam and nondefault user data | The command includes `steam.exe`, `-applaunch 294100` and `-savedatafolder=`; no launch (`TestLaunchPlans`) | Pass |
+| J1 | `launch --dry-run` with Steam and nondefault user data | The command includes `steam.exe`, `-applaunch 294100`, `-savedatafolder=` and the config's explicit logfile; default data omits redirection (`TestLaunchPlans`, `TestConfigLogLaunchAndRotation`) | Pass |
 | J2 | Launch after `--launch direct` | Run `RimWorldWin64.exe` and create one launch record | Pass |
 | J17 | Linux native and Proton launches; missing Steam; own/custom saves, extra savedatafolder, pack and test runs | Native selects its executable; Proton shared saves launch through Steam, and unsupported routes refuse before game-file writes (`TestLinuxLaunch`, `TestSteamCommand`, `TestProtonRefusesIsolatedRun`) | Synthetic; Linux VM pending |
 | J3 | Enable a SteamCMD Mod, run `save --dry-run`, then `save` | The preview lists the link without creating it; save creates `Mods/_Archo_…` (`TestLinkDeployment`) | Pass |

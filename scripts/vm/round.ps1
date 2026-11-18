@@ -276,15 +276,19 @@ foreach ($l in ((ReadShared "$run\drive.log") -split "`r?`n")) { if ($l -match '
 $data = if ($start -and $start.data) { $start.data } else { Join-Path $env:USERPROFILE 'AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios' }
 $keep = $w -and $w.status -eq 'done'  # the script left the game running on purpose
 # The guest's saves sync to the player's Steam Cloud when the game exits: delete the
-# round's own saves that are still there, before a game that did not quit is stopped.
+# round's own saves that are still there, and those its delete steps did not reach, before a
+# game that did not quit is stopped.
 foreach ($l in (Get-Content -Encoding UTF8 "$run\round.txt")) {
   $words = @((($l -replace '#.*', '').Trim() -split '\s+') | Where-Object { $_ -and $_ -notmatch '=' })
-  if ($words.Count -lt 2 -or $words[0] -ne 'save') { continue }
+  if ($words.Count -lt 2 -or $words[0] -notin 'save', 'delete') { continue }
   $name = ($words[1..($words.Count - 1)] -join ' ')
   $p = Join-Path $data "Saves\$name.rws"
   if (-not (Test-Path -LiteralPath $p)) { continue }
   if ($keep) { "NOTE finish: the game is still running with the round's save '$name'; delete it before the game quits, or Steam Cloud gets it" }
-  else { Remove-Item -LiteralPath $p -Force; "NOTE finish: deleted the round's save '$name' so Steam Cloud does not get it" }
+  else {
+    try { Remove-Item -LiteralPath $p -Force -ErrorAction Stop; "NOTE finish: deleted the round's save '$name' so Steam Cloud does not get it" }
+    catch { "FAIL finish: could not delete the round's save '$name' ($($_.Exception.Message)); delete it before the game quits, or Steam Cloud gets it" }
+  }
 }
 $killed = $false
 if (Games) {

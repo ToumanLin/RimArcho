@@ -74,7 +74,7 @@ func TestReadIndexSharesModsBeyondItsSource(t *testing.T) {
 	id := wx.Mods[0].ID
 	m := rx.ByID[id]
 	if m != wx.ByID[id] || wx.Env == rx.Env {
-		t.Fatal("the reader should share the Mods and own its environment")
+		t.Fatal("the reader should share the Mods and own its Game Config")
 	}
 	if err := w.Close(); err != nil {
 		t.Fatal(err)

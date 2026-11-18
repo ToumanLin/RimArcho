@@ -101,8 +101,12 @@ type ModSettingsDetail struct {
 
 // SettingsWindowView is a settings window as Archo Monitor saw it.
 type SettingsWindowView struct {
-	Seen     string      `json:"seen"` // the date it was seen
-	Full     bool        `json:"full"` // false: the window drew more than Monitor keeps
+	Seen string `json:"seen"` // the date it was seen
+	Full bool   `json:"full"` // false: the window drew more than Monitor keeps
+	// Older: the file differs from the file as the window opened (a value changed in that
+	// opening or here; app.ModSettingsFile.WindowOutdated), so the window's values may be
+	// out of date.
+	Older    bool        `json:"older"`
 	Controls []WindowRow `json:"controls"`
 }
 
@@ -157,6 +161,7 @@ func ModSettingsFileDetail(sm *app.ModSettingsMod, class string) *ModSettingsDet
 	}
 	if f.Window != nil {
 		d.Window = windowView(f.Window)
+		d.Window.Older = f.WindowOutdated()
 	}
 	if !f.Exists {
 		d.Notes = []string{T("no file yet: the Mod uses its defaults until its settings are changed in the game")}
@@ -277,6 +282,12 @@ func windowView(w *app.SeenSettingsWindow) *SettingsWindowView {
 		v.Controls = append(v.Controls, WindowRow{Kind: c.Kind, Label: c.Label, Text: WindowText(c)})
 	}
 	return v
+}
+
+// WindowLabel is a label the game drew without its own trailing colon ("Search:"), for
+// surfaces that add one after it.
+func WindowLabel(s string) string {
+	return strings.TrimRight(strings.TrimSpace(s), ":\uff1a ")
 }
 
 // WindowText is a control's value as shown: on/off, a chosen choice, a slider's value and

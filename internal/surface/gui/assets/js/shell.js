@@ -111,7 +111,7 @@ function kidMenu(b, keys) {
 
 function planMenuButton(b, id) {
   pop.menuOpener(b);
-  b.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); ui.planMenu(id, e.clientX, e.clientY, b, e.button === 0); };
+  b.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); ui.planMenu(id, e.clientX, e.clientY, b, e.button === 0); }; // keys: Menu, shift+F10 on the button (below)
   b.addEventListener("keydown", e => {
     if (e.key !== "ContextMenu" && !(e.key === "F10" && e.shiftKey)) return;
     e.preventDefault(); e.stopPropagation(); const r = b.getBoundingClientRect();
@@ -184,7 +184,7 @@ export function current() {
   if (S.screen === "packs" && S.packFocus) return "pack:" + S.packFocus;
   // a list's export: under Manage lists, or under the list when the editor opened it (16 §2.17)
   if (S.screen === "plan-export" && S.planExport) return S.planExport.from === "editor" ? "plan:" + S.planExport.id : "plans";
-  if (S.screen === "plan-import") return "plans"; // 16 §2.17
+  if (S.screen === "plan-import") return "import"; // Library > Import (16 §2.18)
   // uninstall RimArcho is under settings
   if (S.screen === "uninstall" || S.screen === "uninstall-progress" || S.screen === "feedback") return "settings";
   // adding an environment belongs to the environment page
@@ -212,7 +212,7 @@ function inGameMark(isInGame) {
   return m;
 }
 
-const ICONS = { home: "home", needs: "needs", plan: "plan", packs: "packs", saves: "saves", textures: "textures", env: "env", library: "library", log: "log" };
+const ICONS = { home: "home", needs: "needs", plan: "plan", packs: "packs", saves: "saves", review: "review", textures: "textures", env: "env", library: "library", log: "log", import: "import" };
 
 // The entry whose sub-entries were open when the sidebar was last drawn: a redraw starts
 // from it, so the sub-entries open and close with a transition (16 §7.1).
@@ -346,7 +346,7 @@ export function crumbs() {
   const cur = current();
   let out = (sh && sh.crumbs && sh.crumbs[cur]) || [];
   if (S.screen === "guide") {
-    const from = S.guideFrom, label = from === "env" ? T("add a game") : from === "preview" ? T("first-run guide (preview)") : T("getting started");
+    const from = S.guideFrom, label = from === "env" ? T("Add Game Config") : from === "preview" ? T("first-run guide (preview)") : T("getting started");
     out = (from === "env" || from === "preview" ? out : []).concat([{ label, id: "guide" }]);
   }
   if (S.screen === "full" && S.fullName) out = out.concat([{ label: S.fullName, id: "full" }]);
@@ -354,7 +354,6 @@ export function crumbs() {
   if (S.screen === "feedback") out = out.concat([{ label: T("feedback"), id: "feedback" }]);
   if (S.screen === "build") out = out.concat([{ label: T("create a pack"), id: "build" }]);
   if (S.screen === "plan-export" && S.planExport) out = ((sh && sh.crumbs && sh.crumbs["plan:" + S.planExport.id]) || []).concat([{ label: T("export"), id: "plan-export" }]);
-  if (S.screen === "plan-import") out = out.slice(0, -1).concat([{ label: T("import"), id: "plan-import" }]);
   if (S.screen === "plans" && S.listCreating) out = out.concat([{ label: T("new list"), id: "plan:new" }]);
   return out;
 }
@@ -380,7 +379,7 @@ function renderCrumbs() {
   if (S.screen === "needs" && sh && sh.plan) chip = sh.plan.name + "  " + chip;
   factText(env, chip);
   env.hidden = !chip || !S.screen || S.screen === "home" || S.screen === "guide" || S.screen === "library" || S.screen === "changes" || S.screen === "subscribe" || S.screen === "uninstall" || S.screen === "uninstall-progress" || S.screen === "textures" || S.screen === "tasks";
-  env.title = T("game") + T("; ") + "E";
+  env.title = T("Game Config") + T("; ") + "E";
   env.classList.toggle("on", S.screen === "env");
   const nav = $("#crumbs");
   nav.setAttribute("aria-label", T("breadcrumbs"));

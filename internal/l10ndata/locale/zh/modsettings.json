@@ -31,6 +31,7 @@
   "chosen": "已选",
   "%s (%s to %s)": "%s（%s 到 %s）",
   "in the game's window (%s)": "游戏里的窗口（%s）",
+  "changed since: the values stored in the file are the current ones": "之后改过：当前的值以文件里存的为准",
   "the window draws more than Archo Monitor keeps": "窗口内容超出了 Archo Monitor 记录的上限",
   "stored in the file": "文件里存的",
   "HugsLib: %s": "HugsLib：%s",

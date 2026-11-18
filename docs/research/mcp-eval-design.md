@@ -276,6 +276,91 @@ Failures:
 
 Reading: the instructions do not close the gap. P solves no more than A (6/9 against 7/9, within chance) and names the culprit as often as dsh (8/9 against 9/9). Its failures are a hung shell command and two DLL builds, not diagnosis. They cut Pi's tokens on h4 and h8 (1.08 M against 2.75 M; 3.14 M against 3.97 M) and raise its Archo calls on h7 and h8. Over rounds 2 to 5 dsh is ahead mainly on execution: bounded commands and a fix that runs. For an Archo Agent that points at dsh as the base (MIT, so it can ship with RimArcho), with Archo's instructions given to whichever harness is used.
 
+### Round 6, Alma and a Pi harness prototype (2026-11-11)
+
+Questions: how does a third harness, Alma 0.4.567 (closed source, studied by reverse engineering), do with Archo? And do two of its execution rules, ported to Pi as an extension, close Pi's gap?
+
+- **L:** Alma as shipped, driven headless by `guest/alma-run.mjs`, with Archo as its MCP server. Alma never reads an MCP server's `instructions`, and its MCP tools are deferred: their names appear only in the description of its `run_script` tool.
+- **M:** L plus Archo's instructions in Alma's project card, which is rendered into the system prompt. The card's focus line says the tools are named `archo__<tool>`.
+- **Q:** P plus `guest/pi-harness.ts`:
+  - bash gets a 120 s default timeout;
+  - a prompt section with four run rules: bounded commands and searches, Git Bash vs Windows paths, put the answer in place early, check the result against the task's own terms.
+
+Setup: 27 runs (h4, h7, h8 × 3 per group) on Player-Test and the re-copied Eval-2 and Eval-3, 20 min limit, the same build, model and grading as round 5. Columns A, B and P are from rounds 4 and 5.
+
+| Case | A Pi | B dsh | P Pi + instructions | Q P + harness | L Alma | M Alma + instructions |
+| --- | --- | --- | --- | --- | --- | --- |
+| h4 | 2/3 | 3/3 | 2/3, 740 s, 1.08 M | 3/3, 439 s, Archo 12.0, 1.56 M | 2/3, 433 s, Archo 0, 2.22 M | 2/3, 582 s, Archo 7.7, 2.99 M |
+| h7 | 3/3 | 3/3 | 3/3, 384 s, 0.81 M | 3/3, 335 s, Archo 12.7, 0.99 M | 3/3, 464 s, Archo 0, 1.68 M | 3/3, 439 s, Archo 2.0, 1.73 M |
+| h8 | 2/3 | 2/3 | 1/3, 440 s, 3.14 M | 3/3, 366 s, Archo 18.3, 1.82 M | 2/3, 482 s, Archo 0, 2.91 M | 3/3, 401 s, Archo 13.3, 2.88 M |
+| All | 7/9 | 8/9 | 6/9 | 9/9 | 7/9 | 8/9 |
+
+Failures:
+
+- **h4-L-1, h4-M-2:** named the decoy and shipped a new DLL that works around CyanobotsGenes' postfix instead of fixing it; this is the same mode as h4-A-2. h4-M-2 made no Archo call.
+- **h8-L-2:** right culprit and a working rebuild, but after `cd /c/Eval/work` it wrote to the relative `submit/`, so nothing reached `C:\Eval\submit`.
+
+Reading:
+
+- **Alma without the instructions never calls Archo:** 0 calls in 9 L runs, so L measures Alma alone.
+- **With them, M calls Archo in 6 of 9 runs**, always from `run_script` scripts and never directly. Three runs ignored it, and those include M's only failure. M uses no fewer tokens than L.
+- **Q passed every run.** Each Q run called Archo directly, and 8 of 9 verified with `test_run` (P on h8: 0 of 3). No command hit the 120 s default; the model often set its own `timeout`. P's two failure modes did not recur: a hung command, and an unverified DLL that throws at startup.
+- **The sample is small.** With 9 runs a group, 9/9 against 6/9 is within chance (Fisher's two-sided p ≈ 0.2). The extension is kept as the baseline for the next round, not counted as proven.
+- **L and M ran Alma without its extras.** On a custom gateway Alma picks no tool model (it recognises only official model names), so titles, tool preselection, memory and query rewriting stay off, and its memory has no embeddings. Groups J and K below turn them on.
+
+Follow-up the same day, groups **J** (L + extras) and **K** (M + extras): the tool model is the same deepseek-flash, and memory uses Alma's local embedding model `multilingual-e5-small`. The model files are pushed into the guest from `D:\VMs\Transfer\alma\embedding-models.tar` (`alma-run.mjs --full`). The 18 runs ran on Player-Test, Eval-2 and the linked clone Eval-4.
+
+| Case | J Alma + extras | K Alma + instructions + extras |
+| --- | --- | --- |
+| h4 | 2/3, 801 s, Archo 1.7, 4.42 M | 3/3, 543 s, Archo 2.3, 1.96 M |
+| h7 | 3/3, 383 s, Archo 2.0, 1.94 M | 3/3, 537 s, Archo 6.7, 2.53 M |
+| h8 | 2/3, 516 s, Archo 2.7, 4.16 M | 3/3, 443 s, Archo 9.0, 3.16 M |
+| All | 7/9 | 9/9 |
+
+- **Failures:**
+  - h4-J-3 is the decoy-workaround mode again.
+  - h8-J-2 named the right culprit, but its rebuilt DLL still logs errors.
+- **With the tool model, Alma calls Archo even without the instructions.** J averages about 2 calls a run, where L made none. The tool model's preselection is what surfaces the deferred `archo__` tools.
+- **K matches Q at 9/9**, at about twice Q's tokens. J costs more than L on h4 and h8 and passes no more.
+- **Memory stayed idle:** across 18 runs it stored 1 memory. Each run starts with a fresh data folder and one thread, so this setup cannot test cross-session memory.
+
+The Chinese reports (`ArchoAgent/research/`: results, reverse engineering of Alma's coding harness and memory system, Pi upgrade plan) stay outside the repo.
+
+### Round 7, the Archo Agent package on two models (2026-11-12)
+
+Question: does Q's prototype still work when it is packaged as extensions, and does it hold back a strong model? This is M0 of the Archo Agent roadmap. The package is the separate repository `ArchoAgent`; `run-case.ps1 -AgentDir` pushes it into the guest every run.
+
+- **R:** A plus the package. It has three extensions:
+  - `run-harness`: Q's timeout and run rules.
+  - `archo-instructions`: reads Archo's instructions from the connected server, falling back to the server's `initialize` reply; this replaces `--append-system-prompt`.
+  - `continue-truncated`: continues a reply cut off at the output limit.
+- **S:** P on claude-sonnet-5-5.
+- **T:** R on claude-sonnet-5-5.
+
+Setup: 27 runs on Player-Test, Eval-3 and Eval-4, plus h8 runs 4 to 6 for R and Q. The limit, Archo build and grading are the same as in round 6.
+
+| Case | Q (round 6) | R deepseek + package | S Sonnet + instructions | T Sonnet + package |
+| --- | --- | --- | --- | --- |
+| h4 | 3/3, 439 s, 1.56 M | 3/3, 516 s, 2.26 M | 3/3, 55 s, 0.18 M | 2/3, 101 s, 0.43 M |
+| h7 | 3/3, 335 s, 0.99 M | 3/3, 329 s, 1.26 M | 2/3, 437 s, 0.19 M | 3/3, 121 s, 0.28 M |
+| h8 | 3/3, 366 s, 1.82 M | 1/3, 572 s, 3.49 M | 3/3, 69 s, 0.32 M | 3/3, 90 s, 0.26 M |
+| All | 9/9 | 7/9 | 8/9 | 8/9 |
+| h8 runs 4–6 | 3/3 | 2/3 | | |
+
+Failures:
+
+- **h8-R-1, R-2 and R-5:** each named the right culprit, rebuilt Progression: Education and verified it with `test_run`. Grading loads the case's prepared save and found new errors: a NullReferenceException in the classroom job twice, and a broken static constructor once. The VM's `test_run` starts a new map and never loads that save (see Setup), so the agent cannot reproduce h8's fault there, and a passing `test_run` proves nothing for this case.
+- **h4-T-2:** the decoy workaround again.
+- **h7-S-3:** an unbounded `find /` ran out the 20 minutes. S has no `run-harness`, so this is the failure its default timeout prevents, now seen on a strong model.
+
+Reading:
+
+- **R and Q send the same prompt.** A captured request (a fake MCP server; `before_provider_request`) shows the instructions and run rules in the system message in both. Only their place relative to `<cwd>` differs. `continue-truncated` never fired in any run: no reply reached the output limit. h8's 3/6 for R against Q's 6/6 has no mechanism behind it (Fisher's two-sided p ≈ 0.18), so it is read as noise. R also used about twice Q's tokens on h8.
+- **The package does not hold back a strong model:** T 8/9 against S 8/9. Sonnet runs take 1 to 2 minutes and about a tenth of deepseek-flash's tokens.
+- **M0's exit criterion is missed by one run:** R is 7/9 against the 8/9 asked for. With the prompt shown to be the same as Q's, the package is kept.
+- **h8 needs a verification path.** Verifying an h8 fix needs `test_run` to load a save. The VM gets no saves, because the guest's Steam syncs them to the real Steam Cloud. Until that changes, h8 measures whether the agent can reason about the fault without seeing it.
+- **The gateway reports `stop` for a reply cut at `max_tokens`** (found while testing `continue-truncated` on the host). The extension therefore also treats a reply that used the model's whole `maxTokens` as cut off.
+
 ## Grading
 
 `scripts/mcp-eval/logdiff.mjs` compares a run's error lines (paths and addresses normalised) with the case's `reference.Player.log`. A submission is applied as a layer over the case (`sandbox.mjs <case> --layer <dir>`; files at `<packageId>/<mod-relative path>`, `enable.json` for re-enabled Mods), the game starts, and the log must have no error line the reference fix lacks. Culprit scoring uses `answer.json`: every Mod in `required` must be named, or, where the key has `requiredAny` (h7), every Mod of one of its lists; naming only a `decoy` fails.

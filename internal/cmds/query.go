@@ -21,7 +21,7 @@ func init() {
 		Flags: []Flag{{Name: "full", Help: "re-hash every semantic file"},
 			{Name: "game-only", Help: "only the game's own Data/ and Mods/, not the shared mod folders"},
 			{Name: "progress", Help: "progress lines on stderr: mod folders read, then saving"}}, Run: scanCmd})
-	register(&Command{Name: "status", Summary: "overview of the current environment", MaxArgs: 0, Run: statusCmd})
+	register(&Command{Name: "status", Summary: "overview of the current Game Config", MaxArgs: 0, Run: statusCmd})
 	register(&Command{Name: "list", Summary: "list mods", MaxArgs: 0,
 		Flags: []Flag{{Name: "filter", Value: "<expr>", Help: "terms: source:<label|kind> status:live|tombstone|all residue unloadable copies pkg:<id> ws:<id> tag:<tag> or words"},
 			{Name: "active", Help: "the workspace Loadout in load order"}, {Name: "all", Help: "no truncation"}}, Run: listCmd})
@@ -208,7 +208,7 @@ func statusCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	root.KV("lineages", fmt.Sprintf("%d (%d with several instances)", len(ix.ByLineage), withCopies))
-	sc, st, err := c.App.LastScan(e.ID)
+	sc, st, err := c.App.LastScan(e.GameID)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +219,7 @@ func statusCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		root.KV("last-scan", fmt.Sprintf("scan:%d %s, %s", sc.ID, c.App.FormatTime(sc.Started), app.Elapsed(st.DurationMS)))
 		root.KV("changes", fmt.Sprintf("%s (archo changes)", eventSummary(st.Events)))
 	}
-	qs, err := c.App.Store.Questions(e.ID, false)
+	qs, err := c.App.Store.Questions(e.GameID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -549,7 +549,22 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 		}
 	}
 	if dl := forVersion(deps, byV, mm); len(dl) > 0 {
-		root.KV("depends", pkgRefs(ix, dl))
+		dn := root.KV("depends", pkgRefs(ix, dl))
+		// A dependency met by another enabled Mod (16 §4.1): say which, as the window does.
+		if st, err := c.App.Loadout(); err == nil && dn != nil {
+			all := append(slices.Clone(decl.Dependencies), decl.DependenciesByVersion["v"+mm]...)
+			seen := map[string]bool{}
+			for _, x := range all {
+				if seen[strings.ToLower(x.PackageID)] {
+					continue
+				}
+				seen[strings.ToLower(x.PackageID)] = true
+				if s, how := c.App.DependencyStandIn(st, x); s != nil {
+					why := map[string]string{app.StandInAlternative: "an alternative it accepts", app.StandInReplacement: "Use This Instead", app.StandInRule: "your replaces rule"}[how]
+					dn.Addf("pkg:%s met by %s %s (%s)", strings.ToLower(x.PackageID), ix.Ref(s.ID), s.DisplayName(), why)
+				}
+			}
+		}
 	}
 	for _, r := range []struct {
 		key  string
@@ -611,7 +626,7 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 	}
 	root.KV("files", fmt.Sprintf("%d (%s), %d semantic", m.FileCount, render.Size(m.TotalSize), m.SemanticCount))
 	root.KV("seen", fmt.Sprintf("first %s, last %s", c.App.FormatTime(m.FirstSeen), c.App.FormatTime(m.LastSeen)))
-	evs, err := c.App.Store.Events(store.EventFilter{EnvID: ix.Env.ID, InstanceIDs: []string{m.ID}})
+	evs, err := c.App.Store.Events(store.EventFilter{EnvID: ix.Env.GameID, InstanceIDs: []string{m.ID}})
 	if err != nil {
 		return nil, err
 	}
@@ -619,7 +634,7 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 		last := evs[len(evs)-1]
 		root.KV("changes", fmt.Sprintf("%d, latest %s %s (archo changes %s)", len(evs), last.Kind, c.App.FormatDate(last.ScanTime), ref))
 	}
-	qs, err := c.App.Store.Questions(ix.Env.ID, false)
+	qs, err := c.App.Store.Questions(ix.Env.GameID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -899,20 +914,12 @@ func loadoutStatus(c *Ctx, root *render.Node, d *render.Doc) {
 	if s, err := c.App.MonitorState(); err == nil && (s.Bundled != nil || s.Source != nil || s.Newest != nil || s.InPlan != nil) {
 		root.KV("monitor", MonitorPlanLine(c, s))
 	}
-	if run, _ := c.App.GameRunning(); run != nil {
-		w := c.App.WhatRuns(st.Ix.Env, run)
-		what := w.PlanText() // the plan, from the launch records (09 §4)
-		if what == "its list" {
-			what = "the list"
-		}
-		if w.Pack != "" {
-			what = "pack " + w.Pack
-			if w.Guess {
-				what += " (from the launch records)"
-			}
-		}
-		root.KV("game", fmt.Sprintf("running %s for %s (pid %d; archo log --follow)", what, c.App.Now().Sub(run.Started).Round(time.Minute), run.PID))
+	if g, err := c.App.RunningGame(); err != nil {
+		root.KV("game", "unavailable: "+err.Error())
+	} else if g != nil {
+		root.KV("game", g.Describe(c.App.Loc))
 	}
+
 	for _, n := range st.Notices {
 		root.KV("notice", n)
 	}
