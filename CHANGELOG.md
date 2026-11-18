@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- New **Library › Import** page: every kind of import in one place instead of spread over Settings, the first-run guide and the lists: a game (opens "add a game"), moving over from RimSort or RimCrow (says what it found before you open it), a Mod list (share code, collection or Rentry link, packageIds, or a file) and a pack. Each opens the import it always did, previewed first. Settings no longer has an "import from RimSort or RimCrow" row, and the first-run guide's "move over" box now shows what was found too.
 - Settings › Interface has a "first-run guide" row whose "preview…" opens the guide as a new player sees it, managed-folder step included, without saving anything: the folder choice, adding games, downloading a version, reading the Mods and the starting list are played out on the page only, and "end the preview" (or any way out of the last step) returns to Settings. The TUI's settings panel points to `archo gui` for it.
 
 ## 1.0.9 — 2026-11-10

@@ -18,6 +18,7 @@ var frontendNodeSuites = []string{
 	"testdata/detail-follow.mjs",
 	"testdata/editorfilter.mjs",
 	"testdata/guide.mjs",
+	"testdata/importhub.mjs",
 	"testdata/home-memory.mjs",
 	"testdata/nativemenu.mjs",
 	"testdata/needs.mjs",

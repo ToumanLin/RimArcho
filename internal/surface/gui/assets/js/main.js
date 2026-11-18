@@ -25,6 +25,8 @@ import * as shell from "./shell.js";
 import * as homePage from "./home.js";
 import * as fullPage from "./fulldetail.js";
 import * as guide from "./guide.js";
+import * as importHub from "./importhub.js";
+import { initImportWays } from "./importways.js";
 import * as firstRun from "./firstrun.js";
 import * as plans from "./plans.js";
 import * as library from "./library.js";
@@ -1448,6 +1450,8 @@ async function start() {
   packsPage.initPacks(ui);
   planManage.initPlanManage(ui);
   guide.initGuide(ui);
+  importHub.initImportHub(ui);
+  initImportWays(ui);
   initExchange(ui);
   plans.initPlans(ui);
   library.initLibrary(ui);

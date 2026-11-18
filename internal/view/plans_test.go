@@ -313,7 +313,7 @@ func TestNavCapsAndCounts(t *testing.T) {
 		packs = append(packs, view.PackRow{Name: "p" + itoa(i), PlayedAt: now.Add(time.Duration(i) * time.Hour)})
 	}
 	g := view.Nav(0, rows, packs)[1]
-	lists, pk := g.Items[0].Kids, g.Items[1].Kids
+	lists, pk := g.Items[0].Kids, g.Items[2].Kids
 	if lists[0].Label != "all lists (6)" {
 		t.Fatalf("lists head %q", lists[0].Label)
 	}
@@ -324,7 +324,7 @@ func TestNavCapsAndCounts(t *testing.T) {
 	if strings.Join(got, ",") != "all packs (6),p5,p4,p3,p2" || pk[0].ID != view.PagePacks {
 		t.Fatalf("sidebar packs %v", got)
 	}
-	if few := view.Nav(0, rows[:2], packs[:2])[1]; few.Items[0].Kids[0].Label != "all lists" || len(few.Items[1].Kids) != 2 {
+	if few := view.Nav(0, rows[:2], packs[:2])[1]; few.Items[0].Kids[0].Label != "all lists" || len(few.Items[2].Kids) != 2 {
 		t.Fatalf("few: %+v", few.Items[1:3])
 	}
 }

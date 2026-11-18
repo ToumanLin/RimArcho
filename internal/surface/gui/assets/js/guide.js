@@ -18,6 +18,7 @@ import { exchange, importFrom } from "./exchange.js";
 import { withEnvironmentSwitch } from "./environment.js";
 import { on } from "./api.js";
 import { archoFigure, archoMode, bootDone } from "./archo.js";
+import { managersWay } from "./importways.js";
 
 let ui = null;
 export function initGuide(u) {
@@ -545,8 +546,8 @@ function step3(card) {
   const n = S.board && S.board.cols ? (S.board.cols[1] || []).length : 0;
   ways.append(way(T("the game's current list"), Tf("ModsConfig.xml enables %d mods; that becomes your first list", n),
     button(T("use this list"), "", () => finish(T("use the game's list as it is")), "primary")));
-  const imp = button(T("import…"), "", () => { ui.afterImport = () => finish(""); ui.importManagers(); });
-  ways.append(way(T("move over from RimSort or RimCrow"), T("lists and player data, previewed before anything is imported"), imp));
+  // the same box as the Import page's (16 §2.18): it says what discovery found
+  ways.append(managersWay(() => { ui.afterImport = () => finish(""); }));
   const src = el("input", "field");
   src.placeholder = T("a Steam Workshop collection link");
   src.type = "url"; src.spellcheck = false;

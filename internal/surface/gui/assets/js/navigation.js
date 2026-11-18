@@ -10,6 +10,7 @@ import * as shell from "./shell.js";
 import * as homePage from "./home.js";
 import * as fullPage from "./fulldetail.js";
 import * as guide from "./guide.js";
+import * as importHub from "./importhub.js";
 import * as plans from "./plans.js";
 import * as library from "./library.js";
 import { exchange } from "./exchange.js";
@@ -85,6 +86,7 @@ export async function openPage(id, plan = null, entry = null, save = "", guideFr
     case "packs": return packsPage.list();
     case "plans": return planManage.open();
     case "plan-import": return exchange();
+    case "import": return importHub.open();
     case "plan-export": return planManage.exportOf(entry?.planExport?.id || planManage.exportPlan(), entry?.planExport?.from || planManage.exportFrom());
     case "build": return packsPage.build();
     case "env": return scr.environment();

@@ -68,5 +68,17 @@
   "preview…": "预览…",
   "a preview of the first run: nothing you choose here is saved": "这是首次使用的预览：在这里做的选择都不会保存",
   "end the preview": "结束预览",
-  "preview ended; nothing was saved": "预览已结束，没有保存任何内容"
+  "preview ended; nothing was saved": "预览已结束，没有保存任何内容",
+  "RimSort, RimCrow and RimWorld lists, saves, share codes, Steam collections and Rentry; previewed first": "RimSort、RimCrow 和 RimWorld 的列表、存档、分享码、Steam 合集和 Rentry；先预览再导入",
+  "a RimWorld on this computer, a folder you choose, or a version downloaded with SteamCMD": "电脑上已有的 RimWorld、你选的文件夹，或用 SteamCMD 下载的版本",
+  "a game": "游戏",
+  "a mod list": "Mod 列表",
+  "a pack": "整合包",
+  "a share code, a collection or Rentry link, packageIds…": "分享码、合集或 Rentry 链接、packageId…",
+  "added: %s": "已添加：%s",
+  "an .archopack with its mods, order and settings; its files are checked first": ".archopack 整合包，Mod、顺序和设置一起带进来；会先核对文件",
+  "bring what you have into RimArcho; every import is previewed first and none writes the game's files": "把已有的东西带进 RimArcho；每种导入都会先预览，都不会改动游戏文件",
+  "found %s: %d": "找到 %s：%d 项",
+  "no game added yet": "还没有添加游戏",
+  "or drop a file anywhere in the window": "也可以把文件拖到窗口任意位置"
 }

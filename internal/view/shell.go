@@ -90,6 +90,8 @@ const (
 	PageSearch = "search"
 	// PageModSettings: Mod library › Mod settings (16 §2.9 "Mod settings")
 	PageModSettings = "mod-settings"
+	// PageImport: every kind of import in one place, under Library (16 §2.18)
+	PageImport = "import"
 )
 
 // NavItem is one sidebar entry. Kids show only under the open entry.
@@ -185,6 +187,8 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	}
 	library := []NavItem{
 		{ID: PagePlan, Label: T("lists"), Kids: planKids},
+		// Import (16 §2.18): GUI only, so no shift key, as for Saves
+		{ID: PageImport, Label: T("import")},
 		{ID: PagePacks, Label: T("packs"), Kids: packKids},
 		// Saves (16 §2.11), after the packs since 2026-11-04. Its own name: the plain
 		// "saves" key is translated for settings rows; the sidebar's name is longer.
@@ -199,7 +203,7 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	n := 0
 	for g := range groups {
 		for i := range groups[g].Items {
-			if groups[g].Items[i].ID == PageSaves {
+			if id := groups[g].Items[i].ID; id == PageSaves || id == PageImport {
 				continue // no shift key: shift+1–8 stay the eight pages the TUI also has (16 §3.5)
 			}
 			n++
