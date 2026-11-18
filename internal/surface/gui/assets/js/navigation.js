@@ -49,6 +49,8 @@ export async function go(id, entry = null) {
   // "guide:preview": the first-run guide as a new player sees it, writing nothing (16 §2.15)
   let guideFrom = null;
   if (id === "guide:preview") { id = "guide"; guideFrom = "preview"; }
+  // "guide:copy": Add Game Config on its "copy a game folder" way (03 §3.5)
+  if (id === "guide:copy") { id = "guide"; S.guideWay = 2; }
   // "save:<ref>": Saves with that save selected
   let save = "";
   if (id.startsWith("save:")) { save = id.slice(5); id = "saves"; }

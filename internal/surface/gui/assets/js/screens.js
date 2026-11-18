@@ -2047,7 +2047,7 @@ export async function environment() {
   const top = sc.scrollTop;
   sc.innerHTML = "";
   const current=(p.envs||[]).find(e=>e.current);
-  const w = page("env", "", act(T("Add Game Config"), "plus", () => ui.go("guide")), rescanButton());
+  const w = page("env", "", act(T("Add Game Config"), "plus", () => ui.go("guide")), act(T("copy the game folder…"), "copy", () => ui.go("guide:copy")), rescanButton());
   sc.append(w);
   const envLab = el("div", "label section", T("all Game Configs"));
   w.append(envLab);
