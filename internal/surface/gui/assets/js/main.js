@@ -6,6 +6,7 @@
 //   4. the hint line lists what you can do with the object now;
 //   5. few popups, each closed with esc, never nested.
 import { phase as perfPhase } from "./perf.js";
+import { hintLine } from "./hintline.js";
 import { api, on, setText } from "./api.js";
 import "./window-theme.js";
 import { blockNativeMenu } from "./nativemenu.js";
@@ -391,39 +392,32 @@ function renderWhere() {
   factText($("#where"), s);
 }
 
-// actions: what can be done with the object now (the hint line and the context menu).
+// actions: what can be done with the object now, for the hint line: at most 7, ending with
+// ? all keys (16 §2.2); the rest (ctrl+s, J K, x …) are in ? (view.KeyHelp).
 function actions() {
+  const help = { key: "?", label: T("all keys") };
   if (S.focus > 2) return [
-    { key: "PgDn", label: T("scroll") }, { key: "enter", label: T("full details"), run: () => verb("full") },
-    { key: "ctrl+o", label: T("open the folder"), run: () => verb("folder") }, { key: "ctrl+w", label: T("Workshop page"), run: () => verb("workshop-id") },
-    { key: "ctrl+s", label: T("steam page"), run: () => verb("steam") },
-    { key: "g", label: T("tags"), run: () => verb("tags") },
+    { key: "PgDn", label: T("scroll") }, { key: "enter", label: T("full details") },
+    { key: "ctrl+o", label: T("open the folder") }, { key: "ctrl+w", label: T("Workshop page") },
+    { key: "ctrl+s", label: T("steam page") }, { key: "g", label: T("tags") }, help,
   ];
   const sel = selection();
   const k = S.focus;
   const group = headOf(col(), col().view[col().cursor]);
-  if (group && !sel.length && !group.none) return [{ key: "← →", label: T("collapse / expand the group"), run: () => toggleGroup() },
-    { key: "F2", label: T("rename"), run: () => startRename(tagBox(), group, tagCtx) }, { key: "M", label: T("merge into…"), run: () => pickMerge(group.tag, tagCtx) },
-    { key: "Del", label: T("delete tag"), run: () => confirmDelete([group.tag], tagCtx) },
-    { key: "v", label: T("individual"), run: () => switchView() }, { key: "ctrl+k", label: T("commands"), run: () => pop.palette() }];
-  if (group && !sel.length) return [{ key: "← →", label: T("collapse / expand the group"), run: () => toggleGroup() },
-    { key: "v", label: T("individual"), run: () => switchView() }, { key: "/", label: T("search"), run: () => startSearch() }, { key: "ctrl+k", label: T("commands"), run: () => pop.palette() }];
-  if (!sel.length) return [{ key: "/", label: T("search"), run: () => startSearch() }, { key: "ctrl+k", label: T("commands"), run: () => pop.palette() }];
-  const out = [];
-  if (k === 0) out.push({ key: "space", label: T("enable"), run: () => verb("toggle") });
-  if (k === 1) out.push({ key: "space", label: T("disable"), run: () => verb("toggle") });
-  if (k === 2) out.push({ key: "space", label: T("put back"), run: () => verb("toggle") });
-  out.push({ key: "t", label: k === 2 ? T("put back") : T("stage"), run: () => verb("stage") });
-  out.push({ key: "m", label: k === 1 ? T("move to…") : T("enable at…"), run: () => verb("move") });
+  if (group && !sel.length && !group.none) return [{ key: "← →", label: T("collapse / expand the group") },
+    { key: "F2", label: T("rename") }, { key: "M", label: T("merge into…") }, { key: "Del", label: T("delete tag") },
+    { key: "v", label: T("individual") }, { key: "ctrl+k", label: T("commands") }, help];
+  if (group && !sel.length) return [{ key: "← →", label: T("collapse / expand the group") },
+    { key: "v", label: T("individual") }, { key: "/", label: T("search") }, { key: "ctrl+k", label: T("commands") }, help];
+  if (!sel.length) return [{ key: "/", label: T("search") }, { key: "ctrl+k", label: T("commands") }, help];
+  const out = [{ key: "space", label: [T("enable"), T("disable"), T("put back")][k] }];
+  out.push({ key: "t", label: k === 2 ? T("put back") : T("stage") });
+  out.push({ key: "m", label: k === 1 ? T("move to…") : T("enable at…") });
+  out.push({ key: "g", label: T("tags") });
+  if (sel.length === 1) out.push({ key: "enter", label: T("full details") });
   // ctrl+o / ctrl+w: the folder and the Workshop page of the cursor's mod (16 §3.5)
-  if (sel.length === 1 && sel[0].id) out.push({ key: "ctrl+o", label: T("open the folder"), run: () => verb("folder") }, { key: "ctrl+w", label: T("Workshop page"), run: () => verb("workshop-id") });
-  if (sel.length === 1 && sel[0].id) out.push({ key: "ctrl+s", label: T("steam page"), run: () => verb("steam") });
-  if (k === 1) out.push({ key: "J K", label: T("down / up"), run: null });
-  out.push({ key: "g", label: T("tags"), run: () => verb("tags") });
-  if (sel.length === 1) {
-    out.push({ key: "enter", label: T("full details"), run: () => verb("full") });
-    if (k === 1 && sel[0].id) out.push({ key: "x", label: T("switch version…"), run: () => verb("swap") });
-  }
+  if (sel.length === 1 && sel[0].id) out.push({ key: "ctrl+o", label: T("open the folder") }, { key: "ctrl+w", label: T("Workshop page") });
+  out.push(help);
   return out;
 }
 
@@ -449,17 +443,13 @@ function renderHints() {
   if (scr.changesFiltered()) list = [{ key: "esc", label: T("every mod") }, ...list];
   list = foldShortcuts(list);
   const c = S.focus < 3 ? col() : null;
-  if (c && c.sel.size && !S.screen) h.append(el("span", "accent", Tf("%d selected", c.sel.size)));
-  list.slice(0, 7).forEach((a) => {
+  const selected = c && c.sel.size && !S.screen;
+  if (selected) h.append(el("span", "accent", Tf("%d selected", c.sel.size)));
+  hintLine(list, selected ? [{ key: "esc", label: T("clear the selection") }] : []).forEach((a) => {
     const group = el("span", "hint-group");
     group.append(keyCaps(a.key), " " + a.label);
     h.append(group);
   });
-  if (c && c.sel.size && !S.screen) {
-    const group = el("span", "hint-group");
-    group.append(keyCaps("esc"), " " + T("clear the selection"));
-    h.append(group);
-  }
 }
 
 // foldShortcuts: ctrl+o and ctrl+w share one place in the hint line.

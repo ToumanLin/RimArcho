@@ -1124,7 +1124,6 @@ export function hintList() {
   if (x && x.t === "inst" && !x.lone) list.push({ key: "←", label: T("open / close") });
   list.push({ key: "enter", label: L.full ? T("back") : T("details") });
   if (codes.includes("folder") || codes.includes("workshop")) list.push({ key: "ctrl+o", label: T("open the folder") }, { key: "ctrl+w", label: T("Workshop page") });
-  if (codes.includes("steam")) list.push({ key: "ctrl+s", label: T("steam page") });
   list.push({ key: "/", label: T("search") }, { key: "\\", label: T("filter") }, other);
   list.push({ key: "?", label: T("all keys") });
   return list;
