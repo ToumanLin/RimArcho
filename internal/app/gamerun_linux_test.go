@@ -12,10 +12,7 @@ import (
 func TestLinuxGameProcesses(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	program, err := os.ReadFile("/bin/sleep")
-	if err != nil {
-		t.Fatal(err)
-	}
+	program := sleeperProgram(t)
 	for _, loader := range []string{"RimWorldLinux", "RimWorldWin64.exe", "wine64-preloader", "wine"} {
 		t.Run(loader, func(t *testing.T) {
 			game := filepath.Join(dir, loader, "Game With Spaces")
@@ -27,6 +24,7 @@ func TestLinuxGameProcesses(t *testing.T) {
 				t.Fatal(err)
 			}
 			cmd := exec.Command(exe, "30")
+			cmd.Env = append(os.Environ(), sleeperEnvVar)
 			want := exe
 			if strings.HasPrefix(loader, "wine") {
 				want = filepath.Join(game, "RimWorldWin64.exe")

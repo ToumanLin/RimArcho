@@ -304,6 +304,9 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 	if like != nil {
 		if selectedPlan == 0 && !spec.NewList {
 			reader := &App{Home: a.Home, Store: a.Store, Config: a.Config, Now: a.Now, Rand: a.Rand, Loc: a.Loc, Detect: a.Detect, EnvName: like.Name}
+			// EnvAdd already holds the launch lock. The reader shares it instead of taking
+			// a second OS lock on the same home, which would wait on this call and fail.
+			reader.launchDepth, reader.launchUnlock = a.launchDepth, a.launchUnlock
 			st, err := reader.Loadout()
 			if err != nil {
 				return nil, nil, err

@@ -14,15 +14,13 @@ func TestLinuxToolIdle(t *testing.T) {
 	if err := os.Mkdir(bin, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	program, err := os.ReadFile("/bin/sleep")
-	if err != nil {
-		t.Fatal(err)
-	}
+	program := sleeperProgram(t)
 	exe := filepath.Join(bin, "arbitrary-name")
 	if err := os.WriteFile(exe, program, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	cmd := exec.Command(exe, "30")
+	cmd.Env = append(os.Environ(), sleeperEnvVar)
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}

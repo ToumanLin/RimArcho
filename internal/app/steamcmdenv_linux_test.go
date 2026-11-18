@@ -52,8 +52,10 @@ func TestSteamCMDOwnHome(t *testing.T) {
 	}
 	stdout := os.Stdout
 	os.Stdout = f // the console run writes to archo's terminal
+	consoleForTest = true
 	p, err := startWorkshopCMD(exe, nil, true)
 	os.Stdout = stdout
+	consoleForTest = false
 	if err == nil {
 		err = p.Wait()
 	}
