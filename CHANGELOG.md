@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Settings › Interface has a "first-run guide" row whose "preview…" opens the guide as a new player sees it, managed-folder step included, without saving anything: the folder choice, adding games, downloading a version, reading the Mods and the starting list are played out on the page only, and "end the preview" (or any way out of the last step) returns to Settings. The TUI's settings panel points to `archo gui` for it.
 - List editor: Mods that are only missing a version declaration (for example made for 1.5 on a 1.6 game) now show a muted clock instead of the amber warning triangle, so the rows that need fixing stand out. Can it run still lists the version reminder as before.
 - List editor: clearing out Mods you unsubscribed is one click. The problem panel shows each item's first two fixes as buttons, so a group of Mods that are not installed shows both "subscribe" and "remove them from the list"; and clicking the red icon on any not-installed row offers "remove all N not installed".
 - List editor: "only these in the list" at the top of the problem panel filters the lists to the Mods with something to fix (`has:problem`, which no longer matches version-only reminders or hints); "show every mod" puts the whole list back.

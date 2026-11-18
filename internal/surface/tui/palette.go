@@ -211,7 +211,7 @@ func (m *model) palRunOf(id string) func(m *model) tea.Cmd {
 						fmt.Fprintf(&b, "    : archo %s\n", strings.Join(it.MoveArgv, " "))
 					}
 					for _, a := range it.Actions {
-						if a.Argv[0] == "import-managers" {
+						if a.Argv[0] == "import-managers" || a.Argv[0] == "guide-preview" {
 							fmt.Fprintf(&b, "    %s  : archo gui\n", a.Label)
 							continue
 						}

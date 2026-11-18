@@ -46,6 +46,9 @@ export async function go(id, entry = null) {
     planManage.restoreHistory({ creating: false, selected: planManage.selected() });
   }
   if (id === "plan:new") return plans.newPlan();
+  // "guide:preview": the first-run guide as a new player sees it, writing nothing (16 §2.15)
+  let guideFrom = null;
+  if (id === "guide:preview") { id = "guide"; guideFrom = "preview"; }
   // "save:<ref>": Saves with that save selected
   let save = "";
   if (id.startsWith("save:")) { save = id.slice(5); id = "saves"; }
@@ -55,12 +58,12 @@ export async function go(id, entry = null) {
   if (id !== "plans") planManage.abandon();
   if (id !== "build") S.buildFrom = null;
   if (id !== "plan-export") S.planExport = null;
-  await openPage(id, plan, entry, save);
+  await openPage(id, plan, entry, save, guideFrom);
   // a page already shown is redrawn in place: its sub-entry and breadcrumb follow too
   ui.renderWhere();
 }
 
-export async function openPage(id, plan = null, entry = null, save = "") {
+export async function openPage(id, plan = null, entry = null, save = "", guideFrom = null) {
   if (S.packFocus) return packsPage.pack(S.packFocus);
   switch (id) {
     case "plan":
@@ -99,7 +102,7 @@ export async function openPage(id, plan = null, entry = null, save = "") {
     case "mod-settings": return modSettings.open();
     case "saves": return savesPage.open(save);
     case "review": return reviewPage.open();
-    case "guide": return entry ? guide.resume() : guide.start(S.board && S.board.envs && S.board.envs.length ? "env" : "first");
+    case "guide": return entry ? guide.resume() : guide.start(guideFrom || (S.board && S.board.envs && S.board.envs.length ? "env" : "first"));
   }
 }
 

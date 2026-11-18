@@ -12,6 +12,9 @@ import { editablePath, copyablePath, pathContent } from "./fields.js";
 // with one game picked and the config's choices under it: name, settings copied or not,
 // the Mod list and the saves folder. A game no config uses yet is read (step 2); another
 // config of a game already read is ready at once. There is no step 3: the list is chosen.
+// Settings' "preview" shows the first run as a new player sees it, managed-folder step
+// included, and writes nothing: adding, downloading, scanning and the starting list are
+// played out on the page only.
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { choiceControl } from "./choices.js";
 import { page, button, seg, chooseLocalPath, beginPageRead } from "./screens.js";
@@ -28,6 +31,7 @@ export function initGuide(u) {
 
 let session = 0, activeSession = null;
 export const historySession = () => activeSession;
+export const previewing = () => S.guideFrom === "preview";
 
 const STEPS = ["find the game", "read the mods", "where to start"];
 // G.folder: the managed folder (FirstRunFolder) while the first run still has to choose it;
@@ -60,7 +64,8 @@ async function updateSteamCMD() {
   loadDownload();
 }
 
-// start opens the guide at step 1; from is "first" (no environment yet) or "env".
+// start opens the guide at step 1; from is "first" (no environment yet), "env" (adding a
+// game) or "preview" (the first run, shown without writing anything).
 export async function start(from = "first") {
   activeSession = ++session;
   S.guideFrom = from;
@@ -72,9 +77,10 @@ export async function start(from = "first") {
   if (D.run && D.run.end) D.run = null;
   G.way = D.run ? 1 : 0;
   G.folder = null;
+  P.timer = null;
   A.from = from === "env" ? S.board?.env || "" : "";
   A.copy = !!A.from; A.list = ""; A.lists = []; A.saves = ""; A.path = "";
-  await find(from === "first");
+  await find(from !== "env");
   bootDone();
 }
 
@@ -90,8 +96,10 @@ async function find(first = false, keep = "") {
     games ||= [];
   } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
-  if (folder && !folder.done) { G.folder = folder; G.step = -1; }
-  G.games = games;
+  // a preview shows the folder step even when the folder was chosen long ago
+  if (folder && (!folder.done || previewing())) { G.folder = { ...folder, done: false }; G.step = -1; }
+  // a preview shows the games already added as a new player would see them: not added yet
+  G.games = previewing() ? games.map((g) => ({ ...g, env: "" })) : games;
   A.lists = lists || [];
   if (!A.list && A.lists.length) A.list = A.lists[0];
   if (adding()) {
@@ -155,6 +163,7 @@ function draw() {
   // the lead and the steps on the left, Archo on the right: one row, as tall as she is
   const top = el("div", "guide-top"), left = el("div", "guide-lead"), head = el("div", "page-head");
   head.append(el("p", "lead word-facts", lead));
+  if (previewing()) head.append(el("p", "guide-preview-note muted", T("a preview of the first run: nothing you choose here is saved")));
   left.append(head, bar);
   top.append(left);
   // Archo on the steps' row, behind the card (16 §2.15): one slot kept across redraws, so
@@ -196,6 +205,7 @@ function go(i) {
 function footer(card, ...btns) {
   const f = el("div", "guide-foot");
   if (G.error) f.append(el("span", "err grow", G.error)); else f.append(el("span", "grow"));
+  if (previewing()) f.append(button(T("end the preview"), "", () => finish("")));
   if (G.step > (G.folder ? -1 : 0)) f.append(button(T("back"), "", () => go(G.step - 1)));
   for (const b of btns) if (b) f.append(b);
   card.append(f);
@@ -225,7 +235,7 @@ function folderStep(card) {
   const use = button(T("use this folder"), "", async () => {
     G.folderBusy = true; draw();
     try {
-      await api.ChooseManagedFolder(info.path);
+      if (!previewing()) await api.ChooseManagedFolder(info.path);
       G.folder = { ...info, done: true };
       G.error = "";
       G.step = 0;
@@ -289,6 +299,7 @@ function step1(card) {
     // the names already on the page count as taken: two games of one version get 1.6-2, 1.6-3
     const pending = G.games.filter((x) => !x.env && x.name).map((x) => x.name);
     try { g = await api.GuideGame(path, pending); } catch (e) { G.typed = path; G.error = errText(e); return draw(); }
+    if (previewing()) g = { ...g, env: "" };
     G.typed = "";
     G.error = "";
     let at = G.games.findIndex((x) => x.game.toLowerCase() === g.game.toLowerCase());
@@ -309,6 +320,7 @@ function step1(card) {
     let names;
     try {
       const games = picked.map((i) => G.games[i]);
+      if (previewing()) return await added(games.map((g) => g.name));
       const accepted = await withEnvironmentSwitch(games[0].name, async () => {
         names = await api.GuideAdd(games);
       });
@@ -406,7 +418,7 @@ async function finishConfig(name) {
 // added: environments were added (found, typed or downloaded); read their mods.
 async function added(names) {
   G.added = names;
-  G.games = (await api.GuideFind()) || G.games;
+  if (!previewing()) G.games = (await api.GuideFind()) || G.games;
   G.picked.clear();
   await scanAll();
 }
@@ -487,6 +499,7 @@ function download(card) {
     const size = o.bytes > 0 ? sizeText(o.bytes) : T("size unknown");
     card.append(pathContent(el("div", "dl-note"), Tf("RimArcho downloads game versions with Valve's SteamCMD, which is not on this computer. Download it from Valve (%s) into %s?", size, o.dir || ""), [o.dir]));
     const get = button(T("download SteamCMD"), "", async () => {
+      if (previewing()) { D.info = { ...info, steamcmd: "preview", games: info.games || "C:\\Games", branches: PREVIEW_BRANCHES }; return applyDownloadInfo(); }
       get.disabled = true;
       C.submitting = true; C.row = null;
       draw();
@@ -532,6 +545,7 @@ function download(card) {
   card.append(who);
   card.append(el("div", "dl-note", T("Anonymous by default; you can choose an account in settings or here. Enter anonymous to override a saved account. Password and Steam Guard are entered only in SteamCMD.")));
   const start1 = button(T("download and add"), "", async () => {
+    if (previewing()) return previewDownload();
     let ok;
     try { ok = await api.GuideDownload(D.branch, D.dir, D.account, ""); } catch (e) { G.error = errText(e); return draw(); }
     if (!ok) { G.error = T("a download is already running"); return draw(); }
@@ -568,7 +582,7 @@ function downloading(card, r) {
 
 // downloadEvent is a "download" event: SteamCMD's progress, then the end.
 export function downloadEvent(ev) {
-  if (!D.run || D.run.end) return;
+  if (!D.run || D.run.end || D.run.preview) return;
   if (ev.end) {
     Object.assign(D.run, { end: true, ok: ev.ok, error: ev.error || "", env: ev.env || "" });
     draw();
@@ -593,6 +607,7 @@ async function scanAll() {
   G.step = 1;
   G.scan = { rows: G.added.map((n) => ({ env: n, text: T("waiting"), state: "wait" })), done: false, ok: true };
   draw();
+  if (previewing()) return previewScan();
   // A scan that did not start gives the flag back as it was (another scan may still run).
   const was = S.busy.scan;
   S.busy.scan = true;
@@ -614,7 +629,7 @@ async function scanAll() {
 
 // guideEvent is a "guide" event: an environment started, ended, or all are done.
 export function guideEvent(ev) {
-  if (!G.scan || G.scan.done) return;
+  if (!G.scan || G.scan.done || previewing()) return;
   if (ev.done) {
     G.scan.done = true;
     S.busy.scan = false;
@@ -659,6 +674,7 @@ function step2(card) {
 
 function step3(card) {
   card.append(el("div", "guide-q", T("where does your first list come from?")));
+  if (previewing()) return previewStep3(card);
   const ways = el("div", "ways");
   const n = S.board && S.board.cols ? (S.board.cols[1] || []).length : 0;
   ways.append(way(T("the game's current list"), Tf("ModsConfig.xml enables %d mods; that becomes your first list", n),
@@ -708,7 +724,72 @@ async function finish(text) {
   activeSession = null;
   ui.afterImport = null;
   G.scan = null;
+  if (previewing()) {
+    P.timer = null;
+    if (D.run?.preview) D.run = null;
+    say("ok", T("preview ended; nothing was saved"));
+    return ui.go("settings");
+  }
   if (text) say("ok", text);
   await ui.reload();
   ui.go("home");
+}
+
+// ---- the preview (16 §2.15) ----
+// The same cards with made-up progress: a download and a scan play out on timers, and the
+// last step's ways end the preview. A timer belongs to one preview session; leaving the page
+// or ending the preview stops it.
+
+const P = { timer: null };
+const PREVIEW_BRANCHES = [
+  { name: "public", version: "" },
+  { name: "unstable", version: "" },
+  { name: "version-1.5", version: "1.5" },
+];
+
+function previewTick(steps, ms = 180) {
+  const own = activeSession, timer = {};
+  P.timer = timer;
+  let i = 0;
+  const next = () => {
+    if (P.timer !== timer || activeSession !== own || !previewing()) return;
+    steps[i++]();
+    if (S.screen === "guide") draw();
+    if (i < steps.length) setTimeout(next, ms);
+  };
+  setTimeout(next, ms);
+}
+
+function previewDownload() {
+  G.error = "";
+  const total = 2.6e9, env = "1.6";
+  D.run = { state: "starting", percent: 0, line: "", end: false, preview: true };
+  const steps = [() => { D.run.state = "login"; }];
+  for (let k = 1; k <= 10; k++) steps.push(() => Object.assign(D.run, { state: "downloading", percent: k * 10, done: total * k / 10, total }));
+  steps.push(() => Object.assign(D.run, { state: "verifying", total: 0 }));
+  steps.push(() => { Object.assign(D.run, { end: true, ok: true, env }); added([env]); });
+  draw();
+  previewTick(steps, 250);
+}
+
+function previewScan() {
+  const rows = G.scan.rows, total = 240, steps = [];
+  rows.forEach((r) => {
+    for (let k = 1; k <= 9; k++) steps.push(() => Object.assign(r, { state: "cur", frac: k / 10, text: Tf("reading the mods of %s: %d of %d", r.env, Math.round(total * k / 9), total) }));
+    steps.push(() => Object.assign(r, { frac: 0.95, text: Tf("checking the files of %s…", r.env) }));
+    steps.push(() => Object.assign(r, { state: "ok", frac: 1, text: Tf("%d mods", total) }));
+  });
+  steps.push(() => { G.scan.done = true; });
+  previewTick(steps);
+}
+
+function previewStep3(card) {
+  const ways = el("div", "ways");
+  const end = (label) => button(label, "", () => finish(""));
+  const n = S.board && S.board.cols ? (S.board.cols[1] || []).length : 0;
+  ways.append(way(T("the game's current list"), Tf("ModsConfig.xml enables %d mods; that becomes your first list", n), end(T("use this list"))));
+  ways.append(way(T("move over from RimSort, RimCrow or RimPy"), T("lists and player data, previewed before anything is imported"), end(T("import…"))));
+  ways.append(way(T("open a pack or a Steam collection"), T("choose a pack (.archopack), or paste a Steam Workshop collection link"), end(T("choose a pack…"))));
+  card.append(ways);
+  footer(card, end(T("skip")));
 }

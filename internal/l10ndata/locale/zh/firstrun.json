@@ -62,5 +62,12 @@
   "mods with data: %d, matched: %d, not matched: %d": "有数据的 Mod：%d 个，匹配 %d 个，未匹配 %d 个",
   "not installed here": "这里未安装",
   "user rules are switched off in RimCrow (--include-disabled-rules)": "RimCrow 中的用户规则已关闭（--include-disabled-rules）",
-  "tag colours: %d": "标签颜色：%d"
+  "tag colours: %d": "标签颜色：%d",
+  "first-run guide": "首次使用引导",
+  "first-run guide (preview)": "首次使用引导（预览）",
+  "see what a new player sees; nothing you choose there is saved": "看看新玩家第一次打开时看到的样子；在里面做的选择都不会保存",
+  "preview…": "预览…",
+  "a preview of the first run: nothing you choose here is saved": "这是首次使用的预览：在这里做的选择都不会保存",
+  "end the preview": "结束预览",
+  "preview ended; nothing was saved": "预览已结束，没有保存任何内容"
 }

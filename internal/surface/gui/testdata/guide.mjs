@@ -7,16 +7,16 @@ const info = (description = "old", refreshing = true, error = "") => ({
   branches: [{ name: "public", description }, { name: "version-1.5", version: "1.5", description }],
 });
 
-async function setup({ folder = { done: true }, space = (path) => ({ path, free: 50e9 }), scan = async () => true } = {}) {
+async function setup({ folder = { done: true }, space = (path) => ({ path, free: 50e9 }), scan = async () => true, from } = {}) {
   const screen = new Element("div"), S = { screen: "guide", busy: {} }, chosen = [];
   let now = 0, calls = 0, response = info(), switchWay, pathEditor;
-  const timers = [], delays = [], gameCalls = [];
+  const timers = [], delays = [], gameCalls = [], writes = [], went = [];
   const el = (tag, cls, text) => new Element(tag, cls, text);
   const guide = await loadModules("./guide.js", {
     "./fields.js": { copyablePath: (n) => n, editablePath: (n) => n, pathContent: (n) => n },
     "./state.js": { S, $: () => screen, el, api: {
-      GuideFind: async () => [], GuideAdd: async (games) => games.map((g) => g.name), GuideScan: (names) => scan(names), GuideDownloadInfo: async () => { calls++; return await response; },
-      ManagedFolder: async () => folder, FolderSpace: async (path) => space(path), ChooseManagedFolder: async (path) => { chosen.push(path); },
+      GuideFind: async () => [], GuideAdd: async (games) => { writes.push("add"); return games.map((g) => g.name); }, GuideScan: (names) => { writes.push("scan"); return scan(names); }, GuideDownloadInfo: async () => { calls++; return await response; },
+      ManagedFolder: async () => folder, FolderSpace: async (path) => space(path), ChooseManagedFolder: async (path) => { chosen.push(path); writes.push("folder"); },
       // as view.GameAt: the version's first name not among the environments or pending
       GuideGame: async (path, pending) => {
         gameCalls.push([path, pending]);
@@ -35,11 +35,11 @@ async function setup({ folder = { done: true }, space = (path) => ({ path, free:
     "./environment.js": { withEnvironmentSwitch: async (_, run) => { await run(); return true; } },
     "./api.js": { on() {} },
   }, { Date: { now: () => now }, setTimeout: (fn, ms) => { timers.push({fn,ms}); delays.push(ms); } });
-  guide.initGuide({ renderWhere() {} });
-  await guide.start();
-  if (folder.done) { switchWay(1); await flush(); }
+  guide.initGuide({ renderWhere() {}, go: (id) => went.push(id) });
+  await guide.start(from);
+  if (folder.done && !from) { switchWay(1); await flush(); }
   return {
-    screen, S, timers, delays, guide, chosen, gameCalls, choosePath: (value) => pathEditor.done(value),
+    screen, S, timers, delays, guide, chosen, gameCalls, writes, went, choosePath: (value) => pathEditor.done(value),
     calls: () => calls, now: () => now, respond: value => { response = value; },
     switchWay: n => switchWay(n),
     changeDirectory(value) { screen.querySelectorAll("button").find(b => b.textContent === "change…").onclick(); pathEditor.done(value); },
@@ -147,6 +147,43 @@ for (const way of ["throws", "refuses"]) test(`a first scan that ${way} gives ba
   assert.ok(!h.S.busy.scan, "no scan runs");
   assert.match(h.screen.textContent, way === "throws" ? /scan failed/ : /a scan is already running/);
   if (way === "throws") assert.ok(h.screen.querySelectorAll("button").some(b => b.textContent === "scan again"));
+});
+
+test("the preview shows the first run from the folder step and writes nothing", async () => {
+  const button = (h, label) => h.screen.querySelectorAll("button").find(b => b.textContent === label);
+  const h = await setup({ from: "preview", folder: { path: "C:\\RimArcho", free: 50e9, done: true } });
+  // the folder was chosen long ago, yet the preview starts there, as a first run does
+  assert.equal(h.screen.querySelectorAll(".st").length, 4);
+  assert.match(h.screen.querySelector(".st.cur").textContent, /managed folders/);
+  assert.match(h.screen.textContent, /nothing you choose here is saved/);
+  button(h, "use this folder").onclick(); await flush();
+  assert.match(h.screen.querySelector(".st.cur").textContent, /find the game/);
+  h.switchWay(0); await flush();
+  button(h, "add this folder").onclick(); await h.choosePath("D:\\Game2"); await flush();
+  await button(h, "add and continue").onclick(); await flush();
+  // the scan plays out on timers
+  assert.match(h.screen.querySelector(".st.cur").textContent, /read the mods/);
+  for (let i = 0; h.timers.length; i++) { assert.ok(i < 40, "the made-up scan did not end"); await h.tick(); }
+  assert.match(h.screen.textContent, /✓/);
+  button(h, "next").onclick(); await flush();
+  assert.match(h.screen.querySelector(".st.cur").textContent, /where to start/);
+  await button(h, "use this list").onclick(); await flush();
+  assert.deepEqual(h.writes, []);
+  assert.deepEqual(h.went, ["settings"]);
+});
+
+test("the preview's download plays out without SteamCMD", async () => {
+  const h = await setup({ from: "preview" });
+  h.respond({ games: "", offer: { bytes: 1e6, dir: "C:\\x" } });
+  h.screen.querySelectorAll("button").find(b => b.textContent === "use this folder").onclick(); await flush();
+  h.switchWay(1); await flush();
+  h.screen.querySelectorAll("button").find(b => b.textContent === "download SteamCMD").onclick(); await flush();
+  assert.equal(h.screen.querySelectorAll(".branch").length, 3);
+  await h.screen.querySelectorAll("button").find(b => b.textContent === "download and add").onclick(); await flush();
+  for (let i = 0; h.timers.length; i++) { assert.ok(i < 60, "the made-up download did not end"); await h.tick(); }
+  assert.match(h.screen.querySelector(".st.cur").textContent, /read the mods/);
+  assert.match(h.screen.textContent, /✓/);
+  assert.deepEqual(h.writes, []);
 });
 
 // Add Game Config (S.guideFrom "env"): the current config's choices follow a switch.

@@ -62,5 +62,12 @@
   "mods with data: %d, matched: %d, not matched: %d": "データのあるMOD：%d件、一致：%d件、不一致：%d件",
   "not installed here": "ここにはインストールされていません",
   "user rules are switched off in RimCrow (--include-disabled-rules)": "RimCrowでユーザールールが無効です（--include-disabled-rules）",
-  "tag colours: %d": "タグの色：%d"
+  "tag colours: %d": "タグの色：%d",
+  "first-run guide": "初回ガイド",
+  "first-run guide (preview)": "初回ガイド（プレビュー）",
+  "see what a new player sees; nothing you choose there is saved": "新しいプレイヤーが最初に見る画面を確認します。そこで選んだ内容は保存されません",
+  "preview…": "プレビュー…",
+  "a preview of the first run: nothing you choose here is saved": "初回起動のプレビューです。ここで選んだ内容は保存されません",
+  "end the preview": "プレビューを終了",
+  "preview ended; nothing was saved": "プレビューを終了しました。何も保存されていません"
 }
