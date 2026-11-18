@@ -666,7 +666,13 @@ func startSteamCMD(exe string, args []string, console bool) (SteamCMDProc, error
 	}
 	cmd := exec.Command(exe, args...)
 	cmd.Dir = filepath.Dir(exe)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	if callerConsole() {
+		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	} else {
+		// The GUI has no console, so SteamCMD would open one; under `archo mcp`, stdin
+		// and stdout carry the protocol (14 §1). Run it hidden; its log is read instead.
+		hideWindow(cmd)
+	}
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}

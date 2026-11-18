@@ -154,7 +154,9 @@ func (a *App) sourceVersion(ctx context.Context) string {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, exe, "--version").Output()
+	cmd := exec.CommandContext(ctx, exe, "--version")
+	hideWindow(cmd)
+	out, err := cmd.Output()
 	if err != nil {
 		return "unknown"
 	}
