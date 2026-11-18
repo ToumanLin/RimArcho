@@ -47,12 +47,20 @@ let els = null;
 
 export function initTasks(u) { ui = u; }
 
-// ---- the sidebar's foot line (16 §2.1): always there, where it is; it says more while
-// something runs, waits or failed ----
+// ---- the sidebar's foot line (16 §2.1): always there once the window has its first page,
+// where it is; it says more while something runs, waits or failed ----
+// footShown: the start-up is over (showFoot). Until then the line stays hidden, so it does not
+// stand alone in an empty sidebar while the rest of the window loads (2026-11-18).
+let footShown = false;
+export function showFoot() {
+  if (footShown) return;
+  footShown = true;
+  refreshFoot();
+}
 export function foot(p) {
   const b = $("#tasks-line");
   if (!b) return;
-  b.hidden = false;
+  b.hidden = !footShown;
   b.classList.toggle("on", S.screen === "tasks");
   const busy = !!(p && (p.running || p.queued));
   const sig = p ? [p.foot, p.pct, p.unseen, p.running, p.queued].join("|") : "";

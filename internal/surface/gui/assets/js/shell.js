@@ -1,8 +1,8 @@
 // The window's shell (16 §2.1, §2.2): the sidebar grouped by the player's questions, the
-// top bar (collapse, breadcrumb, environment chip, the page's actions) and, at the
+// top bar (collapse, breadcrumb, the page's actions) and, at the
 // sidebar's foot, the environment and the running game. What it lists comes from
 // view.Nav and view.NavPath through API.Shell.
-import { factText, S, $, el, api, T, Tf } from "./state.js";
+import { S, $, el, api, T, Tf } from "./state.js";
 import { icon } from "./icons.js";
 import { liveCount, seg, setSeg, syncPageAccessibility } from "./screens.js";
 import { bump, slideNav, places, slideFrom } from "./motion.js";
@@ -27,7 +27,6 @@ export function initShell(u) {
   const t = $("#navtoggle");
   t.innerHTML = icon.sidebar;
   t.onclick = () => toggleNav();
-  $("#env").onclick = () => ui.go("env");
   $("#nav-settings").onclick = () => ui.go("settings");
   $("#tasks-line").onclick = () => ui.go("tasks");
   $("#side").addEventListener("keydown", navKey);
@@ -189,6 +188,8 @@ export function current() {
   if (S.screen === "uninstall" || S.screen === "uninstall-progress" || S.screen === "feedback") return "settings";
   // adding an environment belongs to the environment page
   if (S.screen === "guide" && S.guideFrom === "env") return "env";
+  // the first-run guide's preview belongs to settings, where it is opened
+  if (S.screen === "guide" && S.guideFrom === "preview") return "settings";
   return S.screen;
 }
 
@@ -343,7 +344,10 @@ export function crumbs() {
   const sh = S.shell;
   const cur = current();
   let out = (sh && sh.crumbs && sh.crumbs[cur]) || [];
-  if (S.screen === "guide") out = (S.guideFrom === "env" ? out : []).concat([{ label: S.guideFrom === "env" ? T("Add Game Config") : T("getting started"), id: "guide" }]);
+  if (S.screen === "guide") {
+    const from = S.guideFrom, label = from === "env" ? T("Add Game Config") : from === "preview" ? T("first-run guide (preview)") : T("getting started");
+    out = (from === "env" || from === "preview" ? out : []).concat([{ label, id: "guide" }]);
+  }
   if (S.screen === "full" && S.fullName) out = out.concat([{ label: S.fullName, id: "full" }]);
   if (S.screen === "uninstall" || S.screen === "uninstall-progress") out = out.concat([{ label: T("uninstall RimArcho"), id: "uninstall" }]);
   if (S.screen === "feedback") out = out.concat([{ label: T("feedback"), id: "feedback" }]);
@@ -353,10 +357,9 @@ export function crumbs() {
   return out;
 }
 
-// renderCrumbs: the breadcrumb names the page (there is no other title), and the chip
-// beside it says what the page is about: the environment, and on Can it run the plan too.
-// The home page spans every environment, and Mod library (All and Updates) every copy on the
-// machine: no chip there.
+// renderCrumbs: the breadcrumb names the page (there is no other title). The top bar has no
+// Game Config chip since 2026-11-18 (16 §2.2): Launch's 01 column and the Game Config
+// entry in the sidebar name and switch it.
 function namePage() {
   const nav = $("#crumbs");
   for (const old of document.querySelectorAll("#page-title")) old.removeAttribute("id");
@@ -368,14 +371,7 @@ function namePage() {
 }
 
 function renderCrumbs() {
-  const env = $("#env");
   const sh = S.shell;
-  let chip = (sh && sh.env) || "";
-  if (S.screen === "needs" && sh && sh.plan) chip = sh.plan.name + "  " + chip;
-  factText(env, chip);
-  env.hidden = !chip || !S.screen || S.screen === "home" || S.screen === "guide" || S.screen === "library" || S.screen === "changes" || S.screen === "subscribe" || S.screen === "uninstall" || S.screen === "uninstall-progress" || S.screen === "textures" || S.screen === "tasks";
-  env.title = T("Game Config") + T("; ") + "E";
-  env.classList.toggle("on", S.screen === "env");
   const nav = $("#crumbs");
   nav.setAttribute("aria-label", T("breadcrumbs"));
   let cs = crumbs();

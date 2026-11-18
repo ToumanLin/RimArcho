@@ -299,7 +299,7 @@ func (a *App) checkOneSave(st *LoadoutState, sv *Save, others []*Save) (*SaveChe
 		s.Prefix, s.Name = SplitSaveName(s.File)
 		s.Auto = autosaveRe.MatchString(s.Name)
 	}
-	a.readHeads(saves)
+	a.readHeads(saves, nil)
 	if err := a.attachSummaries(saves); err != nil {
 		return nil, err
 	}

@@ -165,8 +165,9 @@ function games() {
 }
 const gameOf = (r) => games().find((g) => g.name === r.envName) || { name: r.envName, version: "" };
 
-// Numbered columns are focus keys (16 §2.3, 16 §3.5): ↑↓ in 01 changes games;
-// elsewhere it applies lists and packs. Enter on 03 launches, elsewhere it opens the row.
+// Numbered columns are focus keys (16 §2.3, 16 §3.5); ←→ step between them. ↑↓ in 01
+// changes games, in 02 (or with no column focused) applies lists and packs. Enter on 03
+// launches, elsewhere it opens the row.
 function focusedStep() { return document.activeElement?.closest(".hm-step")?.dataset.step; }
 
 function focusStep(n) {
@@ -187,17 +188,26 @@ export function homeKey(e) {
   }
   if (k === "Enter" && document.activeElement?.matches(".hm-go, .hm-s3")) { e.preventDefault(); document.querySelector(".hm-go")?.click(); return; }
   if (!f) return;
-  const vertical = k === "ArrowDown" || k === "ArrowUp";
-  if (vertical && focusedStep() !== "1") {
+  // ←→ move between the three columns; ↑↓ change what the focused column holds: the game
+  // in 01, the list or pack in 02 (also with no column focused); nothing in 03 (2026-11-18).
+  if (k === "ArrowLeft" || k === "ArrowRight") {
     e.preventDefault();
-    const list = rowsOf(f.envName), i = list.findIndex((r) => key(r) === key(f));
-    if (list.length > 1) apply(list[(i + (k === "ArrowDown" ? 1 : list.length - 1)) % list.length]);
+    const at = +(focusedStep() || 0);
+    const to = at ? Math.max(1, Math.min(3, at + (k === "ArrowRight" ? 1 : -1))) : k === "ArrowRight" ? 1 : 3;
+    if (to !== at) focusStep(String(to));
     return;
   }
-  if (vertical || k === "ArrowLeft" || k === "ArrowRight") {
+  if (k === "ArrowDown" || k === "ArrowUp") {
     e.preventDefault();
-    const gs = games(), i = gs.findIndex((g) => g.name === f.envName);
-    if (gs.length > 1) pickGame(gs[(i + (k === "ArrowRight" || k === "ArrowDown" ? 1 : gs.length - 1)) % gs.length].name);
+    const at = focusedStep(), down = k === "ArrowDown";
+    if (at === "3") return;
+    if (at === "1") {
+      const gs = games(), i = gs.findIndex((g) => g.name === f.envName);
+      if (gs.length > 1) pickGame(gs[(i + (down ? 1 : gs.length - 1)) % gs.length].name);
+      return;
+    }
+    const list = rowsOf(f.envName), i = list.findIndex((r) => key(r) === key(f));
+    if (list.length > 1) apply(list[(i + (down ? 1 : list.length - 1)) % list.length]);
     return;
   }
   if (k === "Enter") { e.preventDefault(); edit(f); return; }
@@ -209,7 +219,7 @@ export function homeKey(e) {
 
 // (w, save, is on its button while there is something to save: the line holds seven)
 export function hintList() {
-  return [{ key: "1–3", label: T("column") }, { key: "↑↓", label: T("list") }, { key: "←→", label: T("Game Config") }, { key: "enter", label: T("edit") }, { key: "L", label: T("launch") },
+  return [{ key: "1–3 ←→", label: T("column") }, { key: "↑↓", label: T("choose") }, { key: "enter", label: T("edit") }, { key: "L", label: T("launch") },
     { key: "shift+1–8", label: T("pages") }, { key: "?", label: T("all keys") }];
 }
 
@@ -389,8 +399,8 @@ function step(n, cls, title) {
 }
 
 // 01: the games, the applied one first; picking one applies its last row (this session's
-// pick, else its most recently played). Each says its short version unless its name
-// already does ("1.6"); the full build is on hover.
+// pick, else its most recently played). Each says its full version ("1.6.4871 rev590";
+// the short one when the build is unknown).
 function gameStep(env) {
   const s = step("01", "hm-s1", T("Game Config"));
   const list = el("div", "hm-picks");
@@ -401,7 +411,7 @@ function gameStep(env) {
     b.dataset.game = g.name;
     b.dataset.id = "game|" + g.name;
     b.title = g.version;
-    b.append(el("span", "nm", g.name), el("small", "num", g.short && !g.name.includes(g.short) ? g.short : ""));
+    b.append(el("span", "nm", g.name), el("small", "num", g.version || g.short || ""));
     b.onclick = () => pickGame(g.name);
     list.append(b);
   }

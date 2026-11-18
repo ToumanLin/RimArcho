@@ -1916,6 +1916,9 @@ function renderSettingActions(right, actions, run, item) {
     if (a.argv[0] === "import-managers") {
       right.append(button(a.label, "", () => ui.importManagers())); continue;
     }
+    if (a.argv[0] === "guide-preview") {
+      right.append(button(a.label, "", () => ui.go("guide:preview"))); continue;
+    }
     // uninstall RimArcho and Feedback are their own pages; every other action is a command
     if (a.argv[0] === "uninstall" || a.argv[0] === "feedback") {
       const b = button(a.label, "", () => ui.go(a.argv[0]));
@@ -2044,7 +2047,7 @@ export async function environment() {
   const top = sc.scrollTop;
   sc.innerHTML = "";
   const current=(p.envs||[]).find(e=>e.current);
-  const w = page("env", "", act(T("Add Game Config"), "plus", () => ui.go("guide")), rescanButton());
+  const w = page("env", "", act(T("Add Game Config"), "plus", () => ui.go("guide")), act(T("copy the game folder…"), "copy", () => ui.go("guide:copy")), rescanButton());
   sc.append(w);
   const envLab = el("div", "label section", T("all Game Configs"));
   w.append(envLab);
