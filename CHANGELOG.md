@@ -2,6 +2,10 @@
 
 All notable changes to RimArcho. Versions follow semantic versioning; the MVP is 0.5.0.
 
+## Unreleased
+
+- Settings › Interface has a "first-run guide" row whose "preview…" opens the guide as a new player sees it, managed-folder step included, without saving anything: the folder choice, adding games, downloading a version, reading the Mods and the starting list are played out on the page only, and "end the preview" (or any way out of the last step) returns to Settings. The TUI's settings panel points to `archo gui` for it.
+
 ## 1.0.9 — 2026-11-10
 
 - **Linux (experimental):** releases now include `archo-<version>-linux-amd64.tar.gz` with the terminal UI, CLI and MCP (no window). It is tested only with synthetic data so far, not with a real game on Linux; expect bugs and back up saves and Mod lists. The Linux entries below are part of it.
