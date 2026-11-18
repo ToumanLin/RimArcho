@@ -107,7 +107,9 @@ func ILSpyDecompiler(ctx context.Context, dll, outDir, typ string, refs []string
 	}
 	if typ != "" {
 		args = append(args, "-t", typ)
-		out, err := exec.CommandContext(ctx, exe, args...).Output()
+		cmd := exec.CommandContext(ctx, exe, args...)
+		hideWindow(cmd)
+		out, err := cmd.Output()
 		if err != nil && len(out) == 0 {
 			return fmt.Errorf("ilspycmd -t %s: %v", typ, err)
 		}
@@ -118,7 +120,9 @@ func ILSpyDecompiler(ctx context.Context, dll, outDir, typ string, refs []string
 		return os.WriteFile(filepath.Join(outDir, safeName(typ)+".cs"), out, 0o644)
 	}
 	args = append(args, "-p", "-o", outDir)
-	if out, err := exec.CommandContext(ctx, exe, args...).CombinedOutput(); err != nil {
+	cmd := exec.CommandContext(ctx, exe, args...)
+	hideWindow(cmd)
+	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("ilspycmd: %v: %s", err, firstN(string(out), 300))
 	}
 	return nil
