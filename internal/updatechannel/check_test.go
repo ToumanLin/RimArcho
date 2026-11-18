@@ -53,7 +53,7 @@ func TestChecksChooseHighestAndKeepFailures(t *testing.T) {
 				switch r.URL.Path {
 				case "/releases/latest":
 					if failGitHub {
-						http.Error(w, "offline", 503)
+						http.Error(w, "offline", http.StatusServiceUnavailable)
 						return
 					}
 					ioJSON(w, map[string]any{"tag_name": "v1.10.0"})

@@ -53,6 +53,9 @@ func newRunner(client *http.Client, hosts []string, testOrigin string) (*runner,
 	// A proxy can resolve a public name to a private address after local validation.
 	t.Proxy = nil
 	t.DialTLSContext = nil
+	// A caller's Transport may still set the deprecated DialTLS; clear it too so no
+	// custom dialer bypasses the destination check below.
+	//lint:ignore SA1019 cleared on purpose, never used
 	t.DialTLS = nil
 	t.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
 		if testOrigin != "" {
