@@ -788,7 +788,7 @@ function previewStep3(card) {
   const end = (label) => button(label, "", () => finish(""));
   const n = S.board && S.board.cols ? (S.board.cols[1] || []).length : 0;
   ways.append(way(T("the game's current list"), Tf("ModsConfig.xml enables %d mods; that becomes your first list", n), end(T("use this list"))));
-  ways.append(way(T("move over from RimSort or RimCrow"), T("lists and player data, previewed before anything is imported"), end(T("import…"))));
+  ways.append(way(T("move over from RimSort, RimCrow or RimPy"), T("lists and player data, previewed before anything is imported"), end(T("import…"))));
   ways.append(way(T("open a pack or a Steam collection"), T("choose a pack (.archopack), or paste a Steam Workshop collection link"), end(T("choose a pack…"))));
   card.append(ways);
   footer(card, end(T("skip")));
