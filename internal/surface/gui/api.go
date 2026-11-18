@@ -92,6 +92,7 @@ type API struct {
 	autoWG          sync.WaitGroup
 	quit            func()        // closes the window (nil in the harness and in tests)
 	windowTheme     func(bool)    // synchronises the native frame with the resolved page scheme
+	zoom            windowZoom    // settings › interface size (zoom.go)
 	memTarget       *memoryTarget // WebView2's memory target (winmem_policy.go); nil off Windows and in tests
 	// tasks is the Background tasks record and its lanes (tasks.go, 16 §2.16)
 	tasks        *app.Tasks
@@ -223,6 +224,7 @@ type Start struct {
 
 // Init returns the page's start data.
 func (s *API) Init() *Start {
+	s.zoom.apply(ZoomFactor(s.a)) // the window opens zoomed; a change in Settings reaches it here (reaccent)
 	defer perftrace.Span("Init")()
 	s.mu.Lock()
 	defer s.mu.Unlock()

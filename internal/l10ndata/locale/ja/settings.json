@@ -287,5 +287,7 @@
   "Workshop": "ワークショップ",
   "Lanzou": "Lanzou",
   "%s failed": "%s 失敗",
-  "choose the downloaded RimArcho zip": "ダウンロードしたRimArchoのZIPを選択"
+  "choose the downloaded RimArcho zip": "ダウンロードしたRimArchoのZIPを選択",
+  "interface size": "表示サイズ",
+  "makes text and controls larger together; for 2K and 4K screens at 100% Windows scaling": "文字とコントロールをまとめて拡大します。Windows の拡大率が 100% の 2K・4K 画面向けです"
 }

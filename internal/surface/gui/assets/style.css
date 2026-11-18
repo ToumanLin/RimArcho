@@ -108,7 +108,7 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 6px; 
 .grow { flex: 1; }
 .num { font-variant-numeric: tabular-nums; }
 .dim, .faint { color: var(--faint); } .second, .muted { color: var(--muted); } .accent { color: var(--accent-11, var(--accent)); }
-.ok { color: var(--green); } .warn { color: var(--amber); } .err { color: var(--red); } .log { color: var(--log); }
+.ok { color: var(--green); } .warn { color: var(--amber); } .err { color: var(--red); } .log { color: var(--log); } .vers { color: var(--muted); }
 svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 
 /* ---- the shell (16 §2.1, §2.2): the sidebar, then the top bar, the page and the bottom line ---- */
@@ -2684,7 +2684,7 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 .prob-pop { position: fixed; z-index: 18; display: flex; flex-direction: column; background: var(--card); border: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); box-shadow: var(--shadow); color: var(--fg); font-size: 13px; animation: pop-in var(--t-enter) var(--ease); overflow: hidden; }
 .prob-pop .pp-head { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: var(--hairline) solid var(--line-2); flex-wrap: wrap; }
 .prob-pop .pp-lead { display: flex; gap: 8px; align-items: baseline; }
-.prob-pop .pp-head .pp-acts { display: flex; gap: 6px; }
+.prob-pop .pp-head .pp-acts { display: flex; gap: 6px; } .prob-pop .pp-head .btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-11, var(--accent)); }
 .prob-pop .pp-list { overflow: auto; padding: 4px 0 8px; min-height: 0; }
 .prob-pop .pp-sec { display: flex; gap: 6px; align-items: baseline; padding: 10px 12px 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 .prob-pop .pp-sec .num { color: var(--faint); }

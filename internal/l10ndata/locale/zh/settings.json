@@ -287,5 +287,7 @@
   "Workshop": "创意工坊",
   "Lanzou": "蓝奏云",
   "%s failed": "%s 失败",
-  "choose the downloaded RimArcho zip": "选择下载的 RimArcho 压缩包"
+  "choose the downloaded RimArcho zip": "选择下载的 RimArcho 压缩包",
+  "interface size": "界面大小",
+  "makes text and controls larger together; for 2K and 4K screens at 100% Windows scaling": "文字和控件一起放大；适合 Windows 缩放为 100% 的 2K、4K 屏幕"
 }

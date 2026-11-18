@@ -177,7 +177,7 @@ A query consists of space-separated words. All free words must match (AND). Stru
 | `source:value` | Match the directory role official, workshop, local, steamcmd, locked, or other, or a stable custom-directory alias (03 §2.2) |
 | `content:value` | Match assembly, xml, or language content |
 | `type:value` legacy | Match sources official, workshop, local, copy, git, or steamcmd; or content assembly (has a DLL), xml (no DLL, also xml-only), or language (language files only, also language-pack) |
-| `has:problem` / `has:error` | Match an actionable can it run item or a finding that causes loading to fail, respectively. Also supports has:tag, has:note, and has:alias |
+| `has:problem` / `has:error` | Match an actionable can it run item or a finding that causes loading to fail, respectively; has:problem leaves out rows whose only item is a corpus hint or a version reminder (§5). Also supports has:tag, has:note, and has:alias |
 | `version:1.6` | Match declared support for this game version |
 | `-word`, `-tag:x` | Negate a condition |
 | `"with spaces"` | Treat the quoted text as one word |

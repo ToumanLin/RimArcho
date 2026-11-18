@@ -32,6 +32,7 @@ const (
 	statusUnloadable = view.StatusUnloadable
 	statusWarn       = view.StatusWarn
 	statusHint       = view.StatusHint
+	statusVersion    = view.StatusVersion
 	statusLog        = view.StatusLog
 	statusErr        = view.StatusErr
 )
@@ -511,6 +512,8 @@ func statusGlyph(s int) string {
 	switch s {
 	case statusHint:
 		return ic.hint
+	case statusVersion:
+		return ic.ver
 	case statusErr:
 		return ic.err
 	case statusLog:
@@ -531,7 +534,7 @@ func statusStyle(s int) lipgloss.Style {
 		return sErrS
 	case statusWarn:
 		return sWarnS
-	case statusUnloadable:
+	case statusUnloadable, statusVersion:
 		return sDimS
 	}
 	return plainStyle

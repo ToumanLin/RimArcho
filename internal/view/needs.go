@@ -165,6 +165,7 @@ type Need struct {
 
 	linkProblems []*app.Problem // original subjects and targets, retained through folding for name links
 	rowReasons   map[string]Reason
+	refReasons   map[string]Reason // by a missing entry's pkg: ref (16 §5 row icons)
 }
 
 // Needs is the screen's content and what it means for the rest of the interface.
@@ -449,16 +450,28 @@ func indexNeeds(n *Needs) {
 		if len(it.rowReasons) == 0 {
 			common = Reason{Status: it.Status, Text: text, Why: it.Why, Content: reasonContent(it), Evidence: it.Evidence, Section: it.Section, Actions: popActions(it.Actions)}
 		}
+		// A row that only lacks the game's version gets the quiet version icon, so the rows
+		// that need something done stand out (16 §5); the item itself stays a warning.
+		rowStatus := it.Status
+		if it.code == "version.unsupported" {
+			rowStatus = StatusVersion
+		}
 		for _, id := range icons {
-			if n.Status[id] == StatusNone || it.Status > n.Status[id] {
-				n.Status[id] = it.Status
+			if n.Status[id] == StatusNone || rowStatus > n.Status[id] {
+				n.Status[id] = rowStatus
 			}
 			r := common
 			if own, ok := it.rowReasons[id]; ok {
 				r = own
 				r.Section = it.Section
 			}
+			r.Status = rowStatus
 			n.Reasons[id] = append(n.Reasons[id], r)
+		}
+		// rows with no installed mod (missing list entries) are keyed by their pkg: ref
+		for ref, r := range it.refReasons {
+			r.Section = it.Section
+			n.Reasons[ref] = append(n.Reasons[ref], r)
 		}
 	}
 	for _, rs := range n.Reasons {
@@ -526,6 +539,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 	// a mod needing one of them is covered by the same item.
 	type missingEntry struct {
 		pkg, ws, name string
+		ref           string // the list row's ref (pkg:<entry>), which keys its icon's reason
 		n             Need
 	}
 	missingInfo := map[string]app.MissingMod{}
@@ -622,7 +636,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 					look.Label, look.URL = T("open it in the Workshop"), u
 				}
 			}
-			me := missingEntry{pkg: pkg, name: pkg, n: Need{rank: 4, Group: GroupList, code: p.Code, Text: Tf("the list has %s, but it is not installed", pkg),
+			me := missingEntry{pkg: pkg, name: pkg, ref: x, n: Need{rank: 4, Group: GroupList, code: p.Code, Text: Tf("the list has %s, but it is not installed", pkg),
 				Actions: []Action{look, disable(st, "pkg:"+pkg, T("remove it from the list"))}, Counted: true, Status: s,
 				Title: Tf("not installed: %s", pkg), Why: T("the list has it, but no mod folder does"), Evidence: ev}}
 			me.n.linkProblems = []*app.Problem{p}
@@ -776,6 +790,10 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			{Kind: ActUseInstalled, Key: "space", Label: T("use installed copies"), Refs: packages, Undo: true, Done: T("using installed copies")},
 			{Kind: ActFold, Key: "f", Label: T("show which")},
 		}
+		f.refReasons = map[string]Reason{}
+		for _, m := range installed {
+			f.refReasons[m.ref] = missingRowReason(m.n, f.Actions[0])
+		}
 		add(f)
 	}
 	switch len(missing) {
@@ -785,6 +803,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 		if ws := missing[0].ws; ws != "" {
 			n.Actions = append([]Action{subscribeAction([]string{ws}, T("subscribe to it"))}, n.Actions...)
 		}
+		n.refReasons = map[string]Reason{missing[0].ref: missingRowReason(n)}
 		add(n)
 	default:
 		f := Need{rank: 4, Group: GroupList, Counted: true, Status: missing[0].n.Status, Fold: true, code: "entry.missing",
@@ -809,9 +828,15 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			}
 			f.Actions = append(f.Actions, subscribeAction(ws, label))
 		}
-		f.Actions = append(f.Actions,
-			Action{Kind: ActDisable, Key: "x", Label: T("remove them from the list"), Refs: refs, Done: Tf("removed %d mods from the list", len(refs))},
-			Action{Kind: ActFold, Key: "f", Label: T("show which")})
+		removeAll := Action{Kind: ActDisable, Key: "x", Label: T("remove them from the list"), Refs: refs, Done: Tf("removed %d mods from the list", len(refs))}
+		f.Actions = append(f.Actions, removeAll, Action{Kind: ActFold, Key: "f", Label: T("show which")})
+		// Each row's icon offers its own fixes and removing every entry that is not
+		// installed, so clearing a list after unsubscribing is one click from any row.
+		removeAll.Label = Tf("remove all %d not installed", len(refs))
+		f.refReasons = map[string]Reason{}
+		for _, m := range missing {
+			f.refReasons[m.ref] = missingRowReason(m.n, removeAll)
+		}
 		add(f)
 	}
 	for _, k := range mergeKeys {
@@ -1513,6 +1538,24 @@ func ShortDate(t time.Time) string {
 
 // popActions are an item's actions as the badge popover offers them: all but "fold" (the
 // popover has no parts to unfold).
+// missingRowReason explains a missing list entry's row icon (16 §5): the entry's own
+// sentence and fixes, then the group's (group) when several entries share them.
+func missingRowReason(n Need, group ...Action) Reason {
+	acts := popActions(n.Actions)
+	switch {
+	case len(group) == 0:
+	case group[0].Kind == ActDisable: // remove this one, then all of them
+		acts = append(acts, group...)
+	default: // use the installed copies first
+		acts = append(append([]Action{}, group...), acts...)
+	}
+	text := n.Title
+	if text == "" {
+		text = n.Text
+	}
+	return Reason{Status: StatusErr, Text: text, Why: n.Why, Evidence: n.Evidence, Actions: acts}
+}
+
 func popActions(as []Action) []Action {
 	var out []Action
 	for _, a := range as {

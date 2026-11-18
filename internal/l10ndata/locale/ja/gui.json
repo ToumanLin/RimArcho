@@ -416,5 +416,8 @@
   "the list it became is gone": "取り込み先のMODリストはもうありません",
   "changed lists": "変更されたMODリスト",
   "lists again": "もう一度取り込むMODリスト",
-  "all of it is already in RimArcho": "すべて RimArcho にあります"
+  "all of it is already in RimArcho": "すべて RimArcho にあります",
+  "only these in the list": "リストでこれだけ表示",
+  "show every mod": "すべてのMODを表示",
+  "has:problem in the filter: the rows with something to fix, without version reminders": "フィルター has:problem：対応が必要なMODだけを表示し、バージョンの通知は含めません"
 }

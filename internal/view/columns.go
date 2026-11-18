@@ -34,6 +34,10 @@ const (
 // StatusHint is informational and sorts below warnings without changing existing wire values.
 const StatusHint = -1
 
+// StatusVersion marks a row whose only reminder is that it does not declare the game's
+// version (version.unsupported, 16 §5): a quieter icon than a warning, below hints.
+const StatusVersion = -2
+
 // Item is one row of a column.
 type Item struct {
 	Lists       []string          `json:"-"`

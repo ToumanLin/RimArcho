@@ -211,7 +211,7 @@ func termMatch(t term, it *Item, f MatchFacts) bool {
 		switch v {
 		case "problem", "problems":
 			s := RowStatus(it, f.Status)
-			return s != StatusNone && s != StatusUnloadable && s != StatusHint
+			return s != StatusNone && s != StatusUnloadable && s != StatusHint && s != StatusVersion
 		case "error", "errors":
 			s := RowStatus(it, f.Status)
 			return s == StatusErr || s == StatusLog

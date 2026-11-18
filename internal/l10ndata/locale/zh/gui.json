@@ -416,5 +416,8 @@
   "the list it became is gone": "它导入成的那个列表已不存在",
   "changed lists": "有变化的列表",
   "lists again": "再导入的列表",
-  "all of it is already in RimArcho": "全部已在 RimArcho 中"
+  "all of it is already in RimArcho": "全部已在 RimArcho 中",
+  "only these in the list": "列表里只看这些",
+  "show every mod": "显示全部 Mod",
+  "has:problem in the filter: the rows with something to fix, without version reminders": "筛选 has:problem：只列出需要处理的 Mod，不含版本提醒"
 }

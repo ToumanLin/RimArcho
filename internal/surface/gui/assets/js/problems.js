@@ -27,6 +27,9 @@ export const isOpen = () => box.isConnected;
 
 // autoFixable: the items one click can fix with no question (required mods that are
 // installed but not enabled); CompleteDependencies enables them and sorts again.
+// onlyProblems: the editor's filter already holds has:problem
+const onlyProblems = () => /(^|\s)has:problems?(?=\s|$)/i.test((S.bar && S.bar.search) || "");
+
 const autoFixable = () => items().filter((it) => it.counted && (it.actions || []).some((a) => a.kind === "enable") && it.target);
 
 // chip: the top bar's button, or null when the list has nothing to fix.
@@ -95,6 +98,16 @@ function draw() {
     b.onclick = (e) => { e.stopPropagation(); fixAutomatically(); };
     acts.append(b);
   }
+  // one click lists only the rows with something to fix (has:problem, 16 §3.7): version
+  // reminders, hints and the rest stay out; pressed again, the list is whole again
+  if (S.bar) {
+    const on = onlyProblems();
+    const only = el("button", "btn small" + (on ? " on" : ""), T(on ? "show every mod" : "only these in the list"));
+    only.title = T("has:problem in the filter: the rows with something to fix, without version reminders");
+    only.setAttribute("aria-pressed", String(on));
+    only.onclick = (e) => { e.stopPropagation(); S.bar.set("has:problem", on ? 0 : 1); draw(); };
+    acts.append(only);
+  }
   const all = el("button", "btn small", T("open can it run"));
   all.onclick = (e) => { e.stopPropagation(); close(); ui.go("needs"); };
   acts.append(all);
@@ -145,16 +158,17 @@ function card(it) {
     if (answers) {
       for (const a of acts.filter((a) => a.kind !== "answer")) body.append(actButton(it, a, "btn identity-why"));
     }
-    const shown = answers ? acts.filter((a) => a.kind === "answer") : acts.slice(0, 1);
-    for (const a of shown) right.append(actButton(it, a, answers ? "btn small" : "btn small primary"));
-    if (!answers && acts.length > 1) {
+    // the first two fixes show (subscribe to them / remove them from the list), the rest wait under ⋯
+    const shown = answers ? acts.filter((a) => a.kind === "answer") : acts.slice(0, 2);
+    shown.forEach((a, i) => right.append(actButton(it, a, answers || i ? "btn small" : "btn small primary")));
+    if (!answers && acts.length > 2) {
       const more = el("button", "btn small more", "⋯");
       pop.menuOpener(more);
-      more.title = acts.slice(1).map((x) => x.label).join(T("; "));
+      more.title = acts.slice(2).map((x) => x.label).join(T("; "));
       more.onclick = (e) => {
         e.stopPropagation();
         const r = more.getBoundingClientRect();
-        pop.menu(r.left, r.bottom + 4, acts.slice(1).map((x) => ({ label: x.label, envWrite: needActionWrite(x), run: () => runNeedAction(it, x) })), e.detail === 0, { name: t.textContent, opener: more });
+        pop.menu(r.left, r.bottom + 4, acts.slice(2).map((x) => ({ label: x.label, envWrite: needActionWrite(x), run: () => runNeedAction(it, x) })), e.detail === 0, { name: t.textContent, opener: more });
       };
       right.append(more);
     }

@@ -60,6 +60,7 @@ Both palettes draw text on the terminal's own background. Each role also names a
 | Error causing load failure | times-circle `U+F057` | `⨯` U+2A2F | Error red |
 | Warning of a possible issue | exclamation-triangle `U+F071` | `!` | Amber |
 | Corpus hint; counting follows §5 | info-circle `U+F05A` | `ⓘ` U+24D8 | Secondary; a circled i in the GUI |
+| Only the game's version is not declared (`StatusVersion`, §5) | clock-o `U+F017` | `◷` U+25F7 | Muted; a clock in the GUI |
 | Last-run error | bug `U+F188` | `◍` U+25CD | Error red |
 | Unloadable disabled residue | ban `U+F05E` | `◌` U+25CC | Faint |
 | No problem | Hidden | Hidden | — |
