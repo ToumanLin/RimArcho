@@ -507,6 +507,7 @@ func (a *App) UpdateSubscriptionsWith(refs []string, dryRun bool, calls BatchCal
 				ctx, cancel := context.WithCancel(context.Background())
 				watched := make(chan struct{})
 				go func() {
+					// not scheduled: checks the task's stop request while SteamCMD runs the group
 					tick := time.NewTicker(250 * time.Millisecond)
 					defer tick.Stop()
 					for {

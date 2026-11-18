@@ -49,6 +49,7 @@ func (u *upgradeReport) progress(p store.UpgradeProgress) {
 
 func (u *upgradeReport) run() {
 	defer close(u.done)
+	// not scheduled: redraws the upgrade progress (04 §4), a UI throttle
 	t := time.NewTicker(100 * time.Millisecond)
 	defer t.Stop()
 	for {
