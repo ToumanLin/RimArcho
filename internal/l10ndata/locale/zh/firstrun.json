@@ -69,5 +69,20 @@
   "preview…": "预览…",
   "a preview of the first run: nothing you choose here is saved": "这是首次使用的预览：在这里做的选择都不会保存",
   "end the preview": "结束预览",
-  "preview ended; nothing was saved": "预览已结束，没有保存任何内容"
+  "preview ended; nothing was saved": "预览已结束，没有保存任何内容",
+  "copy a game folder": "复制游戏文件夹",
+  "copy the game of": "复制哪个配置的游戏",
+  "copy to": "复制到",
+  "the game's Mods folder": "游戏的 Mods 文件夹",
+  "not copied": "不复制",
+  "copied too (%s)": "一起复制（%s）",
+  "copies %s; free: %s": "要复制 %s；可用空间：%s",
+  "Not enough room on this drive for the copy.": "这个磁盘放不下这份副本。",
+  "The copy plays %s's Mod list and starts with the game's own exe, so Steam never updates it. RimArcho's Mod links are made again when it launches.": "副本使用 %s 的 Mod 列表，并用游戏自己的 exe 启动，所以 Steam 不会更新它。启动时 RimArcho 会重新建立 Mod 链接。",
+  "copy and add": "复制并添加",
+  "a copy is already running": "已经有一个复制在进行",
+  "copied; Game Config %s added": "复制完成，已添加游戏配置 %s",
+  "the copy did not finish": "复制没有完成",
+  "copying the game…": "正在复制游戏…",
+  "copy the game folder…": "复制游戏文件夹…"
 }

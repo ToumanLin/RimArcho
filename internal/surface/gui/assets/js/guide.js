@@ -27,6 +27,7 @@ let ui = null;
 export function initGuide(u) {
   ui = u;
   on("tasks", () => updateSteamCMD());
+  on("copy", (ev) => copyEvent(ev));
 }
 
 let session = 0, activeSession = null;
@@ -45,6 +46,10 @@ const C = { id: "", row: null, submitting: false };
 // custom with path); lists are the global lists, the current config's first.
 const A = { copy: true, list: "", lists: [], saves: "", path: "", from: "" };
 const adding = () => S.guideFrom === "env";
+// The copy way (03 §3.5): which Game Config's game, where, the new config's name, what comes
+// along, the plan the backend checked (GuideCopyPlan) and a run's progress.
+const K = { from: "", dir: "", dirTyped: false, name: "", mods: false, own: false, plan: null, planning: false, run: null, seq: 0 };
+const addedConfigs = () => (S.board && S.board.envs) || [];
 
 // The guide follows the same durable task as the background page (16 §2.15, 16 §2.16).
 async function updateSteamCMD() {
@@ -75,7 +80,10 @@ export async function start(from = "first") {
   G.error = "";
   G.picked.clear();
   if (D.run && D.run.end) D.run = null;
-  G.way = D.run ? 1 : 0;
+  if (K.run && K.run.end) { K.run = null; K.plan = null; }
+  G.way = D.run ? 1 : K.run && !K.run.end ? 2 : 0;
+  // the Game Config page's "copy the game folder…" opens this way (03 §3.5)
+  if (S.guideWay != null) { G.way = S.guideWay; S.guideWay = null; }
   G.folder = null;
   P.timer = null;
   A.from = from === "env" ? S.board?.env || "" : "";
@@ -116,6 +124,7 @@ export function resume() {
   if (staleConfig()) return reread();
   const read = beginPageRead("guide"); draw(); read.finish();
   if (G.step === 0 && G.way === 1 && !D.run && !D.loading) loadDownload();
+  if (G.step === 0 && G.way === 2 && !K.run && !K.plan) loadCopyPlan();
 }
 
 // Add Game Config copies from and lists the current Game Config: a switch while its first
@@ -252,15 +261,22 @@ const freeText = (n) => n < 0 ? T("free space unknown") : sizeText(n);
 
 function step1(card) {
   card.append(el("div", "guide-q", adding() ? T("which game is this Game Config for?") : T("which RimWorld installs should RimArcho manage?")));
-  const sw = seg([T("a game you have"), T("download a version")], G.way, (i) => {
+  // copying needs a Game Config whose game is copied (a preview shows the way with yours)
+  const canCopyGame = addedConfigs().length > 0;
+  if (G.way === 2 && !canCopyGame) G.way = 0;
+  const ways = [T("a game you have"), T("download a version")];
+  if (canCopyGame) ways.push(T("copy a game folder"));
+  const sw = seg(ways, G.way, (i) => {
     G.way = i;
     G.error = "";
     draw();
     if (i === 1 && !D.run && !D.loading) loadDownload();
+    if (i === 2 && !K.run) loadCopyPlan();
   });
   sw.classList.add("guide-way");
   card.append(sw);
   if (G.way === 1) return download(card);
+  if (G.way === 2) return copyGame(card);
   const list = el("div", "games");
   if (!G.games.length) list.append(el("div", "empty-state", T("no RimWorld found in the Steam libraries or the usual folders; add its folder below")));
   G.games.forEach((g, i) => {
@@ -727,6 +743,7 @@ async function finish(text) {
   if (previewing()) {
     P.timer = null;
     if (D.run?.preview) D.run = null;
+    if (K.run?.preview) K.run = null;
     say("ok", T("preview ended; nothing was saved"));
     return ui.go("settings");
   }
@@ -788,8 +805,126 @@ function previewStep3(card) {
   const end = (label) => button(label, "", () => finish(""));
   const n = S.board && S.board.cols ? (S.board.cols[1] || []).length : 0;
   ways.append(way(T("the game's current list"), Tf("ModsConfig.xml enables %d mods; that becomes your first list", n), end(T("use this list"))));
-  ways.append(way(T("move over from RimSort or RimCrow"), T("lists and player data, previewed before anything is imported"), end(T("import…"))));
+  ways.append(way(T("move over from RimSort, RimCrow or RimPy"), T("lists and player data, previewed before anything is imported"), end(T("import…"))));
   ways.append(way(T("open a pack or a Steam collection"), T("choose a pack (.archopack), or paste a Steam Workshop collection link"), end(T("choose a pack…"))));
   card.append(ways);
   footer(card, end(T("skip")));
+}
+
+// ---- 1c. copy a game folder (03 §3.5) ----
+// A backup before the game updates, or a second game to try something in: a Game Config's
+// game folder, never RimArcho's links in Mods/, copied and added as a Game Config that plays
+// the same list and starts directly.
+
+async function loadCopyPlan() {
+  const configs = addedConfigs();
+  if (!configs.includes(K.from)) K.from = configs.includes(S.board?.env) ? S.board.env : configs[0] || "";
+  if (!K.from) return;
+  const seq = ++K.seq;
+  K.planning = true;
+  draw();
+  let plan = null, error = "";
+  try { plan = await api.GuideCopyPlan(K.from, K.dirTyped ? K.dir : "", K.name, K.mods); } catch (e) { error = errText(e); }
+  if (seq !== K.seq) return;
+  K.planning = false;
+  K.plan = plan;
+  if (plan && !K.dirTyped) K.dir = plan.dir;
+  G.error = error;
+  draw();
+}
+
+function copyGame(card) {
+  if (K.run) return copying(card, K.run);
+  if (!K.from) { loadCopyPlan(); return footer(card); }
+  const p = K.plan;
+  const box = el("div", "guide-config");
+  const row = (label, ...control) => { const r = el("div", "typed"); r.append(el("span", "muted lbl", label), ...control); box.append(r); return r; };
+  const from = choiceControl(T("copy the game of"), addedConfigs().map((n) => ({ value: n, label: n })), K.from);
+  from.onchange = () => { K.from = from.value; K.name = ""; if (!K.dirTyped) K.dir = ""; loadCopyPlan(); };
+  row(T("copy the game of"), from);
+  const choose = () => chooseLocalPath(K.dir, (path) => { K.dir = path; K.dirTyped = true; loadCopyPlan(); });
+  row(T("copy to"), editablePath(copyablePath(el("span", "", K.dir), K.dir), choose), button(T("change…"), "", choose));
+  const name = el("input", "field");
+  name.value = K.name;
+  name.placeholder = p?.name || "";
+  name.spellcheck = false;
+  name.onchange = () => { K.name = name.value.trim(); loadCopyPlan(); };
+  row(T("Game Config name"), name);
+  const mods = choiceControl(T("the game's Mods folder"), [
+    { value: "no", label: T("not copied") },
+    { value: "yes", label: Tf("copied too (%s)", p ? sizeText(p.modBytes) : "…") },
+  ], K.mods ? "yes" : "no");
+  mods.onchange = () => { K.mods = mods.value === "yes"; loadCopyPlan(); };
+  row(T("the game's Mods folder"), mods);
+  const saves = choiceControl(T("saves folder"), [
+    { value: "shared", label: T("shared (the game's default folder)") },
+    { value: "own", label: T("own folder in RimArcho") },
+  ], K.own ? "own" : "shared");
+  saves.onchange = () => { K.own = saves.value === "own"; };
+  row(T("saves folder"), saves);
+  card.append(box);
+  const space = el("div", "folder-space muted");
+  if (p) {
+    space.append(el("span", "", Tf("copies %s; free: %s", sizeText(p.bytes), freeText(p.free))));
+    if (p.low) space.append(el("span", "warn", T("Not enough room on this drive for the copy.")));
+  } else if (K.planning) space.append(el("span", "", T("checking…")));
+  card.append(space);
+  card.append(el("div", "dl-note muted", Tf("The copy plays %s's Mod list and starts with the game's own exe, so Steam never updates it. RimArcho's Mod links are made again when it launches.", K.from)));
+  const go = button(T("copy and add"), "", async () => {
+    go.disabled = true;
+    if (previewing()) return previewCopy();
+    let ok;
+    try { ok = await api.GuideCopy(K.from, K.dir, K.name, K.mods, K.own); } catch (e) { G.error = errText(e); return draw(); }
+    if (!ok) { G.error = T("a copy is already running"); return draw(); }
+    G.error = "";
+    K.run = { bytes: 0, total: p.bytes, end: false };
+    draw();
+  }, "primary");
+  go.disabled = !p || p.low || K.planning;
+  footer(card, go);
+}
+
+function copying(card, r) {
+  const t = r.end ? (r.ok ? Tf("copied; Game Config %s added", r.env) : T("the copy did not finish")) : T("copying the game…");
+  const head = el("div", "dl-state");
+  head.append(el("span", "t", t));
+  if (!r.end && r.total > 0) head.append(el("span", "muted", Tf("%s of %s", sizeText(r.bytes), sizeText(r.total))));
+  card.append(head);
+  const pct = r.end && r.ok ? 100 : r.total > 0 ? Math.round(100 * r.bytes / r.total) : 0;
+  const prog = el("div", "prog");
+  const bar = el("div", "bar");
+  const fill = el("i");
+  fill.style.width = pct + "%";
+  bar.append(fill);
+  progress(bar, head, pct);
+  prog.append(bar);
+  card.append(prog);
+  if (r.error) card.append(el("div", "dl-note err", r.error));
+  if (r.end && !r.ok) return footer(card, button(T("try again"), "", () => { K.run = null; K.plan = null; loadCopyPlan(); }));
+  footer(card);
+}
+
+// copyEvent is a "copy" event: the bytes copied, then the end. The copy is a new game
+// folder, so its Mods are read next (step 2).
+function copyEvent(ev) {
+  if (!K.run || K.run.end || K.run.preview) return;
+  if (ev.end) {
+    Object.assign(K.run, { end: true, ok: ev.ok, error: ev.error || "", env: ev.env || "" });
+    draw();
+    if (ev.ok) { K.plan = null; added([ev.env]); }
+    return;
+  }
+  Object.assign(K.run, ev);
+  draw();
+}
+
+function previewCopy() {
+  G.error = "";
+  const total = K.plan?.bytes || 1.3e9, env = K.name || K.plan?.name || K.from + "-copy";
+  K.run = { bytes: 0, total, end: false, preview: true };
+  const steps = [];
+  for (let k = 1; k <= 10; k++) steps.push(() => { K.run.bytes = total * k / 10; });
+  steps.push(() => { Object.assign(K.run, { end: true, ok: true, env }); added([env]); });
+  draw();
+  previewTick(steps, 200);
 }

@@ -69,5 +69,20 @@
   "preview…": "プレビュー…",
   "a preview of the first run: nothing you choose here is saved": "初回起動のプレビューです。ここで選んだ内容は保存されません",
   "end the preview": "プレビューを終了",
-  "preview ended; nothing was saved": "プレビューを終了しました。何も保存されていません"
+  "preview ended; nothing was saved": "プレビューを終了しました。何も保存されていません",
+  "copy a game folder": "ゲームフォルダーをコピー",
+  "copy the game of": "コピーする構成のゲーム",
+  "copy to": "コピー先",
+  "the game's Mods folder": "ゲームの Mods フォルダー",
+  "not copied": "コピーしない",
+  "copied too (%s)": "一緒にコピー（%s）",
+  "copies %s; free: %s": "コピーするサイズ：%s、空き容量：%s",
+  "Not enough room on this drive for the copy.": "このドライブにはコピーを置く空きがありません。",
+  "The copy plays %s's Mod list and starts with the game's own exe, so Steam never updates it. RimArcho's Mod links are made again when it launches.": "コピーは %s のMODリストを使い、ゲーム自身の exe で起動するため、Steam に更新されません。RimArcho のMODリンクは起動時に作り直されます。",
+  "copy and add": "コピーして追加",
+  "a copy is already running": "コピーはすでに実行中です",
+  "copied; Game Config %s added": "コピーしました。ゲーム構成 %s を追加しました",
+  "the copy did not finish": "コピーは完了しませんでした",
+  "copying the game…": "ゲームをコピー中…",
+  "copy the game folder…": "ゲームフォルダーをコピー…"
 }
