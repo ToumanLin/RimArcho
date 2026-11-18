@@ -481,5 +481,6 @@
   "The game keeps only what fits this card; about %s of textures load from the disk cache when drawn, which may stutter but does not stop the game.": "游戏只在显存里保留这张显卡放得下的贴图；约 %s 的贴图画到时才从磁盘缓存载入，可能会卡顿，但不影响进游戏。",
   "RAM: loading needs %s; available memory and total capacity are unavailable": "内存：载入时需要 %s；无法读取当前可用内存和总容量",
   "RAM: loading needs %s; available memory is unavailable; total capacity %s": "内存：载入时需要 %s；无法读取当前可用内存；总容量 %s",
-  "VRAM: estimated %s; dedicated capacity is unknown": "显存：预计 %s；显卡专用显存容量未知"
+  "VRAM: estimated %s; dedicated capacity is unknown": "显存：预计 %s；显卡专用显存容量未知",
+  "the mod's files changed after RimArcho wrote its DDS": "RimArcho 写 DDS 之后，Mod 的文件更新过"
 }

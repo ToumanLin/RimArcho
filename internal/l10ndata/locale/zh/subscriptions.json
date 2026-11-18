@@ -255,5 +255,6 @@
   "Steam downloads it; it appears after the next scan.": "由 Steam 下载；下次扫描后出现。",
   "Git submodules are not downloaded.": "不下载 Git 子模块。",
   "Git LFS content is not downloaded; LFS files remain pointers.": "不下载 Git LFS 内容；LFS 文件仍是指针。",
-  "Would subscribe through Steam; use SteamCMD only if Steam is unavailable.": "将通过 Steam 订阅；只在 Steam 不可用时用 SteamCMD。"
+  "Would subscribe through Steam; use SteamCMD only if Steam is unavailable.": "将通过 Steam 订阅；只在 Steam 不可用时用 SteamCMD。",
+  "moved to the recycle bin": "已移到回收站"
 }

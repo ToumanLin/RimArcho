@@ -28,10 +28,10 @@ var hintAllowed = map[string]string{
 var hintPrefix = map[string]int{"js/subscriptions.js changesHints": 1}
 
 type hintWay struct {
-	n          int
-	first      string
-	last       string
-	open       bool // a loop or spread without a written limit
+	n            int
+	first        string
+	last         string
+	open         bool // a loop or spread without a written limit
 	ctrlO, ctrlW bool
 }
 
