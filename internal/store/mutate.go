@@ -21,85 +21,95 @@ func (s *Store) inTx(fn func(tx *sql.Tx) error) error {
 }
 
 // ResolveSame merges the question's new Instance into the candidate (04 §2.4 "same"): the
-// candidate takes over the location, snapshots and events, and comes back to life.
+// candidate takes over the location, snapshots and events, and comes back to life. Every
+// stored reference follows through the shared rewrite of 03 §2.1 (rewriteInstances,
+// rewriteOrigins and, when the new Instance's Lineage is left empty, rewriteLineages,
+// mergePlayerData and mergeRules), so notes, tags, rules and ignores move with it and the
+// emptied Lineage is deleted.
 func (s *Store) ResolveSame(q *Question, now time.Time) error {
 	return s.inTx(func(tx *sql.Tx) error {
 		if err := lockHistory(tx); err != nil {
 			return err
 		}
-		var candStatus string
+		var candStatus, keptLineage string
 		var candSnap sql.NullInt64
-		if err := tx.QueryRow(`SELECT status, current_snapshot_id FROM instance WHERE id=?`, q.CandidateID).Scan(&candStatus, &candSnap); err != nil {
+		if err := tx.QueryRow(`SELECT status, current_snapshot_id, lineage_id FROM instance WHERE id=?`, q.CandidateID).Scan(&candStatus, &candSnap, &keptLineage); err != nil {
 			return fmt.Errorf("candidate #%s: %w", q.CandidateID, err)
 		}
 		if candStatus == identity.Live {
 			return fmt.Errorf("candidate #%s is live again; answer copy or unrelated instead", q.CandidateID)
 		}
-		var src, rel, real string
+		var src, rel, real, oldLineage string
 		var residue int
 		var lastSeen int64
 		var newSnap sql.NullInt64
-		if err := tx.QueryRow(`SELECT source_id, rel_path, real_path, residue, last_seen, current_snapshot_id, status FROM instance WHERE id=?`, q.InstanceID).
-			Scan(&src, &rel, &real, &residue, &lastSeen, &newSnap, new(string)); err != nil {
+		if err := tx.QueryRow(`SELECT source_id, rel_path, real_path, residue, last_seen, current_snapshot_id, lineage_id FROM instance WHERE id=?`, q.InstanceID).
+			Scan(&src, &rel, &real, &residue, &lastSeen, &newSnap, &oldLineage); err != nil {
 			return fmt.Errorf("instance #%s: %w", q.InstanceID, err)
 		}
-		mapping := map[string]string{q.InstanceID: q.CandidateID}
-		if err := rewriteInstanceLists(tx, mapping); err != nil {
-			return err
-		}
-		if err := remapHistoryStages(tx, mapping, nil); err != nil {
-			return err
-		}
-		// Durable aliases also cover fixed pack manifests and on-disk origin markers.
-		var oldLineage, keptLineage string
 		var remaining int
-		if err := tx.QueryRow(`SELECT lineage_id FROM instance WHERE id=?`, q.InstanceID).Scan(&oldLineage); err != nil {
-			return err
-		}
-		if err := tx.QueryRow(`SELECT lineage_id FROM instance WHERE id=?`, q.CandidateID).Scan(&keptLineage); err != nil {
-			return err
-		}
 		if err := tx.QueryRow(`SELECT count(*) FROM instance WHERE lineage_id=? AND id<>?`, oldLineage, q.InstanceID).Scan(&remaining); err != nil {
 			return err
 		}
-		aliases := map[string]string{q.InstanceID: q.CandidateID}
+		instances := map[string]string{q.InstanceID: q.CandidateID}
+		lineages := map[string]string{}
 		if remaining == 0 && oldLineage != keptLineage {
-			aliases[oldLineage] = keptLineage
+			lineages[oldLineage] = keptLineage
 		}
-		for old, kept := range aliases {
-			kind := "instance"
-			if old == oldLineage {
-				kind = "lineage"
-			}
-			if _, err := tx.Exec(`UPDATE id_alias SET new_id=? WHERE new_id=? AND kind=?`, kept, old, kind); err != nil {
-				return err
-			}
-			if _, err := tx.Exec(`INSERT OR REPLACE INTO id_alias(old_id,new_id,kind) VALUES(?,?,?)`, old, kept, kind); err != nil {
-				return err
+		// Aliases that pointed at the merged-away IDs follow them (pack.json and
+		// origin.json written before an earlier merge).
+		for _, a := range []struct {
+			m    map[string]string
+			kind string
+		}{{instances, "instance"}, {lineages, "lineage"}} {
+			for old, kept := range a.m {
+				if _, err := tx.Exec(`UPDATE id_alias SET new_id=? WHERE new_id=? AND kind=?`, kept, old, a.kind); err != nil {
+					return err
+				}
 			}
 		}
-		stmts := []struct {
-			q    string
-			args []any
-		}{
-			{`UPDATE instance SET source_id=?, rel_path=?, real_path=?, residue=?, last_seen=?, status=?, tombstone_at=NULL, current_snapshot_id=?,
+		if _, err := tx.Exec(`UPDATE instance SET source_id=?, rel_path=?, real_path=?, residue=?, last_seen=?, status=?, tombstone_at=NULL, current_snapshot_id=?,
 				game_id=coalesce((SELECT game_id FROM source WHERE id=?), game_id) WHERE id=?`,
-				[]any{src, rel, real, residue, lastSeen, identity.Live, newSnap, src, q.CandidateID}},
-			{`UPDATE snapshot SET instance_id=? WHERE instance_id=?`, []any{q.CandidateID, q.InstanceID}},
-			{`DELETE FROM change_event WHERE instance_id=? AND kind=?`, []any{q.InstanceID, identity.EvDiscovered}},
-			{`UPDATE change_event SET instance_id=? WHERE instance_id=?`, []any{q.CandidateID, q.InstanceID}},
-			{`UPDATE OR REPLACE instance_alias SET instance_id=? WHERE instance_id=?`, []any{q.CandidateID, q.InstanceID}},
-			{`INSERT INTO change_event(scan_id, instance_id, kind, before_snapshot, after_snapshot, detail) VALUES(?,?,?,?,?,?)`,
-				[]any{q.ScanID, q.CandidateID, identity.EvReappeared, candSnap, newSnap, fmt.Sprintf("confirmed by player (q:%d)", q.ID)}},
-			{`DELETE FROM instance WHERE id=?`, []any{q.InstanceID}},
-			{`UPDATE identity_question SET status='resolved', resolution='same', resolved_at=? WHERE id=?`, []any{now.Unix(), q.ID}},
-			{`UPDATE identity_question SET status='resolved', resolution='superseded', resolved_at=? WHERE status='open' AND id<>? AND (instance_id=? OR candidate_instance_id=?)`,
-				[]any{now.Unix(), q.ID, q.InstanceID, q.CandidateID}},
+			src, rel, real, residue, lastSeen, identity.Live, newSnap, src, q.CandidateID); err != nil {
+			return err
 		}
-		for _, st := range stmts {
-			if _, err := tx.Exec(st.q, st.args...); err != nil {
+		// The answered question is resolved before the rewrite, which supersedes the
+		// other open questions whose two sides become the same Instance.
+		if _, err := tx.Exec(`UPDATE identity_question SET status='resolved', resolution='same', resolved_at=? WHERE id=?`, now.Unix(), q.ID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`UPDATE identity_question SET status='resolved', resolution='superseded', resolved_at=? WHERE status='open' AND id<>? AND (instance_id=? OR candidate_instance_id=?)`,
+			now.Unix(), q.ID, q.InstanceID, q.CandidateID); err != nil {
+			return err
+		}
+		if err := remapHistoryStages(tx, instances, nil); err != nil {
+			return err
+		}
+		if err := rewriteInstances(tx, instances); err != nil {
+			return err
+		}
+		// The answered question keeps naming the Instance it asked about: its record shows
+		// that Instance as gone, as before the shared rewrite.
+		if _, err := tx.Exec(`UPDATE identity_question SET instance_id=? WHERE id=?`, q.InstanceID, q.ID); err != nil {
+			return err
+		}
+		if err := rewriteOrigins(tx, instances, lineages); err != nil {
+			return err
+		}
+		if len(lineages) > 0 {
+			if err := rewriteLineages(tx, lineages); err != nil {
 				return err
 			}
+			if err := mergePlayerData(tx, lineages); err != nil {
+				return err
+			}
+			if err := mergeRules(tx, lineages); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.Exec(`INSERT INTO change_event(scan_id, instance_id, kind, before_snapshot, after_snapshot, detail) VALUES(?,?,?,?,?,?)`,
+			q.ScanID, q.CandidateID, identity.EvReappeared, candSnap, newSnap, fmt.Sprintf("confirmed by player (q:%d)", q.ID)); err != nil {
+			return err
 		}
 		return recomputePrimaries(tx, q.EnvID)
 	})

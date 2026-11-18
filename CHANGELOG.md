@@ -4,6 +4,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Answering "same" to an identity question now carries the new Mod's notes, tags, user rules and ignored findings over to the Mod it was, and removes the left-over empty record. Before, they stayed on a record nothing pointed to any more.
+- TUI: drawing the screen no longer reads the database; Can it run's count is brought up to date after each key or result instead.
 - Window: the top bar no longer shows the Game Config chip (`name 1.6`) beside the breadcrumb; the sidebar and the Launch page's 01 column already name and switch it.
 - Launch page: each game in 01 shows its full version (`1.6.4871 rev590`) instead of the short one. Keys: `←` `→` now move between the three columns, and `↑` `↓` change what the focused column holds (the game in 01, the list or pack in 02); before, `←` `→` changed the game.
 - Window start: the sidebar's background-tasks line appears together with the first page instead of standing alone while the rest of the window loads.
