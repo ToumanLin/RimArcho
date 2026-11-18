@@ -1260,6 +1260,7 @@ svg.i.fill { fill: currentColor; }
 .way .typed { width: 100%; margin-top: 0; flex-wrap: nowrap; }
 .way .typed .field { flex: 1; min-width: 0; }
 .way-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.copy-opt { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
 .way-found { font-size: 12px; }
 .way-found.on { color: var(--green); }
 .import-ways { grid-template-columns: repeat(2, minmax(0, 1fr)); }

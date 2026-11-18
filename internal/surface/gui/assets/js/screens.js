@@ -1986,7 +1986,7 @@ export async function environment() {
   const sc = S.screen === "env" ? $("#screen") : openScreen("env");
   const top = sc.scrollTop;
   sc.innerHTML = "";
-  const w = page("env", "", act(T("add a game"), "plus", () => ui.go("guide")), rescanButton());
+  const w = page("env", "", act(T("add a game"), "plus", () => ui.go("guide")), act(T("copy a game…"), "copy", () => ui.go("guide:copy")), rescanButton());
   sc.append(w);
   const envLab = el("div", "label section", T("every game"));
   w.append(envLab);

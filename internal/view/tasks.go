@@ -26,6 +26,7 @@ const (
 	TaskTextures         = OpTextures
 	TaskTexClean         = OpTexClean
 	TaskDownload         = "download"
+	TaskCopyGame         = "copy-game" // a game folder copied as a new game (03 §3.5)
 	TaskSteamCMD         = "install-steamcmd"
 	TaskTodds            = "install-todds"
 	TaskDepRemove        = "remove-dependency"
@@ -180,6 +181,8 @@ func TaskTitle(kind string) string {
 		return T("create a pack")
 	case TaskDownload:
 		return T("download the game")
+	case TaskCopyGame:
+		return T("copy the game")
 	case TaskSteamCMD:
 		return T("download SteamCMD")
 	case TaskTodds:
@@ -543,7 +546,7 @@ func taskTarget(t *app.Task) string {
 		return PagePacks
 	case TaskTextures, TaskTexClean:
 		return PageTextures
-	case TaskDownload:
+	case TaskDownload, TaskCopyGame:
 		return PageEnv
 	}
 	return PageLibrary

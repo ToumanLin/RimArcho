@@ -1,8 +1,10 @@
 package cmds
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -415,4 +417,50 @@ func envDownload(c *Ctx, a *Args) (*render.Doc, error) {
 		return nil, err
 	}
 	return envDoc(c, r.Env, "downloaded and added", r.Changes), nil
+}
+
+func init() {
+	register(&Command{Name: "env copy", Args: "<name>", Summary: "copy a game's folder (a backup before the game updates) and add the copy as an environment",
+		MinArgs: 1, MaxArgs: 1, Flags: []Flag{
+			{Name: "to", Value: "<dir>", Help: "the new game folder (absent or empty)"},
+			{Name: "name", Value: "<env>", Help: "the copy's name (default: <name>-copy)"},
+			{Name: "mods", Help: "copy the game's Mods folder too (local Mods; RimArcho's links are never copied)"},
+			{Name: "saves", Value: "shared|own", Help: "own: the copy keeps its saves and settings apart (default shared)"},
+			{Name: "dry-run", Help: "say what would be copied and how much, write nothing"},
+		}, Run: envCopy})
+}
+
+// envCopy copies a game folder (03 §3.5).
+func envCopy(c *Ctx, a *Args) (*render.Doc, error) {
+	if a.Str("to") == "" {
+		return nil, &UsageError{Msg: "give the folder (--to)"}
+	}
+	saves := a.Str("saves")
+	if saves != "" && saves != app.SavesShared && saves != app.SavesOwn {
+		return nil, &UsageError{Msg: "--saves is shared or own"}
+	}
+	spec := app.CopyGameSpec{From: a.Pos[0], Dir: a.Str("to"), Name: a.Str("name"), Mods: a.Bool("mods"), OwnSaves: saves == app.SavesOwn}
+	if a.Bool("dry-run") {
+		p, err := c.App.PlanGameCopy(spec)
+		if err != nil {
+			return nil, err
+		}
+		d, root := render.New(fmt.Sprintf("env:%s  would be copied to %s as env:%s", p.From.Name, p.Dir, p.Name))
+		root.KV("copies", fmt.Sprintf("%d bytes", p.Bytes))
+		mods := "not copied"
+		if spec.Mods {
+			mods = "copied"
+		}
+		root.KV("Mods/", fmt.Sprintf("%d bytes, %s (RimArcho's links never are)", p.ModBytes, mods))
+		if p.Free >= 0 {
+			root.KV("free", fmt.Sprintf("%d bytes", p.Free))
+		}
+		d.AddNext(fmt.Sprintf("archo env copy %s --to %s", p.From.Name, strconv.Quote(p.Dir)))
+		return d, nil
+	}
+	r, err := c.App.CopyGame(context.Background(), spec, nil)
+	if err != nil {
+		return nil, err
+	}
+	return envDoc(c, r.Env, "copied and added", r.Changes), nil
 }

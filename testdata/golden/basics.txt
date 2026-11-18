@@ -93,6 +93,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     deps remove <name>                        remove only RimArcho's own downloaded dependency
     env branches                              list RimWorld's Steam branches (versions) SteamCMD can download
     env download <branch>                     download a RimWorld version with SteamCMD and add it as an environment (anonymous by default)
+    env copy <name>                           copy a game's folder (a backup before the game updates) and add the copy as an environment
     folder check                              check all managed directories, including games, the lock library and packs
     folder set <directory-id> <dir>           locate a directory you moved; keep its mods and lists
     folder move <directory-id> <dir>          move a managed directory to a new location

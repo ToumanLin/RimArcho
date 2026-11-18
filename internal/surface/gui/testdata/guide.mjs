@@ -7,8 +7,8 @@ const info = (description = "old", refreshing = true, error = "") => ({
   branches: [{ name: "public", description }, { name: "version-1.5", version: "1.5", description }],
 });
 
-async function setup({ folder = { done: true }, space = (path) => ({ path, free: 50e9 }), scan = async () => true, from } = {}) {
-  const screen = new Element("div"), S = { screen: "guide", busy: {} }, chosen = [];
+async function setup({ folder = { done: true }, space = (path) => ({ path, free: 50e9 }), scan = async () => true, from, envs = [] } = {}) {
+  const screen = new Element("div"), S = { screen: "guide", busy: {}, board: { envs } }, chosen = [], handlers = {}, copies = [];
   let now = 0, calls = 0, response = info(), switchWay, pathEditor;
   const timers = [], delays = [], gameCalls = [], writes = [], went = [];
   const el = (tag, cls, text) => new Element(tag, cls, text);
@@ -16,6 +16,8 @@ async function setup({ folder = { done: true }, space = (path) => ({ path, free:
     "./fields.js": { copyablePath: (n) => n, editablePath: (n) => n, pathContent: (n) => n },
     "./state.js": { S, $: () => screen, el, api: {
       GuideFind: async () => [], GuideAdd: async (games) => { writes.push("add"); return games.map((g) => g.name); }, GuideScan: (names) => { writes.push("scan"); return scan(names); }, GuideDownloadInfo: async () => { calls++; return await response; },
+      GuideCopyPlan: async (from, dir, name, mods) => ({ dir: dir || "D:\\Games\\RimWorld " + from + "-copy", name: name || from + "-copy", bytes: mods ? 5e9 : 1e9, modBytes: 4e9, free: 50e9, low: false }),
+      GuideCopy: async (...args) => { copies.push(args); writes.push("copy"); return true; },
       ManagedFolder: async () => folder, FolderSpace: async (path) => space(path), ChooseManagedFolder: async (path) => { chosen.push(path); writes.push("folder"); },
       // as view.GameAt: the version's first name not among the environments or pending
       GuideGame: async (path, pending) => {
@@ -33,13 +35,14 @@ async function setup({ folder = { done: true }, space = (path) => ({ path, free:
     },
     "./exchange.js": { exchange() {}, importFrom() {} },
     "./environment.js": { withEnvironmentSwitch: async (_, run) => { await run(); return true; } },
-    "./api.js": { on() {} },
+    "./api.js": { on(name, fn) { handlers[name] = fn; } },
+    "./importways.js": { managersWay: () => el("div") },
   }, { Date: { now: () => now }, setTimeout: (fn, ms) => { timers.push({fn,ms}); delays.push(ms); } });
   guide.initGuide({ renderWhere() {}, go: (id) => went.push(id) });
   await guide.start(from);
   if (folder.done && !from) { switchWay(1); await flush(); }
   return {
-    screen, S, timers, delays, guide, chosen, gameCalls, writes, went, choosePath: (value) => pathEditor.done(value),
+    screen, S, timers, delays, guide, chosen, gameCalls, writes, went, handlers, copies, choosePath: (value) => pathEditor.done(value),
     calls: () => calls, now: () => now, respond: value => { response = value; },
     switchWay: n => switchWay(n),
     changeDirectory(value) { screen.querySelectorAll("button").find(b => b.textContent === "change…").onclick(); pathEditor.done(value); },
@@ -184,4 +187,28 @@ test("the preview's download plays out without SteamCMD", async () => {
   assert.match(h.screen.querySelector(".st.cur").textContent, /read the mods/);
   assert.match(h.screen.textContent, /✓/);
   assert.deepEqual(h.writes, []);
+});
+
+test("copying a game: the plan, the copy's events, then reading its mods", async () => {
+  const button = (h, label) => h.screen.querySelectorAll("button").find(b => b.textContent === label);
+  const h = await setup({ envs: ["1.6", "1.5"] });
+  h.switchWay(2); await flush();
+  assert.ok(h.screen.textContent.includes("D:\\Games\\RimWorld 1.6-copy"));
+  assert.match(h.screen.textContent, /copies %s; free: %s/);
+  // the Mods folder too: the plan is asked again
+  h.screen.querySelectorAll("input").find(i => i.type === "checkbox").onchange({ target: { checked: true } }); await flush();
+  await button(h, "copy and add").onclick(); await flush();
+  assert.equal(h.copies.length, 1);
+  assert.equal(h.copies[0][0], "1.6");
+  h.handlers.copy({ bytes: 5e8, total: 1e9 }); await flush();
+  assert.match(h.screen.textContent, /copying the game…/);
+  h.handlers.copy({ end: true, ok: true, env: "1.6-copy" }); await flush();
+  assert.match(h.screen.querySelector(".st.cur").textContent, /read the mods/);
+  assert.deepEqual(h.writes, ["copy", "scan"]);
+});
+
+test("with no game added there is no copy way", async () => {
+  const h = await setup();
+  h.switchWay(2); await flush();
+  assert.doesNotMatch(h.screen.textContent, /copy and add/);
 });

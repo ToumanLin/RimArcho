@@ -83,6 +83,7 @@ export function packWay(done) {
 export function gameWay() {
   const envs = (S.board && S.board.envs) || [];
   const text = envs.length ? Tf("added: %s", envs.map((e) => e.name || e).join(", ")) : T("no game added yet");
-  return way(T("a game"), T("a RimWorld on this computer, a folder you choose, or a version downloaded with SteamCMD"),
-    button(T("add a game"), "", () => ui.go("guide")), el("div", "way-found muted", text));
+  return way(T("a game"), T("a RimWorld on this computer, a folder you choose, a version downloaded with SteamCMD, or a copy of one you added"),
+    [button(T("add a game"), "", () => ui.go("guide")), envs.length ? button(T("copy a game…"), "", () => ui.go("guide:copy")) : null],
+    el("div", "way-found muted", text));
 }
