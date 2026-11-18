@@ -100,7 +100,7 @@ func newSelfRelease(t *testing.T) *selfRelease {
 			fmt.Fprint(w, `]}]}}`)
 		case "/releases/tags/v0.9.1":
 			if f.tagDown {
-				http.Error(w, "offline", 503)
+				http.Error(w, "offline", http.StatusServiceUnavailable)
 				return
 			}
 			fmt.Fprint(w, release("v0.9.1", false))
@@ -116,14 +116,14 @@ func newSelfRelease(t *testing.T) *selfRelease {
 			fmt.Fprint(w, "["+release("v0.9.1", false)+"]")
 		case "/dl/sum":
 			if f.sumDown {
-				http.Error(w, "offline", 503)
+				http.Error(w, "offline", http.StatusServiceUnavailable)
 				return
 			}
 			fmt.Fprint(w, f.sum)
 		case "/dl/zip":
 			f.zipHits.Add(1)
 			if f.zipDown {
-				http.Error(w, "offline", 503)
+				http.Error(w, "offline", http.StatusServiceUnavailable)
 				return
 			}
 			if f.cut {

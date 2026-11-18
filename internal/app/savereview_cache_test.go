@@ -214,8 +214,15 @@ func TestSaveReviewProgressAndCancellation(t *testing.T) {
 			}
 			time.Sleep(510 * time.Millisecond)
 		}
-	}, Partial: func(p *app.SaveReview) { partial = p; updates++ }})
-	if err != nil || updates != 1 || partial.Done != 1 || partial.Total != 3 || partial.Saves != 1 || r.Done != 3 {
+	}, Partial: func(p *app.SaveReview) {
+		// A slow runner can take another 500 ms on a later save; the first snapshot is
+		// the one the sleep above guarantees.
+		if partial == nil {
+			partial = p
+		}
+		updates++
+	}})
+	if err != nil || updates < 1 || partial.Done != 1 || partial.Total != 3 || partial.Saves != 1 || r.Done != 3 {
 		t.Fatalf("progress: updates=%d partial=%+v final=%+v err=%v", updates, partial, r, err)
 	}
 	// Progress has already been merged when Stop is checked, including the last save.

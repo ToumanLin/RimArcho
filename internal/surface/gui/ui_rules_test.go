@@ -76,7 +76,7 @@ var (
 // listed here. A body.<state> rule that stops selection during a drag or resize is allowed.
 var unselectableAllowed = map[string]string{
 	"button": "control", "select": "control", "kbd": "key cap", "svg": "icon",
-	"#side": "sidebar", "#crumbs": "breadcrumbs", ".envchip": "Game Config switcher", "#hints": "hint line",
+	"#side": "sidebar", "#crumbs": "breadcrumbs", "#hints": "hint line",
 	".area .head": "area heading", ".hbar": "area heading bar", ".split": "splitter", ".lib-th": "table header",
 	".row": "multi-select row", ".lib-row": "multi-select row", ".tk-row": "multi-select row",
 	".fbar-chip": "filter chip", ".drop-tip": "drag hint", ".archo-slot": "Archo's figure",
