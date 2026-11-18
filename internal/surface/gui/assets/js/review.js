@@ -6,7 +6,7 @@
 // 4 what the saves show of it: each category folded, the names not seen inside. The review runs in the background and arrives as "review"
 // events: the page in parts (their done/total is the progress), then the whole page, or
 // "stale" when a newer request or leaving stopped it (16 §8.4).
-import { S, $, el, api, T, Tf, say } from "./state.js";
+import { S, $, el, api, T, Tf, say, keyCaps } from "./state.js";
 import { on } from "./api.js";
 import { beginPageRead, page, area, button } from "./screens.js";
 import { icon } from "./icons.js";
@@ -191,7 +191,7 @@ function build() {
     else if (e.key === "ArrowDown" || e.key === "Enter") { e.preventDefault(); e.stopPropagation(); cols.focus({ preventScroll: true }); }
     else e.stopPropagation(); // typing is not a page key
   };
-  search.append(find, el("kbd", "", "/"));
+  search.append(find, keyCaps("/"));
   const leftCard = el("section", "card sv-left");
   cols = el("div", "sv-tree rv-cols");
   cols.tabIndex = 0;

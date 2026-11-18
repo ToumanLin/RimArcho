@@ -59,5 +59,7 @@
   "waiting for Steam: %s": "等 Steam 处理 %s",
   "waiting in the %s queue for the one before": "排在%s队列，等前一项做完",
   "working on it": "正在做",
-  "yesterday": "昨天"
+  "yesterday": "昨天",
+  "copy the game": "复制游戏",
+  "the copy was stopped": "复制已停止"
 }

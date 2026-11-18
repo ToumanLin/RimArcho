@@ -392,5 +392,10 @@
   "colour of %s: %s": "%s 的颜色：%s",
   "Texture optimisation needs a Linux todds. The Linux build of todds 0.4.1 (https://github.com/todds-encoder/todds/releases/tag/0.4.1) runs on Ubuntu 24.04, Fedora 39, Arch and newer; on older systems, build it from source. Then put todds on PATH or set textures.todds to its full path.": "贴图优化需要 Linux 版 todds。todds 0.4.1 的 Linux 版（https://github.com/todds-encoder/todds/releases/tag/0.4.1）可在 Ubuntu 24.04、Fedora 39、Arch 及更新的系统上运行；更旧的系统请从源码构建。然后把 todds 放进 PATH，或把 textures.todds 设为它的完整路径。",
   "new": "新",
-  "added": "加入日期"
+  "added": "加入日期",
+  "press T again to convert its textures again": "再按一次 T：重新转换它的贴图",
+  "RimArcho writes the DDS again next to the PNGs that changed": "RimArcho 在更新过的 PNG 旁重新写 DDS",
+  "converted the textures of %s again": "已重新转换 %s 的贴图",
+  "press C again to delete the DDS RimArcho wrote": "再按一次 C：删除 RimArcho 写的 DDS",
+  "removed the converted textures of %s": "已清除 %s 的贴图优化"
 }

@@ -19,7 +19,7 @@ const writesGame = new Set([
   "PlanSync", "PlanFollow", "PlanFollowMode", "PlanUnfollow", "PlanVersionsSet", "SetModNote", "SetTag",
   "RenameTag", "MergeTags", "DeleteTags", "SetTagNote", "PinTag",
   "LibraryDo", "LibrarySetNote", "Subscribe", "SubscriptionFrom", "CheckSubscriptionSource", "WorkshopUpdate", "Scan", "Analyze", "RemoveEnv", "ApplySetting", "AddMonitor",
-  "PackLaunch", "PackBuild", "PackRemove", "PackRemoveUnfinished", "TexturesRun", "TexturesClean", "CreditAnswer", "CompleteDependencies", "ReplaceRecommended",
+  "PackLaunch", "PackBuild", "PackRemove", "PackRemoveUnfinished", "TexturesRun", "TexturesClean", "CreditAnswer",
   // Saves (16 §2.11): fixes edit the save's list, the file actions change its folder;
   // SaveChoose and SaveCopyTo act for the current Game Config
   "SaveFix", "SaveNewList", "SaveRename", "ColonyRename", "SaveCopy", "SaveCopyTo", "SaveChoose", "SaveTrash",

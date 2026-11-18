@@ -13,5 +13,5 @@ export function keepsNativeMenu(t) {
 }
 
 export function blockNativeMenu(doc) {
-  doc.addEventListener("contextmenu", (e) => { if (!keepsNativeMenu(e.target)) e.preventDefault(); });
+  doc.addEventListener("contextmenu", (e) => { if (!keepsNativeMenu(e.target)) e.preventDefault(); }); // keys: none; it only stops the browser's own menu
 }

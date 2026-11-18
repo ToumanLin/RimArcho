@@ -42,5 +42,8 @@
   "download the zip in the browser, then install it:": "在浏览器中下载压缩包，然后安装：",
   "path to the zip": "压缩包路径",
   "o: open the download page": "o：打开下载页",
-  "opened the download page": "已打开下载页"
+  "opened the download page": "已打开下载页",
+  "enter: stop the update (nothing is changed before the files are replaced); esc: keep going": "enter：停止更新（替换文件之前什么都不会改）；esc：继续",
+  "enter: install; esc: cancel   :update --check checks again": "enter：安装；esc：取消   :update --check 重新检查",
+  "enter: check for updates; esc: cancel": "enter：检查更新；esc：取消"
 }

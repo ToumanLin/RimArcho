@@ -392,5 +392,10 @@
   "colour of %s: %s": "%sの色：%s",
   "Texture optimisation needs a Linux todds. The Linux build of todds 0.4.1 (https://github.com/todds-encoder/todds/releases/tag/0.4.1) runs on Ubuntu 24.04, Fedora 39, Arch and newer; on older systems, build it from source. Then put todds on PATH or set textures.todds to its full path.": "テクスチャ最適化にはLinux版toddsが必要です。todds 0.4.1のLinux版（https://github.com/todds-encoder/todds/releases/tag/0.4.1）はUbuntu 24.04、Fedora 39、Archおよびそれ以降で動作します。古いゲーム構成ではソースからビルドしてください。その後toddsをPATHに追加するか、textures.toddsにフルパスを設定してください。",
   "new": "新着",
-  "added": "追加日"
+  "added": "追加日",
+  "press T again to convert its textures again": "もう一度Tを押すとテクスチャを再変換します",
+  "RimArcho writes the DDS again next to the PNGs that changed": "RimArchoは変更されたPNGの横にDDSを書き直します",
+  "converted the textures of %s again": "%sのテクスチャを再変換しました",
+  "press C again to delete the DDS RimArcho wrote": "もう一度Cを押すとRimArchoが作成したDDSを削除します",
+  "removed the converted textures of %s": "%sの変換済みテクスチャを削除しました"
 }

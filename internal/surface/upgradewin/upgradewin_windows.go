@@ -121,6 +121,7 @@ func (w *Window) Close() {
 		w.closing = posted != 0
 	}
 	w.mu.Unlock()
+	// not scheduled: a bounded wait for the window's thread to end
 	timer := time.NewTimer(2 * time.Second)
 	defer timer.Stop()
 	select {

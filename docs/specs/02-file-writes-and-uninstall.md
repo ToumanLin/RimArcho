@@ -64,6 +64,8 @@ Never do the following:
 - Network access is limited to actions the player starts and, when their master switch is on, automatic checks (16 §2.16): community data updates (08 §2), Workshop descriptions and images (can be turned off in settings, 16 §4.3), reading Steam collections (07 §7), subscribing to Git repositories, reading the Mod metadata of download pages and checking for and pulling updates, logging in to LoversLab and validating its session after the player opts in, and downloading selected site files (11 §1), SteamCMD Workshop downloads without a Steam client (11 §1), subscribing and unsubscribing through the Steam client (11 §2), resumable credit replacement subscriptions after the player accepts (11 §1), downloading SteamCMD and using it to read branches and download game versions (11 §3), checking external tools' versions and downloading them (17 §2.1), checking for new RimArcho versions and downloading one after confirmation (GitHub Releases, 17 §5.1), sending a feedback report through the feedback relay (16 §2.14), and model calls (with consent, 15 §3).
 - Never ask for, receive, save or pass on passwords, verification codes, Steam Guard codes, recovery codes or TOTP secrets for any service. SteamCMD interacts only in its own console; LoversLab only in an isolated window of the original site. Session cookies are used only in the secret storage and restricted HTTP client of 11 §4, never in ordinary data or by agents.
 
+Surfaces (`internal/surface/**`) and `internal/cmds` call app or view for every write. `TestArchSurfaceWrites` lists their remaining own writes, each with its reason; those marked "open question" are to move into app.
+
 ## 2. Uninstall
 
 Implemented in `internal/app/uninstall.go`. Uninstall reverses each row of §1's table as its last column says: the column names the step (`accounts`, `links`, `modsconfig`, `textures`, `locked`, `monitor`, `packs`, `saves`, `games`, `steamcmd`, `source`, `data`, `program`), or says after "None:" why no step applies. `TestUninstallCoversWriteList` checks that every row has this column, that every step it names exists, and that every step appears in §1.
@@ -112,6 +114,8 @@ Other paths are refused (`ErrNotInTrashList`, `TestTrashAllowList`).
 - **macOS** renames the item into `~/.Trash`, adding `.2`, `.3` on name collisions.
 - **Other systems** follow freedesktop: on the data directory's volume use `$XDG_DATA_HOME/Trash` (default `~/.local/share/Trash`); on other volumes use `<mount>/.Trash-<uid>`. The volume trash and its `files/` and `info/` directories must be owned by the current user, have mode 0700 and be real directories, not links. Move the item into `files/` and write `info/<name>.trashinfo` with URL-escaped `Path` and local `DeletionDate`; `Path` is absolute for the home trash and relative to the mount for volume trash. Reserve metadata exclusively and finish writing it before moving the item; existing files or metadata get `.2`, `.3` suffixes. An unavailable or unsafe trash, metadata failure or failed rename leaves the original in place; remove this attempt's metadata when the move fails.
 - Trash never falls back to copying and permanently deleting. macOS still refuses a rename across volumes.
+
+`source.Trash` is used only by `App.ToTrash` in `internal/app/trash.go`, and `SHFileOperationW` only in `source/trash_windows.go`. The recycle-bin implementations never call `os.RemoveAll` (`TestArchTrash`).
 
 ## 4. Acceptance
 

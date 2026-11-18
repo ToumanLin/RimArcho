@@ -253,7 +253,7 @@ function build() {
   rows.addEventListener("scroll", drawRows, { passive: true });
   rows.addEventListener("mousedown", () => { L.focus = "rows"; rows.focus(); markFocus(); });
   scroll.addEventListener("mousedown", () => { L.focus = "detail"; markFocus(); });
-  rows.addEventListener("contextmenu", (e) => { if (!e.target.closest(".lib-row")) e.preventDefault(); });
+  rows.addEventListener("contextmenu", (e) => { if (!e.target.closest(".lib-row")) e.preventDefault(); }); // keys: none; it only stops the browser's menu outside rows
   draw();
   rows.focus();
 }
@@ -420,8 +420,8 @@ function rowEl(x, k) {
   }
   table.row(r, k);
   r.onclick = (e) => click(k, e);
-  r.ondblclick = () => { if (x.t === "lin") toggle(x.r); };
-  r.oncontextmenu = (e) => {
+  r.ondblclick = () => { if (x.t === "lin") toggle(x.r); }; // keys: → / ← open and close a Mod's copies
+  r.oncontextmenu = (e) => { // keys: Menu, shift+F10 (menuAtCursor)
     e.preventDefault();
     if (!selected) { L.cur = k; L.sel.clear(); els.rows.dataset.sig = ""; drawRows(); follow(); drawBar(); }
     menuAt(e.clientX, e.clientY);
@@ -456,8 +456,8 @@ function groupEl(x, k) {
   r.setAttribute("aria-labelledby", t.id);
   table.row(r, k);
   r.onclick = (e) => click(k, e);
-  r.ondblclick = () => toggleGroup(g.key);
-  r.oncontextmenu = (e) => {
+  r.ondblclick = () => toggleGroup(g.key); // keys: → / ← open and close the group
+  r.oncontextmenu = (e) => { // keys: Menu, shift+F10 (menuAtCursor)
     e.preventDefault();
     L.cur = k; L.sel.clear(); els.rows.dataset.sig = ""; drawRows(); follow(); drawBar(); hints();
     groupMenu(e.clientX, e.clientY);
@@ -1124,7 +1124,6 @@ export function hintList() {
   if (x && x.t === "inst" && !x.lone) list.push({ key: "←", label: T("open / close") });
   list.push({ key: "enter", label: L.full ? T("back") : T("details") });
   if (codes.includes("folder") || codes.includes("workshop")) list.push({ key: "ctrl+o", label: T("open the folder") }, { key: "ctrl+w", label: T("Workshop page") });
-  if (codes.includes("steam")) list.push({ key: "ctrl+s", label: T("steam page") });
   list.push({ key: "/", label: T("search") }, { key: "\\", label: T("filter") }, other);
   list.push({ key: "?", label: T("all keys") });
   return list;

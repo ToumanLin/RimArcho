@@ -481,5 +481,6 @@
   "The game keeps only what fits this card; about %s of textures load from the disk cache when drawn, which may stutter but does not stop the game.": "ゲームはグラフィックカードの容量に収まる分だけ保持します。テクスチャの約%sは描画時にディスクキャッシュから読み込まれるため、カクつく可能性がありますが、ゲームが停止するわけではありません",
   "RAM: loading needs %s; available memory and total capacity are unavailable": "RAM：読み込みに必要な容量 %s／空き容量と総容量は取得できません",
   "RAM: loading needs %s; available memory is unavailable; total capacity %s": "RAM：読み込みに必要な容量 %s／空き容量は不明（総容量 %s）",
-  "VRAM: estimated %s; dedicated capacity is unknown": "VRAM：推定使用量 %s／専用容量は不明"
+  "VRAM: estimated %s; dedicated capacity is unknown": "VRAM：推定使用量 %s／専用容量は不明",
+  "the mod's files changed after RimArcho wrote its DDS": "RimArchoがDDSを作成した後にMODのファイルが変更されました"
 }

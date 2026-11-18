@@ -468,10 +468,6 @@ export function hintList() {
       {
         key: "ctrl+o",
         label: T("show in folder")
-      },
-      {
-        key: "ctrl+c",
-        label: T("copy the path")
       }
     );
   }

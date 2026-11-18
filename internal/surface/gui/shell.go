@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/perftrace"
@@ -614,6 +616,100 @@ func (s *API) GuideDownload(branch, dir, account, name string) (bool, error) {
 			s.endSelf(task, nil, r.Env.Name)
 		}
 		s.send("download", end)
+	}()
+	return true, nil
+}
+
+// CopyPlan is what copying a game would do (03 §3.5), for the guide's copy way.
+type CopyPlan struct {
+	Dir      string `json:"dir"`
+	Name     string `json:"name"`
+	Bytes    int64  `json:"bytes"`
+	ModBytes int64  `json:"modBytes"`
+	Free     int64  `json:"free"`
+	Low      bool   `json:"low"` // not enough room for the copy
+}
+
+// GuideCopyPlan checks a copy of the game from into dir (empty: <games folder>\RimWorld
+// <from>-copy) and says how much it copies; nothing is written.
+func (s *API) GuideCopyPlan(from, dir, name string, mods bool) (*CopyPlan, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if strings.TrimSpace(dir) == "" {
+		base := name
+		if base == "" {
+			base = from + "-copy"
+		}
+		dir = filepath.Join(gamesFolder(s.a), "RimWorld "+base)
+	}
+	p, err := s.a.PlanGameCopy(app.CopyGameSpec{From: from, Dir: dir, Name: name, Mods: mods})
+	if err != nil {
+		return &CopyPlan{Dir: dir, Name: name, Free: app.DiskFree(dir)}, errors.New(view.Humanize(nil, err.Error()))
+	}
+	return &CopyPlan{Dir: p.Dir, Name: p.Name, Bytes: p.Bytes, ModBytes: p.ModBytes, Free: p.Free, Low: p.Free >= 0 && p.Free < p.Bytes}, nil
+}
+
+// GuideCopy copies the game and returns at once; "copy" events carry the bytes copied and
+// the end (with the environment added). It is a background task the player can stop; a
+// stopped or failed copy leaves nothing (03 §3.5).
+func (s *API) GuideCopy(from, dir, name string, mods, ownSaves bool) (bool, error) {
+	s.mu.Lock()
+	if s.busy["copy"] {
+		s.mu.Unlock()
+		return false, nil
+	}
+	spec := app.CopyGameSpec{From: from, Dir: dir, Name: name, Mods: mods, OwnSaves: ownSaves}
+	if _, err := s.a.PlanGameCopy(spec); err != nil {
+		s.mu.Unlock()
+		return false, errors.New(view.Humanize(nil, err.Error()))
+	}
+	s.busy["copy"] = true
+	s.mu.Unlock()
+	ctx, cancel := context.WithCancel(context.Background())
+	task := s.beginSelf(view.TaskCopyGame, from, func() error { cancel(); return nil })
+	go func() {
+		defer cancel()
+		var r *app.SourceChangeEnv
+		reader, err := s.detachedReader()
+		if reader != nil {
+			defer reader.Close()
+		}
+		if err == nil {
+			last := time.Time{}
+			r, err = reader.CopyGame(ctx, spec, func(p app.CopyGameProgress) {
+				if now := time.Now(); now.Sub(last) >= 100*time.Millisecond || p.Bytes == p.Total {
+					last = now
+					s.tasks.Update(task, func(t *app.Task) {
+						if p.Total > 0 {
+							t.Frac = float64(p.Bytes) / float64(p.Total)
+						}
+					})
+					s.send("copy", p)
+				}
+			})
+		}
+		end := map[string]any{"end": true}
+		s.mu.Lock()
+		if err == nil {
+			err = s.a.Store.SetCurrentEnv(r.Env.ID)
+			s.a.EnvName = r.Env.Name
+		}
+		// GuideScan owns link preparation and the first scan (16 §8.4).
+		s.busy["copy"], s.board, s.needs = false, nil, nil
+		s.mu.Unlock()
+		switch {
+		case errors.Is(err, app.ErrCopyStopped):
+			end["ok"], end["error"] = false, view.T("the copy was stopped")
+			s.tasks.Finish(task, app.TaskStopped, view.T("the copy was stopped"))
+		case err != nil:
+			msg := view.Humanize(nil, err.Error())
+			end["ok"], end["error"] = false, msg
+			s.tasks.Finish(task, app.TaskFailed, msg)
+		default:
+			end["ok"], end["env"] = true, r.Env.Name
+			s.endSelf(task, nil, r.Env.Name)
+		}
+		s.send("copy", end)
 	}()
 	return true, nil
 }

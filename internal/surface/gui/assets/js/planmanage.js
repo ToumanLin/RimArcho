@@ -5,7 +5,7 @@ import { choiceControl } from "./choices.js";
 // follows (07 §7.6) and how to share it (export, pack). The export is a sub-page of its own
 // (Library / Lists / <list> / export). Editing what a list holds stays in the editor (16 §2.5).
 // Data: API.PlanManage (view.BuildPlanManage), API.PlanExport (view.BuildPlanExport).
-import { pathContent, copyablePath, editablePath } from "./fields.js";
+import { pathContent, copyablePath, editablePath, copy as copyText } from "./fields.js";
 import { S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { openScreen, page, button, act, area, seg, beginPageRead } from "./screens.js";
 import { icon } from "./icons.js";
@@ -138,7 +138,7 @@ function listCard(d) {
       b.append(use);
     }
     b.onclick = () => pick(r.id);
-    b.ondblclick = () => ui.go(r.page);
+    b.ondblclick = () => ui.go(r.page); // keys: enter edits the picked list
     box.append(b);
   }
   card.append(box);
@@ -167,7 +167,7 @@ function detailCard(p) {
   else {
     const h = el("h2", "pm-title", p.name);
     h.title = T("double-click to rename");
-    h.ondblclick = () => startRename(p.id);
+    h.ondblclick = () => startRename(p.id); // keys: F2
     n.append(h);
   }
   if (p.mark) { const m = el("span", "adot"); m.title = p.mark; n.append(m); }
@@ -1060,7 +1060,7 @@ async function copy(out) {
   let c;
   try { c = await api.PlanExportCopy(X.id, X.format); } catch (e) { return result(out, false, errText(e)); }
   let ok = c.copied;
-  if (!ok && navigator.clipboard) { try { await navigator.clipboard.writeText(c.text); ok = true; } catch { /* shown below */ } }
+  if (!ok) ok = await copyText(c.text);
   if (ok) return result(out, true, c.line);
   out.className = "xc-out";
   out.textContent = T("copy it from here:");

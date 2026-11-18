@@ -32,6 +32,9 @@
   --accent: var(--default-accent);
   --accent-soft: #eeedfd;
   --accent-fg: #ffffff;
+  --on-red: #ffffff;
+  --star: #fde68a;
+  --thumb-bg: #1c1c20;
   --sel: #ecebfb;
   --green: #189a58;
   --green-soft: #e4f6ec;
@@ -51,6 +54,7 @@
   --t-enter: 200ms;
   --t-exit: 150ms;
   --t-layout: 250ms;
+  --t-flash: 400ms;
   --row-h: 28px;
   --font: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
   --code: "Cascadia Mono", Consolas, "Microsoft YaHei UI", "Microsoft YaHei", monospace;
@@ -366,7 +370,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .col-head { flex: none; padding: 9px 12px 6px; font-size: 12px; color: var(--muted); border-bottom: var(--hairline) solid var(--line-2); }
 .card.area-on, section.area-on { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .sec.area-on > h2 { color: var(--accent-11, var(--accent)); }
-.area .head .t { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+.area .head .t { color: var(--muted); font-size: 12px; font-weight: 600; }
 .area .head .num { color: var(--faint); font-size: 12px; }
 .area.focus .head .t { color: var(--accent-11, var(--accent)); }
 .area .head .q { color: var(--faint); overflow: hidden; text-overflow: ellipsis; }
@@ -419,7 +423,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 body.row-dragging, body.row-dragging * { cursor: grabbing !important; user-select: none !important; }
 .empty { color: var(--faint); padding: 14px; }
 .hist { margin-top: 14px; color: var(--fg); }
-.hist .hh { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; margin: 12px 0 4px; }
+.hist .hh { color: var(--muted); font-size: 12px; font-weight: 600; margin: 12px 0 4px; }
 .hist .h { padding: 4px 8px; border-radius: var(--r-sm); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hist .h:hover { background: var(--pill); }
 .hist .h.now { cursor: default; color: var(--accent-11, var(--accent)); font-weight: 600; }
@@ -463,7 +467,7 @@ body.row-dragging, body.row-dragging * { cursor: grabbing !important; user-selec
 :is(#detail, .lib-desc, .mod-detail) .link { color: var(--accent-11, var(--accent)); cursor: pointer; }
 :is(#detail, .lib-desc, .mod-detail) .link:hover { text-decoration: underline; }
 :is(#detail, .lib-desc, .mod-detail) .chip, .chip { display: inline-block; background: var(--pill); color: var(--fg-2); border-radius: 999px; padding: 0 8px; margin: 0 4px 2px 0; font-size: 12px; line-height: 19px; }
-:is(#detail, .lib-desc, .mod-detail) .sub { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; margin: 18px 0 6px; }
+:is(#detail, .lib-desc, .mod-detail) .sub { color: var(--muted); font-size: 12px; font-weight: 600; margin: 18px 0 6px; }
 :is(#detail, .lib-desc, .mod-detail) .desc p { margin: 0 0 2px; white-space: pre-wrap; overflow-wrap: anywhere; }
 :is(#detail, .lib-desc, .mod-detail) .desc p.gap { height: 8px; }
 :is(#detail, .lib-desc, .mod-detail) .desc h3 { font-size: 13px; margin: 10px 0 4px; }
@@ -513,7 +517,7 @@ body.row-dragging, body.row-dragging * { cursor: grabbing !important; user-selec
 /* one line under the breadcrumb that says what the page is for (16 §2.2) */
 .page-head .lead { margin: 0; color: var(--muted); font-size: 13px; }
 .subbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-.label { font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.label { font-size: 12px; font-weight: 600; color: var(--muted); }
 .label.section { margin: 8px 2px -4px; }
 .sec { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
 .sec > h2.label { margin: 0 2px; font-size: 12px; letter-spacing: 0; text-transform: none; }
@@ -523,7 +527,7 @@ body.row-dragging, body.row-dragging * { cursor: grabbing !important; user-selec
 .card-head { display: flex; align-items: baseline; gap: 10px; padding: 10px 14px 8px; border-bottom: var(--hairline) solid var(--line-2); }
 .card-head .n { margin-left: auto; color: var(--amber); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .empty-state { padding: 36px 20px; text-align: center; color: var(--muted); }
-.group { padding: 12px 14px 4px; color: var(--faint); font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+.group { padding: 12px 14px 4px; color: var(--faint); font-size: 12px; font-weight: 600; }
 .page-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--card-gap); padding-bottom: 8px; }
 .cols { flex: 1; min-height: 0; display: grid; gap: var(--card-gap); }
 .cols.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -821,7 +825,7 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 /* ---- motion (16 §7.1): opacity and transform only ---- */
 /* a changed row flashes accent-soft: an overlay that fades, not an animated background */
 .row.flash { isolation: isolate; }
-.row.flash::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--accent-soft); pointer-events: none; animation: flash 400ms var(--ease) forwards; }
+.row.flash::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--accent-soft); pointer-events: none; animation: flash var(--t-flash) var(--ease) forwards; }
 @keyframes flash { 0%, 30% { opacity: 1; } to { opacity: 0; } }
 /* a number that changed bumps */
 .bump { animation: bump var(--t-layout) var(--ease); }
@@ -913,10 +917,10 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 @media (prefers-reduced-motion: reduce) { .env-progress-bar > span { width: 100%; transform: none; opacity: .65; } }
 :root[data-motion="reduced"] .env-progress-bar > span { width: 100%; transform: none; opacity: .65; }
 
-#popup { position: absolute; inset: 0; z-index: 20; background: rgba(0, 0, 0, .28); display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; animation: fade var(--t-press) ease-out; }
+#popup { position: absolute; inset: 0; z-index: 20; background: rgba(0, 0, 0, .28); display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; animation: fade var(--t-press) var(--ease); }
 @keyframes fade { from { opacity: 0; } }
 /* no backdrop blur: WebView2 repaints it on every frame of a scroll behind it */
-.pop { width: min(620px, 92vw); background: var(--card); border: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); box-shadow: var(--shadow); overflow: hidden; animation: pop-in var(--t-enter) ease-out; }
+.pop { width: min(620px, 92vw); background: var(--card); border: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); box-shadow: var(--shadow); overflow: hidden; animation: pop-in var(--t-enter) var(--ease); }
 @keyframes pop-in { from { opacity: 0; transform: scale(.98); } }
 .pop .ttl { padding: 12px 16px 0; color: var(--muted); font-size: 12px; }
 .pop .in { display: flex; gap: 8px; padding: 0 14px; height: 42px; border-bottom: var(--hairline) solid var(--line-2); align-items: center; }
@@ -999,7 +1003,7 @@ svg.i.fill { fill: currentColor; }
    with extra coverage behind text: down the left, along the bottom, under the top bar and in
    the top right corner (the last run and update lines). */
 #backdrop { position: absolute; left: 0; right: 0; top: 0; bottom: 30px; z-index: 0; overflow: hidden; pointer-events: none; background: var(--bg); }
-#backdrop .img { position: absolute; inset: 0; background-size: cover; background-repeat: no-repeat; animation: fade var(--t-enter) ease-out; }
+#backdrop .img { position: absolute; inset: 0; background-size: cover; background-repeat: no-repeat; animation: fade var(--t-enter) var(--ease); }
 #backdrop .shade { position: absolute; inset: 0; background:
   radial-gradient(640px 260px at 100% 0, rgba(var(--photo-shade), .8), rgba(var(--photo-shade), 0)),
   linear-gradient(rgba(var(--photo-shade), var(--dim, .3)), rgba(var(--photo-shade), var(--dim, .3))),
@@ -1105,7 +1109,7 @@ svg.i.fill { fill: currentColor; }
 .hm-go .bar::after { content: ""; position: absolute; top: 0; bottom: 0; width: 38%; background: var(--accent-fg); opacity: .7; animation: hm-bar 1.2s var(--ease) infinite; }
 .hm-go.arrived .top, .hm-go.arrived .bottom { animation: hm-land var(--t-enter) var(--ease) both; }
 .hm-go.arrived .bottom { animation-delay: .06s; }
-.hm-go.arrived::before { content: ""; position: absolute; inset: 0; background: var(--accent-fg); opacity: 0; animation: hm-flash 400ms var(--ease); pointer-events: none; }
+.hm-go.arrived::before { content: ""; position: absolute; inset: 0; background: var(--accent-fg); opacity: 0; animation: hm-flash var(--t-flash) var(--ease); pointer-events: none; }
 .hm-pick.leaving { animation: hm-leave var(--t-exit) var(--ease-in) forwards; }
 /* the running dot blinks three times when the game starts, then holds: an endless blink
    redraws the window every frame for the whole run (about 5% of a core, 16 §10) */
@@ -1211,7 +1215,7 @@ svg.i.fill { fill: currentColor; }
 .bg-tile:hover { background: var(--card-2); }
 .bg-tile.sel { border-color: var(--accent); background: var(--accent-soft); }
 .bg-grid:focus-visible .bg-tile.kb { outline: 1.5px solid var(--muted); outline-offset: 1px; }
-.bg-tile .th { position: relative; aspect-ratio: 16 / 9; border-radius: var(--r-sm); overflow: hidden; background: #1c1c20; }
+.bg-tile .th { position: relative; aspect-ratio: 16 / 9; border-radius: var(--r-sm); overflow: hidden; background: var(--thumb-bg); }
 .bg-tile .th img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .bg-tile .th.plain { background: linear-gradient(135deg, var(--card), var(--bg)); border: var(--hairline) solid var(--line); }
 .bg-tile .t { margin: 5px 2px 0; font-size: 12px; color: var(--fg-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1219,7 +1223,7 @@ svg.i.fill { fill: currentColor; }
 .bg-tile .star, .bg-tile .rm { position: absolute; top: 3px; width: 20px; height: 20px; border-radius: var(--r-sm); font-size: 12px; line-height: 20px; text-align: center; color: rgba(255, 255, 255, .85); background: rgba(0, 0, 0, .45); opacity: 0; transition: opacity var(--t-press); }
 .bg-tile .star { right: 3px; }
 .bg-tile .rm { left: 3px; }
-.bg-tile .star.on { opacity: 1; color: #fde68a; }
+.bg-tile .star.on { opacity: 1; color: var(--star); }
 .bg-tile:hover .star, .bg-tile:hover .rm, .bg-grid:focus-visible .bg-tile.kb .star { opacity: 1; }
 .bg-tile.add .th { display: grid; place-items: center; font-size: 15px; color: var(--muted); background: none; border: var(--hairline) solid var(--line); border-radius: var(--r-sm); }
 .bg-note { margin-top: 12px; font-size: 12px; color: var(--muted); }
@@ -1479,7 +1483,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .lib-row.grp .c.name { grid-column: 1 / -1; min-width: 0; }
 .lib-row.grp .t { font-weight: 600; flex: none; max-width: 40%; }
 .lib-row.grp .gn { flex: none; font-size: 12px; color: var(--muted); }
-.lib-row.grp .gnote { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 12px; color: var(--muted); font-style: italic; }
+.lib-row.grp .gnote { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 12px; color: var(--muted); }
 .lib-row.grp.none .t { color: var(--muted); font-weight: 500; }
 /* a mod's chevron stands under its tag's name; a copy's name lines up with the mods', its └ in the chevron's place (Mods view: .lib-row.inst above) */
 .lib-row.in.lin .c.name { padding-left: 21px; }
@@ -1624,7 +1628,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .un-result { margin: 0 0 12px; }
 .un-foot { display: flex; justify-content: flex-end; margin: 14px 0 24px; }
 .un-foot .prog { flex: 1; }
-.page .btn.primary.danger-go { background: var(--red); border-color: var(--red); color: #fff; }
+.page .btn.primary.danger-go { background: var(--red); border-color: var(--red); color: var(--on-red); }
 .page .btn.primary.danger-go:disabled { opacity: .45; cursor: default; }
 .uninstall .set .sub { white-space: normal; }
 
@@ -1649,8 +1653,8 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .fb-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 0 24px; }
 .fb-foot .m { flex: 1 1 260px; min-width: 0; color: var(--muted); font-size: 12px; }
 .fb-foot .m.warn { color: var(--amber); }
-/* "public on GitHub" beside preview: a note, not part of the uppercase heading */
-.fb-public { margin-left: 12px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--faint); }
+/* "public on GitHub" beside preview: a note, not part of the heading */
+.fb-public { margin-left: 12px; font-weight: 400; color: var(--faint); }
 
 /* Library > Texture optimisation (10 §2): settings rows, the run's foot, the mods table */
 .textures .set .sub { white-space: normal; }
@@ -1841,7 +1845,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .pm-row .m { grid-column: 1; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pm-row .ri { grid-row: 1 / 3; grid-column: 2; display: flex; align-items: center; color: var(--faint); }
 .pm-row .ri.pill { align-self: center; }
-.pm-row .pm-use { align-self: center; font-size: 12px; color: var(--accent-11, var(--accent)); cursor: pointer; opacity: 0; transition: opacity .12s; }
+.pm-row .pm-use { align-self: center; font-size: 12px; color: var(--accent-11, var(--accent)); cursor: pointer; opacity: 0; transition: opacity var(--t-press); }
 .pm-row:hover .pm-use, .pm-row.on .pm-use, .pm-row:focus-visible .pm-use { opacity: 1; }
 .pm-row .pm-use:hover { text-decoration: underline; }
 .pm .pill { display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 999px; font-size: 12px; background: var(--pill); color: var(--fg-2); flex: none; }
@@ -2554,7 +2558,7 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .ms-edit:hover { background: var(--pill); }
 .ms-switch::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; border: var(--hairline) solid var(--muted); vertical-align: 1px; }
 .ms-switch.on::before { background: var(--accent); border-color: var(--accent); }
-select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-sm); background: var(--pill); color: var(--fg); border: 0; font: inherit; }
+.ms-edit.ms-choice { height: 24px; margin-left: 0; padding: 0 8px; }
 .ms-input { width: min(100%, 260px); height: 22px; padding: 0 6px; margin-left: -6px; border-radius: var(--r-sm); background: var(--pill); font: 12px var(--code); }
 .ms-input:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
 .ms-reset { margin-left: 10px; padding: 0 4px; border-radius: var(--r-sm); color: var(--muted); font-size: 12px; opacity: 0; }
@@ -2664,7 +2668,7 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 .fbar-more { color: var(--muted); }
 
 /* The row badge's popover (16 §4.2): what the warning or error is; a click pins it. */
-.badge-pop { position: fixed; z-index: 26; max-width: 360px; padding: 8px 10px; background: var(--pop-bg); border: var(--hairline) solid var(--line-2); border-radius: var(--r-sm); box-shadow: var(--shadow); color: var(--fg); font-size: 12px; line-height: 1.45; user-select: text; cursor: text; display: grid; gap: 6px; animation: fade var(--t-press) ease-out; }
+.badge-pop { position: fixed; z-index: 26; max-width: 360px; padding: 8px 10px; background: var(--pop-bg); border: var(--hairline) solid var(--line-2); border-radius: var(--r-sm); box-shadow: var(--shadow); color: var(--fg); font-size: 12px; line-height: 1.45; user-select: text; cursor: text; display: grid; gap: 6px; animation: fade var(--t-press) var(--ease); }
 .badge-pop .bp-item { display: flex; gap: 7px; align-items: flex-start; }
 .badge-pop .bp-ic { display: flex; flex: none; margin-top: 1px; }
 .badge-pop .bp-t { color: var(--fg); overflow-wrap: anywhere; }
@@ -2692,7 +2696,7 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 .prob-pop .pp-lead { display: flex; gap: 8px; align-items: baseline; }
 .prob-pop .pp-head .pp-acts { display: flex; gap: 6px; } .prob-pop .pp-head .btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-11, var(--accent)); }
 .prob-pop .pp-list { overflow: auto; padding: 4px 0 8px; min-height: 0; }
-.prob-pop .pp-sec { display: flex; gap: 6px; align-items: baseline; padding: 10px 12px 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.prob-pop .pp-sec { display: flex; gap: 6px; align-items: baseline; padding: 10px 12px 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
 .prob-pop .pp-sec .num { color: var(--faint); }
 .prob-pop .pp-item { display: flex; gap: 8px; align-items: flex-start; padding: 7px 12px; }
 .prob-pop .pp-item:hover { background: var(--pill); }
@@ -2869,7 +2873,7 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 .un-summary-row { display: flex; flex-direction: column; gap: 3px; padding: 6px 0; overflow-wrap: anywhere; }
 .un-summary-row strong { font-weight: 500; }
 .un-summary p { margin: 8px 0 0; overflow-wrap: anywhere; }
-.pop.un-confirm .btns .danger-go { background: var(--red); border-color: var(--red); color: #fff; }
+.pop.un-confirm .btns .danger-go { background: var(--red); border-color: var(--red); color: var(--on-red); }
 
 /* Address rows keep their full payload behind a single-line display (16 §3.1). Only an
    address takes the room; a short value (RimArcho's version) keeps its own width, so its
@@ -2940,6 +2944,6 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 
 /* Saves (16 §2.11, 12 §4.8): whose Saves folder, and a save the current Game Config's game does not list */
 .sv-col .o { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; font-size: 12px; color: var(--muted); }
-.sv-cardhead .sv-owner-filter { margin-left: auto; max-width: 60%; height: 22px; padding: 0 4px; background: var(--card-2); color: var(--fg); border: var(--hairline) solid var(--line-2); border-radius: var(--r-sm); font: 400 12px var(--font); }
+.sv-cardhead .sv-owner-filter { margin-left: auto; max-width: 60%; height: 24px; font-size: 12px; }
 .sv-unseen { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 0 0 8px; padding: 8px 10px; border-radius: var(--r-sm); background: var(--line-2); font-size: 12px; color: var(--fg); }
 .sv-unseen .t { flex: 1; min-width: 200px; }

@@ -9,7 +9,7 @@ async function setup() {
   let backs = 0;
   const tasks = await loadModules("./tasks.js", {
     "./feedbacksemantics.js": { progress() {} },
-    "./fields.js": { pathContent: n => n },
+    "./fields.js": { pathContent: n => n, copy: async () => true },
     "./state.js": { S, $: () => null, el: (t, c, x) => new Element(t, c, x), api: { Tasks: async () => ({ rows: [] }), TasksSeen: async () => {}, Setting: async () => "" }, Tf: s => s, errText: String, say() {} },
     "./screens.js": { beginPageRead: name => (S.screen = name, { current: () => false, finish() {}, fail() {} }), page: () => new Element("div"), act: () => new Element("button"), area() {} },
     "./filterbar.js": { createBar: () => ({}) },

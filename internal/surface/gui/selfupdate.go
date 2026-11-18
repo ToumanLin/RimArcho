@@ -74,6 +74,7 @@ func (s *API) restartUpdated(res *app.SelfUpdateResult) bool {
 		return false
 	}
 	c.Process.Release()
+	// not scheduled: the window quits shortly after starting the updated program (17 §5.1).
 	time.AfterFunc(1500*time.Millisecond, s.quit)
 	return true
 }

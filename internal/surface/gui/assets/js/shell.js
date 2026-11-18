@@ -110,7 +110,7 @@ function kidMenu(b, keys) {
 
 function planMenuButton(b, id) {
   pop.menuOpener(b);
-  b.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); ui.planMenu(id, e.clientX, e.clientY, b, e.button === 0); };
+  b.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); ui.planMenu(id, e.clientX, e.clientY, b, e.button === 0); }; // keys: Menu, shift+F10 on the button (below)
   b.addEventListener("keydown", e => {
     if (e.key !== "ContextMenu" && !(e.key === "F10" && e.shiftKey)) return;
     e.preventDefault(); e.stopPropagation(); const r = b.getBoundingClientRect();
@@ -188,6 +188,8 @@ export function current() {
   if (S.screen === "uninstall" || S.screen === "uninstall-progress" || S.screen === "feedback") return "settings";
   // adding an environment belongs to the environment page
   if (S.screen === "guide" && S.guideFrom === "env") return "env";
+  // the first-run guide's preview belongs to settings, where it is opened
+  if (S.screen === "guide" && S.guideFrom === "preview") return "settings";
   return S.screen;
 }
 
@@ -342,7 +344,10 @@ export function crumbs() {
   const sh = S.shell;
   const cur = current();
   let out = (sh && sh.crumbs && sh.crumbs[cur]) || [];
-  if (S.screen === "guide") out = (S.guideFrom === "env" ? out : []).concat([{ label: S.guideFrom === "env" ? T("Add Game Config") : T("getting started"), id: "guide" }]);
+  if (S.screen === "guide") {
+    const from = S.guideFrom, label = from === "env" ? T("Add Game Config") : from === "preview" ? T("first-run guide (preview)") : T("getting started");
+    out = (from === "env" || from === "preview" ? out : []).concat([{ label, id: "guide" }]);
+  }
   if (S.screen === "full" && S.fullName) out = out.concat([{ label: S.fullName, id: "full" }]);
   if (S.screen === "uninstall" || S.screen === "uninstall-progress") out = out.concat([{ label: T("uninstall RimArcho"), id: "uninstall" }]);
   if (S.screen === "feedback") out = out.concat([{ label: T("feedback"), id: "feedback" }]);

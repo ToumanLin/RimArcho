@@ -313,6 +313,9 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 			ChoiceLabels: []string{T("follow system"), T("reduced")},
 			Hover:        T("reduced keeps the window still: the sidebar, lists, pages and status line change without sliding or fading; follow system uses the Windows animation setting"),
 			Argv:         []string{"config", "set", "ui.motion", "{}"}},
+		// the first run, shown again without writing anything (16 §2.15)
+		{Key: "guide.preview", Label: T("first-run guide"), Note: T("see what a new player sees; nothing you choose there is saved"),
+			Actions: []SettingAction{{Label: T("preview…"), Argv: []string{"guide-preview"}}}},
 	}}, AccountGroup(a), AutomaticGroup(a)}
 
 	// RimArcho's folders, each with relocation controls, then adding a mod folder.

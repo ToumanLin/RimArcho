@@ -17,6 +17,14 @@ func startConsole(exe string, args []string) (SteamCMDProc, error) {
 	return createSteamProcess(exe, args, windows.CREATE_NEW_CONSOLE, false)
 }
 
+// callerConsole reports whether stdin and stdout are a console the player can type into.
+// The GUI has none; `archo mcp` has pipes that carry the protocol (14 §1).
+func callerConsole() bool {
+	var mode uint32
+	return windows.GetConsoleMode(windows.Handle(os.Stdin.Fd()), &mode) == nil &&
+		windows.GetConsoleMode(windows.Handle(os.Stdout.Fd()), &mode) == nil
+}
+
 // A job owns just this invocation and descendants, including updater children.
 // Assign before resuming so cancellation cannot race a spawned child.
 func startWorkshopCMD(exe string, args []string, console bool) (SteamCMDProc, error) {

@@ -125,6 +125,7 @@ func (s *API) RunCLI(line string) (CommandResult, error) {
 	// stopped); quick ones answer in the panel and leave no record.
 	var taskMu sync.Mutex
 	task, finished := "", false
+	// not scheduled: a command still running after a second gets a Background tasks row (UI).
 	slow := time.AfterFunc(time.Second, func() {
 		taskMu.Lock()
 		defer taskMu.Unlock()

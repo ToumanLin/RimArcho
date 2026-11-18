@@ -255,5 +255,6 @@
   "Steam downloads it; it appears after the next scan.": "Steamがダウンロードします。次回スキャン後に表示されます。",
   "Git submodules are not downloaded.": "Gitのサブモジュールはダウンロードされません。",
   "Git LFS content is not downloaded; LFS files remain pointers.": "Git LFSの実データはダウンロードされず、ポインタファイルのまま残ります。",
-  "Would subscribe through Steam; use SteamCMD only if Steam is unavailable.": "Steam経由でサブスクライブします。Steamが使えない場合のみSteamCMDを使用します。"
+  "Would subscribe through Steam; use SteamCMD only if Steam is unavailable.": "Steam経由でサブスクライブします。Steamが使えない場合のみSteamCMDを使用します。",
+  "moved to the recycle bin": "ごみ箱に移動しました"
 }
