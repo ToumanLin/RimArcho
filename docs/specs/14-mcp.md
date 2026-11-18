@@ -7,7 +7,7 @@
 
 ## 1. Transport and lifecycle
 
-- Only stdio is supported (`StdioTransport`); no network ports are opened. stdout carries only protocol messages.
+- Only stdio is supported (`StdioTransport`); no network ports are opened. stdout carries only protocol messages: no package `archo mcp` links prints to stdout or hands stdin or stdout to a child (`TestArchMCPStdout`).
 - **Tool groups.** There are 45 tools, `guide` included. `archo mcp` serves the core group (§2): the 29 tools for diagnosis (Mod settings and saves included), plan edits, saving, launching, test runs, locking, rules and ignoring problems. `archo mcp --tools all` (or `--tools=all`) serves all 45, adding the player's management tools (13 §1.2). `--tools core` is the default. The core group is the default because each listed tool costs agent context on every turn; a new tool joins it only when agents need it to diagnose, edit, save, launch or test a plan. Another value, an unknown flag or a positional argument is a usage error (exit 2) before the data folder is opened; `archo mcp --help` shows the flag. A tool outside the served group is an unknown tool to the client. Each tool's group is part of its row in `Tools()`; `Tools()`, `Catalog()` and `ArgvFor()` still cover every tool for harnesses (`spikes/agenteval`), and `ToolDoc.Group` names its group. On synthetic data, the core `tools/list` is about 30 KB and all tools about 48 KB, at the 48 KB limit (§3).
 - The server is named `rimarcho` and reports the release version. It sends the `Instructions` from §3 during initialization.
 - The server is not resident: the process exits when the harness closes the session.

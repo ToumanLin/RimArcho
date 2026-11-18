@@ -88,7 +88,7 @@ The editor has four focus areas: `1` Disabled, `2` Enabled, `3` Staging / histor
 - `ctrl+space`, or `v` in the TUI, toggles the cursor row. `ctrl+a` selects all displayed rows, which means the filtered rows when a filter is active. Normal arrows and ctrl arrows **do not** clear the selection, so moving the cursor and toggling rows allows scattered selection.
 - A click moves the cursor, shift-click selects a range, and ctrl-click toggles a row. A click in the same list preserves the selection, just as arrows do; clicking a different list clears it.
 - Esc clears the selection, as does changing to another list area. The hint warns `←→ changing lists clears selection`.
-- Selected rows have a faint accent background across the whole row, with a deeper shade at the cursor, in both the GUI and TUI. **Do not draw a vertical bar at the left of a row or card** (§7 principle 4). The hint becomes `selected 3  space disable  t stage  m move  g tags  esc clear selection`. This is only a hint line, not a popup or mode.
+- Selected rows have a faint accent background across the whole row, with a deeper shade at the cursor, in both the GUI and TUI. **Do not draw a vertical bar at the left of a row or card** (§7 principle 4). The hint becomes `selected 3  space disable  t stage  m move  g tags  enter details  esc clear selection  ? all keys` (at most 7 actions, `?` last, §2.2). This is only a hint line, not a popup or mode.
 - After an action, `g` retains the selection so it can be repeated. Space and t clear it because the rows leave the list. J / K and m within Enabled retain it.
 
 ### 3.5 Verb keys

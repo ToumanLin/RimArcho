@@ -71,7 +71,11 @@ spikes/               Technology experiments and measurement programs (same modu
 testdata/             Synthetic Mod samples (mods/), golden files (golden/), .NET fixtures (dotnet/)
 ```
 
-- CLI and MCP depend only on `cmds`; TUI and GUI depend on `view` and `app`. Business packages never depend on surfaces.
+- MCP depends on `cmds`, plus `app` (opening the App, switching Game Config per call, waiting for analysis), `subscribe` (types) and `buildinfo`. That is an open question in `TestArchImports`. The CLI is the dispatcher and starts every surface. TUI and GUI depend on `view` and `app`. Business packages never depend on surfaces.
+- Only `internal/surface/**` and `cmd/**` import surface packages. Only surfaces and `internal/cmdline` import `internal/view`. `app` never imports `cmds`, `cmdline`, `view` or a surface. `store` imports no `app`, `view`, `cmds` or surface package; its imports of `analyze` and `identity` disagree with 00a §2 (open question). Product code never imports `spikes/` or `scripts/`.
+- `cmds` and MCP never import `accounts`, `secret` or `lanzou`. `secret` is imported only by `app/agent.go` and `app/uninstall.go`.
+- identity, env, vdf, scan, content, analyze, logs, order, deps and savefile write no files, and neither do `app/save*.go` other than `saveactions.go`. Only netcfg, lanzou and testkit build an `http.Transport`, and no code opens a network listener (§2.2).
+- Every child process is started with `hideWindow` (CREATE_NO_WINDOW), unless it is a GUI program, the game, or an interactive run in the caller's own console. SteamCMD gets the caller's console only when stdin and stdout are a console or terminal (`callerConsole`); otherwise it runs hidden.
 - Business rules belong only in `app` or `view`. A surface-layer condition such as "if this is a Workshop Mod …" is a defect (16 §1).
 - Heavy work runs in short-lived child processes. TUI, GUI and commands needing content facts launch scanning (`archo scan`) and analysis (`archo analyze --env <name>`) as children, passing `RIMARCHO_HOME`. Progress lines (`progress: …`) go to stderr; the UI routes them to its status bar. Tests inject an in-process runner.
 
@@ -169,6 +173,16 @@ Schema 35 adds unresolved Def classification inputs and per-set content readines
 | Scale | Opt-in with `RIMARCHO_SCALE_TESTS=1` (about a minute each, so not in the default run): `tui.TestT1KeyLatency1354` (16 §11 T1, 1,354 synthetic Mods, slowest key ≤ 50 ms; run it alone, as other packages' CPU load breaks the threshold) and `vmstate.TestScaleFixture` (the 4,000-Mod VM fixture) |
 | Concurrency | `app/concurrent_test.go`: two connections to one data directory; external changes update `ChangeKey`, edits from a stale view do not overwrite them (G8) |
 | Real corpus | Optional tests run only with environment variables: `RIMARCHO_REAL_HOME` (data directory) + `RIMARCHO_EXE` (archo for children) for TUI memory; `RIMARCHO_IDLE_SECONDS` changes idle duration; `RIMARCHO_NO_BROWSE` skips browsing; `RIMARCHO_LOG_VERSION` specifies log replay major/minor version; `RIMARCHO_REAL_COPY` (data directory **copy**) for T1; `RIMARCHO_WORKSHOP_CACHE` replays real Workshop descriptions. Measurement programs in `spikes/` (`tuimem`, `tuistart`, `mcplat`, `mcpcheck`, `analyzereal`, `logreal`, `logfirst`, etc.) |
+
+**Static checks.** Rules that can be checked by reading the source are tests, so an agent that skips the specifications still gets caught. Each failure names the section to read. Exceptions are Go maps with a reason per entry, and an entry that no longer matches fails as stale. Add an exception only when the specification allows it; mark existing drift that needs a decision "open question". When a new checkable rule is written into a specification, add its check in the same commit.
+- `internal/archlint` (`TestArch*`) checks code structure and forbidden APIs. It covers import layering (§2), read-only packages, file writes in surfaces and cmds (02 §1), the single recycle-bin entry point (02 §3), hidden child windows (§5), network transports and listeners (§2.2), banned dependencies, cgo, and go.mod versions against §1 and §7.1. It also forbids `os.Exit`, ANSI colours (13 §3.1, §3.3) and anything `archo mcp` links writing to stdout (14 §1), and checks the CHANGELOG layout.
+- `internal/speccheck` and `TestSpec*` tests in store, cmds, mcp, harmony and app check that the specifications and the code agree. They cover cited tests and Go identifiers, the finding catalog and severities (05 §4.3), unique acceptance IDs, the scheduled-behaviour table and every timer (16 §2.16.1; an unscheduled timer carries `// not scheduled: <reason>`), and the schema upgrade steps (04 §4). They also cover the CLI command table, flags, settings keys and JSON commands (13 §3.1, §4), the MCP tool table, groups, hints, `env` text and tool names (14 §1–§3), and list parity (05 §5.3, 12 §4.6).
+- The GUI's `TestStyleRules`, `TestUI*` and `TestEndlessAnimationsOnlyWhileWorking` check 16 §3.1 "Checks" and §7.3 "Checks".
+- Run all of them in about 15 seconds:
+
+  `go test -count=1 -run 'TestArch|TestSpec|TestStyleRules|TestUI|TestEndlessAnimations' ./internal/...`
+
+  In Claude Code, `.claude/settings.json` runs the matching subset after each Edit or Write (`scripts/lint-hook.mjs`) and hands any failure back to the agent.
 
 Test speed: `testkit.New` copies a schema-only database built once per test process instead of creating the schema for each fixture, and replaces the SteamCMD retry backoff (5 s / 15 s) with no wait. Run the suite with `go test -count=1 ./...`: on Windows, recording the test cache's file accesses makes an uncached run about 40% slower (32 threads: 4.5 minutes, against 3.2 with `-count=1`). Linux CI coverage and exclusions are in §5.
 

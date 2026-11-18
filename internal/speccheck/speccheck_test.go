@@ -545,10 +545,7 @@ func acceptanceProblems(docs []*Doc) []string {
 
 // Timers in files the table does not list that carry no `// not scheduled:` comment; for
 // files this lint may not edit. Key: "<file relative to internal/>:<line text trimmed>".
-var timerExceptions = map[string]string{
-	"surface/gui/command.go:slow := time.AfterFunc(time.Second, func() {":     "not scheduled: a command panel line still running after a second gets a Background tasks row (UI); internal/surface/gui is edited by the GUI owner, who may move this into a comment",
-	"surface/gui/selfupdate.go:time.AfterFunc(1500*time.Millisecond, s.quit)": "not scheduled: the window quits shortly after starting the updated program (17 §5.1); internal/surface/gui is edited by the GUI owner, who may move this into a comment",
-}
+var timerExceptions = map[string]string{}
 
 var (
 	rowRefRe   = regexp.MustCompile(`2\.16\.1 ([A-Z]\d\d)\b`)
