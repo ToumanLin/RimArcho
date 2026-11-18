@@ -4,6 +4,11 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Window: the top bar no longer shows the Game Config chip (`name 1.6`) beside the breadcrumb; the sidebar and the Launch page's 01 column already name and switch it.
+- Launch page: each game in 01 shows its full version (`1.6.4871 rev590`) instead of the short one. Keys: `←` `→` now move between the three columns, and `↑` `↓` change what the focused column holds (the game in 01, the list or pack in 02); before, `←` `→` changed the game.
+- Window start: the sidebar's background-tasks line appears together with the first page instead of standing alone while the rest of the window loads.
+- All saves: progress bars while it loads. The first listing shows "listing the saves N/M" with a bar in the loading card, and while the saves are read in full a bar in the page's head follows "reading the saves N/M".
+
 - List editor: Mods that are only missing a version declaration (for example made for 1.5 on a 1.6 game) now show a muted clock instead of the amber warning triangle, so the rows that need fixing stand out. Can it run still lists the version reminder as before.
 - List editor: clearing out Mods you unsubscribed is one click. The problem panel shows each item's first two fixes as buttons, so a group of Mods that are not installed shows both "subscribe" and "remove them from the list"; and clicking the red icon on any not-installed row offers "remove all N not installed".
 - List editor: "only these in the list" at the top of the problem panel filters the lists to the Mods with something to fix (`has:problem`, which no longer matches version-only reminders or hints); "show every mod" puts the whole list back.

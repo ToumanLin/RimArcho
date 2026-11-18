@@ -66,6 +66,7 @@
   "the game is running: close it first": "ゲーム実行中です。先に終了してください",
   "the saves changed since you were shown them; press it again to see them as they are now": "表示した後にセーブが変わりました。もう一度押すと現在の状態を表示します",
   "reading the saves…": "セーブ一覧を読み込み中…",
+  "listing the saves %d/%d": "セーブ一覧を作成中：%d／%d",
   "saves read again": "セーブを再読み込みしました",
   "colonies and their saves": "コロニーとセーブデータ",
   "%s, %d saves": "%s：セーブ%d件",

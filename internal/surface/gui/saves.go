@@ -54,10 +54,12 @@ type savesState struct {
 	nextAt    uint64                     // the SaveDetail call that asked for next
 	fresh     []string                   // refs read since the last "saves-read" event
 	line      string                     // the run's newest progress, for the status line
-	dirty     bool                       // saves were read since the page was last relisted
-	timer     *time.Timer                // the next "saves-read" event, when one is due
-	sent      time.Time                  // when the last event went
-	listed    time.Time                  // when the page was last listed
+	lineRead  int                        // and as numbers: saves read of lineTotal
+	lineTotal int
+	dirty     bool        // saves were read since the page was last relisted
+	timer     *time.Timer // the next "saves-read" event, when one is due
+	sent      time.Time   // when the last event went
+	listed    time.Time   // when the page was last listed
 	// Events are numbered when their news is taken (flushes) and sent in that order: an
 	// event taken before one already sent drops its progress line, so a late flush never
 	// puts "reading the saves n/m" back after the run's end (sendMu: one send at a time).
@@ -78,13 +80,29 @@ const (
 // event (Refs), the run's progress for the status line (Line), the listing again with
 // their days and colonies (Page; nil when not relisted this time), and the run's end.
 type SavesReadEvent struct {
-	Refs  []string        `json:"refs,omitempty"`
-	Line  string          `json:"line,omitempty"`
+	Refs []string `json:"refs,omitempty"`
+	Line string   `json:"line,omitempty"`
+	// Read and Total are the run's progress as numbers (saves read of those to read), for
+	// the page's progress bar; sent with Line.
+	Read  int             `json:"read,omitempty"`
+	Total int             `json:"total,omitempty"`
 	Page  *view.SavesPage `json:"page,omitempty"`
 	Done  bool            `json:"done,omitempty"`
 	Text  string          `json:"text,omitempty"`
 	Error string          `json:"error,omitempty"`
 }
+
+// SavesProgressEvent is how far a listing's heads are, for the page's first listing
+// (16 §2.11 "Loading"): done of total saves, at most every savesProgressEvery.
+type SavesProgressEvent struct {
+	Request uint64 `json:"request"`
+	Done    int    `json:"done"`
+	Total   int    `json:"total"`
+}
+
+// savesProgressEvery throttles "saves-progress": often enough for a moving bar, rarely
+// enough not to flood the window with a cold library of thousands of saves.
+const savesProgressEvery = 120 * time.Millisecond
 
 // SavesEvent is a listing as the "saves" event carries it.
 type SavesEvent struct {
@@ -159,7 +177,14 @@ func (s *API) listSaves(request, visit uint64) (*SavesEvent, *app.SaveList) {
 		ev.Error = err.Error()
 		return ev, nil
 	}
-	l, err := r.ListSaves()
+	var last time.Time
+	l, err := r.ListSavesProgress(func(done, total int) {
+		if done < total && time.Since(last) < savesProgressEvery {
+			return
+		}
+		last = time.Now()
+		s.send("saves-progress", &SavesProgressEvent{Request: request, Done: done, Total: total})
+	})
 	if err != nil {
 		ev.Error = err.Error()
 		return ev, nil

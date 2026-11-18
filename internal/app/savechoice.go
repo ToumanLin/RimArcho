@@ -173,7 +173,7 @@ func (a *App) ChosenSave(st *LoadoutState) (*SaveCheck, *SaveChoice, error) {
 		c.Ref = SaveRef(c.Path)
 		probe[i] = &c
 	}
-	a.readHeads(probe)
+	a.readHeads(probe, nil)
 	if err := a.attachSummaries(probe); err != nil {
 		return nil, ch, err
 	}

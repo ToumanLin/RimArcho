@@ -1551,7 +1551,6 @@ async function start() {
   // a task's o on a mod: Mod library searching for it (16 §2.16)
   document.addEventListener("library-search", async (e) => { shell.navigated(); await library.openSearch(e.detail); renderWhere(); });
   document.addEventListener("library-instance", async (e) => { shell.navigated(); await library.openInstance(e.detail); renderWhere(); });
-  tasksPage.refreshFoot();
   on("guide", (ev) => guide.guideEvent(ev));
   on("download", (ev) => guide.downloadEvent(ev));
   // launching waits (up to ten seconds) for a background Steam credit switch to finish
@@ -1573,7 +1572,7 @@ async function start() {
   // poll and Ready (an early throw used to leave the boot screen with no page behind it).
   const failed = (e) => say("fail", errText(e));
   try { if (!(await firstRun.workshopStart())) return; } catch (e) { failed(e); }
-  try { if (await uninst.restore()) { bootDone(); shell.settle(); return; } } catch (e) { failed(e); }
+  try { if (await uninst.restore()) { bootDone(); shell.settle(); tasksPage.showFoot(); return; } } catch (e) { failed(e); }
   // The start page needs only Workspace's shell and board. The editor behind it gets its
   // filter answer (the bar's first one reads every mod's content) and its rows afterwards,
   // so the first page does not wait for them. The launch page's own read starts now too.
@@ -1600,6 +1599,8 @@ async function start() {
   homePage.forgetEarly();
   bootDone();
   shell.settle();
+  // the sidebar's background-tasks line comes with the first page, not before it
+  tasksPage.showFoot();
   requestAnimationFrame(() => api.Ready().catch(() => {}));
   pollLive();
   try {

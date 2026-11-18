@@ -211,6 +211,9 @@ func (s *API) startSavesIndex(l *app.SaveList, first string, visit uint64) {
 				// "n/m" makes the status line a progress bar (16 §11 A11)
 				text := view.Tf("reading the saves %d/%d  %s", done, total, name)
 				s.tasks.Update(task, func(t *app.Task) { t.Phase, t.Done, t.Total = text, done, total })
+				st.mu.Lock()
+				st.lineRead, st.lineTotal = done, total
+				st.mu.Unlock()
 				s.savesNews([]string{ref}, text, false)
 			}
 		}
@@ -327,8 +330,12 @@ func (s *API) savesFlush(end *SavesReadEvent) {
 		ev = &SavesReadEvent{}
 	}
 	ev.Refs, ev.Line, st.fresh, st.line = st.fresh, st.line, nil, ""
+	if ev.Line != "" {
+		ev.Read, ev.Total = st.lineRead, st.lineTotal
+	}
 	if end != nil {
-		ev.Line = ""
+		ev.Line, ev.Read, ev.Total = "", 0, 0
+		st.lineRead, st.lineTotal = 0, 0
 	}
 	relist := st.dirty && (end != nil || time.Since(st.listed) >= savesListEvery)
 	onPage, closed := st.list != nil, st.closed
@@ -348,7 +355,7 @@ func (s *API) savesFlush(end *SavesReadEvent) {
 	}
 	st.mu.Lock()
 	if ticket < st.lastSent { // a newer event went first: this line is old news
-		ev.Line = ""
+		ev.Line, ev.Read, ev.Total = "", 0, 0
 	} else {
 		st.lastSent = ticket
 	}

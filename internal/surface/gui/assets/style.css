@@ -92,7 +92,7 @@ body { font-variant-numeric: tabular-nums; user-select: text; overflow: hidden; 
 /* Text is selectable everywhere (16 §3.1 rule 13); only the controls are not: buttons,
    navigation, area heads and dividers, and the multi-select list rows, whose press selects
    the row, shift / ctrl extend it and a drag moves the mods. */
-button, select, kbd, svg, #side, #crumbs, .envchip, #hints, .area .head, .hbar, .split, .lib-th,
+button, select, kbd, svg, #side, #crumbs, #hints, .area .head, .hbar, .split, .lib-th,
 .row, .lib-row, .tk-row, .fbar-chip, .drop-tip { user-select: none; }
 ::-webkit-scrollbar { width: 10px; height: 10px; background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--faint); border: var(--hairline) solid transparent; border-radius: var(--r-sm); background-clip: padding-box; }
@@ -235,12 +235,11 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
    breadcrumb was (magpie's second row) */
 #crumbs .navtabs { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow-x: auto; scrollbar-width: none; background: color-mix(in srgb, var(--fg) 4%, transparent); }
 #crumbs .navtabs button { height: 26px; font-size: 13px; }
-#app.nav-top #top #env { margin-left: 4px; }
 /* the change between the side and the top: the navigation and the page move to their new
    places (a view transition, none when motion is reduced) */
 ::view-transition-group(nav), ::view-transition-group(page) { animation-duration: var(--t-enter); animation-timing-function: var(--ease); }
 
-/* ---- the top bar: collapse, the breadcrumb, the environment chip, the page's actions ---- */
+/* ---- the top bar: collapse, the breadcrumb, the page's actions ---- */
 #top { position: relative; display: flex; align-items: center; gap: 8px; padding: 0 16px 0 12px; min-width: 0; }
 #crumbs { display: flex; align-items: center; gap: 2px; min-width: 0; overflow: hidden; flex: 0 1 auto; }
 #crumbs .crumb { height: 28px; padding: 0 5px; border-radius: var(--r-sm); color: var(--muted); font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
@@ -255,17 +254,12 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .page-acts .field { flex: 0 1 200px; }
 .page-acts .unwritten { color: var(--accent-11, var(--accent)); font-size: 12px; white-space: nowrap; margin-right: 2px; }
 .page-acts .unwritten::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; }
-#top #env { flex: 0 1 auto; }
-/* the chip beside the page's name: the environment (and the plan on Can it run) */
-.envchip { height: 20px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: var(--r-sm); background: var(--pill); color: var(--fg-2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; transition: background var(--t-press), color var(--t-press); }
-.envchip:hover, .envchip.on { background: var(--pill-hover); color: var(--fg); }
 /* a page's actions: quiet icon + text, no border (16 §2.2) */
 .page-acts .btn.quiet { border-color: transparent; background: none; box-shadow: none; color: var(--fg-2); font-size: 13px; padding: 0 6px; }
 .page-acts .btn.quiet:hover { background: var(--pill); color: var(--fg); }
 .page-acts .btn.quiet kbd { display: none; }
 .page-acts .btn.quiet .ic { margin-right: 6px; }
 @media (max-width: 1100px) { .page-acts .wide-only, .page-acts kbd { display: none; } }
-@media (max-width: 640px) { #top #env { display: none; } }
 .pill { height: 24px; display: inline-flex; align-items: center; background: var(--pill); color: var(--fg-2); border-radius: 999px; padding: 0 11px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; transition: background var(--t-press); }
 .pill:hover { background: var(--pill-hover); color: var(--fg); }
 .pill.on { background: var(--accent-soft); color: var(--accent-11, var(--accent)); }
@@ -1356,7 +1350,6 @@ details.xc-sec > summary { cursor: pointer; }
 .page-acts .play-note .lnk { color: var(--accent-11, var(--accent)); font-size: 12px; padding: 0; background: none; border: 0; cursor: pointer; }
 .page-acts .play-note .lnk:hover { text-decoration: underline; }
 #crumbs { min-width: 0; }
-#top #env { margin-left: 2px; }
 @media (max-width: 1280px) { .page-acts .chip.mark .t, .page-acts .play-note .t { display: none; } .page-acts .chip.mark { padding: 0 7px; line-height: 22px; } }
 .page-acts .icon-btn { padding: 0 8px; letter-spacing: 1px; }
 /* the plan the game has, when there are several plans: a small green dot by its name */
@@ -2259,6 +2252,19 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .page.fill.saves { display: flex; flex-direction: column; }
 .sv { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--sv-left, 248px) var(--card-gap) minmax(0, 11fr) var(--card-gap) var(--sv-right, minmax(260px, 9fr)); }
 .sv > .card, .sv-leftcol > .card.sv-left { min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+/* loading progress (16 §2.11 "Loading"): the first listing in the loading card, the full
+   read in the page's head */
+.sv-progress { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: 12px; color: var(--muted); }
+.sv-progress .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sv-progress .track { position: relative; display: block; height: 4px; border-radius: var(--r-sm); overflow: hidden; background: var(--pill); }
+.sv-progress .fill { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: inherit; background: var(--accent); transition: width .25s var(--ease); }
+.sv-progress.indeterminate .fill { width: 38%; transition: none; animation: env-progress 1.3s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .sv-progress.indeterminate .fill { width: 100%; animation: none; opacity: .65; } }
+:root[data-motion="reduced"] .sv-progress.indeterminate .fill { width: 100%; animation: none; opacity: .65; }
+.page-loading .sv-progress { margin-top: 14px; max-width: 420px; }
+.page-head .sv-progress.sv-reading { flex: 0 1 300px; flex-direction: row; align-items: center; gap: 10px; }
+.page-head .sv-progress.sv-reading .t { flex: 1 1 auto; min-width: 0; }
+.page-head .sv-progress.sv-reading .track { flex: 0 0 96px; }
 .sv-leftcol { min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: var(--card-gap); }
 .sv-leftcol > .sv-left { flex: 1; }
 .sv-split { align-self: stretch; margin: 0; }
@@ -2840,7 +2846,7 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 
 /* Uninstall owns the page until its report (16 §2.14). */
 .uninstall-exclusive :is(#nav, #nav-settings, #tasks-line, #self-update) { pointer-events: none; opacity: .45; }
-.uninstall-exclusive #crumbs, .uninstall-exclusive #env, .uninstall-exclusive #hints { pointer-events: none; }
+.uninstall-exclusive #crumbs, .uninstall-exclusive #hints { pointer-events: none; }
 .uninstall-exclusive #hints { visibility: hidden; }
 .un-progress-page { width: min(640px, 100%); margin-inline: auto; padding: 0 20px 24px; min-height: 65vh; justify-content: center; }
 .un-progress { display: flex; flex-direction: column; gap: var(--card-gap); padding: 24px; text-align: center; }

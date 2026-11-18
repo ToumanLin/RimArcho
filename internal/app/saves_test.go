@@ -491,3 +491,31 @@ func TestSavesLaunchRootSnapshot(t *testing.T) {
 		}
 	}
 }
+
+// ListSavesProgress counts the heads up to every save: new ones as they are read, unchanged
+// ones at once on the next listing (16 §2.11 "Loading").
+func TestListSavesProgress(t *testing.T) {
+	t.Parallel()
+	e := savesFixture(t)
+	var seen [][2]int
+	l, err := e.App.ListSavesProgress(func(done, total int) { seen = append(seen, [2]int{done, total}) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := len(l.Saves())
+	if n == 0 || len(seen) < 2 || seen[0] != [2]int{0, n} || seen[len(seen)-1] != [2]int{n, n} {
+		t.Fatalf("cold listing progress %v for %d saves", seen, n)
+	}
+	for i := 1; i < len(seen); i++ {
+		if seen[i][0] < seen[i-1][0] {
+			t.Fatalf("progress went back: %v", seen)
+		}
+	}
+	seen = nil
+	if _, err := e.App.ListSavesProgress(func(done, total int) { seen = append(seen, [2]int{done, total}) }); err != nil {
+		t.Fatal(err)
+	}
+	if len(seen) != 1 || seen[0] != [2]int{n, n} {
+		t.Fatalf("warm listing progress %v", seen)
+	}
+}

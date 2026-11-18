@@ -66,6 +66,7 @@
   "the game is running: close it first": "游戏正在运行：请先关闭",
   "the saves changed since you were shown them; press it again to see them as they are now": "列出之后存档又变了；再按一次，看看它们现在的样子",
   "reading the saves…": "正在读取存档…",
+  "listing the saves %d/%d": "正在列出存档 %d/%d",
   "saves read again": "已重新读取存档",
   "colonies and their saves": "殖民地和它们的存档",
   "%s, %d saves": "%s，%d 个存档",
