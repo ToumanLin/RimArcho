@@ -249,3 +249,46 @@ func TestHugsLibMerge(t *testing.T) {
 		t.Fatal("a class with a path was accepted")
 	}
 }
+
+// 10 §3 (VM 2026-11-18): revision 1 was played, so its links are in Mods/; revision 2 drops a
+// Mod and with it the folder one link points to. Launching revision 2 (or the plan) removes
+// that link; the broken link of the pack's own does not refuse the launch.
+func TestPackRevisionLaunchAfterDroppedMod(t *testing.T) {
+	t.Parallel()
+	e := packEnv(t)
+	e.MustRun("disable", "pkg:gone.mod")
+	e.MustRun("enable", "pkg:tester.versions")
+	e.MustRun("pack", "build", "first")
+	e.MustRun("pack", "launch", "first")
+	mods := filepath.Join(e.Game, "Mods")
+	stale := ""
+	for _, de := range readDir(t, mods) {
+		if de == "!ArchoPack_first_1001" { // tester.a
+			stale = de
+		}
+	}
+	if stale == "" {
+		t.Fatalf("no link of tester.a in %v", readDir(t, mods))
+	}
+	e.MustRun("disable", "pkg:tester.a")
+	e.MustRun("pack", "build", "first", "--update")
+	if out, code := e.Run("pack", "launch", "first"); code != 0 {
+		t.Fatalf("revision 2 launch refused (%d):\n%s", code, out)
+	}
+	if _, err := os.Lstat(filepath.Join(mods, stale)); err == nil {
+		t.Fatalf("the dropped Mod's link is still in Mods/: %s", stale)
+	}
+}
+
+func readDir(t *testing.T, dir string) []string {
+	t.Helper()
+	ents, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []string
+	for _, de := range ents {
+		out = append(out, de.Name())
+	}
+	return out
+}

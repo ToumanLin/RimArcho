@@ -18,6 +18,7 @@ var frontendNodeSuites = []string{
 	"testdata/detail-follow.mjs",
 	"testdata/editorfilter.mjs",
 	"testdata/envnotice.mjs",
+	"testdata/envswitch.mjs",
 	"testdata/guide.mjs",
 	"testdata/hints.mjs",
 	"testdata/home-memory.mjs",

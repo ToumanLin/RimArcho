@@ -166,7 +166,7 @@ func TestModSettingsFilesPage(t *testing.T) {
 		t.Fatal("Prefs.xml was accepted")
 	}
 	msg, err := api.RecycleModSettings([]string{"Mod_Removed_RMod.xml"})
-	if err != nil || !strings.Contains(msg, "moved 1 settings files") {
+	if err != nil || !strings.Contains(msg, "moved 1 settings file to") {
 		t.Fatalf("recycle: %q %v", msg, err)
 	}
 	l, err := api.ModSettings()

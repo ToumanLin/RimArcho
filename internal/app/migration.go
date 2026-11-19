@@ -215,6 +215,13 @@ func (a *App) SurveyMigration(found []ManagerImport, tags ManagerTagNames) []Mig
 	out := make([]MigrationManager, 0, len(order))
 	for _, n := range order {
 		m := byName[n]
+		// a group that could not be read has no parts: an empty list, never null, so the
+		// page draws its error and the rest of the manager (B4b VM round)
+		for i := range m.Groups {
+			if m.Groups[i].Parts == nil {
+				m.Groups[i].Parts = []MigrationPart{}
+			}
+		}
 		sort.SliceStable(m.Groups, func(i, j int) bool { return groupRank(m.Groups[i].Kind) < groupRank(m.Groups[j].Kind) })
 		out = append(out, *m)
 	}

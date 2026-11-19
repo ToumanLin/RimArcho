@@ -398,5 +398,6 @@
   "RimArcho writes the DDS again next to the PNGs that changed": "RimArchoは変更されたPNGの横にDDSを書き直します",
   "converted the textures of %s again": "%sのテクスチャを再変換しました",
   "press C again to delete the DDS RimArcho wrote": "もう一度Cを押すとRimArchoが作成したDDSを削除します",
-  "removed the converted textures of %s": "%sの変換済みテクスチャを削除しました"
+  "removed the converted textures of %s": "%sの変換済みテクスチャを削除しました",
+  "replace at: %s (%d file, %s)": "置き換え先：%s（%dファイル、%s）"
 }

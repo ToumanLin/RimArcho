@@ -349,7 +349,7 @@ async function openFiles() {
   const shown = filesShown();
   let bytes = 0;
   for (const r of shown) bytes += r.bytes;
-  const lead = Tf("%d files, %s", shown.length, sizeText(bytes));
+  const lead = shown.length === 1 ? Tf("%d file, %s", 1, sizeText(bytes)) : Tf("%d files, %s", shown.length, sizeText(bytes));
   const w = page("fill modsettings", lead, viewSwitch(), copyButton(), act(T("open the Config folder"), "export", () => openFolder(), "ctrl+o"));
   tableCard = detailCard = null; rowEls = [];
   if (!shown.length) {
@@ -464,7 +464,7 @@ function drawSelection() {
   else if (go.length) {
     let bytes = 0;
     for (const r of go) bytes += r.bytes;
-    const b = el("button", "btn ms-recycle", Tf("move %d files (%s) to the recycle bin…", go.length, sizeText(bytes)));
+    const b = el("button", "btn ms-recycle", go.length === 1 ? Tf("move %d file (%s) to the recycle bin…", 1, sizeText(bytes)) : Tf("move %d files (%s) to the recycle bin…", go.length, sizeText(bytes)));
     b.type = "button";
     b.dataset.envWrite = "mod-settings";
     b.onclick = () => recycle(go);
@@ -479,7 +479,7 @@ function drawSelection() {
 function recycle(rows) {
   if (!rows.length || F.page?.locked) return;
   const lines = rows.map((r) => r.name + "  " + r.size + "  " + r.state);
-  pop.confirm(Tf("move %d settings files to the recycle bin?", rows.length),
+  pop.confirm(rows.length === 1 ? Tf("move %d settings file to the recycle bin?", 1) : Tf("move %d settings files to the recycle bin?", rows.length),
     [T("the game reads these files at start; a Mod whose file goes starts with its defaults"), "", ...lines],
     T("move to the recycle bin"), async () => {
       try { say("ok", await api.RecycleModSettings(rows.map((r) => r.key))); } catch (e) { say("fail", errText(e)); }

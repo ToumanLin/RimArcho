@@ -58,6 +58,9 @@ func PlanLoadCost(r *app.LoadCost) *PlanCost {
 	categories := map[string]string{"textures": "textures", "dds": "DDS", "sounds": "sounds", "defs": "Defs", "patches": "Patches", "assemblies": "assemblies", "mod overhead": "mod overhead"}
 	for _, part := range r.Parts {
 		count := Tf("%d files", part.Count)
+		if part.Count == 1 {
+			count = Tf("%d file", 1)
+		}
 		if part.Key == "mod overhead" {
 			count = Tf("%d mods", part.Count)
 		}

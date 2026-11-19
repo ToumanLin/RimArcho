@@ -409,10 +409,25 @@ func (a *App) refuseUnhealthyLinks(mods string) error {
 	if err != nil {
 		return err
 	}
-	if len(links) > 0 {
-		return fmt.Errorf("%w: %s: %s; check archo links check and confirm a repair", ErrLaunchBlocked, links[0].Path, links[0].Reason)
+	for _, l := range links {
+		if a.droppedPackLink(l) {
+			continue
+		}
+		return fmt.Errorf("%w: %s: %s; check archo links check and confirm a repair", ErrLaunchBlocked, l.Path, l.Reason)
 	}
 	return nil
+}
+
+// droppedPackLink: a pack's link to a folder a newer revision of that pack left out (10 §3).
+// Every launch takes the pack links it does not use out of Mods/ (a plan launch all of
+// them), so such a link does not stop one; it would block the very launch that removes it.
+func (a *App) droppedPackLink(l *GameLink) bool {
+	if !packLink(filepath.Base(l.Path)) || l.State != source.TargetMissing || l.Target == "" {
+		return false
+	}
+	pack := filepath.Dir(filepath.Dir(l.Target))
+	return strings.EqualFold(filepath.Base(filepath.Dir(l.Target)), "mods") && dirExists(pack) &&
+		source.Within(realOrAbs(pack), realOrAbs(a.PacksDir()))
 }
 
 type LinkRepairPlan struct {

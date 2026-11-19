@@ -398,6 +398,9 @@ func ConfigFileRows(cf *app.ConfigFiles) *ConfigFilesPage {
 // SettingsRecycleText is the status line after files went to the recycle bin.
 func SettingsRecycleText(r *app.SettingsRecycle) string {
 	s := Tf("moved %d settings files to the recycle bin", len(r.Files))
+	if len(r.Files) == 1 {
+		s = Tf("moved %d settings file to the recycle bin", 1)
+	}
 	for _, f := range r.Failed {
 		s += "; " + Tf("%s not moved: %s", f.File, f.Err)
 	}
@@ -438,10 +441,17 @@ func SettingsCopyLines(p *app.SettingsCopyPlan) *SettingsCopyView {
 	if len(p.Copies) == 0 {
 		v.Lines = append(v.Lines, Tf("%s has no settings file for these Mods", p.From))
 	}
-	if p.DryRun {
+	switch {
+	case p.DryRun && v.Copies == 1:
+		v.Message = Tf("%d file to copy from %s, %d replacing a file here", v.Copies, p.From, v.Replace)
+	case p.DryRun:
 		v.Message = Tf("%d files to copy from %s, %d replacing a file here", v.Copies, p.From, v.Replace)
-	} else {
+	case v.Copies == 1:
+		v.Message = Tf("copied %d settings file from %s", v.Copies, p.From)
+	default:
 		v.Message = Tf("copied %d settings files from %s", v.Copies, p.From)
+	}
+	if !p.DryRun {
 		if failed > 0 {
 			v.Message += "; " + Tf("%d failed", failed)
 		}

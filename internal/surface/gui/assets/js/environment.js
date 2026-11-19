@@ -1,5 +1,5 @@
 // Only actions that conflict with the destination wait; navigation stays live (16 §2.3).
-import { S, Tf, say } from "./state.js";
+import { S, Tf, say, $ } from "./state.js";
 import { setEnvironmentGuard } from "./api.js";
 
 export const environmentReason = () => S.busy.env ? Tf("switching to %s", S.busy.env) : "";
@@ -50,7 +50,8 @@ export async function withEnvironmentSwitch(name, action) {
   }
   observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["disabled", "title"] });
   updateActions();
-  say("busy", Tf("switching to %s…", name));
+  const text = Tf("switching to %s…", name);
+  say("busy", text);
   try {
     await action(current);
     return current();
@@ -61,6 +62,9 @@ export async function withEnvironmentSwitch(name, action) {
     if (current()) {
       S.busy.env = false;
       updateActions();
+      // The switch's own line goes with it; a message something else put there since stays (16 §6).
+      const st = $("#status");
+      if (st?.dataset.kind === "busy" && st.dataset.message === text) say("", "");
     }
   }
 }

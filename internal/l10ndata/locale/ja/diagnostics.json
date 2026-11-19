@@ -482,5 +482,6 @@
   "RAM: loading needs %s; available memory and total capacity are unavailable": "RAM：読み込みに必要な容量 %s／空き容量と総容量は取得できません",
   "RAM: loading needs %s; available memory is unavailable; total capacity %s": "RAM：読み込みに必要な容量 %s／空き容量は不明（総容量 %s）",
   "VRAM: estimated %s; dedicated capacity is unknown": "VRAM：推定使用量 %s／専用容量は不明",
-  "the mod's files changed after RimArcho wrote its DDS": "RimArchoがDDSを作成した後にMODのファイルが変更されました"
+  "the mod's files changed after RimArcho wrote its DDS": "RimArchoがDDSを作成した後にMODのファイルが変更されました",
+  "%d file": "%dファイル"
 }

@@ -131,5 +131,13 @@
   "removed %d": "移除 %d 个",
   "changed %d": "变了 %d 个",
   "Mod settings of %d mods: only those the pack has none of yet": "%d 个 Mod 的设置：只补整合包还没有的",
-  "the list carries no Mod settings": "这个列表不带 Mod 设置"
+  "the list carries no Mod settings": "这个列表不带 Mod 设置",
+  "%d file, %s": "%d 个文件，%s",
+  "move %d file (%s) to the recycle bin…": "把 %d 个文件（%s）移到回收站…",
+  "move %d settings file to the recycle bin?": "把 %d 个设置文件移到回收站？",
+  "moved %d settings file to the recycle bin": "已把 %d 个设置文件移到回收站",
+  "%d file to copy from %s, %d replacing a file here": "要从 %[2]s 复制 %[1]d 个文件，其中 %[3]d 个替换这里的文件",
+  "copied %d settings file from %s": "已从 %[2]s 复制 %[1]d 个设置文件",
+  "Mod settings: %d file written, %d failed": "Mod 设置：写入 %d 个文件，%d 个失败",
+  "Mod settings: %d file written": "Mod 设置：写入 %d 个文件"
 }

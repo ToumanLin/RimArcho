@@ -482,5 +482,6 @@
   "RAM: loading needs %s; available memory and total capacity are unavailable": "内存：载入时需要 %s；无法读取当前可用内存和总容量",
   "RAM: loading needs %s; available memory is unavailable; total capacity %s": "内存：载入时需要 %s；无法读取当前可用内存；总容量 %s",
   "VRAM: estimated %s; dedicated capacity is unknown": "显存：预计 %s；显卡专用显存容量未知",
-  "the mod's files changed after RimArcho wrote its DDS": "RimArcho 写 DDS 之后，Mod 的文件更新过"
+  "the mod's files changed after RimArcho wrote its DDS": "RimArcho 写 DDS 之后，Mod 的文件更新过",
+  "%d file": "%d 个文件"
 }
