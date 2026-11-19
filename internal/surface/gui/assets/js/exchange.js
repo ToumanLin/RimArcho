@@ -708,7 +708,7 @@ async function preview(kind, src, fileName) {
   // the game's own list, or any list, that the list already is: nothing to import (16 §2.18)
   const fromGame = kind === "file" && !!info?.game && src === info.game.path;
   if (p.replace?.same && !p.settings && !p.collection) {
-    body.append(el("div", "sub xc-same", fromGame ? Tf("%s already matches the game.", active.name) : Tf("%s already is this list.", active.name)));
+    body.append(row(fromGame ? Tf("%s already matches the game.", active.name) : Tf("%s already is this list.", active.name), ""));
     body.append(footer("", button(T("close"), "", hideResult)));
     reveal();
     return;
