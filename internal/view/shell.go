@@ -187,25 +187,26 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 		{ID: PageLog, Label: T("game log")},
 	}
 	library := []NavItem{
-		// every import starts here, and sharing sits beside it (16 §2.18); first in the group
-		// since 2026-11-18, still without a shift key (below)
-		{ID: PageImport, Label: T("import & export")},
 		{ID: PagePlan, Label: T("lists"), Kids: planKids},
 		{ID: PagePacks, Label: T("packs"), Kids: packKids},
 		// Below the packs (2026-10-28). The entry opens All, its first sub-entry (16 §2.9).
 		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all mods")}, {ID: PageChanges, Label: T("updates")}, {ID: PageSubscribe, Label: T("add a subscription")}, {ID: PageSearch, Label: T("search files")}, {ID: PageModSettings, Label: T("mod settings")},
 			// what the game loads faster (10 §2); a sub-entry since 2026-11-18, keeping shift+7
 			{ID: PageTextures, Label: T("texture optimisation")}}},
+		// Saves sits below Mod library since 2026-11-18 (16 §2.11): the saves, and the play
+		// review (12 §3); it opens All saves. Its own name: the plain "saves" key is
+		// translated for settings rows. No shift key (below).
+		{ID: PageSaves, Label: extraName("@nav.saves", "saves"), Kids: []NavItem{{ID: PageSaves, Label: T("all saves")}, {ID: PageReview, Label: T("play review")}}},
 		{ID: PageEnv, Label: T("Game Config")},
+		// every import starts here, and sharing sits beside it (16 §2.18); last in the group
+		// since 2026-11-18, still without a shift key (below)
+		{ID: PageImport, Label: T("import & export")},
 	}
-	// Saves is a group of its own since 2026-11-11 (16 §2.11): the saves, and the play
-	// review (12 §3). Its own name: the plain "saves" key is translated for settings rows.
-	saves := []NavItem{{ID: PageSaves, Label: T("all saves")}, {ID: PageReview, Label: T("play review")}}
-	groups := []NavGroup{{Title: T("playing"), Items: playing}, {Title: extraName("@nav.saves", "saves"), Items: saves}, {Title: T("library"), Items: library}}
+	groups := []NavGroup{{Title: T("playing"), Items: playing}, {Title: T("library"), Items: library}}
 	n := 0
 	for g := range groups {
 		for i := range groups[g].Items {
-			if id := groups[g].Items[i].ID; id == PageSaves || id == PageReview || id == PageImport {
+			if id := groups[g].Items[i].ID; id == PageSaves || id == PageImport {
 				continue // no shift key: shift+1–8 stay the eight pages the TUI also has (16 §3.5)
 			}
 			n++

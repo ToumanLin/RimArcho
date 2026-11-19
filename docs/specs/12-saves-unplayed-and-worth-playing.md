@@ -213,7 +213,7 @@ Results need no AI. Archo may "interpret" this page: pick unused content worth t
 
 ## 4. Saves
 
-The Saves page is in the Saves group of the sidebar, between Playing and Library (16 §2.1, §2.11). A colony is not stored as an object of its own: it is the group of saves of one game. Facts about the colony are read from its **latest save** and shown once; an older save shows only how it differs.
+The Saves page is Library › Saves in the sidebar, directly below Mod library (16 §2.1, §2.11). A colony is not stored as an object of its own: it is the group of saves of one game. Facts about the colony are read from its **latest save** and shown once; an older save shows only how it differs.
 
 ### 4.1 Group by colony
 

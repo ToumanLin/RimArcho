@@ -43,8 +43,8 @@ func TestNavAndPath(t *testing.T) {
 		t.Fatalf("plans %+v %v", plans, err)
 	}
 	g := view.Nav(n.Count, plans, []view.PackRow{{Name: "Main"}})
-	if len(g) != 3 || g[0].Title != "playing" || g[1].Title != "saves" || g[2].Title != "library" {
-		t.Fatalf("three groups, Playing, Saves and Library (16 §2.1): %+v", g)
+	if len(g) != 2 || g[0].Title != "playing" || g[1].Title != "library" {
+		t.Fatalf("two groups, Playing and Library (16 §2.1): %+v", g)
 	}
 	var ids, keys []string
 	for _, gr := range g {
@@ -52,15 +52,15 @@ func TestNavAndPath(t *testing.T) {
 			ids, keys = append(ids, it.ID), append(keys, it.Key)
 		}
 	}
-	if strings.Join(ids, ",") != "home,needs,log,saves,review,import,plan,packs,library,env" {
+	if strings.Join(ids, ",") != "home,needs,log,plan,packs,library,saves,env,import" {
 		t.Fatalf("order %v", ids)
 	}
 	// Saves and Import have no shift key: shift+1–8 stay the eight entries the TUI also has (16 §3.5)
-	if strings.Join(keys, ",") != "shift+1,shift+2,shift+3,,,,shift+4,shift+5,shift+6,shift+8" {
+	if strings.Join(keys, ",") != "shift+1,shift+2,shift+3,shift+4,shift+5,shift+6,,shift+8," {
 		t.Fatalf("keys %v", keys)
 	}
 	// Texture optimisation is Mod library's last sub-entry and keeps shift+7 (16 §2.1)
-	lib := g[2].Items[3]
+	lib := g[1].Items[2]
 	if tx := lib.Kids[len(lib.Kids)-1]; lib.ID != view.PageLibrary || tx.ID != view.PageTextures || tx.Key != "shift+7" {
 		t.Fatalf("textures under Mod library: %+v", lib.Kids)
 	}
@@ -88,8 +88,8 @@ func TestNavAndPath(t *testing.T) {
 		"plans":       "library=plan / lists=plan / all lists=plans",
 		"needs":       "playing=home / can it run=needs",
 		"log":         "playing=home / game log=log",
-		"saves":       "saves=saves / all saves=saves",
-		"review":      "saves=saves / play review=review",
+		"saves":       "library=plan / saves=saves / all saves=saves",
+		"review":      "library=plan / saves=saves / play review=review",
 		"changes":     "library=plan / mod library=library / updates=changes",
 		"library":     "library=plan / mod library=library / all mods=library",
 		"textures":    "library=plan / mod library=library / texture optimisation=textures",
