@@ -764,7 +764,13 @@ func PackImportText(m *app.PackMatch) string {
 	if m == nil || m.Pack == nil {
 		return ""
 	}
+	if u := m.Update; u != nil && !u.Applied {
+		return Tf("pack %s: this file is revision %d, you have revision %d; nothing changed", u.Name, u.To, u.From)
+	}
 	parts := []string{Tf("pack %s is in the packs folder; play it from the home page", m.Pack.Name)}
+	if u := m.Update; u != nil {
+		parts[0] = Tf("pack %s is now revision %d; its saves and settings stay", u.Name, u.To)
+	}
 	if m.Verified {
 		parts = append(parts, T("every mod's files match the pack"))
 	} else {
@@ -779,4 +785,41 @@ func PackImportText(m *app.PackMatch) string {
 		}
 	}
 	return strings.Join(parts, "  ")
+}
+
+// PackUpdateOffer is the confirmation before a pack update (10 §4): what the newer revision
+// changes.
+type PackUpdateOffer struct {
+	Name  string   `json:"name"`
+	Title string   `json:"title"`
+	Lines []string `json:"lines"`
+}
+
+// PackUpdateOfferOf words an update offer.
+func PackUpdateOfferOf(u *app.PackUpdate) *PackUpdateOffer {
+	o := &PackUpdateOffer{Name: u.Name, Title: Tf("update pack %s to revision %d", u.Name, u.To)}
+	o.Lines = append(o.Lines, Tf("you have revision %d; its saves and settings stay, its Mods are replaced", u.From))
+	d := u.Diff
+	list := func(head string, xs []string) {
+		if len(xs) == 0 {
+			return
+		}
+		line := head + ": " + strings.Join(xs[:min(len(xs), 8)], ", ")
+		if len(xs) > 8 {
+			line += " " + Tf("and %d more", len(xs)-8)
+		}
+		o.Lines = append(o.Lines, line)
+	}
+	if d != nil {
+		if d.Empty() {
+			o.Lines = append(o.Lines, T("the same Mods"))
+		}
+		list(Tf("added %d", len(d.Added)), d.Added)
+		list(Tf("removed %d", len(d.Removed)), d.Removed)
+		list(Tf("changed %d", len(d.Changed)), d.Changed)
+		if d.Settings > 0 {
+			o.Lines = append(o.Lines, Tf("Mod settings of %d mods: only those the pack has none of yet", d.Settings))
+		}
+	}
+	return o
 }

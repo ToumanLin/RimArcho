@@ -148,7 +148,7 @@ func (s *API) ImportPreviewFor(id int64, kind, src string) (*PlanImportPreview, 
 	preview, err := view.PreviewImportFor(s.a, imp, id)
 	if err == nil {
 		s.x.imp, s.x.follow = imp, imp.Collection != nil
-		s.x.envID = envID
+		s.x.envID, s.x.settings = envID, imp.List.Settings
 	}
 	if err != nil {
 		return nil, err

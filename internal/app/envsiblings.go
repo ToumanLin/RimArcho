@@ -124,6 +124,13 @@ func (a *App) initializeSibling(e, like *env.Environment, plan int64, newList bo
 
 // seedSettings shares the pack step-4 rules, while reporting every copy failure.
 func seedSettings(from, to string, config bool) ([]string, error) {
+	return seedSettingsWith(from, to, config, true)
+}
+
+// seedSettingsWith is seedSettings; without mods it copies the game's own settings only
+// (Prefs.xml, KeyPrefs.xml…), not Mod_*.xml nor HugsLib/: a pack that carries its own Mod
+// settings (10 §3 step 4).
+func seedSettingsWith(from, to string, config, mods bool) ([]string, error) {
 	if from == "" {
 		return nil, nil
 	}
@@ -134,7 +141,8 @@ func seedSettings(from, to string, config bool) ([]string, error) {
 			return nil, err
 		}
 		for _, f := range ents {
-			if !f.Type().IsRegular() || strings.EqualFold(f.Name(), "ModsConfig.xml") || !strings.EqualFold(filepath.Ext(f.Name()), ".xml") {
+			if !f.Type().IsRegular() || strings.EqualFold(f.Name(), "ModsConfig.xml") || !strings.EqualFold(filepath.Ext(f.Name()), ".xml") ||
+				!mods && isModSettingsName(f.Name()) {
 				continue
 			}
 			cfg := filepath.Join(to, "Config")
@@ -157,6 +165,9 @@ func seedSettings(from, to string, config bool) ([]string, error) {
 	}
 	if err := os.MkdirAll(to, 0o755); err != nil {
 		return copied, err
+	}
+	if !mods {
+		return copied, nil
 	}
 	hl, err := copyHugsLib(from, to)
 	return append(copied, hl...), err

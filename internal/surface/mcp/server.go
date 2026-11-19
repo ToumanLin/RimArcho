@@ -299,10 +299,11 @@ type ModSettingsSetIn struct {
 	Reset  StrList           `json:"reset,omitempty" jsonschema:"names back to their default"`
 	DryRun bool              `json:"dry_run,omitempty" jsonschema:"check and show the change without writing"`
 	// The Config folder's files (16 §2.9): recycle, reset, copy_from.
-	Action string  `json:"action,omitempty" jsonschema:"set, recycle, reset, copy_from"`
-	Files  StrList `json:"files,omitempty" jsonschema:"recycle: Mod_*.xml or orphans"`
-	From   string  `json:"from,omitempty" jsonschema:"copy_from: a Game Config"`
-	Refs   StrList `json:"refs,omitempty" jsonschema:"copy_from: mods"`
+	Action  string  `json:"action,omitempty" jsonschema:"set, recycle, reset, copy_from, apply"`
+	Files   StrList `json:"files,omitempty" jsonschema:"recycle: Mod_*.xml or orphans"`
+	From    string  `json:"from,omitempty" jsonschema:"copy_from: a Game Config; apply: list file"`
+	Refs    StrList `json:"refs,omitempty" jsonschema:"copy_from: mods; apply: packages"`
+	Replace bool    `json:"replace,omitempty" jsonschema:"apply: replace files"`
 }
 
 // ModSettingsSetArgv maps set_mod_settings to its command (set pairs in name order).
@@ -326,6 +327,10 @@ func ModSettingsSetArgv(in ModSettingsSetIn) []string {
 		b := argv("mod-settings", "copy-from", in.From)
 		b.a = append(b.a, in.Refs...)
 		return b.flag("dry-run", in.DryRun).a
+	case "apply":
+		b := argv("mod-settings", "apply", in.From)
+		b.a = append(b.a, in.Refs...)
+		return b.flag("replace", in.Replace).flag("dry-run", in.DryRun).a
 	default:
 		return unknown("set_mod_settings", in.Action)
 	}

@@ -14,14 +14,17 @@ func init() {
 	dry := Flag{Name: "dry-run", Help: "show what would happen"}
 	register(&Command{Name: "pack build", Args: "<name>", Summary: "compile the workspace into a pack: checked, sorted, each mod copied without the version folders this game does not load", MinArgs: 1, MaxArgs: 1, Run: packBuildCmd,
 		Flags: []Flag{{Name: "textures", Help: "convert the copies' PNG textures to DDS and delete the PNGs (pre-convert; with --texture-scale: slim)"},
-			{Name: "texture-scale", Value: "<percent>", Help: "with --textures: scale textures down (20 25 40 50 60 75 80; never below 128 px or off a multiple of 4)"}, dry}})
+			{Name: "texture-scale", Value: "<percent>", Help: "with --textures: scale textures down (20 25 40 50 60 75 80; never below 128 px or off a multiple of 4)"},
+			{Name: "no-settings", Help: "leave the list's Mod settings out (by default the pack carries them)"},
+			{Name: "update", Help: "build the next revision of the existing pack <name>: its Mods are replaced, its saves and settings stay"}, dry}})
 	register(&Command{Name: "pack list", Summary: "the packs: mods, size, game version, last played", MaxArgs: 0, Run: packListCmd})
 	register(&Command{Name: "pack launch", Args: "<name>", Summary: "play a pack: link its mods into Mods/, its own list and saves, start the game", MinArgs: 1, MaxArgs: 1, Run: packLaunchCmd,
 		Flags: []Flag{dry, {Name: "move-duplicates", Help: "first move plain Mods/ folders holding another version of a pack's mod into the lock library"}}})
 	register(&Command{Name: "pack export", Args: "<name> <file>", Summary: "write a pack to a file (.archopack tar + zstd, or with --list its list as a RimArcho list .archolist.json)", MinArgs: 2, MaxArgs: 2, Run: packExportCmd,
 		Flags: []Flag{{Name: "list", Help: "only the list, each mod with its version, no files"}}})
 	register(&Command{Name: "pack import", Args: "<file>", Summary: "unpack a .archopack, or compare a RimArcho list (.archolist.json) with the installed mods", MinArgs: 1, MaxArgs: 1, Run: packImportCmd,
-		Flags: []Flag{{Name: "as-plan", Help: "a list: also load it into the workspace (undoable)"}}})
+		Flags: []Flag{{Name: "as-plan", Help: "a list: also load it into the workspace (undoable)"},
+			{Name: "update", Help: "a newer revision of a pack you have: replace its Mods in place, keeping its saves and settings"}}})
 	register(&Command{Name: "pack check", Args: "<name|file>", Summary: "verify a pack's copies or check an archive without extracting it", MinArgs: 1, MaxArgs: 1, Run: packCheckCmd})
 	register(&Command{Name: "pack remove", Args: "<name>", Summary: "move a pack to the recycle bin; --unfinished deletes what a build cut short copied", MinArgs: 1, MaxArgs: 1, Run: packRemoveCmd,
 		Flags: []Flag{dry, {Name: "unfinished", Help: "the unfinished build of <name> (its folder in the packs folder)"}}})
@@ -57,7 +60,7 @@ func BuildProgressLine(p app.BuildProgress) string {
 }
 
 func packBuildCmd(c *Ctx, a *Args) (*render.Doc, error) {
-	o := app.BuildOptions{DryRun: a.Bool("dry-run")}
+	o := app.BuildOptions{DryRun: a.Bool("dry-run"), NoSettings: a.Bool("no-settings"), Update: a.Bool("update")}
 	if a.Bool("textures") || a.Str("texture-scale") != "" {
 		to, err := textureOptions(a)
 		if err != nil {
@@ -149,6 +152,15 @@ func packBuildCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		root.KV("order", fmt.Sprintf("sorted for the pack: %d moved (the workspace is unchanged)", r.Moved))
 	}
 	root.KV("game", r.Pack.Game)
+	if n := r.Pack.Settings.Mods(); n > 0 {
+		root.KV("Mod settings", fmt.Sprintf("carries the settings of %s (--no-settings leaves them out)", render.Plural(n, "Mod")))
+	} else {
+		root.KV("Mod settings", "none carried")
+	}
+	if r.Diff != nil {
+		root.KV("revision", fmt.Sprintf("%d: replaces the pack's Mods; its saves and settings stay", r.Pack.Revision))
+		packDiffKV(root, r.Diff)
+	}
 	if len(r.Mismatch) > 0 {
 		n := root.KV("versions", fmt.Sprintf("%d mods do not list the game's version", len(r.Mismatch)))
 		for _, x := range r.Mismatch {
@@ -260,12 +272,29 @@ func packExportCmd(c *Ctx, a *Args) (*render.Doc, error) {
 }
 
 func packImportCmd(c *Ctx, a *Args) (*render.Doc, error) {
-	r, err := c.App.ImportPack(a.Pos[0], a.Bool("as-plan"))
+	r, err := c.App.ImportPackWith(a.Pos[0], app.PackImport{AsPlan: a.Bool("as-plan"), Update: a.Bool("update")})
 	if err != nil {
 		return nil, err
 	}
+	if u := r.Update; u != nil && !u.Applied {
+		d, root := render.New(fmt.Sprintf("pack %s: this file is revision %d, you have revision %d; nothing changed yet", u.Name, u.To, u.From))
+		packDiffKV(root, u.Diff)
+		root.KV("keeps", "the pack's saves and settings (userdata/)")
+		d.AddNext("archo pack import " + quoteArg(a.Pos[0]) + " --update")
+		return d, nil
+	}
 	if r.Dir != "" {
-		d, root := render.New("unpacked pack " + r.Pack.Name)
+		head := "unpacked pack " + r.Pack.Name
+		if r.Update != nil {
+			head = fmt.Sprintf("updated pack %s to revision %d (was %d); its saves and settings stay", r.Update.Name, r.Update.To, r.Update.From)
+		}
+		d, root := render.New(head)
+		if r.Update != nil {
+			packDiffKV(root, r.Update.Diff)
+		}
+		if n := r.Pack.Settings.Mods(); n > 0 {
+			root.KV("Mod settings", fmt.Sprintf("carries settings of %s; written on its next launch where the pack has none", render.Plural(n, "Mod")))
+		}
 		root.KV("folder", r.Dir)
 		if r.Verified {
 			root.KV("content", "verified")
@@ -415,4 +444,30 @@ func packUnlinkCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		d.AddNext("archo pack unlink")
 	}
 	return d, nil
+}
+
+// packDiffKV lists what a pack revision changes.
+func packDiffKV(root *render.Node, d *app.PackDiff) {
+	if d == nil {
+		return
+	}
+	if d.Empty() {
+		root.KV("Mods", "the same Mods")
+	}
+	for _, g := range []struct {
+		k  string
+		xs []string
+	}{{"added", d.Added}, {"removed", d.Removed}, {"changed", d.Changed}} {
+		if len(g.xs) == 0 {
+			continue
+		}
+		n := root.KV(g.k, fmt.Sprint(len(g.xs)))
+		for _, x := range g.xs {
+			n.Add(x)
+		}
+		n.Truncate(10, "")
+	}
+	if d.Settings > 0 {
+		root.KV("Mod settings", fmt.Sprintf("carries settings of %s (missing files only)", render.Plural(d.Settings, "Mod")))
+	}
 }

@@ -174,6 +174,9 @@ type ImportPreview struct {
 	Allowed    string       `json:"allowed"`
 	// Collection: the list is a Steam Workshop collection the list can follow (07 §7.6).
 	Collection bool `json:"collection,omitempty"`
+	// Settings: how many Mods a RimArcho list carries Mod settings of (07 §7.3); applying
+	// them is the player's choice after the import.
+	Settings int `json:"settings,omitempty"`
 }
 
 // PreviewImport compares an imported list with the installed mods and the workspace;
@@ -202,7 +205,8 @@ func PreviewImportFor(a *app.App, imp *Import, id int64) (*ImportPreview, error)
 		}
 	}
 	il := imp.List
-	p := &ImportPreview{Format: FormatName(il.Format), Source: imp.Source, SourcePath: imp.SourcePath, Name: il.Title, Game: il.Game, Installed: []ImportRow{}, Missing: []ImportRow{}, Collection: imp.Collection != nil}
+	p := &ImportPreview{Format: FormatName(il.Format), Source: imp.Source, SourcePath: imp.SourcePath, Name: il.Title, Game: il.Game, Installed: []ImportRow{}, Missing: []ImportRow{}, Collection: imp.Collection != nil,
+		Settings: il.Settings.Mods()}
 	if mm := st.GameMM(); il.Game != "" && mm != "" && !strings.HasPrefix(il.Game, mm) {
 		p.GameNote = Tf("the list is for RimWorld %s, this game runs %s", majorMinor(il.Game), mm)
 	}

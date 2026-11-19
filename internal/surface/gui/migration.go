@@ -168,14 +168,15 @@ func (s *API) TaskByID(id string) *app.Task {
 
 // StartPackImport adds a pack from an .archopack file as a background task (10 §4) and
 // returns its ID; the task's result is PackImport's text.
-func (s *API) StartPackImport(path string) (string, error) {
+// With update it applies a newer revision of a pack the player has (PackUpdateOffer).
+func (s *API) StartPackImport(path string, update bool) (string, error) {
 	path = strings.Trim(strings.TrimSpace(path), `"'`)
 	if !app.IsPackZip(path) {
 		return "", errors.New(view.Tf("%s is not a pack (.archopack)", path))
 	}
 	id := s.tasks.Begin(view.TaskPackImport, filepath.Base(path), nil)
 	go func() {
-		text, err := s.PackImport(path)
+		text, err := s.packImport(path, update)
 		s.endSelf(id, err, text)
 	}()
 	return id, nil

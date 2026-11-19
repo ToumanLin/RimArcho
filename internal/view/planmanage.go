@@ -1,6 +1,7 @@
 package view
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -377,10 +378,15 @@ type PlanExport struct {
 	Formats []ExportFormat `json:"formats"`
 	Format  string         `json:"format"`
 	Text    string         `json:"text"`
+	// Settings: the RimArcho list carries the list's Mod settings ("include Mod settings",
+	// 07 §7.3); SettingsMods is how many Mods it carries settings of.
+	Settings     bool `json:"settings"`
+	SettingsMods int  `json:"settingsMods"`
 }
 
-// BuildPlanExport renders a list in a format for the export sub-page.
-func BuildPlanExport(a *app.App, id int64, format string) (*PlanExport, error) {
+// BuildPlanExport renders a list in a format for the export sub-page; with settings a
+// RimArcho list carries the Mod settings.
+func BuildPlanExport(a *app.App, id int64, format string, settings bool) (*PlanExport, error) {
 	p, err := planByID(a, id)
 	if err != nil {
 		return nil, err
@@ -397,7 +403,8 @@ func BuildPlanExport(a *app.App, id int64, format string) (*PlanExport, error) {
 	if !ok {
 		format = fs[0].ID
 	}
-	b, err := a.ExportPlan(id, format)
+	settings = settings && format == app.FormatArcho
+	b, err := a.ExportPlanWith(id, format, settings)
 	if err != nil {
 		return nil, err
 	}
@@ -405,12 +412,19 @@ func BuildPlanExport(a *app.App, id int64, format string) (*PlanExport, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &PlanExport{ID: id, Name: p.Name, Page: PlanPage(id), Format: format, Formats: fs, Text: string(b),
-		Facts: Tf("%d mods", len(ps.List)) + "  " + app.FormatVersions(a.PlanAllowedVersions(st, p))}, nil
+	out := &PlanExport{ID: id, Name: p.Name, Page: PlanPage(id), Format: format, Formats: fs, Text: string(b), Settings: settings,
+		Facts: Tf("%d mods", len(ps.List)) + "  " + app.FormatVersions(a.PlanAllowedVersions(st, p))}
+	if settings {
+		var q app.Pack
+		if json.Unmarshal(b, &q) == nil {
+			out.SettingsMods = q.Settings.Mods()
+		}
+	}
+	return out, nil
 }
 
 // ExportPlanTo writes a list to a file (as ExportTo does for the current list).
-func ExportPlanTo(a *app.App, id int64, format, path string, overwrite bool) (string, error) {
+func ExportPlanTo(a *app.App, id int64, format, path string, overwrite, settings bool) (string, error) {
 	p, err := planByID(a, id)
 	if err != nil {
 		return "", err
@@ -436,7 +450,7 @@ func ExportPlanTo(a *app.App, id int64, format, path string, overwrite bool) (st
 			return "", fmt.Errorf("%s: %s", abs, T("exists; choose another name (nothing is overwritten)"))
 		}
 	}
-	b, err := a.ExportPlan(id, format)
+	b, err := a.ExportPlanWith(id, format, settings && format == app.FormatArcho)
 	if err != nil {
 		return "", err
 	}
@@ -456,7 +470,7 @@ func ExportPlanTo(a *app.App, id int64, format, path string, overwrite bool) (st
 }
 
 // ExportPlanText renders a list for copying.
-func ExportPlanText(a *app.App, id int64, format string) (string, error) {
-	b, err := a.ExportPlan(id, format)
+func ExportPlanText(a *app.App, id int64, format string, settings bool) (string, error) {
+	b, err := a.ExportPlanWith(id, format, settings && format == app.FormatArcho)
 	return string(b), err
 }

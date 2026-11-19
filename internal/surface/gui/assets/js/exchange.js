@@ -134,7 +134,7 @@ function shareCards() {
   ex.classList.add("small"); ex.disabled = !id;
   const r1 = el("div", "xc-row end"); r1.append(ex); lc.append(r1);
   const pc = el("section", "card xc-goal");
-  pc.append(goalHead("packs", T("A pack"), T("the pack as a file (.archopack), or only its list")), el("div", "xc-grow"));
+  pc.append(goalHead("packs", T("A pack (with Mod files)"), T("the pack as a file (.archopack), or only its list")), el("div", "xc-grow"));
   const r2 = el("div", "xc-row end");
   pc.append(r2);
   goals.append(lc, pc);
@@ -203,7 +203,7 @@ function listCard() {
 // A pack: an .archopack file, added as a background task.
 function packCard() {
   const c = el("section", "card xc-goal");
-  c.append(goalHead("packs", T("A pack"), T("a pack you can launch; its Mods are checked first")), el("div", "xc-grow"),
+  c.append(goalHead("packs", T("A pack (with Mod files)"), T("a pack you can launch; its Mods are checked first")), el("div", "xc-grow"),
     dropButton(T("Choose a pack…"), ".archopack", async () => {
       let f = "";
       try { f = await api.PickPackFile(); } catch (e) { return say("fail", errText(e)); }
@@ -597,12 +597,18 @@ async function openPicked(path) {
   if (m && !M.shown.has(mKey(m))) showManager(m);
 }
 
-// importPack adds a pack as a background task and shows it in place.
-async function importPack(path) {
+// importPack adds a pack as a background task and shows it in place. A newer revision of a
+// pack the player has is confirmed first, with what it changes (10 §4).
+async function importPack(path, update = null) {
+  if (update === null) {
+    let offer = null;
+    try { offer = await api.PackUpdateOffer(path); } catch { /* the import reports it */ }
+    if (offer) return pop.confirm(offer.title, offer.lines, T("update the pack"), () => importPack(path, true));
+  }
   const active = session, result = $("#screen .xc-preview"), seq = ++previewSeq;
   result.dataset.mode = "pack"; result.hidden = false; result.textContent = ""; result.classList.remove("pad");
   let id;
-  try { id = await api.StartPackImport(path); } catch (e) { result.classList.add("pad"); result.textContent = errText(e); return say("fail", errText(e)); }
+  try { id = await api.StartPackImport(path, !!update); } catch (e) { result.classList.add("pad"); result.textContent = errText(e); return say("fail", errText(e)); }
   say("", T("adding the pack: a background task; you can leave this page"));
   const name = path.replace(/^.*[\\/]/, "");
   const tick = async () => {
@@ -695,6 +701,8 @@ async function preview(kind, src, fileName) {
   name.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); perform(); } };
   ways.append(name, why); body.append(ways);
   let follow = true;
+  // a RimArcho list's Mod settings (07 §7.3): offered, applied after the import
+  const settings = p.settings ? settingsChoice(body, current) : null;
   async function perform() {
     if (busy || !(await checkName()) || !current()) return;
     busy = true; submit.disabled = true;
@@ -702,6 +710,11 @@ async function preview(kind, src, fileName) {
       await api.ImportFollow(follow);
       const r = destination === "new" ? await api.ImportAsPlan(name.value) : await api.ImportApplyTo(active.target, destination === "merge");
       if (!current()) return;
+      let extra = "";
+      if (settings && settings.on()) {
+        try { extra = settingsLine(await api.ImportSettings(settings.mods(), settings.replace(), false)); }
+        catch (e) { extra = errText(e); }
+      }
       for (const c of S.cols) { c.sel.clear(); c.query = ""; c.cursor = 0; }
       const after = active.from === "guide" ? ui.afterImport : null;
       ui.afterImport = null;
@@ -709,7 +722,7 @@ async function preview(kind, src, fileName) {
       if (after) return after();
       const id = destination === "new" ? +r.page.slice(5) : active.target;
       await ui.manageLists(id);
-      say("ok", destination === "new" ? r.text : r, destination !== "new" ? async () => {
+      say("ok", (destination === "new" ? r.text : r) + (extra ? "  " + extra : ""), destination !== "new" ? async () => {
         try { await api.OpenPlan(id); const t = await api.Undo(); await ui.reload(); await ui.manageLists(id); say("ok", t); }
         catch (e) { say("fail", errText(e)); }
       } : false);
@@ -734,6 +747,67 @@ async function preview(kind, src, fileName) {
   showImportContents(body, p);
 }
 
+// settingsChoice is the import's "apply settings" (07 §7.3): off at first; on, it shows the
+// per-Mod preview (what is written, kept or replaced) with a box per Mod.
+function settingsChoice(body, current) {
+  const sec = el("fieldset", "xc-sec");
+  sec.append(el("legend", "xc-sec-t", T("Mod settings")));
+  const off = new Set(), missing = new Set();
+  const lb = el("label", "xc-check"), cb = el("input");
+  cb.type = "checkbox";
+  lb.append(cb, el("span", "", T("apply settings")), el("span", "xc-hint", T("after the import; settings files you have are kept unless you replace them")));
+  const rl = el("label", "xc-check"), rc = el("input");
+  rc.type = "checkbox";
+  rl.append(rc, el("span", "", T("replace settings files I have")), el("span", "xc-hint", T("the old ones go to the recycle bin")));
+  const list = el("div", "xc-list");
+  rl.hidden = list.hidden = true;
+  let all = [];
+  async function draw() {
+    let pl;
+    try { pl = await api.ImportSettings([], rc.checked, true); } catch (e) { list.textContent = errText(e); return; }
+    if (!current()) return;
+    all = pl.mods;
+    list.textContent = "";
+    for (const m of pl.mods) {
+      const d = el("label", "xc-mod xc-check"), mc = el("input");
+      mc.type = "checkbox";
+      if (m.missing) missing.add(m.package);
+      mc.checked = !m.missing && !off.has(m.package); mc.disabled = !!m.missing;
+      mc.onchange = () => { if (mc.checked) off.delete(m.package); else off.add(m.package); };
+      d.append(mc, el("span", "", m.mod), el("span", "dim", settingsNote(m)));
+      list.append(d);
+    }
+  }
+  cb.onchange = () => { rl.hidden = list.hidden = !cb.checked; if (cb.checked) draw(); };
+  rc.onchange = draw;
+  sec.append(lb, rl, list);
+  body.append(sec);
+  return {
+    on: () => cb.checked && all.some(m => !m.missing && !off.has(m.package)),
+    mods: () => all.filter(m => !m.missing && !off.has(m.package)).map(m => m.package),
+    replace: () => rc.checked,
+  };
+}
+
+// settingsNote says what applying does to one Mod's files.
+function settingsNote(m) {
+  if (m.missing) return T("not installed");
+  let n = 0, kept = 0, same = 0, repl = 0;
+  for (const f of m.files) {
+    if (f.same) same++;
+    else if (f.write && f.exists) repl++;
+    else if (f.write) n++;
+    else kept++;
+  }
+  return [n && Tf("%d new", n), repl && Tf("%d replaced", repl), kept && Tf("%d kept", kept), same && Tf("%d the same", same)].filter(Boolean).join(", ");
+}
+
+function settingsLine(pl) {
+  let n = 0, failed = 0;
+  for (const m of pl.mods) for (const f of m.files) { if (f.error) failed++; else if (f.write) n++; }
+  return failed ? Tf("Mod settings: %d files written, %d failed", n, failed) : Tf("Mod settings: %d files written", n);
+}
+
 // Shared by the standalone destination flow and the new-list form's inline source.
 // sourceIsPath: the source is a file the player picked, so it copies on a click (16 §3.1 rule 12).
 export function showImportSummary(body, p, sourceIsPath = !!p.sourcePath) {
@@ -743,6 +817,7 @@ export function showImportSummary(body, p, sourceIsPath = !!p.sourcePath) {
   if (p.name) facts.push(Tf("list: %s", p.name));
   if (p.game) facts.push("RimWorld " + p.game);
   if (p.allowed) facts.push(Tf("suggested game versions: %s", p.allowed));
+  if (p.settings) facts.push(Tf("Mod settings of %d mods", p.settings));
   top.append(factText(el("div", "xc-note"), facts.filter(Boolean)));
   if (p.gameNote) top.append(el("div", "xc-note warn", p.gameNote));
   body.append(top);

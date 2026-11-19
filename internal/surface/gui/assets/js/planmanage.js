@@ -28,7 +28,7 @@ function syncGame() {
   M.env = game(); M.sourceSeq++; M.importSeq++;
   if (M.draft) { M.draft.loading = false; M.draft.importing = false; }
 }
-const X = { data: null, id: 0, from: "plans", format: "", info: null };
+const X = { data: null, id: 0, from: "plans", format: "", info: null, settings: false };
 const FORMAT_KEY = "ui.gui.export.format";
 const C = { seq: 0, page: null, slot: null, progress: null };
 
@@ -950,7 +950,7 @@ export function hintList() {
 // exportOf opens the export of list id; from is where esc goes back to: "plans" (this
 // page), "editor" (the plan editor's e) or "import" (Import & export's current list).
 export async function exportOf(id, from = "plans") {
-  X.id = id; X.from = from;
+  X.id = id; X.from = from; X.settings = false;
   S.planExport = { id, from };
   return exportPage();
 }
@@ -963,7 +963,7 @@ async function exportPage() {
   if (!X.format) X.format = await api.Setting(FORMAT_KEY).catch(() => "") || "";
   if (!read.current()) return;
   let d, info;
-  try { [d, info] = await Promise.all([api.PlanExport(X.id, X.format), X.info ? X.info : api.ExchangeInfo()]); } catch (e) { read.fail(e); return; }
+  try { [d, info] = await Promise.all([api.PlanExport(X.id, X.format, !!X.settings), X.info ? X.info : api.ExchangeInfo()]); } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
   X.data = d; X.info = info; X.format = d.format;
   drawExport();
@@ -1011,12 +1011,31 @@ function drawExport() {
     s.classList.add("primary");
     acts.append(s, button(T("copy"), "", () => copy(out)));
   }
-  right.append(h, pre, acts, out);
+  right.append(h);
+  // a RimArcho list may carry the list's Mod settings (07 §7.3); off by default
+  if (f.id === "archo") {
+    const lb = el("label", "xc-check");
+    const cb = el("input"); cb.type = "checkbox"; cb.checked = !!d.settings;
+    cb.onchange = () => setSettings(cb.checked);
+    const note = d.settings ? Tf("settings of %d mods", d.settingsMods) : T("by package and settings class; the receiver chooses whether to apply them");
+    lb.append(cb, el("span", "", T("include Mod settings")), el("span", "xc-hint", note));
+    right.append(lb);
+  }
+  right.append(pre, acts, out);
   area(right, null);
   grid.append(left, right);
   w.append(grid);
   sc.append(w);
   ui.renderHints();
+}
+
+async function setSettings(on) {
+  X.settings = on;
+  let d;
+  try { d = await api.PlanExport(X.id, X.format, on); } catch (e) { return say("fail", errText(e)); }
+  if (S.screen !== "plan-export" || X.settings !== on) return;
+  X.data = d;
+  drawExport();
 }
 
 async function choose(id) {
@@ -1025,7 +1044,7 @@ async function choose(id) {
   document.querySelectorAll("#screen .fmt").forEach((b, i) => { const on = X.data.formats[i].id === id; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
   api.SetSetting(FORMAT_KEY, id).catch(() => {});
   let d;
-  try { d = await api.PlanExport(X.id, id); } catch (e) { return say("fail", errText(e)); }
+  try { d = await api.PlanExport(X.id, id, !!X.settings); } catch (e) { return say("fail", errText(e)); }
   if (S.screen !== "plan-export" || X.format !== id) return;
   X.data = d;
   drawExport();
@@ -1045,7 +1064,7 @@ function result(out, ok, text, paths = []) { pathContent(out, text, paths); out.
 async function save(out) {
   const f = fmtOf();
   const write = async (path, overwrite) => {
-    try { result(out, true, await api.PlanExportSave(X.id, f.id, path, overwrite), [path]); } catch (e) { result(out, false, errText(e)); }
+    try { result(out, true, await api.PlanExportSave(X.id, f.id, path, overwrite, !!X.settings), [path]); } catch (e) { result(out, false, errText(e)); }
   };
   if (X.info && X.info.dialogs) {
     let path = "";
@@ -1059,7 +1078,7 @@ async function save(out) {
 
 async function copy(out) {
   let c;
-  try { c = await api.PlanExportCopy(X.id, X.format); } catch (e) { return result(out, false, errText(e)); }
+  try { c = await api.PlanExportCopy(X.id, X.format, !!X.settings); } catch (e) { return result(out, false, errText(e)); }
   let ok = c.copied;
   if (!ok) ok = await copyText(c.text);
   if (ok) return result(out, true, c.line);

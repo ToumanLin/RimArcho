@@ -311,6 +311,12 @@ func BuildPackPage(a *app.App, name string) (*PackPage, error) {
 		built += "  " + p.Env
 	}
 	pg.Facts = append(pg.Facts, built)
+	if p.Revision > 1 {
+		pg.Facts = append(pg.Facts, Tf("revision %d", p.Revision))
+	}
+	if n := p.Settings.Mods(); n > 0 {
+		pg.Facts = append(pg.Facts, Tf("Mod settings of %d mods", n))
+	}
 	if p.LastPlayed.IsZero() {
 		pg.Facts = append(pg.Facts, T("never played"))
 	} else {

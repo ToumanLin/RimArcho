@@ -35,6 +35,69 @@ func init() {
 		Summary: "copy the current list's Mods' settings from another Game Config (all Mods, or those named); a replaced file goes to the recycle bin first",
 		MinArgs: 1, MaxArgs: -1, Run: modSettingsCopyCmd,
 		Flags: []Flag{{Name: "dry-run", Help: "show what would be copied and replaced"}}})
+	register(&Command{Name: "mod-settings apply", Args: "<list file> [<package>…]",
+		Summary: "apply the Mod settings a RimArcho list carries to the installed Mods (all, or the packages named); existing files are kept unless --replace",
+		MinArgs: 1, MaxArgs: -1, Run: modSettingsApplyCmd,
+		Flags: []Flag{{Name: "replace", Help: "also replace settings files that are here (each goes to the recycle bin first)"},
+			{Name: "dry-run", Help: "the per-Mod preview: what would be written, kept or replaced"}}})
+}
+
+func modSettingsApplyCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	il, err := app.ReadLoadoutFile(a.Pos[0])
+	if err != nil {
+		return nil, err
+	}
+	p, err := c.App.ApplyListSettings(il.Settings, a.Pos[1:], a.Bool("replace"), a.Bool("dry-run"))
+	if err != nil {
+		return nil, err
+	}
+	verb := "wrote"
+	if p.DryRun {
+		verb = "would write"
+	}
+	d, root := render.New(fmt.Sprintf("Mod settings from %s: %s %s into %s", a.Pos[0], verb, render.Plural(p.Writes(), "file"), p.Config))
+	failed, kept := 0, 0
+	for _, m := range p.Mods {
+		n := root.Add(m.Mod + "  pkg:" + m.PackageID)
+		if m.Missing {
+			n.Add("skipped: not installed here")
+			continue
+		}
+		for _, f := range m.Files {
+			line := f.To
+			if f.HugsLib {
+				line += " (HugsLib " + f.Class + ")"
+			}
+			switch {
+			case f.Err != "":
+				failed++
+				line += "  failed: " + f.Err
+			case f.Same:
+				line += "  (already the same)"
+			case f.Write && f.Exists:
+				line += "  (replaces the one here; it goes to the recycle bin)"
+			case f.Write:
+				line += "  (new)"
+			default:
+				kept++
+				line += "  (kept: one is here; --replace replaces it)"
+			}
+			n.Add(line)
+		}
+	}
+	if p.DryRun && p.Writes() > 0 {
+		args := append([]string{"archo mod-settings apply", quoteArg(a.Pos[0])}, quoteAll(a.Pos[1:])...)
+		if p.Replace {
+			args = append(args, "--replace")
+		}
+		d.AddNext(strings.Join(args, " "))
+	} else if p.DryRun && kept > 0 {
+		d.AddNext(strings.Join(append(append([]string{"archo mod-settings apply", quoteArg(a.Pos[0])}, quoteAll(a.Pos[1:])...), "--replace", "--dry-run"), " "))
+	}
+	if failed > 0 && failed == p.Writes()+failed && !p.DryRun {
+		return d, fmt.Errorf("%s", d.String())
+	}
+	return d, nil
 }
 
 func configStatus(s string) string {

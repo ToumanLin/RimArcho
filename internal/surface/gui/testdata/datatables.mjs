@@ -116,6 +116,7 @@ test("packs and pack mods render the shared table; dry run toggles inline and re
     BuildPage: async () => 1,
     BuildPageResult: async () => ({ name: "example", plan: "plan", env: "env", mods: 2, steps: [], ok: true, tex: 0 }),
     PackNameCheck: async () => "",
+    PackRevision: async () => 0,
     PackDryRun: (...args) => { const d = deferred(); previews.push({ ...d, args }); return d.promise; },
   });
   const packs = await loadModules("./packs.js", h.deps, h.globals);

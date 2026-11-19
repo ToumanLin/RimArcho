@@ -19,7 +19,7 @@ const descStatus = `Overview of the current environment: game version, mods per 
 
 const descModSettings = `Mod settings, read only. No ref: the current list's Mods that have settings (window title, file, or defaults when there is none yet). ref: what one Mod's files and HugsLib packs store, with window labels and HugsLib defaults from Archo Monitor. files: the Config folder's files and where each stands.`
 
-const descModSettingsSet = `With the game closed: change simple values (on/off, numbers, text, a HugsLib choice; reset = default); action=recycle|reset|copy_from recycles settings files or copies them from another Game Config (dry_run first, ask).`
+const descModSettingsSet = `With the game closed: change simple values (on/off, numbers, text, a HugsLib choice; reset = default); action=recycle|reset|copy_from|apply: recycle files, copy from a Game Config, apply a list's (dry_run first, ask).`
 
 const descFind = `Find mods by name, packageId, author, workshop id or folder (query), or list them (no query; active=true: enabled mods in load order). A packageId can match several copies: each candidate is listed with its ref. Next: get_mod.`
 
@@ -73,7 +73,7 @@ const descScan = `Rescan the mod folders and reconcile them with RimArcho's reco
 
 const descExchange = `Exchange the current plan with list files and Workshop collections: export (several formats), import (replaces the plan; one undoable edit), collection (compare with, or import, a Workshop collection). Ask before replacing the player's plan.`
 
-const descPacks = `Packs: a plan compiled into a self-contained folder with its own mod copies, list and saves. list, check (read-only), build, launch, export, import, remove, stop, unlink. build copies gigabytes, launch starts the game, remove deletes: dry_run=true first and ask.`
+const descPacks = `Packs: a plan compiled into a folder with its own mod copies, settings, list and saves. list, check (read-only), build, launch, export, import, remove, stop, unlink. build copies gigabytes, launch starts the game, remove deletes: dry_run first, ask.`
 
 const descIdentity = `RimArcho's identity of mods: answer open questions (is this new folder the mod that vanished? same, copy or unrelated), split or merge lineages. Answers rewrite history: quote the comparison from action=list or why and ask the player.`
 

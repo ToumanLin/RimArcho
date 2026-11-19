@@ -329,7 +329,7 @@ func TestPackBuildBackground(t *testing.T) {
 		return nil
 	}
 	start := time.Now()
-	if _, err := api.PackBuild("first", 0); err != nil {
+	if _, err := api.PackBuild("first", 0, false, false); err != nil {
 		t.Fatal(err)
 	}
 	if time.Since(start) > 2*time.Second {
@@ -350,7 +350,7 @@ func TestPackBuildBackground(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("the pages wait for the build")
 	}
-	if _, err := api.PackBuild("second", 0); err == nil {
+	if _, err := api.PackBuild("second", 0, false, false); err == nil {
 		t.Fatal("a second build started")
 	}
 	waitPack := func(want string) string {
@@ -413,7 +413,7 @@ func TestBuildPageG14(t *testing.T) {
 	if p.Name == "" || api.PackNameCheck(p.Name) != "" {
 		t.Fatalf("default name %q: %s", p.Name, api.PackNameCheck(p.Name))
 	}
-	lines := api.PackDryRun(p.Name, 0)
+	lines := api.PackDryRun(p.Name, 0, false, false)
 	if len(lines) == 0 || !strings.Contains(strings.Join(lines, "\n"), "cannot build") {
 		t.Fatalf("dry run: %v", lines)
 	}
@@ -441,7 +441,7 @@ func TestBuildPageG14(t *testing.T) {
 	if p, _ := buildPage(t, api, 75); !p.Ok || p.Tex != 75 || p.Steps[2].Go != "" || p.Steps[2].Level == view.LevelBad {
 		t.Fatalf("with an encoder: %+v", p)
 	}
-	if lines := strings.Join(api.PackDryRun("tex one", 75), " | "); !strings.Contains(lines, "dry run") {
+	if lines := strings.Join(api.PackDryRun("tex one", 75, false, false), " | "); !strings.Contains(lines, "dry run") {
 		t.Fatalf("dry run with textures: %s", lines)
 	}
 	e.App.TextureEncoder = nil

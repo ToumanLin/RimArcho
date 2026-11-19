@@ -441,15 +441,18 @@ func writeCopy(src, dst string) error {
 
 // settingsFileTrashable: a Mod settings file directly in an environment's user data Config/
 // folder (02 §3 "Mod settings file").
+// HugsLib's settings file there (HugsLib/ModSettings.xml) counts too: applying a list's
+// HugsLib settings rewrites it after the old one went to the recycle bin (07 §7.3).
 func (a *App) settingsFileTrashable(p string) bool {
-	if !isModSettingsName(filepath.Base(p)) {
+	hugs := strings.EqualFold(filepath.Base(p), filepath.Base(HugsLibSettingsFile)) && strings.EqualFold(filepath.Base(filepath.Dir(p)), "HugsLib")
+	if !hugs && !isModSettingsName(filepath.Base(p)) {
 		return false
 	}
 	if fi, err := os.Lstat(p); err != nil || !fi.Mode().IsRegular() {
 		return false
 	}
 	dir := filepath.Dir(p)
-	if !strings.EqualFold(filepath.Base(dir), "Config") {
+	if !hugs && !strings.EqualFold(filepath.Base(dir), "Config") {
 		return false
 	}
 	envs, err := a.Store.Envs()
@@ -461,7 +464,7 @@ func (a *App) settingsFileTrashable(p string) bool {
 		if root == "" {
 			root = a.DefaultUserData(e.GameRoot)
 		}
-		if root != "" && samePath(dir, filepath.Join(root, "Config")) {
+		if root != "" && samePath(dir, filepath.Join(root, filepath.Base(dir))) {
 			return true
 		}
 	}

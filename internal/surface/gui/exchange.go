@@ -8,6 +8,7 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
@@ -36,6 +37,25 @@ type exchange struct {
 	follow bool
 	seq    uint64
 	envID  string // game that owns the checked new-list preview
+	// settings: the Mod settings the last previewed list carries, kept after its import
+	// so the player can apply them (07 §7.3)
+	settings *app.PackSettings
+}
+
+// ImportSettings is "apply settings" after an import (07 §7.3): mods are package IDs (none:
+// all), replace also replaces files that are here (each to the recycle bin first); dryRun
+// is the per-Mod preview.
+func (s *API) ImportSettings(mods []string, replace, dryRun bool) (*app.ListSettingsPlan, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.x.settings.Empty() {
+		return nil, errors.New(view.T("the list carries no Mod settings"))
+	}
+	p, err := s.a.ApplyListSettings(s.x.settings, mods, replace, dryRun)
+	if err != nil {
+		return nil, errors.New(view.Humanize(nil, err.Error()))
+	}
+	return p, nil
 }
 
 // ImportFollow says whether applying the previewed collection makes the list follow it.
@@ -189,7 +209,7 @@ func (s *API) ImportPreview(kind, src string) (*view.ImportPreview, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.x.imp = imp
+	s.x.imp, s.x.settings = imp, imp.List.Settings
 	s.x.follow = imp.Collection != nil // ticked by default (16 §2.17)
 	return p, nil
 }
