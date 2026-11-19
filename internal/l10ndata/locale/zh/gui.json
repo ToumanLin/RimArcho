@@ -323,7 +323,6 @@
   "A Mod list": "Mod 列表",
   "A pack": "整合包",
   "Cannot be undone, except a list's content.": "除列表内容外，不能撤销。",
-  "Everything from another manager": "其他管理器的全部数据",
   "Everything is in RimArcho.": "全部已在 RimArcho 中。",
   "Finished parts are kept. %d not done.": "已完成的部分保留。%d 项未完成。",
   "Game Configs": "游戏配置",
@@ -388,7 +387,6 @@
   "stopped: %d of %d done": "已停止：完成 %d / %d",
   "unfold": "展开",
   "update it": "更新它",
-  "what comes over from %s": "从 %s 导入的内容",
   "your list %s, changed since": "你的列表 %s，之后有变化",
   "a new list %s": "新列表 %s",
   "a Game Config %s": "游戏配置 %s",
@@ -432,5 +430,12 @@
   "a Steam collection or Rentry link, a share code, or a copied list": "Steam 合集或 Rentry 链接、分享码，或复制的列表",
   "Somewhere else": "其他位置",
   "a data folder or file kept elsewhere; it is only read": "放在别处的数据文件夹或文件；只读取",
-  "a file can also be dropped anywhere on the window": "也可以把文件拖到窗口任意位置"
+  "a file can also be dropped anywhere on the window": "也可以把文件拖到窗口任意位置",
+  "Preview": "预览",
+  "could not read it": "读不了",
+  "installed: %d": "已安装：%d",
+  "%d enabled now": "当前启用 %d",
+  "Adding a pack": "添加整合包",
+  "What comes over from %s": "从 %s 导入的内容",
+  "Moving in from %s": "正在从 %s 迁入"
 }

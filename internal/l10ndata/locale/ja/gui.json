@@ -323,7 +323,6 @@
   "A Mod list": "MODリスト",
   "A pack": "パック",
   "Cannot be undone, except a list's content.": "MODリストの内容以外は元に戻せません。",
-  "Everything from another manager": "他のマネージャーのすべて",
   "Everything is in RimArcho.": "すべて RimArcho に入りました。",
   "Finished parts are kept. %d not done.": "完了した項目はそのままです。未完了は %d件です。",
   "Game Configs": "ゲーム構成",
@@ -388,7 +387,6 @@
   "stopped: %d of %d done": "停止：%d / %d 完了",
   "unfold": "展開",
   "update it": "更新する",
-  "what comes over from %s": "%s から取り込むもの",
   "your list %s, changed since": "MODリスト %s、その後変更あり",
   "a new list %s": "新しいMODリスト %s",
   "a Game Config %s": "ゲーム構成 %s",
@@ -432,5 +430,12 @@
   "a Steam collection or Rentry link, a share code, or a copied list": "Steam コレクションや Rentry のリンク、共有コード、コピーしたMODリスト",
   "Somewhere else": "別の場所",
   "a data folder or file kept elsewhere; it is only read": "別の場所にあるデータフォルダーやファイル。読み取るだけです",
-  "a file can also be dropped anywhere on the window": "ファイルはウィンドウのどこにでもドロップできます"
+  "a file can also be dropped anywhere on the window": "ファイルはウィンドウのどこにでもドロップできます",
+  "Preview": "プレビュー",
+  "could not read it": "読み取れませんでした",
+  "installed: %d": "インストール済み：%d件",
+  "%d enabled now": "現在有効：%d件",
+  "Adding a pack": "パックを追加中",
+  "What comes over from %s": "%s から取り込むもの",
+  "Moving in from %s": "%s から移行中"
 }

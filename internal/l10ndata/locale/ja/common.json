@@ -369,7 +369,6 @@
   "incompatible with %s (About.xml)": "%sと非互換（About.xml）",
   "info": "情報",
   "installed copy available": "インストール済みのコピーあり",
-  "installed: %d (%d enabled now)": "インストール済み：%d件（現在有効：%d件）",
   "interface": "インターフェース",
   "is %s the same mod as %s?": "%sと%sは同一のMODですか？",
   "is a folder": "フォルダです",

@@ -10,6 +10,7 @@ import * as pop from "./popups.js";
 import { getChoices } from "./credit.js";
 import { choiceControl } from "./choices.js";
 import { copyablePath, editablePath } from "./fields.js";
+import { still } from "./motion.js";
 
 let ui = null;
 export function initExchange(u) {
@@ -47,7 +48,8 @@ export function cancel() {
   return from === "guide" ? ui.resumeGuide() : ui.go(from);
 }
 export function key(e) { if (e.key === "Escape") { e.preventDefault(); cancel(); } }
-export const hintList = () => [{ key: "tab", label: T("import destination") }, { key: "enter", label: T("import") }, { key: "esc", label: T("cancel") }, { key: "?", label: T("all keys") }];
+// tab and enter only mean something while a list preview is shown
+export const hintList = () => [...($("#screen .xc-preview")?.dataset.mode === "list" ? [{ key: "tab", label: T("import destination") }, { key: "enter", label: T("import") }] : []), { key: "esc", label: T("cancel") }, { key: "?", label: T("all keys") }];
 
 // The Import page (16 §2.18): the sidebar's Import, `i`, a dropped file, Settings and the guide
 // all open it. It is drawn like Game Config and Settings: numbered sections, each a card of
@@ -71,10 +73,13 @@ export async function exchange(first = false) {
   // esc leaves (the hint line says so); only the first run names its way out, "skip"
   const w = page("plans pm-import", firstRun ? T("Where does your first list come from?") : T("What do you want to bring in?"),
     firstRun ? button(T("skip"), "esc", cancel) : null);
-  const result = el("section", "card pad xc-preview"); result.hidden = true;
+  // the result area (a preview, the tree, a task) sits under the section it came from
+  const resLab = el("div", "label section xc-res-label"); resLab.hidden = true;
+  const result = el("section", "card settings xc-sec xc-preview xc-res"); result.hidden = true;
   const [inLab, inCard] = sectionCard(T("Bring in"));
   const [mLab, mCard] = sectionCard(T("From another manager"));
-  w.append(inLab, inCard, mLab, mCard, result);
+  inCard.dataset.src = "in"; mCard.dataset.src = "m";
+  w.append(inLab, inCard, mLab, mCard, resLab, result);
   area(inCard, inLab); area(mCard, mLab);
   // the export side (C1): share what you have, below bringing things in
   if (!firstRun) { const [sLab, sCard] = sectionCard(T("Share")); shareRows(sCard); w.append(sLab, sCard); area(sCard, sLab); }
@@ -143,20 +148,27 @@ function listRows() {
   ta.spellcheck = false; ta.rows = 1;
   ta.placeholder = T("a link, a share code or a list");
   ta.value = pasted;
-  ta.oninput = () => { pasted = ta.value; };
+  // not focused, a long paste shows its start with an ellipsis (a textarea cannot cut its
+  // own text), whole in the tooltip
+  const shown = el("span", "xc-paste-shown");
+  const wrap = el("span", "xc-pastebox"); wrap.append(ta, shown);
+  const sync = () => { const one = ta.value.replace(/\s+/g, " ").trim(); shown.textContent = one; wrap.classList.toggle("filled", !!one); ta.title = one.length > 60 ? one.slice(0, 400) : ""; };
+  ta.oninput = () => { pasted = ta.value; sync(); };
+  ta.onblur = () => { ta.scrollTop = ta.scrollLeft = 0; sync(); };
+  sync();
   ta.onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); go.click(); } };
   const clip = button(T("paste"), "", async () => {
     let t = "";
     try { t = await api.Clipboard(); } catch { /* the page asks the browser */ }
     if (!t && navigator.clipboard) { try { t = await navigator.clipboard.readText(); } catch { /* not allowed */ } }
     if (!t) return say("", T("the clipboard has no text"));
-    ta.value = pasted = t;
+    ta.value = pasted = t; sync();
   });
   clip.title = T("paste from the clipboard");
   const go = button(T("read"), "", () => ta.value.trim() && preview("text", ta.value));
   go.title = T("links are read from Steam or Rentry when you press read");
   const file = row(T("A Mod list"), T("a new list, or changes to one of yours; previewed first"), pick, fileInput);
-  const text = row(T("Pasted text"), T("a Steam collection or Rentry link, a share code, or a copied list"), ta, clip, go);
+  const text = row(T("Pasted text"), T("a Steam collection or Rentry link, a share code, or a copied list"), wrap, clip, go);
   text.classList.add("xc-textrow");
   return [file, text];
 }
@@ -310,20 +322,19 @@ function drawRows() {
   for (const m of [...M.managers].sort((a, b) => rank(a) - rank(b))) {
     const ps = allParts(m), st = stateOf(ps), on = M.shown.has(mKey(m)), nws = m.imported ? news(m) : [];
     const running = M.run && M.run.mgrs.includes(m.name);
-    const b = el("button", "xc-mrow" + (on ? " on" : "") + (m.imported && !nws.length && !on ? " seen" : ""));
+    const b = el("button", "xc-mrow" + (on && !running ? " on" : "") + (m.imported && !nws.length && !on ? " seen" : ""));
     b.setAttribute("role", "checkbox");
     b.setAttribute("aria-checked", st === "checked" ? "true" : st === "mixed" ? "mixed" : "false");
     const t = el("span", "t", m.name);
     if (m.imported) t.append(el("span", "when", Tf("imported %s", dayText(m.imported))));
     const s = el("span", "s");
-    if (running) s.append(el("span", "pick", runLine()));
+    if (running) s.append(runLine()); // quiet: the run panel below shows the progress
     else if (st) s.append(el("span", "pick", Tf("bringing over %s", pickLine(m))));
     else if (on) s.append(ps.some(p => p.state === "listed") ? T("nothing new to choose; tick a list below to import it again") : T("all of it is already in RimArcho"));
     else if (m.imported && nws.length) { const n = el("span", "nline"); n.title = nws.join(", "); n.append(el("span", "chip-n", T("new")), el("span", "nt", nws.join(", "))); s.append(n); }
     else if (m.imported) s.append(T("nothing new since then"));
     else s.append(holds(m));
     b.append(box(st), mark(m.name, 24), t, s);
-    if (running && M.run.state === "running") b.append(progBar(runPct()));
     b.onclick = () => showManager(m);
     rows.append(b);
   }
@@ -344,7 +355,7 @@ function showManager(m) {
     for (const g of m.groups) if (m.imported && visible(g).some(p => p.state === "new" || p.list?.changed)) M.open.add(gKey(m, g));
   }
   drawRows(); drawTree();
-  if (M.shown.size) $("#screen .xc-preview")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  if (M.shown.size) reveal();
 }
 
 function partLabel(g, p) {
@@ -359,10 +370,13 @@ function partBecomes(g, p) {
   }
   return Tf(BECOMES()[p.part] || "%d", p.new);
 }
+// groupInstance: the RimSort instance a player-data group comes from (its folder name)
+function groupInstance(g) {
+  return g.kind === "player" && /aux_metadata\.db$/i.test(g.path || "") ? g.path.split(/[\\/]/).slice(-2, -1)[0] || "" : "";
+}
 function groupLabel(g) {
-  const label = GROUP()[g.kind];
-  if (g.kind === "player" && /aux_metadata\.db$/i.test(g.path || "")) return label + "  " + (g.path.split(/[\\/]/).slice(-2, -1)[0] || "");
-  return label;
+  const inst = groupInstance(g);
+  return GROUP()[g.kind] + (inst ? " / " + inst : "");
 }
 
 function treeRow(lv, open, twKey, st, disabled, iconEl, label, meta, pills, right, onBox) {
@@ -398,11 +412,8 @@ function drawTree() {
   if (!res || (res.dataset.mode && res.dataset.mode !== "move")) return;
   if (M.run) return drawRun();
   const list = (M.managers || []).filter(m => M.shown.has(mKey(m)));
-  if (!list.length) { if (res.dataset.mode === "move") { res.hidden = true; res.textContent = ""; delete res.dataset.mode; } return; }
-  res.dataset.mode = "move"; res.hidden = false; res.textContent = "";
-  res.classList.remove("pad");
-  const bar = el("div", "xc-stepbar"); bar.innerHTML = icon.import;
-  bar.append(el("span", "", T("Everything from another manager")), el("b", "", Tf("what comes over from %s", list.map(m => m.name).join(", "))));
+  if (!list.length) { if (res.dataset.mode === "move") hideResult(); return; }
+  showResult("move", "m", Tf("What comes over from %s", list.map(m => m.name).join(", ")));
   const tree = el("div", "xc-tree");
   for (const m of list) {
     const ps = allParts(m), k = mKey(m), st = stateOf(ps);
@@ -422,7 +433,7 @@ function drawTree() {
         : gst ? titled(el("span", "bc becomes", gp.filter(p => M.on.has(p.id)).map(p => g.kind === "lists" || g.kind === "configs" ? partLabel(g, p) : partBecomes(g, p)).join(", ")))
         : !toggleable(gp).length && gp.some(p => p.state === "listed") ? el("span", "bc", T("already your lists; tick one to import it again"))
         : el("span", "bc", T("not brought over"));
-      const row = treeRow(1, M.open.has(gk), gp.length ? gk : "", gst, !toggleable(gp).length && !gp.some(p => M.on.has(p.id)), ic, groupLabel(g), "", [], right, () => toggle(gp, gst));
+      const row = treeRow(1, M.open.has(gk), gp.length ? gk : "", gst, !toggleable(gp).length && !gp.some(p => M.on.has(p.id)), ic, GROUP()[g.kind], groupInstance(g), [], right, () => toggle(gp, gst));
       if (allHad) row.classList.add("had");
       tree.append(row);
       if (!M.open.has(gk)) continue;
@@ -439,7 +450,7 @@ function drawTree() {
     button(T("cancel"), "", () => { M.on.clear(); M.mode.clear(); M.shown.clear(); drawRows(); drawTree(); }),
     button(T("bring over the selected"), "", startRun, "primary"));
   acts.lastChild.disabled = !any;
-  res.append(bar, tree, sum, acts);
+  res.append(tree, sum, acts);
 }
 
 function partRow(m, g, p) {
@@ -520,9 +531,10 @@ async function poll(active) {
 }
 
 function drawRun() {
-  const res = $("#screen .xc-preview"), r = M.run;
-  if (!res || !r) return;
-  res.dataset.mode = "move"; res.hidden = false; res.textContent = ""; res.classList.remove("pad");
+  const r = M.run;
+  if (!r) return;
+  const res = showResult("move", "m", Tf("Moving in from %s", r.mgrs.join(", ")));
+  if (!res) return;
   const items = r.task?.items || r.picks.map(p => ({ ref: p.id, state: "wait" }));
   const fails = items.filter(i => i.state === "fail");
   const done = items.filter(i => i.state === "ok").length;
@@ -543,21 +555,21 @@ function drawRun() {
     if (st === "run") si.innerHTML = icon.rescan;
     else if (st === "done") si.innerHTML = TICK; else if (st === "fail") si.innerHTML = icon.warn; else if (st === "cancel") si.innerHTML = icon.close;
     const text = st === "wait" ? T("waiting") : st === "cancel" ? T("not done: stopped") : st === "run" ? "…" : st === "fail" ? it.why : it.note;
-    row.append(si, el("span", "lb", p.name), el("span", "rs", text || ""));
+    row.append(si, el("span", "lb", p.name), factText(el("span", "rs"), text || ""));
     pg.append(row);
   });
-  const f = el("div", "xc-run-f");
+  const f = el("div", "xc-acts");
   if (r.state === "running") {
-    f.append(el("span", "sum", T("Running as a background task. You can leave this page; it goes on.")),
+    f.append(el("span", "note", T("Running as a background task. You can leave this page; it goes on.")),
       button(T("background tasks"), "", () => ui.go("tasks")),
       button(T("stop"), "", () => api.TaskAct("stop", [r.id], "").catch(e => say("fail", errText(e)))));
   } else if (r.state === "stopped") {
     const rest = r.picks.filter((_, i) => items[i]?.state !== "ok" && items[i]?.state !== "fail");
-    f.append(el("span", "sum", Tf("Finished parts are kept. %d not done.", rest.length)),
+    f.append(el("span", "note", Tf("Finished parts are kept. %d not done.", rest.length)),
       button(T("choose again"), "", again), button(Tf("continue %d", rest.length), "", () => startRun(rest), "primary"));
   } else {
     const failed = r.picks.filter((_, i) => items[i]?.state === "fail");
-    f.append(el("span", "sum", (failed.length ? Tf("%d failed; the rest is in RimArcho.", failed.length) : T("Everything is in RimArcho.")) + " " + T("Notes and tags show in the Mod library; lists under lists; Game Configs in the switcher.")));
+    f.append(el("span", "note", (failed.length ? Tf("%d failed; the rest is in RimArcho.", failed.length) : T("Everything is in RimArcho.")) + " " + T("Notes and tags show in the Mod library; lists under lists; Game Configs in the switcher.")));
     if (failed.length) f.append(button(Tf("retry %d", failed.length), "", () => startRun(failed)));
     if (r.picks.some(p => p.kind === "lists")) f.append(button(T("open lists"), "", () => ui.go("plans")));
     f.append(button(T("done"), "", again, "primary"));
@@ -569,8 +581,7 @@ function drawRun() {
 function again() {
   const after = session?.from === "guide" && M.run?.state === "finished" ? ui.afterImport : null;
   M.run = null; M.on.clear(); M.mode.clear(); M.shown.clear();
-  const res = $("#screen .xc-preview");
-  if (res) { res.hidden = true; res.textContent = ""; delete res.dataset.mode; res.classList.add("pad"); }
+  hideResult();
   if (after) { ui.afterImport = null; return after(); }
   survey();
 }
@@ -598,12 +609,15 @@ async function importPack(path, update = null) {
     try { offer = await api.PackUpdateOffer(path); } catch { /* the import reports it */ }
     if (offer) return pop.confirm(offer.title, offer.lines, T("update the pack"), () => importPack(path, true));
   }
-  const active = session, result = $("#screen .xc-preview"), seq = ++previewSeq;
-  result.dataset.mode = "pack"; result.hidden = false; result.textContent = ""; result.classList.remove("pad");
-  let id;
-  try { id = await api.StartPackImport(path, !!update); } catch (e) { result.classList.add("pad"); result.textContent = errText(e); return say("fail", errText(e)); }
-  say("", T("adding the pack: a background task; you can leave this page"));
+  const active = session, seq = ++previewSeq;
   const name = path.replace(/^.*[\\/]/, "");
+  const result = showResult("pack", "in", T("Adding a pack"));
+  if (!result) return;
+  let id;
+  try { id = await api.StartPackImport(path, !!update); }
+  catch (e) { result.append(errorRow(name, errText(e)), footer("", button(T("close"), "", hideResult))); reveal(); return say("fail", errText(e)); }
+  say("", T("adding the pack: a background task; you can leave this page"));
+  let first = true;
   const tick = async () => {
     if (!live(active) || seq !== previewSeq) return;
     let t = null;
@@ -615,12 +629,13 @@ async function importPack(path, update = null) {
     h.append(el("span", "t", name), " ", el("span", "n", running ? T("adding the pack…") : t.state === "done" ? T("added to your packs") : T("not added")));
     head.append(h, el("span"), progBar(running ? 0 : 100, running));
     const pg = el("div", "xc-pg");
-    if (!running) pg.append(el("pre", "xc-out", t.result || ""));
-    const f = el("div", "xc-run-f");
-    if (running) f.append(el("span", "sum", T("Running as a background task. You can leave this page; it goes on.")), button(T("background tasks"), "", () => ui.go("tasks")));
-    else if (t.state === "done") f.append(el("span", "sum", T("The pack is ready to launch.")), button(T("open packs"), "enter", () => ui.go("packs"), "primary"));
-    else f.append(el("span", "sum", ""), button(T("choose another pack…"), "", async () => { const p = await api.PickPackFile().catch(() => ""); if (p) importPack(p); }));
+    if (!running && t.result) pg.append(el("pre", "lines xc-out" + (t.state === "done" ? "" : " err"), t.result));
+    const f = el("div", "xc-acts");
+    if (running) f.append(el("span", "note", T("Running as a background task. You can leave this page; it goes on.")), button(T("background tasks"), "", () => ui.go("tasks")));
+    else if (t.state === "done") f.append(el("span", "note", T("The pack is ready to launch.")), button(T("open packs"), "enter", () => ui.go("packs"), "primary"));
+    else f.append(el("span", "note", ""), button(T("close"), "", hideResult), button(T("choose another pack…"), "", async () => { const p = await api.PickPackFile().catch(() => ""); if (p) importPack(p); }));
     result.append(head, pg, f);
+    if (first) { first = false; reveal(); }
     if (running) setTimeout(tick, 500);
     else { await ui.reload(); say(t.state === "done" ? "ok" : "fail", t.state === "done" ? T("pack added") : t.result); }
   };
@@ -639,6 +654,9 @@ async function readFile(f) {
 }
 
 // ---- import, step 2: the preview ----
+// The preview is a card of rows under the section it came from (16 §2.18): the source on top,
+// the Mods (not installed, installed), where it goes, the Mod settings, and a footer with the
+// page's one filled button.
 
 async function preview(kind, src, fileName) {
   const body = $("#screen .xc-preview");
@@ -646,39 +664,62 @@ async function preview(kind, src, fileName) {
   const current = () => S.screen === "plan-import" && session === active && S.screenSeq === active.epoch && seq === previewSeq;
   if (!body) return;
   delete body.dataset.fieldError;
-  say("busy", kind === "text" && /^\s*\S+\s*$/.test(src) && /steamcommunity|rentry|^\s*\d{6,}\s*$/.test(src) ? T("reading the link…") : T("reading the list…"));
+  const link = kind === "text" && /^\s*\S+\s*$/.test(src) && /steamcommunity|rentry|^\s*\d{6,}\s*$/.test(src);
+  say("busy", link ? T("reading the link…") : T("reading the list…"));
   let p;
-  body.dataset.mode = "list"; body.classList.add("pad");
-  body.hidden = false; body.textContent = T("reading the list…");
+  showResult("list", "in", T("Preview"));
+  const wait = row(link ? T("reading the link…") : T("reading the list…"), "", progBar(0, true));
+  wait.classList.add("xc-wait");
+  body.append(wait);
+  reveal();
   try { p = await api.ImportPreviewFor(active.target, kind, src); }
-  catch (e) { if (current()) { body.dataset.fieldError = fileName || kind === "file" ? "file" : "text"; body.textContent = errText(e); say("fail", errText(e)); } return; }
+  catch (e) {
+    if (!current()) return;
+    body.textContent = "";
+    body.dataset.fieldError = fileName || kind === "file" ? "file" : "text";
+    body.append(errorRow(T("could not read it"), errText(e)));
+    say("fail", errText(e)); reveal(); return;
+  }
   if (!current()) return;
   say("", "");
   if (fileName) p.source = fileName;
-  body.innerHTML = "";
+  body.textContent = "";
 
   showImportSummary(body, p, !!(p.sourcePath || fileName));
+  showImportContents(body, p);
 
   // A destination is selected first; only the final import button changes data (16 §2.17).
-  const ways = el("fieldset", "xc-sec");
-  ways.append(el("legend", "xc-sec-t", T("import destination")));
   let destination = "new", busy = false;
-  const name = el("input", "xc-input"); name.spellcheck = false;
+  const name = el("input", "field xc-name"); name.spellcheck = false;
+  name.setAttribute("aria-label", T("new list name"));
   const base = p.name || (p.source || "").replace(/^.*[\\/]/, "").replace(/\.[^.]*$/, "");
   const free = await api.CheckPlanName(base, "", 0).catch(() => ({ free: base }));
   if (!current()) return;
   name.value = free.free;
-  const why = el("div", "plan-why"); fieldError(name, why);
+  const why = el("div", "sub warn plan-why"); fieldError(name, why);
   const submit = button(T("import"), "enter", perform, "primary", "import-apply");
   submit.title = T("does not write game files");
+  body.append(groupHead(T("import destination")));
+  const ways = el("div", "xc-dests"); ways.setAttribute("role", "radiogroup"); ways.setAttribute("aria-label", T("import destination"));
   const options = [["new", T("import as a new list"), Tf("%d mods; the current list stays as it is", p.total)],
     ["replace", Tf("replace %s", active.name), p.replace.text], ["merge", T("add the ones you lack"), p.merge.text]];
+  const choices = [];
   for (const [value, title, text] of options) {
-    const row = el("label", "xc-check");
-    const radio = el("input"); radio.type = "radio"; radio.name = "destination"; radio.checked = value === destination;
-    radio.onchange = () => { destination = value; name.disabled = value !== "new"; checkName(); };
-    row.append(radio, el("span", "", title), el("span", "xc-note", text)); ways.append(row);
+    const r = choiceRow("radio", title, text, value === destination, () => {
+      destination = value;
+      for (const c of choices) c.set(c.value === value);
+      name.disabled = value !== "new"; checkName();
+    });
+    r.value = value; choices.push(r);
+    if (value === "new") {
+      const lab = el("label", "xc-namef"); lab.append(el("span", "", T("new list name")), name);
+      lab.onclick = e => e.stopPropagation();
+      r.el.querySelector(".r").append(lab);
+      r.el.querySelector(".l").append(why);
+    }
+    ways.append(r.el);
   }
+  body.append(ways);
   let nameSeq = 0;
   async function checkName() {
     const n = ++nameSeq;
@@ -692,8 +733,12 @@ async function preview(kind, src, fileName) {
   }
   name.oninput = checkName;
   name.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); perform(); } };
-  ways.append(name, why); body.append(ways);
   let follow = true;
+  // a Steam Workshop collection: the list can follow it (07 §7.6); ticked by default
+  if (p.collection) {
+    const c = choiceRow("checkbox", T("follow this collection from now on"), T("RimArcho tells you when it changes; catching up is one undoable step"), true, () => { follow = !follow; c.set(follow); });
+    ways.append(c.el);
+  }
   // a RimArcho list's Mod settings (07 §7.3): offered, applied after the import
   const settings = p.settings ? settingsChoice(body, current) : null;
   async function perform() {
@@ -722,63 +767,124 @@ async function preview(kind, src, fileName) {
     } catch (e) { if (current()) { say("fail", errText(e)); busy = false; checkName(); } }
   }
   checkName();
-  // a Steam Workshop collection: the list can follow it (07 §7.6); ticked by default
-  if (p.collection) {
-    const lb = el("label", "xc-check");
-    const cb = el("input");
-    cb.type = "checkbox";
-    cb.checked = true;
-    cb.onchange = () => { follow = cb.checked; };
-    lb.append(cb, el("span", "", T("follow this collection from now on")), el("span", "xc-hint", T("RimArcho tells you when it changes; catching up is one undoable step")));
-    body.append(lb);
-  }
-  body.append(submit);
+  body.append(footer("", button(T("close"), "", hideResult), submit));
   body.onkeydown = e => {
-    if (e.key === "Enter" && !e.target.matches("button, a, select")) { e.preventDefault(); e.stopPropagation(); perform(); }
+    if (e.key === "Enter" && !e.target.matches("button, a, select, textarea")) { e.preventDefault(); e.stopPropagation(); perform(); }
   };
+  reveal();
+}
 
-  showImportContents(body, p);
+// ---- the result area: a card of rows under the section that produced it ----
+
+// showResult empties the result area for one mode and puts it, with its label, under the
+// section the source belongs to ("in": Bring in; "m": From another manager).
+function showResult(mode, at, label) {
+  const res = $("#screen .xc-preview"), lab = $("#screen .xc-res-label"), sec = $(`#screen .xc-sec[data-src="${at}"]`);
+  if (!res) return null;
+  res.dataset.mode = mode; res.hidden = false; res.textContent = "";
+  if (lab) { lab.textContent = label; lab.hidden = false; }
+  if (sec && sec.nextElementSibling !== lab) sec.after(lab || res, ...(lab ? [res] : []));
+  ui?.renderHints?.();
+  return res;
+}
+function hideResult() {
+  ++previewSeq;
+  const res = $("#screen .xc-preview"), lab = $("#screen .xc-res-label");
+  if (res) { res.hidden = true; res.textContent = ""; delete res.dataset.mode; delete res.dataset.fieldError; }
+  if (lab) lab.hidden = true;
+  ui?.renderHints?.();
+}
+// reveal scrolls the result into view and keeps its label in view: a tall result shows from
+// its top, a short one as far as needed.
+function reveal() {
+  const lab = $("#screen .xc-res-label"), res = $("#screen .xc-preview");
+  if (!res || res.hidden) return;
+  let sc = res.parentElement;
+  while (sc && sc !== document.body && !(sc.scrollHeight > sc.clientHeight && /auto|scroll/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
+  if (!sc || sc === document.body) return;
+  const view = sc.getBoundingClientRect(), top = (lab && !lab.hidden ? lab : res).getBoundingClientRect().top - 12, bottom = res.getBoundingClientRect().bottom + 12;
+  let d = 0;
+  if (top < view.top) d = top - view.top;
+  else if (bottom > view.bottom) d = Math.min(bottom - view.bottom, top - view.top);
+  if (d) sc.scrollBy({ top: d, behavior: still() ? "auto" : "smooth" });
+}
+// groupHead names a group of rows inside the result card
+function groupHead(text) { return el("div", "group-note xc-gh", text); }
+// footer: the result's actions at its foot, kept in view while the card scrolls past
+function footer(note, ...acts) {
+  const f = el("div", "xc-acts");
+  f.append(el("span", "note", note || ""));
+  for (const a of acts) if (a) f.append(a);
+  return f;
+}
+function errorRow(name, why) {
+  const r = row(name, "");
+  const s = r.querySelector(".l"); s.append(el("div", "sub warn wrap", why));
+  r.classList.add("xc-err");
+  return r;
+}
+// choiceRow: a row picked with a click, with a radio or a check box drawn like the managers'
+// (16 §2.18); text is facts parted by two spaces.
+function choiceRow(kind, title, text, on, pick) {
+  const r = el("div", "set xc-choice"), l = el("div", "l"), rr = el("div", "r");
+  const b = kind === "radio" ? el("button", "xc-rb") : box(on ? "checked" : "", "button");
+  b.setAttribute("role", kind);
+  const t = el("div", "name");
+  const sub = text ? factText(el("div", "sub"), text) : null;
+  l.append(t); t.append(title); if (sub) l.append(sub);
+  r.append(b, l, rr);
+  const set = v => {
+    r.classList.toggle("on", v);
+    b.setAttribute("aria-checked", v ? "true" : "false");
+    if (kind === "radio") b.classList.toggle("on", v); else b.classList.toggle("on", v);
+  };
+  set(on);
+  r.onclick = e => { if (e.target.closest(".r input, .r .btn")) return; pick(); };
+  b.onclick = e => { e.stopPropagation(); pick(); };
+  return { el: r, set };
 }
 
 // settingsChoice is the import's "apply settings" (07 §7.3): off at first; on, it shows the
 // per-Mod preview (what is written, kept or replaced) with a box per Mod.
 function settingsChoice(body, current) {
-  const sec = el("fieldset", "xc-sec");
-  sec.append(el("legend", "xc-sec-t", T("Mod settings")));
-  const off = new Set(), missing = new Set();
-  const lb = el("label", "xc-check"), cb = el("input");
-  cb.type = "checkbox";
-  lb.append(cb, el("span", "", T("apply settings")), el("span", "xc-hint", T("after the import; settings files you have are kept unless you replace them")));
-  const rl = el("label", "xc-check"), rc = el("input");
-  rc.type = "checkbox";
-  rl.append(rc, el("span", "", T("replace settings files I have")), el("span", "xc-hint", T("the old ones go to the recycle bin")));
-  const list = el("div", "xc-list");
-  rl.hidden = list.hidden = true;
+  body.append(groupHead(T("Mod settings")));
+  const off = new Set();
+  let on = false, replace = false;
+  const apply = choiceRow("checkbox", T("apply settings"), T("after the import; settings files you have are kept unless you replace them"), false, () => {
+    on = !on; apply.set(on); rep.el.hidden = list.hidden = !on; if (on) draw();
+  });
+  apply.el.classList.add("xc-apply");
+  const rep = choiceRow("checkbox", T("replace settings files I have"), T("the old ones go to the recycle bin"), false, () => { replace = !replace; rep.set(replace); draw(); });
+  const list = el("div", "xc-list xc-mods");
+  rep.el.hidden = list.hidden = true;
   let all = [];
   async function draw() {
     let pl;
-    try { pl = await api.ImportSettings([], rc.checked, true); } catch (e) { list.textContent = errText(e); return; }
+    try { pl = await api.ImportSettings([], replace, true); } catch (e) { list.textContent = errText(e); return; }
     if (!current()) return;
     all = pl.mods;
     list.textContent = "";
     for (const m of pl.mods) {
-      const d = el("label", "xc-mod xc-check"), mc = el("input");
-      mc.type = "checkbox";
-      if (m.missing) missing.add(m.package);
-      mc.checked = !m.missing && !off.has(m.package); mc.disabled = !!m.missing;
-      mc.onchange = () => { if (mc.checked) off.delete(m.package); else off.add(m.package); };
-      d.append(mc, el("span", "", m.mod), el("span", "dim", settingsNote(m)));
+      const d = el("div", "xc-mod" + (m.missing ? " dis" : ""));
+      const mc = box(!m.missing && !off.has(m.package) ? "checked" : "", "button");
+      mc.disabled = !!m.missing;
+      const flip = () => {
+        if (m.missing) return;
+        if (off.has(m.package)) off.delete(m.package); else off.add(m.package);
+        const v = !off.has(m.package);
+        mc.classList.toggle("on", v); mc.setAttribute("aria-checked", v ? "true" : "false");
+      };
+      mc.onclick = e => { e.stopPropagation(); flip(); };
+      d.onclick = flip;
+      d.append(mc, el("span", "n", m.mod), el("span", "dim", settingsNote(m)));
       list.append(d);
     }
   }
-  cb.onchange = () => { rl.hidden = list.hidden = !cb.checked; if (cb.checked) draw(); };
-  rc.onchange = draw;
-  sec.append(lb, rl, list);
-  body.append(sec);
+  body.append(apply.el, rep.el, list);
   return {
-    on: () => cb.checked && all.some(m => !m.missing && !off.has(m.package)),
+    on: () => on && all.some(m => !m.missing && !off.has(m.package)),
     mods: () => all.filter(m => !m.missing && !off.has(m.package)).map(m => m.package),
-    replace: () => rc.checked,
+    replace: () => replace,
   };
 }
 
@@ -801,54 +907,72 @@ function settingsLine(pl) {
   return failed ? Tf("Mod settings: %d files written, %d failed", n, failed) : Tf("Mod settings: %d files written", n);
 }
 
-// Shared by the standalone destination flow and the new-list form's inline source.
+// Shared by the Import page and the lists' new / import form: the source as the card's first
+// row, its facts on one line, another game version in amber.
 // sourceIsPath: the source is a file the player picked, so it copies on a click (16 §3.1 rule 12).
 export function showImportSummary(body, p, sourceIsPath = !!p.sourcePath) {
-  const top = el("div", "xc-sum");
-  top.append(el("div", "xc-big", p.summary));
+  const top = el("div", "set xc-src"), l = el("div", "l");
+  l.append(el("div", "name", p.summary));
   const facts = [sourceIsPath && p.source ? { text: p.source, paths: [p.source] } : p.source];
   if (p.name) facts.push(Tf("list: %s", p.name));
   if (p.game) facts.push("RimWorld " + p.game);
   if (p.allowed) facts.push(Tf("suggested game versions: %s", p.allowed));
   if (p.settings) facts.push(Tf("Mod settings of %d mods", p.settings));
-  top.append(factText(el("div", "xc-note"), facts.filter(Boolean)));
-  if (p.gameNote) top.append(el("div", "xc-note warn", p.gameNote));
+  l.append(factText(el("div", "sub facts"), facts.filter(Boolean)));
+  if (p.gameNote) l.append(el("div", "sub warn", p.gameNote));
+  top.append(l);
   body.append(top);
 }
 
+// The Mods: those not installed first (with Workshop subscription), then the installed ones,
+// folded unless some are in another version.
 export function showImportContents(body, p) {
+  if (!p.missing.length && !p.installed.length) return;
+  body.append(groupHead(T("Mods")));
   if (p.missing.length) {
-    const sec = section(body, Tf("not installed: %d", p.missing.length));
-    subscribeAll(sec, p.missing);
-    const list = el("div", "xc-list");
+    const ids = workshopIDs(p.missing), rest = p.missing.length - ids.length;
+    const note = ids.length
+      ? T("subscribed mods take their place in the list once downloaded") + (rest ? "  " + Tf("%d have no Workshop page: look for them yourself", rest) : "")
+      : T("none of them has a known Workshop page: look for them yourself");
+    let go = null;
+    if (ids.length) { go = button(Tf("subscribe all %d", ids.length), "", () => getAll(ids, go), "", "subscribe"); go.type = "button"; }
+    const head = row(Tf("not installed: %d", p.missing.length), "", go);
+    head.classList.add("xc-missing");
+    head.querySelector(".l").append(factText(el("div", "sub wrap"), note));
+    const list = el("div", "xc-list xc-mods");
     for (const r of p.missing) {
       const d = el("div", "xc-mod");
       const n = el("div", "n");
       n.append(el("span", "", r.name));
       if (r.package && r.package !== r.name) n.append(el("span", "dim", r.package));
       d.append(n);
+      if (r.url) d.append(link(T("subscribe"), r.url, true));
+      else d.append(el("span", "dim", T("not on the Workshop list")));
       if (r.instead) {
         const i = el("div", "xc-instead", Tf("replaced by %s", r.instead));
         if (r.insteadUrl) i.append(link(T("Workshop page"), r.insteadUrl));
         d.append(i);
       }
-      if (r.url) d.append(link(T("subscribe"), r.url, true));
-      else d.append(el("span", "dim", T("not on the Workshop list")));
       list.append(d);
     }
-    sec.append(list);
+    body.append(head, list);
   }
   if (p.installed.length) {
     // a RimArcho list names each mod's version: the ones installed in another version are
     // marked, and the list opens to show them
-    const det = el("details", "xc-sec");
-    let sum = Tf("installed: %d (%d enabled now)", p.installed.length, p.installed.filter((r) => r.enabled).length);
-    if (p.other) { sum += "  " + Tf("%d in another version", p.other); det.open = true; }
-    det.append(el("summary", "word-facts", sum));
-    const list = el("div", "xc-list");
+    const det = el("details", "xc-fold");
+    const sum = el("summary", "set");
+    const l = el("div", "l"), tw = el("span", "tw"); tw.innerHTML = icon.chev;
+    l.append(el("div", "name", Tf("installed: %d", p.installed.length)));
+    const facts = [Tf("%d enabled now", p.installed.filter((r) => r.enabled).length)];
+    if (p.other) { facts.push(Tf("%d in another version", p.other)); det.open = true; }
+    l.append(factText(el("div", "sub"), facts));
+    const rr = el("div", "r"); rr.append(tw); sum.append(l, rr);
+    det.append(sum);
+    const list = el("div", "xc-list xc-mods");
     p.installed.forEach((r, i) => {
       const d = el("div", "xc-mod");
-      d.append(el("span", "pos", String(i + 1)), el("span", r.enabled ? "" : "accent", r.name));
+      d.append(el("span", "pos", String(i + 1)), el("span", "n" + (r.enabled ? "" : " accent"), r.name));
       if (r.other) d.append(el("span", "chip mark", T("another version")));
       if (!r.enabled) d.append(el("span", "dim", T("not enabled now")));
       list.append(d);
@@ -872,31 +996,9 @@ export function getAll(ids, btn) {
   });
 }
 
-// subscribeAll gets every missing mod that has a Workshop page in one go (a background task,
-// 16 §2.16); once downloaded they take their place in the list by themselves.
-function subscribeAll(sec, rows) {
-  const ids = workshopIDs(rows);
-  const bar = el("div", "xc-subscribe");
-  const rest = rows.length - ids.length;
-  bar.append(el("span", "xc-note", ids.length
-    ? T("subscribed mods take their place in the list once downloaded") + (rest ? "  " + Tf("%d have no Workshop page: look for them yourself", rest) : "")
-    : T("none of them has a known Workshop page: look for them yourself")));
-  if (ids.length) {
-    const go = button(Tf("subscribe all %d", ids.length), "", () => getAll(ids, go), "primary small", "subscribe");
-    go.type = "button";
-    bar.append(go);
-  }
-  sec.append(bar);
-}
-
 function link(text, url, button) {
   const a = el(button ? "button" : "a", button ? "btn small" : "xc-link", text);
   a.title = url;
   a.onclick = (e) => { e.preventDefault(); api.OpenURL(url).catch((x) => say("fail", errText(x))); };
   return a;
-}
-
-function section(body, title) {
-  const s = el("div", "xc-sec");
-  s.append(el("div", "xc-sec-t", title)); body.append(s); return s;
 }

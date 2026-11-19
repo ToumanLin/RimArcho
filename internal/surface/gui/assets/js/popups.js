@@ -356,9 +356,30 @@ export function previewOk(p, list) {
 }
 
 export function confirm(title, lines, goLabel, go, envWrite = "apply") {
-  const pre = el("pre", "lines");
-  pathContent(pre, (lines || []).join("\n"));
-  panel(title, pre, goLabel, go, "", envWrite);
+  panel(title, confirmBody(lines), goLabel, go, "", envWrite);
+}
+
+// confirmBody: a confirmation's lines in the body type (16 §7.3), not a log. A line
+// "name: value" is a fact row (the name muted on the left); an indented line stays indented
+// under the one before; an empty line is a gap. Paths still copy on a click.
+export function confirmBody(lines) {
+  const body = el("div", "confirm-lines");
+  for (const raw of (lines || []).flatMap(l => String(l ?? "").split("\n"))) {
+    if (!raw.trim()) { body.append(el("div", "gap")); continue; }
+    const fact = /^([^\s:][^:]{0,30}):\s+(\S.*)$/.exec(raw);
+    if (fact && !/^[A-Za-z]$/.test(fact[1]) && !/[\\/]/.test(fact[1])) {
+      const r = el("div", "fact"), v = el("span", "v");
+      pathContent(v, fact[2]);
+      r.append(el("span", "k", fact[1]), v);
+      body.append(r);
+      continue;
+    }
+    const indent = /^\s+/.exec(raw)?.[0].length || 0;
+    const r = el("div", "line" + (indent ? " sub" : ""));
+    pathContent(r, raw.trim());
+    body.append(r);
+  }
+  return body;
 }
 
 // Show the confirmation before starting disk/network checks. A closed or superseded
