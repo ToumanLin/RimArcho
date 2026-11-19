@@ -250,5 +250,7 @@
   "Would subscribe through Steam; use SteamCMD only if Steam is unavailable.": "Steam経由でサブスクライブします。Steamが使えない場合のみSteamCMDを使用します。",
   "moved to the recycle bin": "ごみ箱に移動しました",
   "%s is ready": "%s の準備ができました",
-  "add to %s": "%s に追加"
+  "add to %s": "%s に追加",
+  "no account needed": "アカウント不要",
+  "open the Mods folder": "Modsフォルダを開く"
 }

@@ -250,5 +250,7 @@
   "Would subscribe through Steam; use SteamCMD only if Steam is unavailable.": "将通过 Steam 订阅；只在 Steam 不可用时用 SteamCMD。",
   "moved to the recycle bin": "已移到回收站",
   "%s is ready": "%s 已就绪",
-  "add to %s": "加到 %s"
+  "add to %s": "加到 %s",
+  "no account needed": "不需要账户",
+  "open the Mods folder": "打开 Mods 文件夹"
 }
