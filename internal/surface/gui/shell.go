@@ -486,7 +486,28 @@ func scanLine(out string) string {
 
 // PackImport unpacks a pack file (.archopack) into the packs folder (pack import, 08
 // §5.4). A RimArcho list goes through the import preview like any other list.
-func (s *API) PackImport(path string) (string, error) {
+func (s *API) PackImport(path string) (string, error) { return s.packImport(path, false) }
+
+// PackUpdateOffer is what importing a newer revision of a pack the player has would change
+// (10 §4): nil when the file is not one. Asked before the import starts.
+func (s *API) PackUpdateOffer(path string) (*view.PackUpdateOffer, error) {
+	r, err := s.detachedReader()
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	path = strings.Trim(strings.TrimSpace(path), `"'`)
+	if !app.IsPackZip(path) {
+		return nil, nil
+	}
+	u, err := r.PackUpdateOf(path)
+	if err != nil || u == nil {
+		return nil, nil // the import itself reports what is wrong with the file
+	}
+	return view.PackUpdateOfferOf(u), nil
+}
+
+func (s *API) packImport(path string, update bool) (string, error) {
 	r, err := s.detachedReader()
 	if err != nil {
 		return "", err
@@ -497,7 +518,7 @@ func (s *API) PackImport(path string) (string, error) {
 		return "", errors.New(view.Tf("%s is not a pack (.archopack)", path))
 	}
 	defer s.subRevision.Add(1)
-	m, err := r.ImportPack(path, false)
+	m, err := r.ImportPackWith(path, app.PackImport{Update: update})
 	s.invalidateInventory()
 	if err != nil {
 		return "", errors.New(view.Humanize(nil, err.Error()))

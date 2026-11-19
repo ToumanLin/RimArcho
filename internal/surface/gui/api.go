@@ -353,14 +353,37 @@ func (s *API) PackNameCheck(name string) string {
 	return ""
 }
 
+// PackRevision is the revision of the pack name (0: no such pack): the build page offers
+// to make the next one (10 §2).
+func (s *API) PackRevision(name string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if p, err := s.a.ReadPack(strings.TrimSpace(name)); err == nil && !p.Light {
+		return p.Rev()
+	}
+	return 0
+}
+
+// packBuildFlags are a build's flags: textures, settings left out, a new revision.
+func packBuildFlags(tex int, noSettings, update bool) []string {
+	out := app.PackBuildArgs(view.PackTextureOptions(tex))
+	if noSettings {
+		out = append(out, "--no-settings")
+	}
+	if update {
+		out = append(out, "--update")
+	}
+	return out
+}
+
 // PackDryRun is preview the file list without writing to disk: the text of archo pack build --dry-run (nothing is written).
-func (s *API) PackDryRun(name string, tex int) []string {
+func (s *API) PackDryRun(name string, tex int, noSettings, update bool) []string {
 	r, err := s.detachedReader()
 	if err != nil {
 		return []string{err.Error()}
 	}
 	defer r.Close()
-	argv := append([]string{"pack", "build", strings.TrimSpace(name), "--dry-run"}, app.PackBuildArgs(view.PackTextureOptions(tex))...)
+	argv := append([]string{"pack", "build", strings.TrimSpace(name), "--dry-run"}, packBuildFlags(tex, noSettings, update)...)
 	text, _ := cmds.Execute(r, argv)
 	st, _ := r.Loadout()
 	var out []string
@@ -424,7 +447,9 @@ func (s *API) PackExport(name, file string, list bool) (string, error) {
 // once: the copy takes minutes and holds nothing here, so every page keeps working, and it
 // goes on when the window closes. "pack" events carry the progress (view.PackProgress) and
 // the end. One build at a time.
-func (s *API) PackBuild(name string, tex int) (string, error) {
+// noSettings leaves the list's Mod settings out; update makes the next revision of the
+// existing pack name (its Mods replaced, its saves and settings kept).
+func (s *API) PackBuild(name string, tex int, noSettings, update bool) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := app.CheckPackName(name); err != nil {
@@ -440,8 +465,10 @@ func (s *API) PackBuild(name string, tex int) (string, error) {
 			}
 		}
 	}
-	if _, err := s.a.ReadPack(name); err == nil {
+	if _, err := s.a.ReadPack(name); err == nil && !update {
 		return "", fmt.Errorf("pack %q exists; remove it first or pick another name", name)
+	} else if err != nil && update {
+		return "", err
 	}
 	s.busy["pack"], s.building = true, name
 	tmp := filepath.Join(s.a.PacksDir(), name+app.TmpSuffix)
@@ -449,7 +476,7 @@ func (s *API) PackBuild(name string, tex int) (string, error) {
 	if run == nil {
 		home, env, exe, plan := s.a.Home, s.a.EnvName, s.Exe, s.a.OpenPlanName()
 		log := filepath.Join(home, "logs", "pack-build.log")
-		extra := app.PackBuildArgs(view.PackTextureOptions(tex))
+		extra := packBuildFlags(tex, noSettings, update)
 		run = func(name string) error {
 			if exe != "" {
 				return app.ChildPackBuildExe(exe, home, env, plan, name, log, extra...)

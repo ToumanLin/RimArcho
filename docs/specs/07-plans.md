@@ -458,7 +458,7 @@ Formats are detected by content, not by extension (except `.rws`, read as a save
 
 | Format | Detection | Read |
 | --- | --- | --- |
-| RimArcho list (`.archolist.json`) | Starts `{`, has `entries` array and numeric `format` | `pack.json` format (10 §1): `name` is list name, `game`, `entries[]` fields `package_id`, `name`, `workshop_id`, `hash`; reject newer `format`. Read pack-directory `pack.json` the same way |
+| RimArcho list (`.archolist.json`) | Starts `{`, has `entries` array and numeric `format` | `pack.json` format (10 §1): `name` is list name, `game`, `entries[]` fields `package_id`, `name`, `workshop_id`, `hash`, and `settings` when it carries Mod settings (§7.3); reject newer `format`. Read pack-directory `pack.json` the same way |
 | Text list | Other text | One packageId per line (`author.name`), `#` comments, skip headings/prose |
 | ModsConfig.xml / RimSort or RimPy saved list | Root `ModsConfigData` | `version`, `activeMods/li` |
 | Save | `.rws` or `<savegame` in first 4096 bytes | `gameVersion`, `modIds`, `modNames` under `<meta>`; stop at `</meta>` (saves are tens of MB); names label missing entries |
@@ -483,7 +483,7 @@ Formats are detected by content, not by extension (except `.rws`, read as a save
 
 | Format | Content |
 | --- | --- |
-| `archo` | RimArcho list (`.archolist.json`): `pack.json` format (10 §1), `light` true, `name` the plan's name. Entries include `lineage`, `instance`, `workshop_id` and the semantic `hash` (Core/DLC only `official`); missing entries only `package_id`. The importer can see which versions match (§7.1). The UI's first export option, "RimArcho list" |
+| `archo` | RimArcho list (`.archolist.json`): `pack.json` format (10 §1), `light` true, `name` the plan's name. Entries include `lineage`, `instance`, `workshop_id` and the semantic `hash` (Core/DLC only `official`); missing entries only `package_id`. The importer can see which versions match (§7.1). With `--settings` ("include Mod settings", off by default) it also carries the list's Mod settings as a pack does (`settings`, 10 §1) and is written as format 3; without them it stays format 2. The UI's first export option, "RimArcho list" |
 | `text` (default) | Two `#` header lines (environment, Mod count, time; how to import), then one `<packageId>  # <name>` per line; missing entries are named `missing` |
 | `modsconfig` / `rimsort` | ModsConfig XML (`ModsConfigData`: `version`, `activeMods/li`, `knownExpansions/li`); a Workshop copy of a package that also has another copy uses `_steam`. RimSort exports this format; `rimsort` is an alias |
 | `rml` | RimWorld `savedModList`: `meta` holds `gameVersion`, `modIds`, `modSteamIds` (`0` if none), `modNames`; `modList` holds `ids`, `names`; loads directly in the game's Mod menu |
@@ -492,6 +492,8 @@ Formats are detected by content, not by extension (except `.rws`, read as a save
 | `workshop` | Workshop links: one `#` header (list name, Mod count, Workshop count), then one `- [<name>](https://steamcommunity.com/sharedfiles/filedetails/?id=<Workshop ID>)` per line in load order; a final comment lists the entries not on the Workshop (Core, DLC, local Mods, missing entries). Recipients can subscribe from it; it imports as a Workshop ID list (§7.2) |
 
 `archo` also has `versions`: the plan's allowed game versions (§1.6), for example `["1.5","1.6","1.7"]`. Older RimArcho versions ignore it.
+
+**Applying a list's settings** (decided 2026-11-18, X1). Importing a RimArcho list never applies its settings by itself: the import says the list carries settings of N Mods (CLI line, preview fact), and "apply settings" is a separate choice (`app.ApplyListSettings`; `archo mod-settings apply <file> [<package>…] [--replace] [--dry-run]`; MCP `set_mod_settings action=apply`; the GUI import's "apply settings", 16 §2.18). Each file is written under the folder the game sees the Mod under in the current Game Config (the current list's copy first, else an installed loadable copy); a Mod not installed is skipped. A file that is here is kept unless the player replaces it; a replaced file, and for a HugsLib pack the whole `HugsLib/ModSettings.xml`, goes to the recycle bin first (02 §1, §3); a file with the same text is left. Only while no game runs. The preview lists per Mod each file as new, kept, replaced or already the same (`TestListSettingsExportApply`, `TestHugsLibMerge`).
 
 In the UI, export is a subpage of the list (16 §2.17): preview each format, then save it to a file or copy it; share codes can only be copied.
 

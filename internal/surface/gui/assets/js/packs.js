@@ -291,7 +291,7 @@ export function packEvent(ev) {
 export async function build(again = false) {
   if (again && B.loading) return;
   const seq = ++B.seq;
-  if (!again) { B.dry = null; ++B.drySeq; B.page = null; B.tex = 0; B.name = ""; B.nameErr = ""; B.error = ""; }
+  if (!again) { B.dry = null; ++B.drySeq; B.page = null; B.tex = 0; B.name = ""; B.nameErr = ""; B.error = ""; B.noSettings = false; B.update = false; B.rev = 0; }
   const read = beginPageRead("build", { replace: !again, label: "checking the list…" });
   B.loading = true;
   try {
@@ -302,9 +302,9 @@ export async function build(again = false) {
     if (!read.current() || seq !== B.seq) return;
     B.page = p;
     if (!B.name) B.name = p.name;
-    const error = await api.PackNameCheck(B.name);
+    const [error, rev] = await Promise.all([api.PackNameCheck(B.name), api.PackRevision(B.name.trim())]);
     if (!read.current() || seq !== B.seq) return;
-    B.nameErr = error;
+    B.nameErr = error; B.rev = rev;
   } catch (e) { if (read.current()) B.loading = false; read.fail(e); return; }
   B.loading = false;
   drawBuild();
@@ -443,9 +443,11 @@ function drawBuild() {
   name.oninput = async () => {
     closeDryRun(); B.name = name.value;
     const epoch = S.screenSeq;
-    const n = B.name, err = await api.PackNameCheck(n);
+    const n = B.name, [err, rev] = await Promise.all([api.PackNameCheck(n), api.PackRevision(n.trim())]);
     if (n !== B.name || epoch !== S.screenSeq || S.screen !== "build") return;
-    B.nameErr = err;
+    B.nameErr = err; B.rev = rev;
+    if (!rev) B.update = false;
+    syncRevision();
     syncButton();
   };
   name.onkeydown = (e) => {
@@ -454,7 +456,17 @@ function drawBuild() {
   };
   nameRow.append(el("span", "k", T("name")), name);
   const nameError = el("div", "bd-err", ""); fieldError(name, nameError);
-  bc.append(nameRow, nameError);
+  // a pack of this name: offer its next revision (10 §2), which keeps its saves and settings
+  const revRow = el("label", "xc-check bd-rev");
+  const rev = el("input"); rev.type = "checkbox"; rev.id = "pk-rev"; rev.checked = B.update;
+  rev.onchange = () => { closeDryRun(); B.update = rev.checked; syncButton(); };
+  revRow.append(rev, el("span", "t"), el("span", "xc-hint", T("its Mods are replaced; its saves and settings stay")));
+  // the list's Mod settings go into the pack unless the player leaves them out (10 §1)
+  const setRow = el("label", "xc-check");
+  const set = el("input"); set.type = "checkbox"; set.checked = !B.noSettings;
+  set.onchange = () => { closeDryRun(); B.noSettings = !set.checked; };
+  setRow.append(set, el("span", "", T("include Mod settings")), el("span", "xc-hint", T("this list's Mod settings, written into the pack's own settings on its first launch")));
+  bc.append(nameRow, nameError, revRow, setRow);
   basics.append(bc);
 
   // the four things building does; while it builds, where it is
@@ -556,9 +568,18 @@ function drawBuild() {
   sc.append(w);
   syncDryRun();
   syncMeasure();
+  syncRevision();
   syncButton();
   if (focusTex) $("#pk-tex")?.focus();
   if (focusName) { const n = $("#pk-name"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
+}
+
+// syncRevision shows "make revision N" when the name is a pack's.
+function syncRevision() {
+  const row = $(".bd-rev");
+  if (!row) return;
+  row.hidden = !B.rev;
+  if (B.rev) row.querySelector(".t").textContent = Tf("make revision %d of this pack", B.rev + 1);
 }
 
 // syncButton: create is enabled only when nothing stops the build; the line under it says
@@ -575,8 +596,9 @@ function syncButton() {
   else if (!B.loading && b.why) { reason = b.why; toNeeds = b.toNeeds; toGo = b.toGo; }
   else if (S.packBuild) reason = Tf("creating pack %s", S.packBuild.name);
   else if (building()) reason = T("another pack is being created; wait for it to finish");
-  else if (B.nameErr) reason = B.nameErr;
+  else if (B.nameErr && !(B.update && B.rev)) reason = B.nameErr;
   go1.disabled = B.loading || !!B.error || !!reason;
+  go1.firstChild.textContent = B.update && B.rev ? T("create the new revision") : T("create pack");
   why.classList.toggle("busy", !!S.packBuild && p.ok);
   why.innerHTML = "";
   why.hidden = !reason;
@@ -592,14 +614,14 @@ function syncButton() {
 
 function go() {
   const p = B.page;
-  if (!p || B.loading || B.error || blocker(p).why || B.nameErr || building()) return;
+  if (!p || B.loading || B.error || blocker(p).why || B.nameErr && !(B.update && B.rev) || building()) return;
   startBuild(B.name.trim());
 }
 
 async function startBuild(name) {
   buildEnded = "";
   let text;
-  try { text = await api.PackBuild(name, B.tex || 0); } catch (e) { return say("fail", errText(e)); }
+  try { text = await api.PackBuild(name, B.tex || 0, !!B.noSettings, !!(B.update && B.rev)); } catch (e) { return say("fail", errText(e)); }
   // a build that failed at once keeps its failure on the line; the reply came after it
   if (buildEnded !== name) say("ok", text);
   redraw();
@@ -623,7 +645,7 @@ async function dryRun() {
   B.dry = T("loading…"); syncDryRun();
   const current = () => seq === B.drySeq && S.screen === "build" && epoch === S.screenSeq && entered === B.name && tex === B.tex;
   try {
-    const lines = await api.PackDryRun(name, tex);
+    const lines = await api.PackDryRun(name, tex, !!B.noSettings, !!(B.update && B.rev));
     if (!current()) return;
     B.dry = lines.join("\n"); syncDryRun();
   } catch (e) { if (current()) { B.dry = errText(e); syncDryRun(); say("fail", B.dry); } }

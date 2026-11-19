@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -33,16 +34,29 @@ import (
 // and played from its own data folder through links in Mods/, so the environment's list and
 // saves stay as they were.
 
-// PackFormat is the pack.json format version.
-const PackFormat = 2
+// PackFormat is the pack.json format version. 3 added id, revision and settings; a
+// RimArcho list without settings is still written as 2, which older versions read.
+const PackFormat = 3
+
+// listFormat is the format a RimArcho list is written in: 2 unless it carries settings.
+func listFormat(p *Pack) int {
+	if p.Settings.Empty() {
+		return 2
+	}
+	return PackFormat
+}
 
 // Pack is pack.json.
 type Pack struct {
-	Format  int       `json:"format"`
-	Name    string    `json:"name"`
-	Created time.Time `json:"created"`
-	Game    string    `json:"game"` // the game version it was built for
-	Env     string    `json:"env"`
+	Format int    `json:"format"`
+	Name   string `json:"name"`
+	// ID names a pack across its revisions (format 3): a newer Revision of the same ID
+	// replaces the pack's Mods in place, keeping its saves and settings (10 §4).
+	ID       string    `json:"id,omitempty"`
+	Revision int       `json:"revision,omitempty"`
+	Created  time.Time `json:"created"`
+	Game     string    `json:"game"` // the game version it was built for
+	Env      string    `json:"env"`
 	// Light: the list only, no files — a RimArcho list (07 §7.3) or a pack's exported list.
 	Light bool `json:"light,omitempty"`
 	// PlanID is the plan the pack was created from, in the database that created it (the
@@ -54,6 +68,18 @@ type Pack struct {
 	Trimmed  int64       `json:"trimmed_bytes,omitempty"`
 	// Textures: the copies' PNGs were converted to DDS and deleted (10 §2).
 	Textures *PackTextures `json:"textures,omitempty"`
+	// Settings: the Mod settings the pack (or list) carries, by package and class.
+	Settings *PackSettings `json:"settings,omitempty"`
+}
+
+// Rev is the pack's revision: 1 for packs from before revisions.
+func (p *Pack) Rev() int { return max(p.Revision, 1) }
+
+// newPackID is a random pack ID.
+func newPackID() string {
+	var b [12]byte
+	_, _ = rand.Read(b[:])
+	return hex.EncodeToString(b[:])
 }
 
 // PackTextures is what a build did to the copies' textures: preconvert at full size, resize when
@@ -197,6 +223,7 @@ type PackBuild struct {
 	Peak       int64
 	Final      int64
 	Tool       *TextureTool
+	Diff       *PackDiff // a new revision (--update): what changed from the pack's last one
 }
 
 // BuildOptions for BuildPackWith.
@@ -206,6 +233,11 @@ type BuildOptions struct {
 	// Textures converts the copies' PNGs to DDS and deletes them (nil: they are copied as
 	// they are). Full size is preconvert, a scale resize.
 	Textures *textures.Options
+	// NoSettings leaves the list's Mod settings out (by default a pack carries them, 10 §1).
+	NoSettings bool
+	// Update builds the next revision of the existing pack of this name and replaces its
+	// Mods in place, keeping its saves and settings (10 §2).
+	Update bool
 }
 
 // ErrBuildRunning: a build of this pack is going on (in this or another process).
@@ -246,13 +278,27 @@ func (a *App) WithTextures(pl *PackPlan, o *textures.Options) {
 }
 
 // PlanPack checks the list and sorts it for the pack (the first two steps of a build).
-func (a *App) PlanPack(name string) (*PackPlan, error) {
+func (a *App) PlanPack(name string) (*PackPlan, error) { return a.planPack(name, false) }
+
+// planPack is PlanPack; with update it plans the next revision of the existing pack name
+// (10 §2 "new revision").
+func (a *App) planPack(name string, update bool) (*PackPlan, error) {
 	if err := checkPackName(name); err != nil {
 		return nil, err
 	}
 	dir := a.packPath(name)
-	if _, err := os.Stat(dir); err == nil {
-		return nil, fmt.Errorf("pack %q exists (%s); remove it first or pick another name", name, dir)
+	id, rev := newPackID(), 1
+	if update {
+		old, err := a.ReadPack(name)
+		if err != nil {
+			return nil, err
+		}
+		if old.ID != "" {
+			id = old.ID
+		}
+		rev = old.Rev() + 1
+	} else if _, err := os.Stat(dir); err == nil {
+		return nil, fmt.Errorf("pack %q exists (%s); remove it first, pick another name, or make a new revision of it (--update)", name, dir)
 	}
 	st, err := a.Loadout()
 	if err != nil {
@@ -307,7 +353,7 @@ func (a *App) PlanPack(name string) (*PackPlan, error) {
 	for _, m := range mods {
 		active[m.PackageID] = true
 	}
-	p := &Pack{Format: PackFormat, Name: name, Created: a.Now().UTC(), Game: st.Ix.Env.GameVersion, Env: st.Ix.Env.Name, PlanID: st.Plan.ID}
+	p := &Pack{Format: PackFormat, Name: name, ID: id, Revision: rev, Created: a.Now().UTC(), Game: st.Ix.Env.GameVersion, Env: st.Ix.Env.Name, PlanID: st.Plan.ID}
 	used := map[string]bool{}
 	for _, m := range mods {
 		pe := packEntryOf(m)
@@ -420,8 +466,15 @@ func (a *App) BuildPackWith(name string, o BuildOptions) (*PackBuild, error) {
 		if err := a.managedRootReady("packs", a.PacksDir()); err != nil {
 			return nil, err
 		}
-		if _, err := os.Stat(a.packPath(name)); err == nil {
-			return nil, fmt.Errorf("pack %q exists (%s); remove it first or pick another name", name, a.packPath(name))
+		if o.Update {
+			if _, err := a.ReadPack(name); err != nil {
+				return nil, err
+			}
+			if err := a.checkNoGame(); err != nil {
+				return nil, err
+			}
+		} else if _, err := os.Stat(a.packPath(name)); err == nil {
+			return nil, fmt.Errorf("pack %q exists (%s); remove it first, pick another name, or make a new revision of it (--update)", name, a.packPath(name))
 		}
 		// What is left of an earlier, unfinished build of this name is replaced.
 		if err := os.RemoveAll(tmp); err != nil {
@@ -442,13 +495,24 @@ func (a *App) BuildPackWith(name string, o BuildOptions) (*PackBuild, error) {
 		}
 	}
 	bs.update(func(p *BuildProgress) { p.Step = StepCheck })
-	pl, err := a.PlanPack(name)
+	pl, err := a.planPack(name, o.Update)
 	if err != nil {
 		cleanup()
 		return nil, err
 	}
 	r := pl.R
 	r.DryRun = o.DryRun
+	if len(r.Blockers) == 0 && !o.NoSettings {
+		r.Pack.Settings = a.collectSettings(pl.St)
+		if r.Pack.Settings.Empty() {
+			r.Pack.Settings = nil
+		}
+	}
+	if o.Update {
+		if old, err := a.ReadPack(name); err == nil && r.Pack != nil {
+			r.Diff = diffPacks(old, r.Pack)
+		}
+	}
 	if len(r.Blockers) > 0 {
 		cleanup()
 		return r, nil
@@ -512,7 +576,12 @@ func (a *App) BuildPackWith(name string, o BuildOptions) (*PackBuild, error) {
 	}
 	bs.stop()
 	os.Remove(filepath.Join(tmp, BuildFile))
-	if err := os.Rename(tmp, r.Dir); err != nil {
+	if o.Update {
+		if err := a.replacePackContent(name, tmp); err != nil {
+			os.RemoveAll(tmp)
+			return nil, err
+		}
+	} else if err := os.Rename(tmp, r.Dir); err != nil {
 		os.RemoveAll(tmp)
 		return nil, err
 	}
@@ -677,6 +746,16 @@ type PackInfo struct {
 
 type packState struct {
 	LastPlayed time.Time `json:"last_played"`
+	// SettingsRevision: the revision whose carried settings were written into userdata/.
+	SettingsRevision int `json:"settings_revision,omitempty"`
+}
+
+func readPackState(dir string) packState {
+	var s packState
+	if b, err := os.ReadFile(filepath.Join(dir, "state.json")); err == nil {
+		_ = json.Unmarshal(b, &s)
+	}
+	return s
 }
 
 // Packs lists the packs.
@@ -690,7 +769,7 @@ func (a *App) Packs() ([]*PackInfo, error) {
 	}
 	var out []*PackInfo
 	for _, de := range ents {
-		if !de.IsDir() || strings.HasSuffix(de.Name(), TmpSuffix) {
+		if !de.IsDir() || strings.HasSuffix(de.Name(), TmpSuffix) || strings.HasSuffix(de.Name(), oldSuffix) {
 			continue
 		}
 		p, err := a.ReadPack(de.Name())
@@ -748,7 +827,8 @@ func (a *App) packSettings(st *LoadoutState, p *Pack, reg *loadout.Registry, use
 	folders := settingsFolders(st.Ix, st.Aliases)
 	addSeenFolders(folders, a.MonitorSettings(userData))
 	read := []string{cfg}
-	if root := st.Ix.Env.UserDataRoot; root != "" {
+	// a pack that carries its author's settings never takes the Game Config's (10 §3 step 4)
+	if root := st.Ix.Env.UserDataRoot; root != "" && p.Settings.Empty() {
 		addSeenFolders(folders, a.MonitorSettings(root))
 		read = append(read, filepath.Join(root, "Config"))
 	}
@@ -945,8 +1025,25 @@ func (a *App) launchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 		return nil, err
 	}
 	settings := a.packSettings(st, p, reg, useLocal, r.UserData)
+	// The pack's own settings (10 §3 step 4): written once per revision, missing files only.
+	folderOf := map[string]string{}
+	for _, pe := range p.Entries {
+		if pe.Official || pe.PackageID == "" {
+			continue
+		}
+		id := "pack:" + pe.Folder
+		if m := useLocal[pe.Folder]; m != nil {
+			id = m.ID
+		}
+		folderOf[packageBase(strings.ToLower(pe.PackageID))] = reg.Folder(id)
+	}
+	ps := readPackState(dir)
+	seed := !p.Settings.Empty() && ps.SettingsRevision < p.Rev()
 	if dryRun {
-		r.Settings = planModSettings(settings)
+		if seed {
+			r.Settings = seedPackSettings(p.Settings, folderOf, r.UserData, true)
+		}
+		r.Settings = append(r.Settings, planModSettings(settings)...)
 		return r, nil
 	}
 	if err := a.checkRoots(mods); err != nil {
@@ -957,12 +1054,16 @@ func (a *App) launchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 	}
 	// First run: seed settings with the same rules as --like (10 §3 step 4).
 	_, cfgErr := os.Stat(filepath.Join(r.UserData, "Config"))
-	copied, err := seedSettings(e.UserDataRoot, r.UserData, os.IsNotExist(cfgErr))
+	copied, err := seedSettingsWith(e.UserDataRoot, r.UserData, os.IsNotExist(cfgErr), p.Settings.Empty())
 	if err != nil {
 		return r, fmt.Errorf("pack %s: copying settings: %w", name, err)
 	}
 	r.Copied = append(r.Copied, copied...)
-	r.Settings = carryModSettings(settings, nil)
+	if seed {
+		r.Settings = seedPackSettings(p.Settings, folderOf, r.UserData, false)
+		ps.SettingsRevision = p.Rev()
+	}
+	r.Settings = append(r.Settings, carryModSettings(settings, nil)...)
 	var known []string
 	for _, m := range installedOfficial(st.Ix.Mods) {
 		if m.PackageID != "ludeon.rimworld" {
@@ -990,7 +1091,8 @@ func (a *App) launchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 	if err := a.startGame(r.Plan); err != nil {
 		return nil, err
 	}
-	b, _ := json.Marshal(packState{LastPlayed: a.Now().UTC()})
+	ps.LastPlayed = a.Now().UTC()
+	b, _ := json.Marshal(ps)
 	os.WriteFile(filepath.Join(dir, "state.json"), b, 0o644)
 	// A pack's launch has no plan; its fingerprint is the pack's list (09 §1).
 	return r, a.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: e.ID, GameID: e.GameID, UserDataRoot: r.UserData, EnvName: e.Name, Started: a.Now().UTC(), Method: "pack:" + name,
@@ -1020,6 +1122,8 @@ func (a *App) ExportPack(name, file string, listOnly bool) (int64, error) {
 			q.Entries[i].Files, q.Entries[i].SHA256 = 0, ""
 		}
 		q.Trimmed, q.Textures = 0, nil // a list carries no files
+		q.Settings, q.ID, q.Revision = nil, "", 0
+		q.Format = listFormat(&q)
 		b, _ := json.MarshalIndent(&q, "", "  ")
 		f, err := os.OpenFile(file, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
 		if err != nil {
@@ -1044,6 +1148,15 @@ type PackMatch struct {
 	Dir             string      // a pack: where it was unpacked
 	Verified        bool        // false for format 1, whose copies have no content digests
 	Check           *PackCheck
+	// Update: the file is a newer revision of a pack the player has (10 §4); without
+	// PackImport.Update it is offered only and nothing is written.
+	Update *PackUpdate
+}
+
+// PackImport are ImportPackWith's options.
+type PackImport struct {
+	AsPlan bool // a list: also load it into the workspace
+	Update bool // a newer revision of a pack the player has: replace its Mods in place
 }
 
 // IsPackZip recognizes both ZIP and zstd packs by magic, for existing GUI callers.
@@ -1062,8 +1175,14 @@ func IsPackZip(file string) bool {
 // RimArcho list (.archolist.json, or a pack.json) is compared with the installed mods and,
 // with asPlan, loaded into the workspace (loadout import reads it too, 07 §7.2).
 func (a *App) ImportPack(file string, asPlan bool) (*PackMatch, error) {
+	return a.ImportPackWith(file, PackImport{AsPlan: asPlan})
+}
+
+// ImportPackWith is ImportPack with options.
+func (a *App) ImportPackWith(file string, o PackImport) (*PackMatch, error) {
+	asPlan := o.AsPlan
 	if IsPackZip(file) {
-		return a.importPackArchive(file)
+		return a.importPackArchive(file, o.Update)
 	}
 	b, err := os.ReadFile(file)
 	if err != nil {

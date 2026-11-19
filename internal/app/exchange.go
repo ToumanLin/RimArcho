@@ -42,11 +42,27 @@ func (a *App) ExportLoadout(format string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return a.exportList(st, format)
+	return a.exportList(st, format, false)
+}
+
+// ExportLoadoutWith is ExportLoadout; with settings a RimArcho list carries the list's Mod
+// settings (07 §7.3).
+func (a *App) ExportLoadoutWith(format string, settings bool) ([]byte, error) {
+	st, err := a.Loadout()
+	if err != nil {
+		return nil, err
+	}
+	return a.exportList(st, format, settings)
 }
 
 // ExportPlan renders a plan (current or not) in a format, as this game reads it.
 func (a *App) ExportPlan(planID int64, format string) ([]byte, error) {
+	return a.ExportPlanWith(planID, format, false)
+}
+
+// ExportPlanWith is ExportPlan; with settings a RimArcho list carries the Mod settings of
+// the plan's Mods as this Game Config has them (07 §7.3).
+func (a *App) ExportPlanWith(planID int64, format string, settings bool) ([]byte, error) {
 	st, err := a.Loadout()
 	if err != nil {
 		return nil, err
@@ -62,10 +78,16 @@ func (a *App) ExportPlan(planID int64, format string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return a.exportList(ps, format)
+	return a.exportList(ps, format, settings)
 }
 
-func (a *App) exportList(st *LoadoutState, format string) ([]byte, error) {
+// ErrSettingsFormat: only a RimArcho list carries Mod settings.
+var ErrSettingsFormat = errors.New("only a RimArcho list (--format archo) carries Mod settings")
+
+func (a *App) exportList(st *LoadoutState, format string, settings bool) ([]byte, error) {
+	if settings && format != FormatArcho {
+		return nil, ErrSettingsFormat
+	}
 	tokens := st.Reg.Tokens(st.List, func(id string) string {
 		if m := st.Ix.ByID[id]; m != nil {
 			return m.PackageID
@@ -98,6 +120,12 @@ func (a *App) exportList(st *LoadoutState, format string) ([]byte, error) {
 				p.Entries = append(p.Entries, PackEntry{PackageID: strings.TrimSuffix(e.Missing, "_steam"), Name: e.Name, WorkshopID: e.WorkshopID, Lineage: e.Lineage})
 			}
 		}
+		if settings {
+			if p.Settings = a.collectSettings(st); p.Settings.Empty() {
+				p.Settings = nil
+			}
+		}
+		p.Format = listFormat(p)
 		b, _ := json.MarshalIndent(p, "", "  ")
 		return append(b, '\n'), nil
 	case FormatRML:
@@ -192,6 +220,9 @@ type ImportedList struct {
 	Hashes map[string]string
 	// Versions are the game versions a RimArcho list was meant for (07 §1.6).
 	Versions []string
+	// Settings: the Mod settings a RimArcho list carries (07 §7.3); applied only when the
+	// player asks (ApplyListSettings).
+	Settings *PackSettings
 }
 
 // Hash is the content hash a RimArcho list gives pkg ("" for none).
