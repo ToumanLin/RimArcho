@@ -148,3 +148,80 @@ export function stepMeter(value, max, steps, text, cls = "") {
   for (let i = 0; i < steps; i++) m.append(el("i", i < on ? "on" : ""));
   return m;
 }
+
+// ---- V5: what a list brings, and what it does to a list ----
+
+// splitBar: a whole split into two kinds, the first ✓ and the second ✕, both counts printed
+// after it (V5: installed / not installed). Named by the sentence it stands for.
+export function splitBar(yes, no, text) {
+  const row = el("div", "sbar-row");
+  visTip(row, text, "img", false);
+  const bar = el("span", "sbar");
+  const a = el("i", "s-yes"), b = el("i", "s-no");
+  a.style.flexGrow = String(yes);
+  b.style.flexGrow = String(no);
+  if (yes) bar.append(a);
+  if (no) bar.append(b);
+  row.append(bar, el("span", "s-n yes num", "✓ " + yes), el("span", "s-n no num" + (no ? "" : " zero"), "✕ " + no));
+  return row;
+}
+
+// diffMarks: a list change as Saves' + − ↕ marks (and ⇄ for another version of a Mod), each
+// a number; named by the sentence that says it in words.
+export function diffMarks(e) {
+  const m = el("span", "dmarks");
+  visTip(m, e.text, "img", false);
+  for (const [n, cls, sign] of [[e.added, "add", "+"], [e.removed, "del", "−"], [e.moved, "mv", "↕"], [e.swapped, "sw", "⇄"]]) {
+    if (n) m.append(el("span", cls + " num", sign + n));
+  }
+  return m;
+}
+
+// ---- V6, V11: states as icons, their word as the name ----
+
+// stateMark: a status icon (or a dot) named by its word, which is its tooltip too. kind is
+// an icon of icons.js (ok, err, warn…), "dot" for a small round mark, or "" for no mark: the
+// word then stays in the accessibility tree only (a harmless state that needs no mark).
+export function stateMark(kind, word, svg = "") {
+  const m = el("span", "smark" + (kind ? " k-" + kind : ""));
+  if (!kind) {
+    m.className = "vis-hidden";
+    m.textContent = word;
+    return m;
+  }
+  visTip(m, word, "img", false);
+  if (kind === "dot" || kind === "ring") m.append(el("i"));
+  else m.innerHTML = svg;
+  return m;
+}
+
+// fileMarks: what changed in a Mod's files, by kind, as + ~ − counts (V6); named by the
+// sentence that says it in words.
+export function fileMarks(files, text) {
+  const m = el("span", "fmarks");
+  visTip(m, text, "img", false);
+  for (const f of files) {
+    const k = el("span", "fk");
+    k.append(el("span", "fk-n", f.kind));
+    if (f.added) k.append(el("span", "add num", "+" + f.added));
+    if (f.changed) k.append(el("span", "chg num", "~" + f.changed));
+    if (f.gone) k.append(el("span", "del num", "−" + f.gone));
+    m.append(k);
+  }
+  return m;
+}
+
+// ---- V7: before and after ----
+
+// shrinkBar: a size before and after as one bar the length of before: what stays (accent),
+// then what is saved (hatched, the track), "before → after" printed after it (view.Shrink).
+export function shrinkBar(s) {
+  const row = el("div", "kbar-row");
+  visTip(row, s.text, "img", false);
+  const bar = el("span", "kbar");
+  const stay = el("i", "k-stay");
+  stay.style.width = (s.before > 0 ? Math.max(1, Math.min(100, (s.after / s.before) * 100)) : 0) + "%";
+  bar.append(stay, el("i", "k-saved"));
+  row.append(bar, el("span", "num", s.beforeText + " → " + s.afterText));
+  return row;
+}

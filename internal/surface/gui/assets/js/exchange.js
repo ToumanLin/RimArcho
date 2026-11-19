@@ -11,6 +11,7 @@ import { getChoices } from "./credit.js";
 import { choiceControl } from "./choices.js";
 import { copyablePath, editablePath } from "./fields.js";
 import { still } from "./motion.js";
+import { splitBar, diffMarks } from "./membar.js";
 
 let ui = null;
 export function initExchange(u) {
@@ -702,15 +703,18 @@ async function preview(kind, src, fileName) {
   body.append(groupHead(T("import destination")));
   const ways = el("div", "xc-dests"); ways.setAttribute("role", "radiogroup"); ways.setAttribute("aria-label", T("import destination"));
   const options = [["new", T("import as a new list"), Tf("%d mods; the current list stays as it is", p.total)],
-    ["replace", Tf("replace %s", active.name), p.replace.text], ["merge", T("add the ones you lack"), p.merge.text]];
+    ["replace", Tf("replace %s", active.name), p.replace], ["merge", T("add the ones you lack"), p.merge]];
   const choices = [];
   for (const [value, title, text] of options) {
-    const r = choiceRow("radio", title, text, value === destination, () => {
+    // a destination's effect as + − ↕ marks, named by its sentence (V5); nothing to change stays words
+    const marks = typeof text === "object" && !text.same;
+    const r = choiceRow("radio", title, typeof text === "object" ? (marks ? "" : text.text) : text, value === destination, () => {
       destination = value;
       for (const c of choices) c.set(c.value === value);
       name.disabled = value !== "new"; checkName();
     });
     r.value = value; choices.push(r);
+    if (marks) r.el.querySelector(".l").append(diffMarks(text));
     if (value === "new") {
       const lab = el("label", "xc-namef"); lab.append(el("span", "", T("new list name")), name);
       lab.onclick = e => e.stopPropagation();
@@ -913,7 +917,9 @@ function settingsLine(pl) {
 // sourceIsPath: the source is a file the player picked, so it copies on a click (16 §3.1 rule 12).
 export function showImportSummary(body, p, sourceIsPath = !!p.sourcePath) {
   const top = el("div", "set xc-src"), l = el("div", "l");
-  l.append(el("div", "name", p.summary));
+  // the format, then installed / not installed as a bar named by the summary (V5)
+  if (p.total && p.format) l.append(el("div", "name", p.format), splitBar(p.installed.length, p.missing.length, p.summary));
+  else l.append(el("div", "name", p.summary));
   const facts = [sourceIsPath && p.source ? { text: p.source, paths: [p.source] } : p.source];
   if (p.name) facts.push(Tf("list: %s", p.name));
   if (p.game) facts.push("RimWorld " + p.game);

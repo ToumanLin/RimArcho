@@ -3077,3 +3077,37 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .smeter.lvl-low i.on { background: var(--muted); }
 .pcard .pnext .pmeter { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; white-space: nowrap; vertical-align: middle; } .pcard .pnext .pct { color: var(--muted); font-size: 12px; }
 .lrow .top .cmark { margin-left: 2px; }
+/* V5: installed / not installed, and a destination's + − ↕ marks (as .sv-mcount) */
+.sbar-row { display: grid; grid-template-columns: minmax(60px, 1fr) auto auto; align-items: center; column-gap: 12px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+.sbar { display: flex; gap: 2px; height: 8px; border-radius: var(--r-sm); overflow: hidden; background: var(--pill); }
+.sbar i { display: block; min-width: 3px; height: 100%; }
+.sbar .s-yes { background: var(--green); }
+.sbar .s-no { background: var(--red); }
+.sbar-row .s-n.yes { color: var(--green); }
+.sbar-row .s-n.no { color: var(--red); }
+.sbar-row .s-n.zero { color: var(--faint); }
+.dmarks { display: inline-flex; gap: 12px; font-size: 12px; }
+.dmarks .add { color: var(--green); }
+.dmarks .del { color: var(--red); }
+.dmarks .mv, .dmarks .sw { color: var(--muted); }
+/* V6, V11: state marks and file marks */
+.smark { display: inline-flex; align-items: center; justify-content: center; flex: none; border-radius: var(--r-sm); }
+.smark svg { width: 14px; height: 14px; }
+.smark.k-dot i { display: block; width: 8px; height: 8px; border-radius: 50%; background: var(--amber); }
+.smark.k-warn { color: var(--red); }
+.smark.k-ok { color: var(--green); }
+.smark.k-err { color: var(--red); }
+.vis-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.fmarks { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; }
+.fmarks .fk { display: inline-flex; gap: 4px; }
+.fmarks .fk-n { color: var(--muted); }
+.fmarks .add { color: var(--green); }
+.fmarks .chg { color: var(--fg-2); }
+.fmarks .del { color: var(--red); }
+.smark.k-ring i { display: block; width: 8px; height: 8px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--muted); }
+/* V7: before / after, what stays solid and what is saved hatched */
+.kbar-row { display: grid; grid-template-columns: minmax(80px, 320px) auto; align-items: center; column-gap: 12px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+.kbar { display: flex; gap: 2px; height: 8px; border-radius: var(--r-sm); overflow: hidden; }
+.kbar i { display: block; height: 100%; }
+.kbar .k-stay { background: var(--accent); flex: none; }
+.kbar .k-saved { flex: 1; min-width: 2px; background: repeating-linear-gradient(-45deg, var(--line) 0 2px, transparent 2px 4px); }

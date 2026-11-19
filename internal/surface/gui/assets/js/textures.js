@@ -6,6 +6,7 @@ import { choiceControl } from "./choices.js";
 // Reading every PNG takes a while, so the page opens with only the encoder and the mods:
 // count the textures reads them, and changing a choice never does (the last count stays, marked old).
 import { progress } from "./feedbacksemantics.js";
+import { shrinkBar } from "./membar.js";
 import { pathContent } from "./fields.js";
 import { factText, S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { beginPageRead, pageLoading, page, button } from "./screens.js";
@@ -200,10 +201,13 @@ function draw(measurements = false) {
   setRow(est, T("scale"), T("scaling shrinks them further; never below 128 px, masks stay full size"),
     select("scale", I.scales, I.labels, X.scale, (v) => { X.scale = Number(v); draw(); }));
   const facts = [...(p?.estFacts || [])];
+  // video memory before and after as a bar named by its sentence (V7), not a second line
+  const vram = p?.vram && !p.loading && facts.length > 1 ? (facts.splice(1, 1), p.vram) : null;
   if (p?.upToDate) facts.push(Tf("%d up to date", p.upToDate));
   if (p?.leftAlone) facts.push(Tf("%d left alone (a DDS of the mod's own, or another format of the same name)", p.leftAlone));
   const estimate = slot(setRow(est, T("convert"), p && !p.loading ? facts : null, p?.loading ? pending() : null), "estimate");
   estimate.hidden = !p;
+  if (vram) estimate.querySelector(".l").append(shrinkBar(vram));
   setRow(est, "", T("the PNGs stay; RimArcho writes a .dds next to each and can take them all back"));
   w.append(est);
   w.append(slot(foot(I, p), "foot"));

@@ -8,6 +8,7 @@ import { S, $, el, api, T, Tf, say, errText } from "./state.js";
 import { pathContent } from "./fields.js";
 import * as pop from "./popups.js";
 import { icon } from "./icons.js";
+import { stateMark, fileMarks } from "./membar.js";
 import { wireSeparator } from "./separator.js";
 import { addForm, pageUpdate } from "./subscribe.js";
 import { libraryLink, openLibraryInstance } from "./librarylink.js";
@@ -241,8 +242,13 @@ function row(it) {
     meta.textContent = T("removed from the Workshop");
   } else if (it.t === "change") {
     name.textContent = it.r.mod;
-    meta.textContent = it.r.text;
-    right.append(el("span", "tier " + (TIER[it.r.tier] || ""), it.r.tierText));
+    // V6: the files as + ~ − counts by kind beside the other facts, and the tier as one mark
+    // (▲ affects launch, a dot worth a look, none for content only), each named by its words
+    if (it.r.files?.length) {
+      if (it.r.others) meta.append(el("span", "", it.r.others));
+      meta.append(fileMarks(it.r.files, it.r.details?.[0] || it.r.text));
+    } else meta.textContent = it.r.text;
+    right.append(stateMark({ 1: "warn", 2: "dot" }[it.r.tier] || "", it.r.tierText, icon.warn));
   } else if (it.t === "group") {
     name.textContent = it.g.text;
     name.classList.add("plain");
@@ -299,7 +305,13 @@ function sourcesDetail(card) {
     label.id = "update-source-" + encodeURIComponent(s.key);
     r.setAttribute("role", "group");
     r.setAttribute("aria-labelledby", label.id);
-    l.append(n, el("div", "muted word-facts", (s.checked ? [s.checked, s.result] : [s.result || T("not checked yet")]).filter(Boolean).join("  ")));
+    // V6: whether it was checked as an icon after the name (✓, ✕ with failures, ○ not checked
+    // yet), named by the words; a checked source keeps its time and result below
+    if (s.failures?.length) n.append(stateMark("err", s.result || T("failed"), icon.err));
+    else if (s.checked) n.append(stateMark("ok", s.result || s.checked, icon.ok));
+    else n.append(stateMark("ring", s.result || T("not checked yet")));
+    l.append(n);
+    if (s.checked) l.append(el("div", "muted word-facts", [s.checked, s.result].filter(Boolean).join("  ")));
     if (s.account && ["steamcmd", "page"].includes(s.key)) {
       const a = el("div", "word-facts acct");
       a.append(el("span", "", s.account), button(T("accounts") + " →", "", () => goAccounts(), "link"));

@@ -49,8 +49,11 @@ type TexturePage struct {
 	// StaleText says so (Go builds it: its translation reorders the numbers)
 	StaleText string `json:"staleText,omitempty"`
 	// What a run with Scale would do.
-	Convert   int          `json:"convert"`
-	EstFacts  []string     `json:"estFacts"` // the DDS size, video memory, what stays
+	Convert  int      `json:"convert"`
+	EstFacts []string `json:"estFacts"` // the DDS size, video memory, what stays
+	// VRAM: video memory now and after converting, the GUI's before / after bar (16 §7
+	// principle 9), named by EstFacts' video-memory sentence; nil with nothing to convert
+	VRAM      *Shrink      `json:"vram,omitempty"`
 	UpToDate  int          `json:"upToDate"`
 	LeftAlone int          `json:"leftAlone"`
 	Rows      []TextureRow `json:"rows"`
@@ -178,7 +181,19 @@ func TexturePageReport(a *app.App, r *app.TextureReport, scope string) *TextureP
 	}
 	p.Convert = r.Est.Files
 	p.EstFacts = EstimateFacts(r.Est)
+	if e := r.Est; e.Files > 0 && e.VRAMBefore > 0 {
+		p.VRAM = &Shrink{Before: e.VRAMBefore, After: e.VRAMAfter, BeforeText: SizeText(e.VRAMBefore), AfterText: SizeText(e.VRAMAfter), Text: p.EstFacts[1]}
+	}
 	return p
+}
+
+// Shrink is a size before and after, drawn as one bar: what stays, then what is saved.
+type Shrink struct {
+	Before     int64  `json:"before"`
+	After      int64  `json:"after"`
+	BeforeText string `json:"beforeText"`
+	AfterText  string `json:"afterText"`
+	Text       string `json:"text"` // the sentence: accessible name and tooltip
 }
 
 // EstimateFacts says what converting costs and saves, in the interface's words.
