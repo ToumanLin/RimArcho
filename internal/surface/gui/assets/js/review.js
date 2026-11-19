@@ -115,13 +115,24 @@ export async function open() {
 
 // mark records the player's functional mark on a Mod (12 §3.3 rule 2) and asks for the
 // page again: the saves' kept results are merged, none is read again.
+// A Mod marked functional leaves the map: the pick moves to the tile that took its place
+// (the next one shown, else the one before), so the details, the mark on the map and the
+// mark button all name the same Mod.
 async function mark(library, value) {
   const visit = X.visit;
+  const order = map ? [...map.querySelectorAll(".rv-tile")].map((b) => b.dataset.mod) : [];
   try { say("ok", await api.SaveReviewMark(library, value)); } catch (e) { say("fail", String(e?.message || e)); return; }
   const here = () => S.screen === "review" && X.visit === visit && S.screenSeq === visit;
   let p;
   try { p = await read(() => {}); } catch (e) { if (here()) say("fail", String(e?.message || e)); return; }
-  if (p && here()) { X.page = p; redraw(); }
+  if (!p || !here()) return;
+  X.page = p;
+  const left = new Set(mods().map((x) => modId(x.m)));
+  if (X.sel && !left.has(X.sel)) {
+    const i = order.indexOf(X.sel);
+    X.sel = order.slice(i + 1).find((id) => left.has(id)) || order.slice(0, Math.max(0, i)).reverse().find((id) => left.has(id)) || "";
+  }
+  redraw();
 }
 
 // pick reviews another colony behind the page shown.
@@ -163,7 +174,9 @@ function drawHead() {
 }
 
 const mods = () => (X.page?.groups || []).flatMap((g) => g.mods.map((m) => ({ m, mode: g.key })));
-const picked = () => mods().find((x) => modId(x.m) === X.sel) || mods()[0] || null;
+// with no pick (or one no longer there) the first tile shown, so the right cards and the
+// map's mark agree
+const picked = () => mods().find((x) => modId(x.m) === X.sel) || (X.page && groupsBy()[0]?.items[0]) || null;
 
 // keepFocus runs draw, which rebuilds box, and puts the focus back where it was in box:
 // on the control with the same data-key (and data-cat), or on fallback (an element, or a

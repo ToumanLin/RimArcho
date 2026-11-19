@@ -131,5 +131,13 @@
   "removed %d": "削除 %d 件",
   "changed %d": "変更 %d 件",
   "Mod settings of %d mods: only those the pack has none of yet": "%d 個のMODの設定：MODパックにまだ無いものだけ",
-  "the list carries no Mod settings": "このリストにはMOD設定がありません"
+  "the list carries no Mod settings": "このリストにはMOD設定がありません",
+  "%d file, %s": "%d 個のファイル、%s",
+  "move %d file (%s) to the recycle bin…": "%d 個のファイル（%s）をごみ箱へ…",
+  "move %d settings file to the recycle bin?": "%d 個の設定ファイルをごみ箱に移しますか？",
+  "moved %d settings file to the recycle bin": "%d 個の設定ファイルをごみ箱に移しました",
+  "%d file to copy from %s, %d replacing a file here": "%[2]s から %[1]d 個のファイルをコピー、うち %[3]d 個はここのファイルを置き換え",
+  "copied %d settings file from %s": "%[2]s から %[1]d 個の設定ファイルをコピーしました",
+  "Mod settings: %d file written, %d failed": "MOD設定：%d 件書き込み、%d 件失敗",
+  "Mod settings: %d file written": "MOD設定：%d 件書き込み"
 }

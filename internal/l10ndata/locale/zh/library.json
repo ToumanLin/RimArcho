@@ -398,5 +398,6 @@
   "RimArcho writes the DDS again next to the PNGs that changed": "RimArcho 在更新过的 PNG 旁重新写 DDS",
   "converted the textures of %s again": "已重新转换 %s 的贴图",
   "press C again to delete the DDS RimArcho wrote": "再按一次 C：删除 RimArcho 写的 DDS",
-  "removed the converted textures of %s": "已清除 %s 的贴图优化"
+  "removed the converted textures of %s": "已清除 %s 的贴图优化",
+  "replace at: %s (%d file, %s)": "覆盖位置：%s（%d 个文件，%s）"
 }

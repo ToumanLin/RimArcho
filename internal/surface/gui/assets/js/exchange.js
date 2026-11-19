@@ -904,6 +904,7 @@ function settingsNote(m) {
 function settingsLine(pl) {
   let n = 0, failed = 0;
   for (const m of pl.mods) for (const f of m.files) { if (f.error) failed++; else if (f.write) n++; }
+  if (n === 1) return failed ? Tf("Mod settings: %d file written, %d failed", n, failed) : Tf("Mod settings: %d file written", n);
   return failed ? Tf("Mod settings: %d files written, %d failed", n, failed) : Tf("Mod settings: %d files written", n);
 }
 

@@ -763,7 +763,7 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 			p.Lines = append(p.Lines,
 				T("Changes made in this copy will be overwritten and lost. The old folder goes to the recycle bin."),
 				Tf("copy from: %s", r.From),
-				Tf("replace at: %s (%d files, %s)", r.Target, r.Copy.Files, SizeText(r.Copy.Bytes)),
+				replaceAt(r.Target, r.Copy.Files, SizeText(r.Copy.Bytes)),
 				T("The copy keeps its location and identity in every list."))
 			for _, skipped := range r.Copy.Skipped {
 				p.Lines = append(p.Lines, Tf("skip link: %s", skipped))
@@ -1148,4 +1148,12 @@ func LibCopy(lib *app.Library, ref string) *LibInstRow {
 		}
 	}
 	return nil
+}
+
+// replaceAt is the replace line of a copy refresh: the target, its file count and size.
+func replaceAt(target string, files int, size string) string {
+	if files == 1 {
+		return Tf("replace at: %s (%d file, %s)", target, files, size)
+	}
+	return Tf("replace at: %s (%d files, %s)", target, files, size)
 }

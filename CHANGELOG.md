@@ -4,6 +4,9 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- After the first-run guide (or any Game Config switch) finishes, the status line no longer keeps saying "switching to 1.6…" for minutes; the switch's line goes when the switch ends.
+- Play review: marking a Mod functional moves the pick to the tile that took its place, so the details, the mark on the map and "mark as functional" all name the same Mod. Before, the details fell back to another Mod (often a DLC) with no tile marked.
+- Mod settings, list import and pack refresh say "1 file", not "1 files".
 - **Replies to your feedback, inside RimArcho.** Reports you send from Feedback are listed under "my reports" with their state and the developer's replies; a small dot on the sidebar's Feedback entry says a new reply came. RimArcho checks only when it starts and when you open Feedback, stops 30 days after an issue closes, and fails quietly when the relay is unreachable. "follow up on #N" starts a new report about it. Replies are public on GitHub, and there is no promise of one. Settings › network › "check for replies to my reports" turns checking off. CLI: `config set feedback.replies on|off`; MCP's settings listing shows `feedback.replies`. The feedback relay returns a reply token with each report and answers `GET /status/<n>?t=<token>` (redeploy the Worker).
 - Creating a pack on Windows no longer fails now and then with "rename …: Access is denied" when a virus scanner still holds a file it just wrote; the last step waits up to 3 s. The create-a-pack page's "include Mod settings" box sits beside its label again instead of on a line of its own.
 - Sidebar: the Saves group moves below Library, and Import & export is the last entry of Library. The shift+1–8 keys are unchanged.

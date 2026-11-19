@@ -13,11 +13,11 @@ async function setup() {
   const root = new Element("div"); root.append(screen, status);
   const say = (kind, text) => { status.dataset.kind = kind || ""; status.dataset.message = text || ""; };
   const $ = (s) => s === "#screen" ? screen : s === "#status" ? status : root.querySelector(s.replace(/^#screen /, ""));
-  const asked = [];
+  const asked = [], marks = [];
   let handler = null;
   const el = (t, c, x) => new Element(t, c, x);
   const review = await loadModules("./review.js", {
-    "./state.js": { S, $, el, api: { SaveReviewRead: async (n, colony) => { asked.push({ n, colony }); return true; }, Detail: async () => ({}) }, T: (s) => s, Tf: (s, ...a) => s + " " + a.join("/"), say, factText: (n) => n },
+    "./state.js": { S, $, el, api: { SaveReviewRead: async (n, colony) => { asked.push({ n, colony }); return true; }, Detail: async () => ({}), SaveReviewMark: async (lib, v) => { marks.push([lib, v]); return "marked"; } }, T: (s) => s, Tf: (s, ...a) => s + " " + a.join("/"), say, factText: (n) => n },
     "./api.js": { on: (name, fn) => { if (name === "review") handler = fn; } },
     "./screens.js": {
       beginPageRead: (name) => { if (S.screen !== name) S.screenSeq++; S.screen = name; const seq = S.screenSeq; return { current: () => S.screen === name && S.screenSeq === seq, finish() {}, fail(e) { throw e; } }; },
@@ -34,7 +34,7 @@ async function setup() {
   }, { document, localStorage: { getItem: () => null, setItem() {} } });
   const send = (ev) => handler(ev);
   const leave = () => { S.screen = "saves"; S.screenSeq++; };
-  return { review, S, screen, status, asked, send, document, leave };
+  return { review, S, screen, status, asked, marks, send, document, leave };
 }
 
 const mod = (name, library, more = {}) => ({ name, packageId: "tester.hats", library, sum: "1 of 2 seen", where: "1 colony, 1 save", adds: 2, seen: 1, size: 2, part: 1, tip: "",
@@ -133,4 +133,27 @@ test("two copies of one packageId are two tiles, picked one at a time", async ()
   tiles[1].onclick();
   const on = h.screen.querySelectorAll(".rv-tile").filter((b) => b.classList.contains("on"));
   assert.deepEqual(on.map((b) => b.dataset.mod), ["copy-b"]);
+});
+
+// B4 screenshot 66: VEF was marked functional and left the map, and the details showed
+// Anomaly, the page's first Mod in data order, with no tile marked. The pick moves to the
+// tile that took its place, and the details and the mark button follow it.
+test("a Mod marked functional leaves the map and the pick moves to the next tile", async () => {
+  const h = await setup();
+  const three = [mod("Anomaly", "dlc"), mod("Ideology", "ide"), mod("VEF", "vef"), mod("Hats", "hats")];
+  const opened = h.review.open();
+  h.send({ request: h.asked.at(-1).n, page: pageOf({ groups: [{ key: "rest", label: "rest", hint: "", mods: three }] }) });
+  await opened;
+  find(h.screen, "rv-tile", (b) => b.dataset.mod === "vef").onclick();
+  const named = () => find(h.screen, "word-facts").textContent;
+  assert.equal(named(), "VEF");
+  find(h.screen, "editor-full-link", (b) => b.dataset.key === "review-mark-vef").onclick();
+  await flush();
+  h.send({ request: h.asked.at(-1).n, page: pageOf({ groups: [{ key: "rest", label: "rest", hint: "", mods: three.filter((m) => m.library !== "vef") }] }) });
+  await flush();
+  assert.deepEqual(h.marks, [["vef", "functional"]]);
+  const on = h.screen.querySelectorAll(".rv-tile").filter((b) => b.classList.contains("on")).map((b) => b.dataset.mod);
+  assert.deepEqual(on, ["hats"], "the next tile is picked");
+  assert.equal(named(), "Hats", "the details follow the picked tile");
+  assert.ok(find(h.screen, "editor-full-link", (b) => b.dataset.key === "review-mark-hats"), "the mark button acts on it");
 });
