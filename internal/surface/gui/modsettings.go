@@ -132,3 +132,114 @@ func (s *API) OpenModSettingsFolder() error {
 	}
 	return openDir(dir)
 }
+
+// ModSettingsFiles is the page's other views (16 §2.9 "All files"): every file of the
+// Config folder and where it stands.
+func (s *API) ModSettingsFiles() (*view.ConfigFilesPage, error) {
+	r, err := s.modSettingsReader()
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	defer s.free.soon()
+	cf, err := r.ModSettingsFiles()
+	if err != nil {
+		return nil, err
+	}
+	p := view.ConfigFileRows(cf)
+	if g, _ := r.RunningGame(); g != nil {
+		p.Locked = view.T("the game is running: files move once it is closed")
+	}
+	return p, nil
+}
+
+// RecycleModSettings moves Mod settings files (names in the Config folder) to the recycle
+// bin, after the page's confirmation (16 §2.9 "Cleanup", 02 §1).
+func (s *API) RecycleModSettings(files []string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.a.Uninstalled {
+		return "", errors.New("RimArcho was uninstalled; account operations are disabled")
+	}
+	r, err := s.a.RecycleModSettings(files, false)
+	if err != nil {
+		return "", settingsErr(err)
+	}
+	if len(r.Files) == 0 && len(r.Failed) > 0 {
+		return "", errors.New(view.SettingsRecycleText(r))
+	}
+	return view.SettingsRecycleText(r), nil
+}
+
+// ResetModSettings is one Mod's "reset to defaults": its settings files go to the recycle
+// bin (16 §2.9 "Cleanup").
+func (s *API) ResetModSettings(instance string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.a.Uninstalled {
+		return "", errors.New("RimArcho was uninstalled; account operations are disabled")
+	}
+	ix, err := s.a.Index()
+	if err != nil {
+		return "", err
+	}
+	m := ix.ByID[instance]
+	if m == nil {
+		return "", fmt.Errorf("no mod %s", instance)
+	}
+	r, err := s.a.ResetModSettings(m, false)
+	if err != nil {
+		return "", settingsErr(err)
+	}
+	if len(r.Files) == 0 && len(r.Failed) > 0 {
+		return "", errors.New(view.SettingsRecycleText(r))
+	}
+	return view.Tf("%s starts with its defaults", m.DisplayName()) + "; " + view.SettingsRecycleText(r), nil
+}
+
+// ModSettingsSources are the Game Configs settings can be copied from: every other one
+// with its own user data folder.
+func (s *API) ModSettingsSources() ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cur, err := s.a.Env()
+	if err != nil {
+		return nil, err
+	}
+	envs, err := s.a.Store.Envs()
+	if err != nil {
+		return nil, err
+	}
+	out := []string{}
+	for _, e := range envs {
+		if e.ID != cur.ID {
+			out = append(out, e.Name)
+		}
+	}
+	return out, nil
+}
+
+// CopyModSettingsFrom previews (dryRun) or copies the current list's Mods' settings from
+// another Game Config (16 §2.9 "Copy from another Game Config"); instances: only these
+// Mods, none for all.
+func (s *API) CopyModSettingsFrom(from string, instances []string, dryRun bool) (*view.SettingsCopyView, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.a.Uninstalled {
+		return nil, errors.New("RimArcho was uninstalled; account operations are disabled")
+	}
+	p, err := s.a.CopyModSettingsFrom(from, instances, dryRun)
+	if err != nil {
+		return nil, settingsErr(err)
+	}
+	return view.SettingsCopyLines(p), nil
+}
+
+// settingsErr translates a refusal app gives in its own words.
+func settingsErr(err error) error {
+	var ie *app.SettingInputError
+	if errors.As(err, &ie) {
+		return errors.New(view.SettingErrorText(ie))
+	}
+	return err
+}

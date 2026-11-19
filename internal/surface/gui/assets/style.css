@@ -2530,6 +2530,10 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .ms-split { align-self: stretch; margin: 0; }
 .ms .data-table { max-height: none; min-height: 0; }
 .data-row.ms-defaults .cell:not(.n) { color: var(--faint); }
+.ms .data-row.sel { background: color-mix(in srgb, var(--accent) 13%, transparent); }
+.ms .data-row.sel.cur { background: color-mix(in srgb, var(--accent) 19%, transparent); }
+.ms-dacts { display: flex; gap: 8px; }
+.ms-recycle { margin: 2px 0 10px; }
 .ms-detail { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
 .ms-dhead { display: flex; flex-direction: column; gap: 6px; flex: none; padding: 14px 16px 12px; border-bottom: var(--hairline) solid var(--line-2); }
 .ms-dhead h2 { margin: 0; font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }

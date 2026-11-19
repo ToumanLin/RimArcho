@@ -31,7 +31,7 @@ Annotations follow the MCP specification; the external harness decides whether t
 | `status` | status | true | — |
 | `find_mods` | Use find when query is present; otherwise use list (active and filter). | true | — |
 | `get_mod` | mod | true | — |
-| `get_mod_settings` | mod-settings (ref, all) | true | — |
+| `get_mod_settings` | mod-settings (ref, all); `files` → mod-settings files (`--filter`; `all` gives none) | true | — |
 | `get_description` | describe (source, refresh, and offline) | true | — |
 | `get_def` | def (def, mod, all, and `game_version`) | true | — |
 | `get_patches` | patches (mod, target, failed, all, and `game_version`) | true | — |
@@ -51,7 +51,7 @@ Annotations follow the MCP specification; the external harness decides whether t
 | `plan_history` | `loadout log`, diff, and history (`action=steps`) | true | — |
 | `pin_mod` | pin (ref, name, git, update, `move_to_library`, reason, and `dry_run`); reason is stored in the copy's origin and shown in its copy notes (16 §2.9). | false | false |
 | `unpin_mod` | unpin (ref and `dry_run`) | false | false |
-| `set_mod_settings` | mod-settings set (ref; set as `name=value` pairs in name order; each reset; file; `dry_run`) | false | false |
+| `set_mod_settings` | mod-settings set (ref; set as `name=value` pairs in name order; each reset; file; `dry_run`); `action=recycle` → mod-settings recycle (files; the value `orphans` → `--orphans`), `action=reset` → mod-settings reset (ref), `action=copy_from` → mod-settings copy-from (from, refs) | false | false |
 | `set_player_data` | The action is `tag_add` or `tag_remove` (refs and tags), alias or note (text; an empty string clears it), or `copy_note` (the note on one copy, `note <reference> <text> --copy`; an empty string clears it, 16 §2.9). On a tag itself, without refs: `tag_rename` (tags: the one tag, text: the new name), `tag_merge` (tags, text: the target), `tag_delete` (tags), `tag_note` (tags: the one tag, text; an empty string clears it) and `tag_color` (tags: the one tag, text: a preset name or `#rrggbb`; empty clears it). `tag_order` (refs: one Mod, tags: first, in this order) reorders one Mod's tags. `dry_run` previews rename, merge and delete (`tag rename\|merge\|delete\|note`, 13 §4.2). | false | false |
 | `manage_rules` | `rule add/list/remove` (action, kind, a, b, target, note, and rule) | false | false |
 | `ignore_problem` | `problems ignore` or unignore (undo) | false | false |
@@ -119,7 +119,7 @@ The following table gives the highlights of the tool guides. `internal/cmds/guid
 | `find_mods` | Search by name, package ID, author, Workshop ID, or folder. A package ID may identify several Instances; the output lists a reference for every candidate. Use `get_mod` next. |
 | `get_mod` | Get all facts for one Instance. An ambiguous reference returns candidates rather than choosing one arbitrarily. |
 | `get_mod_settings` | Read what a Mod's settings files and HugsLib packs store, its settings window and HugsLib titles and defaults as Archo Monitor last saw them, or which Mods of the current list have settings. |
-| `set_mod_settings` | Change simple settings values (on/off, numbers, one line of text, a HugsLib choice) or reset them, with the game closed; the file is backed up first. |
+| `set_mod_settings` | Change simple settings values (on/off, numbers, one line of text, a HugsLib choice) or reset them, with the game closed; the file is backed up first. `action=recycle\|reset\|copy_from` moves settings files to the recycle bin or copies them from another Game Config; they stay "write" because every removal is recoverable from the recycle bin, and the description asks for a dry run and the player's answer first. |
 | `get_def` | Use it for "No ThingDef named X", duplicate Defs, or which Mod wins. A `log:` line says when the newest log reports the effective definition's file failed to load (06 §3). |
 | `get_patches` | Use it for a logged "Patch operation … failed"; `failed=true` gives the reason. `target=<defName>` also finds operations nested in `FindMod` / `Sequence`. |
 | `get_harmony` | Use it for PREFIX/POSTFIX stack lines or Mods touching `Pawn.Tick`; next, use `read_source` on the patch class. A bool-returning prefix may skip the original method. Patches applied in code through `Harmony.Patch` are marked as not statically resolvable. A simple `TargetMethod()` gives a static target (`target read from TargetMethod()`); for a method no row names, `target=` lists the dynamic patches the newest log shows on it, or counts the patch classes whose target is chosen at run time, instead of saying there are no declared patches (05 §5.3). |
