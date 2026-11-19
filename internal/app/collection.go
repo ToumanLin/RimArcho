@@ -53,7 +53,10 @@ func (a *App) steamPost(api string, form url.Values, v any) error {
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("User-Agent", UserAgent)
-	resp, err := a.httpClient().Do(req)
+	resp, err := a.steamDo(req)
+	if isSteamBusy(err) {
+		return err
+	}
 	if err != nil {
 		return fmt.Errorf("Steam unreachable: %v", shortErr(err))
 	}

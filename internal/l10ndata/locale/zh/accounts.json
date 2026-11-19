@@ -31,6 +31,7 @@
   "Steam account name": "Steam 账户名",
   "Steam account restricted": "Steam 账号受限",
   "Steam could not complete the request": "Steam 未能完成请求",
+  "Steam is limiting requests; RimArcho asks again after %s": "Steam 正在限制请求；RimArcho 将在 %s 之后再询问",
   "Steam request failed (code %s)": "Steam 请求失败（代码 %s）",
   "Steam request limit exceeded": "Steam 请求已达限额",
   "Steam request rate limited": "Steam 请求过于频繁",

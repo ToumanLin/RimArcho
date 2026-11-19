@@ -15,6 +15,10 @@ let seq = 0, detailTimer;
 // move. The old Mod is inert at once (its actions cannot run) and dims if the wait is long.
 // REVEAL_MS caps the wait: a slower part fills in place after the swap.
 const REVEAL_MS = 250;
+// FETCH_REST_MS: an uncached Workshop description is fetched only once the cursor has rested
+// this long on the Mod, so stepping through a list sends Steam nothing (16 §2.16.1 G12).
+const FETCH_REST_MS = 400;
+export const fetchRest = (current) => new Promise((done) => setTimeout(() => done(current()), FETCH_REST_MS));
 export function stale(box) { if (box) { box.dataset.stale = ""; box.inert = true; } }
 export function unstale(box) { if (box) { delete box.dataset.stale; box.inert = false; } }
 
@@ -35,7 +39,7 @@ export function followDetail(it, staged) {
 
 // showDetail draws the plan editor's details of a row (16 §4.1): its copies, name and
 // picture, the detail, and the copy's note and actions, shown together once Go has answered
-// (REVEAL_MS at most). A Workshop page not read yet is fetched straight away.
+// (REVEAL_MS at most). A Workshop page not read yet is fetched once the cursor rested.
 export async function showDetail(it, staged) {
  clearTimeout(detailTimer);
   const n = ++seq, gameRequest = S.envSeq;
@@ -84,7 +88,7 @@ export async function showDetail(it, staged) {
   box.dataset.ref = it.id;
   f.show();
   const d = await detail;
-  if (!current() || d?.state !== "not cached") return;
+  if (!current() || d?.state !== "not cached" || !(await fetchRest(current))) return;
   f.fetching();
   try {
     const d2 = await api.Detail(it.id, !!staged, true, false);

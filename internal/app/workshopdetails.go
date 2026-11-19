@@ -18,7 +18,8 @@ import (
 // same 100 as the subscribe preflight and collection titles.
 const workshopBatch = 100
 
-// workshopRequests is how many detail requests run at once.
+// workshopRequests is how many detail requests are queued at once; the Steam gate lets
+// steamConcurrent of them through (11 §2.1).
 const workshopRequests = 4
 
 // workshopRetryPause is the wait before a failed detail request is sent again.
@@ -32,7 +33,9 @@ type workshopAnswer struct {
 
 // workshopDetails reads the details of many items, workshopBatch per request (11 §1).
 // A request that fails is sent once more after a pause, and so are the items Steam
-// answered with a passing error (busy, timed out, rate limited). Every ID gets an answer.
+// answered with a passing error (busy, timed out), unless Steam is limiting requests
+// (11 §2.1). Every ID gets an answer. The descriptions are kept in the description cache,
+// so the details of a checked Mod need no request of their own (16 §4.3).
 func (a *App) workshopDetails(ctx context.Context, ids []string) map[string]workshopAnswer {
 	seen := map[string]bool{}
 	var unique []string
@@ -46,12 +49,15 @@ func (a *App) workshopDetails(ctx context.Context, ids []string) map[string]work
 	var mu sync.Mutex
 	ask := func(part []string) {
 		got, err := a.postWorkshopDetails(ctx, part)
-		if err != nil && pause(ctx) {
+		if err != nil && !isSteamBusy(err) && pause(ctx) {
 			got, err = a.postWorkshopDetails(ctx, part)
 		}
 		mu.Lock()
 		defer mu.Unlock()
 		for _, id := range part {
+			if isSteamBusy(err) && out[id].d != nil {
+				continue // asked again during a cooldown: Steam's first answer stands
+			}
 			d, ok := got[id]
 			switch {
 			case err != nil:
@@ -72,6 +78,11 @@ func (a *App) workshopDetails(ctx context.Context, ids []string) map[string]work
 	}
 	if len(again) > 0 && pause(ctx) {
 		inBatches(again, ask)
+	}
+	for _, ans := range out {
+		if ans.d != nil {
+			a.storeWorkshopCache(ans.d)
+		}
 	}
 	return out
 }
@@ -102,10 +113,11 @@ func pause(ctx context.Context) bool {
 	}
 }
 
-// passingResult: Steam result codes worth asking about once more.
+// passingResult: Steam result codes worth asking about once more. "Limit exceeded" and
+// "rate limited" (25, 84) start a cooldown instead (11 §2.1).
 func passingResult(code int) bool {
 	switch code {
-	case 2, 16, 20, 25, 84: // failed, timed out, unavailable, limit exceeded, rate limited
+	case 2, 16, 20: // failed, timed out, unavailable
 		return true
 	}
 	return false
@@ -127,7 +139,10 @@ func (a *App) postWorkshopDetails(ctx context.Context, ids []string) (map[string
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("User-Agent", UserAgent)
-	resp, err := a.httpClient().Do(req)
+	resp, err := a.steamDo(req)
+	if isSteamBusy(err) {
+		return nil, err
+	}
 	if err != nil {
 		return nil, fmt.Errorf("Steam unreachable: %v", shortErr(err))
 	}
@@ -155,11 +170,16 @@ func (a *App) postWorkshopDetails(ctx context.Context, ids []string) (map[string
 	}
 	out := map[string]*workshopCache{}
 	now := a.Now().Unix()
+	limited := false
 	for _, x := range r.Response.Details {
+		limited = limited || limitedResult(x.Result)
 		out[x.ID] = &workshopCache{ID: x.ID, Title: x.Title, Description: x.Description, TimeUpdated: x.TimeUpdated, Fetched: now, Result: x.Result}
 		for _, tag := range x.Tags {
 			out[x.ID].Tags = append(out[x.ID].Tags, tag.Tag)
 		}
+	}
+	if limited {
+		a.steamLimited(api)
 	}
 	return out, nil
 }

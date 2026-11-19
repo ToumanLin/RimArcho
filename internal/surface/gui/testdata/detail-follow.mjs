@@ -6,7 +6,7 @@ async function harness(details=null) {
  const box=new Element("div"), S={envSeq:0,screen:null,cols:[{items:[]},{items:[]},{items:[]}]};
  let next=0;const timers=new Map(),calls=[],detail=deferred();
  const q=await loadModules("./detail.js",{
-  "./state.js":{S,$:()=>box,el:(tag,cls,text)=>{const e=new Element(tag,cls,text);return e},esc:String,api:{LibraryCopy:async()=>null,Detail:id=>{calls.push("Detail");return details?details(id):detail.promise}},T:s=>s,Tf:s=>s,errText:String,say:()=>{},factText:()=>{}},
+  "./state.js":{S,$:()=>box,el:(tag,cls,text)=>{const e=new Element(tag,cls,text);return e},esc:String,api:{LibraryCopy:async()=>null,Detail:(...args)=>{calls.push("Detail");return details?details(...args):detail.promise}},T:s=>s,Tf:s=>s,errText:String,say:()=>{},factText:()=>{}},
   "./icons.js":{icon:{},sourceIcon:()=>"",statusIcon:()=>""},"./fields.js":{fieldList:()=>new Element("div")},"./ops.js":{},
  },{setTimeout:fn=>{timers.set(++next,fn);return next},clearTimeout:id=>timers.delete(id)});
  return {q,S,box,timers,calls,detail};
@@ -74,4 +74,14 @@ test("back to a Mod before the next one showed builds its own frame, not the nex
  const back=q.showDetail({id:"a",name:"A mod"},false);await settle();
  for(const fn of [...timers.values()])fn();await settle();void back;
  assert.equal(box.querySelector("h1").textContent,"A mod");
+});
+
+test("an uncached Workshop description is fetched only for the Mod the cursor rested on", async()=>{
+ const fetched=[];
+ const {q,timers}=await harness((id,staged,fetch)=>{if(fetch)fetched.push(id);return Promise.resolve({id,name:id,header:"",show:"about",about:[],state:fetch?"fetched":"not cached"})});
+ const run=async()=>{for(let i=0;i<5;i++){for(const [k,fn] of [...timers]){timers.delete(k);fn()}await settle()}};
+ const a=q.showDetail({id:"a",name:"a"},false);await settle();await settle();
+ // the cursor leaves a before it rested
+ const b=q.showDetail({id:"b",name:"b"},false);await run();await a;await b;
+ assert.deepEqual(fetched,["b"]);
 });

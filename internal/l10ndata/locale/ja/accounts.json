@@ -31,6 +31,7 @@
   "Steam account name": "Steamアカウント名",
   "Steam account restricted": "Steamアカウントが制限されています",
   "Steam could not complete the request": "Steamが要求を完了できませんでした",
+  "Steam is limiting requests; RimArcho asks again after %s": "Steamが要求を制限しています。RimArchoは%s以降に再度問い合わせます",
   "Steam request failed (code %s)": "Steamの要求に失敗しました（コード：%s）",
   "Steam request limit exceeded": "Steamの要求上限を超えました",
   "Steam request rate limited": "Steamのアクセス頻度が制限されています",

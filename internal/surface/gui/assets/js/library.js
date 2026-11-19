@@ -11,7 +11,7 @@
 import { S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { on } from "./api.js";
 import { icon } from "./icons.js";
-import { detailFrame, stale } from "./detail.js";
+import { detailFrame, fetchRest, stale } from "./detail.js";
 import * as pop from "./popups.js";
 import { beginPageRead, pageLoading, openScreen, page, act, rescanButton, area, full } from "./screens.js";
 import { updateFromForm } from "./subscribe.js";
@@ -705,7 +705,7 @@ let detailSeq = 0, frame = null;
 // drawDetail: the cursor's copy in the details, laid out as the editor's (detail.js
 // detailFrame): its note, picture and name, where it comes from, Mod library's field list, its
 // actions, the description and history (16 §2.9). A Workshop page not read yet is fetched
-// straight away.
+// once the cursor rested (fetchRest).
 async function drawDetail() {
   if (!els) return;
   const x = L.flat[L.cur];
@@ -760,7 +760,7 @@ async function drawDetail() {
   if (!current()) return;
   f.show();
   const d = await detail;
-  if (!current() || d?.state !== "not cached") return;
+  if (!current() || d?.state !== "not cached" || !(await fetchRest(current))) return;
   f.fetching();
   const d2 = await api.Detail(i.id, false, true, false).catch(() => null);
   if (d2 && current()) f.detail(d2);

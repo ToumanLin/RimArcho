@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Steam: RimArcho asks Steam's Workshop service much less often, after a player found Steam refusing to open Mod pages. Details fetch a Mod's Workshop description only once the cursor has rested on it for 0.4 s (in the editor and the Mod library too, not just full-screen details), the update check's answers fill the description cache, and a removed or private Mod is asked about once a day instead of on every view. All Workshop requests share one limit (2 at once, about 1 a second after a short burst); when Steam answers "too many requests" or "rate limited", RimArcho stops asking for at least a minute, doubling up to 30 minutes, and says "Steam is limiting requests; RimArcho asks again after HH:MM" instead. The pause holds across a restart and for `archo` commands and MCP.
 - Answering "same" to an identity question now carries the new Mod's notes, tags, user rules and ignored findings over to the Mod it was, and removes the left-over empty record. Before, they stayed on a record nothing pointed to any more.
 - TUI: drawing the screen no longer reads the database; Can it run's count is brought up to date after each key or result instead.
 - Window: the top bar no longer shows the Game Config chip (`name 1.6`) beside the breadcrumb; the sidebar and the Launch page's 01 column already name and switch it.

@@ -222,7 +222,7 @@ func DescNote(d *DetailData) string {
 	case st == "offline":
 		return T("offline (workshop.fetch)")
 	case st != "" && st != "fetched" && st != "cached":
-		return T("Workshop page: ") + st
+		return T("Workshop page: ") + Text(st)
 	}
 	return ""
 }
