@@ -135,12 +135,11 @@ test("esc clears the box first, then goes back", async () => {
   assert.equal(h.backs(), 1);
 });
 
-test("the empty box describes the sources and accounts on hover, with the local route", async () => {
+test("the empty box shows the source cards with account lines and the local route", async () => {
   const h = await setup({ sources: [{ key: "page", account: "logged in, until Nov 30" }, { key: "steamcmd", account: "rim_player" }], recent: [{ name: "Performance Fish", source: "Git", added: "2026-10-12" }] });
-  assert.ok(!h.root.textContent.includes("logged in, until Nov 30"), "no source cards on the page");
-  assert.ok(h.root.querySelector("input").title.includes("logged in, until Nov 30"), "the field's description has the accounts");
+  assert.ok(h.root.textContent.includes("logged in, until Nov 30"));
   assert.ok(h.root.textContent.includes("Performance Fish"));
-  await h.click("open it");
+  await h.click("open the Mods folder");
   assert.deepEqual(h.calls.at(-1), ["mods"]);
 });
 

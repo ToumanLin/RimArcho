@@ -130,7 +130,7 @@ export function addForm(ctx = {}) {
   const box = el("label", "subscribe-omni");
   const field = el("input");
   field.type = "text"; field.spellcheck = false;
-  field.placeholder = T("paste a Workshop, GitHub or LoversLab link");
+  field.placeholder = T("paste a GitHub repository, a LoversLab file page, a Workshop link or ID");
   field.setAttribute("aria-label", T("add a subscription")); // the page title; the placeholder says what to paste
   box.append(field);
   const result = el("div", "subscribe-result");
@@ -142,17 +142,23 @@ export function addForm(ctx = {}) {
   let seq = 0, timer = 0, shown = "";
 
   const account = (key) => ((ctx.data?.sources || []).find(s => s.key === key) || {}).account || "";
-  // what each kind of address does: the field's description, not three cards (16 §2.9)
-  const kinds = [T("A mod its author publishes on GitHub, or the version in development. Updates download only what changed."),
-    T("A mod published only on LoversLab. Paste its file page and choose a file; RimArcho tells you when a new version is out."),
-    T("Subscribe with Steam; without the Steam client, download with SteamCMD."), account("steamcmd"), account("page")].filter(Boolean).join("\n");
-  field.title = kinds;
-  field.setAttribute("aria-description", kinds);
+  const tile = (title, what, shape, status) => {
+    const t = el("button", "subscribe-tile");
+    t.type = "button";
+    t.append(el("span", "t", T(title)), el("span", "w word-facts", T(what)), el("code", "", shape));
+    if (status) t.append(el("span", "st word-facts", status));
+    t.onclick = () => { field.placeholder = shape; field.focus(); };
+    return t;
+  };
+  const tiles = el("div", "subscribe-tiles");
+  tiles.append(
+    tile("Git repository", "A mod its author publishes on GitHub, or the version in development. Updates download only what changed.", "https://github.com/<author>/<repository>", T("no account needed")),
+    tile("LoversLab", "A mod published only on LoversLab. Paste its file page and choose a file; RimArcho tells you when a new version is out.", "https://www.loverslab.com/files/file/…", account("page")),
+    tile("Workshop item", "Subscribe with Steam; without the Steam client, download with SteamCMD.", "https://steamcommunity.com/sharedfiles/filedetails/?id=…", account("steamcmd")));
   const local = el("div", "subscribe-local");
-  local.append(el("span", "word-facts", T("Local Mods: copy them into the Mods folder.")),
-    button(T("open it"), async () => { await api.OpenModsFolder(); say("ok", T("opened the folder")); }, "link"));
-  local.title = T("Local mods need no subscription: copy them into the Mods folder and the next scan finds them.");
-  below.append(local);
+  local.append(el("span", "word-facts", T("Local mods need no subscription: copy them into the Mods folder and the next scan finds them.")),
+    button(T("open the Mods folder"), async () => { await api.OpenModsFolder(); say("ok", T("opened the folder")); }, "link"));
+  below.append(tiles, local);
   const recent = ctx.data?.recent || [];
   if (recent.length) {
     const list = el("div", "subscribe-recent");

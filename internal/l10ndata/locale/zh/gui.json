@@ -436,8 +436,6 @@
   "%s: %d to fix before you play": "%s：开玩前要修 %d 项",
   "%d errors last time": "上次有 %d 个报错",
   "1 error last time": "上次有 1 个报错",
-  "paste a Workshop, GitHub or LoversLab link": "粘贴工坊、GitHub 或 LoversLab 链接",
-  "Local Mods: copy them into the Mods folder.": "本地 Mod：复制进 Mods 文件夹。",
   "open it": "打开",
   "You can undo it: the PNGs stay.": "可以撤回：PNG 不动。",
   "1 problem breaks the game": "1 个问题会出错"
