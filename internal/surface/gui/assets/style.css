@@ -2849,7 +2849,7 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .pm-field > .choice-control { width: 100%; }
 
 /* Uninstall owns the page until its report (16 §2.14). */
-.uninstall-exclusive :is(#nav, #nav-settings, #tasks-line, #self-update) { pointer-events: none; opacity: .45; }
+.uninstall-exclusive :is(#nav, #nav-settings, #nav-feedback, #tasks-line, #self-update) { pointer-events: none; opacity: .45; }
 .uninstall-exclusive #crumbs, .uninstall-exclusive #hints { pointer-events: none; }
 .uninstall-exclusive #hints { visibility: hidden; }
 .un-progress-page { width: min(640px, 100%); margin-inline: auto; padding: 0 20px 24px; min-height: 65vh; justify-content: center; }

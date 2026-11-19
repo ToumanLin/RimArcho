@@ -350,8 +350,8 @@ function manageCurrent() {
 let lastList = 1;
 
 // The sidebar entry with shift+n (16 §3.5): view.Nav numbers them, so the keys follow the
-// sidebar. "plan" is list: like a click on it, the current list (16 §2.1).
-const navAt = (n) => ((S.shell && S.shell.nav) || []).flatMap((g) => g.items || []).find((it) => it.key === "shift+" + n)?.id;
+// sidebar; a sub-entry can carry one (Texture optimisation). "plan" is list: like a click on it, the current list (16 §2.1).
+const navAt = (n) => ((S.shell && S.shell.nav) || []).flatMap((g) => g.items || []).flatMap((it) => [it, ...(it.kids || [])]).find((it) => it.key === "shift+" + n)?.id;
 const navTarget = (id) => id !== "plan" ? id : ((S.shell && S.shell.plans) || []).find((p) => p.current)?.page || "plans";
 
 // renderWhere: the position line (16 §3.2), the sidebar and the breadcrumb.

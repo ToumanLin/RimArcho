@@ -170,7 +170,7 @@ func TestAboutSettingsOrderAndUniqueControls(t *testing.T) {
 	for _, lang := range []string{"en", "zh"} {
 		view.SetLang(lang)
 		groups := view.SettingsPage(e.App, nil)
-		if groups[0].Title != view.T("about") || len(groups[0].Items) != 4 {
+		if groups[0].Title != view.T("about") || len(groups[0].Items) != 3 { // feedback moved to the sidebar (16 §2.1)
 			t.Fatal(groups[0])
 		}
 		counts := map[string]int{}
@@ -198,7 +198,7 @@ func TestAboutSettingsOrderAndUniqueControls(t *testing.T) {
 		if counts["version"] != 1 || counts["auto"] != 1 || counts["check"] > 1 {
 			t.Fatal(counts)
 		}
-		links := groups[0].Items[3].Links
+		links := groups[0].Items[2].Links
 		if len(links) != 2 || links[0].Label != "Discord" || links[0].URL != "https://discord.gg/HF2GVyurQs" || links[1].Label != "GitHub" {
 			t.Fatal(links)
 		}

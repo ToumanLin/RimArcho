@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Window: Texture optimisation moved into Mod library as its last sub-page; `shift+7`, the command panel and every link and background task still open it. Feedback moved from Settings › About to its own sidebar row, directly above background tasks.
 - Answering "same" to an identity question now carries the new Mod's notes, tags, user rules and ignored findings over to the Mod it was, and removes the left-over empty record. Before, they stayed on a record nothing pointed to any more.
 - TUI: drawing the screen no longer reads the database; Can it run's count is brought up to date after each key or result instead.
 - Window: the top bar no longer shows the Game Config chip (`name 1.6`) beside the breadcrumb; the sidebar and the Launch page's 01 column already name and switch it.

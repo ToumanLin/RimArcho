@@ -114,7 +114,7 @@ The editor and Mod library › all mods share **one key table**. The GUI and TUI
 | `u`, `ctrl+z` / `ctrl+y`, `ctrl+r` | Undo or redo in the editor |
 | `Del` | Unsubscribe the Workshop copy or delete an owned copy, with a dry run before confirmation |
 | Menu key, `shift+F10` | Open the context menu at the cursor (§8.5) |
-| `shift+1`–`shift+8` | Visit the 8 sidebar entries: Launch, Can it run, Game log, Lists (opens the current list), Packs, Mod library, Texture optimisation and Game (the Game Config page). Saves has no key. The GUI uses physical keys, so they work in any keyboard layout; the TUI receives `!@#$%^&*` in the US layout. `!` and `#` have no other meaning |
+| `shift+1`–`shift+8` | Visit the 8 sidebar entries: Launch, Can it run, Game log, Lists (opens the current list), Packs, Mod library, Texture optimisation (Mod library's sub-entry, §2.1) and Game (the Game Config page). Saves has no key. The GUI uses physical keys, so they work in any keyboard layout; the TUI receives `!@#$%^&*` in the US layout. `!` and `#` have no other meaning |
 | `tab`, `shift+tab` | GUI: move the focus to the next or previous control, as on a web page, including the address copy buttons (§3.1 rule 12); in a search field, Tab first accepts the ghost completion (§3.7). Subpages are switched with the sidebar, the breadcrumb or the command panel. TUI: visit the next or previous sibling subpage. The Mod library cycles through all mods ↔ updates ↔ add a subscription ↔ search files. Plans open for editing without changing the current plan (07 §1.3). Packs cycle through the packs, starting with the first; full details use Tab to switch their own pages |
 
 Editor only:
