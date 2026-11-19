@@ -872,6 +872,7 @@ async function run(what, anyway = false) {
   }
   // another version in the way that can move into the lock library: one confirmation, then on
   if (o.moves) return confirmMoves(o, () => api.RunMoving(what), async (o2) => { say(o2.refused ? "fail" : "ok", o2.text); await reload(); motion.play(before, null); });
+  if (o.direct) return offerDirect(o, () => run(what, anyway));
   if (o.refused) {
     say("fail", o.text);
     if (o.refused.length > 1) pop.text({ sort: T("sort"), save: T("save"), launch: T("launch") }[what], o.refused);
@@ -926,6 +927,17 @@ function offerAfterSort(o) {
       try { say("ok", await api.Subscribe({ kind: "workshop", url: ids.join(" "), steamcmd: i === 1, batch: true })); } catch (e) { say("fail", errText(e)); }
     });
   }, "enable");
+}
+
+// offerDirect answers a Steam launch with no Steam client (view.Outcome.Direct, 16 §2.3): one
+// button makes this game start without Steam from now on, then launches again.
+function offerDirect(o, again) {
+  say("fail", o.text);
+  pop.confirm(o.text, [T("This game will start without Steam from now on.")], T("start the game directly"), async () => {
+    try { await api.LaunchDirect(); } catch (e) { return say("fail", errText(e)); }
+    say("busy", T("starting…"));
+    await again();
+  }, "launch");
 }
 
 // confirmMoves asks once about moving folders into the lock library (09 §3), then runs again.
@@ -986,7 +998,7 @@ async function cmd(id) {
 
 async function chooseEnv() {
   const rows = S.board?.environmentRows || [];
-  if (!rows.length) return say("", T("no Game Configs yet (archo env add)"));
+  if (!rows.length) return go("guide"); // no game yet: Add Game Config is the page for it
   const labels = rows.map(e => e.name + "  " + e.installation + (e.current ? "  " + T("in use") : ""));
   labels.push("+ " + T("Add Game Config"));
   pop.choose(T("switch Game Config"), labels, (i) => {
@@ -1433,7 +1445,7 @@ async function loadWidths() {
 // ---- start ----
 
 const ui = {
-  reload, refreshEnvironment, relang, reaccent, render, pageEntering, pageEntered, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go, useEnv,
+  reload, refreshEnvironment, relang, reaccent, render, pageEntering, pageEntered, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go, useEnv, offerDirect,
   back: () => travel(-1),
   palette: paletteChoice, commandDone, uninstallStarted: () => uninst.restore(), selectionItems: selection, planMenu: (id, x, y, opener, keys) => plans.menuAt(id, x, y, opener, keys),
   menu: (x, y) => openRowMenu(x, y, false),

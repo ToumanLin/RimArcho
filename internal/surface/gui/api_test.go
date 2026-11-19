@@ -516,3 +516,32 @@ func TestPackLaunchMovesConfirm(t *testing.T) {
 		t.Fatal("Mods/B is still there")
 	}
 }
+
+// 16 §2.3, §3.1 rule 14: a Steam launch with no Steam client says so without a command and
+// flags the direct start; LaunchDirect makes the Game Config start directly, and it launches.
+func TestLaunchWithoutSteamOffersDirect(t *testing.T) {
+	t.Parallel()
+	e, api, _ := fixture(t)
+	e.MustRun("env", "set", "main", "--launch", "steam")
+	e.App.Detect.SteamRoots = []string{t.TempDir()} // no steam.exe there
+	o, err := api.RunAnyway(view.ListLaunch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !o.Direct && len(o.Refused) == 0 && len(e.Launched) == 1 {
+		t.Skip("a steam Game Config already starts directly when Steam is not running (09 §2)")
+	}
+	if !o.Direct || strings.Contains(o.Text, "archo") || len(e.Launched) != 0 {
+		t.Fatalf("launch with no Steam: %+v", o)
+	}
+	if err := api.LaunchDirect(); err != nil {
+		t.Fatal(err)
+	}
+	en, err := e.App.Store.CurrentEnv()
+	if err != nil || en == nil || en.Launch != "direct" {
+		t.Fatalf("launch method after LaunchDirect: %+v %v", en, err)
+	}
+	if o, err := api.RunAnyway(view.ListLaunch); err != nil || o.Direct || len(o.Refused) > 0 || len(e.Launched) != 1 {
+		t.Fatalf("launch after LaunchDirect: %+v %v %v", o, err, e.Launched)
+	}
+}

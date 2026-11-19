@@ -57,9 +57,11 @@ type LogPage struct {
 	// Monitor is the companion log of this run (Archo Monitor's, else RimCrow's).
 	Monitor *MonitorLog `json:"monitor,omitempty"`
 	// NoMonitor: the current plan has no Archo Monitor, in one line; AddMonitor: it can be
-	// added (an installed monitor and Harmony in the plan).
-	NoMonitor  string `json:"noMonitor,omitempty"`
-	AddMonitor bool   `json:"addMonitor,omitempty"`
+	// added (an installed monitor and Harmony in the plan); InstallMonitor: it is not
+	// installed, and the GUI's button installs it (16 §2.9).
+	NoMonitor      string `json:"noMonitor,omitempty"`
+	AddMonitor     bool   `json:"addMonitor,omitempty"`
+	InstallMonitor bool   `json:"installMonitor,omitempty"`
 	// Links maps a normalised first line to its cluster, for LiveMonitor.
 	Links map[string]string `json:"-"`
 }
@@ -119,7 +121,7 @@ func BuildLogPage(a *app.App, st *app.LoadoutState, path string, live *LiveTrack
 		p.NoMonitor = T("this list has no Archo Monitor: errors will not say which file or def was loading")
 		p.AddMonitor = ms.Newest != nil
 		if !p.AddMonitor {
-			p.NoMonitor = T("Archo Monitor is not installed: errors will not say which file or def was loading (archo monitor install)")
+			p.NoMonitor, p.InstallMonitor = T("Install the in-game helper to see which file caused an error."), true
 		}
 	}
 	if err := a.EnsureLogFileAnalysis(st, path, nil); errors.Is(err, app.ErrStillComputing) {
@@ -152,7 +154,7 @@ func BuildLogPage(a *app.App, st *app.LoadoutState, path string, live *LiveTrack
 	}
 	if p.Monitor != nil {
 		// this run had the monitor: its tab is the answer, not a line saying it is missing
-		p.NoMonitor, p.AddMonitor = "", false
+		p.NoMonitor, p.AddMonitor, p.InstallMonitor = "", false, false
 	}
 	var prev *logs.Phase
 	first := true

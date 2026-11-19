@@ -169,6 +169,7 @@ export async function launchPack(name) {
     });
     return;
   }
+  if (o.direct) return ui.offerDirect(o, () => launchPack(name));
   say(o.refused ? "fail" : "ok", o.text);
   if (o.refused && o.refused.length > 1) pop.text(T("launch"), o.refused);
   ui.reload();

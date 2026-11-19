@@ -437,5 +437,8 @@
   "%d enabled now": "現在有効：%d件",
   "Adding a pack": "パックを追加中",
   "What comes over from %s": "%s から取り込むもの",
-  "Moving in from %s": "%s から移行中"
+  "Moving in from %s": "%s から移行中",
+  "Steam isn't running or installed.": "Steam が見つかりません。",
+  "This game will start without Steam from now on.": "今後このゲームは Steam を通さずに起動します。",
+  "start the game directly": "ゲームを直接起動"
 }

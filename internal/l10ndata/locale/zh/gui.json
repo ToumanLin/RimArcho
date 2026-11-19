@@ -437,5 +437,8 @@
   "%d enabled now": "当前启用 %d",
   "Adding a pack": "添加整合包",
   "What comes over from %s": "从 %s 导入的内容",
-  "Moving in from %s": "正在从 %s 迁入"
+  "Moving in from %s": "正在从 %s 迁入",
+  "Steam isn't running or installed.": "没找到 Steam。",
+  "This game will start without Steam from now on.": "以后这个游戏不经过 Steam 直接启动。",
+  "start the game directly": "直接启动游戏"
 }

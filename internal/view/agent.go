@@ -42,7 +42,7 @@ func AgentGroup(a *app.App) (SettingGroup, bool) {
 	}
 	empty := ""
 	return SettingGroup{Title: T("Archo Agent"),
-		Note: T("Archo as an AI agent in a console window of its own. It works through archo mcp, asks you before anything that changes your game, and sends your model provider no user name or Steam account."),
+		Note: T("Archo as an AI agent in a console window of its own. It works through RimArcho's MCP tools, asks you before anything that changes your game, and sends your model provider no user name or Steam account."),
 		Items: []SettingItem{
 			{Label: T("Archo Agent"), Value: status, Actions: actions},
 			{Label: T("model API"), Value: s.API, Edit: "choice", Choices: cmds.SettingChoices("agent.api"), Argv: []string{"config", "set", "agent.api", "{}"},

@@ -514,7 +514,7 @@ function drawMid(keep) {
   add(T("rename"), "rename", () => startRename(), "F2", locked || noFile);
   add(T("copy"), "copy", () => copySave(), "", noFile);
   add(T("back up"), "backup", () => askFiles("backup"), "", noFile);
-  if (d.newList) add(T("make a list"), "new-list", () => newList(d, false), "", "", "new-plan").title = d.newList.command;
+  if (d.newList) add(T("make a list"), "new-list", () => newList(d, false), "", "", "new-plan");
   if (!noFile) chooseButton(d, false, add);
   const rec = add(T("recycle…"), "recycle", () => askFiles("recycle"), "", locked || noFile);
   rec.classList.add("danger");
@@ -675,7 +675,7 @@ function fixButton(d, f, primary) {
     recycle: "recycle", "new-list": "new-plan", "new-list-analyse": "new-plan" }[f.action] || "";
   const b = button(f.label, "", () => runFix(d, f), primary ? "primary small" : "small sv-fix", env);
   b.dataset.key = "fix-" + f.action + "-" + (f.target || "");
-  b.title = f.action === "switch" ? T("make this game and list current, then open the Launch page") : f.command;
+  if (f.action === "switch") b.title = T("make this game and list current, then open the Launch page");
   if (f.action === "recycle" && d.locked) { b.disabled = true; b.title = d.locked; }
   return b;
 }

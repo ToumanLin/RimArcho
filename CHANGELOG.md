@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- The window no longer tells you to type a command. When Steam is not there to start the game, the launch says "Steam isn't running or installed." in your language and offers **start the game directly** (this game then always starts without Steam). The game log's note about the missing in-game helper (Archo Monitor) has an **install it** button. Switching games with none added opens Add Game Config. Saves' and Can it run's buttons no longer show the equivalent command on hover. CLI and TUI output is unchanged.
 - After the first-run guide (or any Game Config switch) finishes, the status line no longer keeps saying "switching to 1.6…" for minutes; the switch's line goes when the switch ends.
 - Play review: marking a Mod functional moves the pick to the tile that took its place, so the details, the mark on the map and "mark as functional" all name the same Mod. Before, the details fell back to another Mod (often a DLC) with no tile marked.
 - Mod settings, list import and pack refresh say "1 file", not "1 files".

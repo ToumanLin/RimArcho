@@ -53,6 +53,9 @@ type Outcome struct {
 	Text    string   `json:"text"`
 	Undo    bool     `json:"undo,omitempty"`    // u takes it back (sort)
 	Refused []string `json:"refused,omitempty"` // refused: why, then the commands that resolve it
+	// Direct: refused because Steam is not there to start the game; the GUI offers to start
+	// it directly instead (16 §2.3), the TUI shows the command in Refused.
+	Direct bool `json:"direct,omitempty"`
 	// Moves: refused because Mods/ holds another version that can move into the lock
 	// library (09 §3): what moving them does, for the one confirmation; RunMoving goes on.
 	Moves []string `json:"moves,omitempty"`
@@ -110,6 +113,10 @@ func refused(a *app.App, o *Outcome, err error) *Outcome {
 	}
 	o.Refused = RefusalLines(Humanize(st, err.Error()))
 	o.Text = o.Refused[0]
+	if errors.Is(err, app.ErrSteamNotFound) {
+		o.Text, o.Direct = T("Steam isn't running or installed."), true
+		o.Refused[0] = o.Text
+	}
 	return o
 }
 

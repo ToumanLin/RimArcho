@@ -622,7 +622,6 @@ function lastSaveCard(v) {
   const acts = el("div", "need-save-acts");
   if (v.ref) {
     const b = button(T("open in saves"), "", () => ui.go("save:" + v.ref), "small need-save-open");
-    b.title = v.command ? "archo " + v.command : "";
     acts.append(b);
   }
   if (v.chosen) {
@@ -1326,7 +1325,8 @@ function filePicker(files) {
 
 const isArcho = (mon) => !!mon && /^ArchoMonitor/i.test(mon.label || "");
 
-// noMonitor: one line when the current plan has no Archo Monitor, with the default edit.
+// noMonitor: one line when the current plan has no Archo Monitor, with the default edit, or
+// when it is not installed, with the install (16 §2.9).
 function noMonitor(p) {
   const n = el("div", "lognote");
   n.append(el("span", "", p.noMonitor));
@@ -1335,6 +1335,12 @@ function noMonitor(p) {
     await ui.reload();
     gameLog(L.path);
   }, "small", "add-monitor"));
+  if (p.installMonitor) n.append(button(T("install it"), "", async () => {
+    say("busy", T("installing Archo Monitor…"));
+    try { say("ok", await api.InstallMonitor()); } catch (e) { say("fail", errText(e)); }
+    await ui.reload();
+    gameLog(L.path);
+  }, "small", "install-monitor"));
   return n;
 }
 
