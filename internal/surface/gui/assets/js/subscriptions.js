@@ -118,7 +118,7 @@ function draw() {
   V.items = buildItems();
   if (!selected()) V.sel = V.items.find((it) => it.t !== "day")?.key || V.items[0]?.key || "";
   sc.innerHTML = "";
-  const w = page("changes fill subs-page", T("First what waits for you to update, then what Steam already updated."),
+  const w = page("changes fill subs-page", "",
     act(T("check for updates"), "rescan", checkAll, "K"),
     act(T("add a subscription"), "plus", () => ui.go("subscribe"), "+"));
   const grid = el("div", "subs");
@@ -638,7 +638,7 @@ export async function openAdd() {
   if (!read.current()) return;
   const sc = $("#screen");
   sc.innerHTML = "";
-  const w = page("subscribe-page", T("Paste an address: RimArcho recognises what it is, where to download it and how to check it for updates."));
+  const w = page("subscribe-page", "");
   const form = addForm({ data, back: () => ui.go("changes"), done: () => {} });
   w.append(form.el);
   sc.append(w);

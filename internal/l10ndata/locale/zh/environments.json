@@ -91,7 +91,6 @@
   "Game Config %s is running": "游戏配置 %s 正在运行",
   "installation %s running, Game Config unknown": "游戏目录 %s 正在运行，游戏配置未知",
   "added Game Config %s": "已添加游戏配置 %s",
-  "choose the game, then how this Game Config starts: its settings, Mod list and saves folder": "选择游戏，再选这个游戏配置怎么开始：设置、Mod 列表和存档目录",
   "copies game settings and Mod settings; no Mod files or saves are copied": "复制游戏设置和 Mod 设置；不复制 Mod 文件和存档",
   "copy the settings of %s": "复制 %s 的设置",
   "enter a Game Config name": "请输入游戏配置名称",

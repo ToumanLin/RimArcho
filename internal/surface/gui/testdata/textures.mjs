@@ -52,7 +52,7 @@ test("opening reads no texture; changing a choice does not count again", async (
   const h = await setup();
   h.tex.open(); await flush();
   assert.equal(h.requests.length, 0, "the page opens without reading textures");
-  assert.ok(h.screen.textContent.includes("not counted yet"));
+  assert.ok(h.screen.textContent.includes("Count first"));
   h.click("count the textures");
   assert.equal(h.screen.querySelector('[data-f="scale"]').disabled, true, "choices wait while counting");
   h.requests[0].resolve(result(1, false, "first estimate")); await flush();

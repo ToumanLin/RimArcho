@@ -15,7 +15,6 @@
   "A mod its author publishes on GitHub, or the version in development. Updates download only what changed.": "作者在 GitHub 上发布的 Mod，或者想用开发中的版本。以后更新只下载改动",
   "A mod published only on LoversLab. Paste its file page and choose a file; RimArcho tells you when a new version is out.": "只在 LoversLab 发布的 Mod。粘贴文件页，选文件下载；有新版时提醒你",
   "Check the LoversLab login %s.": "%s检查 LoversLab 登录状态。",
-  "Checks RimArcho, mods, external tools and community data while RimArcho is open.": "RimArcho 打开时，检查 RimArcho、Mod、外部工具和社区数据的更新。",
   "Choose a file. Site agreements are shown before downloading.": "选一个文件。站点的下载协议会在下载前显示",
   "Do you want to credit the modders by subscribing from Steam?": "要在 Steam 上订阅，给作者带来订阅数吗？",
   "First what waits for you to update, then what Steam already updated.": "先是等你更新的，再是 Steam 已经更新的",

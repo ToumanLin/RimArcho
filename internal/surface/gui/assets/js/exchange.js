@@ -121,9 +121,10 @@ function gameRow() {
   const use = firstRun
     ? button(T("use this list"), "", () => { const after = ui.afterImport; ui.afterImport = null; firstRun = false; return after?.(T("use the game's list as it is")); }, "primary")
     : button(T("read it"), "", () => g && preview("file", g.path));
-  if (g) use.title = g.path;
   use.disabled = !g && !firstRun;
-  const r = row(T("The game's current list"), g ? Tf("its ModsConfig.xml enables %d Mods", g.mods) : T("the game has no ModsConfig.xml yet"), use);
+  // the file's name is not a word to learn: the row says how many Mods, the path is on hover
+  const r = row(T("The game's current list"), g ? Tf("%d mods", g.mods) : T("the game has no ModsConfig.xml yet"), use);
+  if (g) r.title = use.title = g.path;
   if (firstRun) r.classList.add("on");
   return r;
 }
@@ -168,7 +169,8 @@ function listRows() {
   const go = button(T("read"), "", () => ta.value.trim() && preview("text", ta.value));
   go.title = T("links are read from Steam or Rentry when you press read");
   const file = row(T("A Mod list"), T("a new list, or changes to one of yours; previewed first"), pick, fileInput);
-  const text = row(T("Pasted text"), T("a Steam collection or Rentry link, a share code, or a copied list"), wrap, clip, go);
+  const text = row(T("Pasted text"), "", wrap, clip, go);
+  text.title = T("a Steam collection or Rentry link, a share code, or a copied list");
   text.classList.add("xc-textrow");
   return [file, text];
 }
@@ -239,7 +241,9 @@ function managerRows(card) {
     M.extra.push({ manager: kind === "list" ? T("a file") : "", kind, path: f });
     survey();
   });
-  card.append(el("div", "xc-mrows"), row(T("Somewhere else"), T("a data folder or file kept elsewhere; it is only read"), more));
+  const elsewhere = row(T("Somewhere else"), "", more);
+  elsewhere.title = T("a data folder or file kept elsewhere; it is only read");
+  card.append(el("div", "xc-mrows"), elsewhere);
 }
 
 // survey asks what each manager holds (dry runs in their own session); rows fill in.
@@ -687,12 +691,22 @@ async function preview(kind, src, fileName) {
 
   showImportSummary(body, p, !!(p.sourcePath || fileName));
   showImportContents(body, p);
+  // the game's own list, or any list, that the list already is: nothing to import (16 §2.18)
+  const fromGame = kind === "file" && !!info?.game && src === info.game.path;
+  if (p.replace?.same && !p.settings && !p.collection) {
+    body.append(el("div", "sub xc-same", fromGame ? Tf("%s already matches the game.", active.name) : Tf("%s already is this list.", active.name)));
+    body.append(footer("", button(T("close"), "", hideResult)));
+    reveal();
+    return;
+  }
 
   // A destination is selected first; only the final import button changes data (16 §2.17).
   let destination = "new", busy = false;
   const name = el("input", "field xc-name"); name.spellcheck = false;
   name.setAttribute("aria-label", T("new list name"));
-  const base = p.name || (p.source || "").replace(/^.*[\\/]/, "").replace(/\.[^.]*$/, "");
+  // the game's list is named after its Game Config, not after its file (ModsConfig)
+  const gameName = fromGame ? (S.board?.environmentRows || []).find(e => e.current)?.name : "";
+  const base = gameName || p.name || (p.source || "").replace(/^.*[\\/]/, "").replace(/\.[^.]*$/, "");
   const free = await api.CheckPlanName(base, "", 0).catch(() => ({ free: base }));
   if (!current()) return;
   name.value = free.free;

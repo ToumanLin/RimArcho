@@ -11,6 +11,7 @@ import { createTable } from "./datatable.js";
 import { modSettingsColumns, configFileColumns } from "./tabledefs.js";
 import * as pop from "./popups.js";
 import { wireSeparator } from "./separator.js";
+import { infoMark } from "./needtext.js";
 
 // page: the table's read; rows: its rows as sorted; at: the cursor's file (its key), kept
 // across reads and sorts; detail: the values on the right (for detail.key); seq: the newest
@@ -226,6 +227,8 @@ function drawDetail(d, keep = false) {
     }
     body.append(kv);
   }
+  // how the values work: behind an ⓘ after them, not lines read every time (16 §2.9)
+  if (d.about?.length && d.values?.length) { const p = el("p", "ms-note muted"); p.append(infoMark(d.about.join("\n"))); body.append(p); }
   for (const n of d.notes || []) body.append(el("p", "ms-note muted", n));
   detailCard.append(head, body);
   body.scrollTop = top;

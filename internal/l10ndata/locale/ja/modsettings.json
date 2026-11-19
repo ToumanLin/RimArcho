@@ -116,7 +116,7 @@
   "A pack (with Mod files)": "MODパック（MODファイル入り）",
   "include Mod settings": "MOD設定を含める",
   "settings of %d mods": "%d 個のMODの設定",
-  "by package and settings class; the receiver chooses whether to apply them": "packageId と設定クラスごとに保存。適用するかは受け取った側が決めます",
+  "they choose whether to apply them": "適用するかは相手が決めます",
   "its Mods are replaced; its saves and settings stay": "MODは置き換え、セーブと設定は残ります",
   "this list's Mod settings, written into the pack's own settings on its first launch": "このリストのMOD設定。初回起動時にMODパック自身の設定へ書き込みます",
   "make revision %d of this pack": "このMODパックの第 %d 版を作る",

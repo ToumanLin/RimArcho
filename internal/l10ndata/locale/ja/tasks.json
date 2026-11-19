@@ -48,7 +48,7 @@
   "went on in the background": "バックグラウンドで続行しました",
   "take off the record": "履歴から除外",
   "take off the record, put it back": "履歴から除外／元に戻す",
-  "take the done ones off the record": "完了したタスクを履歴から消去",
+  "clear finished": "完了分を消去",
   "the items' headers: sort and columns, the sorted column's width": "項目の見出し：並び替え・列・並び替えた列の幅",
   "the task's items": "タスクの項目",
   "this task has no result per item": "このタスクには項目ごとの結果がありません",
@@ -61,5 +61,7 @@
   "working on it": "処理中",
   "yesterday": "昨日",
   "copy the game": "ゲームをコピー",
-  "the copy was stopped": "コピーを停止しました"
+  "the copy was stopped": "コピーを停止しました",
+  "The download didn't finish.": "ダウンロードが完了しませんでした。",
+  "see why": "理由を見る"
 }

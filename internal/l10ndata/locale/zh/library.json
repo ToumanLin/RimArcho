@@ -68,7 +68,6 @@
   "available keys": "可用条件",
   "available values": "可用值",
   "back one level: the details, the selection, the search and filters": "退回一级：详情、选择、搜索和筛选",
-  "by RimArcho, click to edit": "RimArcho 写的，点击修改",
   "cannot be loaded": "加载不了",
   "case sensitive": "区分大小写",
   "change…": "更改…",
@@ -182,7 +181,7 @@
   "not a regular expression": "不是有效的正则表达式",
   "not counted for this choice": "这个选项还没统计",
   "not counted yet: only new or changed PNGs are converted, those already done are skipped": "还没统计：只转换新增或变了的 PNG，已经转好的会跳过",
-  "not counted yet: “count the textures” reads every PNG to show what is there and what converting saves": "还没统计：点「扫描统计」读一遍 PNG，看现在有多少、转换能省多少",
+  "Count first to see what converting saves.": "先统计，看转换能省多少。",
   "note on %s": "%s 的备注",
   "note on %s (%s): ": "%s（%s）的备注：",
   "note on which copy of %s": "给 %s 的哪一份写备注",
@@ -399,5 +398,6 @@
   "converted the textures of %s again": "已重新转换 %s 的贴图",
   "press C again to delete the DDS RimArcho wrote": "再按一次 C：删除 RimArcho 写的 DDS",
   "removed the converted textures of %s": "已清除 %s 的贴图优化",
-  "replace at: %s (%d file, %s)": "覆盖位置：%s（%d 个文件，%s）"
+  "replace at: %s (%d file, %s)": "覆盖位置：%s（%d 个文件，%s）",
+  "by RimArcho, click to edit": "RimArcho 写的，点击修改"
 }

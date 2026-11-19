@@ -92,7 +92,7 @@ export async function list() {
   card.setAttribute("role", "table");
   L.cur = Math.min(L.cur, Math.max(L.rows.length - 1, 0));
   drawPackRows();
-  if (!L.rows.length) card.append(el("div", "empty-state", T("no packs yet: a pack fixes the current list — every mod as it is now, without the files of other game versions — and plays with its own saves")));
+  if (!L.rows.length) card.append(el("div", "empty-state", T("No packs yet. A pack is a frozen copy of a list, with its own saves.")));
   w.append(card);
   if (L.others) w.append(el("div", "muted note", Tf("%d packs belong to other games; switch the game to see them", L.others)));
   ui.renderHints();

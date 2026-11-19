@@ -19,7 +19,7 @@ import { on } from "./api.js";
 import { wireSeparator } from "./separator.js";
 import { changes, changesKey, initSubscriptions } from "./subscriptions.js";
 import { setNeedRunner } from "./badgepop.js";
-import { initNeedText, needText, needParts, needEvidence } from "./needtext.js";
+import { initNeedText, needText, needParts, evidenceMark } from "./needtext.js";
 import { getChoices } from "./credit.js";
 import { setVersionRunner } from "./versionwarnings.js";
 import { openVersionList } from "./versionpanel.js";
@@ -515,8 +515,9 @@ function needsLead(d) {
   const plan = (S.shell && S.shell.plan && S.shell.plan.name) || T("the list");
   const left = N.cols[0].filter((x) => !x.done && x.counted).length;
   const runs = N.cols[1].filter((x) => !x.done && x.counted).length;
-  if (left) return Tf("%s is not safe to play yet: %d to handle before you start, %d error groups in the last run", plan, left, runs);
-  if (runs) return Tf("%s: %d error groups in the last run", plan, runs);
+  const errs = (n) => n === 1 ? T("1 error last time") : Tf("%d errors last time", n);
+  if (left) return runs ? Tf("%s: %d to fix before you play, %s", plan, left, errs(runs)) : Tf("%s: %d to fix before you play", plan, left);
+  if (runs) return Tf("%s: %s", plan, errs(runs));
   if (d.never) return Tf("%s: the mods' files are not checked yet.", plan);
   if (N.cols[0].some((x) => x.status === -1)) return Tf("%s can run; suggestions below may help if you see errors.", plan);
   return Tf("%s can run: nothing to handle.", plan);
@@ -544,7 +545,8 @@ function drawNeeds() {
   const column = (ci, title, sub) => {
     const c = el("section", "needcol" + (N.col === ci ? " focus" : ""));
     const cap = el("div", "needcap");
-    cap.append(el("b", "", T(title)), el("span", "", T(sub)));
+    cap.append(el("b", "", T(title)));
+    cap.title = T(sub); // where the column's items come from: on hover, not a line (16 §7.3 rule 7)
     const box = el("div", "scroll");
     c.append(cap, box);
     return [c, box];
@@ -811,7 +813,7 @@ function needCard(it, ci, i) {
   if (N.ask && N.ask.id === it.id) { row.append(confirmRow(it, N.ask.act)); askShown = true; }
   else {
     foot.append(btns);
-    if (it.evidence) foot.append(needEvidence(it.evidence));
+    if (it.evidence) foot.append(evidenceMark(it.evidence));
     if (btns.children.length || it.evidence) row.append(foot);
   }
   row.onclick = () => setCur(ci, i);
@@ -1181,10 +1183,10 @@ function drawGameLog() {
   const p = L.page;
   const right = [];
   if (p && p.path && !L.loading) {
-    if (p.selected) right.push(el("span", "muted", T("its errors are in needs attention")));
+    if (p.selected) { /* its errors are on Can it run already: nothing to say */ }
     // the game still writes it: listed as this run, as the last run once the game exits
-    else if (p.live) right.push(el("span", "muted", T("the game is writing it: its errors join needs attention when it exits")));
-    else right.push(button(T("add its errors to needs attention"), "", async () => {
+    else if (p.live) right.push(el("span", "muted", T("the game is writing it: its errors join Can it run when it exits")));
+    else right.push(button(T("add its errors to Can it run"), "", async () => {
       try { say("ok", await api.SelectLog(p.path)); } catch (e) { say("fail", errText(e)); }
       await ui.reload();
       gameLog(p.path);
@@ -1227,7 +1229,9 @@ function drawGameLog() {
       ic.innerHTML = statusIcon(r.status);
       const body = el("div", "body");
       const top = el("div", "top");
-      top.append(el("span", "chip", r.class), el("span", "count", "×" + r.count));
+      const chip = el("span", "chip", r.class);
+      if (r.code) chip.title = r.code;
+      top.append(chip, el("span", "count", "×" + r.count));
       if (r.mods) top.append(el("span", "mods", r.mods));
       const message = logText(r);
       message.id = row.id + "-message";
@@ -1558,8 +1562,15 @@ function patternCard(c) {
   if (c.causes && c.causes.length) row(T("common causes"), c.causes.join(T("; ")));
   if (c.fixes && c.fixes.length) row(T("kinds of fix"), c.fixes.join("  "));
   if (more.childNodes.length) d.append(more);
+  // the numbers behind it, folded under one question (16 §2.10)
   const facts = [c.seen, c.gone].filter(Boolean).join("  ");
-  if (facts) d.append(el("div", "pm word-facts", facts));
+  if (facts) {
+    const f = el("div", "pm word-facts", facts);
+    f.hidden = true;
+    const b = button(T("how sure is this?"), "", () => { f.hidden = !f.hidden; b.setAttribute("aria-expanded", String(!f.hidden)); }, "link");
+    b.setAttribute("aria-expanded", "false");
+    d.append(b, f);
+  }
   d.append(el("div", "pm note", T("from shared logs, not a conclusion about your list")));
   return d;
 }

@@ -254,9 +254,9 @@ func needHint(key string) string {
 	case app.NeedLoses:
 		return T("the save loads without one; its buildings, items, floors, biomes and the like are gone")
 	case app.NeedCare:
-		return T("research, recipes, appearance and the like reset and the colony goes on; or only Mods that are safe to remove need them")
+		return T("The colony survives; some progress resets.")
 	case app.NeedSafe:
-		return T("nothing of theirs is in the save, as far as the save can tell")
+		return T("Not used in this save.")
 	}
 	return T("not installed, not analysed, or what they hold cannot be read from a save: nothing can be said of them")
 }

@@ -334,5 +334,8 @@
   "Steam has them subscribed, but their folders are not complete yet; RimArcho reads them as soon as Steam is done": "Steam 已订阅它们，但文件夹还没下载完；Steam 下载完后 RimArcho 会自动读取。",
   "the change was made to %s, the list the game had; launching this list is not stopped. Switch to %s to use it, or ignore it.": "改动落在游戏当时用的列表 %s 上；不影响启动这个列表。要用这个改动就切换到 %s，或者忽略它。",
   "last updated": "最近更新",
-  "files modified": "文件修改时间"
+  "files modified": "文件修改时间",
+  "%s already matches the game.": "%s 已经和游戏一致。",
+  "%s already is this list.": "%s 已经是这个列表了。",
+  "No packs yet. A pack is a frozen copy of a list, with its own saves.": "还没有整合包。整合包是列表的固定副本，有自己的存档。"
 }

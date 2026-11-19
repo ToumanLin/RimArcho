@@ -48,7 +48,7 @@
   "went on in the background": "在后台继续",
   "take off the record": "从记录里去掉",
   "take off the record, put it back": "从记录里去掉，放回",
-  "take the done ones off the record": "清除已完成",
+  "clear finished": "清除已完成",
   "the items' headers: sort and columns, the sorted column's width": "每一项的表头：排序和列，排序列的宽度",
   "the task's items": "这个任务的每一项",
   "this task has no result per item": "这个任务没有逐项的结果",
@@ -61,5 +61,7 @@
   "working on it": "正在做",
   "yesterday": "昨天",
   "copy the game": "复制游戏",
-  "the copy was stopped": "复制已停止"
+  "the copy was stopped": "复制已停止",
+  "The download didn't finish.": "下载没完成。",
+  "see why": "看原因"
 }

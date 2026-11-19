@@ -154,9 +154,7 @@ function draw() {
   if (S.screen !== "guide") return;
   const sc = $("#screen");
   sc.innerHTML = "";
-  const lead = adding() ? T("choose the game, then how this Game Config starts: its settings, Mod list and saves folder")
-    : G.folder ? T("choose RimArcho's folder, find the game, read the mods once, then pick where your first list comes from")
-    : T("find the game, read the mods once, then pick where your first list comes from");
+  // no lead: the step bar says where the guide goes (16 §2.15)
   const w = page("guide");
   sc.append(w);
   // the steps: where you are, where you can go back to; the managed folder is step -1
@@ -172,9 +170,8 @@ function draw() {
     b.onclick = () => go(i);
     bar.append(b);
   });
-  // the lead and the steps on the left, Archo on the right: one row, as tall as she is
+  // the steps on the left, Archo on the right: one row, as tall as she is
   const top = el("div", "guide-top"), left = el("div", "guide-lead"), head = el("div", "page-head");
-  head.append(el("p", "lead word-facts", lead));
   if (previewing()) head.append(el("p", "guide-preview-note muted", T("a preview of the first run: nothing you choose here is saved")));
   left.append(head, bar);
   top.append(left);
@@ -229,7 +226,7 @@ function footer(card, ...btns) {
 
 function folderStep(card) {
   const info = G.folder;
-  card.append(el("div", "guide-q", T("Where should RimArcho keep SteamCMD, downloaded Mods and tools?")));
+  card.append(el("div", "guide-q", T("Where should RimArcho keep its downloads?")));
   const choose = () => chooseLocalPath(info.path, async (path) => {
     G.folderBusy = true; draw();
     try { G.folder = { ...(await api.FolderSpace(path)), path }; G.error = ""; }
@@ -381,9 +378,9 @@ function configChoices(card) {
   // copying needs the copied config's game folder (env add --like refuses another one)
   const copy = canCopy(g);
   if (A.from && copy) {
-    row(T("start with"), seg([Tf("copy the settings of %s", A.from), T("game defaults")], A.copy ? 0 : 1, (k) => { A.copy = k === 0; draw(); }));
-    box.append(el("div", "dl-note muted", A.copy ? T("copies game settings and Mod settings; no Mod files or saves are copied")
-      : T("game defaults; no settings or saves are copied")));
+    // what the choice copies: on hover of the row, not a line under it (16 §2.15)
+    row(T("start with"), seg([Tf("copy the settings of %s", A.from), T("game defaults")], A.copy ? 0 : 1, (k) => { A.copy = k === 0; draw(); }))
+      .title = A.copy ? T("copies game settings and Mod settings; no Mod files or saves are copied") : T("game defaults; no settings or saves are copied");
   } else if (A.from && g) {
     row(T("start with"), el("span", "", T("game defaults")));
     box.append(el("div", "dl-note muted", Tf("%s uses another game folder, so its settings cannot be copied; no settings or saves are copied", A.from)));
@@ -670,7 +667,8 @@ export function guideEvent(ev) {
 }
 
 function step2(card) {
-  card.append(el("div", "guide-q", T("RimArcho reads every mod folder once; later scans only read what changed")));
+  card.append(el("div", "guide-q", T("Reading your Mods…")));
+  card.lastChild.title = T("RimArcho reads every mod folder once; later scans only read what changed");
   const s = G.scan || { rows: [], done: true };
   const list = el("div", "scanlist");
   for (const r of s.rows) {

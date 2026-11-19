@@ -96,7 +96,12 @@ export async function refreshFoot() {
 // event: the record changed; a lane task that ended says so on the status line.
 export async function event(ev) {
   if (ev && ev.ended) {
-    say(ev.ended.ok ? "ok" : "fail", ev.ended.text + (ev.ended.ok || S.screen === "tasks" ? "" : ", ctrl+j"));
+    // a task that failed elsewhere says so in a few words, with a link to why (16 §2.16);
+    // the whole result is the status line's hover
+    if (!ev.ended.ok && S.screen !== "tasks") {
+      say("fail", ev.ended.kind === "subscribe" ? T("The download didn't finish.") : ev.ended.text, { label: T("see why"), run: toggle });
+      $("#status").title = ev.ended.text;
+    } else say(ev.ended.ok ? "ok" : "fail", ev.ended.text);
     document.dispatchEvent(new CustomEvent("task-ended", { detail: ev.ended }));
   }
   if (S.screen === "tasks") return load();
@@ -213,7 +218,7 @@ function build() {
   const sc = $("#screen");
   sc.innerHTML = "";
   const w = page("fill tasks", "",
-    pageAct(T("take the done ones off the record"), "ok", () => run("clear", []), "C"));
+    pageAct(T("clear finished"), "ok", () => run("clear", []), "C"));
   const root = el("div", "tk");
   const side = el("div", "fcol tk-side");
   const list = el("section", "area tk-list");
@@ -448,7 +453,8 @@ function drawSum() {
   box.append(acts);
   const facts = el("div", "facts");
   const fact = (k, v) => { if (!v) return; const s = el("span", "", k); s.append(el("b", " word-facts", v)); facts.append(s); };
-  fact(T("queue"), r.laneText + "  " + r.laneNote);
+  fact(T("queue"), r.laneText);
+  if (r.laneNote && facts.lastChild) facts.lastChild.title = r.laneNote; // how the queue works: on hover
   fact(T("started"), r.time);
   fact(T("took"), r.dur);
   box.append(facts);

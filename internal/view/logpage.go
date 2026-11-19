@@ -28,7 +28,8 @@ type LogFile struct {
 type LogRow struct {
 	PhaseStart string `json:"phaseStart,omitempty"` // quiet boundary above this row
 	ID         string `json:"id"`                   // E3
-	Class      string `json:"class"`
+	Class      string `json:"class"`                // the kind in plain words (logClassTitle)
+	Code       string `json:"code"`                 // the class as the log parser names it (06 §2), on hover
 	Count      int    `json:"count"`
 	Text       string `json:"text"` // the first line, rich-text tags removed
 	// Spans is Text with the mods' rich text; Level the line's colour (logtext.go).
@@ -159,7 +160,7 @@ func BuildLogPage(a *app.App, st *app.LoadoutState, path string, live *LiveTrack
 	var prev *logs.Phase
 	first := true
 	for _, lc := range r.Clusters {
-		row := LogRow{ID: lc.ID, Class: T(lc.Class), Count: lc.Count, Spans: LogSpans(lc.First.Message, 240), Cluster: lc.ID, Line: lineKey(lc.First.Message), Info: logs.Informational(lc.Class)}
+		row := LogRow{ID: lc.ID, Class: logClassTitle(lc.Class), Code: lc.Class, Count: lc.Count, Spans: LogSpans(lc.First.Message, 240), Cluster: lc.ID, Line: lineKey(lc.First.Message), Info: logs.Informational(lc.Class)}
 		if r.HasPhases && (first || !samePhase(prev, lc.Phase)) {
 			row.PhaseStart = phaseLabel(lc.Phase, a.Loc)
 		}
@@ -211,4 +212,28 @@ func BuildLogPage(a *app.App, st *app.LoadoutState, path string, live *LiveTrack
 		})
 	}
 	return p, nil
+}
+
+// logClassTitles name a cluster's class in a player's words (16 §2.9); the parser's code
+// (harmony-stack, xref-missing…) stays in LogRow.Code and in CLI and MCP output.
+var logClassTitles = map[string]string{
+	logs.ClassHarmony:     "error in the game's code",
+	logs.ClassXrefMissing: "a missing item",
+	logs.ClassPatchFailed: "a patch that failed",
+	logs.ClassException:   "an exception",
+	logs.ClassXMLLoad:     "content that did not load",
+	logs.ClassTexture:     "a missing texture or sound",
+	logs.ClassMaterial:    "a material error",
+	logs.ClassSave:        "a save data error",
+	logs.ClassGameError:   "a game error naming Mod code",
+	logs.ClassModReport:   "a Mod's own report",
+	logs.ClassOther:       "other",
+	logs.ClassNoise:       "a known harmless line",
+}
+
+func logClassTitle(class string) string {
+	if t, ok := logClassTitles[class]; ok {
+		return T(t)
+	}
+	return T(class)
 }

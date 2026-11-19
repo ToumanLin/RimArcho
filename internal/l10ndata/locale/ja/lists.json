@@ -334,5 +334,8 @@
   "Steam has them subscribed, but their folders are not complete yet; RimArcho reads them as soon as Steam is done": "Steam でサブスクライブ済みですが、フォルダーがまだ揃っていません。Steam の処理が終わると RimArcho が自動で読み込みます。",
   "the change was made to %s, the list the game had; launching this list is not stopped. Switch to %s to use it, or ignore it.": "変更はゲームが使っていたリスト %s に入りました。このリストの起動は止まりません。使うには %s に切り替え、不要なら無視してください。",
   "last updated": "最終更新",
-  "files modified": "ファイル更新日時"
+  "files modified": "ファイル更新日時",
+  "%s already matches the game.": "%s はすでにゲームと同じです。",
+  "%s already is this list.": "%s はすでにこのリストと同じです。",
+  "No packs yet. A pack is a frozen copy of a list, with its own saves.": "MODパックはまだありません。MODパックはリストの固定コピーで、専用のセーブを持ちます。"
 }

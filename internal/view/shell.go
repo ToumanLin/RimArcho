@@ -432,6 +432,9 @@ func planState(k int, checked, stale bool) (string, string) {
 	case !checked:
 		return T("not checked yet"), ""
 	case k > 0:
+		if k == 1 {
+			return T("1 problem breaks the game"), LevelBad
+		}
 		return Tf("%d problems break the game", k), LevelBad
 	case stale:
 		return T("the files changed since the last check"), ""

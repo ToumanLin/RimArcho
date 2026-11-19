@@ -15,7 +15,6 @@
   "A mod its author publishes on GitHub, or the version in development. Updates download only what changed.": "作者がGitHubで公開するMOD、または開発中のバージョンです。更新時には変更されたファイルだけをダウンロードします。",
   "A mod published only on LoversLab. Paste its file page and choose a file; RimArcho tells you when a new version is out.": "LoversLabでのみ公開されているMODです。ファイルのページを貼り付けてダウンロードするファイルを選択すると、更新時に通知できます。",
   "Check the LoversLab login %s.": "LoversLabのログイン状態を確認してください：%s",
-  "Checks RimArcho, mods, external tools and community data while RimArcho is open.": "RimArchoを開いている間、RimArcho本体・MOD・外部ツール・コミュニティデータの更新を確認します。",
   "Choose a file. Site agreements are shown before downloading.": "ファイルを選択してください。ダウンロード前にサイトの利用規約を表示します。",
   "Do you want to credit the modders by subscribing from Steam?": "Steamでサブスクライブし、MOD作者を支援しますか？",
   "First what waits for you to update, then what Steam already updated.": "手動更新待ちの項目を先に、Steamで更新済みの項目を後に表示します。",

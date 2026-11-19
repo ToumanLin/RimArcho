@@ -56,7 +56,7 @@ func HeaderFacts(mod *store.Mod, pos int, staged bool) []string {
 	}
 	switch {
 	case pos > 0:
-		facts = append(facts, Tf("number %d", pos))
+		// enabled: the list shows where (16 §2.5); the number was a word to decode
 	case staged:
 		facts = append(facts, T("staged"))
 	default:
