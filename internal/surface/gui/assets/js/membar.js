@@ -102,3 +102,49 @@ function seg(kind, v, scale) {
   i.style.width = (v / scale) * 100 + "%";
   return i;
 }
+
+// ---- V3, V4: counts as bars ----
+
+// countBar draws a view.CountBar: a fill scaled to max (the largest of its list) on a track,
+// its kinds as shades of one colour, largest first, and the total printed after it. The
+// kinds' names and numbers are in the sentence it is named by.
+export function countBar(c, max, cls = "") {
+  const row = el("div", "cbar-row" + (cls ? " " + cls : ""));
+  visTip(row, c.text);
+  const track = el("span", "cbar");
+  const fill = el("span", "cbar-fill");
+  fill.style.width = (max > 0 ? Math.max(1, (c.n / max) * 100) : 100) + "%";
+  (c.parts || []).forEach((p, i) => {
+    const k = el("i", "c-k" + Math.min(i, 2));
+    k.style.flexGrow = String(p.n);
+    fill.append(k);
+  });
+  track.append(fill);
+  row.append(track, el("span", "mbar-n num", String(c.n)));
+  return row;
+}
+
+// countMark: a quiet bar beside a printed count, scaled to the largest of its list. The number
+// is printed, so the bar is decoration: hidden from assistive technology and not focusable.
+export function countMark(n, max) {
+  const s = el("span", "cmark");
+  s.setAttribute("aria-hidden", "true");
+  const f = el("i");
+  f.style.width = (max > 0 ? Math.max(2, (n / max) * 100) : 0) + "%";
+  s.append(f);
+  return s;
+}
+
+// stepMeter: value of max as filled steps (V4's likelihood in ten, severity in three); a
+// meter named by the sentence it stands for. The number of filled steps carries the value,
+// so it reads without colour.
+export function stepMeter(value, max, steps, text, cls = "") {
+  const m = el("span", "smeter" + (cls ? " " + cls : ""));
+  visTip(m, text, "meter");
+  m.setAttribute("aria-valuemin", "0");
+  m.setAttribute("aria-valuemax", String(max));
+  m.setAttribute("aria-valuenow", String(value));
+  const on = Math.round((value / max) * steps);
+  for (let i = 0; i < steps; i++) m.append(el("i", i < on ? "on" : ""));
+  return m;
+}

@@ -3058,3 +3058,22 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .confirm-lines .fact { display: grid; grid-template-columns: minmax(80px, max-content) minmax(0, 1fr); gap: 12px; }
 .confirm-lines .fact .k { color: var(--muted); }
 .confirm-lines .fact .v { color: var(--fg); min-width: 0; }
+/* V3, V4 count bars (16 §7 principle 9): a fill scaled to the list's largest, kinds as shades */
+.cbar-row { display: grid; grid-template-columns: minmax(60px, 1fr) auto; align-items: center; column-gap: 10px; margin-top: 4px; font-size: 12px; color: var(--muted); border-radius: var(--r-sm); outline-offset: 3px; }
+.cbar { display: block; height: 8px; border-radius: var(--r-sm); background: var(--pill); overflow: hidden; }
+.cbar-fill { display: flex; gap: 2px; height: 100%; transition: width var(--t-layout) var(--ease); }
+.cbar-fill i { display: block; min-width: 2px; height: 100%; }
+.cbar-fill .c-k0 { background: var(--log); }
+.cbar-fill .c-k1 { background: color-mix(in srgb, var(--log) 60%, var(--card)); }
+.cbar-fill .c-k2 { background: color-mix(in srgb, var(--log) 30%, var(--card)); }
+/* V4: a count's quiet bar beside it, and step meters (likelihood, severity) */
+.cmark { display: inline-block; width: 80px; height: 4px; border-radius: var(--r-sm); background: var(--line-2); overflow: hidden; vertical-align: middle; }
+.cmark i { display: block; height: 100%; background: var(--log); border-radius: var(--r-sm); }
+.smeter { display: inline-flex; gap: 2px; align-items: center; vertical-align: middle; border-radius: var(--r-sm); outline-offset: 2px; }
+.smeter i { display: block; width: 6px; height: 8px; background: var(--line); }
+.smeter i.on { background: var(--accent); }
+.smeter.lvl-high i.on { background: var(--red); }
+.smeter.lvl-medium i.on { background: var(--amber); }
+.smeter.lvl-low i.on { background: var(--muted); }
+.pcard .pnext .pmeter { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; white-space: nowrap; vertical-align: middle; } .pcard .pnext .pct { color: var(--muted); font-size: 12px; }
+.lrow .top .cmark { margin-left: 2px; }

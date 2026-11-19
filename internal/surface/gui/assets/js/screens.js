@@ -21,7 +21,7 @@ import { changes, changesKey, initSubscriptions } from "./subscriptions.js";
 import { setNeedRunner } from "./badgepop.js";
 import { initNeedText, needText, needParts, needEvidence } from "./needtext.js";
 import { getChoices } from "./credit.js";
-import { memBars } from "./membar.js";
+import { memBars, countBar, countMark, stepMeter } from "./membar.js";
 import { setVersionRunner } from "./versionwarnings.js";
 import { openVersionList } from "./versionpanel.js";
 
@@ -758,7 +758,9 @@ function needCard(it, ci, i) {
     if (it.why) body.append(needText("div", "why sub", it.why, it.content?.why));
   } else {
     body.append(needText("div", "title word-facts", it.title || it.text, it.title ? it.content?.title : it.content?.text));
-    if (it.why && !it.linkGroups?.length) body.append(needText("div", "why", it.why, it.content?.why));
+    // a last-run group's kinds as one bar, scaled to the column's largest group (V3)
+    if (it.counts?.parts?.length) body.append(countBar(it.counts, Math.max(...N.cols[ci].map((x) => x.counts?.n || 0))));
+    else if (it.why && !it.linkGroups?.length) body.append(needText("div", "why", it.why, it.content?.why));
   }
   top.append(body);
   row.append(top);
@@ -1224,6 +1226,7 @@ function drawGameLog() {
   else {
     if (!(p.rows || []).length) scroll.append(el("div", "empty-state", "✓ " + T("no errors in this log")));
     const rows = p.rows || [];
+    const most = rows.reduce((m, r) => Math.max(m, r.count || 0), 0); // the ×count bars' scale (V4)
     L.cur = Math.min(L.cur, Math.max(0, rows.length - 1));
     L.list = virtualRows(scroll, rows.length, (i) => {
       const r = rows[i];
@@ -1236,6 +1239,7 @@ function drawGameLog() {
       const top = el("div", "top");
       top.append(el("span", "chip", r.class), el("span", "count", "×" + r.count));
       if (r.mods) top.append(el("span", "mods", r.mods));
+      top.querySelector(".count")?.after(countMark(r.count, most));
       const message = logText(r);
       message.id = row.id + "-message";
       row.setAttribute("aria-labelledby", message.id);
@@ -1547,11 +1551,21 @@ function patternCard(c) {
   // (shared logs, not a verdict on this list) closes the card
   if (c.levelText) {
     const h = el("div", "psev");
-    h.append(el("span", "sev " + c.level, c.levelText), el("span", "impact", c.impact));
+    // how much it matters as three steps, named by its word (V4)
+    h.append(stepMeter({ low: 1, medium: 2, high: 3 }[c.level] || 0, 3, 3, c.levelText, "lvl-" + c.level), el("span", "impact", c.impact));
     d.append(h);
   }
   if (c.summary) d.append(el("div", "ps", c.summary));
-  if (c.next) d.append(el("div", "pnext", c.next));
+  if (c.next) {
+    const nx = el("div", "pnext", c.next);
+    // how often the first step helped, in ten steps and a percentage, named by the sentence (V4)
+    if (c.gonePct && c.gone) {
+      const m = el("span", "pmeter");
+      m.append(stepMeter(c.gonePct, 100, 10, c.gone), el("span", "num pct", c.gonePct + "%"));
+      nx.append(" ", m);
+    }
+    d.append(nx);
+  }
   if (c.known) d.append(el("div", "ps known", c.known));
   const more = el("div", "pmore");
   const row = (k, v) => { if (!v) return; const r = el("div", "pr"); r.append(el("span", "k", k), el("span", "v word-facts", v)); more.append(r); };
