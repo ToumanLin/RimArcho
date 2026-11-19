@@ -236,7 +236,7 @@ Open **lists** (`shift+4`). The editor has three areas plus details:
 | Tags / note | `g` / `n` | |
 | Sort | `S` | **sort** |
 | Save to the game | `w` | **save changes** |
-| Make current and go to **start**, ready to launch (`L` again launches) | `L` | **launch** |
+| Make current and launch the game from here, with the same checks as **start** | `L` | **launch** |
 | Undo / redo | `u` or `ctrl+z` / `ctrl+y` or `ctrl+r` | **undo** |
 | History | `H` | |
 | Add a load-order rule | `r` | |
@@ -902,7 +902,7 @@ It never unsubscribes Workshop items or removes your ordinary Mods and saves. If
 
 ## 23. Recipes
 
-**Set up a new list from scratch.** **all lists** → **new / import** → **an empty list** → **create and edit**. Search, `space` to enable, `S` to sort, `F` on **can it run** to fill in dependencies, then `L` in the editor and `L` again on **start**.
+**Set up a new list from scratch.** **all lists** → **new / import** → **an empty list** → **create and edit**. Search, `space` to enable, `S` to sort, `F` on **can it run** to fill in dependencies, then `L` in the editor starts the game.
 
 **A Mod update broke my game.** **updates** → find the Mod (**Affects launch**) → open its changes. To keep playing, **lock this version** of a copy that still works (or switch to an older copy with `x`), or disable it and stage its dependants with `t`. Check **can it run** and launch.
 

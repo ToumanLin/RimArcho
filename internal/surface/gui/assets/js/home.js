@@ -236,7 +236,7 @@ async function save() {
   if (S.screen === "home") home({ keep: true });
 }
 
-// focusLaunch is the editor's launch game (16 §2.5): the current plan becomes the applied row
+// focusLaunch is the Saves page's go to launch (16 §2.11): the current plan becomes the applied row
 // (it usually is; a pack applied here gives way) and the focus goes to ▶ launch game, so L or
 // enter starts the game.
 export async function focusLaunch() {

@@ -198,6 +198,37 @@ func TestRunAtOnce(t *testing.T) {
 	}
 }
 
+// 16 §2.5: the editor launches the current plan directly; a pack applied on Launch gives way,
+// so Launch's headline names the plan that runs. A launch that only asks keeps it.
+func TestLaunchForgetsAppliedPack(t *testing.T) {
+	t.Parallel()
+	e, api, _ := fixture(t)
+	e.MustRun("env", "set", "main", "--launch", "direct")
+	en, err := e.App.Store.CurrentEnv()
+	if err != nil || en == nil {
+		t.Fatal(en, err)
+	}
+	pack := view.FeaturedValue(en.Name, "Some pack", e.App.Store.CurrentPlanID(en.ID))
+	if err := e.App.Store.SetMeta(view.FeaturedKey, pack); err != nil {
+		t.Fatal(err)
+	}
+	// Alpha's Harmony is not enabled: launch asks first, starts nothing, keeps the pack.
+	o, err := api.Run(view.ListLaunch)
+	if err != nil || len(o.Confirm) == 0 || len(e.Launched) != 0 || e.App.Store.Meta(view.FeaturedKey) != pack {
+		t.Fatalf("launch with a missing requirement: %+v %v", o, err)
+	}
+	o, err = api.RunAnyway(view.ListLaunch)
+	if err != nil || len(o.Refused) > 0 || len(o.Confirm) > 0 {
+		t.Fatalf("launch anyway: %+v %v", o, err)
+	}
+	if len(e.Launched) != 1 {
+		t.Fatalf("launched %v", e.Launched)
+	}
+	if got := e.App.Store.Meta(view.FeaturedKey); got != "" {
+		t.Fatalf("the applied pack survived a plan launch: %q", got)
+	}
+}
+
 func previewAndInspect(t *testing.T, _ *testkit.Env, api *API) {
 	p, err := api.Preview(view.ListSort)
 	if err != nil || len(p.Lines) == 0 {

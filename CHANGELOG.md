@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- List editor: launch (the button at the top right, `L` and the command panel's launch) now starts the game directly instead of opening the Launch page, so testing a list again and again no longer means going back each time (GitHub issue #6). It runs the same checks as the Launch page: the open list becomes current, unsaved changes are saved, a serious RAM shortfall and missing required Mods ask once, and a running game or an outside change not yet loaded is refused with the reason. The TUI editor's `L` still opens its Launch page.
 - Answering "same" to an identity question now carries the new Mod's notes, tags, user rules and ignored findings over to the Mod it was, and removes the left-over empty record. Before, they stayed on a record nothing pointed to any more.
 - TUI: drawing the screen no longer reads the database; Can it run's count is brought up to date after each key or result instead.
 - Window: the top bar no longer shows the Game Config chip (`name 1.6`) beside the breadcrumb; the sidebar and the Launch page's 01 column already name and switch it.

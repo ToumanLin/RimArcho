@@ -1021,10 +1021,25 @@ func (s *API) run(what string, ask bool) (*view.Outcome, error) {
 	default:
 		return nil, fmt.Errorf("no action %s", what)
 	}
+	var o *view.Outcome
 	if ask {
-		return view.RunAsking(s.a, what), nil
+		o = view.RunAsking(s.a, what)
+	} else {
+		o = view.Run(s.a, what)
 	}
-	return view.Run(s.a, what), nil
+	s.launchedPlan(o)
+	return o, nil
+}
+
+// launchedPlan forgets a pack applied on Launch once the current plan launched (from the
+// editor, 16 §2.5, or the command panel): Launch's headline then names the plan that runs.
+func (s *API) launchedPlan(o *view.Outcome) {
+	if o == nil || o.What != view.ListLaunch || len(o.Refused) > 0 || len(o.Confirm) > 0 || len(o.Moves) > 0 {
+		return
+	}
+	if s.a.Store.Meta(view.FeaturedKey) != "" {
+		_ = s.a.Store.SetMeta(view.FeaturedKey, "")
+	}
 }
 
 // RunMoving is Run after the player agreed to move the folders in the way into the lock
@@ -1038,7 +1053,9 @@ func (s *API) RunMoving(what string) (*view.Outcome, error) {
 	default:
 		return nil, fmt.Errorf("no action %s", what)
 	}
-	return view.RunMoving(s.a, what), nil
+	o := view.RunMoving(s.a, what)
+	s.launchedPlan(o)
+	return o, nil
 }
 
 // ---- tags (16 §3.8) ----
