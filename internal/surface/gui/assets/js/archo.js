@@ -5,11 +5,13 @@
 //   w.end();                            // the read finished or failed: the figure fades out
 //   const f = archoFigure(slot, "wink"); f.set("think"); f.end();   // shown at once (the guide)
 //
-// Cost (16 §10): nothing is loaded at start. A still (<img>, ~20 KB WebP, 360 px) shows
-// first; with ui.archo.motion "live" and motion allowed, the expression's loop (an animated
-// WebP, ~230 KB, 18 frames at 8.3 fps) is fetched and decoded beside it and replaces it.
-// The loop's first frame is the still, so the swap does not jump. A figure shown while
-// nothing runs (the guide) plays its loop a few times and rests on the still again.
+// Cost (16 §10): nothing is loaded at start. With ui.archo.motion "live" and motion allowed
+// a figure only ever shows loops (animated WebP, ~450 KB, 36 frames at 66 ms): the next
+// expression's loop is fetched and decoded in an <img> beside the shown one and fades in over
+// it, so no still shows between faces. A figure shown while nothing runs (the guide, page
+// placements) gets a copy of the loop whose file says "play 3 times": the browser stops it
+// on its own last frame, so the rest is the loop's own end, with nothing swapped and no timer.
+// With motion still, or reduced, a still (~20 KB WebP, 360 px) is shown instead.
 // Removing the <img> frees its frames.
 import { api } from "./state.js";
 
@@ -17,12 +19,34 @@ import { api } from "./state.js";
 export const POOL = ["neutral", "smug", "laugh", "wink", "think", "ponder", "yum"];
 
 const PACK = "/archo/archo-s/";
-const DELAY = 210, ROTATE = 4000, TIP_ROTATE = 8000, LOOP = 2160, REST_LOOPS = 3;
+const DELAY = 210, ROTATE = 4000, TIP_ROTATE = 8000, REST_LOOPS = 3, FADE = 200;
 const still = (expr) => `${PACK}stills/${expr}@360.webp`;
 const loopOf = (expr) => `${PACK}anim/${expr}.webp`;
 const reduced = () => !!globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches || globalThis.document?.documentElement?.dataset?.motion === "reduced";
 const image = () => { const i = document.createElement("img"); i.alt = ""; i.decoding = "async"; i.draggable = false; return i; };
 const decoded = (i) => i.decode?.().catch(() => {}) || Promise.resolve();
+
+// loopCopy is a fresh object URL of expression e's loop that plays `plays` times (0: for
+// ever) and then stays on its last frame. A copy is its own image, so it starts at frame 0
+// and counts its own plays even when the same face comes back; whoever shows it revokes it.
+async function loopCopy(e, plays) {
+  const r = await fetch(loopOf(e));
+  if (!r.ok) throw Error(`${loopOf(e)}: ${r.status}`);
+  const b = new Uint8Array(await r.arrayBuffer());
+  if (plays) setPlays(b, plays);
+  return URL.createObjectURL(new Blob([b], { type: "image/webp" }));
+}
+// setPlays writes the loop count of an animated WebP: the ANIM chunk holds the background
+// colour (4 bytes), then the count (2 bytes, little-endian; 0 = for ever).
+export function setPlays(b, n) {
+  const v = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  for (let p = 12; p + 14 <= b.length;) {
+    const size = v.getUint32(p + 4, true);
+    if (String.fromCharCode(b[p], b[p + 1], b[p + 2], b[p + 3]) === "ANIM") { v.setUint16(p + 12, n, true); return true; }
+    p += 8 + size + (size & 1);
+  }
+  return false;
+}
 
 let mode = "live";
 try { mode = localStorage.getItem("ui.archo.motion") || "live"; } catch { /* Init supplies it. */ }
@@ -47,52 +71,61 @@ export function nextExpr(pool = POOL) {
 }
 
 // ---- a figure in a slot ----------------------------------------------------------------
-// show is shared by waits and figures: delay before anything appears, the still, then the
-// loop when allowed, and rotation over pool every ROTATE ms (rotate: false keeps one face).
-// rest: the loop plays REST_LOOPS times and the still comes back (nothing moves at rest,
-// 16 §10); a new expression plays again.
+// show is shared by waits and figures: delay before anything appears, then the expression's
+// loop when motion is allowed (its still otherwise), and rotation over pool every ROTATE ms
+// (rotate: false keeps one face). rest: each new expression's loop plays REST_LOOPS times
+// and stops on its last frame (nothing moves at rest, 16 §10); a new expression plays again.
+// img: an image already in the slot (the start-up screen's), kept when it shows expr.
 function show(slot, { delay = 0, expr, pool = POOL, rotate = true, rest = false, img: given } = {}) {
   const h = { ended: false, expr: expr || nextExpr(pool), slot };
   if (mode === "off") return { ...h, end() {}, set() {} };
   slot.classList.add("archo-slot");
   slot.setAttribute("aria-hidden", "true");
-  const img = given || image();
   const timers = [];
-  let restTimer = 0, shown = false;
+  let cur = given || null, url = "", shown = false;
   const later = (ms, f) => timers.push(setTimeout(() => { if (!h.ended) f(); }, ms));
+  const reveal = () => decoded(cur).then(() => { if (!h.ended) slot.classList.add("on"); });
 
-  // put shows expression e: its still (at once on first), then its loop once decoded
-  const put = (e, first) => {
-    const s = still(e), mine = () => !h.ended && h.expr === e;
-    clearTimeout(restTimer);
-    const pre = image();
-    pre.src = s;
-    if (first) img.src = s;
-    decoded(pre).then(() => {
-      if (!mine()) return;
-      img.src = s;
-      if (!canMove()) return;
-      const anim = image();
-      anim.src = loopOf(e);
-      return decoded(anim).then(() => {
-        if (!mine()) return;
-        img.src = anim.src;
-        if (rest) restTimer = setTimeout(() => { if (mine()) img.src = s; }, LOOP * REST_LOOPS);
-      });
-    });
+  // place makes next the figure's image. Over an image already shown it fades in on top
+  // (opacity only) and the old one is removed after the fade; the old loop's copy is revoked.
+  const place = (next, nextURL) => {
+    const old = cur, oldURL = url;
+    cur = next; url = nextURL;
+    // the fade class goes with the old image, so moving the slot on a redraw does not replay it
+    const drop = () => { old?.remove(); if (oldURL) URL.revokeObjectURL(oldURL); next.classList.remove("archo-in"); };
+    if (old?.isConnected && old.src) {
+      next.classList.add("archo-in");
+      slot.append(next);
+      setTimeout(drop, FADE);
+    } else { drop(); slot.append(next); }
+    if (!slot.classList.contains("on")) reveal();
+  };
+  // put shows expression e once its image is decoded: the loop with motion, else the still
+  const put = (e) => {
+    const mine = () => !h.ended && h.expr === e;
+    const stillOf = () => {
+      const i = image();
+      i.src = still(e);
+      return decoded(i).then(() => { if (mine()) place(i, ""); });
+    };
+    if (!canMove()) return stillOf();
+    loopCopy(e, rest ? REST_LOOPS : 0).then((u) => {
+      const i = image();
+      i.src = u;
+      return decoded(i).then(() => { if (mine()) place(i, u); else URL.revokeObjectURL(u); });
+    }).catch(() => { if (mine()) stillOf(); });
   };
   const appear = () => {
     shown = true;
-    if (!given) slot.append(img);
-    put(h.expr, !given);
-    decoded(img).then(() => { if (!h.ended) slot.classList.add("on"); });
+    const kept = given?.src && given.dataset.expr === h.expr && (given.dataset.live === "1") === canMove();
+    if (kept) reveal(); else put(h.expr);
   };
   if (delay) later(delay, appear); else appear();
 
   h.set = (e) => {
     if (h.ended || !e || e === h.expr) return;
     h.expr = e;
-    if (shown) put(e, false);
+    if (shown) put(e);
   };
   if (rotate && !reduced()) {
     const step = () => later(ROTATE, () => { h.set(nextExpr(pool)); step(); });
@@ -103,9 +136,11 @@ function show(slot, { delay = 0, expr, pool = POOL, rotate = true, rest = false,
     if (h.ended) return;
     h.ended = true;
     timers.forEach(clearTimeout);
-    clearTimeout(restTimer);
     slot.classList.remove("on");
-    const done = () => img.remove(); // frees the loop's frames
+    const done = () => { // frees the loop's frames
+      for (const i of [...slot.children]) if (i.tagName === "IMG") i.remove();
+      if (url) URL.revokeObjectURL(url);
+    };
     if (slot.isConnected && globalThis.getComputedStyle?.(slot).opacity !== "0") setTimeout(done, 150); else done();
   };
   return h;
@@ -116,15 +151,15 @@ function show(slot, { delay = 0, expr, pool = POOL, rotate = true, rest = false,
 export const archoWait = (slot, opts = {}) => show(slot, { delay: DELAY, ...opts });
 
 /** archoFigure shows Archo at once with one expression (the first-run guide); its loop
- *  plays a few times on each new expression, then rests on the still. */
+ *  plays a few times on each new expression, then stops on its last frame. */
 export const archoFigure = (slot, expr) => show(slot, { expr, rotate: false, rest: true });
 
 // ---- placements on pages (16 §7.1 "Placements") ----------------------------------------
 // archoSpot keeps one figure per page across redraws: the page calls peek or stand on every
 // draw with the expression for its state, and whether that state is a calm one. A new
-// expression plays its loop three times and rests on the still (as in the guide). In a calm
-// state, left alone, she moves to the next of the page's calm expressions every 45 s, again
-// three loops then the still; a state expression (an error, a run) is never cycled away.
+// expression plays its loop three times and stops on its last frame (as in the guide). In a
+// calm state, left alone, she moves to the next of the page's calm expressions every 45 s,
+// again three loops; a state expression (an error, a run) is never cycled away.
 // Cycling stops with ui.archo.motion still or off and under reduced motion.
 //
 //   const spot = archoSpot("feedback", { size: 128, calm: ["neutral", "ponder", "wink"] });
@@ -153,7 +188,7 @@ export function archoSpot(name, { size = 140, calm = ["neutral"], cycle = ARCHO_
       const anchor = slot.parentElement, sc = scroller(anchor);
       const pad = parseFloat(anchor.style.paddingTop) || 0;
       const room = card.getBoundingClientRect().top - (sc ? sc.getBoundingClientRect().top - sc.scrollTop : 0) - pad;
-      const need = Math.ceil(size * 33 / 50 - PEEK_OVER + 6);
+      const need = Math.ceil(size * 27 / 40 - PEEK_OVER + 6);
       anchor.style.paddingTop = card.getBoundingClientRect().width >= size * 4 && room < need ? need - room + "px" : "";
       // hang from that element: her bottom PEEK_OVER px below the card's top
       const a = anchor.getBoundingClientRect(), c = card.getBoundingClientRect();
@@ -184,7 +219,7 @@ export function archoSpot(name, { size = 140, calm = ["neutral"], cycle = ARCHO_
     slot.style.bottom = slot.style.right = "";
     put(host, expr, calmState);
   };
-  // show puts expression e on the figure (three loops, then the still)
+  // show puts expression e on the figure (three loops, then her last frame)
   const showExpr = (e) => {
     s.expr = e;
     if (mode === "off" || !slot.parentElement) return; // shown on the next peek or stand
@@ -279,7 +314,8 @@ export function tipLine(line, when = "any", delay = 0) {
 }
 
 // ---- the start-up screen -----------------------------------------------------------------
-// index.html holds #boot with a still chosen by boot.js; it appears after 0.21 s by CSS alone.
+// index.html holds #boot with an image chosen by boot.js (the loop with motion, else the
+// still); it appears after 0.21 s by CSS alone.
 // bootLive turns it into the live figure with a tip; bootDone fades it out once the first
 // page has drawn (or the start failed, or a dialog needs the window).
 let boot = null, bootTimer = 0;
