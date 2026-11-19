@@ -19,7 +19,7 @@ RimArcho sets out to answer three questions:
 Everything works without AI. AI assistants are its second kind of user: the built-in AI workbench
 and outside agents (through MCP) get the same facts and the same actions as you, and follow the same
 rules. Their changes can be undone, and nothing is written to the game until you confirm. (The
-built-in workbench is planned for 1.1; outside agents can connect today, see below.)
+built-in workbench is planned for a later release; outside agents can connect today, see below.)
 
 One program gives you a desktop window (`RimArcho.exe`), a terminal UI, a scriptable CLI and an MCP
 server (`archo.exe`). The window and the terminal UI are two faces of the same Go code: they show the

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/buildinfo"
 	"github.com/ToumanLin/RimArcho/internal/l10ndata"
 	"github.com/ToumanLin/RimArcho/internal/netcfg"
 	"github.com/ToumanLin/RimArcho/internal/render"
@@ -168,18 +169,25 @@ func SettingChoices(key string) []string { return slices.Clone(configKeys[key]) 
 func SettingKeys() []string {
 	keys := make([]string, 0, len(configKeys)+len(freeKeys))
 	for k := range configKeys {
-		keys = append(keys, k)
+		if !featureOff(k) {
+			keys = append(keys, k)
+		}
 	}
 	for k := range freeKeys {
-		keys = append(keys, k)
+		if !featureOff(k) {
+			keys = append(keys, k)
+		}
 	}
 	sort.Strings(keys)
 	return keys
 }
 
+// agentSettingsUsage is config set's usage of the Archo Agent keys, in a build that offers it.
+var agentSettingsUsage = map[bool]string{true: "agent.api: openai-completions|anthropic-messages|openai-responses|google-generative-ai; agent.base_url: the model API's base URL; agent.model: a model ID; agent.thinking: high|medium|low|off; "}[buildinfo.AgentOn()]
+
 func init() {
 	register(&Command{Name: "config get", Args: "[<key>]", Summary: "show settings", MaxArgs: 1, Run: configGetCmd})
-	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (local.dir: unused managed-folder root; updates.source: auto|github; updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris or a #rrggbb colour; ui.icons: compat|nerd; ui.mouse: on|off; ui.tui.theme: auto|dark|light; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; ui.archo.motion: off|still|live; ui.motion: auto|reduced; ui.zoom: 100|110|125|150 (the window's interface size in percent); tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; network.proxy: system|off|a proxy URL; network.github_mirror: empty or a mirror prefix such as https://gh-proxy.org/; agent.api: openai-completions|anthropic-messages|openai-responses|google-generative-ai; agent.base_url: the model API's base URL; agent.model: a model ID; agent.thinking: high|medium|low|off)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
+	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (" + agentSettingsUsage + "local.dir: unused managed-folder root; updates.source: auto|github; updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris or a #rrggbb colour; ui.icons: compat|nerd; ui.mouse: on|off; ui.tui.theme: auto|dark|light; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; ui.archo.motion: off|still|live; ui.motion: auto|reduced; ui.zoom: 100|110|125|150 (the window's interface size in percent); tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; network.proxy: system|off|a proxy URL; network.github_mirror: empty or a mirror prefix such as https://gh-proxy.org/)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
 }
 
 // ConfigValue returns a setting, or its default.
@@ -202,6 +210,9 @@ func configGetCmd(c *Ctx, a *Args) (*render.Doc, error) {
 
 func configSetCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	k, v := a.Pos[0], a.Pos[1]
+	if featureOff(k) {
+		return nil, &UsageError{Msg: fmt.Sprintf("unknown setting %q", k)}
+	}
 	if f, ok := freeKeys[k]; ok {
 		if err := f.check(v); err != nil {
 			return nil, &UsageError{Msg: err.Error()}

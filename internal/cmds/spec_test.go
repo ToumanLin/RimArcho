@@ -151,7 +151,7 @@ func documentedCommands(rows []speccheck.Row, reg []*Command, ex *speccheck.Exce
 
 func TestSpecCommandTable(t *testing.T) {
 	t.Parallel()
-	reg := Commands()
+	reg := allCommands()
 	ex := speccheck.NewExceptions("commandExceptions (internal/cmds/spec_test.go)", commandExceptions)
 	fex := speccheck.NewExceptions("flagExceptions (internal/cmds/spec_test.go)", flagExceptions)
 	rows := commandTableRows(t)
@@ -204,7 +204,7 @@ func commandTableProblems(reg []*Command, docs []docCommand, analysis map[string
 				if globalFlags[f] || slices.ContainsFunc(c.Flags, func(x Flag) bool { return x.Name == f }) || fex.Has(c.Name+" --"+f) {
 					continue
 				}
-				out = append(out, fmt.Sprintf("%s: 13 §4.2: `%s` documents --%s, which `%s` does not take (cmds.Commands())", d.row.Line.Pos(), d.span, f, c.Name))
+				out = append(out, fmt.Sprintf("%s: 13 §4.2: `%s` documents --%s, which `%s` does not take (cmds.allCommands())", d.row.Line.Pos(), d.span, f, c.Name))
 			}
 		}
 	}
@@ -255,7 +255,7 @@ func TestSpecJSONCommands(t *testing.T) {
 		if !strings.Contains(s, "--json") {
 			continue
 		}
-		cs, ok := resolveSpan(s, Commands())
+		cs, ok := resolveSpan(s, allCommands())
 		if !ok || len(cs) == 0 {
 			t.Errorf("%s: 13 §3.1 rule 1: `%s` names no command", rule.Pos(), s)
 		}
@@ -263,7 +263,7 @@ func TestSpecJSONCommands(t *testing.T) {
 			documented[c.Name] = true
 		}
 	}
-	for _, c := range Commands() {
+	for _, c := range allCommands() {
 		has := slices.ContainsFunc(c.Flags, func(f Flag) bool { return f.Name == "json" })
 		if has && !documented[c.Name] {
 			t.Errorf("%s: 13 §3.1 rule 1: `%s --json` prints JSON but the rule does not name it", rule.Pos(), c.Name)

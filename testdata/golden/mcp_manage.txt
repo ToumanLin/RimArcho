@@ -14,8 +14,6 @@ Game Configs: 1
 
 > status {"show":"settings"}
 settings
-  agent.api: openai-completions
-  agent.thinking: high
   data.replacements.url: https://raw.githubusercontent.com/emipa606/UseThisInstead/main/replacements.json.gz
   data.rules.url: https://raw.githubusercontent.com/RimSort/Community-Rules-Database/main/communityRules.json
   data.steamdb.url: https://raw.githubusercontent.com/RimSort/Steam-Workshop-Database/main/steamDB.json

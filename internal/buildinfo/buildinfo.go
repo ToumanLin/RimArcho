@@ -11,7 +11,14 @@ var (
 	// GUI is "1" in RimArcho.exe, the Windows-GUI-subsystem link of the same program
 	// (16 §8.1): with no command it opens the GUI instead of the TUI.
 	GUI = ""
+	// Agent is "1" in a build that offers Archo Agent (15 §7): its settings group, `archo agent`
+	// commands and agent.* settings keys. 1.1 ships without it; the code stays so a later release
+	// can turn it on (-X github.com/ToumanLin/RimArcho/internal/buildinfo.Agent=1).
+	Agent = ""
 )
+
+// AgentOn reports whether this build offers Archo Agent (Agent).
+func AgentOn() bool { return Agent == "1" }
 
 // String is "0.5.0 (abc1234, 2026-10-19)" or, for a plain go build, "dev (<vcs revision>)".
 func String() string {

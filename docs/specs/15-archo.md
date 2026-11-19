@@ -1,6 +1,6 @@
 # 15 · Archo (built-in AI assistant)
 
-> Status: designed for 1.1. Implemented: Archo Agent (§7), a separate download that runs in a console window of its own. Not implemented: the right panel, one-click tasks (§4.2), OCR (§5), per-task consent (§3.2) and confirmation inside RimArcho's tool layer (§2.3). External agents connect to `archo mcp` (14) as before.
+> Status: designed for 1.1. Implemented but **not in 1.1**: Archo Agent (§7), a separate download that runs in a console window of its own; 1.1 is built without it (hidden behind `buildinfo.Agent`, §7.0). Not implemented: the right panel, one-click tasks (§4.2), OCR (§5), per-task consent (§3.2) and confirmation inside RimArcho's tool layer (§2.3). External agents connect to `archo mcp` (14) as before.
 > Basis: 00 (§2, §3.2, §4), 00a, 13, 14, 16.
 
 Archo is RimArcho's built-in AI assistant. Its image is the project icon, `internal/icon/portrait.svg`; at small sizes, the bow on the portrait serves as its mark (16 §7). Wherever the interface refers to the AI assistant, it uses this name and portrait, for example "Ask Archo to analyze this error". External agents (Claude Code, Codex, etc.) that connect through MCP keep their own names.
@@ -146,6 +146,17 @@ OCR therefore reads the titles and showcased content in these images; it does mo
 
 Archo Agent is Archo as a separate program: Node, the Pi coding agent and Archo's Pi extensions, built and released from their own repository (`ToumanLin/ArchoAgent`). RimArcho downloads, configures and starts it; the agent reaches RimArcho only through `archo mcp` (14), with the same tools as any external agent. Windows x64 only. Code: `internal/app/agent.go`, `internal/cmds/agent.go`, `internal/view/agent.go`, `internal/secret`.
 
+### 7.0 Build switch (not in 1.1)
+
+1.1 ships without Archo Agent: it is not ready. The code and this section stay, behind one build switch, `buildinfo.Agent` (`buildinfo.AgentOn()`), which is off unless the build is linked with `-X github.com/ToumanLin/RimArcho/internal/buildinfo.Agent=1`. `scripts/release.ps1` does not set it. With it off:
+
+- Settings has no Archo Agent group (16 §2.14), and the GUI refuses its settings commands, its install task and `API.SetAgentKey`.
+- The `agent …` commands (13 §4.2) stay registered but `cmds.Commands()` and command lookup skip them (`featureOff`, `internal/cmds/feature.go`), so `archo help`, the CLI, the TUI and the GUI's command palette, completion and MCP neither list nor run them. The `agent.*` settings keys are not listed by `config get` or completion and `config set` refuses them.
+- Nothing contacts the `ToumanLin/ArchoAgent` release service: only installing does (§7.1), and nothing can start it.
+- A bundle, settings or key an earlier development build left stay untouched and unused. Uninstall still removes them with the rest (02 §2): the stored key, when there is one, still has its line in the preview.
+
+`TestSpecAgentOffBuild` (`internal/view/agent_off_test.go`) fails if any of these shows the Agent while the switch is off, and checks that each comes back when it is on. Everything below describes a build with the switch on.
+
 ### 7.1 Installing
 
 - **Source**: the latest stable GitHub release of `ToumanLin/ArchoAgent` (`RIMARCHO_AGENT_API` substitutes a test release service), through the GitHub mirror like RimArcho's own updates (17 §2.2). Assets: `archo-agent-<version>-windows-amd64.zip` and `<zip>.sha256`. `archo agent install --from <zip>` installs a downloaded zip instead, checked against a `.sha256` beside it when there is one.
@@ -175,10 +186,11 @@ The extensions live in the Archo Agent repository; RimArcho relies on these beha
 
 ## 8. Acceptance
 
-AR1–AR10 cover the panel and are not implemented yet. AG1–AG7 cover Archo Agent.
+AR1–AR10 cover the panel and are not implemented yet. AG1–AG7 cover Archo Agent in a build with `buildinfo.Agent` on (§7.0); 1.1 checks AG0 instead.
 
 | # | Scenario | Expected |
 | --- | --- | --- |
+| AG0 | 1.1 (switch off): look for Archo Agent in Settings, the command palette, `archo help`, `archo agent status`, `archo config get`, the TUI and `archo mcp` tools | Nowhere: no group, row, command, key or tool; `archo agent status` is an unknown command |
 | AG1 | Install Archo Agent in Settings with no network, then with a zip whose checksum does not match | An error; no bundle is installed and nothing under `%LOCALAPPDATA%\RimArcho\agent` is left half-written |
 | AG2 | Install, then install again with no newer release | The first installs; the second reports the installed version and downloads nothing |
 | AG3 | "open Archo Agent" without a model or key | Says which is missing; nothing starts |
