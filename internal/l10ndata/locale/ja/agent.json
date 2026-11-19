@@ -5,7 +5,7 @@
   "RimArcho downloads Archo Agent from GitHub (ToumanLin/ArchoAgent, about 70 MB: Node, the Pi coding agent and Archo's extensions), checks its SHA-256 and installs it in the local folder": "RimArcho が GitHub（ToumanLin/ArchoAgent）から Archo Agent（約 70 MB：Node、Pi コーディングエージェント、Archo の拡張機能）をダウンロードし、SHA-256 を確認してローカルフォルダーにインストールします",
   "the downloaded Archo Agent is deleted; its model settings, API key and conversations stay": "ダウンロードした Archo Agent を削除します。モデル設定、API キー、会話は残ります",
   "stored in Windows Credential Manager": "Windows 資格情報マネージャーに保存済み",
-  "Archo as an AI agent in a console window of its own. It works through archo mcp, asks you before anything that changes your game, and sends your model provider no user name or Steam account.": "専用のコンソールウィンドウで動く AI エージェントの Archo。archo mcp を通じて動作し、ゲームを変更する前に確認を求め、ユーザー名や Steam アカウントをモデルの提供元に送りません。",
+  "Archo as an AI agent in a console window of its own. It works through RimArcho's MCP tools, asks you before anything that changes your game, and sends your model provider no user name or Steam account.": "専用のコンソールウィンドウで動く AI エージェントの Archo。RimArcho の MCP ツールを通じて動作し、ゲームを変更する前に確認を求め、ユーザー名や Steam アカウントをモデルの提供元に送りません。",
   "model API": "モデル API",
   "openai-completions fits most providers and gateways (DeepSeek, OpenRouter, local servers); anthropic-messages is Claude's own API": "openai-completions はほとんどの提供元とゲートウェイ（DeepSeek、OpenRouter、ローカルサーバー）に対応します。anthropic-messages は Claude 独自の API です",
   "API base URL": "API ベース URL",

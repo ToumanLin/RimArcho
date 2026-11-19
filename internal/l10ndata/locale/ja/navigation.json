@@ -93,5 +93,7 @@
   "version folders left out": "対象外のバージョンフォルダ",
   "versions locked  own saves": "バージョン固定・専用セーブデータ",
   "window controls": "ウィンドウ操作",
-  "write these edits to the game's mod list now, without launching; launching saves them too": "ゲームを起動せず、変更をMODリストに書き込みます。起動時にも自動保存されます"
+  "write these edits to the game's mod list now, without launching; launching saves them too": "ゲームを起動せず、変更をMODリストに書き込みます。起動時にも自動保存されます",
+  "all games": "すべてのゲーム",
+  "Game Config: a game folder with its own saves, settings and current list": "ゲーム構成：専用のセーブ、設定、現在のリストを持つゲームフォルダー"
 }

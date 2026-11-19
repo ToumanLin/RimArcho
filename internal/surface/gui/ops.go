@@ -166,3 +166,29 @@ func (s *API) UseInstalled(packageIDs []string) (*view.Result, error) {
 	s.needs, s.board = nil, nil
 	return s.after(view.UseInstalled(s.a, packageIDs))
 }
+
+// DownloadedToAdd is what a finished subscription task can add to the current list (16 §2.9):
+// the status line offers "add to <list>" when it is not empty.
+func (s *API) DownloadedToAdd(taskID string) (*view.AddOffer, error) {
+	var task *app.Task
+	for _, t := range s.tasks.List() {
+		if t.ID == taskID {
+			task = &t
+			break
+		}
+	}
+	if task == nil {
+		return &view.AddOffer{}, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return view.DownloadedOffer(s.a, *task)
+}
+
+// AddDownloaded enables the downloaded Mods in the current list, one undo step.
+func (s *API) AddDownloaded(refs []string) (*view.Result, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.needs, s.board = nil, nil
+	return s.after(view.AddDownloaded(s.a, refs))
+}

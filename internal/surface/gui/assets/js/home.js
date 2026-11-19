@@ -280,9 +280,9 @@ function draw() {
   const f = applied();
   if (!rows().length) {
     const e = el("div", "hm-empty");
-    const add = el("button", "btn", T("Add Game Config"));
+    const add = el("button", "btn", T("add a game"));
     add.onclick = () => ui.go("env");
-    e.append(el("h1", "", T("no Game Config yet: add one on the Game Configs page")), add);
+    e.append(el("h1", "", T("no game yet: add one on the Game Config page")), add);
     w.append(e);
     return;
   }
@@ -402,7 +402,7 @@ function step(n, cls, title) {
 // pick, else its most recently played). Each says its full version ("1.6.4871 rev590";
 // the short one when the build is unknown).
 function gameStep(env) {
-  const s = step("01", "hm-s1", T("Game Config"));
+  const s = step("01", "hm-s1", T("game"));
   const list = el("div", "hm-picks");
   list.append(el("span", "hm-mark"));
   for (const g of shownFirst(games(), (g) => g.name === env)) {
@@ -626,11 +626,13 @@ function activity() {
   const live = running();
   if (live || data.lastRun || data.missingLog) {
     // another Game Config's game: its owner, without this run's errors (they are not ours)
+    const errs = (n) => n === 1 ? T("1 error") : Tf("%d errors", n);
     const runText = live && S.live.blocked ? S.live.blocked
-      : live ? (S.live.owner || T("the game is running")) + "  " + (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet"))
-      : data.missingLog || (data.lastRunDay || data.lastRun) + "  " + (data.lastRunErrors ? Tf("%d errors", data.lastRunErrors) : data.lastRunPending ? T("not checked yet") : T("no errors"));
-    const runGo = (live && !S.live.blocked) || data.lastRunErrors ? "needs" : "log";
-    box.append(actLine(T("last game"), runText, () => ui.go(runGo)));
+      : live ? (S.live.owner || T("the game is running")) + "  " + (S.live.errors ? errs(S.live.errors) : T("no errors yet"))
+      : data.missingLog || (data.lastRunDay || data.lastRun) + "  " + (data.lastRunErrors ? errs(data.lastRunErrors) : data.lastRunPending ? T("not checked yet") : T("no errors"));
+    // the game crashed or errored: the log, at its first error, answers what happened; Can it
+    // run is about the next launch (16 §2.3)
+    box.append(actLine(T("last game"), runText, () => ui.go("log")));
   }
   // "nothing changed" tells nothing: the line shows only with changes or before a scan
   const c = data.changes;

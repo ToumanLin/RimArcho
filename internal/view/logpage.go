@@ -28,7 +28,8 @@ type LogFile struct {
 type LogRow struct {
 	PhaseStart string `json:"phaseStart,omitempty"` // quiet boundary above this row
 	ID         string `json:"id"`                   // E3
-	Class      string `json:"class"`
+	Class      string `json:"class"`                // the kind in plain words (logClassTitle)
+	Code       string `json:"code"`                 // the class as the log parser names it (06 §2), on hover
 	Count      int    `json:"count"`
 	Text       string `json:"text"` // the first line, rich-text tags removed
 	// Spans is Text with the mods' rich text; Level the line's colour (logtext.go).
@@ -57,9 +58,11 @@ type LogPage struct {
 	// Monitor is the companion log of this run (Archo Monitor's, else RimCrow's).
 	Monitor *MonitorLog `json:"monitor,omitempty"`
 	// NoMonitor: the current plan has no Archo Monitor, in one line; AddMonitor: it can be
-	// added (an installed monitor and Harmony in the plan).
-	NoMonitor  string `json:"noMonitor,omitempty"`
-	AddMonitor bool   `json:"addMonitor,omitempty"`
+	// added (an installed monitor and Harmony in the plan); InstallMonitor: it is not
+	// installed, and the GUI's button installs it (16 §2.9).
+	NoMonitor      string `json:"noMonitor,omitempty"`
+	AddMonitor     bool   `json:"addMonitor,omitempty"`
+	InstallMonitor bool   `json:"installMonitor,omitempty"`
 	// Links maps a normalised first line to its cluster, for LiveMonitor.
 	Links map[string]string `json:"-"`
 }
@@ -119,7 +122,7 @@ func BuildLogPage(a *app.App, st *app.LoadoutState, path string, live *LiveTrack
 		p.NoMonitor = T("this list has no Archo Monitor: errors will not say which file or def was loading")
 		p.AddMonitor = ms.Newest != nil
 		if !p.AddMonitor {
-			p.NoMonitor = T("Archo Monitor is not installed: errors will not say which file or def was loading (archo monitor install)")
+			p.NoMonitor, p.InstallMonitor = T("Install the in-game helper to see which file caused an error."), true
 		}
 	}
 	if err := a.EnsureLogFileAnalysis(st, path, nil); errors.Is(err, app.ErrStillComputing) {
@@ -152,12 +155,12 @@ func BuildLogPage(a *app.App, st *app.LoadoutState, path string, live *LiveTrack
 	}
 	if p.Monitor != nil {
 		// this run had the monitor: its tab is the answer, not a line saying it is missing
-		p.NoMonitor, p.AddMonitor = "", false
+		p.NoMonitor, p.AddMonitor, p.InstallMonitor = "", false, false
 	}
 	var prev *logs.Phase
 	first := true
 	for _, lc := range r.Clusters {
-		row := LogRow{ID: lc.ID, Class: T(lc.Class), Count: lc.Count, Spans: LogSpans(lc.First.Message, 240), Cluster: lc.ID, Line: lineKey(lc.First.Message), Info: logs.Informational(lc.Class)}
+		row := LogRow{ID: lc.ID, Class: logClassTitle(lc.Class), Code: lc.Class, Count: lc.Count, Spans: LogSpans(lc.First.Message, 240), Cluster: lc.ID, Line: lineKey(lc.First.Message), Info: logs.Informational(lc.Class)}
 		if r.HasPhases && (first || !samePhase(prev, lc.Phase)) {
 			row.PhaseStart = phaseLabel(lc.Phase, a.Loc)
 		}
@@ -209,4 +212,28 @@ func BuildLogPage(a *app.App, st *app.LoadoutState, path string, live *LiveTrack
 		})
 	}
 	return p, nil
+}
+
+// logClassTitles name a cluster's class in a player's words (16 §2.9); the parser's code
+// (harmony-stack, xref-missing…) stays in LogRow.Code and in CLI and MCP output.
+var logClassTitles = map[string]string{
+	logs.ClassHarmony:     "error in the game's code",
+	logs.ClassXrefMissing: "a missing item",
+	logs.ClassPatchFailed: "a patch that failed",
+	logs.ClassException:   "an exception",
+	logs.ClassXMLLoad:     "content that did not load",
+	logs.ClassTexture:     "a missing texture or sound",
+	logs.ClassMaterial:    "a material error",
+	logs.ClassSave:        "a save data error",
+	logs.ClassGameError:   "a game error naming Mod code",
+	logs.ClassModReport:   "a Mod's own report",
+	logs.ClassOther:       "other",
+	logs.ClassNoise:       "a known harmless line",
+}
+
+func logClassTitle(class string) string {
+	if t, ok := logClassTitles[class]; ok {
+		return T(t)
+	}
+	return T(class)
 }

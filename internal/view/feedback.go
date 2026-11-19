@@ -63,7 +63,7 @@ func FeedbackAttachments(a *app.App, st *app.LoadoutState, o FeedbackOptions) *F
 	}
 	loaded := st != nil && st.Ix != nil && st.Ix.Env != nil
 
-	mods := FeedbackPart{Key: "mods", Label: T("enabled mods"), Note: T("no Game Config yet"), None: true}
+	mods := FeedbackPart{Key: "mods", Label: T("enabled mods"), Note: T("no game yet"), None: true}
 	if loaded && st.Plan != nil {
 		mods.Note, mods.None = Tf("list “%s”, %d mods", st.Plan.Name, len(st.List)), false
 		if o.Mods {

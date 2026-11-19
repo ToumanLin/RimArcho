@@ -45,7 +45,7 @@ var Commands = []Command{
 	{"library", "@palette.library", "mod library", "all mods, copies, sizes, filter, clean up"},
 	{"subscribe", "@palette.subscribe", "add a subscription", "+ Git repository download page LoversLab Workshop SteamCMD"},
 	{"rescan", "@palette.rescan", "rescan", "R scan"},
-	{"analyze", "@palette.analyze", "check the files again", "A analyze"},
+	{"analyze", "@palette.analyze", "check again", "A analyze check the files again"},
 	{"log", "@palette.log", "game log", "l Player.log choose a log"},
 	{"env", "@palette.env", "switch Game Config", "E env environment Game Config"},
 	{"plans", "@palette.plans", "lists", "P switch, new, rename, delete a list"},

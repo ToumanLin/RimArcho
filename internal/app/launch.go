@@ -62,6 +62,10 @@ func quoteArg(s string) string {
 // ErrLaunchBlocked is wrapped by Launch refusals.
 var ErrLaunchBlocked = errors.New("launch blocked")
 
+// ErrSteamNotFound is the refusal of a Steam launch with no Steam client to start it; the
+// GUI offers to start the game directly instead (16 §2.3).
+var ErrSteamNotFound = errors.New("Steam not found")
+
 // Launch plays the current list (09 §2): no game may be running in any environment; then
 // the list is written to the game exactly as archo save does (Mods/ links, ModsConfig.xml,
 // a version with source "launch" unless the list equals the newest version), the launch is
@@ -268,7 +272,7 @@ func (a *App) gamePlan(e *env.Environment, userData string) (*LaunchPlan, error)
 			if proton {
 				return nil, fmt.Errorf("%w: Steam is required for Proton games; install Steam or add it to PATH", ErrLaunchBlocked)
 			}
-			return nil, fmt.Errorf("%w: Steam not found; use archo env set --launch direct", ErrLaunchBlocked)
+			return nil, fmt.Errorf("%w: %w; use archo env set --launch direct", ErrLaunchBlocked, ErrSteamNotFound)
 		}
 		p.Args = append(p.Args, "-applaunch", env.WorkshopAppID)
 		p.Args = append(p.Args, extra...)

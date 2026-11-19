@@ -68,6 +68,7 @@ export async function showDetail(it, staged) {
     run: (code, i) => document.dispatchEvent(new CustomEvent("detail-op", { detail: { code, id: i.id || it.id } })),
     noteSaved: async () => { const i = await api.LibraryCopy(it.id).catch(() => null); if (current() && i) f.inst(i); },
     tech: true,
+    ownNote: true, // the editor shows only the player's note (16 §4)
     later: !same,
     host: box,
   }));
@@ -219,7 +220,7 @@ export function detailFrame(box, sc, o = {}) {
       if (!editing || P.note.dataset.ref !== r.ref) {
         P.note.innerHTML = "";
         P.note.dataset.ref = r.ref;
-        P.note.append(noteEl(r, { saved: o.noteSaved, leave: o.noteLeave }));
+        P.note.append(noteEl(r, { saved: o.noteSaved, leave: o.noteLeave, ownOnly: o.ownNote }));
       }
       P.acts.innerHTML = "";
       const codes = ops.sorted((r.ops || []).filter((c) => { const x = ops.op(c); return x.detail || x.group === 4; }));
@@ -256,7 +257,7 @@ export function detailFrame(box, sc, o = {}) {
       }
       P.more.innerHTML = "";
       if (o.tech) {
-        const more = el("div", "sub link", T("technical information, enter"));
+        const more = el("div", "sub link", T("full details"));
         more.onclick = () => document.dispatchEvent(new CustomEvent("verb", { detail: "full" }));
         P.more.append(more);
       }
@@ -301,17 +302,21 @@ function description(d) {
 // else a place to write one; a click (or n) edits it, enter saves, shift+enter breaks the
 // line, esc leaves it as it was. o.saved() after a save, o.leave() when the editing ends;
 // o.save(text) saves another note (a tag's) in place of the copy's, o.placeholder its hint.
+// o.ownOnly (the editor's details, 16 §4): only the player's own note shows; what RimArcho
+// wrote is the empty note's hover, not a line read every time.
 export function noteEl(i, o = {}) {
-  const box = el("div", "lib-note" + (i.note ? "" : i.auto ? " auto" : " empty"));
+  const auto = o.ownOnly ? "" : i.auto;
+  const box = el("div", "lib-note" + (i.note ? "" : auto ? " auto" : " empty"));
   const show = () => {
     box.innerHTML = "";
     box.classList.remove("editing");
-    box.append(el("div", "txt", i.note || i.auto || T("write a note")));
-    if (!i.note && i.auto) box.append(el("div", "by", T("by RimArcho, click to edit")));
+    box.append(el("div", "txt", i.note || auto || T("write a note")));
+    if (!i.note && auto) box.append(el("div", "by", T("by RimArcho, click to edit")));
   };
   show();
+  const hover = !i.note && i.auto && o.ownOnly ? i.auto + "\n" : "";
   if (!i.id && !o.save) return box;
-  box.title = T("click to edit") + T("; ") + "n";
+  box.title = hover + T("click to edit") + T("; ") + "n";
   box.onclick = () => {
     if (box.classList.contains("editing")) return;
     box.classList.add("editing");
@@ -428,7 +433,7 @@ export function renderDetail(d, box, sc, keepScroll, opts = {}) {
     box.append(el("div", "sub", T("history")), el("div", "history word-facts", d.history), all);
   }
   if (!opts.page) {
-    const more = el("div", "sub link", T("technical information, enter"));
+    const more = el("div", "sub link", T("full details"));
     more.onclick = () => document.dispatchEvent(new CustomEvent("verb", { detail: "full" }));
     box.append(more);
   }

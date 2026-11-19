@@ -312,7 +312,7 @@ func FolderOwner(f *app.SaveFolder) string {
 		names = append(names, e.Name)
 	}
 	if len(names) == 0 {
-		return T("no Game Config saves here")
+		return T("no game of yours saves here")
 	}
 	return strings.Join(names, ", ")
 }
@@ -614,7 +614,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 				continue
 			}
 			order = append(order, Need{rank: 1, Group: GroupList, code: p.Code, Text: Tf("%s should load after %s", nm(x), nm(y)), Actions: []Action{{Kind: ActMove, Key: "m", Label: Tf("move %s after %s", nm(x), nm(y)), Refs: []string{TokRef(st, x)}, After: TokRef(st, y), Undo: true}, sortAction()}, Counted: true, Mods: ids, Status: s,
-				Why: T("a strong requirement (a dependency or loadBefore): breaking it goes with more errors in shared logs; sorting puts it right"), Evidence: ev})
+				Why: T("In the wrong order this Mod may not work; sort fixes it."), Evidence: ev})
 			order[len(order)-1].linkProblems = []*app.Problem{p}
 		case "mod.known-error":
 			// The mod's own problem (05 §4.3): whatever else is enabled, shared logs show it.
@@ -953,7 +953,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			}
 			add(Need{rank: 5, Group: GroupList, Text: text, Counted: true, Status: StatusWarn, Mods: versionMods, Fold: true,
 				code: "version.unsupported", rowReasons: reasons,
-				Why: T("they may still work, but their authors have not said they do on this version"), Evidence: evidence(EvDeclared, T("About.xml supportedVersions")),
+				Why: Tf("They may still work; their authors have not marked %s.", mm), Evidence: evidence(EvDeclared, T("About.xml supportedVersions")),
 				Actions: []Action{{Kind: ActVersionList, Key: "enter", Label: T("see the list"), Title: Tf("does not list %s as supported", mm), GameVersion: mm}, versionBatch(st, versions, false)}})
 		}
 	}

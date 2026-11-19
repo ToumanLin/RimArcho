@@ -60,7 +60,7 @@ func TestReviewPageOf(t *testing.T) {
 		p.Groups[1].Hint != "1 with nothing in the saves (outlined)" {
 		t.Errorf("buildings Mod: %+v; hint: %s", b, p.Groups[1].Hint)
 	}
-	if !strings.HasPrefix(p.Foot, "1 Mod adds nothing a save can show") || strings.Contains(p.Foot, "Menus") {
+	if !strings.HasPrefix(p.Foot, "1 interface, performance or fix Mod") || strings.Contains(p.Foot, "Menus") {
 		t.Errorf("functional count: %q", p.Foot)
 	}
 	if empty := view.ReviewPageOf(&app.SaveReview{}, nil, "", nil); len(empty.Groups) != 0 || empty.Foot != "" || len(empty.Colonies) != 0 {

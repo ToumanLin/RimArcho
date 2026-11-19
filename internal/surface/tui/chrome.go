@@ -350,7 +350,7 @@ func (m *model) needsActions() [][2]string {
 	if n := view.AutoFixCount(m.prob.base); n > 0 {
 		ps = append(ps, [2]string{"F", Tf("fix %d automatically", n)})
 	}
-	return append(ps, [2]string{"A", T("check the files again")}, [2]string{"l", T("choose a log")})
+	return append(ps, [2]string{"A", T("check again")}, [2]string{"l", T("choose a log")})
 }
 
 // needsLayout places Can it run's conclusion and page actions: both in the context row when

@@ -96,12 +96,32 @@ export async function refreshFoot() {
 // event: the record changed; a lane task that ended says so on the status line.
 export async function event(ev) {
   if (ev && ev.ended) {
-    say(ev.ended.ok ? "ok" : "fail", ev.ended.text + (ev.ended.ok || S.screen === "tasks" ? "" : ", ctrl+j"));
+    // a task that failed elsewhere says so in a few words, with a link to why (16 §2.16);
+    // the whole result is the status line's hover
+    if (!ev.ended.ok && S.screen !== "tasks") {
+      say("fail", ev.ended.kind === "subscribe" ? T("The download didn't finish.") : ev.ended.text, { label: T("see why"), run: toggle });
+      $("#status").title = ev.ended.text;
+    } else say(ev.ended.ok ? "ok" : "fail", ev.ended.text);
+    if (ev.ended.ok && (ev.ended.kind === "subscribe" || ev.ended.kind === "subscription-from")) offerAdd(ev.ended.id);
     document.dispatchEvent(new CustomEvent("task-ended", { detail: ev.ended }));
   }
   if (S.screen === "tasks") return load();
   refreshFoot();
 }
+
+// offerAdd: after a download, its Mods that the current list lacks, with "add to <list>" on
+// the status line (16 §2.9). A Steam download shows up only after the next scan: with nothing
+// found yet, the task waits for one scan (scanned) and is asked once more.
+let addWaiting = "";
+async function offerAdd(id) {
+  let o = null;
+  try { o = await api.DownloadedToAdd(id); } catch { return; }
+  if (!o?.refs?.length) { addWaiting = addWaiting === id ? "" : id; return; }
+  addWaiting = "";
+  const what = o.names.length === 1 ? o.names[0] : Tf("%d mods", o.names.length);
+  say("ok", Tf("%s is ready", what), { label: Tf("add to %s", o.list || T("the list")), run: () => ui.edited(() => api.AddDownloaded(o.refs), true) });
+}
+export function scanned() { if (addWaiting) offerAdd(addWaiting); }
 
 // toggle: ctrl+j opens the page, and from it goes back where it came from. X.from belongs
 // to the visit ctrl+j opened; on a visit opened another way it goes back in the page history.
@@ -213,7 +233,7 @@ function build() {
   const sc = $("#screen");
   sc.innerHTML = "";
   const w = page("fill tasks", "",
-    pageAct(T("take the done ones off the record"), "ok", () => run("clear", []), "C"));
+    pageAct(T("clear finished"), "ok", () => run("clear", []), "C"));
   const root = el("div", "tk");
   const side = el("div", "fcol tk-side");
   const list = el("section", "area tk-list");
@@ -448,7 +468,8 @@ function drawSum() {
   box.append(acts);
   const facts = el("div", "facts");
   const fact = (k, v) => { if (!v) return; const s = el("span", "", k); s.append(el("b", " word-facts", v)); facts.append(s); };
-  fact(T("queue"), r.laneText + "  " + r.laneNote);
+  fact(T("queue"), r.laneText);
+  if (r.laneNote && facts.lastChild) facts.lastChild.title = r.laneNote; // how the queue works: on hover
   fact(T("started"), r.time);
   fact(T("took"), r.dur);
   box.append(facts);

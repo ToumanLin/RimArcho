@@ -138,7 +138,7 @@ func ReviewPageOf(r *app.SaveReview, cols []*app.Colony, colony string, tags map
 		p.Colonies = append(p.Colonies, ReviewColony{Key: c.Key, Name: colonyName(c), Line: line})
 	}
 	p.All = countColonies(len(cols)) + T(", ") + countSaves(saves)
-	p.Lead = Tf("what your Mods add and how much of it your saves show: %s, %s", countColonies(r.Colonies), countSaves(r.Saves))
+	p.Lead = countColonies(r.Colonies) + T(", ") + countSaves(r.Saves)
 	if r.Unread > 0 {
 		p.Note = Tf("%s could not be read and are not counted", countSaves(r.Unread))
 	}
@@ -210,9 +210,9 @@ func ReviewPageOf(r *app.SaveReview, cols []*app.Colony, colony string, tags map
 		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
 	})
 	if functional == 1 {
-		p.Foot = T("1 Mod adds nothing a save can show (interface, performance, fixes): saves cannot tell whether it was used")
+		p.Foot = T("1 interface, performance or fix Mod: a save can't show it")
 	} else if functional > 1 {
-		p.Foot = Tf("%d Mods add nothing a save can show (interface, performance, fixes): saves cannot tell whether they were used", functional)
+		p.Foot = Tf("%d interface, performance and fix Mods: a save can't show them", functional)
 	}
 	return p
 }

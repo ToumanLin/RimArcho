@@ -5,7 +5,7 @@
   "RimArcho downloads Archo Agent from GitHub (ToumanLin/ArchoAgent, about 70 MB: Node, the Pi coding agent and Archo's extensions), checks its SHA-256 and installs it in the local folder": "RimArcho 将从 GitHub（ToumanLin/ArchoAgent）下载 Archo Agent（约 70 MB：Node、Pi 编程代理和 Archo 的扩展），校验 SHA-256 后安装到本地文件夹",
   "the downloaded Archo Agent is deleted; its model settings, API key and conversations stay": "删除已下载的 Archo Agent；模型设置、API 密钥和对话记录保留",
   "stored in Windows Credential Manager": "已存入 Windows 凭据管理器",
-  "Archo as an AI agent in a console window of its own. It works through archo mcp, asks you before anything that changes your game, and sends your model provider no user name or Steam account.": "在独立的控制台窗口中运行的 AI 助手 Archo。它通过 archo mcp 工作，改动游戏前会先征求你的同意，也不会把用户名和 Steam 账号发给模型服务商。",
+  "Archo as an AI agent in a console window of its own. It works through RimArcho's MCP tools, asks you before anything that changes your game, and sends your model provider no user name or Steam account.": "在独立的控制台窗口中运行的 AI 助手 Archo。它通过 RimArcho 的 MCP 工具工作，改动游戏前会先征求你的同意，也不会把用户名和 Steam 账号发给模型服务商。",
   "model API": "模型接口",
   "openai-completions fits most providers and gateways (DeepSeek, OpenRouter, local servers); anthropic-messages is Claude's own API": "openai-completions 适用于大多数服务商和网关（DeepSeek、OpenRouter、本地服务）；anthropic-messages 是 Claude 自己的接口",
   "API base URL": "接口地址",

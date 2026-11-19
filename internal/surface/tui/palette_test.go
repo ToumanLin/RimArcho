@@ -105,7 +105,7 @@ func TestPaletteLibrary(t *testing.T) {
 		for _, c := range []struct{ q, alias string }{
 			{"sotr", "sort"},
 			{"subscirbe", "add a subscription"},
-			{"analyze", "check the files again"},
+			{"analyze", "check again"},
 		} {
 			m.update(tea.KeyMsg{Type: tea.KeyCtrlK})
 			typeIn(m, c.q)

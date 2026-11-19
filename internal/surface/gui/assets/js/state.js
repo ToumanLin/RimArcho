@@ -108,11 +108,12 @@ export function say(kind, text, undo = false, paths = []) {
   }
   undoLink = undo;
   if (undo && text) {
-    const a = el("a", "", T("undo"));
+    const a = el("a", "", undo.label || T("undo"));
     a.setAttribute("role", "button");
     a.tabIndex = -1;
-    // undo is true (the current list's undo) or the function that undoes this one thing
-    a.onclick = typeof undo === "function" ? () => undo() : () => document.dispatchEvent(new CustomEvent("verb", { detail: "undo" }));
+    // undo is true (the current list's undo), the function that undoes this one thing, or
+    // another link of the line ({label, run}: a failed task's see why)
+    a.onclick = typeof undo === "function" ? () => undo() : undo.run ? () => undo.run() : () => document.dispatchEvent(new CustomEvent("verb", { detail: "undo" }));
     s.appendChild(a);
   }
   statusIn(s);

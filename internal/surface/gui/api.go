@@ -1076,6 +1076,23 @@ func (s *API) launchedPlan(o *view.Outcome) {
 	}
 }
 
+// LaunchDirect makes the current Game Config start the game without Steam from now on: the
+// answer to a Steam launch with no Steam client (view.Outcome.Direct, 16 §2.3). The page
+// then launches again.
+func (s *API) LaunchDirect() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, err := s.a.Env()
+	if err != nil {
+		return err
+	}
+	if _, _, err := s.a.EnvSet(e.Name, app.EnvSpec{Launch: "direct"}); err != nil {
+		return err
+	}
+	s.needs, s.board = nil, nil
+	return nil
+}
+
 // RunMoving is Run after the player agreed to move the folders in the way into the lock
 // library (Outcome.Moves, 09 §3).
 func (s *API) RunMoving(what string) (*view.Outcome, error) {
@@ -1561,7 +1578,7 @@ func (s *API) LogPage(path string) (*view.LogPage, error) {
 		if current := s.boardState(); current != nil && current.Ix.Env.ID == readState.Ix.Env.ID {
 			s.logLinks, s.logPath = p.Links, p.Path
 			if m := view.LiveMonitor(s.a, current, &s.live, p.Path, p.Links); m != nil {
-				p.Monitor, p.NoMonitor, p.AddMonitor = m, "", false
+				p.Monitor, p.NoMonitor, p.AddMonitor, p.InstallMonitor = m, "", false, false
 			}
 		}
 	}
@@ -1582,6 +1599,25 @@ func (s *API) LogMonitor(path string) (*view.MonitorLog, error) {
 		links = s.logLinks
 	}
 	return view.LiveMonitor(s.a, st, &s.live, path, links), nil
+}
+
+// InstallMonitor installs Archo Monitor now (the game log's install button, 16 §2.9): the
+// child process the window runs once at start (checkMonitor, 19 §6).
+func (s *API) InstallMonitor() (string, error) {
+	home, env, exe := s.a.Home, s.a.EnvName, s.Exe
+	var err error
+	if exe != "" {
+		_, err = app.ChildMonitorExe(exe, home, env)
+	} else {
+		_, err = app.ChildMonitor(home, env)
+	}
+	if err != nil {
+		return "", err
+	}
+	s.mu.Lock()
+	s.board, s.needs = nil, nil
+	s.mu.Unlock()
+	return view.T("Archo Monitor is ready"), nil
 }
 
 // AddMonitor puts Archo Monitor after Harmony in the current plan (the log page's action;

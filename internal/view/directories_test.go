@@ -16,8 +16,14 @@ func TestDirectorySettingsAndWarning(t *testing.T) {
 		t.Fatal(err)
 	}
 	g := view.DirectoryGroup(e.App)
-	if len(g.Items) != len(dirs) {
-		t.Fatalf("settings has %d directories, want %d", len(g.Items), len(dirs))
+	shown := 0
+	for _, d := range dirs {
+		if d.Kind != "lock" || d.Status != "unused" { // an unused lock library is hidden (16 §2.14)
+			shown++
+		}
+	}
+	if len(g.Items) != shown {
+		t.Fatalf("settings has %d directories, want %d", len(g.Items), shown)
 	}
 	for _, it := range g.Items {
 		if it.Value == "" || it.Directory == "" || len(it.Argv) != 4 || len(it.MoveArgv) != 4 {

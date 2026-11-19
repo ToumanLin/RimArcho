@@ -127,7 +127,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("ctrl+o", "open the location"),
 			r("D", "see dependencies (can it run)"),
 			r("S", "sort the list"),
-			r("p", "lock this version (dry run first)"),
+			r("p", "keep this version (dry run first)"),
 			r("esc", "show every mod"),
 		)
 	}
@@ -175,7 +175,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("o", "go to the page it changed"),
 			r("ctrl+o", "open the folder"),
 			r("Del / ctrl+z", "take off the record, put it back"),
-			r("C", "take the done ones off the record"),
+			r("C", "clear finished"),
 			r("s / < > =", "the items' headers: sort and columns, the sorted column's width"),
 			r("shift+↑↓ / ctrl+space / ctrl+a", "select tasks"),
 			r("menu / shift+F10 / right click", "the row's menu: everything it can do"),

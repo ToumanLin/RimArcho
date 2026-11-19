@@ -26,7 +26,7 @@ const freshN = () => ({ data: null, cols: [[], []], cur: [0, 0], at: ['', ''], c
 function cardContext(calls) {
   const context = createContext({ el, N: freshN(), T: (s) => s, Tf: (s, ...a) => s.replace(/%[ds]/g, () => a.shift()),
     archo: {}, statusIcon: () => '', needText: (tag, cls, text) => el(tag, cls, text), needParts: () => el('ul'),
-    needEvidence: () => el('div', 'ev-line'), linkBlock: () => el('div'), jumpTo: (id) => calls.push(['jump', id]),
+    evidenceMark: () => el('div', 'ev-line'), linkBlock: () => el('div'), jumpTo: (id) => calls.push(['jump', id]),
     setCur() {}, snapshot: () => calls.push(['snapshot']), doAction: (a, o) => calls.push(['do', a.kind, o]),
     runAction: (it, a, here) => calls.push(['run', a.kind, here]), actionWrite: (a) => a.kind,
     confirmYes: () => calls.push(['yes']), drawNeeds: () => calls.push(['draw']),

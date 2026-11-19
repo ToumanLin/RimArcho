@@ -18,7 +18,7 @@
   "Archo Monitor added after Harmony (undo removes it)": "已在 Harmony 后面加入 Archo Monitor（撤销即可去掉）",
   "Archo Monitor folder": "Archo Monitor 文件夹",
   "Archo Monitor installed": "已安装的 Archo Monitor",
-  "Archo Monitor is not installed: errors will not say which file or def was loading (archo monitor install)": "Archo Monitor 未安装：报错不会说明当时在加载哪个文件、哪个 Def（archo monitor install）",
+  "Install the in-game helper to see which file caused an error.": "安装游戏内助手，就能看到是哪个文件出错。",
   "Archo Monitor is ready": "Archo Monitor 已就绪",
   "Archo Monitor's own error": "Monitor 自身出错",
   "Discord name or email, so the maintainer can ask you more": "Discord 名字或邮箱，方便维护者追问",
@@ -175,7 +175,7 @@
   "no errors": "没有报错",
   "no folder dialog here; use the desktop window": "这里不能打开文件夹对话框，请使用桌面窗口",
   "no game log yet": "还没有游戏日志",
-  "no game yet": "还没有游戏配置",
+  "no game yet": "还没有游戏",
   "no matching error in Player.log": "Player.log 里没有对应的报错",
   "no release published yet": "还没有发布版本",
   "none found in the Steam libraries": "Steam 库里没有找到",
@@ -309,5 +309,7 @@
   "the developer may reply here; not guaranteed, and public on GitHub": "开发者可能在这里回复；不保证回复，回复在 GitHub 上公开",
   "open on GitHub": "在 GitHub 上打开",
   "follow up on #%d": "补充 #%d",
-  "developer": "开发者"
+  "developer": "开发者",
+  "install it": "安装",
+  "installing Archo Monitor…": "正在安装 Archo Monitor…"
 }

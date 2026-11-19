@@ -29,6 +29,8 @@ export function initExchange(u) {
 
 let info = null;
 let firstRun = false;
+// firstMore: the first run's "something else…" opened the whole page (16 §2.15)
+let firstMore = false;
 let pasted = "";
 let session = null;
 let previewSeq = 0;
@@ -62,7 +64,7 @@ export const hintList = () => [...($("#screen .xc-preview")?.dataset.mode === "l
 // current list comes first and is picked, and "skip" ends the guide.
 export async function exchange(first = false) {
   const from = S.screen === "plan-import" ? session?.from : S.screen || "plan";
-  if (S.screen !== "plan-import") firstRun = first && from === "guide";
+  if (S.screen !== "plan-import") { firstRun = first && from === "guide"; firstMore = false; }
   const target = from === "plans" ? ui.selectedList() : S.shell?.plan?.id || 0;
   const read = beginPageRead("plan-import", { replace: true });
   session = { from, target, name: S.shell?.plans?.find(p => p.id === target)?.name || "", epoch: S.screenSeq };
@@ -79,12 +81,24 @@ export async function exchange(first = false) {
   const [inLab, inCard] = sectionCard(T("Bring in"));
   const [mLab, mCard] = sectionCard(T("From another manager"));
   inCard.dataset.src = "in"; mCard.dataset.src = "m";
-  w.append(inLab, inCard, mLab, mCard, resLab, result);
-  area(inCard, inLab); area(mCard, mLab);
+  // the first run shows the game's list and one way to the rest: the other sources are for
+  // players who are not new (16 §2.15)
+  const brief = firstRun && !firstMore;
+  if (brief) w.append(inLab, inCard, resLab, result);
+  else w.append(inLab, inCard, mLab, mCard, resLab, result);
+  area(inCard, inLab); if (!brief) area(mCard, mLab);
   // the export side (C1): share what you have, below bringing things in
   if (!firstRun) { const [sLab, sCard] = sectionCard(T("Share")); shareRows(sCard); w.append(sLab, sCard); area(sCard, sLab); }
   sc.append(w);
   // the rows are filled in on the page: the file row's error watches the result area
+  if (brief) {
+    const more = button(T("show"), "", () => { firstMore = true; exchange(true); });
+    const other = row(T("something else…"), "", more);
+    other.title = T("a list file, a share code, a pack or another manager");
+    inCard.append(gameRow(), other);
+    read.finish(); ui.renderWhere(); ui.renderHints();
+    return;
+  }
   inCard.append(gameRow(), ...listRows(), packRow());
   managerRows(mCard);
   read.finish(); ui.renderWhere(); ui.renderHints();
@@ -121,9 +135,10 @@ function gameRow() {
   const use = firstRun
     ? button(T("use this list"), "", () => { const after = ui.afterImport; ui.afterImport = null; firstRun = false; return after?.(T("use the game's list as it is")); }, "primary")
     : button(T("read it"), "", () => g && preview("file", g.path));
-  if (g) use.title = g.path;
   use.disabled = !g && !firstRun;
-  const r = row(T("The game's current list"), g ? Tf("its ModsConfig.xml enables %d Mods", g.mods) : T("the game has no ModsConfig.xml yet"), use);
+  // the file's name is not a word to learn: the row says how many Mods, the path is on hover
+  const r = row(T("The game's current list"), g ? Tf("%d mods", g.mods) : T("the game has no ModsConfig.xml yet"), use);
+  if (g) r.title = use.title = g.path;
   if (firstRun) r.classList.add("on");
   return r;
 }
@@ -168,7 +183,8 @@ function listRows() {
   const go = button(T("read"), "", () => ta.value.trim() && preview("text", ta.value));
   go.title = T("links are read from Steam or Rentry when you press read");
   const file = row(T("A Mod list"), T("a new list, or changes to one of yours; previewed first"), pick, fileInput);
-  const text = row(T("Pasted text"), T("a Steam collection or Rentry link, a share code, or a copied list"), wrap, clip, go);
+  const text = row(T("Pasted text"), "", wrap, clip, go);
+  text.title = T("a Steam collection or Rentry link, a share code, or a copied list");
   text.classList.add("xc-textrow");
   return [file, text];
 }
@@ -239,7 +255,9 @@ function managerRows(card) {
     M.extra.push({ manager: kind === "list" ? T("a file") : "", kind, path: f });
     survey();
   });
-  card.append(el("div", "xc-mrows"), row(T("Somewhere else"), T("a data folder or file kept elsewhere; it is only read"), more));
+  const elsewhere = row(T("Somewhere else"), "", more);
+  elsewhere.title = T("a data folder or file kept elsewhere; it is only read");
+  card.append(el("div", "xc-mrows"), elsewhere);
 }
 
 // survey asks what each manager holds (dry runs in their own session); rows fill in.
@@ -363,7 +381,7 @@ function partLabel(g, p) {
   return PART()[p.part] || p.part;
 }
 function partBecomes(g, p) {
-  if (g.kind === "configs") return T("a Game Config with its list");
+  if (g.kind === "configs") return T("a game with its list");
   if (g.kind === "lists") {
     if (p.state === "listed") return M.mode.get(p.id) === "update" ? Tf("changes to your list %s; undoable", p.list.name) : T("another copy");
     return T("a new list");
@@ -465,7 +483,7 @@ function partRow(m, g, p) {
   if (p.list?.changed) P.push(["chg", T("changed")]);
   let right;
   if (p.state === "blocked") right = el("span", "why", p.why || "");
-  else if (p.state === "had") right = have(g.kind === "configs" ? Tf("already the Game Config %s", p.why) : T("already in RimArcho"));
+  else if (p.state === "had") right = have(g.kind === "configs" ? Tf("already the game %s", p.why) : T("already in RimArcho"));
   else if (on) right = el("span", "bc becomes", partBecomes(g, p));
   else if (p.state === "listed") {
     right = el("span", "bc");
@@ -569,7 +587,7 @@ function drawRun() {
       button(T("choose again"), "", again), button(Tf("continue %d", rest.length), "", () => startRun(rest), "primary"));
   } else {
     const failed = r.picks.filter((_, i) => items[i]?.state === "fail");
-    f.append(el("span", "note", (failed.length ? Tf("%d failed; the rest is in RimArcho.", failed.length) : T("Everything is in RimArcho.")) + " " + T("Notes and tags show in the Mod library; lists under lists; Game Configs in the switcher.")));
+    f.append(el("span", "note", (failed.length ? Tf("%d failed; the rest is in RimArcho.", failed.length) : T("Everything is in RimArcho.")) + " " + T("Notes and tags show in the Mod library; lists under lists; games in the switcher.")));
     if (failed.length) f.append(button(Tf("retry %d", failed.length), "", () => startRun(failed)));
     if (r.picks.some(p => p.kind === "lists")) f.append(button(T("open lists"), "", () => ui.go("plans")));
     f.append(button(T("done"), "", again, "primary"));
@@ -687,12 +705,22 @@ async function preview(kind, src, fileName) {
 
   showImportSummary(body, p, !!(p.sourcePath || fileName));
   showImportContents(body, p);
+  // the game's own list, or any list, that the list already is: nothing to import (16 §2.18)
+  const fromGame = kind === "file" && !!info?.game && src === info.game.path;
+  if (p.replace?.same && !p.settings && !p.collection) {
+    body.append(row(fromGame ? Tf("%s already matches the game.", active.name) : Tf("%s already is this list.", active.name), ""));
+    body.append(footer("", button(T("close"), "", hideResult)));
+    reveal();
+    return;
+  }
 
   // A destination is selected first; only the final import button changes data (16 §2.17).
   let destination = "new", busy = false;
   const name = el("input", "field xc-name"); name.spellcheck = false;
   name.setAttribute("aria-label", T("new list name"));
-  const base = p.name || (p.source || "").replace(/^.*[\\/]/, "").replace(/\.[^.]*$/, "");
+  // the game's list is named after its Game Config, not after its file (ModsConfig)
+  const gameName = fromGame ? (S.board?.environmentRows || []).find(e => e.current)?.name : "";
+  const base = gameName || p.name || (p.source || "").replace(/^.*[\\/]/, "").replace(/\.[^.]*$/, "");
   const free = await api.CheckPlanName(base, "", 0).catch(() => ({ free: base }));
   if (!current()) return;
   name.value = free.free;
