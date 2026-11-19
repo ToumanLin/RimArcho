@@ -72,6 +72,9 @@ type App struct {
 	Detect env.DetectOptions
 	// Launcher starts the game; nil means ExecLauncher.
 	Launcher Launcher
+	// SteamRunning reports whether the Steam client runs; nil means the process table
+	// (tests replace it). A Steam launch without it starts the game directly (09 §2).
+	SteamRunning func() bool
 	// AnalyzeRunner brings the Def/Patch analysis up to date; nil means the `archo analyze`
 	// child process (05 §3). Tests run it in-process.
 	AnalyzeRunner func(envName string, progress func(string)) error

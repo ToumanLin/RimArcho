@@ -37,6 +37,12 @@ type LoadoutState struct {
 
 	cands  []loadout.Candidate // what Reg was built from, deployed instances included
 	deploy map[string]bool     // instances linked into Mods/ by RimArcho (09 §3)
+	// workshopLinks: this write is a launch without the Steam client, so the list's
+	// Workshop Mods are linked into Mods/ too (09 §3 "Workshop Mods without Steam").
+	workshopLinks bool
+	// keepWorkshopLinks: a save while the game runs keeps the Workshop links it may have
+	// started with, adding none (09 §3).
+	keepWorkshopLinks bool
 	// localize reads another game's own entries by packageId (nil: as stored).
 	localize func(loadout.List) loadout.List
 }
@@ -1080,6 +1086,9 @@ func (a *App) SaveWith(dryRun, move bool) (*SaveResult, error) {
 	if err != nil {
 		return nil, err
 	}
+	if g, _ := a.GameRunning(); g != nil {
+		st.keepWorkshopLinks = true
+	}
 	r, err := a.writeGame(st, dryRun, false, move)
 	if err != nil {
 		return nil, err
@@ -1139,6 +1148,7 @@ func (a *App) writeGame(st *LoadoutState, dryRun, launch, move bool, creditFrom 
 			if err != nil {
 				return nil, err
 			}
+			st2.workshopLinks, st2.keepWorkshopLinks = st.workshopLinks, st.keepWorkshopLinks
 			r, err := a.writeGame(st2, false, launch, false)
 			if r != nil {
 				r.Moved = de.Moves

@@ -12,6 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/order"
 	"github.com/ToumanLin/RimArcho/internal/render"
+	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
@@ -779,6 +780,9 @@ func launchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	p := r.Launch
 	head := "launched RimWorld via " + p.Method
+	if p.SteamOff {
+		head = "launched RimWorld directly: Steam is not running"
+	}
 	if dry {
 		head = "launch: dry run (" + p.Method + "), nothing written"
 	}
@@ -793,6 +797,23 @@ func launchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		root.KV("history", fmt.Sprintf("v%d (launch)", r.Version))
 	}
 	root.KV("command", p.Command())
+	if p.SteamOff && dry {
+		root.KV("steam", "not running: the game would start directly")
+	}
+	if p.Workshop {
+		n := 0
+		for _, l := range r.Links {
+			if m := r.State.Ix.ByID[l.Mod]; l.Op == "add" && m != nil && m.Kind == source.Workshop {
+				n++
+			}
+		}
+		if n > 0 {
+			root.KV("workshop", fmt.Sprintf("%d Workshop Mod(s) linked into Mods/ (no Steam client to load them)", n))
+		}
+	}
+	if p.AppID != "" {
+		root.KV("writes", p.AppID+" (so the game does not restart through Steam)")
+	}
 	if dry {
 		d.AddNext("archo launch")
 	}

@@ -150,6 +150,44 @@ func (a *App) deploySet(ix *Index, aliases map[string][]store.Alias) (map[string
 	return set, nil
 }
 
+// workshopDeploy is the list's Workshop Mods a launch without the Steam client links into
+// Mods/ (09 §3 "Workshop Mods without Steam"): the game cannot list subscriptions then.
+// Left out: a Mod the game already sees in Mods/ through another tool's link, and one
+// whose packageId another Mods/ copy holds (the Workshop copy plays as "_steam"; a link
+// would make two copies in Mods/).
+func (st *LoadoutState) workshopDeploy() []*store.Mod {
+	if !st.workshopLinks {
+		return nil
+	}
+	return st.workshopMods()
+}
+
+// workshopMods is what workshopDeploy links when the launch is without Steam.
+func (st *LoadoutState) workshopMods() []*store.Mod {
+	kinds := map[string]source.Kind{}
+	for _, s := range st.Ix.Sources {
+		kinds[s.ID] = s.Kind
+	}
+	var out []*store.Mod
+	for _, e := range st.List {
+		m := st.Ix.ByID[e.Instance]
+		if m == nil || m.Kind != source.Workshop || m.Status != identity.Live || m.Residue || m.Unloadable != "" || !st.Reg.Loadable(m.ID) {
+			continue
+		}
+		if !strings.EqualFold(st.Reg.Token(m.ID), m.PackageID) {
+			continue
+		}
+		inMods := false
+		for _, al := range st.Aliases[m.ID] {
+			inMods = inMods || kinds[al.SourceID] == source.Local && !managedLink(al.Rel)
+		}
+		if !inMods {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
 // modsDir is the game's Mods/ folder: the root of the environment's local source.
 func modsDir(ix *Index) string {
 	for _, s := range ix.Sources {
@@ -178,6 +216,15 @@ func planLinks(st *LoadoutState, copies []ModsCopy) (string, []LinkChange, []Dup
 	for _, e := range st.List {
 		if m := st.Ix.ByID[e.Instance]; m != nil && st.Deployable(m) {
 			want[strings.ToLower(DeployName(m))] = m
+		}
+	}
+	for _, m := range st.workshopDeploy() {
+		want[strings.ToLower(DeployName(m))] = m
+	}
+	keep := map[string]*store.Mod{} // Workshop links a running game may use (save only)
+	if st.keepWorkshopLinks {
+		for _, m := range st.workshopMods() {
+			keep[strings.ToLower(DeployName(m))] = m
 		}
 	}
 	if mods == "" {
@@ -230,6 +277,9 @@ func planLinks(st *LoadoutState, copies []ModsCopy) (string, []LinkChange, []Dup
 		m := want[strings.ToLower(name)]
 		if m != nil && sameDir(p, m.RealPath) {
 			have[strings.ToLower(name)] = true
+			continue
+		}
+		if k := keep[strings.ToLower(name)]; k != nil && sameDir(p, k.RealPath) {
 			continue
 		}
 		tgt, _ := source.RealPath(p)
