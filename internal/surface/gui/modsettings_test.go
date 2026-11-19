@@ -136,3 +136,48 @@ func readText(t *testing.T, path string) string {
 	}
 	return string(b)
 }
+
+// 16 §2.9 "All files", "Cleanup": the page's file views and its recycle and reset, by file
+// name and instance (never a path).
+func TestModSettingsFilesPage(t *testing.T) {
+	t.Parallel()
+	e, api, _ := fixture(t)
+	var trashed []string
+	e.App.TrashFunc = func(p string) error { trashed = append(trashed, filepath.Base(p)); return os.Remove(p) }
+	cfg := filepath.Join(e.UserData, "Config")
+	e.WriteFile(filepath.Join(cfg, "Mod_1001_AlphaMod.xml"), `<SettingsBlock><ModSettings><on>True</on></ModSettings></SettingsBlock>`)
+	e.WriteFile(filepath.Join(cfg, "Mod_Removed_RMod.xml"), `<SettingsBlock/>`)
+	e.WriteFile(filepath.Join(cfg, "Prefs.xml"), `<PrefsData/>`)
+	p, err := api.ModSettingsFiles()
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := map[string]string{}
+	for _, r := range p.Rows {
+		st[r.Name] = r.Status
+		if r.Name == "Prefs.xml" && r.Recyclable {
+			t.Fatal("Prefs.xml is recyclable")
+		}
+	}
+	if st["Mod_1001_AlphaMod.xml"] != app.ConfigFileListed || st["Mod_Removed_RMod.xml"] != app.ConfigFileOrphan || st["Prefs.xml"] != app.ConfigFileGame {
+		t.Fatalf("statuses: %v", st)
+	}
+	if _, err := api.RecycleModSettings([]string{"Prefs.xml"}); err == nil {
+		t.Fatal("Prefs.xml was accepted")
+	}
+	msg, err := api.RecycleModSettings([]string{"Mod_Removed_RMod.xml"})
+	if err != nil || !strings.Contains(msg, "moved 1 settings files") {
+		t.Fatalf("recycle: %q %v", msg, err)
+	}
+	l, err := api.ModSettings()
+	if err != nil || len(l.Rows) == 0 {
+		t.Fatalf("list: %+v %v", l, err)
+	}
+	msg, err = api.ResetModSettings(l.Rows[0].Instance)
+	if err != nil || !strings.Contains(msg, "starts with its defaults") || strings.Join(trashed, ",") != "Mod_Removed_RMod.xml,Mod_1001_AlphaMod.xml" {
+		t.Fatalf("reset: %q %v %v", msg, err, trashed)
+	}
+	if _, err := api.ResetModSettings(l.Rows[0].Instance); err == nil || !strings.Contains(err.Error(), "already uses its defaults") {
+		t.Fatalf("reset again: %v", err)
+	}
+}

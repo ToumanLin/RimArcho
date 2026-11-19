@@ -31,3 +31,11 @@ export const modSettingsColumns = [
   { key: "size", title: "size", w: 64, dir: -1, num: true, cmp: number("bytes") },
   { key: "file", title: "file", w: 260, shown: false, dir: 1, cmp: text("file") },
 ];
+// Mod settings › the Config folder's files (16 §2.9 "All files").
+export const configFileColumns = [
+  { ...name, title: "file", w: 260 },
+  { key: "state", title: "where", w: 120, dir: 1, cmp: text("state") },
+  { key: "mod", title: "mod", w: 160, dir: 1, cmp: text("mod") },
+  { key: "size", title: "size", w: 70, dir: -1, num: true, cmp: number("bytes") },
+  { key: "modified", title: "last written", w: 130, dir: -1, cmp: number("modifiedAt") },
+];

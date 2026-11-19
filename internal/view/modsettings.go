@@ -256,6 +256,8 @@ func SettingErrorText(e *app.SettingInputError) string {
 		return T("the Mod has no settings file yet: change a setting in the game once")
 	case "running":
 		return T("the game is running: close it first, or change the value in the game")
+	case "defaults":
+		return T("the Mod has no settings file: it already uses its defaults")
 	}
 	return e.Error()
 }
@@ -340,4 +342,109 @@ func SettingText(v app.SettingValue) string {
 	default:
 		return Tf("nested, %d fields", v.Items)
 	}
+}
+
+// ConfigFilesPage is the Mod settings page's other views (16 §2.9 "All files"): every file
+// in the Config folder and where it stands.
+type ConfigFilesPage struct {
+	Config string          `json:"config"`
+	Rows   []ConfigFileRow `json:"rows"`
+	Locked string          `json:"locked,omitempty"` // why nothing can move now (a game runs)
+}
+
+// ConfigFileRow is one file of the Config folder.
+type ConfigFileRow struct {
+	Key        string `json:"key"` // the file name: unique in the folder
+	Name       string `json:"name"`
+	Status     string `json:"status"` // app.ConfigFile*
+	State      string `json:"state"`  // Status as shown
+	Mod        string `json:"mod"`    // "—" unknown
+	Instance   string `json:"instance,omitempty"`
+	Bytes      int64  `json:"bytes"`
+	Size       string `json:"size"`
+	Modified   string `json:"modified"`
+	ModifiedAt int64  `json:"modifiedAt"` // Unix seconds, for sorting
+	Recyclable bool   `json:"recyclable"`
+}
+
+// ConfigStatusText is how a file's place reads (16 §2.9).
+func ConfigStatusText(s string) string {
+	switch s {
+	case app.ConfigFileListed:
+		return T("this list")
+	case app.ConfigFileUnlisted:
+		return T("not in this list")
+	case app.ConfigFileOrphan:
+		return T("not installed")
+	}
+	return T("game file")
+}
+
+// ConfigFileRows makes the page's rows from app.ModSettingsFiles.
+func ConfigFileRows(cf *app.ConfigFiles) *ConfigFilesPage {
+	p := &ConfigFilesPage{Config: cf.Config, Rows: []ConfigFileRow{}}
+	for _, f := range cf.Files {
+		mod := f.Mod
+		if mod == "" {
+			mod = "—"
+		}
+		p.Rows = append(p.Rows, ConfigFileRow{Key: f.File, Name: f.File, Status: f.Status, State: ConfigStatusText(f.Status),
+			Mod: mod, Instance: f.Instance, Bytes: f.Size, Size: SizeText(f.Size),
+			Modified: f.Modified.Local().Format("2006-01-02 15:04"), ModifiedAt: f.Modified.Unix(), Recyclable: f.Recyclable()})
+	}
+	return p
+}
+
+// SettingsRecycleText is the status line after files went to the recycle bin.
+func SettingsRecycleText(r *app.SettingsRecycle) string {
+	s := Tf("moved %d settings files to the recycle bin", len(r.Files))
+	for _, f := range r.Failed {
+		s += "; " + Tf("%s not moved: %s", f.File, f.Err)
+	}
+	return s
+}
+
+// SettingsCopyView is "copy settings from…"'s preview or result (16 §2.9).
+type SettingsCopyView struct {
+	From    string   `json:"from"`
+	Lines   []string `json:"lines"`
+	Copies  int      `json:"copies"`  // files to copy (new or replacing)
+	Replace int      `json:"replace"` // of them, replacing a file here
+	Message string   `json:"message"`
+}
+
+// SettingsCopyLines describes a SettingsCopyPlan, one line per file.
+func SettingsCopyLines(p *app.SettingsCopyPlan) *SettingsCopyView {
+	v := &SettingsCopyView{From: p.From, Lines: []string{}}
+	failed := 0
+	for _, c := range p.Copies {
+		var note string
+		switch {
+		case c.Err != "":
+			note = Tf("failed: %s", c.Err)
+			failed++
+		case c.Same:
+			note = T("already the same")
+		case c.Replace:
+			note = T("replaces the file here (it goes to the recycle bin first)")
+			v.Copies++
+			v.Replace++
+		default:
+			note = T("new")
+			v.Copies++
+		}
+		v.Lines = append(v.Lines, c.Mod+": "+c.From+" → "+c.To+"  "+note)
+	}
+	if len(p.Copies) == 0 {
+		v.Lines = append(v.Lines, Tf("%s has no settings file for these Mods", p.From))
+	}
+	if p.DryRun {
+		v.Message = Tf("%d files to copy from %s, %d replacing a file here", v.Copies, p.From, v.Replace)
+	} else {
+		v.Message = Tf("copied %d settings files from %s", v.Copies, p.From)
+		if failed > 0 {
+			v.Message += "; " + Tf("%d failed", failed)
+		}
+	}
+	return v
 }

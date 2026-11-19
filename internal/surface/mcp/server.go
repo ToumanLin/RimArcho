@@ -293,15 +293,42 @@ type RefIn struct {
 // ModSettingsSetIn is set_mod_settings: archo mod-settings set (16 §2.9 "Mod settings").
 type ModSettingsSetIn struct {
 	Env    string            `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
-	Ref    string            `json:"ref" jsonschema:"the mod: #<id>, L#<lineage>, pkg:<packageId>, ws:<workshopId>"`
-	File   string            `json:"file,omitempty" jsonschema:"which settings when the Mod has several: its Mod class or hugslib:<pack>, as get_mod_settings names them"`
-	Set    map[string]string `json:"set,omitempty" jsonschema:"setting name (or HugsLib title) → new value: on/off, a number, one line of text, a HugsLib choice"`
-	Reset  StrList           `json:"reset,omitempty" jsonschema:"settings whose stored value is removed: the Mod uses its default"`
+	Ref    string            `json:"ref,omitempty" jsonschema:"the mod (#id, pkg:…)"`
+	File   string            `json:"file,omitempty" jsonschema:"file key when the Mod has several"`
+	Set    map[string]string `json:"set,omitempty" jsonschema:"name (or HugsLib title) → value"`
+	Reset  StrList           `json:"reset,omitempty" jsonschema:"names back to their default"`
 	DryRun bool              `json:"dry_run,omitempty" jsonschema:"check and show the change without writing"`
+	// The Config folder's files (16 §2.9): recycle, reset, copy_from.
+	Action string  `json:"action,omitempty" jsonschema:"set, recycle, reset, copy_from"`
+	Files  StrList `json:"files,omitempty" jsonschema:"recycle: Mod_*.xml or orphans"`
+	From   string  `json:"from,omitempty" jsonschema:"copy_from: a Game Config"`
+	Refs   StrList `json:"refs,omitempty" jsonschema:"copy_from: mods"`
 }
 
 // ModSettingsSetArgv maps set_mod_settings to its command (set pairs in name order).
 func ModSettingsSetArgv(in ModSettingsSetIn) []string {
+	switch in.Action {
+	case "", "set":
+	case "recycle":
+		b := argv("mod-settings", "recycle")
+		orphans := false
+		for _, f := range in.Files {
+			if f == "orphans" {
+				orphans = true
+			} else {
+				b.a = append(b.a, f)
+			}
+		}
+		return b.flag("orphans", orphans).flag("dry-run", in.DryRun).a
+	case "reset":
+		return argv("mod-settings", "reset", in.Ref).flag("dry-run", in.DryRun).a
+	case "copy_from":
+		b := argv("mod-settings", "copy-from", in.From)
+		b.a = append(b.a, in.Refs...)
+		return b.flag("dry-run", in.DryRun).a
+	default:
+		return unknown("set_mod_settings", in.Action)
+	}
 	b := argv("mod-settings", "set", in.Ref)
 	names := make([]string, 0, len(in.Set))
 	for k := range in.Set {
@@ -320,8 +347,10 @@ func ModSettingsSetArgv(in ModSettingsSetIn) []string {
 // ModSettingsIn is get_mod_settings: archo mod-settings (16 §2.9 "Mod settings").
 type ModSettingsIn struct {
 	Env string `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
-	Ref string `json:"ref,omitempty" jsonschema:"a mod reference (#<id>, L#<lineage>, pkg:<packageId>, ws:<workshopId>): its stored values; empty lists the current list's Mods that have settings"`
+	Ref string `json:"ref,omitempty" jsonschema:"a mod (#id, pkg:…): its stored values; empty: the list's Mods with settings"`
 	All bool   `json:"all,omitempty" jsonschema:"no truncation"`
+	// Files lists the Config folder instead (mod-settings files).
+	Files string `json:"files,omitempty" jsonschema:"all|listed|unlisted|orphans|game: Config files instead"`
 }
 
 type DefIn struct {
@@ -555,6 +584,13 @@ func toolList() []tool {
 		}),
 		reg("get_mod", true, false, descMod, func(in RefIn) []string { return []string{"mod", in.Ref} }),
 		reg("get_mod_settings", true, false, descModSettings, func(in ModSettingsIn) []string {
+			if in.Files != "" {
+				f := in.Files
+				if f == "all" {
+					f = ""
+				}
+				return argv("mod-settings", "files").str("filter", f).flag("all", in.All).a
+			}
 			return argv("mod-settings").pos(in.Ref).flag("all", in.All).a
 		}),
 		reg("get_description", true, false, descDescribe, func(in DescribeIn) []string {

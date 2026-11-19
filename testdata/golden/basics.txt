@@ -112,6 +112,10 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     links check                               check RimArcho links without changing files
     links repair                              preview or confirm link repair and unfinished-operation recovery
     mod-settings set <ref> [<name>=<value>…]  change a Mod's simple settings values (on/off, numbers, one line of text, a HugsLib choice) with the game closed; backs the file up first
+    mod-settings files                        every file in the Game Config's Config folder: read by this list, an installed Mod's not in it, an orphan (no installed Mod), or the game's own
+    mod-settings recycle [<file>…]            move Mod settings files (Mod_*.xml in the Config folder) to the recycle bin, with the game closed
+    mod-settings reset <ref>                  reset a Mod to its default settings: its settings files go to the recycle bin, with the game closed
+    mod-settings copy-from <game-config> [<ref>…]  copy the current list's Mods' settings from another Game Config (all Mods, or those named); a replaced file goes to the recycle bin first
     monitor                                   Archo Monitor, the in-game companion: versions, source, place in the plan
     monitor install                           install or update the bundled Archo Monitor and add it to plans by default (19 §6)
     pack build <name>                         compile the workspace into a pack: checked, sorted, each mod copied without the version folders this game does not load

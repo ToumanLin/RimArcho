@@ -56,7 +56,8 @@ func (a *App) trash(path string) error {
 //   - a pack: a folder directly in the pack folder;
 //   - saves: inside a game's Saves/, an own save folder (<data>/userdata/<env>), or the save
 //     backups (<data>/backups/saves);
-//   - a game folder downloaded with SteamCMD (uninstall, when the player chose to delete it).
+//   - a game folder downloaded with SteamCMD (uninstall, when the player chose to delete it);
+//   - a Mod settings file Mod_*.xml directly in an environment's user data Config/.
 //
 // A link is never moved, whatever it points at.
 func (a *App) trashAllowed(path string) error {
@@ -127,7 +128,10 @@ func (a *App) trashAllowed(path string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("%w: %s is not a mod folder, a pack, saves or a downloaded game", ErrNotInTrashList, path)
+	if a.settingsFileTrashable(p) {
+		return nil // a Mod settings file in a Game Config's Config/ (16 §2.9)
+	}
+	return fmt.Errorf("%w: %s is not a mod folder, a pack, saves, a Mod settings file or a downloaded game", ErrNotInTrashList, path)
 }
 
 // realOrAbs resolves links where the path exists, else makes it absolute.
