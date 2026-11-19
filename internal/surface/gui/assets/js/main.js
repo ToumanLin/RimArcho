@@ -38,6 +38,7 @@ import * as ops from "./ops.js";
 import * as uninst from "./uninstall.js";
 import * as packsPage from "./packs.js";
 import * as planManage from "./planmanage.js";
+import { wireZoom } from "./uizoom.js";
 import * as tex from "./textures.js";
 import * as tasksPage from "./tasks.js";
 import * as selfUpdate from "./selfupdate.js";
@@ -271,9 +272,6 @@ function renderTop() {
   $("#planhead .lead").textContent = $("#planhead .lead").title = Tf("%d enabled, in the order the game loads them", col(1).items.length);
 }
 
-// goLaunch is the editor's launch game (and its L): the game starts from Start, so it opens that
-// page with this list applied — launching it from its editor makes it current — and the
-// focus on its launch button (16 §2.5).
 // exportCurrent is the editor's e: the current list's export sub-page (16 §2.5, §2.17).
 function exportCurrent() {
   const p = S.shell && S.shell.plan;
@@ -281,12 +279,39 @@ function exportCurrent() {
   return planManage.exportOf(p.id, "editor");
 }
 
-async function goLaunch() {
+// launchHere is the editor's launch (its button, L and the command panel's launch): it starts
+// the game from the editor, so a player testing a list again and again stays on it (16 §2.5,
+// issue #6). The open list becomes current first; then the same checks as Launch's ▶: the RAM
+// estimate's severe warning asks once (09 §2), run asks about missing required Mods and gives
+// a refusal (a running game, outside changes not loaded) in the status line.
+let launchingHere = false;
+async function launchHere() {
   if (environmentReason()) return say("busy", environmentReason());
-  const open = S.shell && S.shell.plan;
-  if (open && !open.current && !(await plans.usePlan(open.id))) return;
-  await go("home");
-  await homePage.focusLaunch();
+  if (launchingHere) return;
+  launchingHere = true;
+  try {
+    const open = S.shell && S.shell.plan;
+    if (open && !open.current && !(await plans.usePlan(open.id))) return;
+    let m = null;
+    try { m = await api.HomeMemory(); } catch { /* unavailable means unknown, as on Launch */ }
+    if (m?.assessment?.ramSeverity === "severe") {
+      pop.memoryConfirm(m, () => startHere(m.token));
+      return;
+    }
+    await startHere(null);
+  } finally { launchingHere = false; }
+}
+
+// startHere launches after the RAM check; approved is the estimate the player accepted, and a
+// list edited since then asks again.
+async function startHere(approved) {
+  if (approved) {
+    let m = null;
+    try { m = await api.HomeMemory(); } catch { /* unknown */ }
+    if (!m || m.token !== approved) return say("busy", T("the list changed; review the updated estimate before launching"));
+  }
+  say("busy", T("starting…"));
+  await run("launch");
 }
 
 // planActions: the list's actions in the top bar (16 §2.5): its "an outside version has not been loaded" mark,
@@ -333,9 +358,9 @@ function planActions() {
     c.title = Tf("the game is launched with %s; this list is only open here", S.shell.current.name) + T("; ") + T("no game file is written");
     out.push(c);
   } else {
-    // Start opens Start, where the game starts (16 §2.5)
-    const l = btn(T("launch"), "L", goLaunch, "primary", "launch");
-    l.title = T("opens the launch page, where the game starts") + T("; ") + "L";
+    // the game starts from here, as from Launch (16 §2.5)
+    const l = btn(T("launch"), "L", launchHere, "primary", "launch");
+    l.title = T("starts the game with this list; unsaved changes are saved first") + T("; ") + "L";
     out.push(l);
   }
   return out;
@@ -930,8 +955,8 @@ async function cmd(id) {
   // the list's own actions show the list; the rest work on any page
   if (["filter", "details", "tech", "tags", "rules"].includes(id) && scr.closeScreen()) renderWhere();
   switch (id) {
-    // from the editor, Start opens the launch page, as L does there (16 §2.5)
-    case "launch": return S.screen ? run(id) : goLaunch();
+    // from the editor, launch checks the RAM estimate as its L does (16 §2.5)
+    case "launch": return S.screen ? run(id) : launchHere();
     case "sort": case "save": return run(id);
     case "preview-sort": case "preview-save": case "preview-launch": return preview(id.slice(8));
     case "undo": case "redo": case "restore-all": case "stage-all": return verb(id);
@@ -1342,7 +1367,7 @@ function onKey(e) {
   const map = {
     " ": () => verb("toggle"), t: () => verb("stage"), m: () => verb("move"), J: () => verb("down"), K: () => verb("up"),
     g: () => verb("tags"), n: () => verb("note"), p: () => problems.toggle(), Enter: () => verb("full"), x: () => verb("swap"),
-    S: () => run("sort"), w: () => run("save"), L: () => goLaunch(), u: () => verb("undo"), T: () => verb(S.focus === 2 ? "restore-all" : "stage-all"),
+    S: () => run("sort"), w: () => run("save"), L: () => launchHere(), u: () => verb("undo"), T: () => verb(S.focus === 2 ? "restore-all" : "stage-all"),
     "/": () => startSearch(), "\\": () => S.bar.toggle(), c: () => go("changes"), l: () => go("log"), R: () => cmd("rescan"), A: () => cmd("analyze"),
     H: () => historyChooser(), C: () => changesOfCursor(), "<": () => widthKey(-1), ">": () => widthKey(1), "=": () => widthKey(0),
     E: () => go("env"), P: () => plans.chooser(), "?": () => pop.help("plan"), ":": () => commandLine(), i: () => exchange(), e: () => exportCurrent(),
@@ -1464,6 +1489,7 @@ async function start() {
   initRules(ui);
   wireSplits();
   document.addEventListener("keydown", onKey);
+  wireZoom(); // ctrl+wheel, ctrl+'+' / '-' / '0': interface size on every page (16 §2.14)
   document.addEventListener("verb", (e) => { const v = e.detail; v === "needs" ? go("needs") : verb(v); });
   // a detail's settings row: Mod library › Mod settings at that Mod's files (16 §2.9)
   document.addEventListener("open-mod-settings", (e) => { modSettings.focusMod(e.detail); go("mod-settings"); });

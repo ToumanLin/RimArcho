@@ -268,7 +268,8 @@ func KeyHelp(page string, tui bool) []KeyRow {
 	}
 	out = append(out, r("shift+1–8", "go to a page in the sidebar"))
 	if !tui {
-		out = append(out, r("alt+← / alt+→", "page back / forward"), r("ctrl+b", "navigation at the side / at the top"), r("ctrl+j", "background tasks; again goes back"), r("ctrl+\\", "reference numbers on every control, text and image"))
+		out = append(out, r("alt+← / alt+→", "page back / forward"), r("ctrl+b", "navigation at the side / at the top"), r("ctrl+j", "background tasks; again goes back"), r("ctrl+\\", "reference numbers on every control, text and image"),
+			r("ctrl+wheel, ctrl+= / ctrl+- / ctrl+0", "interface size: larger / smaller / 100%"))
 	}
 	out = append(out,
 		r(pick("c / l", "c"), pick("updates, game log", "updates")),

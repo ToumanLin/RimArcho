@@ -39,6 +39,7 @@ var frontendNodeSuites = []string{
 	"testdata/subscriptions.mjs",
 	"testdata/tasks.mjs",
 	"testdata/textures.mjs",
+	"testdata/uizoom.mjs",
 	"testdata/window-chrome.mjs",
 }
 

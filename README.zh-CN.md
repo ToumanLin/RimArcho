@@ -87,6 +87,7 @@ archo import rimcrow --db "D:\Game\RimModManager\data\mod_manager.db" --dry-run 
 | `!`、`c` | 需要处理；最近变化 |
 | `R`、`A`、`E` | 重新扫描；重新检查文件；切换环境 |
 | `ctrl+k`、`?` | 命令面板；全部按键 |
+| `ctrl`+滚轮、`ctrl+=` / `ctrl+-` / `ctrl+0` | 窗口：界面大小放大一档 / 缩小一档 / 恢复 100%（100、110、125、150%；与 设置 › 界面 › 界面大小 相同，下次启动保持） |
 
 方案编辑器和 Mod 库的筛选栏包含**位置**：已登记的来源目录（例如游戏的 `Mods/`、工坊，或某个 SteamCMD、额外目录）。可选多个位置，匹配其中任一位置；右键排除某个位置。位置与其他筛选组组合使用。搜索也接受 `location:"D:\Steam Library\steamapps\common\RimWorld\Mods"`；CLI 用 `archo library --include 'location:D:\Steam Library\steamapps\common\RimWorld\Mods'`。
 
