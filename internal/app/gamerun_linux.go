@@ -112,3 +112,28 @@ func winePath(p, procDir string) string {
 	}
 	return ""
 }
+
+// steamClientRunning reports whether the Steam client runs (09 §2 "Without Steam").
+func steamClientRunning() bool { return steamRunningAt("/proc") }
+
+// steamRunningAt also accepts a synthetic proc tree: a process whose executable is named
+// steam (native, Flatpak and the steam.sh-started client alike).
+func steamRunningAt(proc string) bool {
+	entries, err := os.ReadDir(proc)
+	if err != nil {
+		return true // unknown: keep launching through Steam
+	}
+	for _, entry := range entries {
+		if _, err := strconv.Atoi(entry.Name()); err != nil {
+			continue
+		}
+		exe, err := os.Readlink(filepath.Join(proc, entry.Name(), "exe"))
+		if err != nil {
+			continue
+		}
+		if filepath.Base(strings.TrimSuffix(exe, " (deleted)")) == "steam" {
+			return true
+		}
+	}
+	return false
+}

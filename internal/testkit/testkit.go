@@ -147,6 +147,9 @@ func (e *Env) Open() {
 	a.ToddsNoPath = true
 	// The host's own Steam client is never asked who is signed in.
 	a.SteamSignedIn = func() (string, bool) { return "", false }
+	// The host's Steam client is never looked for: it counts as running, so a Steam
+	// launch stays one unless a test says otherwise.
+	a.SteamRunning = func() bool { return true }
 	// Never start a process from a test: launches are only recorded.
 	a.Launcher = func(exe string, args []string, dir string) error {
 		e.Launched = append(e.Launched, strings.Join(append([]string{exe}, args...), " "))

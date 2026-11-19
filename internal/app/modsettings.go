@@ -25,7 +25,10 @@ type SettingsCarry struct {
 	From string // file name in the Config folder it was read from
 	To   string // file name the game reads now
 	Err  string // why the copy failed ("" when it was made, or would be in a dry run)
-	src  string // the folder From is in
+	// Replace: To exists but is older than From, the same Workshop Mod's file under its
+	// other folder name (Workshop folder or its _Archo_ link, 09 §3), so it is replaced.
+	Replace bool
+	src     string // the folder From is in
 }
 
 // SettingsFile is the file the game reads and writes a Mod's settings in:
@@ -57,6 +60,9 @@ type settingsMod struct {
 	name   string
 	folder string
 	old    []string
+	// twin is the same Instance's other folder name, whose newer file replaces the
+	// current one: a Workshop Mod's Workshop folder and its _Archo_ link (09 §3).
+	twin string
 }
 
 // settingsFolders lists, per package (lower case, without "_steam"), every folder name the
@@ -85,7 +91,10 @@ func settingsFolders(ix *Index, aliases map[string][]store.Alias) map[string][]s
 		}
 		pkg := packageBase(strings.ToLower(m.PackageID))
 		switch m.Kind {
-		case source.Local, source.Workshop:
+		case source.Workshop: // and its link for launches without Steam (09 §3)
+			add(pkg, m.Rel)
+			add(pkg, DeployName(m))
+		case source.Local:
 			add(pkg, m.Rel)
 		case source.Elsewhere: // its own game's Mods/ folder, and its link here
 			add(pkg, m.Rel)
@@ -119,20 +128,30 @@ func (a *App) listSettings(st *LoadoutState, seen map[string]string, cfg string)
 	folders := settingsFolders(st.Ix, st.Aliases)
 	addSeenFolders(folders, a.MonitorSettings(filepath.Dir(cfg)))
 	job := settingsJob{read: []string{cfg}, have: cfg, write: cfg, known: allFolders(folders)}
+	linked := map[string]bool{} // Workshop Mods this launch links into Mods/
+	for _, m := range st.workshopDeploy() {
+		linked[m.ID] = true
+	}
 	for _, en := range st.List {
 		m := st.Ix.ByID[en.Instance]
 		if m == nil || m.Kind == source.Official || m.PackageID == "" {
 			continue
 		}
-		folder := seen[m.ID]
+		folder, twin := seen[m.ID], ""
 		if seen == nil && st.Reg.Loadable(m.ID) {
 			folder = st.Reg.Folder(m.ID)
+			if m.Kind == source.Workshop {
+				twin = DeployName(m)
+				if linked[m.ID] {
+					folder, twin = DeployName(m), m.Rel
+				}
+			}
 		}
 		if folder == "" {
 			continue
 		}
 		job.mods = append(job.mods, settingsMod{name: m.DisplayName(), folder: folder,
-			old: folders[packageBase(strings.ToLower(m.PackageID))]})
+			old: folders[packageBase(strings.ToLower(m.PackageID))], twin: twin})
 	}
 	return job
 }
@@ -189,6 +208,24 @@ func planModSettings(job settingsJob) []SettingsCarry {
 		}
 		stem := settingsStem(m.folder)
 		done := map[string]bool{}
+		if m.twin != "" && len(byDir) > 0 && samePath(job.read[0], job.have) {
+			// The same Mod played under its other name since: its newer file wins.
+			cur := byDir[0][strings.ToLower(stem)]
+			twins := byDir[0][strings.ToLower(settingsStem(m.twin))]
+			classes := make([]string, 0, len(twins))
+			for c := range twins {
+				classes = append(classes, c)
+			}
+			sort.Strings(classes)
+			for _, c := range classes {
+				f, now := twins[c], cur[c]
+				if now.name == "" || !f.mod.After(now.mod) {
+					continue
+				}
+				done[c] = true
+				out = append(out, SettingsCarry{Mod: m.name, From: f.name, To: now.name, src: f.dir, Replace: true})
+			}
+		}
 		for _, files := range byDir {
 			found := map[string]settingsFileInfo{}
 			for _, o := range m.old {
@@ -289,7 +326,7 @@ func copySettingsFile(job settingsJob, c SettingsCarry, check func(path string) 
 			return err
 		}
 	}
-	keep := strings.EqualFold(filepath.Clean(job.write), filepath.Clean(job.have))
+	keep := strings.EqualFold(filepath.Clean(job.write), filepath.Clean(job.have)) && !c.Replace
 	if _, err := os.Lstat(dst); err == nil && keep {
 		return nil // appeared meanwhile: never overwritten
 	}

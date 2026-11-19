@@ -51,16 +51,17 @@ var UninstallSteps = []string{UnAccounts, UnLinks, UnModsConfig, UnTextures, UnL
 
 // What happens to an item.
 const (
-	DoUnlink  = "unlink"     // the link is deleted, never its target
-	DoClean   = "clean"      // ModsConfig.xml keeps the list without the mods that go away
-	DoRestore = "restore"    // ModsConfig.xml.rimarcho.bak goes back
-	DoTrash   = "trash"      // to the recycle bin; refused when there is none (02 §3)
-	DoMove    = "move"       // to Item.To (renamed, or copied, checked and the original trashed)
-	DoKeep    = "keep"       // stays where it is
-	DoDelete  = "delete"     // RimArcho's own: deleted
-	DoLater   = "after-exit" // deleted once RimArcho has closed
-	DoLeave   = "leave"      // left alone; Note says why
-	DoDDS     = "delete-dds" // the DDS RimArcho recorded in a mod folder are deleted, nothing else
+	DoUnlink  = "unlink"      // the link is deleted, never its target
+	DoClean   = "clean"       // ModsConfig.xml keeps the list without the mods that go away
+	DoRestore = "restore"     // ModsConfig.xml.rimarcho.bak goes back
+	DoTrash   = "trash"       // to the recycle bin; refused when there is none (02 §3)
+	DoMove    = "move"        // to Item.To (renamed, or copied, checked and the original trashed)
+	DoKeep    = "keep"        // stays where it is
+	DoDelete  = "delete"      // RimArcho's own: deleted
+	DoLater   = "after-exit"  // deleted once RimArcho has closed
+	DoLeave   = "leave"       // left alone; Note says why
+	DoAppID   = "remove-file" // RimArcho's steam_appid.txt in a game folder (09 §2)
+	DoDDS     = "delete-dds"  // the DDS RimArcho recorded in a mod folder are deleted, nothing else
 )
 
 // UninstallOptions are the player's answers; the zero value is the defaults.
@@ -357,6 +358,19 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 				}
 			}
 			links = append(links, it)
+		}
+	}
+	// steam_appid.txt that direct launches wrote (02 §1): only RimArcho's, and only while
+	// it still holds the game's app ID.
+	seenGames := map[string]bool{}
+	for _, e := range envs {
+		f := filepath.Join(e.GameRoot, AppIDFile)
+		if e.GameRoot == "" || seenGames[env.PathKey(f)] || a.Store.Meta(appIDMeta(e.GameRoot)) == "" {
+			continue
+		}
+		seenGames[env.PathKey(f)] = true
+		if b, err := os.ReadFile(f); err == nil && strings.TrimSpace(string(b)) == env.WorkshopAppID {
+			links = append(links, &UninstallItem{Path: f, Do: DoAppID})
 		}
 	}
 	add(UnLinks, links)
@@ -923,6 +937,11 @@ func (a *App) uninstallItem(step string, it *UninstallItem) error {
 	case "forget-agent-key":
 		return SetAgentKey("")
 	case DoKeep, DoLeave:
+		return nil
+	case DoAppID:
+		if err := os.Remove(it.Path); err != nil && !os.IsNotExist(err) {
+			return err
+		}
 		return nil
 	case DoUnlink:
 		return a.applyLinks(filepath.Dir(it.Path), []LinkChange{{Op: "remove", Name: filepath.Base(it.Path)}})
