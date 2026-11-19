@@ -119,6 +119,109 @@ export const archoWait = (slot, opts = {}) => show(slot, { delay: DELAY, ...opts
  *  plays a few times on each new expression, then rests on the still. */
 export const archoFigure = (slot, expr) => show(slot, { expr, rotate: false, rest: true });
 
+// ---- placements on pages (16 §7.1 "Placements") ----------------------------------------
+// archoSpot keeps one figure per page across redraws: the page calls peek or stand on every
+// draw with the expression for its state. A new expression plays its loop three times and
+// rests on the still (as in the guide); with cycle on, a page left alone moves to the next
+// of its calm expressions every 45 s, again three loops then the still.
+//
+//   const spot = archoSpot("feedback", { size: 128, calm: ["neutral"] });
+//   spot.peek(card, "think");   // behind card's top edge at its right end
+//   spot.stand(column, "thumbsup");   // last in column, right-aligned, fading at the bottom
+//
+// She is never cut: where the space is too narrow or too short, or a box would clip her,
+// the slot is hidden (visibility) until it fits again.
+const CYCLE = 45000, PEEK_RIGHT = 24, PEEK_OVER = 12;
+export const ARCHO_CYCLE = false; // idle cycling: off until the player decides (16 §7.1)
+const spots = new Map();
+
+export function archoSpot(name, { size = 140, calm = ["neutral"], cycle = ARCHO_CYCLE } = {}) {
+  const old = spots.get(name);
+  if (old) return old;
+  const slot = document.createElement("div");
+  slot.className = "archo-spot";
+  slot.style.setProperty("--archo-size", size + "px");
+  let figure = null, timer = 0, card = null, turn = 0;
+  const s = { slot, expr: calm[0] };
+  const fit = () => {
+    if (!slot.isConnected) return;
+    if (card) {
+      // room above the card for her head: what the page lacks is added as padding on the
+      // element before it (the only layout change), and only while she is shown
+      const anchor = slot.parentElement, sc = scroller(anchor);
+      const pad = parseFloat(anchor.style.paddingTop) || 0;
+      const room = card.getBoundingClientRect().top - (sc ? sc.getBoundingClientRect().top - sc.scrollTop : 0) - pad;
+      const need = Math.ceil(size * 33 / 50 - PEEK_OVER + 6);
+      anchor.style.paddingTop = card.getBoundingClientRect().width >= size * 4 && room < need ? need - room + "px" : "";
+      // hang from that element: her bottom PEEK_OVER px below the card's top
+      const a = anchor.getBoundingClientRect(), c = card.getBoundingClientRect();
+      slot.style.bottom = (a.bottom - c.top - PEEK_OVER) + "px";
+      slot.style.right = (a.right - c.right + PEEK_RIGHT) + "px";
+    }
+    slot.classList.toggle("archo-hide", !fits(slot, card ? size * 4 : 0, card));
+  };
+  const ro = typeof ResizeObserver === "function" ? new ResizeObserver(() => fit()) : null;
+  const put = (host, expr) => {
+    if (mode === "off" || !host) { slot.parentElement?.style.removeProperty("padding-top"); slot.remove(); return; }
+    if (slot.parentElement !== host || slot.nextSibling) host.append(slot);
+    ro?.disconnect?.(); ro?.observe?.(host); if (card) ro?.observe?.(card);
+    setTimeout(fit, 0); // once the page holding host is in the document
+    s.set(expr || s.expr);
+  };
+  s.peek = (c, expr) => {
+    const anchor = c?.previousElementSibling;
+    if (!anchor) return s.stand(c?.parentElement, expr);
+    card = c;
+    slot.classList.add("archo-peek"); slot.classList.remove("archo-stand");
+    anchor.classList.add("archo-anchor");
+    put(anchor, expr);
+  };
+  s.stand = (host, expr) => {
+    card = null;
+    slot.classList.add("archo-stand"); slot.classList.remove("archo-peek");
+    slot.style.bottom = slot.style.right = "";
+    put(host, expr);
+  };
+  s.set = (expr) => {
+    s.expr = expr;
+    if (mode === "off" || !slot.parentElement) return; // shown on the next peek or stand
+    if (!figure || figure.ended) figure = show(slot, { expr, rotate: false, rest: true });
+    else figure.set(expr);
+    clearTimeout(timer);
+    if (cycle && calm.length > 1 && calm.includes(expr)) timer = setTimeout(idle, CYCLE);
+  };
+  const idle = () => {
+    if (!slot.isConnected) return s.end();
+    turn = (calm.indexOf(s.expr) + 1) % calm.length;
+    s.set(calm[turn]);
+  };
+  s.end = () => {
+    clearTimeout(timer); ro?.disconnect?.();
+    figure?.end(); figure = null;
+    slot.remove(); spots.delete(name);
+  };
+  spots.set(name, s);
+  return s;
+}
+
+const scroller = (e) => { for (let p = e.parentElement; p && p !== document.body; p = p.parentElement) if (/auto|scroll/.test(getComputedStyle(p).overflowY)) return p; return null; };
+
+// fits: the slot lies inside every box that clips it (scrollers only across), and a peek's
+// card is wide enough for her beside its own content.
+function fits(slot, minCard, card) {
+  if (card && card.getBoundingClientRect().width < minCard) return false;
+  const r = slot.getBoundingClientRect();
+  for (let p = slot.parentElement; p && p !== document.body; p = p.parentElement) {
+    const cs = getComputedStyle(p);
+    if (cs.overflowX === "visible" && cs.overflowY === "visible") continue;
+    const b = p.getBoundingClientRect();
+    if (r.left < b.left - 1 || r.right > b.right + 1) return false;
+    const scrolls = /auto|scroll/.test(cs.overflowY);
+    if (scrolls ? r.top + p.scrollTop < b.top - 1 : (r.top < b.top - 1 || r.bottom > b.bottom + 1)) return false;
+  }
+  return true;
+}
+
 // ---- usage tips --------------------------------------------------------------------------
 let tips = null, tipsRead = null, tipTurn = -1;
 try { tipTurn = +localStorage.getItem("archo.tip"); } catch { /* random start below */ }

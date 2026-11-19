@@ -846,6 +846,14 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
   mask-image: linear-gradient(to bottom, #000 78%, transparent); }
 .archo-slot.on { opacity: 1; transform: none; }
 .archo-slot > img { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* placements on pages (archoSpot): peek hangs from the element before a card, its bottom
+   12 px cut where the card's top edge would cover her; stand closes a column, right-aligned.
+   archo-hide: she would not fit whole (too narrow, too short, or a box would clip her) */
+.archo-anchor { position: relative; }
+.archo-spot.archo-peek { position: absolute; z-index: 1; mask-image: none; clip-path: inset(-40px -40px 12px -40px); }
+.archo-spot.archo-stand { margin: 12px 16px 0 auto; }
+.archo-spot.archo-hide { visibility: hidden; }
+.tk-items > .archo-stand { margin-top: auto; margin-bottom: 8px; }
 /* a loading card: the figure on the left, a usage tip and three lines on the right */
 /* the placeholder shows only once a read has taken 0.21 s, with Archo and the tip; a faster
    page fades in straight from the empty page (screens.js page) */

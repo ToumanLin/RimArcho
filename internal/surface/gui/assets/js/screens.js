@@ -10,7 +10,7 @@ import { factText, S, $, el, api, T, Tf, errText, say, cur, slideThumb, keyCaps 
 import { icon, bowMark } from "./icons.js";
 import { statusIcon } from "./icons.js";
 import { bump, shimmer } from "./motion.js";
-import { archoMode, archoWait, tipLine } from "./archo.js";
+import { archoMode, archoWait, archoSpot, tipLine } from "./archo.js";
 import * as pop from "./popups.js";
 import { bgSection } from "./bg.js";
 import { appearanceControl } from "./appearance.js";
@@ -547,6 +547,18 @@ function runSummary(w) {
   lead.replaceWith(line);
 }
 
+// needsFace: Archo's expression for the page (16 §7.1 "Placements"): thinking while the
+// files are checked, surprised when something breaks the game, skeptical at other things to
+// fix, pondering last run's errors, a thumbs-up when there is nothing to handle.
+function needsFace(d) {
+  if (S.busy.analyze) return "think";
+  const open = (ci) => N.cols[ci].filter((x) => !x.done && x.counted);
+  if (open(0).some((x) => x.section === 0)) return "surprised";
+  if (open(0).length) return "skeptic";
+  if (open(1).length) return "ponder";
+  return d.never ? "neutral" : "thumbsup";
+}
+
 // askShown: drawNeeds drew N.ask's confirmation row.
 let askShown = false;
 function drawNeeds() {
@@ -603,6 +615,8 @@ function drawNeeds() {
     b.onclick = () => e.page === "library" ? document.dispatchEvent(new CustomEvent("library-search", { detail: e.query || "" })) : ui.go(e.page);
     lbox.append(b);
   }
+  // Archo closes the right column, under its last card (16 §7.1 "Placements")
+  archoSpot("needs", { size: 176, calm: ["neutral", "think"] }).stand(rbox, needsFace(d));
   w.append(grid);
   sc.append(w);
   sc.querySelectorAll(".needcol > .scroll").forEach((s, i) => { s.scrollTop = keep[i] || 0; });

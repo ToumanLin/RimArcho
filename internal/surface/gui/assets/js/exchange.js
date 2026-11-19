@@ -12,6 +12,7 @@ import { choiceControl } from "./choices.js";
 import { copyablePath, editablePath } from "./fields.js";
 import { still } from "./motion.js";
 import { splitBar, diffMarks } from "./membar.js";
+import { archoSpot } from "./archo.js";
 
 let ui = null;
 export function initExchange(u) {
@@ -88,6 +89,7 @@ export async function exchange(first = false) {
   if (brief) w.append(inLab, inCard, resLab, result);
   else w.append(inLab, inCard, mLab, mCard, resLab, result);
   area(inCard, inLab); if (!brief) area(mCard, mLab);
+  spot().peek(inCard, "neutral");
   // the export side (C1): share what you have, below bringing things in
   if (!firstRun) { const [sLab, sCard] = sectionCard(T("Share")); shareRows(sCard); w.append(sLab, sCard); area(sCard, sLab); }
   sc.append(w);
@@ -109,6 +111,11 @@ export async function exchange(first = false) {
 const live = (active) => session === active && S.screen === "plan-import";
 
 // section: a numbered label over a card of rows, as on Game Config and Settings
+// Archo peeks over the first card (16 §7.1 "Placements"): thinking while something is read
+// or moved in, pleased with a preview, a thumbs-up when it is in, a shake at an error.
+const spot = () => archoSpot("import", { size: 140, calm: ["neutral", "ponder"] });
+const face = (e) => spot().set(e);
+
 function sectionCard(title) {
   return [el("div", "label section", title), el("section", "card settings xc-sec")];
 }
@@ -557,6 +564,7 @@ function drawRun() {
   const items = r.task?.items || r.picks.map(p => ({ ref: p.id, state: "wait" }));
   const fails = items.filter(i => i.state === "fail");
   const done = items.filter(i => i.state === "ok").length;
+  face(r.state === "running" ? "think" : r.state === "stopped" ? "neutral" : fails.length ? "skeptic" : "thumbsup");
   const head = el("div", "xc-run-h"), t = el("span");
   t.append(el("span", "t", r.mgrs.join(", ")), " ", el("span", "n",
     r.state === "running" ? runLine() : r.state === "stopped" ? Tf("stopped: %d of %d done", done, items.length)
@@ -634,7 +642,7 @@ async function importPack(path, update = null) {
   if (!result) return;
   let id;
   try { id = await api.StartPackImport(path, !!update); }
-  catch (e) { result.append(errorRow(name, errText(e)), footer("", button(T("close"), "", hideResult))); reveal(); return say("fail", errText(e)); }
+  catch (e) { result.append(errorRow(name, errText(e)), footer("", button(T("close"), "", hideResult))); face("shake"); reveal(); return say("fail", errText(e)); }
   say("", T("adding the pack: a background task; you can leave this page"));
   let first = true;
   const tick = async () => {
@@ -643,6 +651,7 @@ async function importPack(path, update = null) {
     try { t = await api.TaskByID(id); } catch { /* try again */ }
     if (!live(active) || seq !== previewSeq) return;
     const running = !t || t.state === "run" || t.state === "queue";
+    face(running ? "think" : t.state === "done" ? "thumbsup" : "shake");
     result.textContent = "";
     const head = el("div", "xc-run-h"), h = el("span");
     h.append(el("span", "t", name), " ", el("span", "n", running ? T("adding the pack…") : t.state === "done" ? T("added to your packs") : T("not added")));
@@ -690,6 +699,7 @@ async function preview(kind, src, fileName) {
   const wait = row(link ? T("reading the link…") : T("reading the list…"), "", progBar(0, true));
   wait.classList.add("xc-wait");
   body.append(wait);
+  face("think");
   reveal();
   try { p = await api.ImportPreviewFor(active.target, kind, src); }
   catch (e) {
@@ -697,6 +707,7 @@ async function preview(kind, src, fileName) {
     body.textContent = "";
     body.dataset.fieldError = fileName || kind === "file" ? "file" : "text";
     body.append(errorRow(T("could not read it"), errText(e)));
+    face("shake");
     say("fail", errText(e)); reveal(); return;
   }
   if (!current()) return;
@@ -704,6 +715,7 @@ async function preview(kind, src, fileName) {
   if (fileName) p.source = fileName;
   body.textContent = "";
 
+  face("smug");
   showImportSummary(body, p, !!(p.sourcePath || fileName));
   showImportContents(body, p);
   // the game's own list, or any list, that the list already is: nothing to import (16 §2.18)
@@ -824,6 +836,7 @@ function hideResult() {
   const res = $("#screen .xc-preview"), lab = $("#screen .xc-res-label");
   if (res) { res.hidden = true; res.textContent = ""; delete res.dataset.mode; delete res.dataset.fieldError; }
   if (lab) lab.hidden = true;
+  face("neutral");
   ui?.renderHints?.();
 }
 // reveal scrolls the result into view and keeps its label in view: a tall result shows from

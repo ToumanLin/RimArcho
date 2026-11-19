@@ -1,6 +1,6 @@
 # Archo placements: survey and proposal (2026-11-19)
 
-Status: proposal, nothing implemented. Today Archo appears in three places (16 §7.1 "Archo figure"): the start-up screen, page-loading cards and the first-run guide. This document surveys every page and the main dialogs for more places and proposes the best ones.
+Status: the player chose Can it run, Feedback, Import & export, Uninstall and Background tasks (not Start); implemented 2026-11-19 as 16 §7.1 "Placements". Idle cycling is built but off until the player decides. Peeks needed head room the pages lacked, added as padding above the card (about 25–50 px). Original proposal below. Today Archo appears in three places (16 §7.1 "Archo figure"): the start-up screen, page-loading cards and the first-run guide. This document surveys every page and the main dialogs for more places and proposes the best ones.
 
 ## Rules
 
