@@ -581,7 +581,7 @@ func (a *App) BuildPackWith(name string, o BuildOptions) (*PackBuild, error) {
 			os.RemoveAll(tmp)
 			return nil, err
 		}
-	} else if err := os.Rename(tmp, r.Dir); err != nil {
+	} else if err := renameSettled(tmp, r.Dir); err != nil {
 		os.RemoveAll(tmp)
 		return nil, err
 	}
@@ -1256,4 +1256,19 @@ func quoteRef(s string) string {
 		return `"` + s + `"`
 	}
 	return s
+}
+
+// renameSettled renames a freshly written folder. On Windows a virus scanner or the search
+// indexer can still hold one of its new files for a moment, and the rename is then denied;
+// it is tried again for up to 3 s before the error counts (VM round 2026-11-18).
+func renameSettled(from, to string) error {
+	err := os.Rename(from, to)
+	for i := 0; err != nil && runtime.GOOS == "windows" && i < 30; i++ {
+		if _, statErr := os.Stat(to); statErr == nil {
+			break // the target exists: waiting does not help
+		}
+		time.Sleep(100 * time.Millisecond)
+		err = os.Rename(from, to)
+	}
+	return err
 }

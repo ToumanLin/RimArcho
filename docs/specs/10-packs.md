@@ -68,7 +68,7 @@ The digest uses SHA-256 rather than the scan's xxh3 because packs may come from 
 3. **Select content (cleaning).** Keep only directories loaded by the current game version under the rules in 05 §1: use the matching LoadFolders.xml entries, or otherwise the shared directories and the highest version not above the current one. Omit unused version directories at the root and record them in `trimmed`. For example, a 1.6 environment keeps `1.6/` and the shared directories but drops `1.5/`. Exclude `.git` and `.rimarcho`. Count and skip links pointing outside the Mod directory, without following them. Do not copy Core or DLC.
 4. **Measure.** Measure each copy's size, the omitted bytes and the free space on the pack volume. Refuse and list any unreadable Mod folders. Require the needed size plus 256 MB of free space.
 5. **Copy.** Assemble the pack in `<pack name>.archo-tmp` inside the pack directory, writing each copy's `.rimarcho/origin.json`.
-6. **Write pack.json**, then rename the temporary directory into place.
+6. **Write pack.json**, then rename the temporary directory into place. On Windows a denied rename (a virus scanner or indexer still holding a new file) is retried for up to 3 s before it fails the build.
 
 `--dry-run` stops after step 4 and lists the omitted version directories, sizes and warnings without writing to disk.
 
