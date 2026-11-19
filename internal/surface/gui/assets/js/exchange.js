@@ -4,7 +4,7 @@
 // and applied as one undo step; nothing here writes ModsConfig.xml (that stays save).
 import { fieldError } from "./feedbacksemantics.js";
 import { factText, S, $, el, api, T, Tf, errText, say } from "./state.js";
-import { page, button, beginPageRead } from "./screens.js";
+import { page, button, beginPageRead, area } from "./screens.js";
 import { icon } from "./icons.js";
 import * as pop from "./popups.js";
 import { getChoices } from "./credit.js";
@@ -50,9 +50,12 @@ export function key(e) { if (e.key === "Escape") { e.preventDefault(); cancel();
 export const hintList = () => [{ key: "tab", label: T("import destination") }, { key: "enter", label: T("import") }, { key: "esc", label: T("cancel") }, { key: "?", label: T("all keys") }];
 
 // The Import page (16 §2.18): the sidebar's Import, `i`, a dropped file, Settings and the guide
-// all open it. Three cards, each a title, one line on what the player gets and its input: a
-// Mod list, a pack, or everything from another manager. Picking a manager above opens a tree below to choose its parts; moving in
-// and adding a pack run as background tasks shown in place (16 §2.16).
+// all open it. It is drawn like Game Config and Settings: numbered sections, each a card of
+// rows with a name and one line on the left and its controls on the right. "Bring in" has a
+// row per kind of source (the game's list, a list file, pasted text, a pack); "From another
+// manager" has a row per manager found, picked with a click, and the tree below to choose its
+// parts; "Share" exports. Moving in and adding a pack run as background tasks shown in place
+// (16 §2.16).
 // first: the first-run guide hands over here after its scan (A1, 16 §2.15): the game's
 // current list comes first and is picked, and "skip" ends the guide.
 export async function exchange(first = false) {
@@ -65,28 +68,38 @@ export async function exchange(first = false) {
   try { info = await api.ExchangeInfo(); } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
   const sc = $("#screen"); sc.innerHTML = "";
+  // esc leaves (the hint line says so); only the first run names its way out, "skip"
   const w = page("plans pm-import", firstRun ? T("Where does your first list come from?") : T("What do you want to bring in?"),
-    firstRun ? button(T("skip"), "esc", cancel) : button(T("cancel"), "esc", cancel));
-  const goals = el("div", "xc-goals four");
+    firstRun ? button(T("skip"), "esc", cancel) : null);
   const result = el("section", "card pad xc-preview"); result.hidden = true;
-  w.append(goals, result);
-  // the export side (C1): share what you have, next to bringing things in
-  if (!firstRun) w.append(el("h2", "xc-side", T("Share")), shareCards());
+  const [inLab, inCard] = sectionCard(T("Bring in"));
+  const [mLab, mCard] = sectionCard(T("From another manager"));
+  w.append(inLab, inCard, mLab, mCard, result);
+  area(inCard, inLab); area(mCard, mLab);
+  // the export side (C1): share what you have, below bringing things in
+  if (!firstRun) { const [sLab, sCard] = sectionCard(T("Share")); shareRows(sCard); w.append(sLab, sCard); area(sCard, sLab); }
   sc.append(w);
-  goals.append(gameCard(), listCard(), packCard(), managerCard());
+  // the rows are filled in on the page: the file row's error watches the result area
+  inCard.append(gameRow(), ...listRows(), packRow());
+  managerRows(mCard);
   read.finish(); ui.renderWhere(); ui.renderHints();
   survey();
 }
 
 const live = (active) => session === active && S.screen === "plan-import";
 
-function goalHead(ic, title, sub) {
-  const h = el("div", "xc-gh"), i = el("span", "xc-gi");
-  i.innerHTML = icon[ic] || "";
-  const t = el("div");
-  t.append(el("h3", "", title), el("p", "", sub));
-  h.append(i, t);
-  return h;
+// section: a numbered label over a card of rows, as on Game Config and Settings
+function sectionCard(title) {
+  return [el("div", "label section", title), el("section", "card settings xc-sec")];
+}
+// row: one setting-style row; right holds its controls
+function row(name, sub, ...right) {
+  const r = el("div", "set"), l = el("div", "l"), rr = el("div", "r");
+  l.append(el("div", "name", name));
+  if (sub) l.append(el("div", "sub", sub));
+  for (const x of right) if (x) rr.append(x);
+  r.append(l, rr);
+  return r;
 }
 function marked(text, ...bold) {
   // "your list %s, changed since" with the name in bold
@@ -94,53 +107,90 @@ function marked(text, ...bold) {
   parts.forEach((p, i) => { span.append(p); if (i < bold.length) span.append(el("b", "", bold[i])); });
   return span;
 }
-// dropButton: the card's file input; what it accepts is its tooltip, not more text.
-function dropButton(big, accepts, run) {
-  const b = el("button", "xc-drop");
-  const i = el("span", "ic"); i.innerHTML = icon.import;
-  b.append(i, el("span", "big", big));
-  b.title = accepts;
-  b.onclick = run;
-  return b;
-}
 
 // The game's current list: its ModsConfig.xml in the current Game Config. On the first run
 // it is the list the scan already made, so "use this list" ends the guide; later it is
 // previewed like any other list.
-function gameCard() {
-  const c = el("section", "card xc-goal" + (firstRun ? " on" : ""));
+function gameRow() {
   const g = info?.game;
-  c.append(goalHead("env", T("The game's current list"), g ? Tf("its ModsConfig.xml enables %d Mods", g.mods) : T("the game has no ModsConfig.xml yet")), el("div", "xc-grow"));
   const use = firstRun
     ? button(T("use this list"), "", () => { const after = ui.afterImport; ui.afterImport = null; firstRun = false; return after?.(T("use the game's list as it is")); }, "primary")
-    : button(T("read it"), "", () => g && preview("file", g.path), "primary");
-  use.classList.add("small");
+    : button(T("read it"), "", () => g && preview("file", g.path));
   if (g) use.title = g.path;
   use.disabled = !g && !firstRun;
-  const row = el("div", "xc-row end");
-  row.append(use);
-  c.append(row);
-  return c;
+  const r = row(T("The game's current list"), g ? Tf("its ModsConfig.xml enables %d Mods", g.mods) : T("the game has no ModsConfig.xml yet"), use);
+  if (firstRun) r.classList.add("on");
+  return r;
 }
 
-// ---- share: the current list in its 7 formats, and packs (C1) ----
+// A Mod list: a file (or one dropped anywhere on the window), or pasted text: a share code,
+// a Rentry or collection link, a copied list. What the file input accepts is its tooltip.
+function listRows() {
+  const fileInput = el("input"); fileInput.type = "file"; fileInput.hidden = true;
+  fileInput.accept = ".xml,.rml,.json,.txt,.rws";
+  fileInput.onchange = () => { if (fileInput.files[0]) readFile(fileInput.files[0]); };
+  const pick = button(T("choose a file…"), "", async () => {
+    let f = "";
+    try { f = await api.PickAnyImport(); } catch (e) { return say("fail", errText(e)); }
+    if (f && S.screen === "plan-import") openPicked(f);
+    else if (!info.dialogs) fileInput.click();
+  });
+  pick.title = T("RimSort, RimCrow and RimPy lists, RimWorld .rml, ModsConfig.xml or a save (.rws)") + ". " + T("a file can also be dropped anywhere on the window");
+  const result = () => $("#screen .xc-preview");
+  fieldError(pick, result(), () => result()?.dataset.fieldError === "file");
+  // one line tall; a copied list keeps its lines (it is a textarea)
+  const ta = el("textarea", "field xc-paste");
+  ta.spellcheck = false; ta.rows = 1;
+  ta.placeholder = T("a link, a share code or a list");
+  ta.value = pasted;
+  ta.oninput = () => { pasted = ta.value; };
+  ta.onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); go.click(); } };
+  const clip = button(T("paste"), "", async () => {
+    let t = "";
+    try { t = await api.Clipboard(); } catch { /* the page asks the browser */ }
+    if (!t && navigator.clipboard) { try { t = await navigator.clipboard.readText(); } catch { /* not allowed */ } }
+    if (!t) return say("", T("the clipboard has no text"));
+    ta.value = pasted = t;
+  });
+  clip.title = T("paste from the clipboard");
+  const go = button(T("read"), "", () => ta.value.trim() && preview("text", ta.value));
+  go.title = T("links are read from Steam or Rentry when you press read");
+  const file = row(T("A Mod list"), T("a new list, or changes to one of yours; previewed first"), pick, fileInput);
+  const text = row(T("Pasted text"), T("a Steam collection or Rentry link, a share code, or a copied list"), ta, clip, go);
+  text.classList.add("xc-textrow");
+  return [file, text];
+}
 
-function shareCards() {
-  const goals = el("div", "xc-goals xc-share");
+// A pack: an .archopack file, added as a background task.
+function packRow() {
+  const b = button(T("choose a pack…"), "", async () => {
+    let f = "";
+    try { f = await api.PickPackFile(); } catch (e) { return say("fail", errText(e)); }
+    if (f && S.screen === "plan-import") importPack(f);
+  });
+  b.title = ".archopack";
+  return row(T("A pack"), T("a pack you can launch; its Mods are checked first"), b);
+}
+
+// ---- share: the current list in its formats, and packs (C1) ----
+// Each export is its own row builder, so export options (what a pack carries, revisions)
+// can be added to one without touching the others.
+
+function shareRows(card) {
+  card.append(listExportRow(), packExportRow());
+}
+function listExportRow() {
   const id = S.shell?.plan?.id || 0, name = S.shell?.plans?.find(p => p.id === id)?.name || "";
-  const lc = el("section", "card xc-goal");
-  lc.append(goalHead("plan", T("The current list"), T("RimSort, RimCrow, RimPy, .rml, a share code or Workshop links")), el("div", "xc-grow"));
-  const ex = button(name ? Tf("export %s…", name) : T("export…"), "", () => id && ui.exportList(id, "import"), "primary");
-  ex.classList.add("small"); ex.disabled = !id;
-  const r1 = el("div", "xc-row end"); r1.append(ex); lc.append(r1);
-  const pc = el("section", "card xc-goal");
-  pc.append(goalHead("packs", T("A pack"), T("the pack as a file (.archopack), or only its list")), el("div", "xc-grow"));
-  const r2 = el("div", "xc-row end");
-  pc.append(r2);
-  goals.append(lc, pc);
+  const ex = button(name ? Tf("export %s…", name) : T("export…"), "", () => id && ui.exportList(id, "import"));
+  ex.disabled = !id;
+  return row(T("The current list"), T("RimSort, RimCrow, RimPy, .rml, a share code or Workshop links"), ex);
+}
+function packExportRow() {
+  const r = row(T("A pack"), T("the pack as a file (.archopack), or only its list"));
+  const right = r.querySelector(".r"), sub = r.querySelector(".sub");
   api.Packs().then(l => {
-    const names = (l?.rows || []).map(r => r.name);
-    if (!names.length) { r2.append(el("span", "xc-hint", T("no packs yet"))); return; }
+    const names = (l?.rows || []).map(x => x.name);
+    if (!names.length) { sub.textContent = T("no packs yet"); return; }
     let pick = names[0];
     const sel = choiceControl(T("pack"), names.map(n => ({ value: n, label: n })), pick);
     sel.onchange = () => { pick = sel.value; };
@@ -153,63 +203,9 @@ function shareCards() {
         });
       }
     };
-    const b = button(T("export the pack"), "", one(false), "primary"); b.classList.add("small");
-    const bl = button(T("export the list"), "", one(true)); bl.classList.add("small");
-    r2.append(sel, bl, b);
-  }).catch(e => r2.append(el("span", "xc-hint", errText(e))));
-  return goals;
-}
-
-// A Mod list: a file, a dropped file, a save, a link, a share code or pasted text.
-function listCard() {
-  const c = el("section", "card xc-goal");
-  c.append(goalHead("plan", T("A Mod list"), T("a new list, or changes to one of yours; previewed first")), el("div", "xc-grow"));
-  const fileInput = el("input"); fileInput.type = "file"; fileInput.hidden = true;
-  fileInput.accept = ".xml,.rml,.json,.txt,.rws";
-  fileInput.onchange = () => { if (fileInput.files[0]) readFile(fileInput.files[0]); };
-  const pick = dropButton(T("Drop a file, or choose one…"), T("RimSort, RimCrow and RimPy lists, RimWorld .rml, ModsConfig.xml or a save (.rws)"), async () => {
-    let f = "";
-    try { f = await api.PickAnyImport(); } catch (e) { return say("fail", errText(e)); }
-    if (f && S.screen === "plan-import") openPicked(f);
-    else if (!info.dialogs) fileInput.click();
-  });
-  const result = () => $("#screen .xc-preview");
-  fieldError(pick, result(), () => result()?.dataset.fieldError === "file");
-  // pasted text: a list, a share code, a Rentry or collection link
-  const ta = el("textarea", "xc-text small");
-  ta.spellcheck = false; ta.rows = 2;
-  ta.placeholder = T("or paste a link, a share code or a list");
-  ta.value = pasted;
-  ta.oninput = () => { pasted = ta.value; };
-  ta.onkeydown = e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); e.stopPropagation(); go.click(); } };
-  const clip = el("button", "btn small", T("paste"));
-  clip.title = T("paste from the clipboard");
-  clip.onclick = async () => {
-    let t = "";
-    try { t = await api.Clipboard(); } catch { /* the page asks the browser */ }
-    if (!t && navigator.clipboard) { try { t = await navigator.clipboard.readText(); } catch { /* not allowed */ } }
-    if (!t) return say("", T("the clipboard has no text"));
-    ta.value = pasted = t;
-  };
-  const go = el("button", "btn primary small", T("read"));
-  go.onclick = () => ta.value.trim() && preview("text", ta.value);
-  const row = el("div", "xc-row end");
-  go.title = T("links are read from Steam or Rentry when you press read");
-  row.append(clip, go);
-  c.append(pick, fileInput, ta, row);
-  return c;
-}
-
-// A pack: an .archopack file, added as a background task.
-function packCard() {
-  const c = el("section", "card xc-goal");
-  c.append(goalHead("packs", T("A pack"), T("a pack you can launch; its Mods are checked first")), el("div", "xc-grow"),
-    dropButton(T("Choose a pack…"), ".archopack", async () => {
-      let f = "";
-      try { f = await api.PickPackFile(); } catch (e) { return say("fail", errText(e)); }
-      if (f && S.screen === "plan-import") importPack(f);
-    }));
-  return c;
+    right.append(sel, button(T("export the list"), "", one(true)), button(T("export the pack"), "", one(false)));
+  }).catch(e => { sub.textContent = errText(e); });
+  return r;
 }
 
 // ---- everything from another manager ----
@@ -219,22 +215,19 @@ function packCard() {
 let M = null;
 function freshM() { return { managers: null, error: "", shown: new Set(), on: new Set(), mode: new Map(), open: new Set(), extra: M?.extra || [], run: null }; }
 
-function managerCard() {
+// managerRows: one row per manager found (drawRows fills them in), then "another folder or
+// file…" as the section's last row.
+function managerRows(card) {
   M = freshM();
-  const c = el("section", "card xc-goal xc-move");
-  c.append(goalHead("import", T("Everything from another manager"), T("lists, notes, tags and rules; their files are only read")),
-    el("div", "xc-mrows"));
-  const more = el("button", "btn link small", T("another folder or file…"));
-  more.onclick = async () => {
+  const more = button(T("another folder or file…"), "", async () => {
     let f = "";
     try { f = await api.PickManagerImport(); } catch (e) { return say("fail", errText(e)); }
     if (!f || S.screen !== "plan-import") return;
     const kind = await api.ManagerFileKind(f).catch(() => "list");
     M.extra.push({ manager: kind === "list" ? T("a file") : "", kind, path: f });
     survey();
-  };
-  c.append(more);
-  return c;
+  });
+  card.append(el("div", "xc-mrows"), row(T("Somewhere else"), T("a data folder or file kept elsewhere; it is only read"), more));
 }
 
 // survey asks what each manager holds (dry runs in their own session); rows fill in.
@@ -329,7 +322,7 @@ function drawRows() {
     else if (m.imported && nws.length) { const n = el("span", "nline"); n.title = nws.join(", "); n.append(el("span", "chip-n", T("new")), el("span", "nt", nws.join(", "))); s.append(n); }
     else if (m.imported) s.append(T("nothing new since then"));
     else s.append(holds(m));
-    b.append(box(st), mark(m.name), t, s);
+    b.append(box(st), mark(m.name, 24), t, s);
     if (running && M.run.state === "running") b.append(progBar(runPct()));
     b.onclick = () => showManager(m);
     rows.append(b);

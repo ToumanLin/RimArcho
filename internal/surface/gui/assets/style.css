@@ -1969,49 +1969,33 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .pm-import .xc-check .xc-note { flex-basis: 100%; padding-left: 22px; }
 .pm-import .xc-preview[hidden] { display: none; }
 
-/* Import (16 §2.18): three cards by what the player gets; a manager picked above opens a
-   tree of its parts below, which turns into the run (a background task) in place. */
-.xc-goals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--card-gap); }
-/* four import cards (the game's current list first): two by two below 1,500 px */
-.xc-goals.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-@media (max-width: 1500px) { .xc-goals.four { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.xc-goals.xc-share { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-@media (max-width: 1100px) { .xc-goals, .xc-goals.four, .xc-goals.xc-share { grid-template-columns: 1fr; } }
-/* the first-run guide's pick, and the export side's heading (Import & export, 16 §2.18) */
-.xc-goal.on { border-color: var(--accent); }
-.xc-side { margin: 8px 0 0; font-size: 13px; font-weight: 600; color: var(--muted); }
-.xc-share .xc-row { flex-wrap: wrap; }
-.xc-goal { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
-.xc-gh { display: flex; gap: 10px; align-items: center; }
-.xc-gi { width: 34px; height: 34px; flex: none; border-radius: var(--r-sm); display: flex; align-items: center; justify-content: center; background: var(--pill); color: var(--fg-2); }
-.xc-gi .i { width: 18px; height: 18px; }
-.xc-gh h3 { margin: 0; font-size: 15px; }
-.xc-gh p { margin: 0; font-size: 12px; color: var(--muted); }
-.xc-grow { flex: 1; }
-.xc-drop { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px; border: var(--hairline) dashed var(--faint); border-radius: var(--r-lg); color: var(--fg-2); background: transparent; }
-.xc-drop:hover { border-color: var(--accent); color: var(--fg); background: var(--accent-soft); }
-.xc-drop .ic .i { width: 18px; height: 18px; }
-.xc-drop .big { font-weight: 600; font-size: 13px; }
-.pm-import .xc-goal .xc-text { min-height: 52px; }
-.xc-move .btn.link { align-self: flex-start; }
-.xc-mrows { display: flex; flex-direction: column; gap: 2px; }
-.xc-mgr { flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-sm); font-weight: 700; letter-spacing: .02em;
-  background: hsl(var(--h) 60% 50% / .16); color: hsl(var(--h) 55% 42%); }
-:root[data-scheme="dark"] .xc-mgr { color: hsl(var(--h) 70% 72%); }
-.xc-mrow { width: 100%; display: grid; grid-template-columns: 16px 32px minmax(0, 1fr); gap: 2px 10px; align-items: center; padding: 8px 10px; border-radius: var(--r-sm);
-  border: var(--hairline) solid transparent; background: transparent; text-align: left; color: var(--fg); }
+/* Import & export (16 §2.18): drawn like Game Config and Settings, numbered sections of
+   setting rows (.settings .set); a manager picked in its section opens a tree of its parts
+   below, which turns into the run (a background task) in place. */
+.pm-import .xc-sec .set .l { flex: 0 1 46%; }
+.pm-import .xc-sec .set .r { flex-wrap: wrap; }
+.pm-import .xc-sec .set.on .name { color: var(--accent-11, var(--accent)); }
+.xc-sec .xc-paste { flex: 1 1 220px; max-width: 420px; height: 26px; min-height: 26px; padding: 4px 9px; resize: none; overflow: hidden; line-height: 16px; font: inherit; font-size: 13px; white-space: nowrap; }
+.xc-sec .xc-paste:focus { height: auto; min-height: 64px; overflow: auto; white-space: pre; }
+.xc-mrows { display: flex; flex-direction: column; }
+.xc-mrows > .xc-hint, .xc-mrows > .xc-note { padding: 14px; font-size: 12px; color: var(--muted); }
+.xc-mrows + .set { border-top: var(--hairline) solid var(--line-2); }
+.xc-mgr { flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-sm); font-weight: 600; background: var(--pill); color: var(--fg-2); }
+.xc-mrow { width: 100%; min-height: 48px; display: grid; grid-template-columns: 16px 24px minmax(0, 1fr); gap: 1px 12px; align-items: center; padding: 8px 14px;
+  border: 0; background: transparent; text-align: left; color: var(--fg); }
+.xc-mrow + .xc-mrow { border-top: var(--hairline) solid var(--line-2); }
 .xc-mrow:hover { background: var(--card-2); }
-.xc-mrow.on { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+.xc-mrow.on { background: var(--accent-soft); }
 .xc-mrow > .xc-cb, .xc-mrow > .xc-mgr { grid-row: span 2; }
-.xc-mrow .t { font-weight: 600; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.xc-mrow .t { font-weight: 500; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .xc-mrow .when { font-size: 12px; font-weight: 400; color: var(--faint); white-space: nowrap; }
-.xc-mrow .s { grid-column: 3; font-size: 12px; color: var(--muted); min-width: 0; }
+.xc-mrow .s { grid-column: 3; font-size: 12px; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .xc-mrow .pick { color: var(--accent); }
 .xc-mrow .nline { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .xc-mrow .nt { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--fg-2); }
 .xc-mrow .chip-n { flex: none; font-size: 12px; height: 18px; display: inline-flex; align-items: center; padding: 0 6px; border-radius: var(--r-sm); background: var(--accent-soft); color: var(--accent); }
 .xc-mrow.seen .xc-mgr { opacity: .5; }
-.xc-mrow.seen .t { color: var(--fg-2); font-weight: 500; }
+.xc-mrow.seen .t { color: var(--fg-2); }
 .xc-mrow .prog { grid-column: 3; margin-top: 4px; }
 .xc-mrow .prog .bar { height: 4px; }
 /* RimArcho's check box: 16px, the small radius, a hairline outline, the accent with the ok icon's tick when on, a bar when partly on */
