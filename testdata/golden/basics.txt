@@ -128,6 +128,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     plan follow <name> <collection link|ID>   make a plan follow a Steam Workshop collection: RimArcho tells you when it changes (uses the network)
     plan unfollow <name> <collection link|ID>  stop following a collection; the plan stays as it is
     plan sync <name> [<collection>]           catch a plan up with a collection it follows (one undoable edit; uses the network)
+    functional <ref>                          mark a mod functional (interface, performance, framework, library, translation: nothing a save can show), so Play review leaves it out of never seen; --not marks it not functional, --clear lets detection decide (12 §3.3)
     problems mute-version <mod>…              ignore version warnings for these packages in every list and game; survives updates
     problems unmute-version <mod>…            restore version warnings for these packages
     import rimsort                            import RimSort's notes, tags, colours and ignored warnings (as tags) from an instance's aux_metadata.db; repeatable

@@ -405,5 +405,22 @@
   "Can it run checks %s": "能不能跑改为检查 %s",
   "copied %s to the saves of %s as %s": "已把 %s 复制到 %s 的存档：%s",
   "the save is in this Game Config's Saves folder already": "这个存档已经在当前游戏配置的存档文件夹里",
-  "1 Mod adds nothing a save can show (interface, performance, fixes): saves cannot tell whether it was used": "1 个功能型 Mod 不添加存档能显示的内容（界面、性能、修复）：存档说明不了它是否用上了"
+  "1 Mod adds nothing a save can show (interface, performance, fixes): saves cannot tell whether it was used": "1 个功能型 Mod 不添加存档能显示的内容（界面、性能、修复）：存档说明不了它是否用上了",
+  "adds nothing a save can show; you marked it not functional": "不添加存档能显示的内容；你把它标成了非功能型",
+  "%s marked functional": "%s 已标为功能型",
+  "%s marked not functional": "%s 已标为非功能型",
+  "%s: mark removed": "%s：已取消标记",
+  "never seen in the saves": "存档里从未出现",
+  "only set up": "只设定过",
+  "not proof it was never met: it may come only late, in raids or quests, or with another storyteller or scenario": "不代表从没遇到：它可能只在后期、袭击或任务里，或换个讲述者、剧本才出现",
+  "in a bill, a quest or research not begun: chosen or offered, not there yet": "在清单、任务或未开始的研究里：选过或被提供过，还没真正出现",
+  "remove your mark": "取消你的标记",
+  "not functional": "非功能型",
+  "you marked it functional; let RimArcho decide again": "你把它标成了功能型；改回由 RimArcho 判断",
+  "it has content a save could show: put it on the map": "它有存档能显示的内容：放回图上",
+  "mark as functional": "标为功能型",
+  "you marked it not functional; let RimArcho decide again": "你把它标成了非功能型；改回由 RimArcho 判断",
+  "interface, performance, framework, library or translation: a save cannot show it, so it leaves the map": "界面、性能、框架、前置库或翻译：存档显示不了它，所以它离开图",
+  "only set up: %d": "只设定过：%d",
+  "what was used up, sold or lost before the oldest save leaves no trace; content that comes only late, in raids or quests, or with another storyteller may not have come yet; bills, filters and research not begun do not count as seen (they are listed as only set up); recipes are not counted; a Mod updated since may have renamed things": "在最早的存档之前用掉、卖掉或丢失的东西不留痕迹；只在后期、袭击或任务里，或换个讲述者才出现的内容可能还没来；清单、过滤器和未开始的研究不算出现过（列为只设定过）；配方不计；之后更新过的 Mod 可能改了名字"
 }

@@ -34,6 +34,8 @@ type SaveContentResult struct {
 	// category every name attributed to it, uncut.
 	mods  []SaveMod
 	names map[string]map[string][]SaveContentName
+	// configNames are the Def names the save only sets up (ConfigRefs), when seen is asked.
+	configNames map[string]bool
 }
 
 // contentOpts are what the playthrough review asks of the attribution (12 §3).
@@ -223,6 +225,12 @@ func (a *App) saveContent(sv *Save, o contentOpts) (*SaveContentResult, error) {
 	defRefs := f.DefRefs
 	config := f.ConfigRefs
 	if o.seen {
+		out.configNames = map[string]bool{}
+		for _, refs := range config {
+			for name := range refs {
+				out.configNames[name] = true
+			}
+		}
 		config = nil
 	}
 	if len(grid)+len(config) > 0 {

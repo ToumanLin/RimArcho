@@ -2504,6 +2504,10 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .rv-tiles.list .rv-tile .bar { grid-column: 2 / 4; grid-row: 2; margin: 0; }
 .rv-tiles.list .rv-tile .n { grid-column: 3; grid-row: 1; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .rv-foot { margin: 14px 14px 0; font-size: 12px; color: var(--muted); }
+.rv-foot > summary { cursor: pointer; }
+.rv-foot .rv-names { margin: 6px 0 0; }
+.rv-fn { white-space: nowrap; }
+.rv-set { cursor: default; }
 .rv-right { min-height: 0; min-width: 0; display: grid; grid-template-rows: var(--rv-top, minmax(120px, 45%)) var(--card-gap) minmax(0, 1fr); }
 .rv-vsplit { margin: 0; height: auto; }
 .rv-detail, .rv-prog { min-height: 0; min-width: 0; display: flex; flex-direction: column; }

@@ -19,14 +19,17 @@ import (
 
 // Bump when attribution or the compact representation changes independently of
 // the save parser or Def content extractor.
-const reviewCacheVersion = 2
+const reviewCacheVersion = 3
 
 // Only seen evidence and a catalog reference belong to a save. Enabled-copy
 // metadata and categorized names live once in the content-addressed catalog.
 type reviewSaveResult struct {
-	Read       bool
-	Mods       []SaveMod `json:"-"`
-	Names      map[string]map[string][]string
+	Read  bool
+	Mods  []SaveMod `json:"-"`
+	Names map[string]map[string][]string
+	// Config: by instance, the catalog names the save only sets up (ConfigRefs: bills,
+	// quest parts, research not begun) and does not have (12 §3.2).
+	Config     map[string][]string `json:",omitempty"`
 	CatalogKey string
 	Catalog    map[string]map[string][]string `json:"-"`
 }
@@ -321,6 +324,7 @@ func (a *App) reviewSave(sv *Save, read bool, run *reviewRun) (*reviewSaveResult
 			return nil, false, err
 		}
 		out.Mods, out.Catalog, out.CatalogKey = catalog.Mods, catalog.Names, catalog.key
+		out.Config = reviewConfigOnly(res.configNames, catalog.Names, out.Names)
 		b, err := json.Marshal(out)
 		if err != nil {
 			return nil, false, err
@@ -341,4 +345,36 @@ func (a *App) reviewSave(sv *Save, read bool, run *reviewRun) (*reviewSaveResult
 		catalog.raw = nil
 	}
 	return out, false, nil
+}
+
+// reviewConfigOnly picks, per instance, the catalog names in config that seen lacks.
+func reviewConfigOnly(config map[string]bool, catalog, seen map[string]map[string][]string) map[string][]string {
+	if len(config) == 0 {
+		return nil
+	}
+	var out map[string][]string
+	for inst, cats := range catalog {
+		had := map[string]bool{}
+		for _, ns := range seen[inst] {
+			for _, n := range ns {
+				had[n] = true
+			}
+		}
+		for key, ns := range cats {
+			if reviewSkip[key] {
+				continue
+			}
+			for _, n := range ns {
+				if config[n] && !had[n] {
+					if out == nil {
+						out = map[string][]string{}
+					}
+					had[n] = true
+					out[inst] = append(out[inst], n)
+				}
+			}
+		}
+		sort.Strings(out[inst])
+	}
+	return out
 }

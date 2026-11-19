@@ -75,6 +75,8 @@ func savesReview(c *Ctx, a *Args) (*render.Doc, error) {
 		root.KV("not counted", render.Plural(r.Unread, "save")+" without a current full read (archo saves review --read)")
 	}
 	root.KV("seen means", "the Def is in a save: a thing, pawn, terrain or biome that is there, research with progress, an event that fired. Not seen is not proof it was never met; recipes are not counted")
+	root.KV("only set up means", "a save names it only in a bill, a quest part or research not begun: chosen or offered, not yet there")
+	root.KV("never seen means", "not in these saves: content may come only late, in raids or quests, or with another storyteller or scenario; a Mod update that renamed things looks the same")
 	if modRef != "" {
 		n := 0
 		for _, m := range r.Mods {
@@ -89,17 +91,21 @@ func savesReview(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		return d, nil
 	}
-	var never, part, whole, functional []app.ReviewMod
+	var never, config, part, whole, functional []app.ReviewMod
 	for _, m := range r.Mods {
-		switch {
-		case m.Functional:
+		switch m.Group() {
+		case app.ReviewFunctional:
 			functional = append(functional, m)
-		case m.Seen == 0:
+		case app.ReviewNeverSeen:
 			never = append(never, m)
-		case m.Seen < m.Adds:
-			part = append(part, m)
+		case app.ReviewConfigured:
+			config = append(config, m)
 		default:
-			whole = append(whole, m)
+			if m.Seen < m.Adds {
+				part = append(part, m)
+			} else {
+				whole = append(whole, m)
+			}
 		}
 	}
 	budget := reviewBudget
@@ -123,6 +129,9 @@ func savesReview(c *Ctx, a *Args) (*render.Doc, error) {
 		more += len(ms) - k
 	}
 	group("never seen", never, func(m app.ReviewMod) string { return "adds " + reviewAdds(m) + reviewWhere(m) })
+	group("only set up", config, func(m app.ReviewMod) string {
+		return fmt.Sprintf("adds %s; %d only set up: %s%s", reviewAdds(m), len(m.Configured), reviewFew(m.Configured), reviewWhere(m))
+	})
 	group("partly seen", part, func(m app.ReviewMod) string {
 		return fmt.Sprintf("%d of %d seen: %s%s", m.Seen, m.Adds, reviewShares(m), reviewWhere(m))
 	})
@@ -134,12 +143,13 @@ func savesReview(c *Ctx, a *Args) (*render.Doc, error) {
 		if len(functional) == 1 {
 			text = " adds nothing a save can show; saves cannot tell whether it was used"
 		}
-		root.KV("functional", render.Plural(len(functional), "Mod")+text)
+		root.KV("functional", render.Plural(len(functional), "Mod")+text+reviewMarked(functional))
 	}
 	if more > 0 {
 		root.Addf("… %d more Mods (archo saves review --all)", more)
 	}
 	d.AddNext("archo saves review --mod <mod>")
+	d.AddNext("archo functional <mod>")
 	return d, nil
 }
 
@@ -172,10 +182,23 @@ func reviewShares(m app.ReviewMod) string {
 // reviewMod is one Mod in full: each category with the names not seen.
 func reviewMod(root *render.Node, m app.ReviewMod, all bool) {
 	text := "adds nothing a save can show; saves cannot tell whether it was used"
+	if m.Marked == app.MarkFunctional {
+		text = "marked functional; saves cannot tell whether it was used"
+	}
 	if !m.Functional {
 		text = fmt.Sprintf("%d of %d seen", m.Seen, m.Adds)
+		if m.Marked == app.MarkNotFunctional {
+			text += " (marked not functional)"
+		}
 	}
 	n := root.Add(m.Name + ": " + text + reviewWhere(m))
+	if len(m.Configured) > 0 {
+		names := m.Configured
+		if !all && len(names) > reviewNames {
+			names = append(names[:reviewNames:reviewNames], fmt.Sprintf("and %d more (--all)", len(m.Configured)-reviewNames))
+		}
+		n.KV("only set up", strings.Join(names, ", "))
+	}
 	for _, cat := range m.Cats {
 		line := fmt.Sprintf("%d of %d seen", cat.Seen, cat.Adds)
 		if cat.Under {
@@ -190,4 +213,26 @@ func reviewMod(root *render.Node, m app.ReviewMod, all bool) {
 		}
 		n.KV(cat.Key, line)
 	}
+}
+
+// reviewFew is up to three names, then how many more.
+func reviewFew(names []string) string {
+	if len(names) <= 3 {
+		return strings.Join(names, ", ")
+	}
+	return strings.Join(names[:3], ", ") + fmt.Sprintf(" and %d more", len(names)-3)
+}
+
+// reviewMarked says how many of the functional Mods the player marked.
+func reviewMarked(ms []app.ReviewMod) string {
+	n := 0
+	for _, m := range ms {
+		if m.Marked == app.MarkFunctional {
+			n++
+		}
+	}
+	if n == 0 {
+		return ""
+	}
+	return fmt.Sprintf(" (%d marked by you)", n)
 }

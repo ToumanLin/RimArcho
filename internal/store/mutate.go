@@ -164,6 +164,10 @@ func (s *Store) SplitLineage(envID, instanceID, newLineageID string, now time.Ti
 			SELECT environment_id, ?, tag, pos FROM lineage_tag WHERE lineage_id=?`, newLineageID, oldLineage); err != nil {
 			return err
 		}
+		if _, err := tx.Exec(`INSERT INTO lineage_functional(lineage_id, functional)
+			SELECT ?, functional FROM lineage_functional WHERE lineage_id=?`, newLineageID, oldLineage); err != nil {
+			return err
+		}
 		if _, err := tx.Exec(`UPDATE instance SET lineage_id=?, lineage_basis=? WHERE id=?`, newLineageID, identity.BasisManual, instanceID); err != nil {
 			return err
 		}

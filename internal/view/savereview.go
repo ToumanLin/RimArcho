@@ -25,6 +25,16 @@ type ReviewPage struct {
 	Groups   []ReviewGroup  `json:"groups"`
 	// Foot counts what the map leaves out: the Mods that add nothing a save can show.
 	Foot string `json:"foot,omitempty"`
+	// Functional are those Mods, by name, so the player can see and unmark them.
+	Functional []ReviewFunctional `json:"functional,omitempty"`
+}
+
+// ReviewFunctional is a functional Mod in the foot's list. Marked: the player marked it
+// (else it was detected, 12 §3.3).
+type ReviewFunctional struct {
+	Name    string `json:"name"`
+	Library string `json:"library,omitempty"`
+	Marked  bool   `json:"marked,omitempty"`
 }
 
 // ReviewColony is a colony's card: its name and a line ("day 379, 48 saves").
@@ -61,6 +71,13 @@ type ReviewModView struct {
 	Part      int             `json:"part"`
 	Tip       string          `json:"tip"`
 	Cats      []ReviewCatView `json:"cats"`
+	// Group is app.ReviewSeen, ReviewConfigured or ReviewNeverSeen (12 §3.1); Set the names
+	// only set up (at most ReviewNames; SetMore counts the rest); Mark the player's mark
+	// ("not functional" is the only one a Mod on the map can have).
+	Group   string   `json:"group"`
+	Set     []string `json:"set,omitempty"`
+	SetMore int      `json:"setMore,omitempty"`
+	Mark    string   `json:"mark,omitempty"`
 }
 
 // ReviewCatView is one category of a Mod: its label, how much is seen, and the names not
@@ -130,10 +147,16 @@ func ReviewPageOf(r *app.SaveReview, cols []*app.Colony, colony string, tags map
 	for _, m := range r.Mods {
 		if m.Functional {
 			functional++
+			p.Functional = append(p.Functional, ReviewFunctional{Name: m.Name, Library: m.Library, Marked: m.Marked == app.MarkFunctional})
 			continue
 		}
 		v := ReviewModView{Name: m.Name, PackageID: m.PackageID, Library: m.Library, Tags: tags[m.Library], Adds: m.Adds, Seen: m.Seen,
-			Sum: Tf("%d of %d seen", m.Seen, m.Adds), Where: countColonies(m.Colonies) + T(", ") + countSaves(m.Saves), Cats: []ReviewCatView{}}
+			Sum: Tf("%d of %d seen", m.Seen, m.Adds), Where: countColonies(m.Colonies) + T(", ") + countSaves(m.Saves), Cats: []ReviewCatView{},
+			Group: m.Group(), Set: m.Configured, Mark: m.Marked}
+		if len(v.Set) > ReviewNames {
+			v.SetMore = len(v.Set) - ReviewNames
+			v.Set = v.Set[:ReviewNames]
+		}
 		var tip []string
 		largest := 0
 		for _, c := range m.Cats {
@@ -160,6 +183,9 @@ func ReviewPageOf(r *app.SaveReview, cols []*app.Colony, colony string, tags map
 			continue
 		}
 		v.Size, v.Part, v.Tip = m.Adds, m.Seen, v.Sum
+		if m.Adds == 0 { // marked not functional: nothing to count, never seen
+			v.Size, v.Tip = 1, T("adds nothing a save can show; you marked it not functional")
+		}
 		rest = append(rest, v)
 	}
 	bySize := func(a, b ReviewModView) int { return b.Size - a.Size }
@@ -180,6 +206,9 @@ func ReviewPageOf(r *app.SaveReview, cols []*app.Colony, colony string, tags map
 		p.Groups = append(p.Groups, ReviewGroup{Key: "rest", Label: T("buildings, floors, clothes, looks and the rest"),
 			Hint: Tf("%d with nothing in the saves (outlined)", none), Mods: rest})
 	}
+	slices.SortStableFunc(p.Functional, func(a, b ReviewFunctional) int {
+		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
+	})
 	if functional == 1 {
 		p.Foot = T("1 Mod adds nothing a save can show (interface, performance, fixes): saves cannot tell whether it was used")
 	} else if functional > 1 {

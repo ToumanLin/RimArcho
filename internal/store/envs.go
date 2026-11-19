@@ -332,6 +332,7 @@ func deleteInstallation(tx *sql.Tx, gameID string) error {
 		`DELETE FROM lineage WHERE id NOT IN (SELECT lineage_id FROM instance)`,
 		`DELETE FROM lineage_data WHERE lineage_id NOT IN (SELECT id FROM lineage)`,
 		`DELETE FROM lineage_tag WHERE lineage_id NOT IN (SELECT id FROM lineage)`,
+		`DELETE FROM lineage_functional WHERE lineage_id NOT IN (SELECT id FROM lineage)`,
 		`DELETE FROM user_rule WHERE (a_lineage<>'' AND a_lineage NOT IN (SELECT id FROM lineage)) OR (b_lineage<>'' AND b_lineage NOT IN (SELECT id FROM lineage))`,
 	} {
 		if _, err := tx.Exec(q); err != nil {
