@@ -141,7 +141,7 @@ Packs do not share: each uses its own `-savedatafolder` (10 §3).
 
 ### 3.5 Copying a game
 
-`app.CopyGame` (`archo env copy <name> --to <dir> [--name <config>] [--mods] [--saves shared|own] [--dry-run]`; GUI: Add Game Config's "copy a game folder", 16 §2.15) copies a Game Config's game folder to a new folder and adds the copy as a Game Config: a backup of a working game before the game updates, or a second game to try something in. The copy is a new installation (§2), not a sibling of the copied config.
+`app.CopyGame` (`archo env copy <name> --to <dir> [--name <config>] [--mods] [--saves shared|own] [--dry-run]`; GUI: Add Game Config's "copy a game folder", 16 §2.15, also opened by the Launch page's “back up <game> first” when the game updated or Steam has an update waiting, 16 §2.3) copies a Game Config's game folder to a new folder and adds the copy as a Game Config: a backup of a working game before the game updates, or a second game to try something in. The copy is a new installation (§2), not a sibling of the copied config.
 
 - `app.PlanGameCopy` checks first and writes nothing: the source Game Config exists; the folder follows `CheckDownloadDir` (not RimArcho's data directory, no other game or Mod folder), is not inside the copied game or around it, and is absent or empty; the name is free (default `<name>-copy`, then `-copy-2`…). It reports the bytes copied, the size of the game's `Mods/` and the drive's free space. A copy that does not fit is refused.
 - Only plain files are copied. Links are never followed or copied: in `Mods/` they are RimArcho's (09 §3), and launching the copy makes them again. `Mods/` itself is copied only with `--mods` (the game's local Mods); otherwise the copy gets an empty `Mods/`.

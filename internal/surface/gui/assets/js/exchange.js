@@ -8,6 +8,7 @@ import { page, button, beginPageRead } from "./screens.js";
 import { icon } from "./icons.js";
 import * as pop from "./popups.js";
 import { getChoices } from "./credit.js";
+import { choiceControl } from "./choices.js";
 import { copyablePath, editablePath } from "./fields.js";
 
 let ui = null;
@@ -26,6 +27,7 @@ export function initExchange(u) {
 }
 
 let info = null;
+let firstRun = false;
 let pasted = "";
 let session = null;
 let previewSeq = 0;
@@ -39,6 +41,8 @@ export async function importFrom(kind, src) {
 export function cancel() {
   ++previewSeq;
   const from = session?.from || "plans";
+  // on the first run, leaving the page ends the guide: the scan made the game's list the first one
+  if (firstRun && from === "guide" && ui.afterImport) { const after = ui.afterImport; ui.afterImport = null; firstRun = false; return after(""); }
   ui.afterImport = null;
   return from === "guide" ? ui.resumeGuide() : ui.go(from);
 }
@@ -49,8 +53,11 @@ export const hintList = () => [{ key: "tab", label: T("import destination") }, {
 // all open it. Three cards, each a title, one line on what the player gets and its input: a
 // Mod list, a pack, or everything from another manager. Picking a manager above opens a tree below to choose its parts; moving in
 // and adding a pack run as background tasks shown in place (16 §2.16).
-export async function exchange() {
+// first: the first-run guide hands over here after its scan (A1, 16 §2.15): the game's
+// current list comes first and is picked, and "skip" ends the guide.
+export async function exchange(first = false) {
   const from = S.screen === "plan-import" ? session?.from : S.screen || "plan";
+  if (S.screen !== "plan-import") firstRun = first && from === "guide";
   const target = from === "plans" ? ui.selectedList() : S.shell?.plan?.id || 0;
   const read = beginPageRead("plan-import", { replace: true });
   session = { from, target, name: S.shell?.plans?.find(p => p.id === target)?.name || "", epoch: S.screenSeq };
@@ -58,11 +65,15 @@ export async function exchange() {
   try { info = await api.ExchangeInfo(); } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
   const sc = $("#screen"); sc.innerHTML = "";
-  const w = page("plans pm-import", T("What do you want to bring in?"), button(T("cancel"), "esc", cancel));
-  const goals = el("div", "xc-goals");
+  const w = page("plans pm-import", firstRun ? T("Where does your first list come from?") : T("What do you want to bring in?"),
+    firstRun ? button(T("skip"), "esc", cancel) : button(T("cancel"), "esc", cancel));
+  const goals = el("div", "xc-goals four");
   const result = el("section", "card pad xc-preview"); result.hidden = true;
-  w.append(goals, result); sc.append(w);
-  goals.append(listCard(), packCard(), managerCard());
+  w.append(goals, result);
+  // the export side (C1): share what you have, next to bringing things in
+  if (!firstRun) w.append(el("h2", "xc-side", T("Share")), shareCards());
+  sc.append(w);
+  goals.append(gameCard(), listCard(), packCard(), managerCard());
   read.finish(); ui.renderWhere(); ui.renderHints();
   survey();
 }
@@ -91,6 +102,62 @@ function dropButton(big, accepts, run) {
   b.title = accepts;
   b.onclick = run;
   return b;
+}
+
+// The game's current list: its ModsConfig.xml in the current Game Config. On the first run
+// it is the list the scan already made, so "use this list" ends the guide; later it is
+// previewed like any other list.
+function gameCard() {
+  const c = el("section", "card xc-goal" + (firstRun ? " on" : ""));
+  const g = info?.game;
+  c.append(goalHead("env", T("The game's current list"), g ? Tf("its ModsConfig.xml enables %d Mods", g.mods) : T("the game has no ModsConfig.xml yet")), el("div", "xc-grow"));
+  const use = firstRun
+    ? button(T("use this list"), "", () => { const after = ui.afterImport; ui.afterImport = null; firstRun = false; return after?.(T("use the game's list as it is")); }, "primary")
+    : button(T("read it"), "", () => g && preview("file", g.path), "primary");
+  use.classList.add("small");
+  if (g) use.title = g.path;
+  use.disabled = !g && !firstRun;
+  const row = el("div", "xc-row end");
+  row.append(use);
+  c.append(row);
+  return c;
+}
+
+// ---- share: the current list in its 7 formats, and packs (C1) ----
+
+function shareCards() {
+  const goals = el("div", "xc-goals xc-share");
+  const id = S.shell?.plan?.id || 0, name = S.shell?.plans?.find(p => p.id === id)?.name || "";
+  const lc = el("section", "card xc-goal");
+  lc.append(goalHead("plan", T("The current list"), T("RimSort, RimCrow, RimPy, .rml, a share code or Workshop links")), el("div", "xc-grow"));
+  const ex = button(name ? Tf("export %s…", name) : T("export…"), "", () => id && ui.exportList(id, "import"), "primary");
+  ex.classList.add("small"); ex.disabled = !id;
+  const r1 = el("div", "xc-row end"); r1.append(ex); lc.append(r1);
+  const pc = el("section", "card xc-goal");
+  pc.append(goalHead("packs", T("A pack"), T("the pack as a file (.archopack), or only its list")), el("div", "xc-grow"));
+  const r2 = el("div", "xc-row end");
+  pc.append(r2);
+  goals.append(lc, pc);
+  api.Packs().then(l => {
+    const names = (l?.rows || []).map(r => r.name);
+    if (!names.length) { r2.append(el("span", "xc-hint", T("no packs yet"))); return; }
+    let pick = names[0];
+    const sel = choiceControl(T("pack"), names.map(n => ({ value: n, label: n })), pick);
+    sel.onchange = () => { pick = sel.value; };
+    const one = (list) => async () => {
+      try { const t = await api.PackExport(pick, "", list); if (t) say("ok", t); }
+      catch {
+        pop.ask(list ? T("export the list") : T("export the pack"), T("the new file") + ": " + pick + (list ? ".archolist.json" : ".archopack"), async (file) => {
+          if (!file) return;
+          try { say("ok", await api.PackExport(pick, file, list)); } catch (e2) { say("fail", errText(e2)); }
+        });
+      }
+    };
+    const b = button(T("export the pack"), "", one(false), "primary"); b.classList.add("small");
+    const bl = button(T("export the list"), "", one(true)); bl.classList.add("small");
+    r2.append(sel, bl, b);
+  }).catch(e => r2.append(el("span", "xc-hint", errText(e))));
+  return goals;
 }
 
 // A Mod list: a file, a dropped file, a save, a link, a share code or pasted text.

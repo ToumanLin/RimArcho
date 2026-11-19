@@ -38,11 +38,12 @@ async function setup({ folder = { done: true }, space = (path) => ({ path, free:
     "./environment.js": { withEnvironmentSwitch: async (_, run) => { await run(); return true; } },
     "./api.js": { on(name, fn) { handlers[name] = fn; } },
   }, { Date: { now: () => now }, setTimeout: (fn, ms) => { timers.push({fn,ms}); delays.push(ms); } });
-  guide.initGuide({ renderWhere() {}, go: (id) => went.push(id) });
+  const ui = { renderWhere() {}, go: (id) => went.push(id), reload: async () => {}, importFirstList: () => went.push("import:first") };
+  guide.initGuide(ui);
   await guide.start(from);
   if (folder.done && !from) { switchWay(1); await flush(); }
   return {
-    screen, S, timers, delays, guide, chosen, gameCalls, writes, went, handlers, copies, choosePath: (value) => pathEditor.done(value),
+    ui, screen, S, timers, delays, guide, chosen, gameCalls, writes, went, handlers, copies, choosePath: (value) => pathEditor.done(value),
     calls: () => calls, now: () => now, respond: value => { response = value; },
     switchWay: n => switchWay(n),
     changeDirectory(value) { screen.querySelectorAll("button").find(b => b.textContent === "change…").onclick(); pathEditor.done(value); },
@@ -108,7 +109,7 @@ test("a response arriving after navigation cannot redraw the page", async () => 
 test("a first run without a managed folder starts on that step, which has no way to skip it", async () => {
   const button = (h, label) => h.screen.querySelectorAll("button").find(b => b.textContent === label);
   const h = await setup({ folder: { path: "C:\RimArcho", free: 50e9, done: false }, space: (path) => ({ path, free: 2e9, low: true }) });
-  assert.equal(h.screen.querySelectorAll(".st").length, 4);
+  assert.equal(h.screen.querySelectorAll(".st").length, 3);
   assert.match(h.screen.querySelector(".st.cur").textContent, /managed folders/);
   assert.ok(h.screen.textContent.includes("C:\RimArcho"));
   assert.equal(button(h, "not now"), undefined);
@@ -128,7 +129,7 @@ test("a first run without a managed folder starts on that step, which has no way
 
 test("a managed folder already chosen, or adding another game, has no folder step", async () => {
   const h = await setup();
-  assert.equal(h.screen.querySelectorAll(".st").length, 3);
+  assert.equal(h.screen.querySelectorAll(".st").length, 2);
   assert.match(h.screen.querySelector(".st.cur").textContent, /find the game/);
 });
 
@@ -156,7 +157,7 @@ test("the preview shows the first run from the folder step and writes nothing", 
   const button = (h, label) => h.screen.querySelectorAll("button").find(b => b.textContent === label);
   const h = await setup({ from: "preview", folder: { path: "C:\\RimArcho", free: 50e9, done: true } });
   // the folder was chosen long ago, yet the preview starts there, as a first run does
-  assert.equal(h.screen.querySelectorAll(".st").length, 4);
+  assert.equal(h.screen.querySelectorAll(".st").length, 3);
   assert.match(h.screen.querySelector(".st.cur").textContent, /managed folders/);
   assert.match(h.screen.textContent, /nothing you choose here is saved/);
   button(h, "use this folder").onclick(); await flush();
@@ -168,9 +169,8 @@ test("the preview shows the first run from the folder step and writes nothing", 
   assert.match(h.screen.querySelector(".st.cur").textContent, /read the mods/);
   for (let i = 0; h.timers.length; i++) { assert.ok(i < 40, "the made-up scan did not end"); await h.tick(); }
   assert.match(h.screen.textContent, /✓/);
-  button(h, "next").onclick(); await flush();
-  assert.match(h.screen.querySelector(".st.cur").textContent, /where to start/);
-  await button(h, "use this list").onclick(); await flush();
+  // where the first list comes from is Import & export (16 §2.15): a preview ends here
+  await button(h, "next").onclick(); await flush();
   assert.deepEqual(h.writes, []);
   assert.deepEqual(h.went, ["settings"]);
 });
@@ -298,4 +298,19 @@ test("the preview's copy plays out and writes nothing", async () => {
   for (let i = 0; h.timers.length; i++) { assert.ok(i < 60, "the made-up copy did not end"); await h.tick(); }
   assert.match(h.screen.querySelector(".st.cur").textContent, /read the mods/);
   assert.deepEqual(h.writes, []);
+});
+
+test("after the scan the first run hands over to Import & export, which ends the guide", async () => {
+  const button = (h, label) => h.screen.querySelectorAll("button").find(b => b.textContent === label);
+  const h = await setup();
+  h.switchWay(0); await flush();
+  button(h, "add this folder").onclick(); await h.choosePath("D:\Game2"); await flush();
+  await button(h, "add and continue").onclick(); await flush();
+  for (let i = 0; h.timers.length && i < 40; i++) await h.tick();
+  const next = button(h, "next");
+  assert.ok(next, "the scan ended")
+  await next.onclick(); await flush();
+  assert.deepEqual(h.went, ["import:first"]);
+  await h.ui.afterImport(""); await flush();
+  assert.deepEqual(h.went, ["import:first", "home"]);
 });

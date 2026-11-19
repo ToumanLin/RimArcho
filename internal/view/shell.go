@@ -85,7 +85,7 @@ const (
 	PageLog      = "log"
 	PageSettings = "settings"
 	PageTextures = "textures" // Texture optimisation (10 §2), under Library
-	// PageImport: Library › Import, where every import starts (16 §2.18)
+	// PageImport: Library › Import & export, where every import starts (16 §2.18)
 	PageImport = "import"
 	// PageSubscribe: Mod library › add a subscription (16 §2.9)
 	PageSubscribe = "subscribe"
@@ -187,6 +187,9 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 		{ID: PageLog, Label: T("game log")},
 	}
 	library := []NavItem{
+		// every import starts here, and sharing sits beside it (16 §2.18); first in the group
+		// since 2026-11-18, still without a shift key (below)
+		{ID: PageImport, Label: T("import & export")},
 		{ID: PagePlan, Label: T("lists"), Kids: planKids},
 		{ID: PagePacks, Label: T("packs"), Kids: packKids},
 		// Below the packs (2026-10-28). The entry opens All, its first sub-entry (16 §2.9).
@@ -194,8 +197,6 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 		// what the game loads faster (10 §2)
 		{ID: PageTextures, Label: T("texture optimisation")},
 		{ID: PageEnv, Label: T("Game Config")},
-		// every import in one place: lists, packs, saves and other managers' data (16 §2.18)
-		{ID: PageImport, Label: T("import")},
 	}
 	// Saves is a group of its own since 2026-11-11 (16 §2.11): the saves, and the play
 	// review (12 §3). Its own name: the plain "saves" key is translated for settings rows.
@@ -234,8 +235,14 @@ func NavPath(groups []NavGroup, id string) []Crumb {
 		return []Crumb{{Label: T("background tasks"), ID: PageTasks}}
 	}
 	for _, g := range groups {
+		// the group's crumb opens its first page; Library's is Lists, not Import & export
+		// above it (16 §2.18)
+		top := g.Items[0].ID
+		if top == PageImport && len(g.Items) > 1 {
+			top = g.Items[1].ID
+		}
 		for _, it := range g.Items {
-			head := []Crumb{{Label: g.Title, ID: g.Items[0].ID}, {Label: it.Label, ID: it.ID}}
+			head := []Crumb{{Label: g.Title, ID: top}, {Label: it.Label, ID: it.ID}}
 			for _, k := range it.Kids {
 				if k.ID == id {
 					return append(head, Crumb{Label: k.Label, ID: k.ID})
@@ -326,6 +333,9 @@ type Home struct {
 	Launch *LaunchHint `json:"launch,omitempty"`
 	// Update is the line about a new RimArcho at the top right (17 §5.1); nil when there is none.
 	Update *SelfUpdateLine `json:"update,omitempty"`
+	// GameUpdate is the line about a game update with "back up <game> first" (16 §2.3);
+	// nil when the game neither changed since the last scan nor has a Steam update waiting.
+	GameUpdate *GameUpdateLine `json:"gameUpdate,omitempty"`
 }
 
 // BuildHome builds the home page: one row per plan of the environment and one per pack.
@@ -401,6 +411,9 @@ func buildHome(a *app.App, st *app.LoadoutState, n *Needs, plans []PlanRow, pack
 	if !launchOnly {
 		h.Changes = ChangeHome(a, st)
 		h.Update = SelfUpdateHome(a)
+		if st.Ix != nil {
+			h.GameUpdate = GameUpdateHome(a, st.Ix.Env)
+		}
 	}
 	return h
 }
@@ -555,11 +568,18 @@ type GameFound struct {
 	Like       string `json:"like,omitempty"`
 	List       string `json:"list,omitempty"`
 	NewList    bool   `json:"newList,omitempty"`
+	// GameList starts the config from the game's own ModsConfig.xml in UserData (the
+	// game's current list); GameMods is how many Mods it enables (0: no such file).
+	GameList bool `json:"gameList,omitempty"`
+	GameMods int  `json:"gameMods,omitempty"`
 }
 
 // spec is the env add of a found game with the page's choices.
 func (g GameFound) spec() app.EnvSpec {
 	sp := app.EnvSpec{GameRoot: g.Game, UserDataRoot: g.UserData, Launch: g.Launch, Like: g.Like, List: g.List, NewList: g.NewList}
+	if g.GameList && g.UserData != "" {
+		sp.GameList = g.UserData
+	}
 	switch g.Saves {
 	case app.SavesOwn:
 		sp.UserDataRoot, sp.Saves = "", app.SavesOwn
@@ -601,6 +621,11 @@ func FindGames(a *app.App) []GameFound {
 		}
 		seen[k] = true
 		g.Env, g.Known, g.Current = used[k], known[k], k == cur
+		if g.UserData != "" {
+			if mc, err := env.ReadModsConfig(env.ModsConfigPath(g.UserData)); err == nil {
+				g.GameMods = len(mc.ActiveMods)
+			}
+		}
 		// a used folder gets a name too: Add Game Config may add another config for it
 		g.Name = freeName(env.MajorMinor(g.Version), taken)
 		taken[g.Name] = true

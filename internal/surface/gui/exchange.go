@@ -8,6 +8,7 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
+	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -54,13 +55,29 @@ type Exchange struct {
 	Dialogs bool                `json:"dialogs"`
 	Dir     string              `json:"dir"`
 	Formats []view.ExportFormat `json:"formats"`
+	// Game is the current Game Config's ModsConfig.xml: the Import page's "the game's
+	// current list" card (16 §2.18); nil when it has none.
+	Game *GameList `json:"game,omitempty"`
+}
+
+// GameList is the game's own ModsConfig.xml and how many Mods it enables.
+type GameList struct {
+	Path string `json:"path"`
+	Mods int    `json:"mods"`
 }
 
 // ExchangeInfo supplies file and clipboard capabilities for the sub-pages (16 §2.17).
 func (s *API) ExchangeInfo() *Exchange {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return &Exchange{Dialogs: s.x.native != nil, Dir: view.DefaultExportDir(), Formats: view.ExportFormats(s.a)}
+	x := &Exchange{Dialogs: s.x.native != nil, Dir: view.DefaultExportDir(), Formats: view.ExportFormats(s.a)}
+	if e, err := s.a.Env(); err == nil && e != nil {
+		path := env.ModsConfigPath(e.UserDataRoot)
+		if mc, err := env.ReadModsConfig(path); err == nil {
+			x.Game = &GameList{Path: path, Mods: len(mc.ActiveMods)}
+		}
+	}
+	return x
 }
 
 // PickFolder shows the folder dialog (the guide's game folder, the settings page's folders),

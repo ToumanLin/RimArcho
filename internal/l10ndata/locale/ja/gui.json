@@ -411,5 +411,21 @@
   "RimSort, RimCrow and RimPy lists, RimWorld .rml, ModsConfig.xml or a save (.rws)": "RimSort・RimCrow・RimPy のリスト、RimWorld .rml、ModsConfig.xml、またはセーブ（.rws）",
   "paste": "貼り付け",
   "a pack you can launch; its Mods are checked first": "起動できるパック。先にMODを確認します",
-  "lists, notes, tags and rules; their files are only read": "リスト、メモ、タグ、ルール。ファイルは読み取るだけです"
+  "lists, notes, tags and rules; their files are only read": "リスト、メモ、タグ、ルール。ファイルは読み取るだけです",
+  "Where does your first list come from?": "最初のリストをどこから用意しますか？",
+  "Share": "共有",
+  "The game's current list": "ゲームの現在のリスト",
+  "its ModsConfig.xml enables %d Mods": "ModsConfig.xml で %d 個の Mod が有効",
+  "the game has no ModsConfig.xml yet": "ゲームにまだ ModsConfig.xml がありません",
+  "read it": "読み込む",
+  "The current list": "現在のリスト",
+  "RimSort, RimCrow, RimPy, .rml, a share code or Workshop links": "RimSort、RimCrow、RimPy、.rml、共有コード、ワークショップのリンク",
+  "export %s…": "%s をエクスポート…",
+  "the pack as a file (.archopack), or only its list": "パックをファイル（.archopack）として、またはリストだけ",
+  "no packs yet": "まだパックがありません",
+  "the game's current list (%d Mods)": "ゲームの現在のリスト（%d 個の Mod）",
+  "back up %s first": "先に %s をバックアップ",
+  "the game": "ゲーム",
+  "updated to %s since the last scan": "前回のスキャン後 %s に更新",
+  "Steam has an update waiting": "Steam に未適用の更新があります"
 }
