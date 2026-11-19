@@ -21,7 +21,7 @@ import { changes, changesKey, initSubscriptions } from "./subscriptions.js";
 import { setNeedRunner } from "./badgepop.js";
 import { initNeedText, needText, needParts, needEvidence } from "./needtext.js";
 import { getChoices } from "./credit.js";
-import { memBars, countBar, countMark, stepMeter } from "./membar.js";
+import { memBars, countBar, countMark, stepMeter, visTip, diskMeter } from "./membar.js";
 import { setVersionRunner } from "./versionwarnings.js";
 import { openVersionList } from "./versionpanel.js";
 
@@ -523,6 +523,29 @@ function needsLead(d) {
   return Tf("%s can run: nothing to handle.", plan);
 }
 
+// runSummary: with something to handle, the lead becomes the list's name and two status
+// icons with their counts, ▲ before you start and ✕ last run (V2, 16 §7 principle 9); the
+// counts match the section headings, and the sentence is the line's name and tooltip.
+function runSummary(w) {
+  const left = N.cols[0].filter((x) => !x.done && x.counted).length;
+  const runs = N.cols[1].filter((x) => !x.done && x.counted).length;
+  const lead = w.querySelector(".page-head .lead");
+  if (!lead || (!left && !runs)) return;
+  const sentence = lead.textContent;
+  const line = el("p", "lead run-sum");
+  const sum = visTip(el("span", "rs"), sentence);
+  sum.append(el("span", "rs-plan", (S.shell && S.shell.plan && S.shell.plan.name) || T("the list")));
+  for (const [n, ic, cls] of [[left, icon.warn, "warn"], [runs, icon.err, "err"]]) {
+    if (!n) continue;
+    const c = el("span", "rs-n " + cls);
+    c.innerHTML = ic;
+    c.append(el("span", "num", String(n)));
+    sum.append(c);
+  }
+  line.append(sum);
+  lead.replaceWith(line);
+}
+
 // askShown: drawNeeds drew N.ask's confirmation row.
 let askShown = false;
 function drawNeeds() {
@@ -540,6 +563,7 @@ function drawNeeds() {
     autoFix(),
     act(T("check the files again"), "rescan", () => ui.cmd("analyze"), "A", "analyze"),
     act(T("game log"), "log", () => ui.go("log"), "l"));
+  runSummary(w);
   N.els = [[], []];
   const live = N.cols[1].some((x) => x.group === 6);
   const column = (ci, title, sub) => {
@@ -1809,6 +1833,7 @@ function renderGroups(w, groups, again) {
       const note = factText(el("div", "sub setting-note"), { text: it.note || "", paths: it.notePaths });
       note.hidden = !it.note;
       left.append(note);
+      if (it.disk) left.append(diskMeter(it.disk)); // the folder's drive (V10)
       const right = el("div", "r");
       if (it.edit === "swatches" || it.edit === "segments") {
         row.classList.add("appearance-row");

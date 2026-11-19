@@ -235,3 +235,21 @@ export function sizeBar(cell, bytes, most) {
   cell.classList.add("szbar");
   cell.style.setProperty("--w", Math.max(1, Math.round((bytes / most) * 100)) + "%");
 }
+
+// ---- V10: a drive's space ----
+
+// diskMeter: used and free on the drive's size, the free part amber when the drive is nearly
+// full; "440 GB free of 1.8 TB" is printed after it and names it (view.DiskMeter).
+export function diskMeter(d) {
+  const row = el("div", "dbar-row" + (d.low ? " low" : ""));
+  const bar = el("span", "dbar");
+  visTip(bar, d.text, "meter", false);
+  bar.setAttribute("aria-valuemin", "0");
+  bar.setAttribute("aria-valuemax", String(d.total));
+  bar.setAttribute("aria-valuenow", String(d.total - d.free));
+  const used = el("i", "d-used");
+  used.style.width = Math.max(1, Math.min(100, ((d.total - d.free) / d.total) * 100)) + "%";
+  bar.append(used, el("i", "d-free"));
+  row.append(bar, el("span", "num", d.text));
+  return row;
+}

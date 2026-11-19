@@ -18,6 +18,7 @@ import * as pop from "./popups.js";
 import { getChoices } from "./credit.js";
 import { openLibraryInstance } from "./librarylink.js";
 import { applyItem, focusLaunch } from "./home.js";
+import { visTip } from "./membar.js";
 
 let ui = null;
 export function initSaves(u) { ui = u; }
@@ -947,12 +948,11 @@ function contentSection(d) {
   if (c.note) s.append(el("p", "sv-note warn", c.note));
   const groups = nd.groups || [];
   const bar = el("div", "sv-nbar");
-  bar.setAttribute("role", "img");
-  bar.setAttribute("aria-label", groups.map((g) => Tf("%d %s", g.mods.length, g.label)).join(T(", ")));
+  // named by the counts it draws, which hover and keyboard focus show too (V9, 16 §7 principle 9)
+  visTip(bar, groups.map((g) => Tf("%d %s", g.mods.length, g.label)).join(T(", ")));
   for (const g of groups) {
     const i = el("i", "k-" + g.key);
     i.style.flex = String(g.mods.length);
-    i.title = Tf("%d %s", g.mods.length, g.label);
     bar.append(i);
   }
   s.append(bar);

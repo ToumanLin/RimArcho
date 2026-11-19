@@ -389,11 +389,18 @@ function mini(r, label) {
   m.append(i);
   return taskProgress(m, r, label);
 }
+// iconWord: done and failed are their ✓ and ✕ alone (V11, 16 §7 principle 9); the word stays
+// for assistive technology and as the tooltip. Other states keep their word.
+function iconWord(s, word, iconOnly) {
+  if (!iconOnly) { s.append(word); return; }
+  s.append(el("span", "vis-hidden", word));
+  s.title = word;
+}
 function stateWord(r) {
   const s = el("span", "stw s-" + r.state);
   const mk = { done: icon.ok, fail: icon.err, part: icon.warn }[r.state];
   if (mk) { const k = el("span", "mk"); k.innerHTML = mk; s.append(k); }
-  s.append(r.stateText);
+  iconWord(s, r.stateText, r.state === "done" || r.state === "fail");
   return s;
 }
 const current = () => (X.page ? X.page.rows.find((r) => r.id === X.cur) : null);
@@ -507,7 +514,7 @@ function itemState(it) {
   const s = el("span", "stw s-" + map[it.state]);
   const mk = { ok: icon.ok, fail: icon.err }[it.state];
   if (mk) { const k = el("span", "mk"); k.innerHTML = mk; s.append(k); }
-  s.append(it.stateText);
+  iconWord(s, it.stateText, !!mk);
   // a Steam download in progress: its bytes as a bar (got / downloadSize)
   if (it.state === "run" && it.downloadSize > 0) {
     const pct = Math.max(0, Math.min(100, (100 * (it.got || 0)) / it.downloadSize));

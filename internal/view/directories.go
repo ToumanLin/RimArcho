@@ -1,6 +1,8 @@
 package view
 
 import (
+	"fmt"
+
 	"github.com/ToumanLin/RimArcho/internal/app"
 )
 
@@ -54,6 +56,9 @@ func DirectoryGroup(a *app.App) SettingGroup {
 		}
 		item := SettingItem{Label: DirectoryLabel(d), Value: d.Path, ValuePath: true, Edit: "directory", Directory: d.ID,
 			Argv: []string{"folder", "set", d.ID, "{}"}, MoveArgv: []string{"folder", "move", d.ID, "{}"}, Note: note}
+		if !DirectoryNeedsLocation(d) {
+			item.Disk = diskMeter(d.Path)
+		}
 		if d.ID == "source" {
 			item.ValueNote = SizeText(a.Store.SourceLibraryBytes())
 			item.Actions = []SettingAction{
@@ -68,6 +73,31 @@ func DirectoryGroup(a *app.App) SettingGroup {
 		g.Items = append(g.Items, item)
 	}
 	return g
+}
+
+// DiskMeter is a drive's space: the GUI draws used and free (amber when low) and prints
+// Text, which also names it.
+type DiskMeter struct {
+	Free  int64  `json:"free"`
+	Total int64  `json:"total"`
+	Low   bool   `json:"low,omitempty"` // under 10 GB free, the first-run guide's limit
+	Text  string `json:"text"`
+}
+
+func diskMeter(path string) *DiskMeter {
+	free, total := app.DiskSpace(path)
+	if free < 0 || total <= 0 {
+		return nil
+	}
+	return &DiskMeter{Free: free, Total: total, Low: free < 10<<30, Text: Tf("%s free of %s", driveSize(free), driveSize(total))}
+}
+
+// driveSize is SizeText with terabytes, which drives reach and Mods do not.
+func driveSize(n int64) string {
+	if n >= 1<<40 {
+		return fmt.Sprintf("%.1f TB", float64(n)/(1<<40))
+	}
+	return SizeText(n)
 }
 
 // directoryCode marks the needs directoryNeeds makes, which RefreshDirectories replaces.
