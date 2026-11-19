@@ -40,10 +40,12 @@ type Report struct {
 	Contact string `json:"contact,omitempty"`
 }
 
-// Sent is the issue the relay opened.
+// Sent is the issue the relay opened. Token reads its replies later (replies.go); it stays
+// in RimArcho's record of sent reports and never reaches the page or the issue.
 type Sent struct {
 	Number int    `json:"number"`
 	URL    string `json:"url"`
+	Token  string `json:"-"`
 }
 
 // RelayError is the relay's refusal. Code is the relay's word for it: slow_down (one a
@@ -81,6 +83,7 @@ func Send(ctx context.Context, endpoint, agent string, r Report) (Sent, error) {
 	b, _ := io.ReadAll(io.LimitReader(res.Body, 64<<10))
 	var out struct {
 		Sent
+		Token string `json:"token"`
 		Error string `json:"error"`
 	}
 	_ = json.Unmarshal(b, &out)
@@ -91,6 +94,7 @@ func Send(ctx context.Context, endpoint, agent string, r Report) (Sent, error) {
 		}
 		return Sent{}, &RelayError{Status: res.StatusCode, Code: code}
 	}
+	out.Sent.Token = out.Token
 	return out.Sent, nil
 }
 

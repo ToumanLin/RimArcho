@@ -30,7 +30,7 @@ func TestNetworkSettings(t *testing.T) {
 			net = &g
 		}
 	}
-	if net == nil || len(net.Items) != 2 {
+	if net == nil || len(net.Items) != 3 || net.Items[2].Key != "feedback.replies" {
 		t.Fatalf("network group: %+v", net)
 	}
 	if p := net.Items[0]; p.Value != "socks5://127.0.0.1:7891" || !strings.Contains(p.ValueNote, "through 127.0.0.1:7891") {

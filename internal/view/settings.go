@@ -429,6 +429,9 @@ func NetworkGroup(a *app.App) SettingGroup {
 			Note:      T("system follows the Windows proxy (Clash, v2rayN in system proxy mode); off goes direct; or a proxy such as http://127.0.0.1:7890 or socks5://127.0.0.1:7891")},
 		{Label: T("GitHub mirror"), Value: mv, EditValue: &mirror, Edit: "text", Argv: []string{"config", "set", "network.github_mirror", "{}"},
 			Note: T("tried before GitHub for community data, updates and todds, e.g. https://gh-proxy.org/; empty goes to GitHub directly. Use one you trust: updates come through it")},
+		{Key: "feedback.replies", Label: T("check for replies to my reports"), Value: cmds.Setting(a, "feedback.replies"), Edit: "choice", Choices: []string{"on", "off"}, ChoiceLabels: []string{T("on"), T("off")},
+			Argv: []string{"config", "set", "feedback.replies", "{}"},
+			Note: T("asks the feedback relay when RimArcho starts and when Feedback opens; nothing else is sent")},
 	}}
 }
 

@@ -6,7 +6,8 @@ Until RimArcho has a relay URL, the feedback page offers only "open GitHub".
 
 ## What it does and does not do
 
-- Receives: `POST /report`, JSON `{title, body, contact}`, `User-Agent: RimArcho/<version>`. Returns `{number, url}` on success or `{error}` on failure; RimArcho translates error codes into player-facing text.
+- Receives: `POST /report`, JSON `{title, body, contact}`, `User-Agent: RimArcho/<version>`. Returns `{number, url, token}` on success or `{error}` on failure; RimArcho translates error codes into player-facing text.
+- Replies: `token` is 24 random bytes that only the sender's RimArcho keeps; KV holds only its HMAC (keyed with the App key) as `reply:<issue number>` for 180 days, and the token never enters the issue. `GET /status/<n>?t=<token>` returns `{state, closed_at, replies:[{body, created_at}]}`, where `replies` are only the comments whose `author_association` is `OWNER` (your replies; nobody else's comment reaches the player). A wrong token is 404, the same as a missing issue. It reads the issue and its comments with the same Issues permission, so the GitHub App needs nothing new. Limit: `STATUS_PER_HOUR` (default 120) per sender per hour, an approximate KV counter (`status:<hash>`, two hours). RimArcho asks only at start-up and when Feedback opens (16 §2.14).
 - Abuse prevention:
   - One report per sender per minute and `PER_IP_DAY` reports per sender per day, exact: a Durable Object per sender (`SendGate`, binding `GATE`), which handles one request at a time and reads its own writes. A report GitHub refuses gives the minute back. Until 1.0.6 the minute limit was Cloudflare's rate-limit binding, which is approximate and per location: it let a second report through 13 s after the first.
   - `PER_DAY` total per day, using an approximate KV counter.
@@ -57,7 +58,8 @@ Requires a Cloudflare account (the free plan suffices), Node.js (LTS) and reposi
       - Contact details are absent from the body.
    4. Read the contact details with `npx wrangler kv key get --binding COUNTS "contact:<number>" --remote`.
    5. Send again within a minute; it should say "one report a minute; send it again in a moment".
-   6. Close or delete the test issue on GitHub afterwards.
+   6. Reply to the issue on GitHub as ToumanLin, then restart RimArcho: the Feedback entry gets a dot and "my reports" shows the reply (the VM row "Feedback replies").
+   7. Close or delete the test issue on GitHub afterwards.
 
 8. **Put it in the program**: set `Relay` in [`internal/feedback/relay.go`](../internal/feedback/relay.go) to this URL (including `/report`), commit and release. The feedback page offers "send" starting with that version.
 
@@ -78,7 +80,8 @@ Requires a Cloudflare account (the free plan suffices), Node.js (LTS) and reposi
 
 `node --test "feedback-relay/*.test.mjs"` (from the repository root). Tests use a fake GitHub, a Map as KV and the real `SendGate` behind a fake Durable Object namespace; no real GitHub or Cloudflare calls. Coverage:
 
-- Issue creation, with neither IP nor contact details in the issue;
+- Issue creation, with neither IP, contact details nor the reply token in the issue, and only the token's hash in KV;
+- Status: only the owner's comments; a wrong token or another issue's number is 404 without asking GitHub; the hourly limit per sender;
 - JWT verification against the App public key;
 - Installation-token reuse;
 - All three limits: per minute (including a resend after 13 s), per sender per day, total per day; a GitHub failure gives the minute back;

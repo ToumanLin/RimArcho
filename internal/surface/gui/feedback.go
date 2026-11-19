@@ -2,6 +2,7 @@ package gui
 
 import (
 	"context"
+	"strings"
 	"sync"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -56,7 +57,53 @@ func (s *API) FeedbackSend(title, text, contact string) (feedback.Sent, error) {
 	s.feedback.mu.Lock()
 	at := s.feedback.at
 	s.feedback.mu.Unlock()
-	return view.SendFeedback(context.Background(), title, text, contact, at)
+	sent, err := view.SendFeedback(context.Background(), title, text, contact, at)
+	if err == nil {
+		view.RecordFeedbackSent(s.a, sent, sentTitle(title, text))
+	}
+	return sent, err
+}
+
+// sentTitle is the title the record keeps: the one typed, or the description's first line.
+func sentTitle(title, text string) string {
+	if t := strings.TrimSpace(title); t != "" {
+		return t
+	}
+	first, _, _ := strings.Cut(strings.TrimSpace(text), "\n")
+	return strings.TrimSpace(first)
+}
+
+// FeedbackReports is Feedback › My reports as recorded, without asking the relay.
+func (s *API) FeedbackReports() view.FeedbackReports { return view.ReadFeedbackReports(s.a) }
+
+// FeedbackCheck asks the relay for replies (the Feedback page opened) and updates the
+// sidebar's dot.
+func (s *API) FeedbackCheck() view.FeedbackReports {
+	r := view.CheckFeedbackReplies(context.Background(), s.a)
+	s.send("feedback-replies", map[string]any{"unseen": r.Unseen})
+	return r
+}
+
+// FeedbackSeen marks the replies shown on the page as seen; the dot goes.
+func (s *API) FeedbackSeen() {
+	view.SeenFeedbackReplies(s.a)
+	s.send("feedback-replies", map[string]any{"unseen": 0})
+}
+
+// FeedbackFollowUp is the title a follow-up about report n starts with.
+func (s *API) FeedbackFollowUp(n int, title string) string { return view.FollowUpTitle(n, title) }
+
+// checkFeedbackReplies is the start-up check (16 §2.14): quiet, and only the dot shows it.
+func (s *API) checkFeedbackReplies() {
+	if !view.RepliesOn(s.a) {
+		return
+	}
+	go func() {
+		r := view.CheckFeedbackReplies(context.Background(), s.a)
+		if r.Unseen > 0 {
+			s.send("feedback-replies", map[string]any{"unseen": r.Unseen})
+		}
+	}()
 }
 
 // Community is RimArcho's public pages for the settings page.

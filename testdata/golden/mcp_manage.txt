@@ -19,6 +19,7 @@ settings
   data.replacements.url: https://raw.githubusercontent.com/emipa606/UseThisInstead/main/replacements.json.gz
   data.rules.url: https://raw.githubusercontent.com/RimSort/Community-Rules-Database/main/communityRules.json
   data.steamdb.url: https://raw.githubusercontent.com/RimSort/Steam-Workshop-Database/main/steamDB.json
+  feedback.replies: on
   monitor.default: on
   network.proxy: system
   tags.pinned: RimWorld,framework,visuals,apparel,races,weapons,buildings,furniture,QoL,balance,story,performance,language packs,testing,to delete

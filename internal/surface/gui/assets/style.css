@@ -1655,6 +1655,18 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .fb-foot .m.warn { color: var(--amber); }
 /* "public on GitHub" beside preview: a note, not part of the heading */
 .fb-public { margin-left: 12px; font-weight: 400; color: var(--faint); }
+/* My reports (16 §2.14): replies as plain text under each report; the sidebar's dot */
+.fb-mine { margin-bottom: 24px; }
+.fb-mine .set .l .setting-note { padding-left: 0; }
+.fb-report { align-items: flex-start; }
+.fb-report > .r { align-self: flex-start; }
+.fb-r-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.fb-r-name { min-width: 0; padding-left: 0; padding-right: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-r-new { flex: none; font-size: 12px; color: var(--accent-11, var(--accent)); }
+.fb-reply { margin-top: 8px; padding: 6px 10px; border-left: var(--hairline) solid var(--line); }
+.fb-reply-when { color: var(--muted); font-size: 12px; }
+.fb-reply-text { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.nav-item .reply-dot { width: 7px; height: 7px; margin: 0 2px 0 auto; border-radius: 50%; background: var(--accent); flex: none; }
 
 /* Library > Texture optimisation (10 §2): settings rows, the run's foot, the mods table */
 .textures .set .sub { white-space: normal; }

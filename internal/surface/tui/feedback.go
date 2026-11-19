@@ -119,8 +119,12 @@ func (m *model) askFeedback(at *view.FeedbackAttach) tea.Cmd {
 			}
 			m.prompt = &prompt{label: T("contact (optional, not public)") + ": ", submit: func(m *model, contact string) tea.Cmd {
 				m.say(sayBusy, T("sending…"))
+				a := m.app
 				return func() tea.Msg {
 					s, err := view.SendFeedback(context.Background(), title, text, contact, at)
+					if err == nil {
+						view.RecordFeedbackSent(a, s, title)
+					}
 					return feedbackSentMsg{s, err}
 				}
 			}}

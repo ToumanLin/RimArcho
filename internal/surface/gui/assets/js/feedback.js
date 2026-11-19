@@ -11,16 +11,33 @@ import { page, button, area, beginPageRead } from "./screens.js";
 // The draft stays for the session: leaving the page does not lose what was typed (16 §3.1).
 // sent: the issue send opened last, shown until the next draft. open: the preview's
 // attachments unfolded by the player (by key), kept while typing.
-const F = { title: "", text: "", contact: "", opts: { mods: false, paths: false, log: false }, at: null, res: null, sent: null, sending: false, open: new Set() };
+const F = { title: "", text: "", contact: "", opts: { mods: false, paths: false, log: false }, at: null, res: null, sent: null, sending: false, open: new Set(), mine: null, fresh: new Set() };
 let seq = 0, typing = 0, retry = 0;
 
 export async function open() {
   const read = beginPageRead("feedback");
-  try { await attach(); } catch (e) { read.fail(e); return; }
+  try {
+    const [, mine] = await Promise.all([attach(), api.FeedbackReports()]);
+    F.mine = mine;
+  } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
   draw();
   read.finish();
   $("#screen .fb-title")?.focus({ preventScroll: true });
+  checkReplies();
+}
+
+// checkReplies asks the relay for replies once the page shows (16 §2.14 My reports). A
+// failure is quiet: the last answer stays, with one muted line.
+async function checkReplies() {
+  let mine;
+  try { mine = await api.FeedbackCheck(); } catch { return; }
+  if (S.screen !== "feedback") return;
+  F.mine = mine;
+  // the replies new on this visit stay marked while the page is open; the dot goes
+  for (const r of mine.reports) if (r.unseen) F.fresh.add(r.number);
+  drawMine();
+  if (mine.unseen) api.FeedbackSeen().catch(() => {});
 }
 
 // attach reads the attachments for the ticked options, then the body; the newest request wins.
@@ -90,9 +107,87 @@ function draw() {
   area(prev, lab3);
 
   w.append(el("div", "fb-foot"));
+  // My reports: numbered once here; drawMine fills it again after each check
+  const mine = el("div", "fb-mine-wrap");
+  const labM = el("div", "label section", T("my reports"));
+  const cardM = el("section", "card settings fb-mine");
+  mine.append(labM, cardM);
+  w.append(mine);
+  area(cardM, labM);
+  drawMine();
   refresh();
   sc.scrollTop = top;
 }
+
+// drawMine is My reports: the reports sent from here, their state and the developer's
+// replies as plain text, with a follow-up for each. Only when the relay is used.
+function drawMine() {
+  const wrap = $("#screen .fb-mine-wrap"), card = $("#screen .fb-mine");
+  if (!wrap || !card) return;
+  card.innerHTML = "";
+  const m = F.mine;
+  wrap.hidden = !m || (!F.at?.send && !m.reports.length);
+  if (wrap.hidden) return;
+  const note = el("div", "set fb-mine-note");
+  const nl = el("div", "l");
+  nl.append(el("div", "sub setting-note", T("the developer may reply to a report here; there is no promise of a reply, and replies are public on GitHub")));
+  if (m.off) nl.append(el("div", "sub setting-note", T("checking for replies is off (Settings › network)")));
+  else if (m.failed) nl.append(el("div", "sub setting-note", T("could not check for replies just now; RimArcho asks again next time")));
+  note.append(nl);
+  card.append(note);
+  if (!m.reports.length) {
+    const row = el("div", "set");
+    const l = el("div", "l");
+    l.append(el("span", "muted", T("no reports sent from this computer yet")));
+    row.append(l);
+    card.append(row);
+  }
+  for (const r of m.reports) card.append(reportRow(r));
+}
+
+function reportRow(r) {
+  const row = el("div", "set fb-report");
+  row.dataset.report = String(r.number);
+  const l = el("div", "l");
+  const head = el("div", "fb-r-head");
+  const name = button("#" + r.number + " " + (r.title || ""), "", () => r.url && api.OpenURL(r.url).catch(e => say("fail", errText(e))), "link");
+  name.classList.add("fb-r-name");
+  if (r.url) name.title = r.url;
+  head.append(name);
+  if (F.fresh.has(r.number) || r.unseen) head.append(el("span", "fb-r-new", T("new reply")));
+  l.append(head);
+  const facts = el("div", "sub setting-note word-facts");
+  facts.append(el("span", "", Tf("sent %s", day(r.sentAt))));
+  if (r.gone) facts.append(el("span", "", T("no longer on GitHub")));
+  else if (r.state === "closed") facts.append(el("span", "", r.closedAt ? Tf("closed %s", day(r.closedAt)) : T("closed")));
+  else if (r.state === "open") facts.append(el("span", "", T("still open")));
+  facts.append(el("span", "", r.replies.length ? Tf("replies: %d", r.replies.length) : T("no reply yet")));
+  l.append(facts);
+  for (const p of r.replies) {
+    const q = el("div", "fb-reply");
+    q.append(el("div", "fb-reply-when", Tf("developer, %s", day(p.created_at))), el("div", "fb-reply-text", p.body));
+    l.append(q);
+  }
+  row.append(l);
+  const right = el("div", "r");
+  right.append(button(T("send a follow-up"), "", () => followUp(r)));
+  row.append(right);
+  return row;
+}
+
+// followUp starts a new report about #N through the normal send path; #N in the title links
+// the two on GitHub.
+async function followUp(r) {
+  try { F.title = await api.FeedbackFollowUp(r.number, r.title || ""); } catch { F.title = "#" + r.number; }
+  F.sent = null;
+  draw();
+  try { F.res = await api.FeedbackCompose(F.title, F.text); refresh(); } catch (e) { say("fail", errText(e)); }
+  const t = $("#screen .fb-text");
+  t?.focus({ preventScroll: false });
+  t?.scrollIntoView({ block: "center" });
+}
+
+const day = (iso) => String(iso || "").slice(0, 10);
 
 function partRow(p) {
   const row = el("div", "set");
@@ -174,6 +269,7 @@ async function sendReport() {
   try {
     F.sent = await api.FeedbackSend(F.title, F.text, F.contact);
     F.title = F.text = "";
+    try { F.mine = await api.FeedbackReports(); } catch { /* the list stays as it was */ }
     say("ok", Tf("sent as #%d", F.sent.number));
     F.res = await api.FeedbackCompose("", "");
     if (S.screen === "feedback") { F.sending = false; draw(); }

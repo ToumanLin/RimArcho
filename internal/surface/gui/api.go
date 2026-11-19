@@ -88,6 +88,7 @@ type API struct {
 	environment     environmentWorker
 	monitorOnce     sync.Once
 	watchOnce       sync.Once // watchDownloads (04 §1.6)
+	repliesOnce     sync.Once // checkFeedbackReplies (16 §2.14)
 	autoOnce        sync.Once
 	maintenanceOnce sync.Once
 	autoWG          sync.WaitGroup
@@ -163,6 +164,7 @@ func (s *API) Ready() {
 	s.prepareBackgrounds(false) // menu extraction starts after the first draw (16 §3.1)
 	s.monitorOnce.Do(s.checkMonitor)
 	s.watchOnce.Do(func() { go s.watchDownloads() })
+	s.repliesOnce.Do(s.checkFeedbackReplies)
 	ms := time.Since(processStart).Milliseconds()
 	dir := filepath.Join(s.a.Home, "logs")
 	if os.MkdirAll(dir, 0o755) != nil {

@@ -304,7 +304,11 @@ function renderSide() {
     fb.prepend(ic);
   }
   $(".lbl", fb).textContent = T("feedback");
-  fb.title = T("feedback");
+  // a reply from the developer the player has not seen yet (16 §2.14 My reports)
+  let dot = fb.querySelector(".reply-dot");
+  if (S.feedbackUnseen && !dot) fb.append(dot = el("span", "reply-dot"));
+  else if (!S.feedbackUnseen && dot) dot.remove();
+  fb.title = S.feedbackUnseen ? T("feedback") + T("; ") + T("new reply") : T("feedback");
   const tl = $("#tasks-line");
   if (tl) {
     tl.classList.toggle("on", cur === "tasks");

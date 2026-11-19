@@ -24,13 +24,16 @@ export default {
   },
 };
 
-// handle answers POST /report with {number, url} of the new issue, or {error} with a code
-// RimArcho turns into words: not_configured, client, bad_json, empty, too_long, slow_down,
-// ip_daily, daily, github.
+// handle answers POST /report with {number, url, token} of the new issue, or {error} with a
+// code RimArcho turns into words: not_configured, client, bad_json, empty, too_long,
+// slow_down, ip_daily, daily, github. GET /status/<n>?t=<token> is the sender's read of that
+// issue (status).
 export async function handle(request, env, deps = {}) {
   const fetchFn = deps.fetch || fetch;
   const now = deps.now || Date.now;
-  if (new URL(request.url).pathname !== "/report") return reply(404, { error: "not_found" });
+  const path = new URL(request.url).pathname;
+  if (path.startsWith("/status/")) return status(request, env, fetchFn, now, deps.random);
+  if (path !== "/report") return reply(404, { error: "not_found" });
   if (request.method !== "POST") return reply(405, { error: "method" });
   if (!env.APP_ID || !env.GITHUB_APP_KEY || !env.REPO || !env.COUNTS || !env.GATE) {
     return reply(503, { error: "not_configured" });
@@ -73,7 +76,74 @@ export async function handle(request, env, deps = {}) {
     // for the maintainer only: wrangler kv key get --binding COUNTS contact:<number> --remote
     await env.COUNTS.put("contact:" + issue.number, report.contact, { expirationTtl: 180 * 86400 }).catch(() => {});
   }
-  return reply(200, { number: issue.number, url: issue.html_url });
+  // the reply token: only its keyed hash is kept, so KV alone cannot read anyone's replies
+  const token = randomToken(deps.random);
+  await env.COUNTS.put("reply:" + issue.number, await keyed(env.GITHUB_APP_KEY, "reply", issue.number + "\n" + token), {
+    expirationTtl: 180 * 86400,
+  }).catch(() => {});
+  return reply(200, { number: issue.number, url: issue.html_url, token });
+}
+
+const STATUS_PER_HOUR = 120;
+
+// status answers GET /status/<n>?t=<token> with {state, closed_at, replies:[{body,
+// created_at}]}: only comments by the repository owner, so a stranger's comment never reaches
+// the player. A wrong token is 404 like a missing issue. Each sender may ask STATUS_PER_HOUR
+// times an hour (a KV counter: approximate, which is enough for a read).
+async function status(request, env, fetchFn, now, random) {
+  if (request.method !== "GET") return reply(405, { error: "method" });
+  if (!env.APP_ID || !env.GITHUB_APP_KEY || !env.REPO || !env.COUNTS) return reply(503, { error: "not_configured" });
+  if (!(request.headers.get("user-agent") || "").startsWith("RimArcho/")) return reply(403, { error: "client" });
+  const u = new URL(request.url);
+  const n = u.pathname.slice("/status/".length);
+  const t = u.searchParams.get("t") || "";
+  if (!/^[1-9]\d{0,9}$/.test(n) || !/^[A-Za-z0-9_-]{16,64}$/.test(t)) return reply(404, { error: "not_found" });
+
+  const hour = new Date(now()).toISOString().slice(0, 13);
+  const who = await sender(request.headers.get("cf-connecting-ip") || "", hour, env.GITHUB_APP_KEY);
+  const key = `status:${who}`;
+  const asked = parseInt((await env.COUNTS.get(key)) || "0", 10) || 0;
+  if (asked >= limit(env.STATUS_PER_HOUR, STATUS_PER_HOUR)) return reply(429, { error: "slow_down" });
+  await env.COUNTS.put(key, String(asked + 1), { expirationTtl: 2 * 3600 }).catch(() => {});
+
+  const want = await env.COUNTS.get("reply:" + n);
+  if (!want || !same(want, await keyed(env.GITHUB_APP_KEY, "reply", n + "\n" + t))) return reply(404, { error: "not_found" });
+  try {
+    const gh = await installationToken(env, fetchFn, now);
+    let res = await github(fetchFn, "GET", `/repos/${env.REPO}/issues/${n}`, gh);
+    if (res.status === 404 || res.status === 410) return reply(404, { error: "not_found" });
+    if (!res.ok) throw new Error(`reading the issue: ${res.status}`);
+    const issue = await res.json();
+    res = await github(fetchFn, "GET", `/repos/${env.REPO}/issues/${n}/comments?per_page=100`, gh);
+    if (!res.ok) throw new Error(`reading the comments: ${res.status}`);
+    const replies = (await res.json())
+      .filter((c) => c && c.author_association === "OWNER")
+      .map((c) => ({ body: String(c.body || ""), created_at: c.created_at }));
+    return reply(200, { state: issue.state === "closed" ? "closed" : "open", closed_at: issue.closed_at || null, replies });
+  } catch (e) {
+    return reply(502, { error: "github", detail: String(e?.message || e).slice(0, 200) });
+  }
+}
+
+// randomToken is 24 random bytes, base64url: the sender's only key to its issue's replies.
+export function randomToken(random) {
+  const b = new Uint8Array(24);
+  (random || ((a) => crypto.getRandomValues(a)))(b);
+  return b64url(b);
+}
+
+// keyed is HMAC-SHA-256 of msg with a key derived from the App's secret and a purpose.
+export async function keyed(secret, purpose, msg) {
+  const enc = new TextEncoder();
+  const k = await crypto.subtle.importKey("raw", enc.encode(purpose + "\n" + secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return b64url(new Uint8Array(await crypto.subtle.sign("HMAC", k, enc.encode(msg))));
+}
+
+function same(a, b) {
+  if (a.length !== b.length) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
 }
 
 function reply(status, data) {

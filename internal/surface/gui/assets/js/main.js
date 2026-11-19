@@ -1574,6 +1574,8 @@ async function start() {
   // the background check of the open list finished: the problems button, the panel and the
   // row icons follow without reading the lists again; an open Can it run shows the new answer
   // (VM run 2026-10-28: after the game exited it kept the run's old time until revisited)
+  // a developer's reply to a sent report: the dot on Feedback (16 §2.14)
+  on("feedback-replies", (ev) => { S.feedbackUnseen = ev.unseen || 0; shell.sync(); });
   on("list-problems", (ev) => {
     if (!problems.event(ev)) return;
     if (!S.screen) { renderLists(); renderWhere(); } else if (S.screen === "needs") scr.needs(true);

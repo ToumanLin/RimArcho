@@ -33,6 +33,8 @@ var configKeys = map[string][]string{
 	"workshop.images": {"on", "off"},
 	// 07 §1.5: add Archo Monitor to new plans (and to each plan once on upgrade)
 	"monitor.default": {"on", "off"},
+	// 16 §2.14 Feedback: off stops asking the feedback relay for replies to sent reports
+	"feedback.replies": {"on", "off"},
 	// 16 §2.14: off starts the window's WebView2 without GPU acceleration (less memory,
 	// software drawing); read when the window opens
 	"ui.gpu":          {"on", "off"},
