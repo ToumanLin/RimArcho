@@ -1580,6 +1580,9 @@ async function start() {
   addEventListener("focus", async () => {
     try { if (S.board && (await api.Stamp()) !== S.board.stamp) await reload(); } catch { /* keep the page */ }
     checkCredit();
+    // Steam or another tool may have added or removed mod folders meanwhile (04 §1.6): a
+    // background scan then, whose "scan" event reloads the page.
+    api.RescanIfChanged().catch(() => {});
   });
   // From here on a failing step says why and the window still boots: a page, the live
   // poll and Ready (an early throw used to leave the boot screen with no page behind it).

@@ -789,5 +789,6 @@
   "your locked version stays behind (%d updates)": "固定バージョンは%d回の更新を取り込んでいません",
   "… %d more": "…ほか%d件",
   "… %d more, tab shows all": "…ほか%d件（Tabですべて表示）",
-  "… enter shows all": "…（Enterですべて表示）"
+  "… enter shows all": "…（Enterですべて表示）",
+  "mod folders changed outside RimArcho: the library is up to date": "RimArcho の外で Mod フォルダーが変わりました：ライブラリを更新しました"
 }

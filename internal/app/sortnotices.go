@@ -41,6 +41,9 @@ type MissingMod struct {
 	SortMod
 	Installed bool `json:"installed"`
 	CanEnable bool `json:"canEnable"`
+	// Downloading: Steam has the Workshop item subscribed or is downloading it, but its
+	// folder is not complete yet (04 §1.6); it takes its place once a scan reads it.
+	Downloading bool `json:"downloading,omitempty"`
 }
 
 // MissingMods preserves imported provenance, then consults stored lineage instances
@@ -53,9 +56,15 @@ func (a *App) MissingMods(st *LoadoutState) []MissingMod {
 	}
 	var out []MissingMod
 	seen := map[string]int{}
+	var pending map[string]bool
 	for _, e := range st.List {
 		if e.Missing == "" {
 			continue
+		}
+		if pending == nil {
+			if pending = a.WorkshopPending(); pending == nil {
+				pending = map[string]bool{}
+			}
 		}
 		p := dependencyPackage(e.Missing)
 		item := MissingMod{SortMod: SortMod{Name: e.Name, PackageID: p, WorkshopID: numericWorkshopID(e.WorkshopID)}}
@@ -89,6 +98,7 @@ func (a *App) MissingMods(st *LoadoutState) []MissingMod {
 		if order.IsOfficial(p) {
 			item.WorkshopID = ""
 		}
+		item.Downloading = !item.Installed && item.WorkshopID != "" && pending[item.WorkshopID]
 		if item.Name == "" {
 			item.Name = p
 		}
@@ -99,6 +109,7 @@ func (a *App) MissingMods(st *LoadoutState) []MissingMod {
 			if out[i].WorkshopID == "" {
 				out[i].WorkshopID = item.WorkshopID
 			}
+			out[i].Downloading = out[i].Downloading || item.Downloading
 			continue
 		}
 		seen[p] = len(out)

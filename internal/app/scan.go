@@ -162,6 +162,13 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 		active = append(active, s)
 	}
 
+	// What the folders look like as this scan starts (04 §1.6): recorded once it succeeds.
+	prints := map[string]string{}
+	for _, s := range listed {
+		if s.Status != source.StatusRetired && s.Status != source.StatusRebindPending {
+			prints[s.ID] = folderPrint(s)
+		}
+	}
 	known, err := a.Store.Known(e.GameID)
 	if err != nil {
 		return nil, err
@@ -300,6 +307,7 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 	if err := a.Store.FinishScan(scanID, a.Now(), st); err != nil {
 		return nil, err
 	}
+	a.recordFolderPrints(prints)
 	if st.Snapshots > 0 {
 		a.Store.TruncateWAL() // new snapshots wrote their file lists through the WAL (04 §4)
 	}

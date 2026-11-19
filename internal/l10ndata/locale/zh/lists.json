@@ -326,5 +326,11 @@
   "Disabled: one row per copy / grouped by tag": "未启用：逐个列出 / 按标签分组",
   "on a tag group's header in Disabled: collapse / expand": "在未启用的标签组标题上：折叠 / 展开",
   "on a tag group's header in Disabled: rename, note, merge, delete the tag": "在未启用的标签组标题上：改名、备注、合并、删除标签",
-  "remove all %d not installed": "移除全部 %d 个未安装的"
+  "remove all %d not installed": "移除全部 %d 个未安装的",
+  "%s is still downloading in Steam": "%s 还在 Steam 里下载",
+  "still downloading: %s": "还在下载：%s",
+  "Steam has it subscribed, but its folder is not complete yet; RimArcho reads it as soon as Steam is done": "Steam 已订阅它，但文件夹还没下载完；Steam 下载完后 RimArcho 会自动读取。",
+  "%d mods in the list are still downloading in Steam": "列表里有 %d 个 Mod 还在 Steam 里下载",
+  "Steam has them subscribed, but their folders are not complete yet; RimArcho reads them as soon as Steam is done": "Steam 已订阅它们，但文件夹还没下载完；Steam 下载完后 RimArcho 会自动读取。",
+  "the change was made to %s, the list the game had; launching this list is not stopped. Switch to %s to use it, or ignore it.": "改动落在游戏当时用的列表 %s 上；不影响启动这个列表。要用这个改动就切换到 %s，或者忽略它。"
 }
