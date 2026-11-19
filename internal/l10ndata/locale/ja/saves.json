@@ -418,5 +418,8 @@
   "you marked it not functional; let RimArcho decide again": "あなたが非機能型にしました。RimArcho の判定に戻します",
   "interface, performance, framework, library or translation: a save cannot show it, so it leaves the map": "UI、パフォーマンス、フレームワーク、ライブラリ、翻訳：セーブには現れないので、マップから外します",
   "only set up: %d": "設定しただけ：%d",
-  "what was used up, sold or lost before the oldest save leaves no trace; content that comes only late, in raids or quests, or with another storyteller may not have come yet; bills, filters and research not begun do not count as seen (they are listed as only set up); recipes are not counted; a Mod updated since may have renamed things": "最も古いセーブより前に使い切った、売った、失ったものは痕跡を残しません。終盤、襲撃やクエスト、別のストーリーテラーでだけ現れる内容はまだ来ていないかもしれません。作業指示、フィルター、未着手の研究は現れたことになりません（設定しただけとして挙げます）。レシピは数えません。その後に更新された Mod は名前を変えたかもしれません"
+  "what was used up, sold or lost before the oldest save leaves no trace; content that comes only late, in raids or quests, or with another storyteller may not have come yet; bills, filters and research not begun do not count as seen (they are listed as only set up); recipes are not counted; a Mod updated since may have renamed things": "最も古いセーブより前に使い切った、売った、失ったものは痕跡を残しません。終盤、襲撃やクエスト、別のストーリーテラーでだけ現れる内容はまだ来ていないかもしれません。作業指示、フィルター、未着手の研究は現れたことになりません（設定しただけとして挙げます）。レシピは数えません。その後に更新された Mod は名前を変えたかもしれません",
+  "Can it run checks this save, for the current Game Config": "起動前チェックでこのセーブを確認します（現在のゲーム構成のみ）",
+  "Can it run checks this colony's newest save, for the current Game Config": "起動前チェックでこのコロニーの最新セーブを確認します（現在のゲーム構成のみ）",
+  "no Game Config saves here": "使っているゲーム構成なし"
 }

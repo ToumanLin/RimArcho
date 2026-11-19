@@ -43,7 +43,7 @@
   "a scan is running": "スキャンを実行中です",
   "activity": "アクティビティ",
   "add %d games": "ゲームを%d件追加",
-  "add a game": "ゲームを追加",
+  "add a game": "ゲーム構成を追加",
   "add an image…": "画像を追加…",
   "add and continue": "追加して続ける",
   "add this folder": "このフォルダを追加",
@@ -438,5 +438,9 @@
   "1 error last time": "前回のエラー 1 件",
   "open it": "開く",
   "You can undo it: the PNGs stay.": "元に戻せます。PNG はそのまま残ります。",
-  "1 problem breaks the game": "1 件の問題でゲームが壊れます"
+  "1 problem breaks the game": "1 件の問題でゲームが壊れます",
+  "Notes and tags show in the Mod library; lists under lists; Game Configs in the switcher.": "メモとタグはMODライブラリ、MODリストは「MODリスト」、ゲーム構成は切り替えメニューにあります。",
+  "a Game Config with its list": "ゲーム構成とそのMODリスト",
+  "already the Game Config %s": "すでにゲーム構成 %s です",
+  "a Game Config %s": "ゲーム構成 %s"
 }

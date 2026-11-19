@@ -270,7 +270,7 @@ function build() {
   // narrows the tree, and shows when saves come from two or more configs or packs
   if (!(p.owners || []).includes(X.owner)) X.owner = "";
   if (p.owners?.length) {
-    const sel = choiceControl(T("whose saves"), [{ value: "", label: T("all games") }, ...p.owners.map((o) => ({ value: o, label: o }))], X.owner);
+    const sel = choiceControl(T("whose saves"), [{ value: "", label: T("all Game Configs") }, ...p.owners.map((o) => ({ value: o, label: o }))], X.owner);
     sel.classList.add("sv-owner-filter");
     sel.onchange = () => { X.owner = sel.value; drawLeft(); };
     treeHead.append(sel);
@@ -1395,7 +1395,7 @@ function chooseButton(d, colony, add) {
   const b = add(label, "choose-" + kind, () => choose(d, colony, on), "", "", "save-choice");
   b.setAttribute("aria-pressed", String(on));
   b.title = on ? T("press to check the last loaded save again")
-    : colony ? T("Can it run checks this colony's newest save, for the current game") : T("Can it run checks this save, for the current game");
+    : colony ? T("Can it run checks this colony's newest save, for the current Game Config") : T("Can it run checks this save, for the current Game Config");
   return b;
 }
 

@@ -394,7 +394,7 @@ Dropped or marked, because they trade discoverability for fewer elements and do 
 ## 9. Decisions for the user
 
 1. **D1: Rewrites T1–T30**: apply all, en and zh (and ja to match en). *Recommended*: yes; they need no spec change except where the spec quotes the old text, and they cut 30–60% of the words on the five heaviest pages.
-2. **D2: "Game Config" in navigation and Launch**: rename to "game" (`游戏`, `ゲーム`) outside its own page, or keep it everywhere with one explaining line. *Recommended*: rename. It is the app's central idea, first met unexplained, and its name collides with the game's Config folder.
+2. **D2: "Game Config" in navigation and Launch**: rename to "game" (`游戏`, `ゲーム`) outside its own page, or keep it everywhere with one explaining line. *Recommended*: rename. It is the app's central idea, first met unexplained, and its name collides with the game's Config folder. **Outcome (2026-11-19):** the rename shipped (f5e95520) and was reversed the same day: the player had already decided on "Game Config", so it is kept everywhere, with the Game Config page's one explaining line (the second option).
 3. **D3: Verbs**: "keep this version" for lock, and only "rescan" and "check again" for the five scan phrasings. *Recommended*: yes, with the glossary updated in the same change.
 4. **D4: After a download**: offer "add to <current list>" when a subscribed Mod finishes downloading. *Recommended*: yes; it closes the adding-a-Mod dead end. Needs a 16 §2.9 addition.
 5. **D5: First run**: skip the managed-folder step (use the default, changeable in Settings), and make the first-list step show "the game's current list" plus one "something else…". *Recommended*: yes; it removes the first two jargon words a new player meets.

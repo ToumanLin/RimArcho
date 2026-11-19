@@ -165,7 +165,11 @@ function scopeBar() {
     return bar;
   }
   const names = [h.plan ? Tf("list “%s”", h.plan) : T("the current list"), T("every mod")];
-  bar.append(seg(names, V.library ? 1 : 0, (i) => { if ((i === 1) !== V.library) toggleScope(); }, ["a", "a"]));
+  const s = seg(names, V.library ? 1 : 0, (i) => { if ((i === 1) !== V.library) toggleScope(); }, ["a", "a"]);
+  // a long list name ends in … (style.css): its button names it in full
+  const first = s.querySelector("button");
+  if (first && h.plan) first.title = names[0] + "  (a)";
+  bar.append(s);
   if (h.since) bar.append(el("span", "since muted word-facts", h.since));
   return bar;
 }

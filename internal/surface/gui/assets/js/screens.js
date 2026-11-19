@@ -1108,24 +1108,27 @@ function logPage(name, title, ...right) {
     w = page("logs fill", title, ...right);
     sc.append(w);
   } else {
-    while (w.children.length > 1) w.lastChild.remove();
-    let box = $(".page-head .page-acts", w);
-    if (!box) {
-      let head = $(".page-head", w);
-      if (!head) { head = el("div", "page-head"); w.prepend(head); }
-      box = el("div", "page-acts");
-      head.append(box);
-    }
+    // Everything but the head goes. page() leaves the head out when it has nothing, so the
+    // first child is not always the head: keeping "the first child" kept the old subbar
+    // under the new one (2026-11-19, two file pickers after the Archo Monitor tab).
+    for (const c of [...w.children]) if (!c.classList.contains("page-head")) c.remove();
+    const kid = (p, cls) => [...p.children].find((c) => c.classList.contains(cls));
+    let head = kid(w, "page-head");
+    if (!head) { head = el("div", "page-head"); w.prepend(head); }
+    let box = kid(head, "page-acts");
+    if (!box) { box = el("div", "page-acts"); head.append(box); }
     box.innerHTML = "";
     // Notes (not controls) are redrawn too: they follow the log's state and the interface
     // language (VM round 2026-11-05: "its errors are in needs attention" kept the old language).
-    const head = box.parentElement;
-    for (const n of head.querySelectorAll(":scope > [data-head-note]")) n.remove();
+    for (const n of [...head.children]) if ("headNote" in n.dataset) n.remove();
     for (const r of right) {
       if (!r) continue;
       if (r.matches("button, input, select")) { if (r.matches("button.btn") && !r.classList.contains("primary")) r.classList.add("quiet"); box.append(r); }
       else { r.dataset.headNote = ""; head.insertBefore(r, box); }
     }
+    // an empty head is a blank band above the subbar (page() leaves it out for that reason)
+    if (!box.childNodes.length) box.remove();
+    if (!head.childNodes.length) head.remove();
   }
   ui.renderWhere();
   return w;

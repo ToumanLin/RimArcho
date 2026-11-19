@@ -20,7 +20,7 @@ The domain/UI distinction follows [03 §1](specs/03-environments-and-sources.md#
 | 共用来源 | shared source |  | A source shared across game environments. |
 | 官方来源 | official source | official | The game's Data directory containing Core and DLC. |
 | 后补订阅 | subscribe after downloading |  | Download with SteamCMD now, subscribe through Steam later to credit authors (11 §1); distinguish subscribing from downloading. |
-| 游戏配置 | environment | game; Game Config on its own page | A play context selecting a game installation, user data directory and current plan. The interface says game (`游戏`, ja `ゲーム`) everywhere except the Game Config page and Add Game Config (`游戏配置`, ja `ゲーム構成`). |
+| 游戏配置 | environment | Game Config | A play context selecting a game installation, user data directory and current plan; Japanese UI: ゲーム構成. The interface says Game Config everywhere (the sidebar, Launch's 01 column, the switcher, Saves, Mod settings); its page explains it in one line. Not game: the player decided to keep the name (2026-11-19, D2 reversed). |
 | 游戏本体 | game installation | internal only | One physical installed game; not a player-facing layer. |
 | 游戏目录 | game folder | | The installation directory; Japanese: ゲームフォルダー. |
 | 环境来源 | environment source |  | An official or local source belonging to one game installation. |

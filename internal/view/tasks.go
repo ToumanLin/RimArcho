@@ -582,7 +582,7 @@ func TaskTargetName(target string) string {
 	case target == PageTextures:
 		return T("texture optimisation")
 	case target == PageEnv:
-		return T("game")
+		return T("Game Config")
 	case target == PageSettings:
 		return T("settings")
 	case target == PageSaves:

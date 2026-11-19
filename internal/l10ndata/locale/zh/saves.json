@@ -418,5 +418,8 @@
   "you marked it not functional; let RimArcho decide again": "你把它标成了非功能型；改回由 RimArcho 判断",
   "interface, performance, framework, library or translation: a save cannot show it, so it leaves the map": "界面、性能、框架、前置库或翻译：存档显示不了它，所以它离开图",
   "only set up: %d": "只设定过：%d",
-  "what was used up, sold or lost before the oldest save leaves no trace; content that comes only late, in raids or quests, or with another storyteller may not have come yet; bills, filters and research not begun do not count as seen (they are listed as only set up); recipes are not counted; a Mod updated since may have renamed things": "在最早的存档之前用掉、卖掉或丢失的东西不留痕迹；只在后期、袭击或任务里，或换个讲述者才出现的内容可能还没来；清单、过滤器和未开始的研究不算出现过（列为只设定过）；配方不计；之后更新过的 Mod 可能改了名字"
+  "what was used up, sold or lost before the oldest save leaves no trace; content that comes only late, in raids or quests, or with another storyteller may not have come yet; bills, filters and research not begun do not count as seen (they are listed as only set up); recipes are not counted; a Mod updated since may have renamed things": "在最早的存档之前用掉、卖掉或丢失的东西不留痕迹；只在后期、袭击或任务里，或换个讲述者才出现的内容可能还没来；清单、过滤器和未开始的研究不算出现过（列为只设定过）；配方不计；之后更新过的 Mod 可能改了名字",
+  "Can it run checks this save, for the current Game Config": "能不能跑改为检查这个存档（只对当前游戏配置）",
+  "Can it run checks this colony's newest save, for the current Game Config": "能不能跑改为检查这个殖民地的最新存档（只对当前游戏配置）",
+  "no Game Config saves here": "没有游戏配置在用"
 }

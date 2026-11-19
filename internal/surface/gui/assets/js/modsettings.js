@@ -509,8 +509,8 @@ function resetMod(d) {
 async function copyFrom() {
   let envs;
   try { envs = await api.ModSettingsSources(); } catch (e) { say("fail", errText(e)); return; }
-  if (!envs.length) { say("fail", T("no other game to copy settings from")); return; }
-  pop.choose(T("copy settings from which game?"), envs, (i) => {
+  if (!envs.length) { say("fail", T("no other Game Config to copy settings from")); return; }
+  pop.choose(T("copy settings from which Game Config?"), envs, (i) => {
     const from = envs[i];
     const r = view === 0 ? X.rows.find((x) => x.key === X.at) : null;
     if (!r) { previewCopy(from, [], ""); return; }

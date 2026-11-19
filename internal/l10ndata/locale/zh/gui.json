@@ -43,7 +43,7 @@
   "a scan is running": "正在扫描",
   "activity": "动态",
   "add %d games": "添加 %d 个游戏",
-  "add a game": "添加游戏",
+  "add a game": "添加游戏配置",
   "add an image…": "添加图片…",
   "add and continue": "添加并继续",
   "add this folder": "添加这个目录",
@@ -438,5 +438,9 @@
   "1 error last time": "上次有 1 个报错",
   "open it": "打开",
   "You can undo it: the PNGs stay.": "可以撤回：PNG 不动。",
-  "1 problem breaks the game": "1 个问题会出错"
+  "1 problem breaks the game": "1 个问题会出错",
+  "Notes and tags show in the Mod library; lists under lists; Game Configs in the switcher.": "备注和标签在 Mod 库里，列表在“列表”里，游戏配置在切换器里。",
+  "a Game Config with its list": "一个游戏配置及其列表",
+  "already the Game Config %s": "已是游戏配置 %s",
+  "a Game Config %s": "游戏配置 %s"
 }

@@ -280,9 +280,9 @@ function draw() {
   const f = applied();
   if (!rows().length) {
     const e = el("div", "hm-empty");
-    const add = el("button", "btn", T("add a game"));
+    const add = el("button", "btn", T("Add Game Config"));
     add.onclick = () => ui.go("env");
-    e.append(el("h1", "", T("no game yet: add one on the Game Config page")), add);
+    e.append(el("h1", "", T("no Game Config yet: add one on the Game Configs page")), add);
     w.append(e);
     return;
   }
@@ -402,7 +402,7 @@ function step(n, cls, title) {
 // pick, else its most recently played). Each says its full version ("1.6.4871 rev590";
 // the short one when the build is unknown).
 function gameStep(env) {
-  const s = step("01", "hm-s1", T("game"));
+  const s = step("01", "hm-s1", T("Game Config"));
   const list = el("div", "hm-picks");
   list.append(el("span", "hm-mark"));
   for (const g of shownFirst(games(), (g) => g.name === env)) {
@@ -651,7 +651,10 @@ function activity() {
 
 function actLine(title, text, go) {
   const b = el("button", "hm-actline");
-  b.append(el("span", "t", title), el("span", "x word-facts", text), el("span", "go", "→"));
+  // title and text wrap inside .tx; → stays on the first line at the right (16 §2.3)
+  const tx = el("span", "tx");
+  tx.append(el("span", "t", title), el("span", "x word-facts", text));
+  b.append(tx, el("span", "go", "→"));
   b.title = text;
   b.onclick = go;
   return b;

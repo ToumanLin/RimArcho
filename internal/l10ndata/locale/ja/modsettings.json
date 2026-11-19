@@ -137,5 +137,7 @@
   "%d file to copy from %s, %d replacing a file here": "%[2]s から %[1]d 個のファイルをコピー、うち %[3]d 個はここのファイルを置き換え",
   "copied %d settings file from %s": "%[2]s から %[1]d 個の設定ファイルをコピーしました",
   "Mod settings: %d file written, %d failed": "MOD設定：%d 件書き込み、%d 件失敗",
-  "Mod settings: %d file written": "MOD設定：%d 件書き込み"
+  "Mod settings: %d file written": "MOD設定：%d 件書き込み",
+  "no other Game Config to copy settings from": "設定をコピーできる別のゲーム構成がありません",
+  "copy settings from which Game Config?": "どのゲーム構成から設定をコピーしますか？"
 }

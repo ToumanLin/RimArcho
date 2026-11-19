@@ -62,7 +62,7 @@ func LastRunErrors(n *Needs) int {
 // EnvChip is an environment as a chip: "steam · 1.6".
 func EnvChip(name, gameVersion string) string {
 	if name == "" {
-		return T("no game")
+		return T("no Game Config")
 	}
 	if mm := env.MajorMinor(gameVersion); mm != "" {
 		return name + "  " + mm
@@ -193,7 +193,7 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all mods")}, {ID: PageChanges, Label: T("updates")}, {ID: PageSubscribe, Label: T("add a subscription")}, {ID: PageSearch, Label: T("search files")}, {ID: PageModSettings, Label: T("mod settings")},
 			// what the game loads faster (10 §2); a sub-entry since 2026-11-18, keeping shift+7
 			{ID: PageTextures, Label: T("texture optimisation")}}},
-		{ID: PageEnv, Label: T("game")},
+		{ID: PageEnv, Label: T("Game Config")},
 		// every import starts here, and sharing sits beside it (16 §2.18); last in the group
 		// since 2026-11-18, still without a shift key (below)
 		{ID: PageImport, Label: T("import & export")},

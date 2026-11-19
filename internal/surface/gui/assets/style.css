@@ -1035,11 +1035,16 @@ svg.i.fill { fill: currentColor; }
   gap: 12px 24px; padding: 8px 48px 36px; overflow-y: auto; font-variant-numeric: normal; }
 .page.home::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 10px; }
 .hm-act { grid-column: 9 / 13; grid-row: 1; min-width: 0; display: flex; flex-direction: column; } /* on 03's lines */
-/* title, text, →; a text that does not fit beside the title goes under it (03 is narrow) */
-.hm-actline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; width: 100%; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12px; text-align: left; color: var(--fg-2); }
+/* Over a picture the lines get the shade's own ground: the top-right corner of a light
+   photo can be dark, and grey text on it was unreadable (2026-11-19). */
+#app.photo .hm-act:not(:empty) { margin: -6px -12px 0; padding: 0 12px 6px; background: rgba(var(--photo-shade), .78); border-radius: var(--r-sm); }
+/* title, text, →; a text that does not fit beside the title goes under it (03 is narrow);
+   → stays at the right of the first line instead of wrapping onto a line of its own */
+.hm-actline { display: flex; align-items: baseline; gap: 14px; width: 100%; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12px; text-align: left; color: var(--fg-2); }
+.hm-actline .tx { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; }
 .hm-actline .t { max-width: 100%; font-weight: 600; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hm-actline .x { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hm-actline .go { margin-left: auto; color: var(--muted); transition: transform var(--t-layout) var(--ease); }
+.hm-actline .go { flex: none; color: var(--muted); transition: transform var(--t-layout) var(--ease); }
 .hm-actline:hover .go { transform: translateX(4px); color: var(--fg); }
 .hm-hero { grid-column: 1 / 13; grid-row: 2; align-self: end; padding-bottom: 34px; min-width: 0; }
 .hm-headline { overflow: hidden; margin-bottom: -.08em; }
@@ -1069,7 +1074,7 @@ svg.i.fill { fill: currentColor; }
 /* A column holds about six rows and scrolls past them; the padding keeps the square on its
    left inside the scroller. The applied row is first (home.js), so it never starts hidden. */
 .hm-picks { position: relative; display: flex; flex-direction: column; max-height: 241px; overflow-y: auto; overscroll-behavior: contain;
-  margin-left: -16px; padding-left: 16px; scrollbar-gutter: stable; }
+  margin-left: -16px; padding-left: 16px; padding-right: 10px; scrollbar-gutter: stable; } /* the counts keep clear of the scrollbar */
 /* Only a column with more rows than it holds scrolls: rows rising in must not flash a bar. */
 .hm-picks:not(.scrolls) { overflow-y: hidden; }
 .hm-picks::-webkit-scrollbar { width: 6px; }
@@ -2128,7 +2133,9 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .settings .set .r > .setting-value { white-space: normal; overflow-wrap: anywhere; }
 .envrow { flex-wrap: wrap; }
 .envrow .l { flex-basis: 240px; }
-.envrow .sub.word-facts { white-space: normal; overflow: visible; }
+/* as wide as its column, not shrink-to-fit: an inline-flex box sized itself without the path's
+   200px floor, so a short path went under the version (2026-11-19) */
+.envrow .sub.word-facts { display: flex; white-space: normal; overflow: visible; }
 .word-facts > .path-copy { min-width: min(100%, 200px); }
 .uninstall .un-item { flex-wrap: wrap; }
 .uninstall .un-item .p { white-space: normal; overflow-wrap: anywhere; }
@@ -2201,8 +2208,16 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .subs-split { align-self: stretch; margin: 0; }
 .subs-left { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: var(--card-gap); min-height: 0; min-width: 0; }
 .subs-scope { display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 0 10px 0 0; min-width: 0; }
-.subs-scope .seg { padding: 4px; }
-.subs-scope .since { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+/* A long list name gives way: it ends in … (the full name on hover). The start of the range
+   is never cut: when it does not fit beside the switch it goes under it (2026-11-19). */
+.subs-scope { flex-wrap: wrap; gap: 0; }
+.subs-scope .seg { padding: 4px; flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.subs-scope .seg button { flex: none; }
+.subs-scope .seg button:first-of-type { flex: 0 1 auto; min-width: 0; overflow: hidden; }
+.subs-scope .seg button.word-facts { flex-wrap: nowrap; }
+.subs-scope .seg button.word-facts > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.subs-scope .since { flex: 0 0 auto; max-width: 100%; padding: 4px 0 4px 14px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.subs-scope .since.word-facts { flex-wrap: nowrap; }
 .subs-scope .lib-cond { margin: 6px; height: 24px; display: inline-flex; align-items: center; gap: 8px; padding: 0 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-11, var(--accent)); font-size: 12px; }
 .subs-scope .lib-cond .x { opacity: .7; }
 .subs-list { display: flex; flex-direction: column; min-height: 0; }

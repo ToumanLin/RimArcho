@@ -93,9 +93,9 @@ func (t *LiveTracker) Update(a *app.App, st *app.LoadoutState) (*Live, error) {
 
 func runningOwner(g *app.RunningGame) string {
 	if g.UnknownEnv {
-		return Tf("installation %s running, which game is unknown", g.Env.GameRoot)
+		return Tf("installation %s running, Game Config unknown", g.Env.GameRoot)
 	}
-	return Tf("game %s is running", g.Env.Name)
+	return Tf("Game Config %s is running", g.Env.Name)
 }
 
 // LiveNeeds turns the running game's clusters into Can it run items, newest first.

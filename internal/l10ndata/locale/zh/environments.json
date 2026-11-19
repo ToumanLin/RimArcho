@@ -93,5 +93,10 @@
   "game defaults; no settings or saves are copied": "使用游戏默认设置；不复制设置和存档",
   "%s uses another game folder, so its settings cannot be copied; no settings or saves are copied": "%s 使用另一个游戏目录，无法复制它的设置；不复制设置和存档",
   "which game is this Game Config for?": "这个游戏配置用哪份游戏？",
-  "has a Game Config": "已有游戏配置"
+  "has a Game Config": "已有游戏配置",
+  "a command, a mod, a Game Config": "命令、Mod 或游戏配置",
+  "no Game Config yet": "还没有游戏配置",
+  "no Game Config yet: add one on the Game Configs page": "还没有游戏配置：请在游戏配置页添加",
+  "Game Config %s is running": "游戏配置 %s 正在运行",
+  "installation %s running, Game Config unknown": "游戏目录 %s 正在运行，游戏配置未知"
 }

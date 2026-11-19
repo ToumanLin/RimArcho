@@ -533,7 +533,7 @@ function drawBuild() {
   side.append(el("div", "h", B.name || p.plan));
   const kv = el("div", "bd-kv");
   const row = (k, v) => kv.append(el("span", "k", k), v instanceof Node ? v : el("span", "v", v));
-  row(T("game"), p.env);
+  row(T("Game Config"), p.env);
   row(T("mods"), el("span", "v num", String(p.mods)));
   if (p.before) {
     const v = el("span", "v");
