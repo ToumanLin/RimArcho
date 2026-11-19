@@ -21,9 +21,14 @@ export async function open() {
     F.mine = mine;
   } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
+  // came for an unseen reply (the sidebar's dot): land on it, not on the form
+  const hit = F.mine?.reports.find(r => r.unseen);
+  if (hit) for (const r of F.mine.reports) if (r.unseen) F.fresh.add(r.number);
+  F.landed = hit ? hit.number : 0;
   draw();
   read.finish();
-  $("#screen .fb-title")?.focus({ preventScroll: true });
+  if (hit) $(`#screen .fb-report[data-report="${hit.number}"]`)?.scrollIntoView({ block: "center" });
+  else $("#screen .fb-title")?.focus({ preventScroll: true });
   checkReplies();
 }
 
@@ -36,6 +41,7 @@ async function checkReplies() {
   F.mine = mine;
   // the replies new on this visit stay marked while the page is open; the dot goes
   for (const r of mine.reports) if (r.unseen) F.fresh.add(r.number);
+  if (!F.landed) { const n = mine.reports.find(r => r.unseen); if (n) F.landed = n.number; }
   drawMine();
   if (mine.unseen) api.FeedbackSeen().catch(() => {});
 }
@@ -146,7 +152,7 @@ function drawMine() {
 }
 
 function reportRow(r) {
-  const row = el("div", "set fb-report");
+  const row = el("div", "set fb-report" + (r.number === F.landed ? " fb-r-hl" : ""));
   row.dataset.report = String(r.number);
   const l = el("div", "l");
   const head = el("div", "fb-r-head");

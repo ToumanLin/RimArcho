@@ -1660,8 +1660,11 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .fb-mine .set .l .setting-note { padding-left: 0; }
 .fb-report { align-items: flex-start; }
 .fb-report > .r { align-self: flex-start; }
+/* the report with the unseen reply the dot led to */
+.fb-report.fb-r-hl { background: var(--accent-soft); }
 .fb-r-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.fb-r-name { min-width: 0; padding-left: 0; padding-right: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-r-head .btn.link.fb-r-name { padding-left: 0; padding-right: 0; border-left-width: 0; }
+.fb-r-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fb-r-new { flex: none; font-size: 12px; color: var(--accent-11, var(--accent)); }
 .fb-reply { margin-top: 8px; padding: 6px 10px; border-left: var(--hairline) solid var(--line); }
 .fb-reply-when { color: var(--muted); font-size: 12px; }
