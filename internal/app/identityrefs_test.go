@@ -194,3 +194,80 @@ func TestResolveSameReferenceRewriteRollback(t *testing.T) {
 		t.Fatal("failed merge deleted mod")
 	}
 }
+
+// A "same" answer goes through the shared merge of 03 §2.1: the new Instance's emptied
+// Lineage is deleted, and its notes, tags, user rules and finding ignores follow the
+// kept Lineage.
+func TestResolveSameMergesLineageData(t *testing.T) {
+	t.Parallel()
+	e, q := identityReferenceFixture(t)
+	db := e.App.Store.DB
+	lineageOf := func(id string) string {
+		var lin string
+		if err := db.QueryRow(`SELECT lineage_id FROM instance WHERE id=?`, id).Scan(&lin); err != nil {
+			t.Fatal(err)
+		}
+		return lin
+	}
+	newLin, keptLin := lineageOf(q.InstanceID), lineageOf(q.CandidateID)
+	if newLin == keptLin {
+		t.Fatal("fixture: both Instances already share a Lineage")
+	}
+	envID := mustEnv(t, e)
+	for _, s := range []struct {
+		q    string
+		args []any
+	}{
+		{`INSERT INTO lineage_data(environment_id, lineage_id, alias, note) VALUES('', ?, '', 'note on B')`, []any{newLin}},
+		{`INSERT INTO lineage_data(environment_id, lineage_id, alias, note) VALUES('', ?, 'A alias', 'note on A')`, []any{keptLin}},
+		{`INSERT INTO lineage_tag(environment_id, lineage_id, tag, pos) VALUES('', ?, 'NewTag', 0)`, []any{newLin}},
+		{`INSERT INTO lineage_tag(environment_id, lineage_id, tag, pos) VALUES('', ?, 'OldTag', 0)`, []any{keptLin}},
+		{`INSERT INTO user_rule(environment_id, kind, a_lineage, created_at) VALUES('', 'top', ?, 1)`, []any{newLin}},
+		{`INSERT INTO finding_ignore(environment_id, lineage_id, code, key, created_at) VALUES(?, ?, 'code', 'key', 1)`, []any{envID, newLin}},
+	} {
+		if _, err := db.Exec(s.q, s.args...); err != nil {
+			t.Fatalf("%s: %v", s.q, err)
+		}
+	}
+	if _, err := e.App.ResolveQuestion(q.ID, "same"); err != nil {
+		t.Fatal(err)
+	}
+	count := func(query string, args ...any) int {
+		var n int
+		if err := db.QueryRow(query, args...).Scan(&n); err != nil {
+			t.Fatalf("%s: %v", query, err)
+		}
+		return n
+	}
+	if n := count(`SELECT count(*) FROM lineage WHERE id=?`, newLin); n != 0 {
+		t.Fatal("emptied lineage row left behind")
+	}
+	var alias, note string
+	if err := db.QueryRow(`SELECT alias, note FROM lineage_data WHERE lineage_id=?`, keptLin).Scan(&alias, &note); err != nil {
+		t.Fatal(err)
+	}
+	if alias != "A alias" || !strings.Contains(note, "note on A") || !strings.Contains(note, "note on B") {
+		t.Fatalf("alias=%q note=%q", alias, note)
+	}
+	if n := count(`SELECT count(*) FROM lineage_tag WHERE lineage_id=? AND tag IN ('NewTag','OldTag')`, keptLin); n != 2 {
+		t.Fatalf("kept lineage has %d of 2 tags", n)
+	}
+	for _, table := range []string{"lineage_data", "lineage_tag", "finding_ignore"} {
+		if n := count(`SELECT count(*) FROM `+table+` WHERE lineage_id=?`, newLin); n != 0 {
+			t.Fatalf("%s still names the merged-away lineage", table)
+		}
+	}
+	if n := count(`SELECT count(*) FROM user_rule WHERE a_lineage=? OR b_lineage=?`, newLin, newLin); n != 0 {
+		t.Fatal("user rule still names the merged-away lineage")
+	}
+	if n := count(`SELECT count(*) FROM user_rule WHERE kind='top' AND a_lineage=?`, keptLin); n != 1 {
+		t.Fatal("user rule not rewritten")
+	}
+	if n := count(`SELECT count(*) FROM finding_ignore WHERE environment_id=? AND lineage_id=?`, envID, keptLin); n != 1 {
+		t.Fatal("finding ignore not rewritten")
+	}
+	aliases, err := e.App.Store.IDAliases()
+	if err != nil || aliases[newLin] != keptLin {
+		t.Fatalf("aliases=%v err=%v", aliases, err)
+	}
+}

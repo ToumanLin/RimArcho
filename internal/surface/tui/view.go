@@ -48,7 +48,6 @@ func (m *model) View() string {
 	case m.insp != nil:
 		content = m.inspectLines(body)
 	case m.tab == tabProblems:
-		m.problemCounts() // reloads the items when the database changed (an edit, a rule, an answer)
 		content = m.needLines(body)
 	case m.tab == tabChanges:
 		content = m.changeLines(body)

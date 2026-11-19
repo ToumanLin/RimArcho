@@ -1,11 +1,13 @@
 package app_test
 
 // Replays the real Player.log patch failures against the simulation (M3 acceptance, as the
-// M0 xpathcompat spike did). Read-only on the game and mod folders; nothing is persisted.
-// Runs only when RIMARCHO_REAL_HOME is set; RIMARCHO_LOG_VERSION selects the major.minor
-// the log was produced with (default: the environment's).
+// M0 xpathcompat spike did). Read-only on the game and mod folders; the data directory is
+// copied into a temp dir first and only the copy is opened (17 §4 rule 3), so nothing is
+// persisted. Runs only when RIMARCHO_REAL_HOME is set; RIMARCHO_LOG_VERSION selects the
+// major.minor the log was produced with (default: the environment's).
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -21,7 +23,7 @@ func TestRealPlayerLogReplay(t *testing.T) {
 	if home == "" {
 		t.Skip("set RIMARCHO_REAL_HOME to replay a real Player.log")
 	}
-	a, err := app.Open(home)
+	a, err := app.Open(copyRealHome(t, home))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,4 +99,33 @@ func TestRealPlayerLogReplay(t *testing.T) {
 	if logOnly > 0 {
 		t.Fatalf("%d failures in the log were not simulated", logOnly)
 	}
+}
+
+// copyRealHome copies a real data directory's database and settings into a temp dir, so
+// opening it (which may upgrade the schema or record the log seen) writes only the copy
+// (17 §4 rule 3).
+func copyRealHome(t *testing.T, src string) string {
+	t.Helper()
+	home := t.TempDir()
+	for _, f := range []string{"archo.db", "archo.db-wal", "config.toml"} {
+		in, err := os.Open(filepath.Join(src, f))
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		out, err := os.Create(filepath.Join(home, f))
+		if err == nil {
+			_, err = io.Copy(out, in)
+			if cerr := out.Close(); err == nil {
+				err = cerr
+			}
+		}
+		in.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	return home
 }
