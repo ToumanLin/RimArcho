@@ -177,7 +177,7 @@ func handler(api *API, files fs.FS) http.Handler {
 	files2 := application.BundledAssetFileServer(files)
 	archoETag := fmt.Sprintf(`"%x"`, sha256.Sum256([]byte(buildinfo.String())))
 	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'")
 		if strings.HasPrefix(r.URL.Path, "/archo/") {
 			// Unhashed paths must revalidate across upgrades. ServeContent in Wails'
 			// file server handles If-None-Match (including lists and weak tags).

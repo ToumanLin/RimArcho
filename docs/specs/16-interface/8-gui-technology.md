@@ -41,7 +41,7 @@ Window-control initialization allows Wails system information to arrive after th
 
 ### 8.3 Security
 
-- The page's CSP is `default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'`. Wails works under `script-src 'self'` without `unsafe-eval`.
+- The page's CSP is `default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'`. `blob:` images are Archo's loop copies (§7.1), made by the page's own script. Wails works under `script-src 'self'` without `unsafe-eval`.
 - Workshop descriptions and images are external content. Go parses descriptions into BBCode blocks, and the frontend builds elements using `textContent`; it **never inserts external text as HTML**. Images are read only from the local cache through `/img/`, never directly from remote URLs.
 - Links open in the system browser. `OpenURL` refuses non-http(s) URLs.
 - On Windows, Wails intercepts WebView2 resources and opens no TCP port.
