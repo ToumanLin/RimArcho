@@ -21,6 +21,7 @@ import { changes, changesKey, initSubscriptions } from "./subscriptions.js";
 import { setNeedRunner } from "./badgepop.js";
 import { initNeedText, needText, needParts, needEvidence } from "./needtext.js";
 import { getChoices } from "./credit.js";
+import { memBars } from "./membar.js";
 import { setVersionRunner } from "./versionwarnings.js";
 import { openVersionList } from "./versionpanel.js";
 
@@ -747,7 +748,12 @@ function needCard(it, ci, i) {
   const ic = el("span", "need-ic");
   ic.innerHTML = statusIcon(it.status);
   top.append(ic);
-  if (quiet) {
+  if (it.bars?.length) {
+    // RAM / VRAM drawn (16 §7 principle 9): each bar is named by its sentence; what else
+    // the item says stays text
+    body.append(needText("div", "title word-facts", it.title || it.text), memBars(it.bars));
+    if (it.barsWhy) body.append(el("div", "why", it.barsWhy));
+  } else if (quiet) {
     body.append(needText("div", "why word-facts", it.text, it.content?.text));
     if (it.why) body.append(needText("div", "why sub", it.why, it.content?.why));
   } else {

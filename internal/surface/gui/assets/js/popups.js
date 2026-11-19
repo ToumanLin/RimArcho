@@ -5,6 +5,7 @@ import { closeChoiceMenu } from "./choices.js";
 import { pathContent, copyablePath } from "./fields.js";
 import { S, $, el, esc, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { buildCommandPanel } from "./command-panel.js";
+import { memBars } from "./membar.js";
 import { tagOrderChips } from "./tagorder.js";
 
 const MODALS = new Set(["url", "memory", "uninstall-confirm", "plan-rename", "ask"]);
@@ -757,7 +758,8 @@ export function memoryConfirm(memory, go) {
       values.append(cell);
     }
     const body = el("div", "body");
-    body.append(values, el("p", "", T("close other apps or reduce the list before launching.")));
+    // the RAM bar when the estimate came with one (16 §7 principle 9); its name has both values
+    body.append(memory.ram?.text ? memBars([memory.ram]) : values, el("p", "", T("close other apps or reduce the list before launching.")));
     pop.append(body);
     const buttons = el("div", "btns");
     const cancel = el("button", "memory-cancel", T("cancel"));

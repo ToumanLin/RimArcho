@@ -123,3 +123,44 @@ func TestMemoryNeedUnknownWording(t *testing.T) {
 		}
 	}
 }
+
+// The GUI's bars (16 §7 principle 9) carry every sentence they replace: each bar is named by
+// its line, the rest of Why is shown beside them, and Text and Why still hold everything.
+func TestMemoryNeedBarsKeepTheSentences(t *testing.T) {
+	view.SetLang("en")
+	t.Cleanup(func() { view.SetLang("en") })
+	r := &app.LoadCost{LoadingRAMLow: 2 << 30, LoadingRAMHigh: 4 << 30}
+	r.VRAMLow, r.VRAMHigh = 1<<30, 3<<30
+	m := machine.Memory{TotalRAM: 8 << 30, AvailableRAM: 3 << 30, SampledAt: time.Now(), Adapters: []machine.Adapter{{Name: "fixture GPU", Dedicated: 2 << 30}}}
+	n := view.MemoryNeed(app.AssessMemory(m, r), 1)
+	if len(n.Bars) != 2 {
+		t.Fatalf("bars: %+v", n.Bars)
+	}
+	ram, vram := n.Bars[0], n.Bars[1]
+	if ram.Total != 8<<30 || ram.Used != 5<<30 || len(ram.Parts) != 1 || ram.Parts[0].Low != 2<<30 || ram.Parts[0].High != 4<<30 {
+		t.Fatalf("RAM bar: %+v", ram)
+	}
+	if vram.Total != 2<<30 || vram.Used != 0 || vram.Note != "fixture GPU" || vram.Parts[0].High != 3<<30 {
+		t.Fatalf("VRAM bar: %+v", vram)
+	}
+	lines := strings.Split(n.Why, "\n")
+	if ram.Text != lines[0] || !strings.HasPrefix(vram.Text, lines[1]) || !strings.Contains(vram.Text, "GPU: fixture GPU") {
+		t.Fatalf("bars not named by their sentences: %q / %q; why %q", ram.Text, vram.Text, n.Why)
+	}
+	for _, l := range lines[2:] {
+		if !strings.HasPrefix(l, "GPU:") && !strings.Contains(n.BarsWhy, l) {
+			t.Errorf("%q neither drawn nor shown: barsWhy %q", l, n.BarsWhy)
+		}
+	}
+	if strings.Contains(n.BarsWhy, "RAM: loading") || strings.Contains(n.BarsWhy, "GPU:") {
+		t.Errorf("barsWhy repeats a bar: %q", n.BarsWhy)
+	}
+	// unknown capacity: no scale, the estimate is printed instead
+	n = view.MemoryNeed(app.AssessMemory(machine.Memory{}, r), 1)
+	if b := n.Bars[1]; b.Total != 0 || b.Size != "1.0 GB–3.0 GB" {
+		t.Fatalf("unknown VRAM bar: %+v", b)
+	}
+	if b := view.MemoryNeed(app.AssessMemory(machine.Memory{}, nil), 1).Bars[0]; len(b.Parts) != 0 || b.Size != "" {
+		t.Fatalf("no estimate drew one: %+v", b)
+	}
+}

@@ -87,6 +87,19 @@ var unselectableAllowed = map[string]string{
 	".choice-control":             "control", ".choice-menu": "menu",
 }
 
+// Visuals named somewhere the check cannot see from the role's line (16 §7 principle 9).
+var visualNameAllowed = map[string]string{
+	"js/saves.js:progressBox":           "every caller names the box with setProgress, which sets aria-label",
+	"js/colorpicker.js:openColorPicker": "paint(), run before the picker shows, names the preview \"new colour #hex\"",
+}
+
+var (
+	// a role that makes an element a visual: img, meter or progressbar, set by setAttribute
+	// (possibly in a ternary) or as an svgEl attribute
+	jsVisualRole = regexp.MustCompile(`(\w+)\.setAttribute\(\s*["']role["']\s*,[^)]*["'](?:img|meter|progressbar)["']|\brole:\s*["'](?:img|meter|progressbar)["']`)
+	jsFuncName   = regexp.MustCompile(`\bfunction\s+(\w+)\s*\(`)
+)
+
 var cssBodyState = regexp.MustCompile(`^body\.[\w-]+(?: \*)?$`)
 
 func TestUIRules(t *testing.T) {
@@ -265,6 +278,19 @@ func uiScriptProblems(name, source string, used map[string]bool) []string {
 		if jsSelect.MatchString(line) {
 			report("16 §3.10: single-value choices use choiceControl (choices.js), not a native <select>")
 		}
+		if m := jsVisualRole.FindStringSubmatch(line); m != nil && !visualNamed(lines, i, m[1]) {
+			fn := ""
+			for k := i; k >= 0 && fn == ""; k-- {
+				if f := jsFuncName.FindStringSubmatch(lines[k]); f != nil {
+					fn = f[1]
+				}
+			}
+			if _, ok := visualNameAllowed[name+":"+fn]; ok {
+				used[name+":"+fn] = true
+			} else {
+				report("16 §7 principle 9: a role img, meter or progressbar needs a non-empty accessible name (aria-label or aria-labelledby, or visTip / progress) set beside it")
+			}
+		}
 		if jsDialog.MatchString(line) {
 			if _, ok := nativeDialogAllowed[name]; ok {
 				used[name] = true
@@ -274,6 +300,27 @@ func uiScriptProblems(name, source string, used map[string]bool) []string {
 		}
 	}
 	return problems
+}
+
+// visualNamed: the element given a visual role at line i is named within the next lines: an
+// aria-label or aria-labelledby set on the same variable (or in the same svgEl attributes),
+// or a progress() call on it, which names it by its visible text.
+func visualNamed(lines []string, i int, v string) bool {
+	end := min(len(lines), i+12)
+	for _, l := range lines[i:end] {
+		if v == "" {
+			if strings.Contains(l, `"aria-label":`) || strings.Contains(l, `"aria-labelledby":`) {
+				return true
+			}
+			continue
+		}
+		q := regexp.QuoteMeta(v)
+		// a name that is a value (not "") or a progress(v, label) call
+		if regexp.MustCompile(`\b` + q + `\.setAttribute\(\s*["']aria-(?:label|labelledby)["']\s*,\s*(?:[^"'\s)]|["'][^"']+["'])|\bprogress\(\s*` + q + `\b`).MatchString(l) {
+			return true
+		}
+	}
+	return false
 }
 
 // These examples guard the lint itself.
@@ -321,6 +368,11 @@ func TestUIRulesDetection(t *testing.T) {
 		{"js/x.js", "const gap = el(\"div\", \"split x-split\");\nwireSeparator(gap, {});", 0},
 		{"js/x.js", "navigator.clipboard.writeText(t); const p = await navigator.clipboard.readText();", 1},
 		{"js/fields.js", "await navigator.clipboard.writeText(text);", 0},
+		{"js/x.js", "bar.setAttribute(\"role\", \"img\");\nbar.setAttribute(\"aria-label\", text);", 0},
+		{"js/x.js", "s.setAttribute(\"role\", busy ? \"progressbar\" : \"status\");\nif (busy) progress(s, s);", 0},
+		{"js/x.js", "const svg = svgEl(\"svg\", { role: \"img\",\n  \"aria-label\": Tf(\"%d days\", n) });", 0},
+		{"js/x.js", "p.setAttribute(\"role\", \"img\");\np.append(a, b);", 1},
+		{"js/x.js", "m.setAttribute(\"role\", \"meter\");\nm.setAttribute(\"aria-label\", \"\");", 1},
 	} {
 		if got := uiScriptProblems(tc.name, tc.js, map[string]bool{}); len(got) != tc.want {
 			t.Errorf("%s: %s: got %v; want %d failures", tc.name, tc.js, got, tc.want)

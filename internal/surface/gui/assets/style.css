@@ -2926,6 +2926,26 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .memory-confirm .memory-values strong { display: block; margin-top: 8px; font-size: 15px; }
 .memory-confirm .memory-cancel:focus, .memory-confirm .go:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 @media (max-width: 480px) { .memory-confirm .memory-values { grid-template-columns: 1fr; } }
+/* V1 memory bars (16 §7 principle 9): in use grey, the estimate accent with its range hatched,
+   free the track; past the capacity red, outside the track. Segments as .sv-nbar. */
+.mbars { display: grid; grid-template-columns: auto minmax(80px, 1fr) auto minmax(0, max-content); column-gap: 10px; row-gap: 6px; margin: 6px 0 2px; }
+.mbar-row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; font-size: 12px; color: var(--muted); border-radius: var(--r-sm); outline-offset: 3px; }
+.mbar-k { color: var(--fg-2); }
+.mbar-n { text-align: right; white-space: nowrap; }
+.mbar-note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--faint); }
+.mbar { position: relative; display: flex; gap: 2px; height: 8px; border-radius: var(--r-sm); overflow: hidden; }
+.mbar::before { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--cap, 100%); background: var(--pill); border-radius: var(--r-sm); }
+.mbar i { position: relative; display: block; flex: 0 1 auto; min-width: 2px; height: 100%; transition: width var(--t-layout) var(--ease); }
+.mbar .m-used { background: var(--faint); }
+.mbar .m-game { background: color-mix(in srgb, var(--accent) 45%, var(--card)); }
+.mbar .m-need, .mbar .m-mods { background: var(--accent); }
+.mbar .m-range { background: repeating-linear-gradient(-45deg, var(--accent) 0 2px, color-mix(in srgb, var(--accent) 30%, var(--card)) 2px 4px); }
+.mbar .m-over { background: var(--red); }
+.mbar .m-range.m-over { background: repeating-linear-gradient(-45deg, var(--red) 0 2px, color-mix(in srgb, var(--red) 30%, var(--card)) 2px 4px); }
+.mbar-row.over .mbar-n { color: var(--red); }
+.mbar-row.nocap .mbar::before { background: none; border: var(--hairline) dashed var(--faint); }
+.memory-confirm .mbars { padding: 12px 0 4px; }
+.vis-tip { position: fixed; z-index: 26; max-width: 360px; padding: 6px 9px; background: var(--pop-bg); border: var(--hairline) solid var(--line-2); border-radius: var(--r-sm); box-shadow: var(--shadow); color: var(--fg); font-size: 12px; line-height: 1.45; pointer-events: none; white-space: pre-line; animation: fade var(--t-press) var(--ease); }
 
 #workshop-warning { padding: 4px 20px; color: var(--amber); font-size: 12px; }
 .pop .typed { display: flex; align-items: center; gap: 8px; margin: 12px 0; }
