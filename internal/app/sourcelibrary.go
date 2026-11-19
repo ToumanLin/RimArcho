@@ -19,12 +19,13 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// SourceDir is the managed, local-only library (05 §5.4, 17 §3).
+// SourceDir is the managed, local-only library (05 §5.4, 17 §3): config source.dir, else
+// <local>/source. Homes from before 1.1 that had <data>/source keep it (store schema 42).
 func (a *App) SourceDir() string {
 	if p := a.Store.Meta("cfg:source.dir"); p != "" {
 		return p
 	}
-	return filepath.Join(a.Home, "source")
+	return filepath.Join(a.LocalDir(), "source")
 }
 
 // Readers/decompilers share access; relocating and cleanup need exclusive access.

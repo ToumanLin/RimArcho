@@ -341,3 +341,23 @@ func deleteInstallation(tx *sql.Tx, gameID string) error {
 	}
 	return nil
 }
+
+// SourceBytes is each source's recorded size: the sum of its live Mods' sizes from their last
+// scan (16 §2.14 Folders headings). Nothing on the disk is read.
+func (s *Store) SourceBytes() (map[string]int64, error) {
+	rows, err := s.DB.Query(`SELECT i.source_id, coalesce(sum(n.total_size),0) FROM instance i JOIN snapshot n ON n.id=i.current_snapshot_id WHERE i.status='live' GROUP BY i.source_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]int64{}
+	for rows.Next() {
+		var id string
+		var n int64
+		if err := rows.Scan(&id, &n); err != nil {
+			return nil, err
+		}
+		out[id] = n
+	}
+	return out, rows.Err()
+}

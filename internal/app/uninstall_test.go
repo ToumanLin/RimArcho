@@ -59,8 +59,8 @@ func uninstallFixture(t *testing.T) *unFix {
 	e.WriteFile(filepath.Join(f.oldSaves, "Saves", "colony.rws"), "a save")
 	e.WriteFile(filepath.Join(e.Home, "backups", "saves", "20261020-120000", "colony.rws"), "a backup")
 
-	e.WriteFile(filepath.Join(e.Home, "packs", "P1", "pack.json"), `{"format":1,"name":"P1","entries":[]}`)
-	e.WriteFile(filepath.Join(e.Home, "packs", "P1", "userdata", "Saves", "pack.rws"), "a pack save")
+	e.WriteFile(filepath.Join(e.App.PacksDir(), "P1", "pack.json"), `{"format":1,"name":"P1","entries":[]}`)
+	e.WriteFile(filepath.Join(e.App.PacksDir(), "P1", "userdata", "Saves", "pack.rws"), "a pack save")
 	e.WriteFile(filepath.Join(f.local, "steamcmd", deps.SteamCMDExecutable()), "MZ")
 	e.WriteFile(filepath.Join(f.local, "steam", "steam_appid.txt"), "294100")
 
@@ -243,7 +243,7 @@ func TestUninstallChoices(t *testing.T) {
 	t.Parallel()
 	f := uninstallFixture(t)
 	copyDir := f.lockCopy(t)
-	pack := filepath.Join(f.Home, "packs", "P1")
+	pack := filepath.Join(f.App.PacksDir(), "P1")
 	p := f.run(t, app.UninstallOptions{KeepLocked: true, RemovePacks: true, RemoveSaves: true, RemoveGames: true, RestoreBackup: true})
 	if p.LockedTo != "main" {
 		t.Fatalf("kept copies go to the current game: %q", p.LockedTo)

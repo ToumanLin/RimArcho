@@ -38,7 +38,7 @@ func TestUninstallPreviewCachesOnlySizes(t *testing.T) {
 		t.Fatalf("size is not marked as estimated: %q", before)
 	}
 	e.WriteFile(file, strings.Repeat("x", 2<<20))
-	pack := filepath.Join(e.Home, "packs", "P")
+	pack := filepath.Join(e.App.PacksDir(), "P")
 	e.WriteFile(filepath.Join(pack, "pack.json"), `{"format":1,"name":"P","entries":[]}`)
 	// These appear after the first preview: discovery and ownership checks must run again.
 	foreign := filepath.Join(e.Game, "Mods", "_Archo_foreign")
@@ -99,7 +99,7 @@ func samePhysicalPath(a, b string) bool {
 func TestUninstallPreviewRechecksForeignLinks(t *testing.T) {
 	t.Parallel()
 	e, s, _ := fixture(t)
-	pack := filepath.Join(e.Home, "packs", "P")
+	pack := filepath.Join(e.App.PacksDir(), "P")
 	e.WriteFile(filepath.Join(pack, "pack.json"), `{"format":1,"name":"P","entries":[]}`)
 	c := view.UninstallChoice{RemovePacks: true}
 	p, err := s.UninstallPlan(c)

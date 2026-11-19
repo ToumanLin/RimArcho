@@ -52,7 +52,7 @@ func TestPackLaunchNoDuplicates(t *testing.T) {
 	if dups := app.ModsDuplicates(e.App.ModsCopies(mustIndex(t, e))); len(dups) != 0 {
 		t.Fatalf("duplicates in Mods/: %+v", dups)
 	}
-	cfg, _ := os.ReadFile(filepath.Join(e.Home, "packs", "Test pack", "userdata", "Config", "ModsConfig.xml"))
+	cfg, _ := os.ReadFile(filepath.Join(e.App.PacksDir(), "Test pack", "userdata", "Config", "ModsConfig.xml"))
 	if !strings.Contains(strings.ToLower(string(cfg)), "<li>hair.kawaii</li>") || !strings.Contains(string(cfg), "<li>rimcrow.companion</li>") {
 		t.Fatalf("the pack's list:\n%s", cfg)
 	}
@@ -76,7 +76,7 @@ func TestPackLinksDuplicateReported(t *testing.T) {
 	t.Parallel()
 	e := dupEnv(t)
 	mods := filepath.Join(e.Game, "Mods")
-	copyDir := filepath.Join(e.Home, "packs", "Test pack", "mods")
+	copyDir := filepath.Join(e.App.PacksDir(), "Test pack", "mods")
 	ents, _ := os.ReadDir(copyDir)
 	if len(ents) == 0 {
 		t.Fatal("the pack carries nothing")

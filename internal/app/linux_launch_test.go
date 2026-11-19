@@ -142,7 +142,7 @@ func TestLinuxLaunch(t *testing.T) {
 						t.Fatalf("pack launch: %v", err)
 					}
 				}
-				if _, err := os.Stat(filepath.Join(e.Home, "packs", "proton-test", "userdata")); !os.IsNotExist(err) {
+				if _, err := os.Stat(filepath.Join(e.App.PacksDir(), "proton-test", "userdata")); !os.IsNotExist(err) {
 					t.Fatal("refused pack created user data")
 				}
 			}

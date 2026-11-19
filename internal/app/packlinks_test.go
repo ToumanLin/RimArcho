@@ -30,7 +30,7 @@ func TestPackLinksLeft(t *testing.T) {
 	}
 
 	// The pack is being played (its save folder on the command line): the links are in use.
-	userdata := filepath.Join(e.Home, "packs", "first", "userdata")
+	userdata := filepath.Join(e.App.PacksDir(), "first", "userdata")
 	e.App.GameProbe = func(string) *app.GameRun { return &app.GameRun{PID: 7, ArgsKnown: true, SaveData: userdata} }
 	if l := e.App.LeftPackLinks(ix); l != nil {
 		t.Fatalf("while the pack runs: %+v", l)
@@ -55,7 +55,7 @@ func TestPackLinksLeft(t *testing.T) {
 	if n := links(t, mods); n != 0 {
 		t.Fatalf("%d pack links left", n)
 	}
-	if _, err := os.Stat(filepath.Join(e.Home, "packs", "first", "mods")); err != nil {
+	if _, err := os.Stat(filepath.Join(e.App.PacksDir(), "first", "mods")); err != nil {
 		t.Fatal("unlink touched the pack")
 	}
 	if l := e.App.LeftPackLinks(ix); l != nil {

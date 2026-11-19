@@ -27,7 +27,7 @@ func TestTrashAllowList(t *testing.T) {
 		"Core":                        filepath.Join(e.Game, "Data", "Core"),
 		"the user data folder":        e.UserData,
 		"the data folder":             e.Home,
-		"a pack's inner folder":       filepath.Join(e.Home, "packs", "first", "mods", "X"),
+		"a pack's inner folder":       filepath.Join(e.App.PacksDir(), "first", "mods", "X"),
 		"the pack folder itself":      filepath.Join(e.Home, "packs"),
 	}
 	for name, p := range refused {
@@ -62,7 +62,7 @@ func TestTrashAllowList(t *testing.T) {
 		"a folder in Mods/":   target,
 		"a workshop folder":   filepath.Join(e.Workshop, "1234"),
 		"a SteamCMD folder":   filepath.Join(e.SteamCMD, "5678"),
-		"a pack":              filepath.Join(e.Home, "packs", "first"),
+		"a pack":              filepath.Join(e.App.PacksDir(), "first"),
 		"a lock library copy": filepath.Join(e.App.LockDir(), "Copy"),
 		"a save":              filepath.Join(e.UserData, "Saves", "Colony.rws"),
 		"an own save folder":  filepath.Join(e.App.OwnSavesRoot(), "main"),

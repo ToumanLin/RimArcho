@@ -82,7 +82,7 @@ func TestIdentityAnswersPreserveListReferences(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			packPath := filepath.Join(e.Home, "packs", "fixture", "pack.json")
+			packPath := filepath.Join(e.App.PacksDir(), "fixture", "pack.json")
 			e.WriteFile(packPath, string(raw))
 			if _, err := e.App.Store.DB.Exec(`INSERT INTO id_alias(old_id,new_id,kind) VALUES('earlier-copy',?,'instance')`, q.InstanceID); err != nil {
 				t.Fatal(err)

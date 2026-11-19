@@ -50,7 +50,7 @@ func TestPackCarriesSettings(t *testing.T) {
 		t.Fatalf("dry run:\n%s", out)
 	}
 	e.MustRun("pack", "launch", "first")
-	packCfg := filepath.Join(e.Home, "packs", "first", "userdata", "Config")
+	packCfg := filepath.Join(e.App.PacksDir(), "first", "userdata", "Config")
 	if got := readFile(t, filepath.Join(packCfg, to)); got != "<SettingsBlock>author</SettingsBlock>" {
 		t.Fatalf("seeded %q", got)
 	}
@@ -60,7 +60,7 @@ func TestPackCarriesSettings(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(packCfg, "Mod_1001_AMod.xml")); err == nil {
 		t.Fatal("the receiver's Mod settings were copied")
 	}
-	hugs := readFile(t, filepath.Join(e.Home, "packs", "first", "userdata", "HugsLib", "ModSettings.xml"))
+	hugs := readFile(t, filepath.Join(e.App.PacksDir(), "first", "userdata", "HugsLib", "ModSettings.xml"))
 	if !strings.Contains(hugs, "<x>author</x>") || strings.Contains(hugs, "other.mod") {
 		t.Fatalf("HugsLib:\n%s", hugs)
 	}
@@ -91,7 +91,7 @@ func TestPackRevisionUpdate(t *testing.T) {
 	rev1 := filepath.Join(e.Root, "rev1.archopack")
 	e.MustRun("pack", "export", "first", rev1)
 	p1, _ := e.App.ReadPack("first")
-	dir := filepath.Join(e.Home, "packs", "first")
+	dir := filepath.Join(e.App.PacksDir(), "first")
 	save := filepath.Join(dir, "userdata", "Saves", "colony.rws")
 	e.WriteFile(save, "<savegame/>")
 
@@ -118,11 +118,11 @@ func TestPackRevisionUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.MustRun("pack", "import", rev1)
-	recv := filepath.Join(e.Home, "packs", "first")
-	if err := os.Rename(recv, filepath.Join(e.Home, "packs", "mine")); err != nil {
+	recv := filepath.Join(e.App.PacksDir(), "first")
+	if err := os.Rename(recv, filepath.Join(e.App.PacksDir(), "mine")); err != nil {
 		t.Fatal(err)
 	}
-	mine := filepath.Join(e.Home, "packs", "mine")
+	mine := filepath.Join(e.App.PacksDir(), "mine")
 	e.WriteFile(filepath.Join(mine, "userdata", "Saves", "colony.rws"), "<savegame>mine</savegame>")
 	out = e.MustRun("pack", "import", rev2)
 	if !strings.Contains(out, "revision 2, you have revision 1") || !strings.Contains(out, "removed") || !strings.Contains(out, "--update") {
@@ -145,7 +145,7 @@ func TestPackRevisionUpdate(t *testing.T) {
 	if readFile(t, filepath.Join(mine, "userdata", "Saves", "colony.rws")) != "<savegame>mine</savegame>" {
 		t.Fatal("the update lost the receiver's save")
 	}
-	if _, err := os.Stat(filepath.Join(e.Home, "packs", "first")); err == nil {
+	if _, err := os.Stat(filepath.Join(e.App.PacksDir(), "first")); err == nil {
 		t.Fatal("the update made a second pack")
 	}
 	if problems, err := e.App.VerifyPack("mine"); err != nil || len(problems) > 0 {

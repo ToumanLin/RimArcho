@@ -47,6 +47,7 @@ func DirectoryGroup(a *app.App) SettingGroup {
 	}
 	// One note for the whole group; a row only says what is different about it.
 	g.Note = T("locate it after moving it yourself, or move it to a new location")
+	var shown []app.ManagedDirectory
 	for _, d := range dirs {
 		// the lock library is a word to learn only once something is kept (16 §2.14)
 		if d.Kind == "lock" && d.Status == "unused" {
@@ -75,7 +76,9 @@ func DirectoryGroup(a *app.App) SettingGroup {
 				Confirm: T("RimArcho forgets this folder; the files stay where they are")}}
 		}
 		g.Items = append(g.Items, item)
+		shown = append(shown, d)
 	}
+	g.Folds = folderFolds(a, g.Items, shown)
 	return g
 }
 

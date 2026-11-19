@@ -3135,3 +3135,16 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .dbar .d-free { flex: 1; min-width: 2px; background: var(--pill); }
 .dbar-row.low .d-free { background: var(--amber); }
 .dbar-row.low .num { color: var(--amber); }
+/* Settings › Folders in folds (16 §2.14): a heading per root; its rows show their folder under it */
+.folder-fold + .folder-fold, .folder-fold + .set { border-top: var(--hairline) solid var(--line-2); }
+.folder-fold-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: 40px; padding: 6px 14px; cursor: pointer; }
+.folder-fold-head .folder-fold-root { font-weight: 500; min-width: 0; flex: 0 1 auto; overflow: hidden; }
+.folder-fold-head .dbar-row { margin: 0 0 0 auto; }
+.folder-fold-toggle { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; padding: 0; color: var(--faint); }
+.folder-fold-toggle:hover, .folder-fold-head:hover .folder-fold-toggle { color: var(--text); }
+.folder-fold-toggle .fold-chev { display: inline-block; transition: transform var(--t-press); }
+.folder-fold.open .folder-fold-toggle .fold-chev { transform: rotate(90deg); }
+.folder-fold-warn { display: inline-flex; color: var(--amber); }
+.folder-fold-warn svg { width: 14px; height: 14px; }
+.folder-fold-rows { border-top: var(--hairline) solid var(--line-2); }
+.folder-fold-rows .set { padding-left: 42px; }

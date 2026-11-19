@@ -19,7 +19,7 @@ The answer to question two feeds question three: first establish what has gone u
 | Location | Belongs to |
 | --- | --- |
 | `<user data directory>/Saves/*.rws` (shared, own or custom user data directory: `app.Saves`, 03 §3.1) | Environments using this user data directory, and plans launched in those environments. When environments share the game's default user data directory (03 §3.4), deduplicate by real path and read only once |
-| `<data directory>/packs/<pack name>/userdata/Saves/*.rws` | This pack (packs use their own `-savedatafolder`, 10 §3) |
+| `<pack directory>/<pack name>/userdata/Saves/*.rws` (10 §1) | This pack (packs use their own `-savedatafolder`, 10 §3) |
 
 Read autosaves (`Autosave-*.rws`) like manual saves; label them "autosave" in the UI.
 

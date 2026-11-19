@@ -316,5 +316,9 @@
   "follow up on #%d": "#%d の続報を送る",
   "developer": "開発者",
   "install it": "インストール",
-  "installing Archo Monitor…": "Archo Monitor をインストール中…"
+  "installing Archo Monitor…": "Archo Monitor をインストール中…",
+  "game and Workshop": "ゲームとワークショップ",
+  "%d folders": "%d 個のフォルダー",
+  "1 folder": "1 個のフォルダー",
+  "what RimArcho has recorded there: the Mods' sizes from the last scan and the generated code": "RimArcho が記録したサイズ：前回のスキャン時の Mod のサイズと生成されたコード"
 }

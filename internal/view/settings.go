@@ -48,6 +48,8 @@ type SettingItem struct {
 	Actions []SettingAction `json:"actions,omitempty"`
 	// Disk: the folder's drive, free of total, for the GUI's meter (16 §7 principle 9)
 	Disk *DiskMeter `json:"disk,omitempty"`
+	// Rel: a Folders row's folder under its fold's root (FolderFold), shown in its place.
+	Rel string `json:"rel,omitempty"`
 	// Details fold under the row (16 §3.1 rule 7): RimArcho's release notes.
 	Details *SettingDetails `json:"details,omitempty"`
 }
@@ -145,6 +147,9 @@ type SettingGroup struct {
 	// Note is said once under the heading instead of on every row.
 	Note  string        `json:"note,omitempty"`
 	Items []SettingItem `json:"items"`
+	// Folds group Folders' directory rows by root in the GUI (16 §2.14); rows in no fold
+	// (adding a folder) follow them.
+	Folds []FolderFold `json:"folds,omitempty"`
 }
 
 // EnvRow is an environment on the environment page.

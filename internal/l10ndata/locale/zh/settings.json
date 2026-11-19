@@ -316,5 +316,9 @@
   "follow up on #%d": "补充 #%d",
   "developer": "开发者",
   "install it": "安装",
-  "installing Archo Monitor…": "正在安装 Archo Monitor…"
+  "installing Archo Monitor…": "正在安装 Archo Monitor…",
+  "game and Workshop": "游戏与创意工坊",
+  "%d folders": "%d 个文件夹",
+  "1 folder": "1 个文件夹",
+  "what RimArcho has recorded there: the Mods' sizes from the last scan and the generated code": "RimArcho 记录的大小：上次扫描时 Mod 的大小，以及生成的代码"
 }

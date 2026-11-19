@@ -23,6 +23,7 @@ import { initNeedText, needText, needParts, evidenceMark } from "./needtext.js";
 import { getChoices } from "./credit.js";
 import { memBars, countBar, countMark, stepMeter, visTip, diskMeter } from "./membar.js";
 import { setVersionRunner } from "./versionwarnings.js";
+import { folderFolds, headMeters, settingValue } from "./folderfolds.js";
 import { openVersionList } from "./versionpanel.js";
 
 let ui = null;
@@ -1730,7 +1731,7 @@ async function refreshSettingTasks(values = false) {
       if (!row) continue;
       const note = row.querySelector(".setting-note"), value = row.querySelector(".setting-value");
       if (note) { factText(note, { text: it.note || "", paths: it.notePaths }); note.hidden = !it.note; }
-      if (value) factText(value, { text: it.value || "", paths: it.valuePath || it.edit === "url" ? [it.value] : [] });
+      if (value) settingValue(value, it);
       settingPathPicker(row, it, settings);
       const valueNote = row.querySelector(".setting-value-note");
       if (valueNote) { valueNote.textContent = it.valueNote || ""; valueNote.hidden = !it.valueNote; }
@@ -1846,7 +1847,9 @@ function renderGroups(w, groups, again) {
     const card = el("section", "card settings");
     area(card, lab);
     if (g.note) card.append(el("div", "group-note", g.note));
-    for (const it of g.items || []) {
+    // Folders: the rows go into their folds after the loop (16 §2.14)
+    const rows = g.folds?.length ? [] : null, meters = headMeters(g);
+    for (const [ii, it] of (g.items || []).entries()) {
       const row = el("div", "set");
       row.dataset.settingRow = g.title + "/" + it.label;
       // The row's record: its key, directory, command or link; the label only as a last resort.
@@ -1865,7 +1868,7 @@ function renderGroups(w, groups, again) {
       const note = factText(el("div", "sub setting-note"), { text: it.note || "", paths: it.notePaths });
       note.hidden = !it.note;
       left.append(note);
-      if (it.disk) left.append(diskMeter(it.disk)); // the folder's drive (V10)
+      if (it.disk && !meters.has(ii)) left.append(diskMeter(it.disk)); // the folder's drive (V10)
       const right = el("div", "r");
       if (it.edit === "swatches" || it.edit === "segments") {
         row.classList.add("appearance-row");
@@ -1893,7 +1896,7 @@ function renderGroups(w, groups, again) {
         };
         right.append(s);
       } else if (it.edit === "directory") {
-        const value = factText(el("span", "muted setting-value"), { text: it.value, paths: [it.value] });
+        const value = settingValue(el("span", "muted setting-value"), it);
         const d = { id: it.directory, label: it.label, path: it.value };
         const after = async () => { await ui.reload(); again(); };
         right.append(value, button(T("locate"), "", () => directoryPrompt(d, false, after), "", "apply-setting"),
@@ -1935,9 +1938,11 @@ function renderGroups(w, groups, again) {
       renderSettingActions(right, it.actions, run, it);
       row.append(left, right);
       settingPathPicker(row, it, again);
-      card.append(row);
-      if (it.details) card.append(settingDetails(it.details));
+      const els = [row];
+      if (it.details) els.push(settingDetails(it.details));
+      if (rows) rows.push(els); else card.append(...els);
     }
+    if (rows) folderFolds(card, g, rows);
     w.append(card);
   }
   if (restyle) ui.reaccent();

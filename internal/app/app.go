@@ -261,11 +261,8 @@ func OpenWith(home string, o OpenOptions) (*App, error) {
 	}
 	// The interfaces check the managed directories at each start (ManagedDirectories is
 	// read after Open, once overrides such as LockBase are installed); it never blocks.
-	// Older installations have no usage metadata. Packs are under Home or an
-	// explicit config path; unlike LockDir this never depends on LockBase.
-	if dirExists(a.PacksDir()) && st.Meta(directoryKey("packs")) == "" {
-		_ = st.SetMeta(directoryKey("packs"), a.PacksDir())
-	}
+	// Packs from older installations got their usage record and folder setting from store
+	// schema 42; new packs record it when they are made.
 	recoveryDone := perftrace.Span("startup-recovery")
 	defer recoveryDone()
 	rows, err := st.ManagedLinks()
