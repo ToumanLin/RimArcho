@@ -205,10 +205,10 @@ function guideExpression() {
   if (G.step === -1) return "wink";
   if (G.step === 0) {
     if (D.run) return !D.run.end ? "think" : D.run.ok ? "salute" : "surprised";
-    return G.way === 1 ? "ponder" : G.folder ? "smile" : "wink";
+    return G.way === 1 ? "ponder" : G.folder ? "neutral" : "wink";
   }
   if (G.step === 1) return !G.scan || !G.scan.done ? "think" : G.scan.ok ? "salute" : "surprised";
-  return "smile";
+  return "neutral";
 }
 
 function go(i) {

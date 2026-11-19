@@ -1,7 +1,7 @@
 {
   "%s free of %s": "%s 空き（全 %s）",
   "Archo animation": "Archoのアニメーション",
-  "Archo's figure while pages load and in the first-run guide; still uses no GPU": "ページ読み込み中や初回ガイドに表示されるArchoの姿。静止表示ではGPUを使いません",
+  "Archo's figure while pages load and in the first-run guide; still shows one picture per expression": "ページ読み込み中や初回ガイドに表示されるArchoの姿。静止表示では表情ごとに1枚の絵だけを表示します",
   "still": "静止",
   "animated": "アニメーション",
   "motion": "アニメーション効果",
