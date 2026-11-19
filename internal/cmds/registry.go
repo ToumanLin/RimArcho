@@ -103,8 +103,22 @@ var commandOrder = []string{"env list", "env detect", "env add", "env set", "env
 	"mod", "mod-settings", "describe", "def", "patches", "harmony", "why", "log", "problems", "problems show", "problems ignore", "problems unignore", "files search", "source", "source search", "analyze", "changes", "library", "library remove-from-plans", "library move-to-locked", "enable", "disable", "move", "swap", "sort", "undo", "redo", "save", "loadout log", "loadout diff",
 	"loadout checkout", "loadout ignore-external", "loadout complete-dependencies", "loadout replace-recommended", "loadout use-installed", "loadout export", "loadout import", "plan list", "plan new", "plan use", "plan rename", "plan remove", "plan cost", "stage list", "stage add", "stage drop", "stage restore", "pin", "copy-local", "import rimcrow", "alias", "note", "tag", "rule add", "rule edit", "rule list", "rule remove", "launch", "test run", "identity", "identity list", "identity why", "identity resolve", "lineage split", "lineage merge", "gc", "config get", "config set", "agent status", "agent install", "agent key", "agent run", "agent remove", "guide", "mcp", "gui", "version", "uninstall"}
 
-// Commands returns the command table in documented order.
+// Commands returns the command table in documented order, without the commands of a feature
+// this build leaves out (featureOff).
 func Commands() []*Command {
+	all := allCommands()
+	out := all[:0:0]
+	for _, c := range all {
+		if !featureOff(c.Name) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// allCommands is every registered command in documented order, including those featureOff
+// hides; the specifications document them all.
+func allCommands() []*Command {
 	out := make([]*Command, 0, len(registry))
 	for _, n := range commandOrder {
 		for _, c := range registry {
@@ -127,7 +141,7 @@ func lookup(words []string) (*Command, []string) {
 	bestN := 0
 	for _, c := range registry {
 		parts := strings.Fields(c.Name)
-		if len(parts) > len(words) || len(parts) <= bestN {
+		if len(parts) > len(words) || len(parts) <= bestN || featureOff(c.Name) {
 			continue
 		}
 		ok := true

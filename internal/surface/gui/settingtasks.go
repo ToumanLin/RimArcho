@@ -7,6 +7,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/accounts"
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/buildinfo"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -144,6 +145,9 @@ func (s *API) runSettingTask(a *app.App, id, kind string, argv []string) (string
 	case view.TaskSelfUpdate:
 		return s.runSelfUpdate(a, id, argv)
 	case view.TaskAgentInstall:
+		if !buildinfo.AgentOn() { // a build without Archo Agent (15 §7) installs none
+			return "", errors.New("not a settings command: agent install")
+		}
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		s.tasks.SetStop(id, func() error { cancel(); return nil })

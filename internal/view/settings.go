@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/buildinfo"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/netcfg"
@@ -97,7 +98,7 @@ func SettingTask(argv []string) string {
 	if len(argv) > 0 && argv[0] == "gc" {
 		return TaskGC
 	}
-	if len(argv) == 2 && argv[0] == "agent" && argv[1] == "install" {
+	if len(argv) == 2 && argv[0] == "agent" && argv[1] == "install" && buildinfo.AgentOn() {
 		return TaskAgentInstall
 	}
 	if len(argv) < 2 {
@@ -454,9 +455,10 @@ func SettingCommand(argv []string) error {
 	if argv[0] == "gc" {
 		return nil
 	}
-	// Archo Agent (15 §7); the key has its own call (API.SetAgentKey), never a command line
-	if len(argv) == 2 && argv[0] == "agent" && (argv[1] == "install" || argv[1] == "remove") ||
-		len(argv) == 3 && argv[0] == "agent" && argv[1] == "run" && argv[2] == "--window" {
+	// Archo Agent (15 §7), in a build that offers it; the key has its own call (API.SetAgentKey),
+	// never a command line
+	if buildinfo.AgentOn() && (len(argv) == 2 && argv[0] == "agent" && (argv[1] == "install" || argv[1] == "remove") ||
+		len(argv) == 3 && argv[0] == "agent" && argv[1] == "run" && argv[2] == "--window") {
 		return nil
 	}
 	if argv[0] == "update" && (len(argv) == 1 || len(argv) == 2 && argv[1] == "--check" || len(argv) == 3 && argv[1] == "--from" && argv[2] != "") {

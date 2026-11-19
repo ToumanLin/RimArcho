@@ -4,6 +4,7 @@ import (
 	"runtime"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/buildinfo"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 )
 
@@ -11,9 +12,9 @@ import (
 const TaskAgentInstall = "agent-install"
 
 // AgentGroup is the settings page's Archo Agent section (16 §2.14, 15 §7). Windows only: the bundle
-// is built for Windows x64.
+// is built for Windows x64. A build without Archo Agent (buildinfo.AgentOn, 1.1) has no section.
 func AgentGroup(a *app.App) (SettingGroup, bool) {
-	if runtime.GOOS != "windows" {
+	if runtime.GOOS != "windows" || !buildinfo.AgentOn() {
 		return SettingGroup{}, false
 	}
 	s := a.AgentStatus()
