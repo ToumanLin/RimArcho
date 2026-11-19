@@ -20,6 +20,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/buildinfo"
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/netcfg"
 	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 	"github.com/ToumanLin/RimArcho/internal/updatechannel"
 )
@@ -106,7 +107,8 @@ func (a *App) CheckSelfUpdate(ctx context.Context) (int, string, error) {
 	s.Sources = nil
 	if runtime.GOOS == "windows" && a.Store.Meta("cfg:updates.source") != "github" && !selfPrerelease(cur) {
 		var report updatechannel.Report
-		report, err = updatechannel.Check(ctx, updatechannel.Options{
+		// GitHub's release metadata never comes through an automatic mirror (17 §2.2).
+		report, err = updatechannel.Check(netcfg.WithoutAutoMirror(ctx), updatechannel.Options{
 			GitHub: *a.selfClient(), HTTP: a.HTTP, SteamAPI: a.SteamAPI, Lanzou: a.selfLanzou(),
 		})
 		s.Sources = report.Sources
@@ -132,7 +134,7 @@ func (a *App) CheckSelfUpdate(ctx context.Context) (int, string, error) {
 			}
 		}
 	} else {
-		r, err = a.selfClient().Latest(ctx, selfPrerelease(cur))
+		r, err = a.selfClient().Latest(netcfg.WithoutAutoMirror(ctx), selfPrerelease(cur))
 		result := updatechannel.SourceResult{Source: "github", Status: "ok"}
 		if err != nil {
 			result.Status, result.Error = "failed", "GitHub release lookup failed"

@@ -412,30 +412,60 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	return out
 }
 
-// NetworkGroup: the proxy and the GitHub mirror for RimArcho's own downloads (17 §2.2).
-// The window's Workshop pages follow the Windows system proxy on their own.
+// NetworkGroup: the proxy and the GitHub mirror for RimArcho's own downloads (17 §2.2),
+// each with the route its last request actually took. The window's Workshop pages follow
+// the Windows system proxy on their own.
 func NetworkGroup(a *app.App) SettingGroup {
 	proxy := cmds.Setting(a, "network.proxy")
-	via := netcfg.Describe("https://github.com/")
-	now := T("direct")
-	if via != "direct" {
-		now = Tf("through %s", via)
+	var now string
+	if u, ok := netcfg.LastUsed(false); ok {
+		now = Tf("last: %s", RouteText(u.Route))
+	} else if via := netcfg.Describe("https://github.com/"); via == "direct" {
+		now = Tf("now: %s", T("direct"))
+	} else {
+		now = Tf("now: %s", Tf("through %s", via))
 	}
 	mirror := cmds.Setting(a, "network.github_mirror")
 	mv := mirror
-	if mv == "" {
-		mv = T("none: GitHub directly")
+	switch mirror {
+	case "auto":
+		mv = T("automatic")
+	case "off":
+		mv = T("off")
+	}
+	var mnow string
+	if u, ok := netcfg.LastUsed(true); ok {
+		mnow = Tf("last GitHub request: %s", RouteText(u.Route))
+	}
+	var hosts []string
+	for _, m := range netcfg.AutoMirrors {
+		hosts = append(hosts, netcfg.MirrorHost(m))
 	}
 	return SettingGroup{Title: T("network"), Items: []SettingItem{
 		{Label: T("proxy"), Value: proxy, Edit: "text", Argv: []string{"config", "set", "network.proxy", "{}"},
-			ValueNote: Tf("now: %s", now),
-			Note:      T("system follows the Windows proxy (Clash, v2rayN in system proxy mode); off goes direct; or a proxy such as http://127.0.0.1:7890 or socks5://127.0.0.1:7891")},
+			ValueNote: now,
+			Hover:     T("system follows the Windows proxy (Clash, v2rayN) and goes direct when it is not running; Steam goes direct first, so game accelerators keep working; off goes direct only; or a proxy such as http://127.0.0.1:7890 or socks5://127.0.0.1:7891")},
 		{Label: T("GitHub mirror"), Value: mv, EditValue: &mirror, Edit: "text", Argv: []string{"config", "set", "network.github_mirror", "{}"},
-			Note: T("tried before GitHub for community data, updates and todds, e.g. https://gh-proxy.org/; empty goes to GitHub directly. Use one you trust: updates come through it")},
+			ValueNote: mnow,
+			Hover:     Tf("automatic tries GitHub first, then %s; off never uses a mirror; or one mirror tried first, such as https://gh-proxy.org/. RimArcho's own updates are checked against GitHub's checksum, never one from an automatic mirror", strings.Join(hosts, ", "))},
 		{Key: "feedback.replies", Label: T("check for replies to my reports"), Value: cmds.Setting(a, "feedback.replies"), Edit: "choice", Choices: []string{"on", "off"}, ChoiceLabels: []string{T("on"), T("off")},
 			Argv: []string{"config", "set", "feedback.replies", "{}"},
 			Note: T("asks the feedback relay when RimArcho starts and when Feedback opens; nothing else is sent")},
 	}}
+}
+
+// RouteText is a route as netcfg names it (direct, proxy host:port, mirror host) in the
+// display language.
+func RouteText(route string) string {
+	switch {
+	case route == "direct":
+		return T("direct")
+	case strings.HasPrefix(route, "proxy "):
+		return Tf("through proxy %s", strings.TrimPrefix(route, "proxy "))
+	case strings.HasPrefix(route, "mirror "):
+		return Tf("through mirror %s", strings.TrimPrefix(route, "mirror "))
+	}
+	return route
 }
 
 // SettingCommand checks that argv is one of the settings page's commands (the interfaces

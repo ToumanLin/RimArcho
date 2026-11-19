@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/lanzou"
+	"github.com/ToumanLin/RimArcho/internal/netcfg"
 	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 	"github.com/ToumanLin/RimArcho/internal/updatechannel"
 )
@@ -45,11 +46,15 @@ func (a *App) downloadSelfUpdate(ctx context.Context, r *selfupdate.Release, dir
 		return "", err
 	}
 	client := a.selfClient()
-	release, githubErr := client.Version(ctx, r.Version)
+	// The release's metadata and checksum never come through an automatic mirror, so a
+	// mirror that relays the ZIP cannot also supply the hash it is checked against; a mirror
+	// the player set still applies to both (17 §2.2).
+	trusted := netcfg.WithoutAutoMirror(ctx)
+	release, githubErr := client.Version(trusted, r.Version)
 	var sum []byte
 	if githubErr == nil {
 		// Retain an obtained checksum even when the ZIP request fails.
-		sumCtx, stop := context.WithTimeout(ctx, 15*time.Second)
+		sumCtx, stop := context.WithTimeout(trusted, 15*time.Second)
 		var sumErr error
 		sum, sumErr = client.Checksum(sumCtx, release)
 		stop()
@@ -101,7 +106,7 @@ func manualSelfVersion(name string) string {
 // selfChecksum never requests a different version, and bounds metadata + sidecar
 // together to fifteen seconds. Failure leaves extraction's CRC checks (17 §5.1).
 func (a *App) selfChecksum(ctx context.Context, version string) []byte {
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	ctx, cancel := context.WithTimeout(netcfg.WithoutAutoMirror(ctx), 15*time.Second)
 	defer cancel()
 	client := a.selfClient()
 	r, err := client.Version(ctx, version)

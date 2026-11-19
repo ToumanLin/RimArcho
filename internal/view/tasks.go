@@ -442,6 +442,11 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 	default:
 		r.Line = result
 		r.Say = joinFacts(r.StateText, result)
+		for _, n := range t.Net {
+			if host, route, ok := strings.Cut(n, " "); ok {
+				r.Say = joinFacts(r.Say, Tf("reached %s %s", host, RouteText(route)))
+			}
+		}
 		r.Bar = t.State == app.TaskStopped || t.State == app.TaskPartial || (t.State == app.TaskFailed && t.Total > 1)
 	}
 	if t.Kind == TaskPack {

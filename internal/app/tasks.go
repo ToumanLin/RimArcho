@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ToumanLin/RimArcho/internal/netcfg"
 )
 
 // Background tasks (16 §2.16): what RimArcho does after a click that takes a while, kept
@@ -90,6 +92,9 @@ type Task struct {
 	Args     []string   `json:"args,omitempty"`   // maintenance command, for retry after reopening
 	Env      string     `json:"env,omitempty"`    // the environment captured at submission
 	Owner    string     `json:"owner,omitempty"`  // the window that runs it (newTaskOwner)
+	// Net: requests this process made while the task ran that answered only on a later
+	// route, as "host route" (17 §2.2: "github.com mirror gh-proxy.com").
+	Net []string `json:"net,omitempty"`
 }
 
 // Ended reports whether the task has finished one way or another.
@@ -388,6 +393,11 @@ func (ts *Tasks) Finish(id, state, result string) {
 		return
 	}
 	t.State, t.Result, t.End, t.Phase = state, result, ts.ms(), ""
+	if t.Start > 0 {
+		for _, u := range netcfg.FallbacksSince(time.UnixMilli(t.Start)) {
+			t.Net = append(t.Net, u.Host+" "+u.Route)
+		}
+	}
 	if state == TaskDone {
 		t.Frac = 1
 		t.Done = t.Total

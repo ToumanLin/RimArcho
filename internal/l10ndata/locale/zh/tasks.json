@@ -62,5 +62,6 @@
   "copy the game": "复制游戏",
   "the copy was stopped": "复制已停止",
   "The download didn't finish.": "下载没完成。",
-  "see why": "看原因"
+  "see why": "看原因",
+  "reached %s %s": "访问 %[1]s 时%[2]s"
 }

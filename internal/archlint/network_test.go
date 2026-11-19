@@ -3,7 +3,10 @@ package archlint
 import (
 	"fmt"
 	"go/ast"
+	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -87,4 +90,71 @@ func serve() { l, _ := net.Listen("tcp", ":0"); http.Serve(l, nil); http.ListenA
 	used := map[string]bool{}
 	expect(t, "allowed listen", networkProblems(synthetic(t, map[string]string{"internal/app/n.go": src}), allow, used), 4)
 	expect(t, "stale listen exception", staleProblems("listenAllowed", allow, used), 1)
+}
+
+// trustFields would replace what Windows already does for every request: the system root
+// store (a game accelerator's local CA, a company's) and the system resolver (the hosts
+// file, an accelerator's virtual adapter). RimArcho pins no certificate (17 §2.2).
+var trustFields = map[string]bool{"RootCAs": true, "InsecureSkipVerify": true, "VerifyPeerCertificate": true,
+	"VerifyConnection": true, "PreferGo": true}
+
+// trustProblems: no file sets the TLS roots, verification hooks or a Go-only resolver, or
+// imports the bundled fallback roots.
+func trustProblems(files []*goFile) []string {
+	var out []string
+	for _, g := range files {
+		if g.test {
+			continue
+		}
+		for _, spec := range g.f.Imports {
+			if strings.Trim(spec.Path.Value, `"`) == "golang.org/x/crypto/x509roots/fallback" {
+				out = append(out, fmt.Sprintf("17 §2.2: %s imports the bundled roots; RimArcho trusts the system root store", g.path))
+			}
+		}
+		ast.Inspect(g.f, func(n ast.Node) bool {
+			var id *ast.Ident
+			switch x := n.(type) {
+			case *ast.KeyValueExpr:
+				id, _ = x.Key.(*ast.Ident)
+			case *ast.SelectorExpr:
+				id = x.Sel
+			}
+			if id != nil && trustFields[id.Name] {
+				out = append(out, fmt.Sprintf("17 §2.2: %s sets %s; requests use the system root store and resolver, and no certificate is pinned", loc(g.fset.Position(id.Pos()), g.path), id.Name))
+			}
+			return true
+		})
+	}
+	sort.Strings(out)
+	return out
+}
+
+func TestArchNetworkTrust(t *testing.T) {
+	t.Parallel()
+	report(t, trustProblems(repoSource(t)))
+	root, _ := repoRoot(t)
+	mod, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{"netdns", "x509usefallbackroots"} {
+		if strings.Contains(string(mod), k) {
+			t.Errorf("17 §2.2: go.mod sets the GODEBUG %s; RimArcho uses the system resolver and root store", k)
+		}
+	}
+}
+
+func TestArchNetworkTrustDetection(t *testing.T) {
+	t.Parallel()
+	src := `package p
+import (
+	"crypto/tls"
+	"net"
+	_ "golang.org/x/crypto/x509roots/fallback"
+)
+var c = &tls.Config{InsecureSkipVerify: true}
+var r = &net.Resolver{PreferGo: true}
+func f(c *tls.Config) { c.RootCAs = nil }
+`
+	expect(t, "trust", trustProblems(synthetic(t, map[string]string{"internal/app/n.go": src})), 4)
 }
