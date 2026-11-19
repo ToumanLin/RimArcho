@@ -3007,3 +3007,10 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .xc-textrow .r { align-items: flex-start; }
 .xc-textrow { align-items: center; }
 .xc-pi .rs.word-facts { justify-content: flex-end; justify-self: end; flex-wrap: nowrap; }
+/* a confirmation's lines (popups.confirm): body type, "name: value" as fact rows */
+.confirm-lines { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--fg-2); overflow-wrap: anywhere; user-select: text; }
+.confirm-lines .gap { height: 6px; }
+.confirm-lines .line.sub { padding-left: 14px; color: var(--muted); font-size: 12px; }
+.confirm-lines .fact { display: grid; grid-template-columns: minmax(80px, max-content) minmax(0, 1fr); gap: 12px; }
+.confirm-lines .fact .k { color: var(--muted); }
+.confirm-lines .fact .v { color: var(--fg); min-width: 0; }

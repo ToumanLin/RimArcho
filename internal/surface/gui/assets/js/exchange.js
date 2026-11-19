@@ -322,20 +322,19 @@ function drawRows() {
   for (const m of [...M.managers].sort((a, b) => rank(a) - rank(b))) {
     const ps = allParts(m), st = stateOf(ps), on = M.shown.has(mKey(m)), nws = m.imported ? news(m) : [];
     const running = M.run && M.run.mgrs.includes(m.name);
-    const b = el("button", "xc-mrow" + (on ? " on" : "") + (m.imported && !nws.length && !on ? " seen" : ""));
+    const b = el("button", "xc-mrow" + (on && !running ? " on" : "") + (m.imported && !nws.length && !on ? " seen" : ""));
     b.setAttribute("role", "checkbox");
     b.setAttribute("aria-checked", st === "checked" ? "true" : st === "mixed" ? "mixed" : "false");
     const t = el("span", "t", m.name);
     if (m.imported) t.append(el("span", "when", Tf("imported %s", dayText(m.imported))));
     const s = el("span", "s");
-    if (running) s.append(el("span", "pick", runLine()));
+    if (running) s.append(runLine()); // quiet: the run panel below shows the progress
     else if (st) s.append(el("span", "pick", Tf("bringing over %s", pickLine(m))));
     else if (on) s.append(ps.some(p => p.state === "listed") ? T("nothing new to choose; tick a list below to import it again") : T("all of it is already in RimArcho"));
     else if (m.imported && nws.length) { const n = el("span", "nline"); n.title = nws.join(", "); n.append(el("span", "chip-n", T("new")), el("span", "nt", nws.join(", "))); s.append(n); }
     else if (m.imported) s.append(T("nothing new since then"));
     else s.append(holds(m));
     b.append(box(st), mark(m.name, 24), t, s);
-    if (running && M.run.state === "running") b.append(progBar(runPct()));
     b.onclick = () => showManager(m);
     rows.append(b);
   }
@@ -371,10 +370,13 @@ function partBecomes(g, p) {
   }
   return Tf(BECOMES()[p.part] || "%d", p.new);
 }
+// groupInstance: the RimSort instance a player-data group comes from (its folder name)
+function groupInstance(g) {
+  return g.kind === "player" && /aux_metadata\.db$/i.test(g.path || "") ? g.path.split(/[\\/]/).slice(-2, -1)[0] || "" : "";
+}
 function groupLabel(g) {
-  const label = GROUP()[g.kind];
-  if (g.kind === "player" && /aux_metadata\.db$/i.test(g.path || "")) return label + "  " + (g.path.split(/[\\/]/).slice(-2, -1)[0] || "");
-  return label;
+  const inst = groupInstance(g);
+  return GROUP()[g.kind] + (inst ? " / " + inst : "");
 }
 
 function treeRow(lv, open, twKey, st, disabled, iconEl, label, meta, pills, right, onBox) {
@@ -431,7 +433,7 @@ function drawTree() {
         : gst ? titled(el("span", "bc becomes", gp.filter(p => M.on.has(p.id)).map(p => g.kind === "lists" || g.kind === "configs" ? partLabel(g, p) : partBecomes(g, p)).join(", ")))
         : !toggleable(gp).length && gp.some(p => p.state === "listed") ? el("span", "bc", T("already your lists; tick one to import it again"))
         : el("span", "bc", T("not brought over"));
-      const row = treeRow(1, M.open.has(gk), gp.length ? gk : "", gst, !toggleable(gp).length && !gp.some(p => M.on.has(p.id)), ic, groupLabel(g), "", [], right, () => toggle(gp, gst));
+      const row = treeRow(1, M.open.has(gk), gp.length ? gk : "", gst, !toggleable(gp).length && !gp.some(p => M.on.has(p.id)), ic, GROUP()[g.kind], groupInstance(g), [], right, () => toggle(gp, gst));
       if (allHad) row.classList.add("had");
       tree.append(row);
       if (!M.open.has(gk)) continue;
