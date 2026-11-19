@@ -69,11 +69,13 @@ type LibCond struct {
 type LibCells struct {
 	Name    string `json:"name"`
 	Size    string `json:"size"`
+	Bytes   int64  `json:"bytes,omitempty"` // Size's number: the GUI's in-cell bar (16 §7 principle 9)
 	State   string `json:"state,omitempty"`
 	Code    string `json:"code,omitempty"` // the state (app.LibStates), for its colour
 	Source  string `json:"source"`
 	Used    string `json:"used,omitempty"`
 	UsedAt  string `json:"usedTitle,omitempty"` // every plan and pack, for the tooltip
+	Uses    int    `json:"uses,omitempty"`      // how many: the GUI's dots
 	Updated string `json:"updated,omitempty"`
 	Version string `json:"version,omitempty"`
 	Author  string `json:"author,omitempty"`
@@ -439,8 +441,12 @@ func BuildLibrary(lib *app.Library, search string, filters []string, sort string
 		r.LibCells.Name = r.Name
 		n, ok := m.Bytes()
 		r.Size = libSize(n, ok)
+		if ok {
+			r.Bytes = n
+		}
 		us := m.UsedIn()
 		r.Used, r.UsedAt = libUsed(us)
+		r.Uses = len(us)
 		if len(us) > 1 {
 			r.Used = Tf("in %d lists", len(us))
 		}
@@ -541,6 +547,9 @@ func libInst(lib *app.Library, l *app.LibLineage, i *app.LibInstance) LibInstRow
 		r.SubscriptionKind = i.Subscription.Kind
 	}
 	r.Size, r.Source = libSize(i.Bytes, i.Sized), r.Label
+	if i.Sized {
+		r.Bytes = i.Bytes
+	}
 	if i.Mod != nil {
 		r.ID = i.Mod.ID
 		r.LibCells.Name = r.Label // player-facing copy name; raw folder remains in fields
@@ -558,6 +567,7 @@ func libInst(lib *app.Library, l *app.LibLineage, i *app.LibInstance) LibInstRow
 		r.States = append(r.States, LibStateText(s, lib.GameMM))
 	}
 	r.Used, r.UsedAt = libUsed(i.UsedIn)
+	r.Uses = len(i.UsedIn)
 	for _, u := range i.UsedIn {
 		r.UsedIn = append(r.UsedIn, libUseText(u.Value()))
 	}

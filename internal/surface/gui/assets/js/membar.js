@@ -225,3 +225,13 @@ export function shrinkBar(s) {
   row.append(bar, el("span", "num", s.beforeText + " → " + s.afterText));
   return row;
 }
+
+// ---- V8: sizes in table cells ----
+
+// sizeBar: a faint bar behind a printed size, scaled to the largest row (V8, 16 §7 principle
+// 9); the number stays, so the bar is only a background
+export function sizeBar(cell, bytes, most) {
+  if (!(bytes > 0 && most > 0)) return;
+  cell.classList.add("szbar");
+  cell.style.setProperty("--w", Math.max(1, Math.round((bytes / most) * 100)) + "%");
+}

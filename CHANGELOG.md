@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Mod library, Packs and a pack page: a faint bar behind each size shows at a glance where the space goes (scaled to the largest Mod or pack listed). In the Mod library "in 3 lists" is three dots; the list names are in the tooltip.
 - **Import previews draw what a list brings.** Under the list's format a two-part bar shows its Mods installed (green, ✓ N) and not installed (red, ✕ N), and "replace <list>" and "add the ones you lack" show their effect as Saves' marks: +7 −12 ↕31 (⇄ for a Mod switched to another version). The sentences are the tooltips and what screen readers read.
 - Mod library › Updates: each updated Mod ends in one mark instead of a "worth a look" label on every row: ▲ for "affects launch", an amber dot for "worth a look", nothing for "content only". The files that changed show as counts by kind ("Defs +1  Patches ~2"), and Update checks shows each source's state as ✓, ✕ or ○. The words are in the tooltips, the details and for screen readers; `archo changes` and MCP `list_changes` are unchanged.
 - Texture optimisation: after "count the textures", video memory before and after converting is one bar (what stays solid, what is saved hatched) with "1.8 GB → 0.6 GB" beside it, instead of a second sentence.

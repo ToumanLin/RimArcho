@@ -14,6 +14,7 @@ import { openScreen, page, button, act, area, beginPageRead } from "./screens.js
 import * as pop from "./popups.js";
 import { createTable } from "./datatable.js";
 import { packColumns, packModColumns } from "./tabledefs.js";
+import { sizeBar } from "./membar.js";
 
 let ui = null;
 export function initPacks(u) { ui = u; }
@@ -40,10 +41,13 @@ function drawPackRows() {
   packCard.append(head);
   packTable.draw(packCard, head, { count: L.rows.length });
   L.els = [];
+  const most = L.rows.reduce((m, r) => Math.max(m, r.bytes || 0), 0); // the size bars' scale (V8)
   L.rows.forEach((r, i) => {
     const row = el("div", "data-row link" + (i === L.cur ? " cur" : ""));
     row.setAttribute("role", "row");
     for (const c of packTable.visible()) row.append(el("span", "cell" + (c.key === "name" ? " n" : "") + (packTable.column(c.key).num ? " num" : ""), String(r[c.key] ?? "—")));
+    const sizeAt = packTable.visible().findIndex((c) => c.key === "size");
+    if (sizeAt >= 0) sizeBar(row.children[sizeAt], r.bytes, most);
     row.onclick = () => ui.go("pack:" + r.name);
     packTable.row(row, i, "pack-row-" + encodeURIComponent(r.name));
     L.els.push(row); packCard.append(row);
@@ -55,10 +59,13 @@ function drawModRows() {
   const head = el("div", "lib-th");
   modCard.append(head);
   modTable.draw(modCard, head, { labelledby: "pack-mods-heading", count: P.mods.length });
+  const most = P.mods.reduce((n, m) => Math.max(n, m.bytes || 0), 0); // the size bars' scale (V8)
+  const sizeAt = modTable.visible().findIndex((c) => c.key === "size");
   for (const [i, m] of modTable.sorted(P.mods).entries()) {
     const row = el("div", "data-row");
     row.setAttribute("role", "row");
     for (const c of modTable.visible()) row.append(el("span", "cell" + (c.key === "name" ? " n" : "") + (modTable.column(c.key).num ? " num" : ""), String(m[c.key] || "—")));
+    if (sizeAt >= 0) sizeBar(row.children[sizeAt], m.bytes, most);
     modTable.row(row, i, "pack-mod-row-" + encodeURIComponent(JSON.stringify([P.name, m.key])));
     modCard.append(row);
   }
