@@ -32,6 +32,7 @@ var frontendNodeSuites = []string{
 	"testdata/review.mjs",
 	"testdata/rules.mjs",
 	"testdata/saves.mjs",
+	"testdata/select.mjs",
 	"testdata/separators.mjs",
 	"testdata/status-motion.mjs",
 	"testdata/subscribe.mjs",
