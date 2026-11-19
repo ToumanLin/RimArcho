@@ -122,21 +122,25 @@ func TestV7ConflictOnEditedWriter(t *testing.T) {
 		t.Fatalf("default was loaded: %s", planList(t, e, "default"))
 	}
 
-	// Plan b would overwrite the unseen change: refused, the file stays.
-	file := e.ReadModsConfig()
+	// Player feedback 2026-11-18: another tool's edit must not stop plan b. The outside
+	// version is kept in default's history and stays marked there; b saves and launches.
 	e.WriteFile(filepath.Join(e.Steam, "steam.exe"), "")
-	for _, args := range [][]string{{"save"}, {"save", "--dry-run"}, {"launch"}} {
-		out, code := e.Run(args...)
-		if code == 0 || !strings.Contains(out, "plan:default v3 was not loaded; nothing was written") ||
-			!strings.Contains(out, "first archo plan use default, then see the difference: archo loadout diff v3 workspace; load it: archo loadout checkout v3; ignore it: archo loadout ignore-external") {
-			t.Fatalf("%v: exit %d\n%s", args, code, out)
-		}
+	if out, code := e.Run("save", "--dry-run"); code != 0 {
+		t.Fatalf("save --dry-run of b: exit %d\n%s", code, out)
 	}
-	if _, err := e.App.Save(false); !errors.Is(err, app.ErrExternalConflict) {
-		t.Fatalf("Save error %v", err)
+	if _, err := e.App.Save(false); err != nil {
+		t.Fatalf("Save of b: %v", err)
 	}
-	if e.ReadModsConfig() != file || len(e.Launched) != 0 {
-		t.Fatal("a refused write changed ModsConfig.xml or launched")
+	if !strings.Contains(e.ReadModsConfig(), "tester.a") { // b is v2: Core, Harmony, A
+		t.Fatal("b was not written")
+	}
+	if out := e.MustRun("status"); strings.Contains(out, "loaded as") || strings.Contains(out, "kept as") || !strings.Contains(out, "plan:default v3 was not loaded") {
+		t.Fatalf("b's own write counted as an outside change:\n%s", out)
+	}
+	if ps, _ := e.App.Store.PlanByName("default"); ps == nil {
+		t.Fatal("no default")
+	} else if ws, _ := e.App.Store.Workspace(ps.ID); ws == nil || ws.Conflict != 3 {
+		t.Fatalf("default lost its mark: %+v", ws)
 	}
 
 	// In the writer: log shows the mark; diff works; save is refused; ignore clears it.
@@ -149,6 +153,10 @@ func TestV7ConflictOnEditedWriter(t *testing.T) {
 	}
 	if out, code := e.Run("save"); code == 0 || strings.Contains(out, "plan use") || !strings.Contains(out, "ignore it: archo loadout ignore-external") {
 		t.Fatalf("save in the writer: exit %d\n%s", code, out)
+	}
+	// Its own unreviewed version still stops the writer: its unsaved edits are at stake.
+	if _, err := e.App.Save(false); !errors.Is(err, app.ErrExternalConflict) {
+		t.Fatalf("Save of the writer: %v", err)
 	}
 	if out := e.MustRun("loadout", "ignore-external"); !strings.Contains(out, "ignored v3 of plan:default") {
 		t.Fatal(out)

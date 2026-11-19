@@ -4,6 +4,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Window: Mods you subscribe to in Steam (or add to `Mods/` with another tool) show up on their own. RimArcho checks the Mod folders when the window starts and whenever it gets the focus, and rescans in the background when they changed; a list the game's menu enabled them in no longer says they are not installed (GitHub #10). While Steam is still downloading subscribed Mods, the window checks every 20 seconds, and Can it run says "still downloading in Steam" instead of "not installed".
+- Lists: when another tool or the game's menu changes ModsConfig.xml while it holds another list's content (for example `default`, edited since), the change is still kept in that list's history, but it no longer stops saving or launching the list you use. Before, the only way past the error was to switch to that list. Can it run's card for it has "ignore it" and "go to list management". CLI: `save` and `launch` refuse only over the current list's own unloaded outside change.
 - Answering "same" to an identity question now carries the new Mod's notes, tags, user rules and ignored findings over to the Mod it was, and removes the left-over empty record. Before, they stayed on a record nothing pointed to any more.
 - TUI: drawing the screen no longer reads the database; Can it run's count is brought up to date after each key or result instead.
 - Window: the top bar no longer shows the Game Config chip (`name 1.6`) beside the breadcrumb; the sidebar and the Launch page's 01 column already name and switch it.

@@ -326,5 +326,11 @@
   "Disabled: one row per copy / grouped by tag": "無効：コピーごとに表示／タグでグループ化",
   "on a tag group's header in Disabled: collapse / expand": "「無効」のタググループ見出し：折りたたむ／展開",
   "on a tag group's header in Disabled: rename, note, merge, delete the tag": "「無効」のタググループ見出し：名前の変更・メモ・結合・タグの削除",
-  "remove all %d not installed": "未インストールの%d件をすべて削除"
+  "remove all %d not installed": "未インストールの%d件をすべて削除",
+  "%s is still downloading in Steam": "%s は Steam でダウンロード中です",
+  "still downloading: %s": "ダウンロード中：%s",
+  "Steam has it subscribed, but its folder is not complete yet; RimArcho reads it as soon as Steam is done": "Steam でサブスクライブ済みですが、フォルダーがまだ揃っていません。Steam の処理が終わると RimArcho が自動で読み込みます。",
+  "%d mods in the list are still downloading in Steam": "リストの %d 個の Mod が Steam でダウンロード中です",
+  "Steam has them subscribed, but their folders are not complete yet; RimArcho reads them as soon as Steam is done": "Steam でサブスクライブ済みですが、フォルダーがまだ揃っていません。Steam の処理が終わると RimArcho が自動で読み込みます。",
+  "the change was made to %s, the list the game had; launching this list is not stopped. Switch to %s to use it, or ignore it.": "変更はゲームが使っていたリスト %s に入りました。このリストの起動は止まりません。使うには %s に切り替え、不要なら無視してください。"
 }

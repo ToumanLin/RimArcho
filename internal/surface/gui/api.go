@@ -87,6 +87,7 @@ type API struct {
 
 	environment     environmentWorker
 	monitorOnce     sync.Once
+	watchOnce       sync.Once // watchDownloads (04 §1.6)
 	autoOnce        sync.Once
 	maintenanceOnce sync.Once
 	autoWG          sync.WaitGroup
@@ -161,6 +162,7 @@ func (s *API) Ready() {
 	s.startMaintenance()
 	s.prepareBackgrounds(false) // menu extraction starts after the first draw (16 §3.1)
 	s.monitorOnce.Do(s.checkMonitor)
+	s.watchOnce.Do(func() { go s.watchDownloads() })
 	ms := time.Since(processStart).Milliseconds()
 	dir := filepath.Join(s.a.Home, "logs")
 	if os.MkdirAll(dir, 0o755) != nil {
@@ -179,6 +181,9 @@ func (s *API) Ready() {
 func (s *API) checkMonitor() {
 	home, env, exe := s.a.Home, s.a.EnvName, s.Exe
 	go func() {
+		// Then the mod folders: what changed while RimArcho was closed (04 §1.6). After the
+		// Monitor, so the two never scan at once.
+		defer s.RescanIfChanged()
 		var out string
 		var err error
 		if exe != "" {
@@ -1598,6 +1603,51 @@ func (s *API) SelectLog(path string) (string, error) {
 func (s *API) Scan() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.startScanLocked(false)
+}
+
+// RescanIfChanged rescans, as Scan does, when a mod folder changed outside RimArcho since the
+// last scan (04 §1.6): Steam finished a new subscription, another tool added or removed a
+// mod. The window calls it when it starts and when it gets the focus; while Steam is still
+// downloading items it is also called every 20 s. False: nothing changed, or a scan runs.
+func (s *API) RescanIfChanged() bool {
+	if s.a == nil || s.a.Store == nil {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.busy["scan"] {
+		return false
+	}
+	if changed, err := s.a.ModFoldersChanged(); err != nil || !changed {
+		return false
+	}
+	return s.startScanLocked(true)
+}
+
+// watchDownloads calls RescanIfChanged every 20 s while Steam has subscribed items that are
+// not on disk yet (04 §1.6), so a list waiting for them fills in without the focus moving.
+// Without pending items it only reads the Steam manifest each round.
+func (s *API) watchDownloads() {
+	t := time.NewTicker(20 * time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-s.branchCtx.Done():
+			return
+		case <-t.C:
+		}
+		s.mu.Lock()
+		pending := len(s.a.WorkshopPending()) > 0
+		s.mu.Unlock()
+		if pending {
+			s.RescanIfChanged()
+		}
+	}
+}
+
+// startScanLocked starts a scan; auto: started by RescanIfChanged, which says so when done.
+func (s *API) startScanLocked(auto bool) bool {
 	if s.busy["scan"] {
 		return false
 	}
@@ -1629,6 +1679,9 @@ func (s *API) Scan() bool {
 			s.endSelf(task, errors.New(reason), "")
 		} else {
 			ev["text"] = view.T("scan complete")
+			if auto {
+				ev["text"], ev["auto"] = view.T("mod folders changed outside RimArcho: the library is up to date"), true
+			}
 			s.endSelf(task, nil, ev["text"].(string))
 		}
 		s.free.soon()

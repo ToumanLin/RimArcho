@@ -546,7 +546,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 	for _, m := range missingMods {
 		missingInfo[strings.ToLower(m.PackageID)] = m
 	}
-	var missing, installed []missingEntry
+	var missing, installed, downloading []missingEntry
 	missingOwners := map[string][]ModOwner{}
 	inList := map[string]bool{}
 	for _, e := range st.List {
@@ -650,6 +650,15 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 				if w.CanEnable {
 					me.pkg = w.PackageID
 					installed = append(installed, me)
+					continue
+				}
+				if w.Downloading { // Steam is not done with it yet (04 §1.6)
+					me.n.Status = StatusWarn
+					me.n.Text = Tf("%s is still downloading in Steam", me.name)
+					me.n.Title = Tf("still downloading: %s", me.name)
+					me.n.Why = T("Steam has it subscribed, but its folder is not complete yet; RimArcho reads it as soon as Steam is done")
+					me.n.Actions = []Action{look, disable(st, "pkg:"+pkg, T("remove it from the list"))}
+					downloading = append(downloading, me)
 					continue
 				}
 			}
@@ -763,7 +772,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 	}
 	// what is added from here on says its own code: cur is the last problem's
 	cur, linkProblem = "", nil
-	for _, entries := range [][]missingEntry{missing, installed} {
+	for _, entries := range [][]missingEntry{missing, installed, downloading} {
 		for i := range entries {
 			m := &entries[i]
 			m.n.RequiredBy = missingOwners[dependencyTarget(st, "pkg:"+m.pkg)]
@@ -793,6 +802,31 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 		f.refReasons = map[string]Reason{}
 		for _, m := range installed {
 			f.refReasons[m.ref] = missingRowReason(m.n, f.Actions[0])
+		}
+		add(f)
+	}
+	switch len(downloading) {
+	case 0:
+	case 1:
+		n := downloading[0].n
+		r := missingRowReason(n)
+		r.Status = StatusWarn
+		n.refReasons = map[string]Reason{downloading[0].ref: r}
+		add(n)
+	default:
+		f := Need{rank: 4, Group: GroupList, Counted: true, Status: StatusWarn, Fold: true, code: "entry.missing",
+			Text:     Tf("%d mods in the list are still downloading in Steam", len(downloading)),
+			Why:      T("Steam has them subscribed, but their folders are not complete yet; RimArcho reads them as soon as Steam is done"),
+			Evidence: downloading[0].n.Evidence, Actions: []Action{{Kind: ActFold, Key: "f", Label: T("show which")}}}
+		f.refReasons = map[string]Reason{}
+		for _, m := range downloading {
+			f.linkProblems = append(f.linkProblems, m.n.linkProblems...)
+			f.RequiredBy = append(f.RequiredBy, m.n.RequiredBy...)
+			f.Mods = append(f.Mods, m.n.Mods...)
+			f.Parts = append(f.Parts, m.name)
+			r := missingRowReason(m.n)
+			r.Status = StatusWarn
+			f.refReasons[m.ref] = r
 		}
 		add(f)
 	}
@@ -1008,8 +1042,13 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 	if cs, err := a.Conflicts(st); err == nil {
 		for _, c := range cs {
 			if !c.Current {
+				// It does not stop this list's launch (07 §4.1): settled here, without switching.
 				add(Need{Group: GroupConfirm, Text: Tf("ModsConfig.xml was changed outside RimArcho; list %s keeps it as v%d, not used yet", c.Plan.Name, c.Version),
-					Counted: true, Status: StatusWarn})
+					Why:     Tf("the change was made to %s, the list the game had; launching this list is not stopped. Switch to %s to use it, or ignore it.", c.Plan.Name, c.Plan.Name),
+					Counted: true, Status: StatusWarn, Actions: []Action{
+						{Kind: ActDismissConflict, Key: "I", Label: T("ignore it"), Refs: []string{c.Plan.Name}, Done: T("the outside change is ignored (it stays in the history)")},
+						{Kind: ActManageLists, Key: "M", Label: T("go to list management"), Argv: []string{"plan", "list"}},
+					}})
 			}
 		}
 	}
@@ -1351,7 +1390,7 @@ func Do(a *app.App, act Action, option int) (done string, err error) {
 	case ActLoadExternal:
 		_, _, err = a.Checkout(fmt.Sprintf("v%d", act.Version))
 	case ActDismissConflict:
-		err = a.DismissConflict()
+		err = a.DismissConflict(act.Refs...)
 	case ActKeepOutside:
 		err = a.KeepOutsideChange()
 	case ActAnswer:

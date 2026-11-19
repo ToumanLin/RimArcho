@@ -789,5 +789,6 @@
   "your locked version stays behind (%d updates)": "锁定的版本落后 %d 次更新",
   "… %d more": "… 另有 %d 项",
   "… %d more, tab shows all": "… 还有 %d 行，tab 查看全部",
-  "… enter shows all": "… 按 enter 查看全部"
+  "… enter shows all": "… 按 enter 查看全部",
+  "mod folders changed outside RimArcho: the library is up to date": "Mod 文件夹在 RimArcho 之外有变化：Mod 库已更新"
 }
