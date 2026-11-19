@@ -99,7 +99,7 @@ export async function list() {
   card.setAttribute("role", "table");
   L.cur = Math.min(L.cur, Math.max(L.rows.length - 1, 0));
   drawPackRows();
-  if (!L.rows.length) card.append(el("div", "empty-state", T("no packs yet: a pack fixes the current list — every mod as it is now, without the files of other game versions — and plays with its own saves")));
+  if (!L.rows.length) card.append(el("div", "empty-state", T("No packs yet. A pack is a frozen copy of a list, with its own saves.")));
   w.append(card);
   if (L.others) w.append(el("div", "muted note", Tf("%d packs belong to other games; switch the game to see them", L.others)));
   ui.renderHints();
@@ -176,6 +176,7 @@ export async function launchPack(name) {
     });
     return;
   }
+  if (o.direct) return ui.offerDirect(o, () => launchPack(name));
   say(o.refused ? "fail" : "ok", o.text);
   if (o.refused && o.refused.length > 1) pop.text(T("launch"), o.refused);
   ui.reload();
@@ -532,7 +533,7 @@ function drawBuild() {
   side.append(el("div", "h", B.name || p.plan));
   const kv = el("div", "bd-kv");
   const row = (k, v) => kv.append(el("span", "k", k), v instanceof Node ? v : el("span", "v", v));
-  row(T("Game Config"), p.env);
+  row(T("game"), p.env);
   row(T("mods"), el("span", "v num", String(p.mods)));
   if (p.before) {
     const v = el("span", "v");

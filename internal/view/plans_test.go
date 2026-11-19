@@ -234,7 +234,7 @@ func TestHomePerPlan(t *testing.T) {
 	for _, r := range h.Rows {
 		order = append(order, r.Name+"="+r.State)
 	}
-	want := "Beta=not checked yet,Pack=checked when created,default=not checked yet,Alpha=1 problems break the game,Zeta=not checked yet"
+	want := "Beta=not checked yet,Pack=checked when created,default=not checked yet,Alpha=1 problem breaks the game,Zeta=not checked yet"
 	if strings.Join(order, ",") != want {
 		t.Fatalf("order\n got %v\nwant %s", order, want)
 	}

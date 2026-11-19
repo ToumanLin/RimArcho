@@ -8,7 +8,7 @@
   "use here this time": "今回だけここで使用",
   "Steam can replace or delete this folder; self-update is unavailable this session.": "Steamがこのフォルダを置き換えたり削除したりする場合があります。このセッションでは自動更新できません。",
   "managed folders": "管理用フォルダ",
-  "Where should RimArcho keep SteamCMD, downloaded Mods and tools?": "SteamCMDやダウンロードしたMOD、ツールの保存先を選んでください。",
+  "Where should RimArcho keep its downloads?": "RimArcho のダウンロードをどこに置きますか？",
   "use this folder": "このフォルダを使用",
   "import from RimSort, RimCrow or RimPy": "RimSort／RimCrow／RimPyからインポート",
   "looking for RimSort, RimCrow and RimPy…": "RimSort・RimCrow・RimPyを検索中…",
@@ -65,7 +65,7 @@
   "tag colours: %d": "タグの色：%d",
   "first-run guide": "初回ガイド",
   "first-run guide (preview)": "初回ガイド（プレビュー）",
-  "see what a new player sees; nothing you choose there is saved": "新しいプレイヤーが最初に見る画面を確認します。そこで選んだ内容は保存されません",
+  "nothing you choose is saved": "選んだ内容は保存されません",
   "preview…": "プレビュー…",
   "a preview of the first run: nothing you choose here is saved": "初回起動のプレビューです。ここで選んだ内容は保存されません",
   "end the preview": "プレビューを終了",
@@ -84,5 +84,6 @@
   "copied; Game Config %s added": "コピーしました。ゲーム構成 %s を追加しました",
   "the copy did not finish": "コピーは完了しませんでした",
   "copying the game…": "ゲームをコピー中…",
-  "copy the game folder…": "ゲームフォルダーをコピー…"
+  "copy the game folder…": "ゲームフォルダーをコピー…",
+  "Reading your Mods…": "Mod を読み込み中…"
 }

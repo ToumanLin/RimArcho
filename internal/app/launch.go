@@ -31,6 +31,16 @@ type LaunchPlan struct {
 	Exe    string
 	Args   []string
 	Dir    string
+	// SteamOff: the Game Config launches through Steam, but the Steam client is not
+	// running, so the game starts directly (09 §2 "Without Steam").
+	SteamOff bool
+	// Workshop: a direct launch without the Steam client, so the list's Workshop Mods are
+	// linked into Mods/ (09 §3); the game cannot list subscriptions without Steam.
+	Workshop bool
+	// AppID is steam_appid.txt to write before a direct start ("" when it exists or the
+	// launch goes through Steam): without it the game's Steamworks restarts it through
+	// Steam (09 §2, 02 §1).
+	AppID string
 }
 
 // Command renders the plan as a command line.
@@ -51,6 +61,10 @@ func quoteArg(s string) string {
 
 // ErrLaunchBlocked is wrapped by Launch refusals.
 var ErrLaunchBlocked = errors.New("launch blocked")
+
+// ErrSteamNotFound is the refusal of a Steam launch with no Steam client to start it; the
+// GUI offers to start the game directly instead (16 §2.3).
+var ErrSteamNotFound = errors.New("Steam not found")
 
 // Launch plays the current list (09 §2): no game may be running in any environment; then
 // the list is written to the game exactly as archo save does (Mods/ links, ModsConfig.xml,
@@ -89,6 +103,7 @@ func (a *App) LaunchWith(dryRun, move bool) (*SaveResult, error) {
 	if err != nil {
 		return nil, err
 	}
+	st.workshopLinks = p.Workshop
 	r, err := a.writeGame(st, dryRun, true, move)
 	if err != nil {
 		return nil, err
@@ -122,6 +137,9 @@ func (a *App) LaunchWith(dryRun, move bool) (*SaveResult, error) {
 }
 
 func (a *App) startGame(p *LaunchPlan) error {
+	if err := a.writeAppID(p); err != nil {
+		return err
+	}
 	// Unity truncates an explicit -logfile instead of preserving the previous run, so the
 	// log moves to Player-prev.log first. A launcher that fails started no game: the logs
 	// go back where they were (03 §6.3).
@@ -211,14 +229,21 @@ func (a *App) gamePlan(e *env.Environment, userData string) (*LaunchPlan, error)
 		goos = runtime.GOOS
 	}
 	proton := goos == "linux" && env.IsProtonGame(e.GameRoot)
+	method := e.Launch
+	steamOn := proton || a.steamRunning()
+	if method == "steam" && !steamOn {
+		// Without Steam (09 §2): the Steam client is not running, so the game starts
+		// directly instead of Steam starting first. Proton games always need Steam.
+		method, p.SteamOff = "direct", true
+	}
 	defaultUserData := a.DefaultUserData(e.GameRoot)
 	if goos == "linux" {
 		defaultUserData = a.DefaultUserData()
-		if e.Launch == "steam" || proton {
+		if method == "steam" || proton {
 			defaultUserData = a.DefaultUserData(e.GameRoot)
 		}
 	}
-	if proton && e.Launch != "steam" {
+	if proton && method != "steam" {
 		return nil, fmt.Errorf("%w: Proton games must launch through Steam; use archo env set --launch steam", ErrLaunchBlocked)
 	}
 	var extra []string
@@ -240,14 +265,14 @@ func (a *App) gamePlan(e *env.Environment, userData string) (*LaunchPlan, error)
 			}
 		}
 	}
-	switch e.Launch {
+	switch method {
 	case "steam":
 		p.Exe, p.Args = env.SteamCommand(a.Detect)
 		if p.Exe == "" {
 			if proton {
 				return nil, fmt.Errorf("%w: Steam is required for Proton games; install Steam or add it to PATH", ErrLaunchBlocked)
 			}
-			return nil, fmt.Errorf("%w: Steam not found; use archo env set --launch direct", ErrLaunchBlocked)
+			return nil, fmt.Errorf("%w: %w; use archo env set --launch direct", ErrLaunchBlocked, ErrSteamNotFound)
 		}
 		p.Args = append(p.Args, "-applaunch", env.WorkshopAppID)
 		p.Args = append(p.Args, extra...)
@@ -267,6 +292,38 @@ func (a *App) gamePlan(e *env.Environment, userData string) (*LaunchPlan, error)
 			return nil, fmt.Errorf("%w: no game executable in %s", ErrLaunchBlocked, e.GameRoot)
 		}
 		p.Args = extra
+		p.Workshop = !steamOn
+		if appid := filepath.Join(e.GameRoot, AppIDFile); !fileExists(appid) {
+			p.AppID = appid
+		}
 	}
 	return p, nil
+}
+
+// AppIDFile is the file that tells the game's Steamworks it was started on purpose
+// outside Steam. Without it SteamAPI_RestartAppIfNecessary (Verse.Steam.SteamManager)
+// quits the game and starts it again through Steam, so "direct" would still launch Steam.
+const AppIDFile = "steam_appid.txt"
+
+// appIDMeta records that RimArcho wrote a game's steam_appid.txt (uninstall removes it).
+func appIDMeta(gameRoot string) string { return "steam-appid:" + env.PathKey(gameRoot) }
+
+// writeAppID writes steam_appid.txt for a direct start (09 §2, 02 §1): only when it is
+// missing, never over the player's or another tool's file, and recorded as RimArcho's.
+func (a *App) writeAppID(p *LaunchPlan) error {
+	if p.AppID == "" || fileExists(p.AppID) {
+		return nil
+	}
+	if err := os.WriteFile(p.AppID, []byte(env.WorkshopAppID), 0o644); err != nil {
+		return fmt.Errorf("cannot write %s (the game would restart through Steam without it): %w", p.AppID, err)
+	}
+	return a.Store.SetMeta(appIDMeta(filepath.Dir(p.AppID)), "1")
+}
+
+// steamRunning reports whether the Steam client runs (SteamRunning in tests).
+func (a *App) steamRunning() bool {
+	if a.SteamRunning != nil {
+		return a.SteamRunning()
+	}
+	return steamClientRunning()
 }

@@ -208,7 +208,7 @@ function draw(measurements = false) {
   const estimate = slot(setRow(est, T("convert"), p && !p.loading ? facts : null, p?.loading ? pending() : null), "estimate");
   estimate.hidden = !p;
   if (vram) estimate.querySelector(".l").append(shrinkBar(vram));
-  setRow(est, "", T("the PNGs stay; RimArcho writes a .dds next to each and can take them all back"));
+  setRow(est, "", T("You can undo it: the PNGs stay.")).title = T("the PNGs stay; RimArcho writes a .dds next to each and can take them all back");
   w.append(est);
   w.append(slot(foot(I, p), "foot"));
 
@@ -301,7 +301,7 @@ function foot(I, p) {
   }
   let note = "";
   if (!X.loading) {
-    if (!p) note = T("not counted yet: “count the textures” reads every PNG to show what is there and what converting saves");
+    if (!p) note = T("Count first to see what converting saves.");
     else if (X.old) note = T("the textures changed since this count; “count the textures” counts again");
     else if (!counted()) note = T("the choices changed since this count; “count the textures” counts again");
   }
@@ -318,7 +318,7 @@ function foot(I, p) {
 
 function convert() {
   const lines = counted() ? [...(X.page.estFacts || [])] : [T("not counted yet: only new or changed PNGs are converted, those already done are skipped")];
-  lines.push(T("the PNGs stay; RimArcho writes a .dds next to each and can take them all back"));
+  lines.push(T("You can undo it: the PNGs stay."));
   pop.confirm(T("convert textures to DDS"), lines, T("convert"), async () => {
     X.ended = false;
     let text;

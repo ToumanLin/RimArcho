@@ -447,6 +447,22 @@ function actions() {
   return out;
 }
 
+// keyboard mode (16 §3.1 rule 4): the hint line shows only after a key outside a text field
+// (or tab, an arrow, enter or esc anywhere) and goes at the next mouse press; a mouse player
+// never reads it, ? and the command panel still list every key.
+let keyboardMode = false;
+function wireKeyboardMode() {
+  const typing = (t) => t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ""));
+  const navKey = /^(Tab|Arrow|Enter$|Escape$|F\d|Page|Home$|End$)/;
+  document.addEventListener("keydown", (e) => {
+    if (keyboardMode || ["Shift", "Control", "Alt", "Meta"].includes(e.key)) return;
+    if (typing(e.target) && !navKey.test(e.key)) return;
+    keyboardMode = true;
+    renderHints();
+  }, true);
+  document.addEventListener("pointerdown", () => { if (keyboardMode) { keyboardMode = false; renderHints(); } }, true);
+}
+
 function renderHints() {
   const h = $("#hints");
   h.innerHTML = "";
@@ -471,6 +487,7 @@ function renderHints() {
   const c = S.focus < 3 ? col() : null;
   const selected = c && c.sel.size && !S.screen;
   if (selected) h.append(el("span", "accent", Tf("%d selected", c.sel.size)));
+  if (!keyboardMode) return;
   hintLine(list, selected ? [{ key: "esc", label: T("clear the selection") }] : []).forEach((a) => {
     const group = el("span", "hint-group");
     group.append(keyCaps(a.key), " " + a.label);
@@ -872,6 +889,7 @@ async function run(what, anyway = false) {
   }
   // another version in the way that can move into the lock library: one confirmation, then on
   if (o.moves) return confirmMoves(o, () => api.RunMoving(what), async (o2) => { say(o2.refused ? "fail" : "ok", o2.text); await reload(); motion.play(before, null); });
+  if (o.direct) return offerDirect(o, () => run(what, anyway));
   if (o.refused) {
     say("fail", o.text);
     if (o.refused.length > 1) pop.text({ sort: T("sort"), save: T("save"), launch: T("launch") }[what], o.refused);
@@ -926,6 +944,17 @@ function offerAfterSort(o) {
       try { say("ok", await api.Subscribe({ kind: "workshop", url: ids.join(" "), steamcmd: i === 1, batch: true })); } catch (e) { say("fail", errText(e)); }
     });
   }, "enable");
+}
+
+// offerDirect answers a Steam launch with no Steam client (view.Outcome.Direct, 16 §2.3): one
+// button makes this game start without Steam from now on, then launches again.
+function offerDirect(o, again) {
+  say("fail", o.text);
+  pop.confirm(o.text, [T("This game will start without Steam from now on.")], T("start the game directly"), async () => {
+    try { await api.LaunchDirect(); } catch (e) { return say("fail", errText(e)); }
+    say("busy", T("starting…"));
+    await again();
+  }, "launch");
 }
 
 // confirmMoves asks once about moving folders into the lock library (09 §3), then runs again.
@@ -986,14 +1015,14 @@ async function cmd(id) {
 
 async function chooseEnv() {
   const rows = S.board?.environmentRows || [];
-  if (!rows.length) return say("", T("no Game Configs yet (archo env add)"));
+  if (!rows.length) return go("guide"); // no game yet: Add Game Config is the page for it
   const labels = rows.map(e => e.name + "  " + e.installation + (e.current ? "  " + T("in use") : ""));
-  labels.push("+ " + T("Add Game Config"));
-  pop.choose(T("switch Game Config"), labels, (i) => {
+  labels.push("+ " + T("add a game"));
+  pop.choose(T("switch game"), labels, (i) => {
     // Add Game Config is a page (16 §2.15), not a dialog
     if (i === rows.length) return go("guide");
     return useEnv(rows[i].name);
-  }, Math.max(0, rows.findIndex(e => e.current)), { key:"Delete", label:T("remove Game Config"), envWrite:"remove-env", run:i => { if(i<rows.length) scr.removeEnv(rows[i].name); } });
+  }, Math.max(0, rows.findIndex(e => e.current)), { key:"Delete", label:T("remove game"), envWrite:"remove-env", run:i => { if(i<rows.length) scr.removeEnv(rows[i].name); } });
 }
 
 async function useEnv(name) {
@@ -1433,7 +1462,7 @@ async function loadWidths() {
 // ---- start ----
 
 const ui = {
-  reload, refreshEnvironment, relang, reaccent, render, pageEntering, pageEntered, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go, useEnv,
+  reload, refreshEnvironment, relang, reaccent, render, pageEntering, pageEntered, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go, useEnv, offerDirect,
   back: () => travel(-1),
   palette: paletteChoice, commandDone, uninstallStarted: () => uninst.restore(), selectionItems: selection, planMenu: (id, x, y, opener, keys) => plans.menuAt(id, x, y, opener, keys),
   menu: (x, y) => openRowMenu(x, y, false),
@@ -1492,6 +1521,7 @@ async function start() {
   initRules(ui);
   wireSplits();
   document.addEventListener("keydown", onKey);
+  wireKeyboardMode();
   wireZoom(); // ctrl+wheel, ctrl+'+' / '-' / '0': interface size on every page (16 §2.14)
   document.addEventListener("verb", (e) => { const v = e.detail; v === "needs" ? go("needs") : verb(v); });
   // a detail's settings row: Mod library › Mod settings at that Mod's files (16 §2.9)
@@ -1538,6 +1568,7 @@ async function start() {
     S.busy.scan = false;
     say(ev.ok ? "ok" : "fail", ev.ok ? ev.text : ev.error);
     await reload();
+    if (ev.ok) tasksPage.scanned(); // a download that waited for this scan offers its Mods (16 §2.9)
     scr.busyChanged();
     if (S.screen === "home") homePage.home();
   });

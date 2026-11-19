@@ -705,7 +705,7 @@ func (b *changeBuilder) mod(id string, evs []*store.Event, info map[int64]*store
 		r.Actions = append(r.Actions, Action{ActSort, tx.T("sort"), "S"})
 	}
 	if kinds[identity.EvUpdated] && m != nil && m.Status == identity.Live && m.Kind.WorkshopLike() && b.locks[id] == nil && r.InPlan {
-		r.Actions = append(r.Actions, Action{ActLock, tx.T("lock this one"), "p"})
+		r.Actions = append(r.Actions, Action{ActLock, tx.T("keep this one"), "p"})
 	}
 	return r, ""
 }

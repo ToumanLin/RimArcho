@@ -286,6 +286,18 @@ namespace ArchoDrive
                 return true;
             }
             string text = Line(box.text.ToString());
+            if (box.text.ToString() == "SteamClientMissing".Translate().ToString())
+            {
+                // A game started without the Steam client asks Quit / Ignore at the main
+                // menu (09 §2 "Without Steam"); a player presses Ignore and plays on.
+                Driver.Note("dialog " + text + " -> " + Line(box.buttonBText ?? "Ignore"));
+                error = Act("dialog button B", () =>
+                {
+                    box.buttonBAction?.Invoke();
+                    box.Close(false);
+                });
+                return true;
+            }
             Driver.Note("dialog " + (string.IsNullOrEmpty(box.title) ? "" : Line(box.title) + ": ") + text + " -> " + Line(box.buttonAText ?? "OK"));
             error = Act("dialog button A", () =>
             {

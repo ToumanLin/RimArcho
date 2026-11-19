@@ -128,7 +128,7 @@ func (c *chState) build() {
 			c.rows = append(c.rows, chRow{text: "  " + r.Name + "  " + T("removed from the Workshop"), kind: chGone, gone: r, key: k})
 			if c.open[k] {
 				add("    "+T("The author deleted the Workshop page or made it private; your installed copy still works, but Steam will never update it."), chDim)
-				add("    "+T("After unsubscribing, you cannot download it again; lock this version to keep it."), chDim)
+				add("    "+T("After unsubscribing, you cannot download it again; keep this version to hold on to it."), chDim)
 			}
 		}
 	}
@@ -548,14 +548,14 @@ func (m *model) changesPairs() [][2]string {
 	case r.kind == chSource:
 		pairs = append(pairs, [2]string{"enter", T("check this source")})
 	case r.kind == chGone:
-		pairs = append(pairs, [2]string{"enter", T("open")}, [2]string{"p", T("lock this version")}, [2]string{"l", T("show in the mod library")})
+		pairs = append(pairs, [2]string{"enter", T("open")}, [2]string{"p", T("keep this version")}, [2]string{"l", T("show in the mod library")})
 	case r.kind == chPending:
 		later = append(later, [2]string{"l", T("show in the mod library")})
 		pairs = append(pairs, [2]string{"u", T("update subscription")})
 		if r.pend.Kind != app.LibWorkshop {
 			pairs = append(pairs, [2]string{"Del", T("remove subscription")})
 		}
-		later = append(later, [2]string{"p", T("lock this version first")})
+		later = append(later, [2]string{"p", T("keep this version first")})
 		if r.pend.Opens != "" {
 			later = append(later, [2]string{"ctrl+w", T("open the source page")})
 		}

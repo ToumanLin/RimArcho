@@ -107,7 +107,7 @@ func TestLiveBlockedByOtherEnv(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if l.Running || l.Blocked != view.Tf("Game Config %s is running", "second") {
+	if l.Running || l.Blocked != view.Tf("game %s is running", "second") {
 		t.Fatalf("blocked: %+v", l)
 	}
 	if p, _ := view.DryRun(e.App, view.ListLaunch); p.Apply {

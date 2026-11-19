@@ -94,6 +94,9 @@ type ModSettingsDetail struct {
 	Editable bool         `json:"editable"`
 	Values   []SettingRow `json:"values"`
 	Notes    []string     `json:"notes"`
+	// About is how the values work (a missing value is at its default; edits wait for the
+	// game to close): the GUI keeps it behind an ⓘ (16 §2.9).
+	About []string `json:"about,omitempty"`
 	// Window is what the game's settings window drew when the player last opened it (Archo
 	// Monitor, 19 §2); nil when never seen.
 	Window *SettingsWindowView `json:"window,omitempty"`
@@ -183,7 +186,7 @@ func ModSettingsFileDetail(sm *app.ModSettingsMod, class string) *ModSettingsDet
 	if len(sc.Values) == 0 {
 		d.Notes = append(d.Notes, T("the file stores no value: every value is at its default"))
 	} else {
-		d.Notes = append(d.Notes, T("a value missing from the file is at its default"))
+		d.About = append(d.About, T("a value missing from the file is at its default"))
 	}
 	if !sc.Simple {
 		d.Notes = append(d.Notes, T("lists, dictionaries and nested values are shown as counts"))
@@ -191,7 +194,7 @@ func ModSettingsFileDetail(sm *app.ModSettingsMod, class string) *ModSettingsDet
 	if d.Window != nil {
 		d.Notes = append(d.Notes, T("the window part shows the game's window as it was when you last opened it"))
 	}
-	d.Notes = append(d.Notes, T("on/off, numbers and text change here while the game is closed; the file is backed up first"))
+	d.About = append(d.About, T("on/off, numbers and text change here while the game is closed; the file is backed up first"))
 	return d
 }
 
@@ -224,8 +227,8 @@ func hugsLibDetail(d *ModSettingsDetail, f *app.ModSettingsFile) {
 	case len(sc.Values) == 0:
 		d.Notes = append(d.Notes, T("HugsLib stores no value of this Mod: every value is at its default"))
 	default:
-		d.Notes = append(d.Notes, T("a value missing from the file is at its default"),
-			T("with Archo Monitor, the game's next start adds every setting's title and default"))
+		d.About = append(d.About, T("a value missing from the file is at its default"))
+		d.Notes = append(d.Notes, T("with Archo Monitor, the game's next start adds every setting's title and default"))
 	}
 	if hidden > 0 {
 		d.Notes = append(d.Notes, Tf("%d settings the Mod keeps out of its window are not shown", hidden))

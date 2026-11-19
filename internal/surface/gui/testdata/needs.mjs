@@ -25,7 +25,7 @@ test("enter after the asked item vanished runs nothing", async () => {
     "./virtualrows.js": { virtualRows() {} },
     "./api.js": { on() {} },
     "./separator.js": { wireSeparator() {} },
-    "./needtext.js": { initNeedText() {}, needText: (tag, cls, text) => el(tag, cls, text), needParts: () => el("div"), needEvidence: () => el("div") },
+    "./needtext.js": { initNeedText() {}, needText: (tag, cls, text) => el(tag, cls, text), needParts: () => el("div"), needEvidence: () => el("div"), evidenceMark: () => el("div") },
     "./fulldetail.js": { full() {}, fullKey() {}, fullSection() {} },
   }, { document: { activeElement: null, dispatchEvent() {}, querySelectorAll: s => screen.querySelectorAll(s) }, URL, CSS: { escape: s => s }, requestAnimationFrame: fn => fn() });
   screens.initScreens({ reload: async () => {}, renderHints() {}, renderWhere() {}, edited: async () => null });

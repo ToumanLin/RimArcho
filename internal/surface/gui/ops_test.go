@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -93,5 +94,24 @@ func TestFormRoutesRunnable(t *testing.T) {
 	history = history[:strings.Index(history, "// pollLive")]
 	if strings.Contains(history, "confirm") || !strings.Contains(history, "api.HistoryGo") || !strings.Contains(history, `r.undo`) {
 		t.Fatal("history checkout must run directly with undo")
+	}
+}
+
+// 16 §2.9: a finished download offers its Mods that the current list lacks, and adding them
+// is one undoable edit; Mods the list holds are not offered again.
+func TestDownloadedOfferAndAdd(t *testing.T) {
+	t.Parallel()
+	e, api, _ := fixture(t)
+	task := app.Task{Kind: view.TaskSubscribe, Items: []app.TaskItem{{Ref: "ws:2009463077", State: app.ItemOK}, {Ref: "ws:1001", State: app.ItemOK}}}
+	o, err := view.DownloadedOffer(e.App, task)
+	if err != nil || len(o.Refs) != 1 || o.Names[0] != "Harmony" || o.List == "" {
+		t.Fatalf("offer: %+v %v", o, err)
+	}
+	r, err := api.AddDownloaded(o.Refs)
+	if err != nil || !r.Undo {
+		t.Fatalf("add: %+v %v", r, err)
+	}
+	if o, err := view.DownloadedOffer(e.App, task); err != nil || len(o.Refs) != 0 {
+		t.Fatalf("offered again after adding: %+v %v", o, err)
 	}
 }

@@ -22,9 +22,9 @@ func MigrationText(p app.MigrationPick, out *app.MigrationOutcome) string {
 		for _, pr := range out.Report.Profiles {
 			if "profile:"+pr.ID == p.Part {
 				if strings.HasPrefix(pr.Status, "already imported") {
-					return Tf("already the Game Config %s", pr.Environment)
+					return Tf("already the game %s", pr.Environment)
 				}
-				return Tf("a Game Config %s", pr.Environment)
+				return Tf("a game %s", pr.Environment)
 			}
 		}
 	}

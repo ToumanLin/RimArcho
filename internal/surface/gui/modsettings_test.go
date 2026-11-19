@@ -64,7 +64,7 @@ func TestModSettingsPage(t *testing.T) {
 	if d.Type != "Alpha.Settings" || strings.Join(got, " ") != "on=on scale=0.5 names=list of 2" || !d.Values[2].Fixed || d.Values[0].Fixed {
 		t.Fatalf("values: %+v", d)
 	}
-	if !strings.Contains(strings.Join(d.Notes, "\n"), "backed up first") {
+	if !strings.Contains(strings.Join(d.About, "\n"), "backed up first") {
 		t.Fatalf("notes: %q", d.Notes)
 	}
 	if d, err := api.ModSettingsFile(r.Instance, "Gone"); err != nil || d.Error == "" {

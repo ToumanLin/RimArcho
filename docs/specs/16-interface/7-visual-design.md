@@ -148,13 +148,14 @@ English UI text is the translation lookup key, so changing it also requires chan
 | save | Save; the editor button says Save changes / no changes, the count says N unsaved, and versions are saved versions | save; save changes / no changes; N unsaved; saved versions | write to game, unwritten, not yet written, written versions |
 | checkout | Go back to this version; history step go back | go back to this version | load version, load list |
 | External ModsConfig changes | Use outside change | use the outside change | load into list |
-| Environment (internal) | A play context with its own user data and current list | Game Config (Chinese and Japanese: see glossary); remove Game Config | environment; game when referring to this context |
+| Environment (internal) | A play context with its own user data and current list | game in the sidebar, on Launch (01 game) and everywhere else; Game Config only on its own page (with the line “a game folder with its own saves, settings and current list”) and Add Game Config (Chinese and Japanese: see glossary) | environment |
 | Game installation (internal only) | The physical installed game | game folder | showing an installation layer or grouping |
 | Source | Mod folders in settings, source in filters and details, such as Workshop or local | mod folders; source | — |
 | Instance | This one, another copy, N copies | this one, another copy | instance, Instance |
 | Lineage | Copies of same Mod | copies of the same mod | Lineage |
 | Copy | Only copies made by RimArcho in the lock library or a pack | copy | calling original Workshop installation a copy |
-| pin / unpin / pin --update | Lock this version / unlock / update the locked version; retain the old copy, and show locked version as the source | lock this version / unlock / update the locked version | pin, including other tools' pins |
+| pin / unpin / pin --update | Keep this version / stop keeping this version / update the locked version; retain the old copy, and show locked version as the source | keep this version / stop keeping this version / update the locked version | pin, lock, including other tools' pins |
+| scan / analyze | Re-read the Mod folders / check the list's problems again | rescan / check again; nothing else | scan again, read the mods, check the files again, rescan the mod folders |
 | Upstream changed after lock | Newer version, use Workshop version | a newer version is out | upstream, original updated, use original; original means Core and DLC |
 | library move-to-locked | Move into lock library | move into the lock library | collect into lock library, back up locked version |
 | swap | Switch version… | switch version… | replace with another copy, replace instance |

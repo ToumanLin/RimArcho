@@ -106,9 +106,16 @@ test("a response arriving after navigation cannot redraw the page", async () => 
   assert.equal(h.screen.textContent, before); assert.equal(h.timers.length, 0);
 });
 
-test("a first run without a managed folder starts on that step, which has no way to skip it", async () => {
+test("a first run takes the default managed folder without asking (16 §2.15)", async () => {
+  const h = await setup({ folder: { path: "C:\RimArcho", free: 50e9, done: false } });
+  assert.deepEqual(h.chosen, ["C:\RimArcho"]);
+  assert.equal(h.screen.querySelectorAll(".st").length, 2);
+  assert.match(h.screen.querySelector(".st.cur").textContent, /find the game/);
+});
+
+test("a default managed folder that cannot be used starts on that step, which has no way to skip it", async () => {
   const button = (h, label) => h.screen.querySelectorAll("button").find(b => b.textContent === label);
-  const h = await setup({ folder: { path: "C:\RimArcho", free: 50e9, done: false }, space: (path) => ({ path, free: 2e9, low: true }) });
+  const h = await setup({ folder: { path: "C:\RimArcho", free: 50e9, done: false, error: "not writable" }, space: (path) => ({ path, free: 2e9, low: true }) });
   assert.equal(h.screen.querySelectorAll(".st").length, 3);
   assert.match(h.screen.querySelector(".st.cur").textContent, /managed folders/);
   assert.ok(h.screen.textContent.includes("C:\RimArcho"));
@@ -150,17 +157,16 @@ for (const way of ["throws", "refuses"]) test(`a first scan that ${way} gives ba
   await h.screen.querySelectorAll("button").find(b => b.textContent === "add and continue").onclick(); await flush();
   assert.ok(!h.S.busy.scan, "no scan runs");
   assert.match(h.screen.textContent, way === "throws" ? /scan failed/ : /a scan is already running/);
-  if (way === "throws") assert.ok(h.screen.querySelectorAll("button").some(b => b.textContent === "scan again"));
+  if (way === "throws") assert.ok(h.screen.querySelectorAll("button").some(b => b.textContent === "rescan"));
 });
 
-test("the preview shows the first run from the folder step and writes nothing", async () => {
+test("the preview shows the first run from finding the game and writes nothing", async () => {
   const button = (h, label) => h.screen.querySelectorAll("button").find(b => b.textContent === label);
-  const h = await setup({ from: "preview", folder: { path: "C:\\RimArcho", free: 50e9, done: true } });
-  // the folder was chosen long ago, yet the preview starts there, as a first run does
-  assert.equal(h.screen.querySelectorAll(".st").length, 3);
-  assert.match(h.screen.querySelector(".st.cur").textContent, /managed folders/);
+  const h = await setup({ from: "preview", folder: { path: "C:\\RimArcho", free: 50e9, done: false } });
+  // a first run takes the default folder, so the preview has no folder step and chooses none
+  assert.equal(h.screen.querySelectorAll(".st").length, 2);
+  assert.deepEqual(h.chosen, []);
   assert.match(h.screen.textContent, /nothing you choose here is saved/);
-  button(h, "use this folder").onclick(); await flush();
   assert.match(h.screen.querySelector(".st.cur").textContent, /find the game/);
   h.switchWay(0); await flush();
   button(h, "add this folder").onclick(); await h.choosePath("D:\\Game2"); await flush();
@@ -178,7 +184,6 @@ test("the preview shows the first run from the folder step and writes nothing", 
 test("the preview's download plays out without SteamCMD", async () => {
   const h = await setup({ from: "preview" });
   h.respond({ games: "", offer: { bytes: 1e6, dir: "C:\\x" } });
-  h.screen.querySelectorAll("button").find(b => b.textContent === "use this folder").onclick(); await flush();
   h.switchWay(1); await flush();
   h.screen.querySelectorAll("button").find(b => b.textContent === "download SteamCMD").onclick(); await flush();
   assert.equal(h.screen.querySelectorAll(".branch").length, 3);
@@ -292,7 +297,6 @@ test("with no Game Config there is no copy way", async () => {
 
 test("the preview's copy plays out and writes nothing", async () => {
   const h = await setup({ from: "preview", envs: ["1.6"] });
-  h.screen.querySelectorAll("button").find(b => b.textContent === "use this folder").onclick(); await flush();
   h.switchWay(2); await flush();
   await h.screen.querySelectorAll("button").find(b => b.textContent === "copy and add").onclick(); await flush();
   for (let i = 0; h.timers.length; i++) { assert.ok(i < 60, "the made-up copy did not end"); await h.tick(); }

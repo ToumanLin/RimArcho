@@ -28,7 +28,7 @@ export function buildCommandPanel(pop, p, { close, pick, reload, uninstall }) {
   input.setAttribute("aria-autocomplete", "list"); input.setAttribute("aria-expanded", "false");
   dismiss.setAttribute("aria-label", T("close")); dismiss.onclick = close;
   output.tabIndex = 0; input.spellcheck = false; input.value = draft;
-  input.placeholder = T("a command, a mod, a Game Config"); input.setAttribute("aria-label", input.placeholder);
+  input.placeholder = T("a command, a mod, a game"); input.setAttribute("aria-label", input.placeholder);
   foot.setAttribute("role", "status"); row.append(el("span", "pr", "❯"), input);
   pop.append(head, output, list, row, foot);
   let options = [], selected = 0, sequence = 0, historyAt = -1, historyDraft = "", completion = null, error = "";

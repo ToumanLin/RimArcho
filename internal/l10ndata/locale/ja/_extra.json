@@ -1,7 +1,7 @@
 {
   "@date.long": "2006年1月2日",
   "@date.short": "%d月%d日",
-  "@palette.analyze": "ファイルを再解析",
+  "@palette.analyze": "もう一度チェック",
   "@palette.changes": "変更内容",
   "@palette.cli": "archoコマンドを実行",
   "@palette.details": "詳細",

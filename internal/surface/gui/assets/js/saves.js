@@ -270,7 +270,7 @@ function build() {
   // narrows the tree, and shows when saves come from two or more configs or packs
   if (!(p.owners || []).includes(X.owner)) X.owner = "";
   if (p.owners?.length) {
-    const sel = choiceControl(T("whose saves"), [{ value: "", label: T("all Game Configs") }, ...p.owners.map((o) => ({ value: o, label: o }))], X.owner);
+    const sel = choiceControl(T("whose saves"), [{ value: "", label: T("all games") }, ...p.owners.map((o) => ({ value: o, label: o }))], X.owner);
     sel.classList.add("sv-owner-filter");
     sel.onchange = () => { X.owner = sel.value; drawLeft(); };
     treeHead.append(sel);
@@ -515,7 +515,7 @@ function drawMid(keep) {
   add(T("rename"), "rename", () => startRename(), "F2", locked || noFile);
   add(T("copy"), "copy", () => copySave(), "", noFile);
   add(T("back up"), "backup", () => askFiles("backup"), "", noFile);
-  if (d.newList) add(T("make a list"), "new-list", () => newList(d, false), "", "", "new-plan").title = d.newList.command;
+  if (d.newList) add(T("make a list"), "new-list", () => newList(d, false), "", "", "new-plan");
   if (!noFile) chooseButton(d, false, add);
   const rec = add(T("recycle…"), "recycle", () => askFiles("recycle"), "", locked || noFile);
   rec.classList.add("danger");
@@ -676,7 +676,7 @@ function fixButton(d, f, primary) {
     recycle: "recycle", "new-list": "new-plan", "new-list-analyse": "new-plan" }[f.action] || "";
   const b = button(f.label, "", () => runFix(d, f), primary ? "primary small" : "small sv-fix", env);
   b.dataset.key = "fix-" + f.action + "-" + (f.target || "");
-  b.title = f.action === "switch" ? T("make this game and list current, then open the Launch page") : f.command;
+  if (f.action === "switch") b.title = T("make this game and list current, then open the Launch page");
   if (f.action === "recycle" && d.locked) { b.disabled = true; b.title = d.locked; }
   return b;
 }
@@ -1395,7 +1395,7 @@ function chooseButton(d, colony, add) {
   const b = add(label, "choose-" + kind, () => choose(d, colony, on), "", "", "save-choice");
   b.setAttribute("aria-pressed", String(on));
   b.title = on ? T("press to check the last loaded save again")
-    : colony ? T("Can it run checks this colony's newest save, for the current Game Config") : T("Can it run checks this save, for the current Game Config");
+    : colony ? T("Can it run checks this colony's newest save, for the current game") : T("Can it run checks this save, for the current game");
   return b;
 }
 

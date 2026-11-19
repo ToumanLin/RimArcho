@@ -8,7 +8,7 @@
   "use here this time": "本次在这里运行",
   "Steam can replace or delete this folder; self-update is unavailable this session.": "Steam 可能替换或删除此目录；本次运行无法自更新。",
   "managed folders": "托管目录",
-  "Where should RimArcho keep SteamCMD, downloaded Mods and tools?": "RimArcho 应将 SteamCMD、下载的 Mod 和工具存放在哪里？",
+  "Where should RimArcho keep its downloads?": "RimArcho 下载的东西放在哪里？",
   "use this folder": "使用此目录",
   "import from RimSort, RimCrow or RimPy": "从 RimSort、RimCrow 或 RimPy 导入",
   "looking for RimSort, RimCrow and RimPy…": "正在查找 RimSort、RimCrow 和 RimPy…",
@@ -65,7 +65,7 @@
   "tag colours: %d": "标签颜色：%d",
   "first-run guide": "首次使用引导",
   "first-run guide (preview)": "首次使用引导（预览）",
-  "see what a new player sees; nothing you choose there is saved": "看看新玩家第一次打开时看到的样子；在里面做的选择都不会保存",
+  "nothing you choose is saved": "选择不会保存",
   "preview…": "预览…",
   "a preview of the first run: nothing you choose here is saved": "这是首次使用的预览：在这里做的选择都不会保存",
   "end the preview": "结束预览",
@@ -84,5 +84,6 @@
   "copied; Game Config %s added": "复制完成，已添加游戏配置 %s",
   "the copy did not finish": "复制没有完成",
   "copying the game…": "正在复制游戏…",
-  "copy the game folder…": "复制游戏文件夹…"
+  "copy the game folder…": "复制游戏文件夹…",
+  "Reading your Mods…": "正在读取你的 Mod…"
 }

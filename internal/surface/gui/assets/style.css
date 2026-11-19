@@ -629,6 +629,7 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 @keyframes need-flash { 0%, 35% { background: var(--accent-soft); } 100% { background: transparent; } }
 .need .ev-line .src { overflow-wrap: anywhere; min-width: 0; }
 .ev-line .src + .src { margin-left: 4px; } /* 8px gap + 4px: the 12px between facts (16 §7.3) */
+.ev-info { flex: none; color: var(--muted); cursor: help; }
 .ev-chip { flex: none; line-height: 16px; padding: 0 6px; border-radius: var(--r-sm); background: var(--pill); color: var(--fg-2); font-size: 12px; }
 .ev-chip.log { color: var(--log); }
 .ev-chip.community { color: var(--accent-11, var(--accent)); }

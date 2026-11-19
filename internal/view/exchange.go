@@ -431,7 +431,7 @@ func ExportFormats(a *app.App) []ExportFormat {
 	}
 	base += "-" + a.Now().In(a.Loc).Format("20060102")
 	return []ExportFormat{
-		{app.FormatArcho, T("RimArcho list"), T("each mod with its version: whoever imports it sees which of theirs match"), base + ".archolist.json", false},
+		{app.FormatArcho, T("RimArcho list"), T("for RimArcho users"), base + ".archolist.json", false},
 		{app.FormatRimSort, "RimSort", T("a ModsConfig-style XML that RimSort imports"), base + ".xml", false},
 		{app.FormatRML, T("RimWorld (.rml)"), T("the game's own saved mod list; RimCrow reads it too"), base + ".rml", false},
 		{app.FormatRimCrowXML, "RimCrow", T("RimCrow's ModList.xml"), base + "-ModList.xml", false},

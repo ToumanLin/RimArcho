@@ -144,7 +144,7 @@ func TestBuildHome(t *testing.T) {
 	}
 	n.Never = false
 	h = view.BuildHome(e.App, b, n, plans, packs)
-	if r := h.Rows[0]; r.State != "1 problems break the game" || r.Level != view.LevelBad {
+	if r := h.Rows[0]; r.State != "1 problem breaks the game" || r.Level != view.LevelBad {
 		t.Fatalf("plan state %+v", r)
 	}
 	if r := h.Rows[2]; r.State != "checked when created" || r.Level != view.HomeOK {
