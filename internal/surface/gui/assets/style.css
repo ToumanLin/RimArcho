@@ -838,17 +838,14 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .skel .bar { position: relative; overflow: hidden; height: 10px; border-radius: var(--r-sm); background: var(--pill); }
 .skel .bar::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--fg) 7%, transparent), transparent); transform: translateX(-100%); animation: shimmer 1.2s ease-in-out infinite; }
 @keyframes shimmer { to { transform: translateX(100%); } }
-/* Archo's figure (16 §7.1): a still that fades in, and the live canvas cross-fading over it.
-   The "wide" framing holds her whole width, so nothing cuts her at the sides; she ends at
-   the bottom only, softly here or behind a card's top edge in the guide. */
-.archo-slot { position: relative; flex: none; width: var(--archo-size, 120px); aspect-ratio: 325 / 263; opacity: 0; transform: translateY(4px);
+/* Archo's figure (16 §7.1): a still that fades in, replaced by its loop (one <img>).
+   The framing holds her whole width, so nothing cuts her at the sides; she ends at the
+   bottom only, softly here or behind a card's top edge in the guide. */
+.archo-slot { position: relative; flex: none; width: var(--archo-size, 140px); aspect-ratio: 50 / 33; opacity: 0; transform: translateY(4px);
   transition: opacity var(--t-enter) var(--ease), transform var(--t-enter) var(--ease); pointer-events: none; user-select: none;
   mask-image: linear-gradient(to bottom, #000 78%, transparent); }
 .archo-slot.on { opacity: 1; transform: none; }
-.archo-slot > img, .archo-slot > canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; }
-.archo-slot > canvas { opacity: 0; transition: opacity var(--t-layout) var(--ease); }
-.archo-slot.live > canvas { opacity: 1; }
-.archo-slot.live > img { opacity: 0; transition: opacity var(--t-layout) var(--ease) 80ms; }
+.archo-slot > img { position: absolute; inset: 0; width: 100%; height: 100%; }
 /* a loading card: the figure on the left, a usage tip and three lines on the right */
 /* the placeholder shows only once a read has taken 0.21 s, with Archo and the tip; a faster
    page fades in straight from the empty page (screens.js page) */
@@ -866,14 +863,14 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 #boot.out { animation: boot-out var(--t-exit) var(--ease) forwards; }
 @keyframes boot-in { to { opacity: 1; } }
 @keyframes boot-out { from { opacity: 1; } to { opacity: 0; } }
-#boot .archo-slot { --archo-size: 176px; opacity: 1; transform: none; }
+#boot .archo-slot { --archo-size: 200px; opacity: 1; transform: none; }
 .boot-tip { max-width: 440px; min-height: 3em; margin: 0; text-align: center; line-height: 1.5; color: var(--muted); opacity: 0; transition: opacity var(--t-enter) var(--ease); }
 .boot-tip.on { opacity: 1; }
 /* the first-run guide: the steps and Archo share one row above the card; she stands behind
    the card, whose top edge hides her below the shoulders */
 .guide-top { display: flex; align-items: flex-end; gap: 16px; padding-top: 8px; }
 .guide-lead { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; }
-.guide-archo { --archo-size: 156px; margin: 0 20px calc(-1 * var(--card-gap) - 26px) 0; mask-image: none; }
+.guide-archo { --archo-size: 176px; margin: 0 20px calc(-1 * var(--card-gap) - 10px) 0; mask-image: none; }
 .guide-top + .guide-card { position: relative; }
 .guide .folder-row { margin-top: 0; }
 .guide .folder-space { margin-top: 8px; font-size: 12px; }

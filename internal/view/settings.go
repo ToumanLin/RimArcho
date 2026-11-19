@@ -309,7 +309,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		gpu,
 		{Label: T("Archo animation"), Value: cmds.Setting(a, "ui.archo.motion"), Edit: "segments",
 			Choices: []string{"off", "still", "live"}, ChoiceLabels: []string{T("off"), T("still"), T("animated")},
-			Hover: T("Archo's figure while pages load and in the first-run guide; still uses no GPU"),
+			Hover: T("Archo's figure while pages load and in the first-run guide; still shows one picture per expression"),
 			Argv:  []string{"config", "set", "ui.archo.motion", "{}"}},
 		{Label: T("motion"), Value: cmds.Setting(a, "ui.motion"), Edit: "segments", Choices: cmds.SettingChoices("ui.motion"),
 			ChoiceLabels: []string{T("follow system"), T("reduced")},

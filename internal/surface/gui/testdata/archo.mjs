@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Element, loadModules, flush } from "./dom.mjs";
 
-// Archo's figure (16 §7.1) with a fake clock and no WebGL: the stills, their timing, the
+// Archo's figure (16 §7.1) with a fake clock: the stills, their loops, their timing, the
 // rotation, the off setting and the tips.
-async function setup({ mode = "live", tips = [] } = {}) {
+async function setup({ mode = "live", tips = [], reduce = false } = {}) {
   let now = 0, serial = 0;
   const timers = new Map();
   const store = new Map(mode ? [["ui.archo.motion", mode]] : []);
@@ -18,7 +18,7 @@ async function setup({ mode = "live", tips = [] } = {}) {
     now = until;
   };
   const archo = await loadModules("./archo.js", { "./state.js": { api: { Tips: async () => tips } } }, {
-    document: { createElement: (tag) => Object.assign(new Element(tag), tag === "canvas" ? { getContext: () => null } : {}) },
+    document: { createElement: (tag) => new Element(tag), documentElement: { dataset: reduce ? { motion: "reduced" } : {} } },
     localStorage: { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)) },
     setTimeout: (fn, ms = 0) => { timers.set(++serial, { fn, at: now + ms }); return serial; },
     clearTimeout: (id) => timers.delete(id), setInterval: () => 0, clearInterval() {},
@@ -28,7 +28,7 @@ async function setup({ mode = "live", tips = [] } = {}) {
   return { archo, advance, store, pending: () => timers.size };
 }
 
-test("a wait shows nothing for 0.21 s, then a still; with no hardware WebGL2 it stays a still", async () => {
+test("a wait shows nothing for 0.21 s, then a still, then the expression's loop", async () => {
   const { archo, advance } = await setup();
   const slot = new Element("div");
   const w = archo.archoWait(slot);
@@ -36,11 +36,34 @@ test("a wait shows nothing for 0.21 s, then a still; with no hardware WebGL2 it 
   assert.equal(slot.children.length, 0);
   await advance(1);
   assert.equal(slot.children.length, 1);
-  assert.match(slot.children[0].src, /\/archo\/archo-s\/stills\/\w+@360\.webp$/);
   assert.ok(slot.classList.contains("on"));
-  assert.ok(!slot.classList.contains("live"));
+  assert.equal(slot.children[0].src, `/archo/archo-s/anim/${w.expr}.webp`);
   w.end();
   assert.ok(!slot.classList.contains("on"));
+});
+
+test("still and reduced motion show only the still", async () => {
+  for (const opts of [{ mode: "still" }, { reduce: true }]) {
+    const { archo, advance } = await setup(opts);
+    const slot = new Element("div");
+    archo.archoWait(slot);
+    await advance(210);
+    assert.match(slot.children[0].src, /\/archo\/archo-s\/stills\/\w+@360\.webp$/);
+  }
+});
+
+test("a figure at rest plays its loop three times, then rests on the still; a new expression plays again", async () => {
+  const { archo, advance } = await setup();
+  const slot = new Element("div");
+  const f = archo.archoFigure(slot, "wink");
+  await flush(); await flush(); await flush();
+  assert.match(slot.children[0].src, /anim\/wink\.webp$/);
+  await advance(3 * 2160);
+  assert.match(slot.children[0].src, /stills\/wink@360\.webp$/);
+  f.set("salute");
+  await flush(); await flush(); await flush();
+  assert.match(slot.children[0].src, /anim\/salute\.webp$/);
+  f.end();
 });
 
 test("a wait that ends within 0.21 s leaves no timers and no image", async () => {
@@ -87,7 +110,7 @@ test("a figure shows its expression at once and changes it on set", async () => 
   assert.match(slot.children[0].src, /wink@360/);
   f.set("salute");
   await flush();
-  assert.match(slot.children[0].src, /salute@360/);
+  assert.match(slot.children[0].src, /salute/);
   f.end();
 });
 

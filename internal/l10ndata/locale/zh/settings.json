@@ -1,7 +1,7 @@
 {
   "%s free of %s": "%s 可用，共 %s",
   "Archo animation": "Archo 动画",
-  "Archo's figure while pages load and in the first-run guide; still uses no GPU": "页面加载和首次使用引导中的 Archo 形象；静态模式不使用 GPU",
+  "Archo's figure while pages load and in the first-run guide; still shows one picture per expression": "页面加载和首次使用引导中的 Archo 形象；静态模式每个表情只显示一张图",
   "still": "静态",
   "animated": "动态",
   "motion": "动态效果",

@@ -7,7 +7,7 @@
   let mode = "live", turn = 0;
   try { mode = localStorage.getItem("ui.archo.motion") || "live"; turn = +localStorage.getItem("archo.turn") || 0; } catch { /* defaults */ }
   if (mode === "off") { box.remove(); return; }
-  const pool = ["neutral", "smile", "laugh", "wink", "think", "ponder", "yum"];
+  const pool = ["neutral", "smug", "laugh", "wink", "think", "ponder", "yum"];
   const expr = pool[turn % pool.length];
   try { localStorage.setItem("archo.turn", (turn + 1) % 1000); } catch { /* storage can be off */ }
   const img = new Image();
