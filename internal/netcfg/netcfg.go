@@ -1,14 +1,11 @@
 // Package netcfg routes RimArcho's own HTTP requests (17 §2.2): through a proxy (the
-// environment's or the Windows system proxy by default) and, for GitHub, through a mirror
-// first. Install wraps http.DefaultTransport once per process, so every client without a
-// transport of its own follows the settings; Configure changes them at any time.
+// environment's or the Windows system proxy by default), with fallback to direct, to a
+// local proxy and, for GitHub, to mirrors. Install wraps http.DefaultTransport once per
+// process, so every client without a transport of its own follows the settings.
 package netcfg
 
 import (
-	"context"
-	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -20,18 +17,36 @@ import (
 
 // Settings are the two network settings (config network.proxy, network.github_mirror).
 type Settings struct {
-	// Proxy: "system" (default: HTTPS_PROXY / HTTP_PROXY, then the Windows system proxy),
-	// "off" (direct), or a proxy URL such as http://127.0.0.1:7890 or socks5://127.0.0.1:7891.
+	// Proxy: "system" (default: HTTPS_PROXY / HTTP_PROXY, then the Windows system proxy,
+	// with fallback to direct and to a local proxy), "off" (direct only), or a proxy URL
+	// such as http://127.0.0.1:7890 or socks5://127.0.0.1:7891 (that proxy only).
 	Proxy string
-	// Mirror: "" (direct) or a GitHub mirror, either a prefix the full URL is appended to
+	// Mirror: "" or "auto" (default: GitHub first, then the built-in mirrors), "off" (never a
+	// mirror), or one mirror tried before GitHub: a prefix the full URL is appended to
 	// (https://gh-proxy.org/) or a template with {url}.
 	Mirror string
 }
 
+// mirrors is the mirror list for these settings and whether the player chose it.
+func (s Settings) mirrors() (list []string, explicit bool) {
+	switch m := strings.TrimSpace(s.Mirror); m {
+	case "", "auto":
+		return AutoMirrors, false
+	case "off":
+		return nil, false
+	default:
+		return []string{m}, true
+	}
+}
+
 var cur atomic.Pointer[Settings]
 
-// Configure sets the settings for every request that follows.
-func Configure(s Settings) { cur.Store(&s) }
+// Configure sets the settings for every request that follows. A change forgets the
+// routes remembered under the old settings.
+func Configure(s Settings) {
+	cur.Store(&s)
+	resetMemory()
+}
 
 func current() Settings {
 	if s := cur.Load(); s != nil {
@@ -51,74 +66,12 @@ func Install() {
 	})
 }
 
-// New wraps base: its proxy follows the settings, and GitHub requests try the mirror first.
+// New wraps base: its proxy follows the settings, and a failed request falls back to the
+// next route (fallback.go).
 func New(base *http.Transport) http.RoundTripper {
 	b := base.Clone()
-	b.Proxy = ProxyFor
-	m := b.Clone()
-	// A mirror that does not answer must not hold up the direct request for long.
-	m.ResponseHeaderTimeout = 15 * time.Second
-	return &transport{base: b, mirror: m}
-}
-
-type transport struct{ base, mirror *http.Transport }
-
-func (t *transport) RoundTrip(r *http.Request) (*http.Response, error) {
-	s := current()
-	if s.Mirror != "" && (r.Method == http.MethodGet || r.Method == http.MethodHead) &&
-		(r.Body == nil || r.Body == http.NoBody) && GitHubHost(r.URL.Hostname()) {
-		if u, err := url.Parse(Mirrored(s.Mirror, r.URL.String())); err == nil && u.Host != "" {
-			mr := r.Clone(r.Context())
-			mr.URL, mr.Host = u, ""
-			mr.Header.Del("Authorization")
-			mr.Header.Del("Cookie")
-			resp, err := t.mirror.RoundTrip(mr)
-			if err == nil && resp.StatusCode < 400 {
-				return resp, nil
-			}
-			if resp != nil {
-				io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
-				resp.Body.Close()
-			}
-			if r.Context().Err() != nil {
-				return nil, r.Context().Err()
-			}
-		}
-	}
-	resp, err := t.base.RoundTrip(r)
-	if err != nil && !errors.Is(err, context.Canceled) && !Loopback(r.URL.Hostname()) {
-		be := &blockedError{err: err, github: GitHubHost(r.URL.Hostname())}
-		if p, _ := ProxyFor(r); p != nil {
-			be.proxy = p.Host
-		}
-		err = be
-	}
-	return resp, err
-}
-
-// blockedError adds what the player can set when a site cannot be reached.
-type blockedError struct {
-	err    error
-	github bool
-	proxy  string // the proxy the request went through, if any
-}
-
-func (e *blockedError) Error() string {
-	hint := "if this site is blocked on your network, set a proxy in Settings › network (archo config set network.proxy http://127.0.0.1:<port>)"
-	if e.proxy != "" {
-		hint = "through the proxy " + e.proxy + "; check that it runs, or change it in Settings › network (network.proxy)"
-	}
-	if e.github {
-		hint += " or a GitHub mirror (network.github_mirror https://gh-proxy.org/)"
-	}
-	return fmt.Sprintf("%v (%s)", e.err, hint)
-}
-func (e *blockedError) Unwrap() error { return e.err }
-
-// Timeout keeps url.Error's Timeout answer.
-func (e *blockedError) Timeout() bool {
-	var t interface{ Timeout() bool }
-	return errors.As(e.err, &t) && t.Timeout()
+	b.Proxy = routeProxy
+	return &transport{base: b}
 }
 
 // githubHosts are the GitHub hosts mirrors serve: pages and releases, raw files, release
@@ -131,6 +84,31 @@ var githubHosts = map[string]bool{
 
 // GitHubHost reports whether a mirror is tried for host.
 func GitHubHost(host string) bool { return githubHosts[strings.ToLower(host)] }
+
+// steamDomains are Steam's own hosts and their subdomains: the Community and Workshop
+// pages, the Web API, the store and the CDNs for previews and downloads. Game
+// accelerators (UU, Xiaoheihe, Watt Toolkit) speed these up below HTTP, so they
+// go direct first (17 §2.2).
+var steamDomains = []string{"steamcommunity.com", "steampowered.com", "steamstatic.com",
+	"steamcontent.com", "steamusercontent.com", "steamserver.net", "steamgames.com"}
+
+// steamAkamai are Steam's CDN names on akamaihd.net (not the whole domain).
+var steamAkamai = map[string]bool{"steamcdn-a.akamaihd.net": true, "steamuserimages-a.akamaihd.net": true,
+	"steamcommunity-a.akamaihd.net": true, "steamstore-a.akamaihd.net": true}
+
+// SteamHost reports whether host is one of Steam's: direct first, then a proxy.
+func SteamHost(host string) bool {
+	host = strings.TrimSuffix(strings.ToLower(host), ".")
+	if steamAkamai[host] {
+		return true
+	}
+	for _, d := range steamDomains {
+		if host == d || strings.HasSuffix(host, "."+d) {
+			return true
+		}
+	}
+	return false
+}
 
 // Mirrored is target through mirror m: {url} replaced, or the target appended to the prefix.
 func Mirrored(m, target string) string {
@@ -145,12 +123,12 @@ func Mirrored(m, target string) string {
 
 // CheckMirror checks a network.github_mirror value.
 func CheckMirror(v string) error {
-	if v == "" {
+	if v == "" || v == "auto" || v == "off" {
 		return nil
 	}
 	u, err := url.Parse(strings.Replace(v, "{url}", "x", 1))
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
-		return fmt.Errorf("network.github_mirror must be empty (direct) or an http(s) prefix such as https://gh-proxy.org/ or a template with {url}")
+		return fmt.Errorf("network.github_mirror must be auto, off, an http(s) prefix such as https://gh-proxy.org/ or a template with {url}")
 	}
 	return nil
 }
@@ -194,7 +172,8 @@ func Loopback(host string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
-// ProxyFor is the transport's proxy function.
+// ProxyFor is the proxy a request starts with: the setting's, or for system the
+// environment's or the Windows system proxy unless that one was just found not running.
 func ProxyFor(r *http.Request) (*url.URL, error) {
 	if Loopback(r.URL.Hostname()) {
 		return nil, nil
@@ -203,16 +182,20 @@ func ProxyFor(r *http.Request) (*url.URL, error) {
 	case "off":
 		return nil, nil
 	case "", "system":
-		if u, err := http.ProxyFromEnvironment(r); u != nil || err != nil {
-			return u, err
+		u, err := http.ProxyFromEnvironment(r)
+		if u == nil && err == nil {
+			u, err = systemProxy(r.URL)
 		}
-		return systemProxy(r.URL)
+		if u != nil && proxyDead(u) {
+			return nil, nil
+		}
+		return u, err
 	default:
 		return proxyURL(p)
 	}
 }
 
-// Describe says which proxy a request to target would use, for the settings page.
+// Describe says which proxy a request to target would start with, for the settings page.
 func Describe(target string) string {
 	u, _ := url.Parse(target)
 	if u == nil {

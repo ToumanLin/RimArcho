@@ -62,5 +62,6 @@
   "copy the game": "ゲームをコピー",
   "the copy was stopped": "コピーを停止しました",
   "The download didn't finish.": "ダウンロードが完了しませんでした。",
-  "see why": "理由を見る"
+  "see why": "理由を見る",
+  "reached %s %s": "%[1]s へは%[2]s"
 }

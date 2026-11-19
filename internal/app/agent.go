@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/netcfg"
 	"github.com/ToumanLin/RimArcho/internal/secret"
 	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 )
@@ -162,7 +163,8 @@ func AgentZipName(version, goos, goarch string) string {
 
 // CheckAgent returns the latest published bundle (nil when its assets are missing).
 func (a *App) CheckAgent(ctx context.Context) (*selfupdate.Release, error) {
-	r, err := a.agentClient().Latest(ctx, false)
+	// Release metadata never comes through an automatic mirror (17 §2.2, §5.1).
+	r, err := a.agentClient().Latest(netcfg.WithoutAutoMirror(ctx), false)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +197,13 @@ func (a *App) InstallAgent(ctx context.Context, zipPath string, step func(phase 
 			return m, nil
 		}
 		step("download", 0)
-		zipPath, err = a.agentClient().Download(ctx, r, filepath.Join(base, "download"), func(done, total int64) {
+		// The checksum comes without an automatic mirror; the zip may come through one
+		// and must match it (17 §2.2).
+		sum, err := a.agentClient().Checksum(netcfg.WithoutAutoMirror(ctx), r)
+		if err != nil {
+			return AgentManifest{}, err
+		}
+		zipPath, err = a.agentClient().DownloadWithChecksum(ctx, r, filepath.Join(base, "download"), sum, func(done, total int64) {
 			if total > 0 {
 				step("download", float64(done)/float64(total))
 			}

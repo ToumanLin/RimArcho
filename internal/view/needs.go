@@ -16,6 +16,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/finding"
 	"github.com/ToumanLin/RimArcho/internal/identity"
+	"github.com/ToumanLin/RimArcho/internal/netcfg"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
@@ -1561,6 +1562,14 @@ var idRe = regexp.MustCompile(`#[0-9a-z]{3,8}\b`)
 // Humanize replaces instance references by mod names and drops the "error: " prefix.
 func Humanize(st *app.LoadoutState, s string) string {
 	s = Text(strings.TrimPrefix(strings.TrimSpace(s), "error: "))
+	// A Steam host no route reached (17 §2.2): the advice in the player's words, then the cause.
+	if i := strings.Index(s, netcfg.SteamHint); i >= 0 {
+		cause := s[:i]
+		if j := strings.LastIndex(cause, " ("); j >= 0 {
+			cause = cause[:j]
+		}
+		s = T("Steam could not be reached. If you use a game accelerator (UU, Xiaoheihe, Watt Toolkit), turn on its Steam Community acceleration, or set a proxy in Settings › network") + "  " + strings.TrimSpace(cause)
+	}
 	if st == nil {
 		return s
 	}

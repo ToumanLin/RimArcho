@@ -111,10 +111,11 @@ var freeKeys = map[string]struct {
 		return nil
 	}},
 	// 17 §2.2: RimArcho's own requests. system: HTTPS_PROXY / HTTP_PROXY, then the Windows
-	// system proxy; off; or a proxy URL.
+	// system proxy, falling back to direct and to a local proxy; off; or a proxy URL.
 	"network.proxy": {"system", netcfg.CheckProxy},
-	// a GitHub mirror tried before GitHub itself; "" is direct
-	"network.github_mirror": {"", netcfg.CheckMirror},
+	// auto: GitHub, then the built-in mirrors; off: never a mirror; or one mirror tried
+	// first. "" (never set, or cleared) is auto.
+	"network.github_mirror": {"auto", netcfg.CheckMirror},
 	// Archo Agent's model (15 §7.2); the API key is not a setting (archo agent key)
 	"agent.base_url": {"", app.CheckAgentBaseURL},
 	"agent.model": {"", func(v string) error {
@@ -187,7 +188,7 @@ var agentSettingsUsage = map[bool]string{true: "agent.api: openai-completions|an
 
 func init() {
 	register(&Command{Name: "config get", Args: "[<key>]", Summary: "show settings", MaxArgs: 1, Run: configGetCmd})
-	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (" + agentSettingsUsage + "local.dir: unused managed-folder root; updates.source: auto|github; updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris or a #rrggbb colour; ui.icons: compat|nerd; ui.mouse: on|off; ui.tui.theme: auto|dark|light; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; ui.archo.motion: off|still|live; ui.motion: auto|reduced; ui.zoom: 100|110|125|150 (the window's interface size in percent); tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; network.proxy: system|off|a proxy URL; network.github_mirror: empty or a mirror prefix such as https://gh-proxy.org/)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
+	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (" + agentSettingsUsage + "local.dir: unused managed-folder root; updates.source: auto|github; updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris or a #rrggbb colour; ui.icons: compat|nerd; ui.mouse: on|off; ui.tui.theme: auto|dark|light; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; ui.archo.motion: off|still|live; ui.motion: auto|reduced; ui.zoom: 100|110|125|150 (the window's interface size in percent); tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; network.proxy: system|off|a proxy URL; network.github_mirror: auto|off or a mirror prefix such as https://gh-proxy.org/)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
 }
 
 // ConfigValue returns a setting, or its default.
