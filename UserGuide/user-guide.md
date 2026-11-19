@@ -877,8 +877,8 @@ Apart from those requested actions it does not change Mods' files. Your Mods, sa
 
 | Folder | Contains |
 | --- | --- |
-| `%APPDATA%\RimArcho\` | The database (lists, history, tags, rules), settings, caches, logs, the source library, packs and backups by default |
-| `%LOCALAPPDATA%\RimArcho\` (or the folder you chose) | Locked copies, Archo Monitor, subscriptions, SteamCMD and its downloads, tools, account sessions |
+| `%APPDATA%\RimArcho\` | The database (lists, history, tags, rules), settings, caches, logs and backups (an install from before 1.1 also keeps its source library and packs here) |
+| `%LOCALAPPDATA%\RimArcho\` (or the folder you chose) | Locked copies, Archo Monitor, subscriptions, SteamCMD and its downloads, tools, account sessions, and the source library and packs of installs since 1.1 |
 | The program folder | `RimArcho.exe`, `archo.exe`, docs, the bundled Monitor and agent skills |
 
 ### Backups

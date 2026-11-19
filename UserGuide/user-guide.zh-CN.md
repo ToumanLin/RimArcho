@@ -877,8 +877,8 @@ archo test run --map
 
 | 文件夹 | 内容 |
 | --- | --- |
-| `%APPDATA%\RimArcho\` | 数据库（列表、历史、标签、规则）、设置、缓存、日志；源码库、整合包和备份默认也在这里 |
-| `%LOCALAPPDATA%\RimArcho\`（或你选择的文件夹） | 锁定副本、Archo Monitor、订阅、SteamCMD 及其下载、工具、账户会话 |
+| `%APPDATA%\RimArcho\` | 数据库（列表、历史、标签、规则）、设置、缓存、日志和备份（1.1 之前的安装，源码库和整合包也仍在这里） |
+| `%LOCALAPPDATA%\RimArcho\`（或你选择的文件夹） | 锁定副本、Archo Monitor、订阅、SteamCMD 及其下载、工具、账户会话；1.1 起新安装的源码库和整合包也在这里 |
 | 程序文件夹 | `RimArcho.exe`、`archo.exe`、文档、自带的 Monitor 和 agent 技能 |
 
 ### 备份

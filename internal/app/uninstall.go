@@ -472,7 +472,7 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 	// 5. packs: kept where they are, or moved out of the data folder, or to the recycle bin
 	var packs []*UninstallItem
 	packsDir := a.PacksDir()
-	inHome := source.Within(packsDir, a.Home)
+	inHome := source.Within(packsDir, a.Home) || source.Within(packsDir, p.Local)
 	p.PacksTo = o.PacksTo
 	if p.PacksTo == "" {
 		p.PacksTo = a.DefaultPacksTo()
@@ -889,7 +889,7 @@ func (a *App) Uninstall(o UninstallOptions, progress func(UninstallProgress)) (*
 		case UnMonitor:
 			removeIfEmpty(a.MonitorDir())
 		case UnPacks:
-			if o.RemovePacks || source.Within(a.PacksDir(), a.Home) {
+			if o.RemovePacks || source.Within(a.PacksDir(), a.Home) || source.Within(a.PacksDir(), a.LocalDir()) {
 				removeIfEmpty(a.PacksDir())
 			}
 		}

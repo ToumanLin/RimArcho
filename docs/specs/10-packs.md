@@ -7,7 +7,7 @@ A pack **builds** a plan into a fixed artifact. Each Mod is locked to its Instan
 
 ## 1. Data
 
-**Location.** A pack lives at `<pack directory>/<pack name>/`. The pack directory is set by `pack.dir` (`archo config set pack.dir <path>`) and defaults to `<data directory>/packs`.
+**Location.** A pack lives at `<pack directory>/<pack name>/`. The pack directory is set by `pack.dir` (`archo config set pack.dir <path>`) and defaults to `packs` in RimArcho's local folder (`%LOCALAPPDATA%\RimArcho\packs` on Windows, `app.LocalDir()`, 17 §3). A home from before 1.1 that had `<data directory>/packs` keeps it as its `pack.dir` (store schema 42); nothing is moved. Import and export read and write the pack directory, wherever it is.
 
 **Pack names** may contain letters, digits, spaces, `.`, `_` and `-`. The first character must be a letter or digit. The maximum length is 64 characters, and the name must not end in a dot or space.
 

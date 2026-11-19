@@ -251,7 +251,7 @@ next:
 $ archo saves index Rimward
 Rimward matches 2 saves; pick one
   sv:<Rimward.rws>  Iron Pact/Rimward  $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Rimward.rws
-  sv:<pack:Rimward.rws>  Rimward/Rimward    $ROOT/ArchoHome/packs/P1/userdata/Saves/Rimward.rws
+  sv:<pack:Rimward.rws>  Rimward/Rimward    $ROOT/LocalAppData/RimArcho/packs/P1/userdata/Saves/Rimward.rws
 next:
   archo saves show sv:<Rimward.rws>
   archo saves show sv:<pack:Rimward.rws>

@@ -124,12 +124,13 @@ type PackEntry struct {
 	GitHead         string   `json:"git_head,omitempty"` // observed fingerprint, not Git subscription provenance
 }
 
-// PacksDir is where packs are kept: config pack.dir, else <data>/packs.
+// PacksDir is where packs are kept: config pack.dir, else <local>/packs (17 §3). Homes from
+// before 1.1 that had <data>/packs keep it as their pack.dir (store schema 42).
 func (a *App) PacksDir() string {
 	if v := a.Store.Meta("cfg:pack.dir"); v != "" {
 		return v
 	}
-	return filepath.Join(a.Home, "packs")
+	return filepath.Join(a.LocalDir(), "packs")
 }
 
 // packNameOK: a letter or digit, then up to 63 letters, digits, spaces and . _ -. Checked

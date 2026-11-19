@@ -38,7 +38,7 @@ func TestPackBuildAndLaunch(t *testing.T) {
 	if out, code := e.Run("pack", "build", "first"); code == 0 || !strings.Contains(out, "not installed: pkg:gone.mod") {
 		t.Fatalf("K2: exit %d\n%s", code, out)
 	}
-	if _, err := os.Stat(filepath.Join(e.Home, "packs", "first")); err == nil {
+	if _, err := os.Stat(filepath.Join(e.App.PacksDir(), "first")); err == nil {
 		t.Fatal("K2: a blocked build wrote a pack")
 	}
 	e.MustRun("disable", "pkg:gone.mod")
@@ -50,7 +50,7 @@ func TestPackBuildAndLaunch(t *testing.T) {
 		t.Fatalf("dry run:\n%s", out)
 	}
 	e.MustRun("pack", "build", "first")
-	dir := filepath.Join(e.Home, "packs", "first")
+	dir := filepath.Join(e.App.PacksDir(), "first")
 	var p app.Pack
 	b, err := os.ReadFile(filepath.Join(dir, "pack.json"))
 	if err != nil || json.Unmarshal(b, &p) != nil {
@@ -168,7 +168,7 @@ func TestPackExportImport(t *testing.T) {
 		t.Fatalf("remove: %v", trashed)
 	}
 	e.MustRun("pack", "import", full)
-	if _, err := os.Stat(filepath.Join(e.Home, "packs", "first", "mods")); err != nil {
+	if _, err := os.Stat(filepath.Join(e.App.PacksDir(), "first", "mods")); err != nil {
 		t.Fatal("unpacked pack has no mods")
 	}
 	if _, code := e.Run("pack", "import", full); code == 0 {

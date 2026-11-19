@@ -139,7 +139,7 @@ func TestUninstallWorkerFinishesWithoutTerminal(t *testing.T) {
 	e, _ := fixture(t)
 	m := direct(t, e, 140, 40)
 	for i := 0; i < 20; i++ {
-		e.WriteFile(filepath.Join(e.Home, "packs", fmt.Sprintf("synthetic-%d", i), "pack.json"), `{ "format":1,"entries":[] }`)
+		e.WriteFile(filepath.Join(e.App.PacksDir(), fmt.Sprintf("synthetic-%d", i), "pack.json"), `{ "format":1,"entries":[] }`)
 	}
 	e.App.AfterExitFunc = func(app.AfterExit) error { return nil }
 	m.startUninstall(app.UninstallOptions{})
@@ -188,7 +188,7 @@ func TestUninstallReviewsQuotedDestination(t *testing.T) {
 	e, _ := fixture(t)
 	m := direct(t, e, 140, 40)
 	destination := filepath.Join(e.Root, "synthetic kept packs")
-	e.WriteFile(filepath.Join(e.Home, "packs", "synthetic", "pack.json"), `{ "format":1,"entries":[] }`)
+	e.WriteFile(filepath.Join(e.App.PacksDir(), "synthetic", "pack.json"), `{ "format":1,"entries":[] }`)
 	m.uninstallPanel()
 	m.uninstallPrompt()
 	typeIn(m, `uninstall --packs-to "`+destination+`"`)

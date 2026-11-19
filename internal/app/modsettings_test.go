@@ -65,7 +65,7 @@ func TestPackSettingsFollowTheMod(t *testing.T) {
 	e.MustRun("enable", "pkg:tester.versions")
 	e.MustRun("save")
 	e.MustRun("pack", "build", "first")
-	dir := filepath.Join(e.Home, "packs", "first")
+	dir := filepath.Join(e.App.PacksDir(), "first")
 	var p app.Pack
 	if err := json.Unmarshal([]byte(readFile(t, filepath.Join(dir, "pack.json"))), &p); err != nil {
 		t.Fatal(err)

@@ -175,7 +175,7 @@ func (a *App) managedDirectory(id string) (*ManagedDirectory, error) {
 
 func (a *App) validateDirectory(d *ManagedDirectory, path string) error {
 	if d.ID == "packs" || d.ID == "source" {
-		// These managed directories default to their own child of Home.
+		// Homes from before 1.1 keep these as their own child of Home (store schema 42).
 		if directoriesOverlap(path, a.Home) && env.PathKey(path) != env.PathKey(filepath.Join(a.Home, d.ID)) {
 			return fmt.Errorf("the %s directory overlaps the data directory", d.ID)
 		}

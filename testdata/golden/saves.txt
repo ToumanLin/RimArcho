@@ -288,7 +288,7 @@ moved to the recycle bin: 1 save, 425 B
 
 $ archo saves show Tundra
 Tundra matches 2 saves; pick one
-  sv:<pack:Tundra.rws>  Tundra/Tundra  $ROOT/ArchoHome/packs/P1/userdata/Saves/Tundra.rws
+  sv:<pack:Tundra.rws>  Tundra/Tundra  $ROOT/LocalAppData/RimArcho/packs/P1/userdata/Saves/Tundra.rws
   sv:<Tundra.rws>  Tundra/Tundra  $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Tundra.rws
 next:
   archo saves show sv:<pack:Tundra.rws>
@@ -308,7 +308,7 @@ next:
   archo saves show sv:<pack:Tundra.rws>
 
 $ archo saves fix sv:<pack:Tundra.rws>
-error: Tundra is a save of pack P1; a pack's list does not change (loadout import $ROOT/ArchoHome/packs/P1/userdata/Saves/Tundra.rws --new makes a list from it)
+error: Tundra is a save of pack P1; a pack's list does not change (loadout import $ROOT/LocalAppData/RimArcho/packs/P1/userdata/Saves/Tundra.rws --new makes a list from it)
 [exit 1]
 
 $ archo saves list

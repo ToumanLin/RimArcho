@@ -198,13 +198,13 @@ moved to the recycle bin
   folder: $ROOT/Steam/steamapps/workshop/content/294100/4200
 
 > manage_packs {"action":"list"}
-packs: 0 ($ROOT/ArchoHome/packs)
+packs: 0 ($ROOT/LocalAppData/RimArcho/packs)
 next:
   archo pack build <name>
 
 > manage_packs {"action":"build","dry_run":true,"name":"first"}
 pack build: dry run, nothing written
-  folder: $ROOT/ArchoHome/packs/first
+  folder: $ROOT/LocalAppData/RimArcho/packs/first
   mods: 2 carried, 1 from the game (Core and DLCs)
   size: 868 B; 0 B of other game versions left out
   space: <free> free on the packs drive
@@ -216,7 +216,7 @@ next:
 
 > manage_packs {"action":"build","dry_run":true,"name":"first","texture_scale":50}
 pack build: dry run, nothing written
-  folder: $ROOT/ArchoHome/packs/first
+  folder: $ROOT/LocalAppData/RimArcho/packs/first
   mods: 2 carried, 1 from the game (Core and DLCs)
   size: 868 B; 0 B of other game versions left out
   space: <free> free on the packs drive
@@ -236,7 +236,7 @@ error: todds (the DDS encoder) is not installed; archo textures tool --install d
 
 > manage_packs {"action":"build","name":"first"}
 built pack first
-  folder: $ROOT/ArchoHome/packs/first
+  folder: $ROOT/LocalAppData/RimArcho/packs/first
   mods: 2 carried, 1 from the game (Core and DLCs)
   size: 868 B; 0 B of other game versions left out
   trimmed: nothing (no folders for other game versions)
@@ -261,9 +261,9 @@ pack launch: dry run, nothing written
     + !ArchoPack_first_2009463077
   from Mods/: 1 mods: the same version is already in Mods/, so the pack's copy is not linked next to it
     A
-  list: $ROOT/ArchoHome/packs/first/userdata/Config/ModsConfig.xml (3 entries; the Game Config's ModsConfig.xml is not touched)
-  saves: $ROOT/ArchoHome/packs/first/userdata
-  command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe -savedatafolder=$ROOT/ArchoHome/packs/first/userdata -logfile $ROOT/ArchoHome/packs/first/userdata/Player.log
+  list: $ROOT/LocalAppData/RimArcho/packs/first/userdata/Config/ModsConfig.xml (3 entries; the Game Config's ModsConfig.xml is not touched)
+  saves: $ROOT/LocalAppData/RimArcho/packs/first/userdata
+  command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe -savedatafolder=$ROOT/LocalAppData/RimArcho/packs/first/userdata -logfile $ROOT/LocalAppData/RimArcho/packs/first/userdata/Player.log
 
 > manage_packs {"action":"launch","name":"first"}
 pack first: the game is starting
@@ -274,9 +274,9 @@ pack first: the game is starting
     + !ArchoPack_first_2009463077
   from Mods/: 1 mods: the same version is already in Mods/, so the pack's copy is not linked next to it
     A
-  list: $ROOT/ArchoHome/packs/first/userdata/Config/ModsConfig.xml (3 entries; the Game Config's ModsConfig.xml is not touched)
-  saves: $ROOT/ArchoHome/packs/first/userdata
-  command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe -savedatafolder=$ROOT/ArchoHome/packs/first/userdata -logfile $ROOT/ArchoHome/packs/first/userdata/Player.log
+  list: $ROOT/LocalAppData/RimArcho/packs/first/userdata/Config/ModsConfig.xml (3 entries; the Game Config's ModsConfig.xml is not touched)
+  saves: $ROOT/LocalAppData/RimArcho/packs/first/userdata
+  command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe -savedatafolder=$ROOT/LocalAppData/RimArcho/packs/first/userdata -logfile $ROOT/LocalAppData/RimArcho/packs/first/userdata/Player.log
 
 > list_problems {"code":"pack"}
 problems: 0 error, 1 warning, 0 info
@@ -329,13 +329,13 @@ error: no build of "first" is running
 [isError]
 
 > manage_packs {"action":"remove","dry_run":true,"name":"first"}
-dry run: would move $ROOT/ArchoHome/packs/first to the recycle bin
+dry run: would move $ROOT/LocalAppData/RimArcho/packs/first to the recycle bin
 
 > manage_packs {"action":"remove","name":"first"}
-moved $ROOT/ArchoHome/packs/first to the recycle bin
+moved $ROOT/LocalAppData/RimArcho/packs/first to the recycle bin
 
 > manage_packs {"action":"list"}
-packs: 0 ($ROOT/ArchoHome/packs)
+packs: 0 ($ROOT/LocalAppData/RimArcho/packs)
 next:
   archo pack build <name>
 
