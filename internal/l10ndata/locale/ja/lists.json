@@ -337,5 +337,13 @@
   "files modified": "ファイル更新日時",
   "%s already matches the game.": "%s はすでにゲームと同じです。",
   "%s already is this list.": "%s はすでにこのリストと同じです。",
-  "No packs yet. A pack is a frozen copy of a list, with its own saves.": "MODパックはまだありません。MODパックはリストの固定コピーで、専用のセーブを持ちます。"
+  "No packs yet. A pack is a frozen copy of a list, with its own saves.": "MODパックはまだありません。MODパックはリストの固定コピーで、専用のセーブを持ちます。",
+  "something else…": "ほかの方法…",
+  "show": "表示",
+  "a list file, a share code, a pack or another manager": "リストファイル、共有コード、MODパック、ほかのマネージャー",
+  "for a friend": "友だち向け",
+  "for another manager": "ほかのマネージャー向け",
+  "a pack, with the Mod files…": "MODパック（Mod ファイル付き）…",
+  "show the file": "ファイルを表示",
+  "hide the file": "ファイルを隠す"
 }

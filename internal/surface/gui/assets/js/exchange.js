@@ -29,6 +29,8 @@ export function initExchange(u) {
 
 let info = null;
 let firstRun = false;
+// firstMore: the first run's "something else…" opened the whole page (16 §2.15)
+let firstMore = false;
 let pasted = "";
 let session = null;
 let previewSeq = 0;
@@ -62,7 +64,7 @@ export const hintList = () => [...($("#screen .xc-preview")?.dataset.mode === "l
 // current list comes first and is picked, and "skip" ends the guide.
 export async function exchange(first = false) {
   const from = S.screen === "plan-import" ? session?.from : S.screen || "plan";
-  if (S.screen !== "plan-import") firstRun = first && from === "guide";
+  if (S.screen !== "plan-import") { firstRun = first && from === "guide"; firstMore = false; }
   const target = from === "plans" ? ui.selectedList() : S.shell?.plan?.id || 0;
   const read = beginPageRead("plan-import", { replace: true });
   session = { from, target, name: S.shell?.plans?.find(p => p.id === target)?.name || "", epoch: S.screenSeq };
@@ -79,12 +81,24 @@ export async function exchange(first = false) {
   const [inLab, inCard] = sectionCard(T("Bring in"));
   const [mLab, mCard] = sectionCard(T("From another manager"));
   inCard.dataset.src = "in"; mCard.dataset.src = "m";
-  w.append(inLab, inCard, mLab, mCard, resLab, result);
-  area(inCard, inLab); area(mCard, mLab);
+  // the first run shows the game's list and one way to the rest: the other sources are for
+  // players who are not new (16 §2.15)
+  const brief = firstRun && !firstMore;
+  if (brief) w.append(inLab, inCard, resLab, result);
+  else w.append(inLab, inCard, mLab, mCard, resLab, result);
+  area(inCard, inLab); if (!brief) area(mCard, mLab);
   // the export side (C1): share what you have, below bringing things in
   if (!firstRun) { const [sLab, sCard] = sectionCard(T("Share")); shareRows(sCard); w.append(sLab, sCard); area(sCard, sLab); }
   sc.append(w);
   // the rows are filled in on the page: the file row's error watches the result area
+  if (brief) {
+    const more = button(T("show"), "", () => { firstMore = true; exchange(true); });
+    const other = row(T("something else…"), "", more);
+    other.title = T("a list file, a share code, a pack or another manager");
+    inCard.append(gameRow(), other);
+    read.finish(); ui.renderWhere(); ui.renderHints();
+    return;
+  }
   inCard.append(gameRow(), ...listRows(), packRow());
   managerRows(mCard);
   read.finish(); ui.renderWhere(); ui.renderHints();

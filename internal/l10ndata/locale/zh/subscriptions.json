@@ -255,5 +255,7 @@
   "Git submodules are not downloaded.": "不下载 Git 子模块。",
   "Git LFS content is not downloaded; LFS files remain pointers.": "不下载 Git LFS 内容；LFS 文件仍是指针。",
   "Would subscribe through Steam; use SteamCMD only if Steam is unavailable.": "将通过 Steam 订阅；只在 Steam 不可用时用 SteamCMD。",
-  "moved to the recycle bin": "已移到回收站"
+  "moved to the recycle bin": "已移到回收站",
+  "%s is ready": "%s 已就绪",
+  "add to %s": "加到 %s"
 }

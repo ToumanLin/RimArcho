@@ -958,6 +958,10 @@ export async function exportOf(id, from = "plans") {
 export const exportPlan = () => X.id;
 export const exportFrom = () => X.from;
 
+// FRIEND: the export formats for a friend (16 §2.17): a RimArcho list and the share code.
+const FRIEND = ["archo", "rimcrow"];
+const shownFormats = () => [...X.data.formats.filter((f) => FRIEND.includes(f.id)), ...X.data.formats.filter((f) => !FRIEND.includes(f.id))];
+
 async function exportPage() {
   const read = beginPageRead("plan-export");
   if (!X.format) X.format = await api.Setting(FORMAT_KEY).catch(() => "") || "";
@@ -980,25 +984,37 @@ function drawExport() {
   const w = page("plans pm-export", d.lead, button(T("cancel"), "esc", back));
   const grid = el("div", "pm-x");
   const left = el("section", "card pad");
-  left.append(el("div", "pm-sub", T("format")));
+  // two groups (16 §2.17): for a friend (a RimArcho list, a share code, a pack with the files),
+  // then the formats of other managers and the game; one list, so the arrows go through both
   const list = el("div", "fmts");
-  d.formats.forEach((f, i) => {
+  const friend = (f) => FRIEND.includes(f.id);
+  const fmtButton = (f, i) => {
     const b = el("button", "fmt" + (f.id === d.format ? " on" : ""));
     b.setAttribute("aria-pressed", String(f.id === d.format));
     b.append(el("span", "rd"));
     const nm = el("span", "nm", f.name);
     if (i === 0) nm.append(el("small", "", T("recommended")));
     b.append(nm, el("span", "ext", extOf(f)), el("span", "ds", f.desc));
+    b.dataset.id = f.id;
     b.onclick = () => choose(f.id);
-    list.append(b);
-  });
+    return b;
+  };
+  list.append(el("div", "pm-sub", T("for a friend")));
+  d.formats.forEach((f, i) => { if (friend(f)) list.append(fmtButton(f, i)); });
+  const pack = button(T("a pack, with the Mod files…"), "", () => ui.go("packs"), "link");
+  list.append(pack, el("div", "pm-sub", T("for another manager")));
+  d.formats.forEach((f, i) => { if (!friend(f)) list.append(fmtButton(f, i)); });
   left.append(list);
   area(left, null, () => { const on = left.querySelector(".fmt.on"); if (on) on.focus({ preventScroll: true }); });
 
   const right = el("section", "card pad");
   const h = el("div", "pm-sub");
   h.append(el("span", "", T("content")), el("span", "r word-facts", d.facts));
+  // the file itself is for the curious: folded under "show the file" (16 §2.17)
   const pre = el("pre", "prev", d.text);
+  pre.hidden = !X.showFile;
+  const show = button(X.showFile ? T("hide the file") : T("show the file"), "", () => { X.showFile = !X.showFile; drawExport(); }, "link");
+  show.setAttribute("aria-expanded", String(!!X.showFile));
   const out = el("div", "xc-out");
   const acts = el("div", "acts-row");
   const f = fmtOf();
@@ -1021,7 +1037,7 @@ function drawExport() {
     lb.append(cb, el("span", "", T("include Mod settings")), el("span", "xc-hint", note));
     right.append(lb);
   }
-  right.append(pre, acts, out);
+  right.append(acts, out, show, pre);
   area(right, null);
   grid.append(left, right);
   w.append(grid);
@@ -1041,7 +1057,7 @@ async function setSettings(on) {
 async function choose(id) {
   if (id === X.format) return;
   X.format = id;
-  document.querySelectorAll("#screen .fmt").forEach((b, i) => { const on = X.data.formats[i].id === id; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
+  document.querySelectorAll("#screen .fmt").forEach((b) => { const on = b.dataset.id === id; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
   api.SetSetting(FORMAT_KEY, id).catch(() => {});
   let d;
   try { d = await api.PlanExport(X.id, id, !!X.settings); } catch (e) { return say("fail", errText(e)); }
@@ -1095,7 +1111,7 @@ function exportKey(e) {
   if (!X.data) return;
   if (k === "ArrowDown" || k === "ArrowUp" || k === "j" || k === "k") {
     e.preventDefault();
-    const fs = X.data.formats;
+    const fs = shownFormats(); // in the order the two groups show them
     const i = fs.findIndex((f) => f.id === X.format); // the one picked, before its text is in
     const j = Math.max(0, Math.min(fs.length - 1, i + (k === "ArrowDown" || k === "j" ? 1 : -1)));
     return choose(fs[j].id);

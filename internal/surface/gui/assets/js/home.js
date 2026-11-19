@@ -626,11 +626,13 @@ function activity() {
   const live = running();
   if (live || data.lastRun || data.missingLog) {
     // another Game Config's game: its owner, without this run's errors (they are not ours)
+    const errs = (n) => n === 1 ? T("1 error") : Tf("%d errors", n);
     const runText = live && S.live.blocked ? S.live.blocked
-      : live ? (S.live.owner || T("the game is running")) + "  " + (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet"))
-      : data.missingLog || (data.lastRunDay || data.lastRun) + "  " + (data.lastRunErrors ? Tf("%d errors", data.lastRunErrors) : data.lastRunPending ? T("not checked yet") : T("no errors"));
-    const runGo = (live && !S.live.blocked) || data.lastRunErrors ? "needs" : "log";
-    box.append(actLine(T("last game"), runText, () => ui.go(runGo)));
+      : live ? (S.live.owner || T("the game is running")) + "  " + (S.live.errors ? errs(S.live.errors) : T("no errors yet"))
+      : data.missingLog || (data.lastRunDay || data.lastRun) + "  " + (data.lastRunErrors ? errs(data.lastRunErrors) : data.lastRunPending ? T("not checked yet") : T("no errors"));
+    // the game crashed or errored: the log, at its first error, answers what happened; Can it
+    // run is about the next launch (16 §2.3)
+    box.append(actLine(T("last game"), runText, () => ui.go("log")));
   }
   // "nothing changed" tells nothing: the line shows only with changes or before a scan
   const c = data.changes;

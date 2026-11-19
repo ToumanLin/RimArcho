@@ -107,8 +107,14 @@ async function find(first = false, keep = "") {
     games ||= [];
   } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
-  // a preview shows the folder step even when the folder was chosen long ago
-  if (folder && (!folder.done || previewing())) { G.folder = { ...folder, done: false }; G.step = -1; }
+  // the managed folder is not asked on the first run: the default is taken (Settings ›
+  // folders changes it); only a default that cannot be used asks (16 §2.15)
+  if (folder && !folder.done && !previewing()) {
+    let taken = !folder.error;
+    if (taken) try { await api.ChooseManagedFolder(folder.path); } catch { taken = false; }
+    if (!read.current()) return;
+    if (!taken) { G.folder = { ...folder, done: false }; G.step = -1; }
+  }
   // a preview shows the games already added as a new player would see them: not added yet
   G.games = previewing() ? games.map((g) => ({ ...g, env: "" })) : games;
   A.lists = lists || [];

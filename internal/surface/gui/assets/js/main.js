@@ -1550,6 +1550,7 @@ async function start() {
     S.busy.scan = false;
     say(ev.ok ? "ok" : "fail", ev.ok ? ev.text : ev.error);
     await reload();
+    if (ev.ok) tasksPage.scanned(); // a download that waited for this scan offers its Mods (16 §2.9)
     scr.busyChanged();
     if (S.screen === "home") homePage.home();
   });
