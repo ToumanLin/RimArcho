@@ -555,30 +555,44 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
    section is a card of items, its heading stays at the top of its column */
 .cols.needcols { grid-template-columns: minmax(320px, var(--needs-left, 55fr)) var(--card-gap) minmax(300px, 45fr); gap: 0; }
 .needcol { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-.needcap { display: flex; align-items: baseline; gap: 8px; padding: 2px 4px 2px; font-size: 12px; color: var(--muted); }
-.needcap b { color: var(--fg); font-size: 13px; font-weight: 600; transition: color var(--t-press); }
-.needcol.focus .needcap b { color: var(--accent-11, var(--accent)); }
-.needcol > .scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 2px 8px; display: flex; flex-direction: column; }
-.needcol .need-sec > h2.label { position: sticky; top: 0; z-index: 2; margin: 0; padding: 10px 2px 6px; background: var(--bg); }
-.need-sec { margin-top: 0; gap: 0; }
-.need-sec > h2.label { display: flex; align-items: baseline; gap: 2px; }
-.need-fold { display: inline-flex; align-items: baseline; gap: 2px; text-align: inherit; }
-.need-sec.break > h2.label { color: var(--red); }
-.need-sec.run > h2.label { color: var(--log); }
-.need-sec.confirm > h2.label { color: var(--amber); }
+.needcol > .scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 2px 8px; display: flex; flex-direction: column; gap: var(--card-gap); }
+/* One card per section, each headed inside in one style (the app's .card-head): the
+   section's icon in its colour, the name, the count, the date or run on the right. Only
+   the icon is coloured; the words are the muted heading colour of every page. */
+.need-card { position: relative; z-index: 1; overflow: clip; }
+.need-head { position: sticky; top: 0; z-index: 2; margin: 0; align-items: center; gap: 8px; min-width: 0; padding: 9px 16px 7px; background: var(--card); font-size: 12px; font-weight: 600; color: var(--muted); }
+.need-head .anum { margin-right: -2px; }
+.need-head .need-hic { display: inline-flex; flex: none; }
+.need-head .need-hic svg { width: 14px; height: 14px; }
+.need-head .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.need-head .n { margin-left: 0; color: var(--faint); font-weight: 600; }
+.need-head .meta { margin-left: auto; padding-left: 12px; font-weight: 400; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.need-card.area-on .need-head .t { color: var(--accent-11, var(--accent)); }
+.need-sec.break .need-hic { color: var(--red); }
+.need-none.run .need-hic { color: var(--log); }
+.need-sec.run .need-hic { color: var(--log); }
+.need-sec.confirm .need-hic { color: var(--amber); }
+.need-none.all-clear .need-hic { color: var(--green); }
 /* worth knowing: what shared logs taught, RimArcho's own knowledge: the accent, not dimmed */
-.need-sec.worth > h2.label { color: var(--accent-11, var(--accent)); cursor: pointer; }
-.need-sec.worth .need-ic { color: var(--accent-11, var(--accent)); }
-.need-sec > h2.label .fold-chev { display: inline-block; width: 12px; color: var(--faint); transition: transform var(--t-press); }
-.need-sec > h2.label .fold-chev.open { transform: rotate(90deg); }
-.need-sec > h2.label .muted { font-weight: 400; }
-.need-sec > h2.label .n.muted { color: var(--muted); }
-.need-live { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; }
+.need-sec.worth .need-hic, .need-sec.worth .need-ic { color: var(--accent-11, var(--accent)); }
+.need-sec.worth .need-head { cursor: pointer; }
+.need-sec.shut .need-head { border-bottom: 0; }
+.need-fold { display: flex; flex: 1; align-items: center; gap: 8px; min-width: 0; text-align: inherit; color: inherit; font: inherit; }
+.need-fold .fold-chev { display: inline-flex; margin-left: auto; color: var(--faint); transition: transform var(--t-press); }
+.need-fold .fold-chev svg { width: 12px; height: 12px; }
+.need-fold .fold-chev.open { transform: rotate(90deg); }
+.need-head .need-live { display: inline-flex; align-items: center; gap: 6px; color: var(--fg-2); }
 .need-live .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
-.need-empty { padding: 14px 4px; color: var(--muted); font-size: 12px; }
-.need-away { align-self: flex-start; margin: 10px 2px 0; padding: 2px 4px; border-radius: var(--r-sm); color: var(--muted); font-size: 12px; }
+.need-none .need.lv-ok .need-ic { color: var(--green); }
+.need-none .need .body { color: var(--muted); }
+/* Archo over the right column's first card: she stands right-aligned in the band before it,
+   and the card's top edge (above her) hides her chest (16 §7.1 "Placements") */
+.needs-perch { display: flex; justify-content: flex-end; margin-bottom: calc(-12px - var(--card-gap)); }
+.needs-perch:empty { display: none; }
+.needs-perch > .archo-spot.archo-stand { margin: 6px 28px 0 0; mask-image: none; }
+.need-away { align-self: flex-start; margin: 6px 2px 0; padding: 2px 4px; border-radius: var(--r-sm); color: var(--muted); font-size: 12px; }
 .need-away:hover { color: var(--accent-11, var(--accent)); background: var(--accent-soft); }
-@media (max-width: 900px) { .cols.needcols { grid-template-columns: 1fr; } .needsplit { display: none; } .needcol > .scroll { overflow: visible; } .needcol .need-sec > h2.label { position: static; } }
+@media (max-width: 900px) { .cols.needcols { grid-template-columns: 1fr; gap: var(--card-gap); } .needsplit { display: none; } .needcol > .scroll { overflow: visible; } .need-head { position: static; } }
 .need-list { display: flex; flex-direction: column; }
 .need-phase { padding: 14px 18px 4px; color: var(--muted); font-size: 12px; }
 /* the last run after this run's items (while the game runs): a rule above, the facts a gap apart */
@@ -2395,17 +2409,15 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .sv-mods .r .mv { font-weight: 400; color: var(--muted); font-size: 12px; }
 .sv-mods .tagx { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: var(--r-sm); font-size: 12px; background: var(--pill); color: var(--muted); white-space: nowrap; }
 .sv-mods .tagx.bad { color: var(--red); background: var(--red-soft); }
-.need-save .need-save-row { padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
-.need-save .need-save-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; min-width: 0; }
-.need-save .need-save-head b { overflow-wrap: anywhere; }
-.need-save .need-save-dot { width: 14px; text-align: center; font-weight: 700; flex: none; }
-.need-save .ok .need-save-dot { color: var(--green); }
-.need-save .warn .need-save-dot, .need-save .warn .need-save-verdict { color: var(--amber); }
-.need-save .err .need-save-dot, .need-save .err .need-save-verdict { color: var(--red); }
-.need-save .need-save-verdict { color: var(--fg-2); }
-.need-save .need-save-lines { margin: 0; padding-left: 22px; font-size: 12px; color: var(--fg-2); display: flex; flex-direction: column; gap: 2px; }
-.need-save .need-save-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-left: 22px; }
-.need-save .need-save-unseen { margin: 0 0 0 22px; font-size: 12px; }
+/* your last save: an item like the others; its verdict after the name, its rows as chips */
+.need-save .need-save-row:hover { background: none; }
+.need-save .need-save-verdict { font-weight: 400; color: var(--fg-2); }
+.need-save .lv-err .need-ic { color: var(--red); }
+.need-save .lv-warn .need-ic { color: var(--amber); }
+.need-save .lv-ok .need-ic { color: var(--green); }
+.need-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.need-chip { display: inline-flex; align-items: center; height: 20px; max-width: 100%; padding: 0 8px; border-radius: var(--r-sm); background: var(--pill); color: var(--fg-2); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.need-chip.more { color: var(--muted); }
 .sv-mods .r .sg { font-weight: 600; font-size: 13px; width: 16px; text-align: center; }
 .sv-mods .r.add .sg, .sv-mods .r.add .n { color: var(--green); }
 .sv-mods .r.del .sg, .sv-mods .r.del .n { color: var(--red); }

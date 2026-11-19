@@ -580,13 +580,14 @@ function drawNeeds() {
   runSummary(w);
   N.els = [[], []];
   const live = N.cols[1].some((x) => x.group === 6);
+  // The columns have no heading of their own: every card heads itself in one style (16 §2.4).
+  // A column's name and where its items come from stay its accessible name and description.
   const column = (ci, title, sub) => {
     const c = el("section", "needcol" + (N.col === ci ? " focus" : ""));
-    const cap = el("div", "needcap");
-    cap.append(el("b", "", T(title)));
-    cap.title = T(sub); // where the column's items come from: on hover, not a line (16 §7.3 rule 7)
+    c.setAttribute("aria-label", T(title));
+    c.setAttribute("aria-description", T(sub));
     const box = el("div", "scroll");
-    c.append(cap, box);
+    c.append(box);
     return [c, box];
   };
   askShown = false;
@@ -596,6 +597,9 @@ function drawNeeds() {
   const grid = el("div", "cols needcols");
   grid.append(left, split, right);
   needSplit(grid, left, split);
+  // Archo looks over the right column's first card, her chest behind its top edge (16 §7.1)
+  const perch = el("div", "needs-perch");
+  rbox.append(perch);
   if (d.lastSave) lbox.append(lastSaveCard(d.lastSave));
   for (const [ci, box] of [[0, lbox], [1, rbox]]) {
     for (const si of COL_SECS[ci]) {
@@ -608,29 +612,29 @@ function drawNeeds() {
   }
   // a question whose item is gone (resolved by a refresh) is no question: enter must not run it
   if (!askShown) N.ask = null;
-  if (!N.cols[0].length && !d.lastSave) lbox.append(el("section", "card empty-state", "✓ " + T("nothing here")));
-  if (!N.cols[1].length) rbox.append(el("div", "need-empty", N.data.missingLog || T("no errors in the last run")));
+  if (!N.cols[0].length && !d.lastSave) lbox.append(emptyCard(-1, T("nothing here"), "ok"));
+  if (!N.cols[1].length) rbox.append(emptyCard(3, N.data.missingLog || T("no errors in the last run"), N.data.missingLog ? "" : "ok"));
   // what other pages handle: one line each (16 §2.4)
   for (const e of d.elsewhere || []) {
     const b = el("button", "need-away", "→ " + e.text);
     b.onclick = () => e.page === "library" ? document.dispatchEvent(new CustomEvent("library-search", { detail: e.query || "" })) : ui.go(e.page);
     lbox.append(b);
   }
-  // Archo closes the right column, under its last card (16 §7.1 "Placements")
   const face = needsFace(d);
-  archoSpot("needs", { size: 176, calm: ["neutral", "smug", "wink", "smirk", "sleepy"] }).stand(rbox, face, face === "thumbsup" || face === "neutral");
+  archoSpot("needs", { size: 140, calm: ["neutral", "smug", "wink", "smirk", "sleepy"] }).stand(perch, face, face === "thumbsup" || face === "neutral");
   w.append(grid);
   sc.append(w);
   sc.querySelectorAll(".needcol > .scroll").forEach((s, i) => { s.scrollTop = keep[i] || 0; });
-  // 1–9: the sections in the order shown, the left column's first (16 §3.5)
+  // 1–9: the cards in the order shown, the left column's first (16 §3.5); a card without
+  // items (your last save, an empty column) focuses its first button
   resetAreas();
-  sc.querySelectorAll(".need-sec").forEach((sec) => area(sec, sec.querySelector("h2"), () => {
+  sc.querySelectorAll(".need-card").forEach((sec) => area(sec, sec.querySelector("h2"), sec.dataset.section ? () => {
     // a block of the run's errors focuses its own first item
     const ci = +sec.dataset.col, first = sec.dataset.first;
     let i = first ? N.cols[ci].findIndex((x) => x === sec.firstItem) : -1;
     if (i < 0) i = N.cols[ci].findIndex((x) => x.section === +sec.dataset.section);
     if (i >= 0) { N.col = ci; setCur(ci, i); }
-  }));
+  } : undefined));
   markNeeds(false);
   if (focused) sc.querySelector(`.need[data-id="${CSS.escape(focused)}"] button`)?.focus({ preventScroll: true });
   ui.renderHints();
@@ -640,44 +644,78 @@ function drawNeeds() {
 // loaded loads with this list, the rows that need attention, and a way to the save on
 // Saves, where each row has its fix.
 function lastSaveCard(v) {
-  const sec = el("section", "sec need-save");
   // the save the last run loaded, or the save or colony the player chose on Saves (12 §4.8)
-  const h = el("h2", "label word-facts", v.title || T("your last save"));
-  if (v.loaded) h.append(el("span", "muted", Tf("loaded %s", v.loaded)));
-  else if (v.saved) h.append(el("span", "muted", Tf("saved %s", v.saved)));
-  sec.append(h);
-  const card = el("div", "card need-list");
+  const sec = el("section", "card need-card need-save");
+  sec.append(needHead("save", v.title || T("your last save"), v.loaded ? Tf("loaded %s", v.loaded) : v.saved ? Tf("saved %s", v.saved) : ""));
+  // one item like every other card's: status icon, the save's name, its verdict, its rows
   const lvl = v.gone ? "warn" : v.level === "error" ? "err" : v.level === "warning" ? "warn" : v.level === "writing" ? "" : "ok";
-  const row = el("div", "need-save-row " + lvl);
-  const head = el("div", "need-save-head");
-  head.append(el("span", "need-save-dot", lvl === "err" ? "✕" : lvl === "warn" ? "!" : lvl === "ok" ? "✓" : "…"));
-  const t = el("b", "", v.name);
-  if (v.colony && v.colony !== v.name) t.title = v.colony;
-  head.append(t, el("span", "need-save-verdict", v.verdict));
-  row.append(head);
+  const row = el("div", "need need-save-row lv-" + (lvl || "none"));
+  const top = el("div", "top");
+  const ic = el("span", "need-ic");
+  ic.innerHTML = lvl === "err" ? icon.err : lvl === "warn" ? icon.warn : lvl === "ok" ? icon.ok : statusIcon(-1);
+  const body = el("div", "body");
+  const t = el("div", "title word-facts");
+  const name = el("span", "", v.name);
+  if (v.colony && v.colony !== v.name) name.title = v.colony;
+  t.append(name, el("span", "need-save-verdict", v.verdict));
+  body.append(t);
+  // the rows that need attention, as chips; the rest as a count whose tooltip says so
   if (v.lines?.length) {
-    const ul = el("ul", "need-save-lines");
-    for (const l of v.lines) ul.append(el("li", "", l));
-    if (v.more) ul.append(el("li", "muted", Tf("and %d more", v.more)));
-    row.append(ul);
+    const chips = el("div", "need-chips");
+    for (const l of v.lines) chips.append(el("span", "need-chip", l));
+    if (v.more) visTip(chips.appendChild(el("span", "need-chip more", "+" + v.more)), Tf("and %d more", v.more), "img", false);
+    body.append(chips);
   }
-  if (v.unseen) row.append(el("p", "need-save-unseen muted", v.unseen));
-  const acts = el("div", "need-save-acts");
-  if (v.ref) {
-    const b = button(T("open in saves"), "", () => ui.go("save:" + v.ref), "small need-save-open");
-    acts.append(b);
-  }
+  if (v.unseen) body.append(el("div", "why sub", v.unseen));
+  top.append(ic, body);
+  row.append(top);
+  const acts = el("div", "acts");
+  if (v.ref) acts.append(button(T("open in saves"), "", () => ui.go("save:" + v.ref), lvl === "err" || lvl === "warn" ? "primary need-save-open" : "need-save-open"));
   if (v.chosen) {
     const b = button(T("check the last loaded save"), "", async () => {
       try { say("ok", await api.SaveChoose("", false, true)); } catch (e) { say("fail", errText(e)); return; }
       needs(true);
-    }, "small");
+    });
     b.title = T("the save was chosen on Saves; this goes back to the save the last run loaded");
     acts.append(b);
   }
-  if (acts.childNodes.length) row.append(acts);
-  card.append(row);
-  sec.append(card);
+  if (acts.childNodes.length) {
+    const foot = el("div", "need-foot");
+    foot.append(acts);
+    row.append(foot);
+  }
+  sec.append(row);
+  return sec;
+}
+
+// needHead is every card's heading on this page, in one style (16 §2.4): the section's icon
+// in its colour, its name, the count, and on the right what it is about (a date, the run).
+// kind: a section (0–3, view.Section*) or "save".
+const SEC_ICON = ["err", "hint", "warn", "log"];
+function needHead(kind, text, meta = "", count = 0) {
+  const h = el("h2", "card-head need-head");
+  const ic = el("span", "need-hic");
+  ic.innerHTML = icon[kind === "save" ? "saves" : SEC_ICON[kind]] || "";
+  ic.setAttribute("aria-hidden", "true");
+  h.append(ic, el("span", "t", text));
+  if (count) h.append(el("span", "n num", String(count)));
+  if (meta) h.append(el("span", "meta", meta));
+  return h;
+}
+
+// emptyCard: a column with nothing to show still has its card, so the page keeps one shape
+// (and Archo a card to look over): before you start (si -1) or the last run's errors (3).
+function emptyCard(si, text, lvl) {
+  const sec = el("section", "card need-card need-none " + (si === 3 ? "run" : "break") + (lvl === "ok" ? " all-clear" : ""));
+  sec.append(needHead(si === 3 ? 3 : "save", T(si === 3 ? "errors from the last run" : "before you start"), si === 3 ? N.data.lastRun || "" : ""));
+  if (lvl === "ok") sec.querySelector(".need-hic").innerHTML = icon.ok;
+  const row = el("div", "need dimmed lv-" + (lvl || "none"));
+  const ic = el("span", "need-ic");
+  ic.innerHTML = lvl === "ok" ? icon.ok : statusIcon(-1);
+  const top = el("div", "top");
+  top.append(ic, el("div", "body why word-facts", text));
+  row.append(top);
+  sec.append(row);
   return sec;
 }
 
@@ -703,42 +741,39 @@ function runBlocks(rows) {
 // game runs this run's come first, then the last run's blocks (runBlocks). heading: a
 // block's own heading, already translated.
 function needSection(si, rows, ci, shut, live, heading = "") {
-  const sec = el("section", "sec need-sec " + SECTION_CLS[si]);
+  const sec = el("section", "card need-card need-sec " + SECTION_CLS[si] + (shut ? " shut" : ""));
   sec.dataset.col = String(ci);
   sec.dataset.section = String(si);
   if (heading && rows.length) { sec.dataset.first = "1"; sec.firstItem = rows[0]; }
   const lastRun = si === 3 && !rows.some((x) => x.group === 6);
   const title = si === 3 && !lastRun ? "errors this run" : SECTIONS[si];
-  const h = el("h2", "label", heading || T(title));
   const n = rows.filter((x) => !x.done && x.counted).length;
+  const h = needHead(si, heading || T(title), si === 3 && lastRun ? N.data.lastRun || "" : "", si === 1 ? 0 : n);
+  // where the items come from: the heading's hover (16 §7.3 rule 7)
+  h.querySelector(".t").title = T(ci ? "seen in the game's log" : "found by checking the mods' files and shared logs");
+  if (n && si !== 1) bump("needs:" + si + (heading ? ":" + heading : ""), h.querySelector(".n"), n);
   if (si === 1) {
-    // worth knowing folds and opens by its heading (16 §2.4)
+    // worth knowing folds and opens by its heading (16 §2.4); the chevron is at its right end
     const all = (N.data.items || []).filter((x) => x.section === 1 && !x.into).length;
     const toggle = el("button", "need-fold");
     toggle.tabIndex = -1;
-    const chev = el("span", "fold-chev" + (shut ? "" : " open"), "›");
+    const chev = el("span", "fold-chev" + (shut ? "" : " open"));
+    chev.innerHTML = icon.chev || "›";
     chev.setAttribute("aria-hidden", "true"); // the state is aria-expanded
-    toggle.append(chev, ...h.childNodes, el("span", "n num muted", String(all)));
+    toggle.append(...h.childNodes, el("span", "n num", String(all)), chev);
     toggle.setAttribute("aria-expanded", String(!shut));
     h.onclick = () => { N.hintsShut = !N.hintsShut; orderNeeds(); drawNeeds(); };
     toggle.title = T(shut ? "show" : "hide");
     h.append(toggle);
-  } else if (n) {
-    const c = el("span", "n num", String(n));
-    h.classList.add("word-facts");
-    h.append(c);
-    bump("needs:" + si + (heading ? ":" + heading : ""), c, n);
   }
-  if (si === 3) {
-    if (!lastRun) {
-      const run = el("span", "muted need-live");
-      run.append(el("span", "dot"), document.createTextNode(S.live.pack ? Tf("pack %s", S.live.pack) : T("game running")));
-      h.append(run);
-    } else if (N.data.lastRun) h.append(el("span", "muted word-facts", N.data.lastRun));
+  if (si === 3 && !lastRun) {
+    const run = el("span", "meta need-live");
+    run.append(el("span", "dot"), document.createTextNode(S.live.pack ? Tf("pack %s", S.live.pack) : T("game running")));
+    h.append(run);
   }
   sec.append(h);
   if (shut) return sec;
-  const card = el("div", "card need-list");
+  const card = el("div", "need-list");
   let phase = "", group = -1;
   for (const it of rows) {
     const i = N.cols[ci].indexOf(it);
