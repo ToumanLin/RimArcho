@@ -124,19 +124,17 @@ func (a *App) Describe(ix *Index, m *store.Mod, fetch, refresh bool) *Descriptio
 		d.WorkshopState = ""
 		return d
 	}
-	path := filepath.Join(a.cacheDir("workshop"), id+".json")
-	var c workshopCache
-	cached := false
-	if b, err := os.ReadFile(path); err == nil && json.Unmarshal(b, &c) == nil {
-		cached = true
-	}
+	c, cached := a.readWorkshopCache(id)
 	fresh := cached && !refresh
 	if fresh {
+		age := a.Now().Sub(time.Unix(c.Fetched, 0))
 		switch {
+		case c.Result != 1:
+			fresh = age < 24*time.Hour // removed or private: ask again tomorrow (C01)
 		case m.ACFTimeUpdated > 0:
 			fresh = c.TimeUpdated >= m.ACFTimeUpdated
 		default:
-			fresh = a.Now().Sub(time.Unix(c.Fetched, 0)) < 7*24*time.Hour
+			fresh = age < 7*24*time.Hour
 		}
 	}
 	switch {
@@ -154,10 +152,7 @@ func (a *App) Describe(ix *Index, m *store.Mod, fetch, refresh bool) *Descriptio
 		}
 		c, cached = *nc, true
 		d.WorkshopState = "fetched"
-		if b, err := json.Marshal(c); err == nil {
-			os.MkdirAll(filepath.Dir(path), 0o755)
-			os.WriteFile(path, b, 0o644)
-		}
+		a.storeWorkshopCache(nc)
 	}
 	if cached && c.Result == 1 {
 		d.Workshop, d.Updated = c.Description, time.Unix(c.TimeUpdated, 0)
@@ -216,6 +211,37 @@ func isDigits(s string) bool {
 		}
 	}
 	return s != ""
+}
+
+func (a *App) workshopCachePath(id string) string {
+	return filepath.Join(a.cacheDir("workshop"), id+".json")
+}
+
+func (a *App) readWorkshopCache(id string) (workshopCache, bool) {
+	var c workshopCache
+	b, err := os.ReadFile(a.workshopCachePath(id))
+	return c, err == nil && json.Unmarshal(b, &c) == nil
+}
+
+// storeWorkshopCache keeps an answer for the details (16 §4.3); a passing one (busy, rate
+// limited) is not kept, so it does not stand in for the description.
+func (a *App) storeWorkshopCache(c *workshopCache) {
+	if c == nil || !isDigits(c.ID) || passingResult(c.Result) || limitedResult(c.Result) {
+		return
+	}
+	b, err := json.Marshal(c)
+	if err != nil {
+		return
+	}
+	path := a.workshopCachePath(c.ID)
+	if os.MkdirAll(filepath.Dir(path), 0o755) != nil {
+		return
+	}
+	// A reader never sees half a file.
+	tmp := fmt.Sprintf("%s.%d.tmp", path, os.Getpid())
+	if os.WriteFile(tmp, b, 0o644) != nil || os.Rename(tmp, path) != nil {
+		os.Remove(tmp)
+	}
 }
 
 func (a *App) fetchWorkshop(id string) (*workshopCache, error) {

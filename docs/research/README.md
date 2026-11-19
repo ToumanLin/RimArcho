@@ -31,6 +31,7 @@ Investigations, measurements and open questions; once a report's conclusions are
 
 | Document | What it is | Status |
 | --- | --- | --- |
+| [2026-11-18_steam-request-rate.md](2026-11-18_steam-request-rate.md) | Every path that talks to Steam, its request count for 1,000 Mods, and why players were rate limited | Fixes in 11 §2.1, 16 §4.3; VM check pending (§4) |
 | [2026-11-12_update-channel.md](2026-11-12_update-channel.md) | Parallel version checks, unchanged release pairs and Lanzou probes | Unwired prototype; listing-only checks and browser fallback |
 | [2026-11-05_workshop-distribution.md](2026-11-05_workshop-distribution.md) | Publishing RimArcho on the Workshop and updating from it with anonymous SteamCMD | Open (ToDo); tests in §4 |
 | [2026-10-26_steamcmd-parallel-downloads.md](2026-10-26_steamcmd-parallel-downloads.md) | Parallel and batched SteamCMD downloads, shared-library races | Batching in 11 §1; kept as evidence for the Workshop distribution research |
