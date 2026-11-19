@@ -2002,6 +2002,28 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 /* Import & export (16 §2.18): drawn like Game Config and Settings, numbered sections of
    setting rows (.settings .set); a manager picked in its section opens a tree of its parts
    below, which turns into the run (a background task) in place. */
+/* The sections sit in a grid: one column on a narrow page; from 880 px Bring in spans it with
+   its sources two to a line, From another manager and Share stand side by side, and a result
+   spans the grid under its section (dense placement puts Share beside From another manager
+   while the tree follows it in the document, so tab goes from the managers to their tree). */
+.xc-cols { container: xc / inline-size; }
+.xc-grid { display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-flow: row dense; gap: var(--card-gap) 16px; align-items: start; }
+.xc-blk { display: flex; flex-direction: column; gap: var(--card-gap); min-width: 0; }
+@container xc (min-width: 880px) {
+  .xc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .xc-grid > .xc-blk.wide, .xc-grid > .xc-res-label, .xc-grid > .xc-res { grid-column: 1 / -1; }
+  .pm-import .xc-sec.xc-in { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pm-import .xc-sec.xc-in > .set:nth-child(2) { border-top: 0; }
+  .pm-import .xc-sec.xc-in > .set:nth-child(even) { border-left: var(--hairline) solid var(--line-2); }
+  .pm-import .xc-blk .xc-textrow .xc-pastebox { max-width: none; }
+}
+/* a section's rows: the controls follow the name, and drop under it only when they do not fit */
+.pm-import .xc-blk .xc-sec .set { flex-wrap: wrap; row-gap: 6px; }
+.pm-import .xc-blk .xc-sec .set .l { flex: 1 1 160px; }
+.pm-import .xc-blk .xc-sec .set .r { flex: 0 1 auto; margin-left: auto; }
+.pm-import .xc-blk .xc-sec .xc-textrow .l { flex: none; }
+.pm-import .xc-blk .xc-sec .xc-textrow .r { flex: 1 1 240px; flex-wrap: nowrap; }
+.pm-import .xc-blk .xc-textrow .xc-pastebox { flex-basis: 120px; }
 .pm-import .xc-sec .set .l { flex: 0 1 46%; }
 .pm-import .xc-sec .set .r { flex-wrap: wrap; }
 .pm-import .xc-sec .set.on .name { color: var(--accent-11, var(--accent)); }
@@ -2020,7 +2042,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .xc-mrow .t { font-weight: 500; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .xc-mrow .when { font-size: 12px; font-weight: 400; color: var(--faint); white-space: nowrap; }
 .xc-mrow .s { grid-column: 3; font-size: 12px; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.xc-mrow .pick { color: var(--accent); }
+.xc-mrow .pick, .pm-import .set .sub.xc-busy { color: var(--accent); }
 .xc-mrow .nline { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .xc-mrow .nt { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--fg-2); }
 .xc-mrow .chip-n { flex: none; font-size: 12px; height: 18px; display: inline-flex; align-items: center; padding: 0 6px; border-radius: var(--r-sm); background: var(--accent-soft); color: var(--accent); }

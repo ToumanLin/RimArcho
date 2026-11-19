@@ -83,15 +83,22 @@ export async function exchange(first = false) {
   const [inLab, inCard] = sectionCard(T("Bring in"));
   const [mLab, mCard] = sectionCard(T("From another manager"));
   inCard.dataset.src = "in"; mCard.dataset.src = "m";
+  inCard.classList.add("xc-in");
+  // the sections sit in a grid (16 §2.18 "Layout"): on a wide page Bring in spans it with its
+  // sources two to a line, and From another manager and Share stand side by side under it; a
+  // result spans the grid under its section. Narrow, it is one column in the same order.
+  const cols = el("div", "xc-cols"), grid = el("div", "xc-grid"); cols.append(grid);
   // the first run shows the game's list and one way to the rest: the other sources are for
   // players who are not new (16 §2.15)
   const brief = firstRun && !firstMore;
-  if (brief) w.append(inLab, inCard, resLab, result);
-  else w.append(inLab, inCard, mLab, mCard, resLab, result);
+  grid.append(block(inLab, inCard, "wide"));
+  if (!brief) grid.append(block(mLab, mCard));
+  grid.append(resLab, result);
+  w.append(cols);
   area(inCard, inLab); if (!brief) area(mCard, mLab);
   spot().peek(inCard, "neutral", true);
-  // the export side (C1): share what you have, below bringing things in
-  if (!firstRun) { const [sLab, sCard] = sectionCard(T("Share")); shareRows(sCard); w.append(sLab, sCard); area(sCard, sLab); }
+  // the export side (C1): share what you have, beside bringing things in from other managers
+  if (!firstRun) { const [sLab, sCard] = sectionCard(T("Share")); shareRows(sCard); grid.append(block(sLab, sCard)); area(sCard, sLab); }
   sc.append(w);
   // the rows are filled in on the page: the file row's error watches the result area
   if (brief) {
@@ -119,6 +126,12 @@ const face = (e) => spot().set(e, e === "neutral");
 
 function sectionCard(title) {
   return [el("div", "label section", title), el("section", "card settings xc-sec")];
+}
+// block: a section's label and card as one cell of the page's grid; "wide" spans it
+function block(lab, card, cls = "") {
+  const b = el("div", "xc-blk" + (cls ? " " + cls : ""));
+  b.append(lab, card);
+  return b;
 }
 // row: one setting-style row; right holds its controls
 function row(name, sub, ...right) {
@@ -231,14 +244,25 @@ function packExportRow() {
     let pick = names[0];
     const sel = choiceControl(T("pack"), names.map(n => ({ value: n, label: n })), pick);
     sel.onchange = () => { pick = sel.value; };
+    // while the file is written (a pack's Mods can take minutes) the row says so and its
+    // controls wait
+    const line = sub.textContent;
+    const busy = (on) => {
+      for (const c of right.querySelectorAll("button, select")) c.disabled = on;
+      sub.textContent = on ? T("exporting…") : line; sub.classList.toggle("xc-busy", on);
+    };
     const one = (list) => async () => {
+      busy(true);
       try { const t = await api.PackExport(pick, "", list); if (t) say("ok", t); }
       catch {
         pop.ask(list ? T("export the list") : T("export the pack"), T("the new file") + ": " + pick + (list ? ".archolist.json" : ".archopack"), async (file) => {
           if (!file) return;
+          busy(true);
           try { say("ok", await api.PackExport(pick, file, list)); } catch (e2) { say("fail", errText(e2)); }
+          finally { busy(false); }
         });
       }
+      finally { busy(false); }
     };
     right.append(sel, button(T("export the list"), "", one(true)), button(T("export the pack"), "", one(false)));
   }).catch(e => { sub.textContent = errText(e); });
@@ -828,7 +852,9 @@ function showResult(mode, at, label) {
   if (!res) return null;
   res.dataset.mode = mode; res.hidden = false; res.textContent = "";
   if (lab) { lab.textContent = label; lab.hidden = false; }
-  if (sec && sec.nextElementSibling !== lab) sec.after(lab || res, ...(lab ? [res] : []));
+  // after the section's grid cell: the result spans the grid there (16 §2.18 "Layout")
+  const cell = sec?.closest(".xc-blk") || sec;
+  if (cell && cell.nextElementSibling !== (lab || res)) cell.after(lab || res, ...(lab ? [res] : []));
   ui?.renderHints?.();
   return res;
 }
