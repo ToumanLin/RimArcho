@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Window: `ctrl`+mouse wheel and `ctrl+=` / `ctrl+-` / `ctrl+0` change the interface size on any page, one step at a time through 100, 110, 125 and 150% (`0` goes back to 100%). It is the same setting as Settings › Interface › interface size, so the window reopens at it. Over the Saves page's over-time chart, `ctrl`+wheel still zooms the chart (GitHub issue #8).
 - List editor: launch (the button at the top right, `L` and the command panel's launch) now starts the game directly instead of opening the Launch page, so testing a list again and again no longer means going back each time (GitHub issue #6). It runs the same checks as the Launch page: the open list becomes current, unsaved changes are saved, a serious RAM shortfall and missing required Mods ask once, and a running game or an outside change not yet loaded is refused with the reason. The TUI editor's `L` still opens its Launch page.
 - Answering "same" to an identity question now carries the new Mod's notes, tags, user rules and ignored findings over to the Mod it was, and removes the left-over empty record. Before, they stayed on a record nothing pointed to any more.
 - TUI: drawing the screen no longer reads the database; Can it run's count is brought up to date after each key or result instead.

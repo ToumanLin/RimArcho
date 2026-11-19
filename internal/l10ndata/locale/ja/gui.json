@@ -236,6 +236,7 @@
   "started": "開始しました",
   "started directly": "直接起動しました",
   "starting…": "起動中…",
+  "interface size %s": "表示サイズ %s",
   "state": "状態",
   "stopping %d tasks": "%d件のタスクを停止中",
   "switch to %s and use this; no game file is written": "%sに切り替えて使用します。ゲームのファイルは変更しません",

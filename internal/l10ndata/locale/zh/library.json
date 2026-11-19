@@ -168,6 +168,7 @@
   "moved into the lock library on %s": "%s 移入锁定库",
   "narrow %s": "变窄%s",
   "navigation at the side / at the top": "导航在侧边 / 在顶部",
+  "interface size: larger / smaller / 100%": "界面大小：放大 / 缩小 / 100%",
   "new locked version made on %s": "该锁定版本创建于 %s",
   "next / previous page under the same sidebar entry": "同一侧栏条目下的下一个 / 上一个子页",
   "next page": "下一页",

@@ -236,6 +236,7 @@
   "started": "开始",
   "started directly": "直接启动",
   "starting…": "正在启动…",
+  "interface size %s": "界面大小 %s",
   "state": "状态",
   "stopping %d tasks": "正在停止 %d 个任务",
   "switch to %s and use this; no game file is written": "切换到 %s 并用这个；不写游戏文件",

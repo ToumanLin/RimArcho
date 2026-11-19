@@ -126,6 +126,7 @@ under the cursor) and `u` undoes them. The top line always says where you are.
 | `!`, `c` | needs attention; recent changes |
 | `R`, `A`, `E` | rescan; check the files again; switch environment |
 | `ctrl+k`, `?` | command palette; all keys |
+| `ctrl`+wheel, `ctrl+=` / `ctrl+-` / `ctrl+0` | window: interface size one step larger / smaller / back to 100% (100, 110, 125, 150%; the same as Settings › Interface › interface size, kept for the next start) |
 
 The filter bar in the plan editor and mod library includes **Location**: the registered
 source folder (for example, the game's `Mods/`, Workshop, or an individual SteamCMD or extra

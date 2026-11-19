@@ -38,6 +38,7 @@ import * as ops from "./ops.js";
 import * as uninst from "./uninstall.js";
 import * as packsPage from "./packs.js";
 import * as planManage from "./planmanage.js";
+import { wireZoom } from "./uizoom.js";
 import * as tex from "./textures.js";
 import * as tasksPage from "./tasks.js";
 import * as selfUpdate from "./selfupdate.js";
@@ -1493,6 +1494,7 @@ async function start() {
   initRules(ui);
   wireSplits();
   document.addEventListener("keydown", onKey);
+  wireZoom(); // ctrl+wheel, ctrl+'+' / '-' / '0': interface size on every page (16 §2.14)
   document.addEventListener("verb", (e) => { const v = e.detail; v === "needs" ? go("needs") : verb(v); });
   // a detail's settings row: Mod library › Mod settings at that Mod's files (16 §2.9)
   document.addEventListener("open-mod-settings", (e) => { modSettings.focusMod(e.detail); go("mod-settings"); });

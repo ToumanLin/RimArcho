@@ -168,6 +168,7 @@
   "moved into the lock library on %s": "%sに固定ライブラリへ移動",
   "narrow %s": "%sを狭くする",
   "navigation at the side / at the top": "サイドバー／上部ナビゲーション",
+  "interface size: larger / smaller / 100%": "表示サイズ：拡大 / 縮小 / 100%",
   "new locked version made on %s": "%sに新しい固定バージョンを作成",
   "next / previous page under the same sidebar entry": "同じサイドバー項目内で次／前のページ",
   "next page": "次のページ",
