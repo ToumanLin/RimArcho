@@ -258,7 +258,7 @@ function viewControls() {
   order.classList.add("dview-sort");
   order.title = T("sort");
   order.onmousedown = (e) => e.stopPropagation();
-  order.onclick = (e) => e.stopPropagation();
+  order.addEventListener("click", (e) => e.stopPropagation()); // keep choiceControl's own onclick (opens the menu)
   order.onchange = async () => { if (await setSort(order.value)) onSortChange(); };
   controls.append(fold, order, seg);
   return controls;

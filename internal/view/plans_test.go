@@ -190,7 +190,7 @@ func TestInGameAndMarks(t *testing.T) {
 		t.Fatalf("marks %+v", rows)
 	}
 	nav := view.Nav(0, rows, nil)
-	kids := nav[2].Items[1].Kids
+	kids := nav[1].Items[0].Kids
 	// all lists first, then the current list (list opens it), then the open one (16 §2.1)
 	if len(kids) != 3 || kids[0].ID != view.PagePlans || kids[2].Mark == "" || !kids[2].Open || !kids[1].Current {
 		t.Fatalf("plan kids %+v", kids)
@@ -279,7 +279,7 @@ func TestNavRecentLists(t *testing.T) {
 		rows = append(rows, view.PlanRow{Page: "plan:" + itoa(i), Name: itoa(i), UsedAt: now.Add(time.Duration(i) * time.Hour)})
 	}
 	label := func() string {
-		kids := view.Nav(0, rows, nil)[2].Items[1].Kids
+		kids := view.Nav(0, rows, nil)[1].Items[0].Kids
 		if kids[0].ID != view.PagePlans {
 			t.Fatalf("head %+v", kids[0])
 		}
@@ -312,8 +312,8 @@ func TestNavCapsAndCounts(t *testing.T) {
 		rows = append(rows, view.PlanRow{Page: "plan:" + itoa(i), Name: itoa(i), UsedAt: now})
 		packs = append(packs, view.PackRow{Name: "p" + itoa(i), PlayedAt: now.Add(time.Duration(i) * time.Hour)})
 	}
-	g := view.Nav(0, rows, packs)[2]
-	lists, pk := g.Items[1].Kids, g.Items[2].Kids
+	g := view.Nav(0, rows, packs)[1]
+	lists, pk := g.Items[0].Kids, g.Items[1].Kids
 	if lists[0].Label != "all lists (6)" {
 		t.Fatalf("lists head %q", lists[0].Label)
 	}
@@ -324,7 +324,7 @@ func TestNavCapsAndCounts(t *testing.T) {
 	if strings.Join(got, ",") != "all packs (6),p5,p4,p3,p2" || pk[0].ID != view.PagePacks {
 		t.Fatalf("sidebar packs %v", got)
 	}
-	if few := view.Nav(0, rows[:2], packs[:2])[2]; few.Items[1].Kids[0].Label != "all lists" || len(few.Items[2].Kids) != 2 {
-		t.Fatalf("few: %+v", few.Items[1:3])
+	if few := view.Nav(0, rows[:2], packs[:2])[1]; few.Items[0].Kids[0].Label != "all lists" || len(few.Items[1].Kids) != 2 {
+		t.Fatalf("few: %+v", few.Items[0:2])
 	}
 }
