@@ -125,3 +125,39 @@ func TestMigrationByParts(t *testing.T) {
 }
 
 func itoa(n int) string { return strconv.Itoa(n) }
+
+// A RimSort userRules.json saved with a byte order mark is read; one that cannot be read
+// is a group with its error and an empty part list, never null, so the Import page still
+// draws the manager (16 §2.18; B4b VM round: the page drew nothing).
+func TestMigrationRulesBOMAndBrokenGroup(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	e.AddWorkshop("3000000002", testkit.Sample("tester.alpha", "Alpha"))
+	e.AddWorkshop("3000000003", testkit.Sample("tester.beta", "Beta"))
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.alpha", "tester.beta")
+	e.AddEnv(false)
+	e.MustRun("scan")
+	root := filepath.Join(e.Root, "RimSort")
+	os.MkdirAll(filepath.Join(root, "dbs"), 0o755)
+	rules := filepath.Join(root, "dbs", "userRules.json")
+	os.WriteFile(rules, []byte("\xef\xbb\xbf"+`{"rules": {"tester.beta": {"loadAfter": {"tester.alpha": {}}}}}`), 0o644)
+	found := app.DiscoverManagerImports(app.ManagerLocations{RimSort: []string{root}})
+	group := func() app.MigrationGroup {
+		for _, m := range e.App.SurveyMigration(found, app.ManagerTagNames{}) {
+			for _, g := range m.Groups {
+				if g.Kind == app.MigrateRules {
+					return g
+				}
+			}
+		}
+		t.Fatal("no rules group")
+		return app.MigrationGroup{}
+	}
+	if g := group(); g.Error != "" || len(g.Parts) != 1 || g.Parts[0].New != 1 {
+		t.Fatalf("rules with a BOM: %+v", g)
+	}
+	os.WriteFile(rules, []byte(`{"rules": `), 0o644)
+	if g := group(); g.Error == "" || g.Parts == nil {
+		t.Fatalf("broken rules: error %q, parts %v (nil: %v)", g.Error, g.Parts, g.Parts == nil)
+	}
+}

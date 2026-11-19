@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,6 +29,8 @@ func (a *App) ImportRimSortRules(path string, dryRun bool) (*RimCrowReport, erro
 	if len(b) > 4<<20 {
 		return nil, errors.New("user rules exceed 4 MB")
 	}
+	// a file saved again in Notepad starts with a byte order mark
+	b = bytes.TrimPrefix(b, []byte("\xef\xbb\xbf"))
 	var raw struct {
 		Rules map[string]map[string]json.RawMessage `json:"rules"`
 	}
