@@ -1,4 +1,4 @@
-import { fieldError, progress } from "./feedbacksemantics.js";
+import { progress } from "./feedbacksemantics.js";
 import { editablePath, copyablePath, pathContent } from "./fields.js";
 // The first-run guide (16 §2.15): three steps, each with a way back.
 //   1. find the game: existing games — what detection finds (tick several), or a folder
@@ -18,7 +18,6 @@ import { editablePath, copyablePath, pathContent } from "./fields.js";
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { choiceControl } from "./choices.js";
 import { page, button, seg, chooseLocalPath, beginPageRead } from "./screens.js";
-import { exchange, importFrom } from "./exchange.js";
 import { withEnvironmentSwitch } from "./environment.js";
 import { on } from "./api.js";
 import { archoFigure, archoMode, bootDone } from "./archo.js";
@@ -34,7 +33,9 @@ let session = 0, activeSession = null;
 export const historySession = () => activeSession;
 export const previewing = () => S.guideFrom === "preview";
 
-const STEPS = ["find the game", "read the mods", "where to start"];
+// Two steps: where the first list comes from is the Import & export page, which the guide
+// opens after the scan (A1, 16 §2.15).
+const STEPS = ["find the game", "read the mods"];
 // G.folder: the managed folder (FirstRunFolder) while the first run still has to choose it;
 // it is then step -1, before "find the game" (16 §2.15).
 const G = { folder: null, folderBusy: false, step: 0, way: 0, games: [], picked: new Set(), added: [], scan: null, typed: "", error: "", errorFrom: null };
@@ -44,7 +45,9 @@ const C = { id: "", row: null, submitting: false };
 // Add Game Config's choices (S.guideFrom "env"): copy the current config's settings, the
 // list (a global list's name, "" a new Core and DLC list), the saves folder (shared, own,
 // custom with path); lists are the global lists, the current config's first.
-const A = { copy: true, list: "", lists: [], saves: "", path: "", from: "" };
+const A = { copy: true, list: "", listPicked: false, lists: [], saves: "", path: "", from: "" };
+// the Mod list choice's value for the game's own ModsConfig.xml
+const GAME_LIST = "@game";
 const adding = () => S.guideFrom === "env";
 // The copy way (03 §3.5): which Game Config's game, where, the new config's name, what comes
 // along, the plan the backend checked (GuideCopyPlan) and a run's progress.
@@ -87,7 +90,7 @@ export async function start(from = "first") {
   G.folder = null;
   P.timer = null;
   A.from = from === "env" ? S.board?.env || "" : "";
-  A.copy = !!A.from; A.list = ""; A.lists = []; A.saves = ""; A.path = "";
+  A.copy = !!A.from; A.list = ""; A.listPicked = false; A.lists = []; A.saves = ""; A.path = "";
   await find(from !== "env");
   bootDone();
 }
@@ -158,7 +161,7 @@ function draw() {
   sc.append(w);
   // the steps: where you are, where you can go back to; the managed folder is step -1
   const bar = el("div", "steps");
-  const all = adding() ? STEPS.slice(0, 2) : STEPS;
+  const all = STEPS;
   const steps = G.folder ? ["managed folders", ...all] : all, first = G.folder ? -1 : 0;
   steps.forEach((s, k) => {
     const i = first + k;
@@ -187,7 +190,7 @@ function draw() {
   }
   const card = el("section", "card guide-card");
   w.append(top, card);
-  [folderStep, step1, step2, step3][G.step + 1](card);
+  [folderStep, step1, step2][G.step + 1](card);
   ui.renderWhere();
 }
 
@@ -385,8 +388,15 @@ function configChoices(card) {
     row(T("start with"), el("span", "", T("game defaults")));
     box.append(el("div", "dl-note muted", Tf("%s uses another game folder, so its settings cannot be copied; no settings or saves are copied", A.from)));
   }
-  const list = choiceControl(T("Mod list"), [...A.lists.map((n) => ({ value: n, label: n })), { value: "", label: T("New empty list") }], A.list);
-  list.onchange = () => { A.list = list.value; };
+  // the game's current list (its ModsConfig.xml) comes first when there is one, and is
+  // picked until the player chooses another (16 §2.15)
+  const gameMods = g?.gameMods || 0;
+  if (!A.listPicked) A.list = gameMods ? GAME_LIST : A.lists[0] || "";
+  else if (A.list === GAME_LIST && !gameMods) A.list = A.lists[0] || "";
+  const listOpts = [...A.lists.map((n) => ({ value: n, label: n })), { value: "", label: T("New empty list") }];
+  if (gameMods) listOpts.unshift({ value: GAME_LIST, label: Tf("the game's current list (%d Mods)", gameMods) });
+  const list = choiceControl(T("Mod list"), listOpts, A.list);
+  list.onchange = () => { A.list = list.value; A.listPicked = true; };
   row(T("Mod list"), list);
     const opts = [["own", T("own folder in RimArcho")], ["custom", T("a folder you choose")]];
   if (g && !g.env) opts.unshift(["shared", T("shared (the game's default folder)")]);
@@ -404,7 +414,7 @@ function configChoices(card) {
     if (A.saves === "custom" && !A.path) { G.error = T("choose a user data folder"); return draw(); }
     add.disabled = true;
     const one = { ...g, addConfig: !!g.env, saves: A.saves, customData: A.saves === "custom" ? A.path : "",
-      like: A.copy && copy ? A.from : "", list: A.list, newList: !A.list };
+      like: A.copy && copy ? A.from : "", list: A.list === GAME_LIST ? "" : A.list, newList: !A.list, gameList: A.list === GAME_LIST };
     let names;
     try {
       const accepted = await withEnvironmentSwitch(one.name, async () => { names = await api.GuideAdd([one]); });
@@ -681,59 +691,20 @@ function step2(card) {
   card.append(prog);
   const again = s.done && !s.ok ? button(T("scan again"), "", () => scanAll()) : null;
   // Add Game Config chose its list already: the scan is the last step
-  const next = adding() ? button(T("done"), "", () => finish(""), "primary") : button(T("next"), "", () => go(2), "primary");
+  const next = adding() ? button(T("done"), "", () => finish(""), "primary") : button(T("next"), "", firstList, "primary");
   next.disabled = !s.done;
   footer(card, again, next);
 }
 
-// ---- 3. where to start ----
+// ---- then: where the first list comes from ----
+// The Import & export page in its first-run view (16 §2.18): the game's current list first
+// and picked, then a Mod list, a pack and other managers. Whatever the player brings in, or
+// "use this list" / "skip", ends the guide. A preview ends here: it never imports.
 
-function step3(card) {
-  card.append(el("div", "guide-q", T("where does your first list come from?")));
-  if (previewing()) return previewStep3(card);
-  const ways = el("div", "ways");
-  const n = S.board && S.board.cols ? (S.board.cols[1] || []).length : 0;
-  ways.append(way(T("the game's current list"), Tf("ModsConfig.xml enables %d mods; that becomes your first list", n),
-    button(T("use this list"), "", () => finish(T("use the game's list as it is")), "primary")));
-  const imp = button(T("import…"), "", () => { ui.afterImport = () => finish(""); ui.importManagers(); });
-  ways.append(way(T("move over from RimSort, RimCrow or RimPy"), T("lists and player data, previewed before anything is imported"), imp));
-  const src = el("input", "field");
-  src.placeholder = T("a Steam Workshop collection link");
-  src.type = "url"; src.spellcheck = false;
-  const open = button(T("open"), "", async () => {
-    const v = src.value.trim();
-    if (!v) return src.focus();
-    if (!/^https?:\/\//i.test(v)) { G.error = T("enter a complete HTTP or HTTPS URL"); G.errorFrom = ["url", G.error]; return draw(); }
-    ui.afterImport = () => finish(""); return importFrom("text", v);
-  });
-  src.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); open.click(); } };
-  const row = el("div", "typed");
-  const pick = button(T("choose a pack…"), "", async () => {
-    const session = activeSession;
-    try {
-      const path = await api.PickPackFile();
-      if (path && S.screen === "guide" && activeSession === session) await finish(await api.PackImport(path));
-    } catch (e) { if (S.screen === "guide" && activeSession === session) { G.error = errText(e); G.errorFrom = ["pack", G.error]; draw(); } }
-  });
-  // the link field above, the pack button on the buttons' line with the other two ways
-  row.append(src, open);
-  ways.append(way(T("open a pack or a Steam collection"), T("choose a pack (.archopack), or paste a Steam Workshop collection link"), pick, row));
-  card.append(ways);
-  footer(card, button(T("skip"), "", () => finish("")));
-  const error = card.querySelector(".guide-foot .err");
-  // the footer's error belongs to the field that caused it, while it is still that error
-  const from = (k) => () => G.errorFrom?.[0] === k && G.errorFrom[1] === G.error;
-  if (error) { fieldError(src, error, from("url")); fieldError(pick, error, from("pack")); }
-}
-
-// way is one choice: its title, what it does, then its button at the bottom, level with the
-// other choices' buttons (extra goes between the text and the button)
-function way(title, text, action, extra) {
-  const d = el("div", "way");
-  d.append(el("div", "t", title), el("div", "muted", text));
-  if (extra) d.append(extra);
-  d.append(action);
-  return d;
+function firstList() {
+  if (previewing()) return finish("");
+  ui.afterImport = (text) => finish(text || "");
+  return ui.importFirstList();
 }
 
 async function finish(text) {
@@ -798,17 +769,6 @@ function previewScan() {
   });
   steps.push(() => { G.scan.done = true; });
   previewTick(steps);
-}
-
-function previewStep3(card) {
-  const ways = el("div", "ways");
-  const end = (label) => button(label, "", () => finish(""));
-  const n = S.board && S.board.cols ? (S.board.cols[1] || []).length : 0;
-  ways.append(way(T("the game's current list"), Tf("ModsConfig.xml enables %d mods; that becomes your first list", n), end(T("use this list"))));
-  ways.append(way(T("move over from RimSort, RimCrow or RimPy"), T("lists and player data, previewed before anything is imported"), end(T("import…"))));
-  ways.append(way(T("open a pack or a Steam collection"), T("choose a pack (.archopack), or paste a Steam Workshop collection link"), end(T("choose a pack…"))));
-  card.append(ways);
-  footer(card, end(T("skip")));
 }
 
 // ---- 1c. copy a game folder (03 §3.5) ----

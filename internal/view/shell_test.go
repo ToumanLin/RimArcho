@@ -52,15 +52,15 @@ func TestNavAndPath(t *testing.T) {
 			ids, keys = append(ids, it.ID), append(keys, it.Key)
 		}
 	}
-	if strings.Join(ids, ",") != "home,needs,log,saves,review,plan,packs,library,env,import" {
+	if strings.Join(ids, ",") != "home,needs,log,saves,review,import,plan,packs,library,env" {
 		t.Fatalf("order %v", ids)
 	}
 	// Saves and Import have no shift key: shift+1–8 stay the eight entries the TUI also has (16 §3.5)
-	if strings.Join(keys, ",") != "shift+1,shift+2,shift+3,,,shift+4,shift+5,shift+6,shift+8," {
+	if strings.Join(keys, ",") != "shift+1,shift+2,shift+3,,,,shift+4,shift+5,shift+6,shift+8" {
 		t.Fatalf("keys %v", keys)
 	}
 	// Texture optimisation is Mod library's last sub-entry and keeps shift+7 (16 §2.1)
-	lib := g[2].Items[2]
+	lib := g[2].Items[3]
 	if tx := lib.Kids[len(lib.Kids)-1]; lib.ID != view.PageLibrary || tx.ID != view.PageTextures || tx.Key != "shift+7" {
 		t.Fatalf("textures under Mod library: %+v", lib.Kids)
 	}

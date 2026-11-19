@@ -183,8 +183,8 @@ export function current() {
   if (!S.screen || S.screen === "full" || S.screen === "build") return (S.shell && S.shell.plan && S.shell.plan.page) || "plan";
   if (S.screen === "packs" && S.packFocus) return "pack:" + S.packFocus;
   // a list's export: under Manage lists, or under the list when the editor opened it (16 §2.17)
-  if (S.screen === "plan-export" && S.planExport) return S.planExport.from === "editor" ? "plan:" + S.planExport.id : "plans";
-  if (S.screen === "plan-import") return "import"; // Library > Import (16 §2.18)
+  if (S.screen === "plan-export" && S.planExport) return S.planExport.from === "editor" ? "plan:" + S.planExport.id : S.planExport.from === "import" ? "import" : "plans";
+  if (S.screen === "plan-import") return "import"; // Library > Import & export (16 §2.18)
   // uninstall RimArcho is under settings
   if (S.screen === "uninstall" || S.screen === "uninstall-progress") return "settings";
   // adding an environment belongs to the environment page

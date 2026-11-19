@@ -30,10 +30,14 @@ const (
 // EnvSpec is what the player passes to `env add` / `env set`. Empty fields mean "keep" (set)
 // or "derive" (add).
 type EnvSpec struct {
-	Rename       string
-	Like         string
-	List         string
-	NewList      bool
+	Rename  string
+	Like    string
+	List    string
+	NewList bool
+	// GameList is a user data folder whose ModsConfig.xml becomes the new config's first
+	// list (Add Game Config's "the game's current list", 16 §2.15): no list is taken from
+	// Like, and a new user data folder without its own ModsConfig.xml gets a copy of it.
+	GameList     string
 	GameRoot     string
 	UserDataRoot string
 	Saves        string // shared | own ("" = keep, or shared when adding without --user-data)
@@ -224,7 +228,7 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 	}
 	var like *env.Environment
 	var selectedPlan int64
-	if spec.List != "" && spec.NewList {
+	if (spec.List != "" || spec.GameList != "") && spec.NewList || spec.List != "" && spec.GameList != "" {
 		return nil, nil, fmt.Errorf("--list and --new-list cannot be combined")
 	}
 	if spec.List != "" {
@@ -302,7 +306,7 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 		e.GameID, e.GameRoot, e.GameVersion = installation.GameID, installation.GameRoot, installation.GameVersion
 	}
 	if like != nil {
-		if selectedPlan == 0 && !spec.NewList {
+		if selectedPlan == 0 && !spec.NewList && spec.GameList == "" {
 			reader := &App{Home: a.Home, Store: a.Store, Config: a.Config, Now: a.Now, Rand: a.Rand, Loc: a.Loc, Detect: a.Detect, EnvName: like.Name}
 			// EnvAdd already holds the launch lock. The reader shares it instead of taking
 			// a second OS lock on the same home, which would wait on this call and fail.
@@ -321,6 +325,9 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 		if err := os.MkdirAll(user, 0o755); err != nil {
 			return nil, nil, err
 		}
+	}
+	if err := seedGameList(spec.GameList, user); err != nil {
+		return nil, nil, err
 	}
 	plansBefore, err := a.Store.Plans()
 	if err != nil {
@@ -852,4 +859,28 @@ func (a *App) PrepareEnvForScan(name string) (*env.Environment, error) {
 		return nil, fmt.Errorf("no Game Config named %q (archo env list)", name)
 	}
 	return e, a.prepareEnvLinks(e, false)
+}
+
+// seedGameList copies the game's ModsConfig.xml from the folder from into a new config's
+// user data folder that has none, so its first use makes that order the first list (07
+// §1.4). The same folder, or one with its own ModsConfig.xml, is left as it is.
+func seedGameList(from, user string) error {
+	if from == "" || user == "" || store.UserDataKey(from) == store.UserDataKey(user) {
+		return nil
+	}
+	src, dst := env.ModsConfigPath(from), env.ModsConfigPath(user)
+	if _, err := os.Stat(dst); err == nil {
+		return nil
+	}
+	fi, err := os.Stat(src)
+	if err != nil {
+		return nil // nothing to copy: the first use starts from Core and the DLC
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return err
+	}
+	if err := copyFile(src, dst, fi); err != nil && !errors.Is(err, os.ErrExist) {
+		return fmt.Errorf("copy the game's ModsConfig.xml: %w", err)
+	}
+	return nil
 }

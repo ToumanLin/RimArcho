@@ -170,7 +170,7 @@ func TestPlansInWindow(t *testing.T) {
 	if _, err := api.RemovePlan(def.ID); err != nil {
 		t.Fatal(err)
 	}
-	if sh := api.Shell(); len(sh.Plans) != 2 || sh.Nav[2].Items[0].Kids[1].Label != "Empty" {
+	if sh := api.Shell(); len(sh.Plans) != 2 || sh.Nav[2].Items[1].Kids[1].Label != "Empty" {
 		t.Fatalf("after delete %+v", sh.Plans)
 	}
 	// The palette goes to the other plans.
@@ -215,7 +215,7 @@ func TestOpenListKeepsCurrent(t *testing.T) {
 	if !def.Current || def.Open || sh.Plan == nil || sh.Plan.Name != "Empty" || sh.Current == nil || sh.Current.ID != def.ID {
 		t.Fatalf("a new list is open, not current: %+v", sh.Plans)
 	}
-	if kids := sh.Nav[2].Items[0].Kids; len(kids) != 3 || kids[0].ID != view.PagePlans || kids[1].ID != def.Page {
+	if kids := sh.Nav[2].Items[1].Kids; len(kids) != 3 || kids[0].ID != view.PagePlans || kids[1].ID != def.Page {
 		t.Fatalf("All lists first, then the current list: %+v", kids)
 	}
 	if h := api.Home(); h.Featured < 0 || h.Rows[h.Featured].Name != def.Name {

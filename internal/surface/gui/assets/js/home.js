@@ -640,6 +640,10 @@ function activity() {
   }
   // a new RimArcho (17 §5.1): opens its row in settings, where it is installed
   if (data.update) box.append(actLine(data.update.title, data.update.text, goSelfUpdate));
+  // the game updated, or Steam is about to (B1): copy its folder first, from Add Game
+  // Config's "copy a game folder", which starts from the current config (03 §3.5)
+  const gu = data.gameUpdate;
+  if (gu) box.append(actLine(gu.label, gu.text + "  " + gu.link, () => ui.go("guide:copy")));
   return box;
 }
 

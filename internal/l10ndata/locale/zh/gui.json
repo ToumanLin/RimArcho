@@ -412,5 +412,21 @@
   "RimSort, RimCrow and RimPy lists, RimWorld .rml, ModsConfig.xml or a save (.rws)": "RimSort、RimCrow、RimPy 的列表，RimWorld .rml，ModsConfig.xml 或存档（.rws）",
   "paste": "粘贴",
   "a pack you can launch; its Mods are checked first": "可直接启动的整合包；先逐个检查其中的 Mod",
-  "lists, notes, tags and rules; their files are only read": "列表、备注、标签和规则；只读取它们的文件"
+  "lists, notes, tags and rules; their files are only read": "列表、备注、标签和规则；只读取它们的文件",
+  "Where does your first list come from?": "你的第一个列表从哪里来？",
+  "Share": "分享",
+  "The game's current list": "游戏当前的列表",
+  "its ModsConfig.xml enables %d Mods": "它的 ModsConfig.xml 启用了 %d 个 Mod",
+  "the game has no ModsConfig.xml yet": "游戏还没有 ModsConfig.xml",
+  "read it": "读取",
+  "The current list": "当前列表",
+  "RimSort, RimCrow, RimPy, .rml, a share code or Workshop links": "RimSort、RimCrow、RimPy、.rml、分享码或创意工坊链接",
+  "export %s…": "导出 %s…",
+  "the pack as a file (.archopack), or only its list": "整合包文件（.archopack），或只导出它的列表",
+  "no packs yet": "还没有整合包",
+  "the game's current list (%d Mods)": "游戏当前的列表（%d 个 Mod）",
+  "back up %s first": "先备份 %s",
+  "the game": "游戏",
+  "updated to %s since the last scan": "上次扫描后已更新到 %s",
+  "Steam has an update waiting": "Steam 有一个待装的更新"
 }

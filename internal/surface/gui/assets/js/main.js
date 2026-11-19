@@ -1443,6 +1443,8 @@ const ui = {
   selectedList: () => planManage.selected(),
   resumeGuide: () => guide.resume(),
   importManagers: () => exchange(),
+  importFirstList: () => exchange(true), // the first-run guide's hand-over (16 §2.15)
+  exportList: (id, from) => planManage.exportOf(id, from), // Import & export's current list (16 §2.18)
   manageLists: (id = 0) => { planManage.select(id); return go("plans"); },
   edited: (call, undoable = true) => edited(call, undoable),
   ruleTarget: () => actionContext().sel[0],

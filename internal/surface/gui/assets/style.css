@@ -1972,7 +1972,15 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 /* Import (16 §2.18): three cards by what the player gets; a manager picked above opens a
    tree of its parts below, which turns into the run (a background task) in place. */
 .xc-goals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--card-gap); }
-@media (max-width: 1100px) { .xc-goals { grid-template-columns: 1fr; } }
+/* four import cards (the game's current list first): two by two below 1,500 px */
+.xc-goals.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1500px) { .xc-goals.four { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.xc-goals.xc-share { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .xc-goals, .xc-goals.four, .xc-goals.xc-share { grid-template-columns: 1fr; } }
+/* the first-run guide's pick, and the export side's heading (Import & export, 16 §2.18) */
+.xc-goal.on { border-color: var(--accent); }
+.xc-side { margin: 8px 0 0; font-size: 13px; font-weight: 600; color: var(--muted); }
+.xc-share .xc-row { flex-wrap: wrap; }
 .xc-goal { display: flex; flex-direction: column; padding: 16px; gap: 10px; }
 .xc-gh { display: flex; gap: 10px; align-items: center; }
 .xc-gi { width: 34px; height: 34px; flex: none; border-radius: var(--r-sm); display: flex; align-items: center; justify-content: center; background: var(--pill); color: var(--fg-2); }
