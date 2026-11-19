@@ -29,6 +29,7 @@ export function initShell(u) {
   t.onclick = () => toggleNav();
   $("#nav-settings").onclick = () => ui.go("settings");
   $("#tasks-line").onclick = () => ui.go("tasks");
+  $("#nav-feedback").onclick = () => ui.go("feedback");
   $("#side").addEventListener("keydown", navKey);
   wireSideSplit();
   // the layout from the last run first (a copy in localStorage), so the window does not
@@ -185,7 +186,7 @@ export function current() {
   if (S.screen === "plan-export" && S.planExport) return S.planExport.from === "editor" ? "plan:" + S.planExport.id : "plans";
   if (S.screen === "plan-import") return "import"; // Library > Import (16 §2.18)
   // uninstall RimArcho is under settings
-  if (S.screen === "uninstall" || S.screen === "uninstall-progress" || S.screen === "feedback") return "settings";
+  if (S.screen === "uninstall" || S.screen === "uninstall-progress") return "settings";
   // adding an environment belongs to the environment page
   if (S.screen === "guide" && S.guideFrom === "env") return "env";
   // the first-run guide's preview belongs to settings, where it is opened
@@ -294,6 +295,16 @@ function renderSide() {
   const set = $("#nav-settings");
   set.classList.toggle("on", cur === "settings");
   if (cur === "settings") set.setAttribute("aria-current", "page"); else set.removeAttribute("aria-current");
+  const fb = $("#nav-feedback");
+  fb.classList.toggle("on", cur === "feedback");
+  if (cur === "feedback") fb.setAttribute("aria-current", "page"); else fb.removeAttribute("aria-current");
+  if (!fb.querySelector(".ic")) {
+    const ic = el("span", "ic");
+    ic.innerHTML = icon.feedback;
+    fb.prepend(ic);
+  }
+  $(".lbl", fb).textContent = T("feedback");
+  fb.title = T("feedback");
   const tl = $("#tasks-line");
   if (tl) {
     tl.classList.toggle("on", cur === "tasks");
@@ -323,7 +334,7 @@ function kidList(it, kids, cur, hl) {
     kb.dataset.id = k.id;
     if (k.id === cur) kb.setAttribute("aria-current", "page");
     kb.append(el("span", "lbl", k.label));
-    kb.title = k.label;
+    kb.title = k.label + (k.key ? T("; ") + k.key.replace("shift", "Shift") : "");
     const g = inGameMark(k.inGame);
     if (g) kb.append(g);
     // a plan's "an outside version has not been loaded" (07 §4.3)
@@ -350,7 +361,8 @@ export function crumbs() {
   }
   if (S.screen === "full" && S.fullName) out = out.concat([{ label: S.fullName, id: "full" }]);
   if (S.screen === "uninstall" || S.screen === "uninstall-progress") out = out.concat([{ label: T("uninstall RimArcho"), id: "uninstall" }]);
-  if (S.screen === "feedback") out = out.concat([{ label: T("feedback"), id: "feedback" }]);
+  // Feedback is its own sidebar row since 2026-11-18 (16 §2.1)
+  if (S.screen === "feedback") out = [{ label: T("feedback"), id: "feedback" }];
   if (S.screen === "build") out = out.concat([{ label: T("create a pack"), id: "build" }]);
   if (S.screen === "plan-export" && S.planExport) out = ((sh && sh.crumbs && sh.crumbs["plan:" + S.planExport.id]) || []).concat([{ label: T("export"), id: "plan-export" }]);
   if (S.screen === "plans" && S.listCreating) out = out.concat([{ label: T("new list"), id: "plan:new" }]);

@@ -190,9 +190,9 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 		{ID: PagePlan, Label: T("lists"), Kids: planKids},
 		{ID: PagePacks, Label: T("packs"), Kids: packKids},
 		// Below the packs (2026-10-28). The entry opens All, its first sub-entry (16 §2.9).
-		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all mods")}, {ID: PageChanges, Label: T("updates")}, {ID: PageSubscribe, Label: T("add a subscription")}, {ID: PageSearch, Label: T("search files")}, {ID: PageModSettings, Label: T("mod settings")}}},
-		// what the game loads faster (10 §2)
-		{ID: PageTextures, Label: T("texture optimisation")},
+		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all mods")}, {ID: PageChanges, Label: T("updates")}, {ID: PageSubscribe, Label: T("add a subscription")}, {ID: PageSearch, Label: T("search files")}, {ID: PageModSettings, Label: T("mod settings")},
+			// what the game loads faster (10 §2); a sub-entry since 2026-11-18, keeping shift+7
+			{ID: PageTextures, Label: T("texture optimisation")}}},
 		{ID: PageEnv, Label: T("Game Config")},
 		// every import in one place: lists, packs, saves and other managers' data (16 §2.18)
 		{ID: PageImport, Label: T("import")},
@@ -209,6 +209,13 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 			}
 			n++
 			groups[g].Items[i].Key = fmt.Sprintf("shift+%d", n)
+			// Texture optimisation keeps its own key under Mod library (16 §2.1)
+			for k := range groups[g].Items[i].Kids {
+				if groups[g].Items[i].Kids[k].ID == PageTextures {
+					n++
+					groups[g].Items[i].Kids[k].Key = fmt.Sprintf("shift+%d", n)
+				}
+			}
 		}
 	}
 	return groups
