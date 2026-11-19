@@ -400,10 +400,10 @@ function pendingDetail(card, r) {
   usedIn(body, r.usedIn);
   const acts = el("div", "subs-acts");
   if (r.opens) acts.append(button(r.opens === "compare" ? T("compare on the website") : r.opens === "notes" ? T("Workshop change notes") : T("open the source page"), "ctrl+w", () => openSource(r), "line small"));
-  acts.append(button(T("lock this version first"), "p", () => lock(r.ref), "small", "pin"));
+  acts.append(button(T("keep this version first"), "p", () => lock(r.ref), "small", "pin"));
   acts.append(button(T("show in the mod library"), "l", () => openLibraryInstance(r.id), "small"));
   const keep = section(body, T("keep the old one"));
-  keep.append(el("div", "muted subs-note", T("Updating replaces this copy. To keep the old one, lock this version first.")), acts);
+  keep.append(el("div", "muted subs-note", T("Updating replaces this copy. To keep the old one, keep this version first.")), acts);
   card.append(body);
 }
 
@@ -411,9 +411,9 @@ function goneDetail(card, r) {
   detailHead(card, r.name, []);
   const body = el("div", "scroll subs-gone");
   body.append(el("p", "word-facts", T("The author deleted the Workshop page or made it private; your installed copy still works, but Steam will never update it.")),
-    el("p", "word-facts", T("After unsubscribing, you cannot download it again; lock this version to keep it.")));
+    el("p", "word-facts", T("After unsubscribing, you cannot download it again; keep this version to hold on to it.")));
   const acts = el("div", "subs-acts");
-  acts.append(button(T("lock this version"), "p", () => lock(r.ref), "small", "pin"),
+  acts.append(button(T("keep this version"), "p", () => lock(r.ref), "small", "pin"),
     button(T("show in the mod library"), "l", () => openLibraryInstance(r.id), "small"));
   body.append(acts);
   card.append(body);
@@ -519,7 +519,7 @@ async function openSource(r) {
 async function lock(ref) {
   let p;
   try { p = await api.LibraryPreview("pin", [ref]); } catch (e) { return say("fail", errText(e)); }
-  pop.confirm(p.title, p.lines, T("lock this one"), p.apply ? async () => {
+  pop.confirm(p.title, p.lines, T("keep this one"), p.apply ? async () => {
     try { say("ok", await api.LibraryDo("pin", [ref])); } catch (e) { say("fail", errText(e)); }
     await ui.reload();
     changes();
@@ -557,8 +557,8 @@ async function changeAct(r, kind) {
 export function changesHints() {
   const it = selected();
   const out = [{ key: "↑↓", label: T("move") }];
-  if (it?.t === "pending") out.push({ key: "u", label: T("update") }, { key: "p", label: T("lock this version") });
-  else if (it?.t === "gone") out.push({ key: "p", label: T("lock this version") }, { key: "l", label: T("show in the mod library") });
+  if (it?.t === "pending") out.push({ key: "u", label: T("update") }, { key: "p", label: T("keep this version") });
+  else if (it?.t === "gone") out.push({ key: "p", label: T("keep this version") }, { key: "l", label: T("show in the mod library") });
   else if (it?.t === "sources" || it?.t === "group") out.push({ key: "enter", label: T("open") }, { key: "tab", label: T("the next field or button") });
   else if (it?.t === "change") {
     if (hasFiles(it.r)) out.push({ key: "i", label: T("files") });

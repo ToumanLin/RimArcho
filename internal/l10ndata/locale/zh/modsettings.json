@@ -92,8 +92,6 @@
   "move this Mod's settings files to the recycle bin: the game starts it with its defaults": "把这个 Mod 的设置文件移到回收站：游戏会以默认值启动它",
   "reset %s to its defaults?": "把 %s 恢复为默认？",
   "its settings files go to the recycle bin; the game starts the Mod with its defaults (HugsLib settings stay: reset them value by value)": "它的设置文件会移到回收站；游戏以默认值启动这个 Mod（HugsLib 设置保留：请逐个值重置）",
-  "no other Game Config to copy settings from": "没有可以复制设置的其他游戏配置",
-  "copy settings from which Game Config?": "从哪个游戏配置复制设置？",
   "copy which settings?": "复制哪些设置？",
   "every Mod of this list": "这个列表的每个 Mod",
   "copy the settings of %s from %s?": "从 %[2]s 复制 %[1]s 的设置？",

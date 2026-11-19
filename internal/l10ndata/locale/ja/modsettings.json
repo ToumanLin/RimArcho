@@ -92,8 +92,6 @@
   "move this Mod's settings files to the recycle bin: the game starts it with its defaults": "この Mod の設定ファイルをごみ箱へ移します：ゲームは既定値で起動します",
   "reset %s to its defaults?": "%s を既定値に戻しますか？",
   "its settings files go to the recycle bin; the game starts the Mod with its defaults (HugsLib settings stay: reset them value by value)": "設定ファイルはごみ箱へ移り、ゲームはこの Mod を既定値で起動します（HugsLib の設定は残ります：値ごとに戻してください）",
-  "no other Game Config to copy settings from": "設定をコピーできる別のゲーム構成がありません",
-  "copy settings from which Game Config?": "どのゲーム構成から設定をコピーしますか？",
   "copy which settings?": "どの設定をコピーしますか？",
   "every Mod of this list": "このリストのすべての Mod",
   "copy the settings of %s from %s?": "%[2]s から %[1]s の設定をコピーしますか？",

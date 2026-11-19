@@ -174,7 +174,7 @@ func TaskTitle(kind string) string {
 	case TaskSubscriptionFrom:
 		return T("update subscription")
 	case TaskScan:
-		return T("scan the mods")
+		return T("rescan")
 	case TaskAnalyze:
 		return T("check whether it runs")
 	case TaskSaves:
@@ -577,7 +577,7 @@ func TaskTargetName(target string) string {
 	case target == PageTextures:
 		return T("texture optimisation")
 	case target == PageEnv:
-		return T("Game Config")
+		return T("game")
 	case target == PageSettings:
 		return T("settings")
 	case target == PageSaves:

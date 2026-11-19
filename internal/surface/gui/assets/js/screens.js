@@ -538,7 +538,7 @@ function drawNeeds() {
   const w = page("needs fill", needsLead(d),
     state ? el("span", "state-note", state) : null,
     autoFix(),
-    act(T("check the files again"), "rescan", () => ui.cmd("analyze"), "A", "analyze"),
+    act(T("check again"), "rescan", () => ui.cmd("analyze"), "A", "analyze"),
     act(T("game log"), "log", () => ui.go("log"), "l"));
   N.els = [[], []];
   const live = N.cols[1].some((x) => x.group === 6);
@@ -1579,7 +1579,7 @@ function patternCard(c) {
 export { changes, changesHints, changesFiltered, changesPlan, openAdd, addHints } from "./subscriptions.js";
 
 export function rescanButton(label) {
-  const b = button(S.busy.scan ? T("scanning…") : label || T("rescan the mod folders"), "R", () => ui.cmd("rescan"), "", "rescan");
+  const b = button(S.busy.scan ? T("scanning…") : label || T("rescan"), "R", () => ui.cmd("rescan"), "", "rescan");
   b.classList.add("rescan");
   if (label) b.dataset.label = label;
   b.prepend(el("span", "ic" + (S.busy.scan ? " spin" : "")));
@@ -2064,7 +2064,7 @@ export async function environment() {
   const top = sc.scrollTop;
   sc.innerHTML = "";
   const current=(p.envs||[]).find(e=>e.current);
-  const w = page("env", "", act(T("Add Game Config"), "plus", () => ui.go("guide")), act(T("copy the game folder…"), "copy", () => ui.go("guide:copy")), rescanButton());
+  const w = page("env", T("Game Config: a game folder with its own saves, settings and current list"), act(T("Add Game Config"), "plus", () => ui.go("guide")), act(T("copy the game folder…"), "copy", () => ui.go("guide:copy")), rescanButton());
   sc.append(w);
   const envLab = el("div", "label section", T("all Game Configs"));
   w.append(envLab);

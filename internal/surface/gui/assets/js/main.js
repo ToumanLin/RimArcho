@@ -447,6 +447,22 @@ function actions() {
   return out;
 }
 
+// keyboard mode (16 §3.1 rule 4): the hint line shows only after a key outside a text field
+// (or tab, an arrow, enter or esc anywhere) and goes at the next mouse press; a mouse player
+// never reads it, ? and the command panel still list every key.
+let keyboardMode = false;
+function wireKeyboardMode() {
+  const typing = (t) => t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ""));
+  const navKey = /^(Tab|Arrow|Enter$|Escape$|F\d|Page|Home$|End$)/;
+  document.addEventListener("keydown", (e) => {
+    if (keyboardMode || ["Shift", "Control", "Alt", "Meta"].includes(e.key)) return;
+    if (typing(e.target) && !navKey.test(e.key)) return;
+    keyboardMode = true;
+    renderHints();
+  }, true);
+  document.addEventListener("pointerdown", () => { if (keyboardMode) { keyboardMode = false; renderHints(); } }, true);
+}
+
 function renderHints() {
   const h = $("#hints");
   h.innerHTML = "";
@@ -471,6 +487,7 @@ function renderHints() {
   const c = S.focus < 3 ? col() : null;
   const selected = c && c.sel.size && !S.screen;
   if (selected) h.append(el("span", "accent", Tf("%d selected", c.sel.size)));
+  if (!keyboardMode) return;
   hintLine(list, selected ? [{ key: "esc", label: T("clear the selection") }] : []).forEach((a) => {
     const group = el("span", "hint-group");
     group.append(keyCaps(a.key), " " + a.label);
@@ -1000,12 +1017,12 @@ async function chooseEnv() {
   const rows = S.board?.environmentRows || [];
   if (!rows.length) return go("guide"); // no game yet: Add Game Config is the page for it
   const labels = rows.map(e => e.name + "  " + e.installation + (e.current ? "  " + T("in use") : ""));
-  labels.push("+ " + T("Add Game Config"));
-  pop.choose(T("switch Game Config"), labels, (i) => {
+  labels.push("+ " + T("add a game"));
+  pop.choose(T("switch game"), labels, (i) => {
     // Add Game Config is a page (16 §2.15), not a dialog
     if (i === rows.length) return go("guide");
     return useEnv(rows[i].name);
-  }, Math.max(0, rows.findIndex(e => e.current)), { key:"Delete", label:T("remove Game Config"), envWrite:"remove-env", run:i => { if(i<rows.length) scr.removeEnv(rows[i].name); } });
+  }, Math.max(0, rows.findIndex(e => e.current)), { key:"Delete", label:T("remove game"), envWrite:"remove-env", run:i => { if(i<rows.length) scr.removeEnv(rows[i].name); } });
 }
 
 async function useEnv(name) {
@@ -1504,6 +1521,7 @@ async function start() {
   initRules(ui);
   wireSplits();
   document.addEventListener("keydown", onKey);
+  wireKeyboardMode();
   wireZoom(); // ctrl+wheel, ctrl+'+' / '-' / '0': interface size on every page (16 §2.14)
   document.addEventListener("verb", (e) => { const v = e.detail; v === "needs" ? go("needs") : verb(v); });
   // a detail's settings row: Mod library › Mod settings at that Mod's files (16 §2.9)

@@ -298,7 +298,6 @@
   "type what to look for": "検索する内容を入力",
   "undo applies to list edits (space, m, t, x)": "取り消せるのはリストの変更です（space、m、t、x）",
   "unhide": "再表示",
-  "unlock": "固定を解除",
   "unsubscribe": "サブスクライブ解除",
   "unsubscribe / move to the recycle bin (asks first)": "サブスクライブ解除／ゴミ箱へ移動（事前確認あり）",
   "unsubscribed from %s, Steam deletes the folder": "%sのサブスクライブを解除しました。Steamがフォルダを削除します",
@@ -399,5 +398,13 @@
   "press C again to delete the DDS RimArcho wrote": "もう一度Cを押すとRimArchoが作成したDDSを削除します",
   "removed the converted textures of %s": "%sの変換済みテクスチャを削除しました",
   "replace at: %s (%d file, %s)": "置き換え先：%s（%dファイル、%s）",
-  "by RimArcho, click to edit": "RimArchoが作成・クリックで編集"
+  "by RimArcho, click to edit": "RimArchoが作成・クリックで編集",
+  "keep this version": "このバージョンを残す",
+  "keep this version first": "先にこのバージョンを残す",
+  "keep this one": "これを残す",
+  "keep this version (dry run first)": "このバージョンを残す（先に予行）",
+  "stop keeping this version": "このバージョンを残すのをやめる",
+  "Updating replaces this copy. To keep the old one, keep this version first.": "更新するとこのコピーが置き換わります。旧版を残す場合は先にバージョンを固定してください。",
+  "After unsubscribing, you cannot download it again; keep this version to hold on to it.": "サブスクライブを解除すると再取得できません。残したい場合は先にこのバージョンを固定してください。",
+  "check again": "もう一度チェック"
 }

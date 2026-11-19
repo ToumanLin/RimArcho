@@ -298,7 +298,6 @@
   "type what to look for": "先输入要找的内容",
   "undo applies to list edits (space, m, t, x)": "撤销作用于列表的修改（space、m、t、x）",
   "unhide": "取消隐藏",
-  "unlock": "解除锁定",
   "unsubscribe": "退订",
   "unsubscribe / move to the recycle bin (asks first)": "退订 / 移到回收站（先确认）",
   "unsubscribed from %s, Steam deletes the folder": "已退订 %s，Steam 会删掉它的文件夹",
@@ -399,5 +398,13 @@
   "press C again to delete the DDS RimArcho wrote": "再按一次 C：删除 RimArcho 写的 DDS",
   "removed the converted textures of %s": "已清除 %s 的贴图优化",
   "replace at: %s (%d file, %s)": "覆盖位置：%s（%d 个文件，%s）",
-  "by RimArcho, click to edit": "RimArcho 写的，点击修改"
+  "by RimArcho, click to edit": "RimArcho 写的，点击修改",
+  "keep this version": "保留这个版本",
+  "keep this version first": "先保留这个版本",
+  "keep this one": "保留这一个",
+  "keep this version (dry run first)": "保留这个版本（先试运行）",
+  "stop keeping this version": "不再保留这个版本",
+  "Updating replaces this copy. To keep the old one, keep this version first.": "更新会替换这一份。想留着旧版：先保留这个版本",
+  "After unsubscribing, you cannot download it again; keep this version to hold on to it.": "退订后将无法重新下载；保留这个版本即可保留。",
+  "check again": "重新检查"
 }

@@ -312,7 +312,7 @@ func FolderOwner(f *app.SaveFolder) string {
 		names = append(names, e.Name)
 	}
 	if len(names) == 0 {
-		return T("no Game Config saves here")
+		return T("no game of yours saves here")
 	}
 	return strings.Join(names, ", ")
 }

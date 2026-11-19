@@ -693,7 +693,7 @@ function step2(card) {
   progress(bar, card.querySelector(".guide-q"), s.rows.length ? Math.round(100 * doneN / s.rows.length) : undefined, 100);
   prog.append(bar);
   card.append(prog);
-  const again = s.done && !s.ok ? button(T("scan again"), "", () => scanAll()) : null;
+  const again = s.done && !s.ok ? button(T("rescan"), "", () => scanAll()) : null;
   // Add Game Config chose its list already: the scan is the last step
   const next = adding() ? button(T("done"), "", () => finish(""), "primary") : button(T("next"), "", firstList, "primary");
   next.disabled = !s.done;

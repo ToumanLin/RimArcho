@@ -157,7 +157,7 @@ for (const way of ["throws", "refuses"]) test(`a first scan that ${way} gives ba
   await h.screen.querySelectorAll("button").find(b => b.textContent === "add and continue").onclick(); await flush();
   assert.ok(!h.S.busy.scan, "no scan runs");
   assert.match(h.screen.textContent, way === "throws" ? /scan failed/ : /a scan is already running/);
-  if (way === "throws") assert.ok(h.screen.querySelectorAll("button").some(b => b.textContent === "scan again"));
+  if (way === "throws") assert.ok(h.screen.querySelectorAll("button").some(b => b.textContent === "rescan"));
 });
 
 test("the preview shows the first run from finding the game and writes nothing", async () => {

@@ -127,7 +127,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("ctrl+o", "open the location"),
 			r("D", "see dependencies (can it run)"),
 			r("S", "sort the list"),
-			r("p", "lock this version (dry run first)"),
+			r("p", "keep this version (dry run first)"),
 			r("esc", "show every mod"),
 		)
 	}

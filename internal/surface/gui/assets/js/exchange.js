@@ -381,7 +381,7 @@ function partLabel(g, p) {
   return PART()[p.part] || p.part;
 }
 function partBecomes(g, p) {
-  if (g.kind === "configs") return T("a Game Config with its list");
+  if (g.kind === "configs") return T("a game with its list");
   if (g.kind === "lists") {
     if (p.state === "listed") return M.mode.get(p.id) === "update" ? Tf("changes to your list %s; undoable", p.list.name) : T("another copy");
     return T("a new list");
@@ -483,7 +483,7 @@ function partRow(m, g, p) {
   if (p.list?.changed) P.push(["chg", T("changed")]);
   let right;
   if (p.state === "blocked") right = el("span", "why", p.why || "");
-  else if (p.state === "had") right = have(g.kind === "configs" ? Tf("already the Game Config %s", p.why) : T("already in RimArcho"));
+  else if (p.state === "had") right = have(g.kind === "configs" ? Tf("already the game %s", p.why) : T("already in RimArcho"));
   else if (on) right = el("span", "bc becomes", partBecomes(g, p));
   else if (p.state === "listed") {
     right = el("span", "bc");
@@ -587,7 +587,7 @@ function drawRun() {
       button(T("choose again"), "", again), button(Tf("continue %d", rest.length), "", () => startRun(rest), "primary"));
   } else {
     const failed = r.picks.filter((_, i) => items[i]?.state === "fail");
-    f.append(el("span", "note", (failed.length ? Tf("%d failed; the rest is in RimArcho.", failed.length) : T("Everything is in RimArcho.")) + " " + T("Notes and tags show in the Mod library; lists under lists; Game Configs in the switcher.")));
+    f.append(el("span", "note", (failed.length ? Tf("%d failed; the rest is in RimArcho.", failed.length) : T("Everything is in RimArcho.")) + " " + T("Notes and tags show in the Mod library; lists under lists; games in the switcher.")));
     if (failed.length) f.append(button(Tf("retry %d", failed.length), "", () => startRun(failed)));
     if (r.picks.some(p => p.kind === "lists")) f.append(button(T("open lists"), "", () => ui.go("plans")));
     f.append(button(T("done"), "", again, "primary"));
