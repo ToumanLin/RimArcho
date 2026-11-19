@@ -131,7 +131,16 @@ The motions are implemented in `js/motion.js` and the motion section of `style.c
     - **Import & export**: peeks over “Bring in”, 140 px. Neutral; think while a list is read, a pack added or another manager's data moved in; smug at a preview; thumbsup when a pack is added or a move-in finished without failures; skeptic when some parts failed; shake at an error.
     - **Uninstall**: peeks over the plan card, 140 px, and over the progress card while it runs. Cry at the plan; skeptic when uninstalling is blocked; think while it runs; salute when done; dizzy when it failed.
     - **Background tasks**: stands at the foot of the "every item" pane when the selected task has no per-item list, 176 px. Think while it runs or waits; thumbsup when done; skeptic when partly done; cry when failed; neutral when stopped; sleepy with no task selected.
-    - Idle cycling (each page's calm expressions in turn every 45 s, three loops each) exists in `archoSpot` but is off (`ARCHO_CYCLE`) until the player decides.
+    - **Idle cycling.** While a page is in a calm state and nothing changes, she moves to the next of the page's calm expressions every 45 s, plays it three times and holds the still. A state expression (an error, a run, a sent report) is never cycled away; a redraw in the same calm state keeps her turn. Motion still or off and reduced motion stop it. Calm states and sets:
+
+      | Page | Calm states | Calm expressions, in turn |
+      | --- | --- | --- |
+      | Can it run | nothing to handle (thumbsup), not checked yet (neutral) | neutral, smug, wink, smirk, sleepy |
+      | Feedback | the empty form | neutral, ponder, think, wink, smirk |
+      | Import & export | nothing read or running | neutral, ponder, think, smirk, yum |
+      | Uninstall | the plan, not run and not blocked | cry, ponder, sleepy, neutral |
+      | Background tasks | no task selected, a task done or stopped | sleepy, neutral, ponder, wink, yum |
+      Cost at rest (16 §10, 2026-11-19, headless Edge at 150 %, process tree): a loop plays 6.5 s in every 45 s. A playing loop measured about 1 % of a core above a blank page, and the noise on this host is ±2 %, so cycling averages about 0.2 %. On the dev harness, Feedback, Background tasks and Can it run left alone for 150 s measured the same with Archo live and off (45.9–49.1 % vs 46.0–47.6 %). That figure is the headless harness itself, which has no animations running; the native WebView2 figure is a VM check (release-vm-tests S6).
 
 The following rules apply:
 - Continuous or moving animations change only opacity and transform so WebView2 can composite without relayout or repaint. A flash uses a fading overlay instead of animating the background color; shimmer and progress use moving gradient layers. The exceptions are one-off 120ms hover-color transitions and the few sidebar grid rows expanding once over 250ms.

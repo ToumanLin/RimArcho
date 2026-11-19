@@ -505,8 +505,10 @@ function drawItems() {
   els.iscroll.hidden = !has;
   els.none.hidden = has;
   // Archo stands in the empty detail (16 §7.1 "Placements"); a list of items fills it
-  const spot = archoSpot("tasks", { size: 176, calm: ["neutral", "sleepy"] });
-  if (has) spot.slot.remove(); else spot.stand(els.items, taskFace(r));
+  const spot = archoSpot("tasks", { size: 176, calm: ["sleepy", "neutral", "ponder", "wink", "yum"] });
+  const face = taskFace(r);
+  // calm: nothing selected, a task done or stopped; running, failed or partly done hold
+  if (has) spot.slot.remove(); else spot.stand(els.items, face, ["sleepy", "thumbsup", "neutral"].includes(face));
   if (!has) {
     factText(els.none, r ? [r.noItems, r.line] : []);
     if (r) {

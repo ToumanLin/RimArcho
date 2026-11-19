@@ -616,7 +616,8 @@ function drawNeeds() {
     lbox.append(b);
   }
   // Archo closes the right column, under its last card (16 §7.1 "Placements")
-  archoSpot("needs", { size: 176, calm: ["neutral", "think"] }).stand(rbox, needsFace(d));
+  const face = needsFace(d);
+  archoSpot("needs", { size: 176, calm: ["neutral", "smug", "wink", "smirk", "sleepy"] }).stand(rbox, face, face === "thumbsup" || face === "neutral");
   w.append(grid);
   sc.append(w);
   sc.querySelectorAll(".needcol > .scroll").forEach((s, i) => { s.scrollTop = keep[i] || 0; });

@@ -89,7 +89,7 @@ export async function exchange(first = false) {
   if (brief) w.append(inLab, inCard, resLab, result);
   else w.append(inLab, inCard, mLab, mCard, resLab, result);
   area(inCard, inLab); if (!brief) area(mCard, mLab);
-  spot().peek(inCard, "neutral");
+  spot().peek(inCard, "neutral", true);
   // the export side (C1): share what you have, below bringing things in
   if (!firstRun) { const [sLab, sCard] = sectionCard(T("Share")); shareRows(sCard); w.append(sLab, sCard); area(sCard, sLab); }
   sc.append(w);
@@ -113,8 +113,9 @@ const live = (active) => session === active && S.screen === "plan-import";
 // section: a numbered label over a card of rows, as on Game Config and Settings
 // Archo peeks over the first card (16 §7.1 "Placements"): thinking while something is read
 // or moved in, pleased with a preview, a thumbs-up when it is in, a shake at an error.
-const spot = () => archoSpot("import", { size: 140, calm: ["neutral", "ponder"] });
-const face = (e) => spot().set(e);
+const spot = () => archoSpot("import", { size: 140, calm: ["neutral", "ponder", "think", "smirk", "yum"] });
+// nothing read or running is the calm state: her idle faces follow only there
+const face = (e) => spot().set(e, e === "neutral");
 
 function sectionCard(title) {
   return [el("div", "label section", title), el("section", "card settings xc-sec")];

@@ -140,7 +140,7 @@ test("tips: each line takes the next one of its kind; first-run tips stay in the
   assert.equal(guide.textContent, "g");
 });
 
-test("a spot stands in its host, plays three loops per state and rests; idle cycling is off", async () => {
+test("a spot stands in its host, plays three loops per state and rests; a state expression never cycles", async () => {
   const { archo, advance, pending } = await setup();
   const col = new Node("div");
   const spot = archo.archoSpot("t1", { size: 176, calm: ["neutral", "sleepy"] });
@@ -160,27 +160,52 @@ test("a spot stands in its host, plays three loops per state and rests; idle cyc
   await flush(); await flush(); await flush();
   assert.match(slot.children[0].src, /anim\/thumbsup\.webp$/);
   await advance(3 * 2160);
-  await advance(120000); // no cycling: nothing changes, nothing is left running
+  await advance(120000); // a state, not calm: nothing changes, nothing is left running
   assert.match(slot.children[0].src, /stills\/thumbsup@360\.webp$/);
   assert.equal(pending(), 0);
   spot.end();
   assert.equal(col2.children.length, 0);
 });
 
-test("a peek hangs from the element before its card; with cycling a calm face moves on every 45 s", async () => {
+test("a peek hangs from the element before its card; in a calm state the calm faces take turns every 45 s", async () => {
   const { archo, advance } = await setup();
   const page = new Node("div"), label = new Node("div"), card = new Node("section");
   page.append(label, card);
-  const spot = archo.archoSpot("t2", { size: 140, calm: ["neutral", "ponder"], cycle: true });
-  spot.peek(card, "neutral");
+  const spot = archo.archoSpot("t2", { size: 140, calm: ["neutral", "ponder", "wink", "smirk"] });
+  spot.peek(card, "neutral", true);
   const slot = label.children.at(-1);
   assert.ok(slot.classList.contains("archo-peek") && label.classList.contains("archo-anchor"));
-  await advance(45000);
+  await advance(44999);
+  assert.equal(spot.expr, "neutral");
+  await advance(1);
   assert.equal(spot.expr, "ponder");
-  spot.set("shake"); // a state's face does not cycle
-  await advance(90000);
+  await flush(); await flush(); await flush();
+  assert.match(slot.children[0].src, /anim\/ponder\.webp$/); // three loops, then the still
+  await advance(3 * 2160);
+  assert.match(slot.children[0].src, /stills\/ponder@360\.webp$/);
+  // a redraw in the same calm state keeps the turn
+  spot.peek(card, "neutral", true);
+  assert.equal(spot.expr, "ponder");
+  await advance(45000);
+  assert.equal(spot.expr, "wink");
+  // a state's face holds
+  spot.set("shake");
+  await advance(180000);
   assert.equal(spot.expr, "shake");
   spot.end();
+});
+
+test("still and reduced motion stop the cycling", async () => {
+  for (const opts of [{ mode: "still" }, { reduce: true }]) {
+    const { archo, advance } = await setup(opts);
+    const col = new Node("div");
+    const spot = archo.archoSpot("t4", { calm: ["neutral", "ponder", "wink"] });
+    spot.stand(col, "neutral", true);
+    await advance(200000);
+    assert.equal(spot.expr, "neutral");
+    assert.match(col.children[0].children[0].src, /stills\/neutral@360\.webp$/);
+    spot.end();
+  }
 });
 
 test("off places no spot", async () => {

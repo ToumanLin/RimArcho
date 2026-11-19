@@ -59,7 +59,8 @@ async function draw(fetch) {
   w.append(card);
   w.append(foot(pg));
   // Archo peeks over the card: sad to go, a salute when it is done (16 §7.1 "Placements")
-  spot().peek(card, pg.ran ? (pg.failed ? "dizzy" : "salute") : pg.blocked ? "skeptic" : "cry");
+  // the plan, left open, is the calm state (sad faces in turn); the rest hold
+  spot().peek(card, pg.ran ? (pg.failed ? "dizzy" : "salute") : pg.blocked ? "skeptic" : "cry", !pg.ran && !pg.blocked);
   sc.scrollTop = top;
   read?.finish();
 }
@@ -224,7 +225,7 @@ function exclusive() {
   }
 }
 
-const spot = () => archoSpot("uninstall", { size: 140, calm: ["cry"] });
+const spot = () => archoSpot("uninstall", { size: 140, calm: ["cry", "ponder", "sleepy", "neutral"] });
 
 function drawProgress() {
   const sc = S.screen === "uninstall-progress" ? $("#screen") : openScreen("uninstall-progress");

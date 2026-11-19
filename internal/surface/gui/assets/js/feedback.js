@@ -69,7 +69,7 @@ async function compose() {
 
 // Archo peeks over the form (16 §7.1 "Placements"): thinking while you write, pondering
 // while it sends, a salute once sent, tears if sending failed, a wink at a new reply.
-const spot = () => archoSpot("feedback", { size: 128, calm: ["neutral", "ponder"] });
+const spot = () => archoSpot("feedback", { size: 128, calm: ["neutral", "ponder", "think", "wink", "smirk"] });
 function fbFace() {
   if (F.sending) return "ponder";
   if (F.failed) return "cry";
@@ -77,7 +77,8 @@ function fbFace() {
   if (F.title.trim() || F.text.trim()) return "think";
   return F.landed ? "wink" : "neutral";
 }
-const face = () => spot().set(fbFace());
+// only the empty form is calm: her idle faces follow there, never over a state
+const face = () => { const e = fbFace(); spot().set(e, e === "neutral"); };
 
 function draw() {
   const sc = $("#screen");
@@ -111,7 +112,7 @@ function draw() {
   }
   w.append(lab1, form);
   area(form, lab1, () => title.focus());
-  spot().peek(form, fbFace());
+  spot().peek(form, fbFace(), fbFace() === "neutral");
 
   const lab2 = el("div", "label section", T("attach"));
   const card = el("section", "card settings");

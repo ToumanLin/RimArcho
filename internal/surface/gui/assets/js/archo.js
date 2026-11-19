@@ -121,18 +121,20 @@ export const archoFigure = (slot, expr) => show(slot, { expr, rotate: false, res
 
 // ---- placements on pages (16 §7.1 "Placements") ----------------------------------------
 // archoSpot keeps one figure per page across redraws: the page calls peek or stand on every
-// draw with the expression for its state. A new expression plays its loop three times and
-// rests on the still (as in the guide); with cycle on, a page left alone moves to the next
-// of its calm expressions every 45 s, again three loops then the still.
+// draw with the expression for its state, and whether that state is a calm one. A new
+// expression plays its loop three times and rests on the still (as in the guide). In a calm
+// state, left alone, she moves to the next of the page's calm expressions every 45 s, again
+// three loops then the still; a state expression (an error, a run) is never cycled away.
+// Cycling stops with ui.archo.motion still or off and under reduced motion.
 //
-//   const spot = archoSpot("feedback", { size: 128, calm: ["neutral"] });
-//   spot.peek(card, "think");   // behind card's top edge at its right end
-//   spot.stand(column, "thumbsup");   // last in column, right-aligned, fading at the bottom
+//   const spot = archoSpot("feedback", { size: 128, calm: ["neutral", "ponder", "wink"] });
+//   spot.peek(card, "think");          // behind card's top edge at its right end
+//   spot.stand(column, "thumbsup", true);   // last in column; a calm state: cycling follows
 //
 // She is never cut: where the space is too narrow or too short, or a box would clip her,
 // the slot is hidden (visibility) until it fits again.
 const CYCLE = 45000, PEEK_RIGHT = 24, PEEK_OVER = 12;
-export const ARCHO_CYCLE = false; // idle cycling: off until the player decides (16 §7.1)
+export const ARCHO_CYCLE = true; // idle cycling in calm states (16 §7.1)
 const spots = new Map();
 
 export function archoSpot(name, { size = 140, calm = ["neutral"], cycle = ARCHO_CYCLE } = {}) {
@@ -141,7 +143,7 @@ export function archoSpot(name, { size = 140, calm = ["neutral"], cycle = ARCHO_
   const slot = document.createElement("div");
   slot.className = "archo-spot";
   slot.style.setProperty("--archo-size", size + "px");
-  let figure = null, timer = 0, card = null, turn = 0;
+  let figure = null, timer = 0, card = null, turn = 0, base = "", quiet = false;
   const s = { slot, expr: calm[0] };
   const fit = () => {
     if (!slot.isConnected) return;
@@ -161,39 +163,51 @@ export function archoSpot(name, { size = 140, calm = ["neutral"], cycle = ARCHO_
     slot.classList.toggle("archo-hide", !fits(slot, card ? size * 4 : 0, card));
   };
   const ro = typeof ResizeObserver === "function" ? new ResizeObserver(() => fit()) : null;
-  const put = (host, expr) => {
+  const put = (host, expr, calmState) => {
     if (mode === "off" || !host) { slot.parentElement?.style.removeProperty("padding-top"); slot.remove(); return; }
     if (slot.parentElement !== host || slot.nextSibling) host.append(slot);
     ro?.disconnect?.(); ro?.observe?.(host); if (card) ro?.observe?.(card);
     setTimeout(fit, 0); // once the page holding host is in the document
-    s.set(expr || s.expr);
+    s.set(expr || base || s.expr, calmState);
   };
-  s.peek = (c, expr) => {
+  s.peek = (c, expr, calmState = false) => {
     const anchor = c?.previousElementSibling;
-    if (!anchor) return s.stand(c?.parentElement, expr);
+    if (!anchor) return s.stand(c?.parentElement, expr, calmState);
     card = c;
     slot.classList.add("archo-peek"); slot.classList.remove("archo-stand");
     anchor.classList.add("archo-anchor");
-    put(anchor, expr);
+    put(anchor, expr, calmState);
   };
-  s.stand = (host, expr) => {
+  s.stand = (host, expr, calmState = false) => {
     card = null;
     slot.classList.add("archo-stand"); slot.classList.remove("archo-peek");
     slot.style.bottom = slot.style.right = "";
-    put(host, expr);
+    put(host, expr, calmState);
   };
-  s.set = (expr) => {
-    s.expr = expr;
+  // show puts expression e on the figure (three loops, then the still)
+  const showExpr = (e) => {
+    s.expr = e;
     if (mode === "off" || !slot.parentElement) return; // shown on the next peek or stand
-    if (!figure || figure.ended) figure = show(slot, { expr, rotate: false, rest: true });
-    else figure.set(expr);
+    if (!figure || figure.ended) figure = show(slot, { expr: e, rotate: false, rest: true });
+    else figure.set(e);
+  };
+  // set: the page's state. The same calm state again (a redraw) keeps the cycle where it is.
+  s.set = (expr, calmState = false) => {
+    if (calmState && quiet && expr === base && figure && !figure.ended) return;
+    base = expr; quiet = calmState;
+    showExpr(expr);
     clearTimeout(timer);
-    if (cycle && calm.length > 1 && calm.includes(expr)) timer = setTimeout(idle, CYCLE);
+    if (quiet) timer = setTimeout(idle, CYCLE);
   };
   const idle = () => {
     if (!slot.isConnected) return s.end();
-    turn = (calm.indexOf(s.expr) + 1) % calm.length;
-    s.set(calm[turn]);
+    if (!quiet) return;
+    if (cycle && calm.length > 1 && canMove()) {
+      const at = calm.indexOf(s.expr);
+      turn = at >= 0 ? (at + 1) % calm.length : turn % calm.length;
+      showExpr(calm[turn] === s.expr ? calm[(turn + 1) % calm.length] : calm[turn]);
+    }
+    timer = setTimeout(idle, CYCLE);
   };
   s.end = () => {
     clearTimeout(timer); ro?.disconnect?.();
