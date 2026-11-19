@@ -480,7 +480,7 @@ type DescribeIn struct {
 
 type PlayerIn struct {
 	Env    string  `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
-	Action string  `json:"action" jsonschema:"tag_add, tag_remove, tag_order, alias, note, copy_note (one copy's own); on every mod: tag_rename, tag_merge, tag_delete, tag_note, tag_color"`
+	Action string  `json:"action" jsonschema:"tag_add, tag_remove, tag_order, alias, note, copy_note (one copy), functional; on every mod: tag_rename, tag_merge, tag_delete, tag_note, tag_color"`
 	Refs   StrList `json:"refs,omitempty" jsonschema:"the mods (tag_add / tag_remove: one or more; others: one)"`
 	Tags   StrList `json:"tags,omitempty" jsonschema:"the tags (tag_rename, tag_note: one)"`
 	Text   string  `json:"text,omitempty" jsonschema:"alias, note, copy_note, tag_note: text, empty clears it; tag_rename: new name; tag_merge: target; tag_color: colour name or #rrggbb"`
@@ -775,6 +775,14 @@ func PlayerArgv(in PlayerIn) []string {
 			return []string{in.Action, first, "--clear"}
 		}
 		return []string{in.Action, first, in.Text}
+	case "functional":
+		switch in.Text {
+		case "":
+			return []string{"functional", first, "--clear"}
+		case "not functional", "not":
+			return []string{"functional", first, "--not"}
+		}
+		return []string{"functional", first}
 	case "copy_note":
 		if in.Text == "" {
 			return []string{"note", first, "--copy", "--clear"}

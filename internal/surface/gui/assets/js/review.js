@@ -113,6 +113,17 @@ export async function open() {
   show(p, false);
 }
 
+// mark records the player's functional mark on a Mod (12 §3.3 rule 2) and asks for the
+// page again: the saves' kept results are merged, none is read again.
+async function mark(library, value) {
+  const visit = X.visit;
+  try { say("ok", await api.SaveReviewMark(library, value)); } catch (e) { say("fail", String(e?.message || e)); return; }
+  const here = () => S.screen === "review" && X.visit === visit && S.screenSeq === visit;
+  let p;
+  try { p = await read(() => {}); } catch (e) { if (here()) say("fail", String(e?.message || e)); return; }
+  if (p && here()) { X.page = p; redraw(); }
+}
+
 // pick reviews another colony behind the page shown.
 async function pick(key) {
   if (key === X.colony) return;
@@ -323,10 +334,15 @@ function groupsBy() {
   if (X.by === "kind") list = gs.map((g) => ({ label: g.label, hint: g.hint, items: g.mods.map((m) => ({ m, mode: g.key })) }));
   else if (X.by === "progress") {
     // what the player asks first: what was never touched, then how far the rest went
-    const order = [["none", T("nothing in the saves")], ["some", T("a little seen")], ["most", T("mostly seen")], ["whole", T("all seen")], ["used", T("picked from, some in use")]];
+    const order = [["none", T("never seen in the saves")], ["set", T("only set up")], ["some", T("a little seen")], ["most", T("mostly seen")], ["whole", T("all seen")], ["used", T("picked from, some in use")]];
+    const hints = {
+      none: T("not proof it was never met: it may come only late, in raids or quests, or with another storyteller or scenario"),
+      set: T("in a bill, a quest or research not begun: chosen or offered, not there yet"),
+      used: T("floors, furniture, clothes, looks: how many are used says little"),
+    };
     const by = new Map(order.map(([k]) => [k, []]));
     for (const x of mods()) by.get(tier(x.m, x.mode)).push(x);
-    list = order.map(([k, label]) => ({ label, hint: k === "used" ? T("floors, furniture, clothes, looks: how many are used says little") : "", items: by.get(k) }));
+    list = order.map(([k, label]) => ({ label, hint: hints[k] || "", items: by.get(k) }));
   } else {
     const out = new Map();
     const add = (k, x) => { if (!out.has(k)) out.set(k, []); out.get(k).push(x); };
@@ -351,7 +367,7 @@ function groupsBy() {
 // tier is how far the saves went with a Mod: for what the game brings you to, nothing,
 // some (under half), most, all; for what is picked from, nothing or used.
 function tier(m, mode) {
-  if (m.part === 0) return "none";
+  if (m.part === 0) return m.group === "configured" ? "set" : "none";
   if (mode !== "meet") return "used";
   return m.part >= m.size ? "whole" : m.part * 2 >= m.size ? "most" : "some";
 }
@@ -407,8 +423,31 @@ function drawTiles() {
     sec.append(h, tiles);
     map.append(sec);
   }
-  if (X.page.foot) map.append(el("p", "rv-foot", X.page.foot));
+  if (X.page.foot) map.append(functionalFoot());
   map.scrollTop = top;
+}
+
+// functionalFoot: the count of the Mods with nothing a save can show, folded over their
+// names; the player's marks can be taken back there, and a detected one marked not
+// functional (12 §3.3).
+function functionalFoot() {
+  const d = el("details", "rv-foot");
+  const sum = el("summary", "", X.page.foot);
+  sum.dataset.key = "review-functional";
+  d.append(sum);
+  const list = el("p", "rv-names");
+  for (const f of X.page.functional || []) {
+    const row = el("span", "rv-fn", f.name);
+    if (f.library) {
+      const b = button(f.marked ? T("remove your mark") : T("not functional"), "", () => mark(f.library, f.marked ? "" : "not functional"), "link sv-fold");
+      b.dataset.key = "review-unmark-" + f.library;
+      b.title = f.marked ? T("you marked it functional; let RimArcho decide again") : T("it has content a save could show: put it on the map");
+      row.append(" ", b);
+    }
+    list.append(row);
+  }
+  d.append(list);
+  return d;
 }
 
 // choose picks a Mod's square: the mark moves, and the right cards show it.
@@ -477,6 +516,13 @@ function drawRightCards(x) {
     go.dataset.key = "review-lib-" + id;
     go.onclick = () => openLibraryInstance(m.library);
     dinfo.append(go);
+    const fn = el("button", "editor-full-link", m.mark ? T("remove your mark") : T("mark as functional"));
+    fn.type = "button";
+    fn.dataset.key = "review-mark-" + id;
+    fn.title = m.mark ? T("you marked it not functional; let RimArcho decide again")
+      : T("interface, performance, framework, library or translation: a save cannot show it, so it leaves the map");
+    fn.onclick = () => mark(m.library, m.mark ? "" : "functional");
+    dinfo.append(fn);
   }
   if (shown !== id) {
     shown = id;
@@ -498,7 +544,7 @@ function drawRightCards(x) {
   const sum = el("summary", "", T("not exact: a save shows only what is in it now"));
   sum.dataset.key = "review-why";
   lim.append(sum);
-  lim.append(el("p", "", T("what was used up, sold or lost before the oldest save leaves no trace; bills, filters and research not begun do not count; recipes are not counted; a Mod updated since may have renamed things")));
+  lim.append(el("p", "", T("what was used up, sold or lost before the oldest save leaves no trace; content that comes only late, in raids or quests, or with another storyteller may not have come yet; bills, filters and research not begun do not count as seen (they are listed as only set up); recipes are not counted; a Mod updated since may have renamed things")));
   const body = el("div", "sv-body rv-cats");
   body.tabIndex = 0;
   body.setAttribute("aria-label", T("what it adds, by category, with the names not seen"));
@@ -535,6 +581,16 @@ function drawRightCards(x) {
         sec.append(p);
       }
     }
+    body.append(sec);
+  }
+  if ((m.set || []).length) {
+    // what a save only sets up: chosen or offered, not there yet (12 §3.2)
+    const sec = el("section", "rv-cat");
+    sec.append(el("p", "rv-cath rv-set", Tf("only set up: %d", m.set.length + (m.setMore || 0))));
+    const p = el("p", "rv-names");
+    for (const n of m.set) p.append(el("span", "", n));
+    if (m.setMore) p.append(el("span", "more", Tf("and %d more", m.setMore)));
+    sec.append(p);
     body.append(sec);
   }
   pwrap.append(lim, body);

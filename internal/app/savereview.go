@@ -25,11 +25,44 @@ type ReviewMod struct {
 	Name, PackageID, Library string
 	Game                     bool // Core or a DLC
 	Colonies, Saves          int  // counted colonies and saves that had it enabled
-	// Functional: it adds nothing in a category a save can show, so saves cannot tell
-	// whether it was used (12 §3.3).
+	// Functional: it adds nothing in a category a save can show (Detected), or the player
+	// marked it so (Marked), and saves cannot tell whether it was used (12 §3.3).
 	Functional bool
+	Detected   bool
+	// Marked is the player's mark: MarkFunctional, MarkNotFunctional or "" (none).
+	Marked     string
 	Adds, Seen int // over Cats
 	Cats       []ReviewCat
+	// Configured are the names of its content that no counted save has but some only sets
+	// up (a bill, a quest part, research not begun; 12 §3.2).
+	Configured []string
+}
+
+// The player's marks on a Mod (12 §3.3 rule 2).
+const (
+	MarkFunctional    = "functional"
+	MarkNotFunctional = "not functional"
+)
+
+// The groups of 12 §3.1, by what the saves show of a Mod's content.
+const (
+	ReviewSeen       = "seen"       // some of it is in a counted save
+	ReviewConfigured = "configured" // none is, but a save sets some of it up
+	ReviewNeverSeen  = "never-seen" // neither
+	ReviewFunctional = "functional" // nothing a save can show, or marked so
+)
+
+// Group is which group of 12 §3.1 the Mod is in.
+func (m *ReviewMod) Group() string {
+	switch {
+	case m.Functional:
+		return ReviewFunctional
+	case m.Seen > 0:
+		return ReviewSeen
+	case len(m.Configured) > 0:
+		return ReviewConfigured
+	}
+	return ReviewNeverSeen
 }
 
 // ReviewCat is one category of a Mod's content. Seen counts the names it adds that some
@@ -65,6 +98,10 @@ func (a *App) SaveReview(cols []*Colony, o ReviewOpts) (*SaveReview, error) {
 	src := &defSource{}
 	catalogs := &reviewCatalogs{}
 	mods := map[string]*reviewModState{}
+	marks, err := a.Store.FunctionalByInstance()
+	if err != nil {
+		return nil, err
+	}
 	// Copy only the ordering slices, never the save facts. Callers may supply a filtered
 	// listing; attribution still follows the Saves page's newest-first order.
 	cols = slices.Clone(cols)
@@ -81,7 +118,7 @@ func (a *App) SaveReview(cols []*Colony, o ReviewOpts) (*SaveReview, error) {
 	run := &reviewRun{input: input, src: src, catalogs: catalogs, lists: map[int64]string{}}
 	// Building a snapshot walks the accumulated catalog, not the saves. Facts and each
 	// compact result fall out of scope before the next save.
-	snapshot := func() *SaveReview { return reviewSnapshot(out, mods, catalog) }
+	snapshot := func() *SaveReview { return reviewSnapshot(out, mods, catalog, marks) }
 	sent := time.Now()
 	for _, c := range cols {
 		saves := slices.Clone(c.Saves)
@@ -113,13 +150,16 @@ func (a *App) SaveReview(cols []*Colony, o ReviewOpts) (*SaveReview, error) {
 					}
 					st := mods[m.Instance]
 					if st == nil {
-						st = &reviewModState{colonies: map[*Colony]bool{}, seen: map[string]map[string]bool{}}
+						st = &reviewModState{colonies: map[*Colony]bool{}, seen: map[string]map[string]bool{}, config: map[string]bool{}}
 						st.Name, st.PackageID, st.Library = m.Name, m.PackageID, m.Library
 						st.Game = strings.HasPrefix(normPkg(m.PackageID), "ludeon.rimworld")
 						mods[m.Instance] = st
 					}
 					st.Saves++
 					st.colonies[c] = true
+					for _, n := range res.Config[m.Instance] {
+						st.config[n] = true
+					}
 					for key, ns := range res.Names[m.Instance] {
 						if st.seen[key] == nil {
 							st.seen[key] = map[string]bool{}
@@ -149,9 +189,10 @@ type reviewModState struct {
 	ReviewMod
 	colonies map[*Colony]bool
 	seen     map[string]map[string]bool
+	config   map[string]bool // names some save only sets up
 }
 
-func reviewSnapshot(counts *SaveReview, mods map[string]*reviewModState, catalog map[string]map[string][]string) *SaveReview {
+func reviewSnapshot(counts *SaveReview, mods map[string]*reviewModState, catalog map[string]map[string][]string, marks map[string]bool) *SaveReview {
 	out := *counts
 	out.Mods = nil
 	for inst, st := range mods {
@@ -168,13 +209,26 @@ func reviewSnapshot(counts *SaveReview, mods map[string]*reviewModState, catalog
 					cat.Seen++
 				} else {
 					cat.NotSeen = append(cat.NotSeen, n)
+					if st.config[n] {
+						m.Configured = append(m.Configured, n)
+					}
 				}
 			}
 			m.Adds += cat.Adds
 			m.Seen += cat.Seen
 			m.Cats = append(m.Cats, cat)
 		}
-		m.Functional = m.Adds == 0
+		sort.Strings(m.Configured)
+		m.Configured = slices.Compact(m.Configured)
+		m.Detected = m.Adds == 0
+		m.Functional = m.Detected
+		if mark, ok := marks[inst]; ok {
+			m.Functional = mark
+			m.Marked = MarkNotFunctional
+			if mark {
+				m.Marked = MarkFunctional
+			}
+		}
 		out.Mods = append(out.Mods, m)
 	}
 	sort.Slice(out.Mods, func(i, j int) bool {

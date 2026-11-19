@@ -229,6 +229,9 @@ func rewriteOrigins(tx *sql.Tx, im, lm map[string]string) error {
 // are combined (the kept lineage's alias wins; different notes are both kept), tags
 // are joined.
 func mergePlayerData(tx *sql.Tx, m map[string]string) error {
+	if err := remapFunctional(tx, m); err != nil {
+		return err
+	}
 	type data struct{ alias, note string }
 	var order []string
 	all := map[string]*data{}

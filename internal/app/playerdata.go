@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/store"
@@ -69,4 +70,27 @@ func (a *App) setText(ref, v string, set func(env, lin, v string) error) error {
 		return err
 	}
 	return set(ix.Env.ID, m.LineageID, strings.TrimSpace(v))
+}
+
+// SetFunctional records the player's mark on a mod (12 §3.3 rule 2): MarkFunctional,
+// MarkNotFunctional, or "" to clear it so detection decides. It returns the mod.
+func (a *App) SetFunctional(ref, mark string) (*store.Mod, error) {
+	var v *bool
+	switch mark {
+	case MarkFunctional, MarkNotFunctional:
+		b := mark == MarkFunctional
+		v = &b
+	case "":
+	default:
+		return nil, fmt.Errorf("unknown mark %q: use %q, %q or none", mark, MarkFunctional, MarkNotFunctional)
+	}
+	ix, err := a.Index()
+	if err != nil {
+		return nil, err
+	}
+	m, err := ix.ResolveOne(ref)
+	if err != nil {
+		return nil, err
+	}
+	return m, a.Store.SetFunctional(m.LineageID, v)
 }

@@ -2,12 +2,17 @@ $ archo saves review
 playthrough review: 2 colonies, 0 saves
   not counted: 3 saves without a current full read (archo saves review --read)
   seen means: the Def is in a save: a thing, pawn, terrain or biome that is there, research with progress, an event that fired. Not seen is not proof it was never met; recipes are not counted
+  only set up means: a save names it only in a bill, a quest part or research not begun: chosen or offered, not yet there
+  never seen means: not in these saves: content may come only late, in raids or quests, or with another storyteller or scenario; a Mod update that renamed things looks the same
 next:
   archo saves review --mod <mod>
+  archo functional <mod>
 
 $ archo saves review --read
 playthrough review: 2 colonies, 3 saves
   seen means: the Def is in a save: a thing, pawn, terrain or biome that is there, research with progress, an event that fired. Not seen is not proof it was never met; recipes are not counted
+  only set up means: a save names it only in a bill, a quest part or research not begun: chosen or offered, not yet there
+  never seen means: not in these saves: content may come only late, in raids or quests, or with another storyteller or scenario; a Mod update that renamed things looks the same
   never seen (2):
     Core: adds 1 humanlike race · 2 colonies, 3 saves
     Hats: adds 1 apparel item · 2 colonies, 3 saves
@@ -16,10 +21,13 @@ playthrough review: 2 colonies, 3 saves
   functional: 1 Mod adds nothing a save can show; saves cannot tell whether it was used
 next:
   archo saves review --mod <mod>
+  archo functional <mod>
 
 $ archo saves review --mod tester.arms
 playthrough review: 1 colony, 2 saves
   seen means: the Def is in a save: a thing, pawn, terrain or biome that is there, research with progress, an event that fired. Not seen is not proof it was never met; recipes are not counted
+  only set up means: a save names it only in a bill, a quest part or research not begun: chosen or offered, not yet there
+  never seen means: not in these saves: content may come only late, in raids or quests, or with another storyteller or scenario; a Mod update that renamed things looks the same
   Arms: 2 of 5 seen · 1 colony, 2 saves
     weapons: 2 of 3 seen; not seen: Club
     research: 0 of 1 seen; not seen: Smithing
@@ -28,11 +36,14 @@ playthrough review: 1 colony, 2 saves
 $ archo saves review --colony Camp
 playthrough review: 1 colony, 1 save
   seen means: the Def is in a save: a thing, pawn, terrain or biome that is there, research with progress, an event that fired. Not seen is not proof it was never met; recipes are not counted
+  only set up means: a save names it only in a bill, a quest part or research not begun: chosen or offered, not yet there
+  never seen means: not in these saves: content may come only late, in raids or quests, or with another storyteller or scenario; a Mod update that renamed things looks the same
   never seen (2):
     Core: adds 1 humanlike race · 1 colony, 1 save
     Hats: adds 1 apparel item · 1 colony, 1 save
 next:
   archo saves review --mod <mod>
+  archo functional <mod>
 
 $ archo saves review --colony Nowhere
 error: no colony named Nowhere (archo saves list)

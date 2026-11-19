@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/render"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
@@ -16,6 +17,8 @@ func init() {
 		Flags: []Flag{{Name: "clear"}}})
 	register(&Command{Name: "note", Args: "<ref> [<text>]", Summary: "attach a plain-text note to a mod (all its copies), or with --copy to this copy only", MinArgs: 1, MaxArgs: 2, Run: noteCmd,
 		Flags: []Flag{{Name: "clear"}, {Name: "copy", Help: "this copy's own note (Mod library), not the mod's"}}})
+	register(&Command{Name: "functional", Args: "<ref>", Summary: "mark a mod functional (interface, performance, framework, library, translation: nothing a save can show), so Play review leaves it out of never seen; --not marks it not functional, --clear lets detection decide (12 §3.3)", MinArgs: 1, MaxArgs: 1, Run: functionalCmd,
+		Flags: []Flag{{Name: "not", Help: "mark it not functional"}, {Name: "clear", Help: "remove the mark"}}})
 	register(&Command{Name: "tag", Args: "add|remove <ref> <tag…> | list | rename <tag> <new> | merge <tag…> --into <tag> | delete <tag…> | note <tag> [<text>] | color <tag> <colour> | order <ref> <tag…>", Summary: "tags for filtering (list --filter tag:<tag>); rename, merge, delete, note and color apply to the tag on every mod; color marks its mods in the lists (blue, cyan, teal, grass, orange, pink, plum, violet, #rrggbb or none); order sets a mod's tag order (its first tag's colour marks it)", MinArgs: 1, MaxArgs: -1, Run: tagCmd,
 		Flags: []Flag{{Name: "mod", Value: "<ref>", Multi: true, Help: "more mods to tag (add/remove)"},
 			{Name: "into", Value: "<tag>", Help: "merge: the tag the others become (new or existing)"},
@@ -316,4 +319,21 @@ func tagEditDoc(e TagEdit, dryRun bool, verb, what string) *render.Doc {
 		root.KV("undo", "tag changes are not in the undo history")
 	}
 	return d
+}
+
+func functionalCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	mark, what := app.MarkFunctional, "marked functional"
+	switch {
+	case a.Bool("clear"):
+		mark, what = "", "mark cleared: detection decides"
+	case a.Bool("not"):
+		mark, what = app.MarkNotFunctional, "marked not functional"
+	}
+	m, err := c.App.SetFunctional(a.Pos[0], mark)
+	if err != nil {
+		return nil, err
+	}
+	d, root := render.New(m.Name + ": " + what)
+	root.Add("all copies of this mod share the mark; Play review uses it on its next run")
+	return d, nil
 }

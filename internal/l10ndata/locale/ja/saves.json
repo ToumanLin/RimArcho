@@ -405,5 +405,22 @@
   "Can it run checks %s": "起動前チェックで %s を確認します",
   "copied %s to the saves of %s as %s": "%s を %s のセーブに %s としてコピーしました",
   "the save is in this Game Config's Saves folder already": "このセーブはすでに現在のゲーム構成のセーブフォルダーにあります",
-  "1 Mod adds nothing a save can show (interface, performance, fixes): saves cannot tell whether it was used": "1個の機能系MODはセーブに残る内容を追加しません（UI、パフォーマンス、修正）。使われたかどうかはセーブからは分かりません"
+  "1 Mod adds nothing a save can show (interface, performance, fixes): saves cannot tell whether it was used": "1個の機能系MODはセーブに残る内容を追加しません（UI、パフォーマンス、修正）。使われたかどうかはセーブからは分かりません",
+  "adds nothing a save can show; you marked it not functional": "セーブに現れる内容を追加しません。あなたが非機能型にしました",
+  "%s marked functional": "%s を機能型にしました",
+  "%s marked not functional": "%s を非機能型にしました",
+  "%s: mark removed": "%s：マークを外しました",
+  "never seen in the saves": "セーブに一度も現れない",
+  "only set up": "設定しただけ",
+  "not proof it was never met: it may come only late, in raids or quests, or with another storyteller or scenario": "出会っていない証拠ではありません：終盤、襲撃やクエスト、別のストーリーテラーやシナリオでだけ現れることがあります",
+  "in a bill, a quest or research not begun: chosen or offered, not there yet": "作業指示、クエスト、未着手の研究にあるだけ：選んだか提示されたが、まだ現れていない",
+  "remove your mark": "マークを外す",
+  "not functional": "非機能型",
+  "you marked it functional; let RimArcho decide again": "あなたが機能型にしました。RimArcho の判定に戻します",
+  "it has content a save could show: put it on the map": "セーブに現れうる内容があります：マップに戻します",
+  "mark as functional": "機能型にする",
+  "you marked it not functional; let RimArcho decide again": "あなたが非機能型にしました。RimArcho の判定に戻します",
+  "interface, performance, framework, library or translation: a save cannot show it, so it leaves the map": "UI、パフォーマンス、フレームワーク、ライブラリ、翻訳：セーブには現れないので、マップから外します",
+  "only set up: %d": "設定しただけ：%d",
+  "what was used up, sold or lost before the oldest save leaves no trace; content that comes only late, in raids or quests, or with another storyteller may not have come yet; bills, filters and research not begun do not count as seen (they are listed as only set up); recipes are not counted; a Mod updated since may have renamed things": "最も古いセーブより前に使い切った、売った、失ったものは痕跡を残しません。終盤、襲撃やクエスト、別のストーリーテラーでだけ現れる内容はまだ来ていないかもしれません。作業指示、フィルター、未着手の研究は現れたことになりません（設定しただけとして挙げます）。レシピは数えません。その後に更新された Mod は名前を変えたかもしれません"
 }

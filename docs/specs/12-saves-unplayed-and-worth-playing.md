@@ -160,7 +160,15 @@ Under Saves › Play review (16 §2.11). Consider only saves where the player ac
 
 ### 3.1 Coverage and presentation
 
-For each Mod, the review counts the content added and the content seen, by category, and lists the names not seen. Functional Mods (§3.3) have no counted content. The GUI presents these results as a map with two content groups and a functional-Mod count at its foot; the groups, square sizes, colour steps, grouping switch and selected Mod's details are specified in 16 §2.11. CLI and MCP list never-seen and partly-seen Mods and report counts of all-seen and functional Mods.
+For each Mod, the review counts the content added and the content seen, by category, and lists the names not seen. Functional Mods (§3.3) have no counted content. Each other Mod is in one of three groups, by the evidence of §3.2 (`ReviewMod.Group`):
+
+1. **Seen in play** (`seen`): some of its counted content is seen in a counted save. CLI and MCP split it into partly seen and all seen.
+2. **Only set up** (`configured`): none is seen, but some counted save sets some of it up (`ConfigRefs`: a bill, a quest part, research not begun). The player chose or was offered it; it was not there yet.
+3. **Never seen** (`never-seen`): neither. This is the 1.1 answer to "content you never saw".
+
+Every result carries what each group means and what it cannot tell: never seen is "not in these saves", not "never met" — content that comes only late game, in raids or quests, with another storyteller or scenario, or that was used up before the oldest save leaves no trace; a Mod update that renamed things looks the same (§3.2). There are no cleanup or removal suggestions.
+
+The GUI presents these results as a map with two content groups and a functional-Mod count at its foot; the groups, square sizes, colour steps, grouping switch and selected Mod's details are specified in 16 §2.11. CLI and MCP list never-seen, only-set-up and partly-seen Mods and report counts of all-seen and functional Mods.
 
 - Count **colonies** (§4.1): union all saves of the same colony, not only its latest (what was used up or sold is only in older saves), so that saving a colony 30 times does not count as 30 playthroughs. Saves are read in the background (§1.7); until all are read the result says how many it covers.
 - Count only Mods still installed and analysed (§3.4). Current enabled status does not affect the result.
@@ -177,10 +185,10 @@ For each Mod, the review counts the content added and the content seen, by categ
 
 ### 3.3 Functional Mods
 
-UI, performance, bug-fix and pure mechanics-adjustment Mods do not add Defs to saves; saves cannot tell whether they were used. Criterion (draft):
+UI, performance, bug-fix, framework, library, translation and pure mechanics-adjustment Mods do not add Defs to saves; saves cannot tell whether they were used. Criterion:
 
-1. A Mod with **no** Def in a playable content category in its effective content (only Patches, assemblies, textures, language files, or mechanics/UI Defs outside the playable groups in §2.2) is functional;
-2. The player may mark a Mod "functional" or "not functional", overriding detection. This is player data on its Lineage (07 §6); storage is undecided (possibly a reserved tag).
+1. **Detected**: a Mod with **no** Def in a counted category (§3.4) in its effective content (only Patches, assemblies, textures, language files, or mechanics/UI Defs outside the playable groups in §2.2) is functional (`ReviewMod.Detected`). A translation or a library that also ships a few Defs is not detected; the player marks it.
+2. **Marked**: the player may mark a Mod "functional" or "not functional", overriding detection (`ReviewMod.Marked`). This is player data on its Lineage (07 §6.1), shared by its copies, in the table `lineage_functional` (schema 41; it follows lineage splits and merges like tags). Set it with `archo functional <ref> [--not] [--clear]`, MCP `set_player_data` action `functional`, or the GUI's Play review details (16 §2.11). A mark changes no per-save cache row: it is applied when the result is assembled.
 
 Functional Mods are excluded from the GUI map and counted in its foot line (16 §2.11). Framework Mods (such as Harmony and HugsLib) naturally fall under rule 1.
 
@@ -189,7 +197,7 @@ Functional Mods are excluded from the GUI map and counted in its foot line (16 �
 `App.SaveReview` (CLI `saves review`, MCP `list_saves` with `review`, and the page Saves › Play review, 16 §2.11).
 
 - Each save is attributed as in §2.3 with `ConfigRefs` left out. A Mod's catalog, what it adds by category, is every Def it provides when loaded with the Mods of the first counted save that has it, categorised as in §2.2; a pawn kind is its race. Seen is the catalog's names that some counted save has, so generated names (meat, techprints, smoothed stone) count for neither side.
-- Counted categories are those of §2.2 without `recipes`, `scenarios` and `other`. A Mod with nothing in them is functional (§3.3 rule 1; the player's mark of rule 2 is not built).
+- Counted categories are those of §2.2 without `recipes`, `scenarios` and `other`. A Mod with nothing in them is functional (§3.3 rule 1) unless the player marked it otherwise (rule 2). Only set up is, per Mod, the catalog names in some counted save's `ConfigRefs` and in none's seen evidence; each save's kept row stores those names by copy (`Config`, review cache version 3).
 - Mods: installed and analysed copies only. The game's own (Core, DLC) are included.
 - Application result order: Mods with something to see first, by the share seen, lowest first, then by how much they add; functional ones last. CLI and MCP use coverage groups; the GUI orders its content groups by amount added (16 §2.11).
 - A save counts when it has a current full read (`savefile.ParserVersion`; the index keeps reads of older parsers, §1.7). The others are counted as left out, or read first on request (`--read`).

@@ -262,3 +262,28 @@ func reviewStamp(cols []*app.Colony) string {
 	}
 	return hex.EncodeToString(h.Sum(nil)[:12])
 }
+
+// SaveReviewMark records the player's functional mark on the Mod of a library copy
+// (12 §3.3 rule 2): app.MarkFunctional, app.MarkNotFunctional or "" to clear it. Kept
+// pages are dropped, so the page's next request assembles them with the mark; no save is
+// read or attributed again. It returns the status line.
+func (s *API) SaveReviewMark(library, mark string) (string, error) {
+	s.mu.Lock()
+	m, err := s.a.SetFunctional("#"+library, mark)
+	s.lib = nil
+	s.mu.Unlock()
+	if err != nil {
+		return "", err
+	}
+	s.review.mu.Lock()
+	s.review.pages = map[string]reviewEntry{}
+	s.review.contexts = nil
+	s.review.mu.Unlock()
+	switch mark {
+	case app.MarkFunctional:
+		return view.Tf("%s marked functional", m.Name), nil
+	case app.MarkNotFunctional:
+		return view.Tf("%s marked not functional", m.Name), nil
+	}
+	return view.Tf("%s: mark removed", m.Name), nil
+}
