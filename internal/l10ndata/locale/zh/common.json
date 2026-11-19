@@ -369,7 +369,6 @@
   "incompatible with %s (About.xml)": "与 %s 不兼容（About.xml）",
   "info": "提示",
   "installed copy available": "有已安装的副本",
-  "installed: %d (%d enabled now)": "已安装：%d（当前启用 %d）",
   "interface": "界面",
   "is %s the same mod as %s?": "%s 和 %s 是同一个 Mod 吗？",
   "is a folder": "是一个文件夹",

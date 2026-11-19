@@ -537,7 +537,7 @@ function inlineImport(draft, active, updateButtons) {
   };
   reading(status.textContent);
   const error = el("div", "plan-why", imp.error || ""); error.setAttribute("role", "alert"); fieldError(text, error); fieldError(pickBtn, error);
-  const preview = el("div", "pm-inline-preview");
+  const preview = el("div", "pm-inline-preview settings xc-res");
   box.append(status, error, preview);
   function invalidate() {
     M.importSeq++; draft.importing = false; imp.preview = null; imp.error = "";
