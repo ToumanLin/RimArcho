@@ -9,7 +9,7 @@
 | [glossary.md](glossary.md) | Chinese and English terms, and where the interface's words differ from the documentation's | Add a row when a term is introduced |
 | [release-vm-tests.md](../UserGuide/release-vm-tests.md) | Checks to run in the VM before a release, one row per new or changed feature | A row per change; tested rows leave the table |
 | [research/](research/README.md) | Investigations and open questions; conclusions move into the specifications and the report is removed once it has landed | One file per question |
-| [design/](design/) | Interactive interface drafts (HTML) with a README each | One folder per page |
+| [design/](design/) | Interactive interface drafts (HTML) with a README each, and dated proposals ([2026-11-18_ux-scenarios.md](design/2026-11-18_ux-scenarios.md): entries by usage scenario, guide ↔ Import merge) | One folder per page; proposals for review |
 | [api/](api/) | GUI API contracts that the frontend calls | Next to the code they describe |
 | [assets/](assets/) | Images used by the documentation and the README | — |
 

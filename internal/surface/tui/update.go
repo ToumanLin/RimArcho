@@ -38,7 +38,16 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return mm, tea.Batch(cmd, next, m.navRefresh())
 }
 
+// update handles one message, then brings Can it run's items up to date when the database
+// changed (an edit, a rule, an answer), so View only draws what is held (16 §9.6: drawing
+// reads nothing).
 func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	mm, cmd := m.handle(msg)
+	m.problemCounts()
+	return mm, cmd
+}
+
+func (m *model) handle(msg tea.Msg) (tea.Model, tea.Cmd) {
 	defer m.fsLeft() // leaving Search files stops its search (16 §3.1 rule 9)
 	if m.uninstallRun != nil {
 		switch msg := msg.(type) {

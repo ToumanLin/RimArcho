@@ -170,8 +170,8 @@ func (m *model) composeNeeds() {
 // needCount is the top bar's "Can it run N" number (16 §2.2): problems, identity
 // questions, an external change of the list, a list saved for another game version, and
 // the running game's errors, so it equals the counted items of the screen (16 §2.4).
+// It reads nothing: update keeps the items current (problemCounts).
 func (m *model) needCount() int {
-	m.problemCounts()
 	n := m.prob.need
 	if m.live != nil {
 		for _, it := range m.live.Items {

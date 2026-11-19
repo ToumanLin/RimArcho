@@ -2,11 +2,14 @@ package tui
 
 // Measurement against a real installation (18 §2, 16 §3.5 T5), skipped unless
 // RIMARCHO_REAL_HOME (data dir) and RIMARCHO_EXE (archo binary for the child scan) are set.
-// Only navigation and search keys are sent; the launcher fails the test if called.
+// Only navigation and search keys are sent; the launcher fails the test if called. The data
+// directory is copied into a temp dir first, and this process and the child scan open only
+// the copy (17 §4 rule 3): the scan and the TUI write to the database.
 
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"strconv"
@@ -29,6 +32,11 @@ func TestRealIdleMemory(t *testing.T) {
 		n, _ := strconv.Atoi(s)
 		idle = time.Duration(n) * time.Second
 	}
+	src := home
+	home = t.TempDir()
+	for _, f := range []string{"archo.db", "archo.db-wal", "config.toml"} {
+		copyFile(t, filepath.Join(src, f), filepath.Join(home, f))
+	}
 	a, err := app.Open(home)
 	if err != nil {
 		t.Fatal(err)
@@ -45,7 +53,9 @@ func TestRealIdleMemory(t *testing.T) {
 	ws1, _, _ := procmem.MB()
 	t.Logf("after one workspace load: working set %.1f MB", ws1)
 	opts := Options{App: a, Scan: func(env string) (string, error) {
-		out, err := exec.Command(exe, "scan").CombinedOutput()
+		cmd := exec.Command(exe, "scan")
+		cmd.Env = append(os.Environ(), "RIMARCHO_HOME="+home) // the copy, never the real data directory
+		out, err := cmd.CombinedOutput()
 		return string(out), err
 	}}
 	tm := teatest.NewTestModel(t, New(opts), teatest.WithInitialTermSize(120, 30))
