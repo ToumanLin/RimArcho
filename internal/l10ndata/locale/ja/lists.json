@@ -326,5 +326,7 @@
   "Disabled: one row per copy / grouped by tag": "無効：コピーごとに表示／タグでグループ化",
   "on a tag group's header in Disabled: collapse / expand": "「無効」のタググループ見出し：折りたたむ／展開",
   "on a tag group's header in Disabled: rename, note, merge, delete the tag": "「無効」のタググループ見出し：名前の変更・メモ・結合・タグの削除",
-  "remove all %d not installed": "未インストールの%d件をすべて削除"
+  "remove all %d not installed": "未インストールの%d件をすべて削除",
+  "last updated": "最終更新",
+  "files modified": "ファイル更新日時"
 }

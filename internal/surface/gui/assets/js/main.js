@@ -15,7 +15,7 @@ import "./activity.js";
 import "./fulltitle.js";
 import { applyAccent } from "./accent.js";
 import { factText, S, $, $$, el, esc, T, Tf, errText, say, clearSay, undoStatus, busyStart, col, cur, selection, key, idsOf, refsOf, named, AREAS, keyCaps } from "./state.js";
-import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, pageDelta, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn, setOnViewChange, detailHead } from "./lists.js";
+import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, pageDelta, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn, setOnViewChange, setOnSortChange, detailHead } from "./lists.js";
 import { G, grouped, headOf, curKey, shownItems, shape, findEntry, setGroupOpen, reveal, setView, loadView, refreshOrder, regroup } from "./disabledgroups.js";
 import { createBar } from "./filterbar.js";
 import { followDetail, showDetail, scrollDetail, refreshCopies, showPanel } from "./detail.js";
@@ -1459,6 +1459,7 @@ async function start() {
   $('.area[data-area="3"] > .head').addEventListener("click", () => { if (S.bar.fills()) S.bar.toggle(false); });
   wireLists(ui);
   setOnViewChange(viewChanged);
+  setOnSortChange(() => reload());
   // the Disabled column's last view (16 §2.5); the editor is not shown yet at start
   loadView().then((tags) => { if (tags) { regroup(); if (!S.screen) viewChanged(); } });
   initRules(ui);

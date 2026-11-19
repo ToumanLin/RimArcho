@@ -10,7 +10,9 @@ import { S, key, api } from "./state.js";
 export const VIEW_KEY = "ui.gui.plan.disabled"; // "individual" or "tags"
 const CLOSED_KEY = "archo.disabled.closed";     // closed groups, by lower-case tag ("" no tag)
 
-export const G = { view: "individual", order: [], tags: [], orderStamp: undefined, closed: new Set() };
+export const SORT_KEY = "ui.gui.plan.disabledsort"; // view.DisabledSorts; Go orders the rows
+export const SORTS = ["name", "updated", "modified", "added"];
+export const G = { view: "individual", sort: "name", order: [], tags: [], orderStamp: undefined, closed: new Set() };
 try { const v = JSON.parse(localStorage.getItem(CLOSED_KEY) || "[]"); if (Array.isArray(v)) G.closed = new Set(v); } catch { /* none closed */ }
 const keepClosed = () => { try { localStorage.setItem(CLOSED_KEY, JSON.stringify([...G.closed])); } catch { /* not kept */ } };
 
@@ -137,9 +139,18 @@ export async function refreshOrder(force = false) {
   return true;
 }
 
-// loadView learns the view the player chose last (once, at start).
+// setSort keeps Disabled's order; the board is read again to show it (Go sorts, 16 §2.5).
+export async function setSort(v) {
+  if (G.sort === v || !SORTS.includes(v)) return false;
+  G.sort = v;
+  try { await api.SetSetting(SORT_KEY, v); } catch { return false; }
+  return true;
+}
+
+// loadView learns the view and order the player chose last (once, at start).
 export async function loadView() {
   let v = "";
+  api.Setting(SORT_KEY).then((o) => { if (SORTS.includes(o)) G.sort = o; }).catch(() => {});
   try { v = await api.Setting(VIEW_KEY); } catch { /* the default */ }
   if (v !== "tags") return false;
   await refreshOrder();

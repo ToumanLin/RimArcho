@@ -2920,6 +2920,7 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .area .head .dview-fold[hidden] { display: none; }
 .area .head .dview-fold button { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border-radius: var(--r-sm); color: var(--muted); }
 .area .head .dview-fold button:hover { background: var(--pill); color: var(--fg-2); }
+.area .head .dview-sort { height: 24px; gap: 6px; padding: 0 6px 0 8px; font-size: 12px; border-radius: var(--r-sm); }
 .area .head .dview-seg { padding: 2px; margin-left: 2px; border-radius: var(--r-sm); }
 .area .head .dview-seg > .thumb { top: 2px; bottom: 2px; }
 .area .head .dview-seg button { height: 20px; padding: 0 8px; font-size: 12px; }
