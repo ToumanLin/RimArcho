@@ -19,6 +19,19 @@ func diskFree(dir string) int64 {
 	return int64(free)
 }
 
+// diskSpace: what the caller may still write, and the volume's size; -1, -1 when unknown.
+func diskSpace(dir string) (int64, int64) {
+	p, err := windows.UTF16PtrFromString(dir)
+	if err != nil {
+		return -1, -1
+	}
+	var free, total, all uint64
+	if windows.GetDiskFreeSpaceEx(p, &free, &total, &all) != nil {
+		return -1, -1
+	}
+	return int64(free), int64(total)
+}
+
 // startDetached starts a child with no console that outlives this process: out of this
 // process's job when the job allows it (CREATE_BREAKAWAY_FROM_JOB), else as it is.
 func startDetached(mk func() *exec.Cmd) (*exec.Cmd, error) {

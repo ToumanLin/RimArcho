@@ -75,6 +75,8 @@
   "Patches": "パッチ",
   "Player.log, %d error groups": "Player.log：エラーグループ%d件",
   "RAM / VRAM": "RAM／VRAM",
+  "RAM": "RAM",
+  "VRAM": "VRAM",
   "RAM about %s  VRAM about %s": "RAM約%s／VRAM約%s",
   "RAM available now": "現在のRAM空き容量",
   "RAM includes %s of VRAM held in system memory on this computer.": "このPCではVRAMのうち%sがシステムメモリに保持され、RAM使用量に含まれます",

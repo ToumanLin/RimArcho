@@ -2927,6 +2927,26 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .memory-confirm .memory-values strong { display: block; margin-top: 8px; font-size: 15px; }
 .memory-confirm .memory-cancel:focus, .memory-confirm .go:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 @media (max-width: 480px) { .memory-confirm .memory-values { grid-template-columns: 1fr; } }
+/* V1 memory bars (16 §7 principle 9): in use grey, the estimate accent with its range hatched,
+   free the track; past the capacity red, outside the track. Segments as .sv-nbar. */
+.mbars { display: grid; grid-template-columns: auto minmax(80px, 1fr) auto; column-gap: 10px; row-gap: 6px; margin: 6px 0 2px; }
+.mbar-row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; font-size: 12px; color: var(--muted); border-radius: var(--r-sm); outline-offset: 3px; }
+.mbar-k { color: var(--fg-2); }
+.mbar-n { text-align: right; white-space: nowrap; }
+.mbar-note { grid-column: 2 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--faint); } /* the GPU name: a line of its own under the VRAM bar */
+.mbar { position: relative; display: flex; gap: 2px; height: 8px; border-radius: var(--r-sm); overflow: hidden; }
+.mbar::before { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--cap, 100%); background: var(--pill); border-radius: var(--r-sm); }
+.mbar i { position: relative; display: block; flex: 0 1 auto; min-width: 2px; height: 100%; transition: width var(--t-layout) var(--ease); }
+.mbar .m-used { background: var(--faint); }
+.mbar .m-game { background: color-mix(in srgb, var(--accent) 45%, var(--card)); }
+.mbar .m-need, .mbar .m-mods { background: var(--accent); }
+.mbar .m-range { background: repeating-linear-gradient(-45deg, var(--accent) 0 2px, color-mix(in srgb, var(--accent) 30%, var(--card)) 2px 4px); }
+.mbar .m-over { background: var(--red); }
+.mbar .m-range.m-over { background: repeating-linear-gradient(-45deg, var(--red) 0 2px, color-mix(in srgb, var(--red) 30%, var(--card)) 2px 4px); }
+.mbar-row.over .mbar-n { color: var(--red); }
+.mbar-row.nocap .mbar::before { background: none; border: var(--hairline) dashed var(--faint); }
+.memory-confirm .mbars { padding: 12px 0 4px; }
+.vis-tip { position: fixed; z-index: 26; max-width: 360px; padding: 6px 9px; background: var(--pop-bg); border: var(--hairline) solid var(--line-2); border-radius: var(--r-sm); box-shadow: var(--shadow); color: var(--fg); font-size: 12px; line-height: 1.45; pointer-events: none; white-space: pre-line; animation: fade var(--t-press) var(--ease); }
 
 #workshop-warning { padding: 4px 20px; color: var(--amber); font-size: 12px; }
 .pop .typed { display: flex; align-items: center; gap: 8px; margin: 12px 0; }
@@ -3039,3 +3059,74 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .confirm-lines .fact { display: grid; grid-template-columns: minmax(80px, max-content) minmax(0, 1fr); gap: 12px; }
 .confirm-lines .fact .k { color: var(--muted); }
 .confirm-lines .fact .v { color: var(--fg); min-width: 0; }
+/* V3, V4 count bars (16 §7 principle 9): a fill scaled to the list's largest, kinds as shades */
+.cbar-row { display: grid; grid-template-columns: minmax(60px, 1fr) auto; align-items: center; column-gap: 10px; margin-top: 4px; font-size: 12px; color: var(--muted); border-radius: var(--r-sm); outline-offset: 3px; }
+.cbar { display: block; height: 8px; border-radius: var(--r-sm); background: var(--pill); overflow: hidden; }
+.cbar-fill { display: flex; gap: 2px; height: 100%; transition: width var(--t-layout) var(--ease); }
+.cbar-fill i { display: block; min-width: 2px; height: 100%; }
+.cbar-fill .c-k0 { background: var(--log); }
+.cbar-fill .c-k1 { background: color-mix(in srgb, var(--log) 60%, var(--card)); }
+.cbar-fill .c-k2 { background: color-mix(in srgb, var(--log) 30%, var(--card)); }
+/* V4: a count's quiet bar beside it, and step meters (likelihood, severity) */
+.cmark { display: inline-block; width: 80px; height: 4px; border-radius: var(--r-sm); background: var(--line-2); overflow: hidden; vertical-align: middle; }
+.cmark i { display: block; height: 100%; background: var(--log); border-radius: var(--r-sm); }
+.smeter { display: inline-flex; gap: 2px; align-items: center; vertical-align: middle; border-radius: var(--r-sm); outline-offset: 2px; }
+.smeter i { display: block; width: 6px; height: 8px; background: var(--line); }
+.smeter i.on { background: var(--accent); }
+.smeter.lvl-high i.on { background: var(--red); }
+.smeter.lvl-medium i.on { background: var(--amber); }
+.smeter.lvl-low i.on { background: var(--muted); }
+.pcard .pnext .pmeter { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; white-space: nowrap; vertical-align: middle; } .pcard .pnext .pct { color: var(--muted); font-size: 12px; }
+.lrow .top .cmark { margin-left: 2px; }
+/* V5: installed / not installed, and a destination's + − ↕ marks (as .sv-mcount) */
+.sbar-row { display: grid; grid-template-columns: minmax(60px, 1fr) auto auto; align-items: center; column-gap: 12px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+.sbar { display: flex; gap: 2px; height: 8px; border-radius: var(--r-sm); overflow: hidden; background: var(--pill); }
+.sbar i { display: block; min-width: 3px; height: 100%; }
+.sbar .s-yes { background: var(--green); }
+.sbar .s-no { background: var(--red); }
+.sbar-row .s-n.yes { color: var(--green); }
+.sbar-row .s-n.no { color: var(--red); }
+.sbar-row .s-n.zero { color: var(--faint); }
+.dmarks { display: inline-flex; gap: 12px; font-size: 12px; }
+.dmarks .add { color: var(--green); }
+.dmarks .del { color: var(--red); }
+.dmarks .mv, .dmarks .sw { color: var(--muted); }
+/* V6, V11: state marks and file marks */
+.smark { display: inline-flex; align-items: center; justify-content: center; flex: none; border-radius: var(--r-sm); }
+.smark svg { width: 14px; height: 14px; }
+.smark.k-dot i { display: block; width: 8px; height: 8px; border-radius: 50%; background: var(--amber); }
+.smark.k-warn { color: var(--red); }
+.smark.k-ok { color: var(--green); }
+.smark.k-err { color: var(--red); }
+.vis-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.fmarks { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; }
+.fmarks .fk { display: inline-flex; gap: 4px; }
+.fmarks .fk-n { color: var(--muted); }
+.fmarks .add { color: var(--green); }
+.fmarks .chg { color: var(--fg-2); }
+.fmarks .del { color: var(--red); }
+.smark.k-ring i { display: block; width: 8px; height: 8px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--muted); }
+/* V7: before / after, what stays solid and what is saved hatched */
+.kbar-row { display: grid; grid-template-columns: minmax(80px, 320px) auto; align-items: center; column-gap: 12px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+.kbar { display: flex; gap: 2px; height: 8px; border-radius: var(--r-sm); overflow: hidden; }
+.kbar i { display: block; height: 100%; }
+.kbar .k-stay { background: var(--accent); flex: none; }
+.kbar .k-saved { flex: 1; min-width: 2px; background: repeating-linear-gradient(-45deg, var(--line) 0 2px, transparent 2px 4px); }
+/* V8: a faint bar behind a size, and used-in dots */
+.szbar { background: linear-gradient(to right, color-mix(in srgb, var(--accent) 16%, transparent) var(--w), transparent var(--w)) no-repeat; background-size: 100% 60%; background-position: 0 50%; }
+.udots { color: var(--accent); letter-spacing: 1px; font-size: 12px; }
+/* V2: Can it run's lead as the list's name and status icons with counts */
+.lead.run-sum .rs { display: inline-flex; align-items: center; gap: 12px; border-radius: var(--r-sm); outline-offset: 3px; }
+.lead.run-sum .rs-n { display: inline-flex; align-items: center; gap: 4px; }
+.lead.run-sum .rs-n svg { width: 14px; height: 14px; }
+.lead.run-sum .rs-n.warn { color: var(--amber); }
+.lead.run-sum .rs-n.err { color: var(--red); }
+.sv-nbar[tabindex] { outline-offset: 3px; }
+/* V10: a folder's drive, used and free */
+.dbar-row { display: grid; grid-template-columns: minmax(80px, 200px) auto; align-items: center; column-gap: 10px; margin-top: 4px; font-size: 12px; color: var(--muted); }
+.dbar { display: flex; gap: 2px; height: 6px; border-radius: var(--r-sm); overflow: hidden; }
+.dbar i { display: block; height: 100%; }
+.dbar .d-used { background: var(--faint); flex: none; }
+.dbar .d-free { flex: 1; min-width: 2px; background: var(--pill); }
+.dbar-row.low .d-free { background: var(--amber); }
+.dbar-row.low .num { color: var(--amber); }

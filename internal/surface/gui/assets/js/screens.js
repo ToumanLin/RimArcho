@@ -21,6 +21,7 @@ import { changes, changesKey, initSubscriptions } from "./subscriptions.js";
 import { setNeedRunner } from "./badgepop.js";
 import { initNeedText, needText, needParts, evidenceMark } from "./needtext.js";
 import { getChoices } from "./credit.js";
+import { memBars, countBar, countMark, stepMeter, visTip, diskMeter } from "./membar.js";
 import { setVersionRunner } from "./versionwarnings.js";
 import { openVersionList } from "./versionpanel.js";
 
@@ -523,6 +524,29 @@ function needsLead(d) {
   return Tf("%s can run: nothing to handle.", plan);
 }
 
+// runSummary: with something to handle, the lead becomes the list's name and two status
+// icons with their counts, ▲ before you start and ✕ last run (V2, 16 §7 principle 9); the
+// counts match the section headings, and the sentence is the line's name and tooltip.
+function runSummary(w) {
+  const left = N.cols[0].filter((x) => !x.done && x.counted).length;
+  const runs = N.cols[1].filter((x) => !x.done && x.counted).length;
+  const lead = w.querySelector(".page-head .lead");
+  if (!lead || (!left && !runs)) return;
+  const sentence = lead.textContent;
+  const line = el("p", "lead run-sum");
+  const sum = visTip(el("span", "rs"), sentence);
+  sum.append(el("span", "rs-plan", (S.shell && S.shell.plan && S.shell.plan.name) || T("the list")));
+  for (const [n, ic, cls] of [[left, icon.warn, "warn"], [runs, icon.err, "err"]]) {
+    if (!n) continue;
+    const c = el("span", "rs-n " + cls);
+    c.innerHTML = ic;
+    c.append(el("span", "num", String(n)));
+    sum.append(c);
+  }
+  line.append(sum);
+  lead.replaceWith(line);
+}
+
 // askShown: drawNeeds drew N.ask's confirmation row.
 let askShown = false;
 function drawNeeds() {
@@ -540,6 +564,7 @@ function drawNeeds() {
     autoFix(),
     act(T("check again"), "rescan", () => ui.cmd("analyze"), "A", "analyze"),
     act(T("game log"), "log", () => ui.go("log"), "l"));
+  runSummary(w);
   N.els = [[], []];
   const live = N.cols[1].some((x) => x.group === 6);
   const column = (ci, title, sub) => {
@@ -748,12 +773,19 @@ function needCard(it, ci, i) {
   const ic = el("span", "need-ic");
   ic.innerHTML = statusIcon(it.status);
   top.append(ic);
-  if (quiet) {
+  if (it.bars?.length) {
+    // RAM / VRAM drawn (16 §7 principle 9): each bar is named by its sentence; what else
+    // the item says stays text
+    body.append(needText("div", "title word-facts", it.title || it.text), memBars(it.bars));
+    if (it.barsWhy) body.append(el("div", "why", it.barsWhy));
+  } else if (quiet) {
     body.append(needText("div", "why word-facts", it.text, it.content?.text));
     if (it.why) body.append(needText("div", "why sub", it.why, it.content?.why));
   } else {
     body.append(needText("div", "title word-facts", it.title || it.text, it.title ? it.content?.title : it.content?.text));
-    if (it.why && !it.linkGroups?.length) body.append(needText("div", "why", it.why, it.content?.why));
+    // a last-run group's kinds as one bar, scaled to the column's largest group (V3)
+    if (it.counts?.parts?.length) body.append(countBar(it.counts, Math.max(...N.cols[ci].map((x) => x.counts?.n || 0))));
+    else if (it.why && !it.linkGroups?.length) body.append(needText("div", "why", it.why, it.content?.why));
   }
   top.append(body);
   row.append(top);
@@ -1219,6 +1251,7 @@ function drawGameLog() {
   else {
     if (!(p.rows || []).length) scroll.append(el("div", "empty-state", "✓ " + T("no errors in this log")));
     const rows = p.rows || [];
+    const most = rows.reduce((m, r) => Math.max(m, r.count || 0), 0); // the ×count bars' scale (V4)
     L.cur = Math.min(L.cur, Math.max(0, rows.length - 1));
     L.list = virtualRows(scroll, rows.length, (i) => {
       const r = rows[i];
@@ -1233,6 +1266,7 @@ function drawGameLog() {
       if (r.code) chip.title = r.code;
       top.append(chip, el("span", "count", "×" + r.count));
       if (r.mods) top.append(el("span", "mods", r.mods));
+      top.querySelector(".count")?.after(countMark(r.count, most));
       const message = logText(r);
       message.id = row.id + "-message";
       row.setAttribute("aria-labelledby", message.id);
@@ -1551,11 +1585,21 @@ function patternCard(c) {
   // (shared logs, not a verdict on this list) closes the card
   if (c.levelText) {
     const h = el("div", "psev");
-    h.append(el("span", "sev " + c.level, c.levelText), el("span", "impact", c.impact));
+    // how much it matters as three steps, named by its word (V4)
+    h.append(stepMeter({ low: 1, medium: 2, high: 3 }[c.level] || 0, 3, 3, c.levelText, "lvl-" + c.level), el("span", "impact", c.impact));
     d.append(h);
   }
   if (c.summary) d.append(el("div", "ps", c.summary));
-  if (c.next) d.append(el("div", "pnext", c.next));
+  if (c.next) {
+    const nx = el("div", "pnext", c.next);
+    // how often the first step helped, in ten steps and a percentage, named by the sentence (V4)
+    if (c.gonePct && c.gone) {
+      const m = el("span", "pmeter");
+      m.append(stepMeter(c.gonePct, 100, 10, c.gone), el("span", "num pct", c.gonePct + "%"));
+      nx.append(" ", m);
+    }
+    d.append(nx);
+  }
   if (c.known) d.append(el("div", "ps known", c.known));
   const more = el("div", "pmore");
   const row = (k, v) => { if (!v) return; const r = el("div", "pr"); r.append(el("span", "k", k), el("span", "v word-facts", v)); more.append(r); };
@@ -1806,6 +1850,7 @@ function renderGroups(w, groups, again) {
       const note = factText(el("div", "sub setting-note"), { text: it.note || "", paths: it.notePaths });
       note.hidden = !it.note;
       left.append(note);
+      if (it.disk) left.append(diskMeter(it.disk)); // the folder's drive (V10)
       const right = el("div", "r");
       if (it.edit === "swatches" || it.edit === "segments") {
         row.classList.add("appearance-row");

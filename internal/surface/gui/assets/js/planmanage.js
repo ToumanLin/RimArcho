@@ -13,6 +13,7 @@ import * as pop from "./popups.js";
 import * as plans from "./plans.js";
 import { wireSeparator } from "./separator.js";
 import * as motion from "./motion.js";
+import { memBars } from "./membar.js";
 import { showImportSummary, showImportContents, getAll, workshopIDs } from "./exchange.js";
 
 let ui = null;
@@ -642,9 +643,9 @@ function costSection(p) {
     const pending = el("div", "skel");
     progress(pending, s.querySelector(".pm-sub"));
     pending.setAttribute("aria-busy", "true");
-    // as tall as an estimate (the last one shown, else its usual four lines), so the
-    // estimate arriving does not push the sections below it down
-    pending.append(el("span", "bar"), el("span", "bar"), el("span", "bar"), el("span", "bar"));
+    // as tall as an estimate (the last one shown, else its two bars and "what is counted"),
+    // so the estimate arriving does not move the sections below it
+    pending.append(el("span", "bar"), el("span", "bar"), el("span", "bar"));
     if (C.height) s.style.minHeight = C.height + "px";
     C.progress = el("div", "muted pm-note", C.page?.progress || "");
     C.progress.setAttribute("aria-live", "polite");
@@ -699,8 +700,13 @@ function showCost(p, id) {
   s.replaceChildren(el("div", "pm-sub", T("Loaded memory (estimate)")));
   s.style.minHeight = "";
   if (p.error) { s.append(el("div", "muted pm-note", p.error)); return; }
-  s.append(el("div", "word-facts", p.summary), el("div", "muted pm-note", p.detail));
-  if (p.loadingBudget) s.append(el("div", "muted pm-note", p.loadingBudget));
+  // the summary, the game / Mods split and the loading budget drawn (16 §7 principle 9);
+  // the bars are named by those sentences
+  if (p.bars?.length) s.append(memBars(p.bars));
+  else {
+    s.append(el("div", "word-facts", p.summary), el("div", "muted pm-note", p.detail));
+    if (p.loadingBudget) s.append(el("div", "muted pm-note", p.loadingBudget));
+  }
   const details = el("details"), summary = el("summary", "muted pm-note", T("what is counted"));
   details.open = M.open.has("cost:" + id);
   details.ontoggle = () => { if (details.open) M.open.add("cost:" + id); else M.open.delete("cost:" + id); };

@@ -21,6 +21,7 @@ import { createTable, mergeColumns } from "./datatable.js";
 import { wireSeparator } from "./separator.js";
 import { pickClick } from "./select.js";
 import { markOf, paintMark, tagCSS, tagColors, fromTagList } from "./tagcolor.js";
+import { sizeBar } from "./membar.js";
 import { tagPanel, tagInfo, startRename as tagStartRename, editTagNote as tagEditNote, pickMerge as tagPickMerge, confirmDelete as tagConfirmDelete } from "./tagmanager.js";
 
 const ROW = 30;      // every row has the same height: the list is drawn by position
@@ -176,6 +177,8 @@ function flatten() {
     }
   } else for (const r of L.page.rows || []) push(r);
   L.flat = out;
+  // the size bars' scale: the largest Mod listed (V8)
+  L.most = (L.page.rows || []).reduce((m, r) => Math.max(m, r.bytes || 0), 0);
   const at = keep ? out.findIndex((x) => rowKey(x) === keep) : -1;
   L.cur = at >= 0 ? at : Math.min(L.cur, Math.max(out.length - 1, 0));
   // a selected copy that is no longer listed is no longer selected
@@ -394,6 +397,16 @@ function drawRows() {
   else box.removeAttribute("aria-activedescendant");
 }
 
+// useDots: "in 3 lists" as a dot per list, up to 6 and then +N; the words stay for assistive
+// technology and the list names in the tooltip (V8)
+function useDots(cell, n, words) {
+  cell.textContent = "";
+  const d = el("span", "udots");
+  d.setAttribute("aria-hidden", "true");
+  d.textContent = "●".repeat(Math.min(n, 6)) + (n > 6 ? " +" + (n - 6) : "");
+  cell.append(d, el("span", "vis-hidden", words));
+}
+
 function rowEl(x, k) {
   if (x.t === "grp") return groupEl(x, k);
   const r = el("div", "lib-row " + x.t + (x.lone ? " lone" : "") + (x.gk != null ? " in" : "") + (k === L.cur ? " cur" : ""));
@@ -409,7 +422,8 @@ function rowEl(x, k) {
     if (c.key === "name") { r.append(nameCell(x, k)); continue; }
     const v = cells[c.key] || "";
     const cell = el("span", "word-facts c " + c.key + (c.key === "state" && cells.code ? " " + cells.code : ""), v);
-    if (c.key === "size") cell.classList.add("num");
+    if (c.key === "size") { cell.classList.add("num"); sizeBar(cell, cells.bytes, L.most); }
+    if (c.key === "used" && cells.uses > 1) useDots(cell, cells.uses, v);
     if (c.key === "used" && cells.usedTitle) cell.title = cells.usedTitle;
     else if (v) cell.title = v;
     r.append(cell);

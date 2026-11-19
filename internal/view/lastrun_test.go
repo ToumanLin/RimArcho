@@ -81,6 +81,11 @@ func TestLastRunSummary(t *testing.T) {
 	if n.Title != "Alpha — 5 errors, 8 warnings" || n.Why != "missing textures ×8 (纹理/Empty); missing references ×3; 2 other messages; source not confirmed" {
 		t.Fatalf("mixed: %+v", n)
 	}
+	// the GUI's count bar (16 §7 principle 9): the kinds the sentence names, the rest as
+	// "other", the total of all, and the sentence as its name
+	if c := n.Counts; c == nil || c.N != 13 || len(c.Parts) != 3 || c.Parts[0] != (BarCount{"texture-missing", 8}) || c.Parts[2] != (BarCount{"other", 2}) || c.Text != n.Why {
+		t.Fatalf("counts: %+v", n.Counts)
+	}
 	n = lastRunNeed("unknown source", ps, "", false)
 	if n.Actions[0].Cluster != "" || strings.Contains(n.Why, "source not confirmed") {
 		t.Fatalf("unattributed: %+v", n)

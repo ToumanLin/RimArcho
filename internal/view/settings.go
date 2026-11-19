@@ -45,6 +45,8 @@ type SettingItem struct {
 	URL     string          `json:"url,omitempty"`
 	Links   []CommunityLink `json:"links,omitempty"`
 	Actions []SettingAction `json:"actions,omitempty"`
+	// Disk: the folder's drive, free of total, for the GUI's meter (16 §7 principle 9)
+	Disk *DiskMeter `json:"disk,omitempty"`
 	// Details fold under the row (16 §3.1 rule 7): RimArcho's release notes.
 	Details *SettingDetails `json:"details,omitempty"`
 }

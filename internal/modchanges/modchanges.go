@@ -89,6 +89,21 @@ type Row struct {
 	Actions    []Action `json:"actions,omitempty"`
 	InPlan     bool     `json:"inPlan,omitempty"`
 	Present    bool     `json:"present,omitempty"` // the library can select this installed copy
+	// Files: the files that differ, by kind, for the GUI's change marks (16 §7 principle 9);
+	// Others: the sentence's facts that are not about files, shown beside the marks. Text
+	// and Details still say everything; the CLI and MCP print those.
+	Files  []FileCount `json:"files,omitempty"`
+	Others string      `json:"others,omitempty"`
+}
+
+// FileCount is one kind of file that differs: how many were added, changed and deleted, and
+// for textures and sounds the size change.
+type FileCount struct {
+	Kind    string `json:"kind"` // in the player's words: code, Defs, textures…
+	Added   int    `json:"added,omitempty"`
+	Changed int    `json:"changed,omitempty"`
+	Gone    int    `json:"gone,omitempty"`
+	Delta   int64  `json:"delta,omitempty"` // textures and sounds only
 }
 
 // HasFiles: the raw file list has something to compare.
@@ -645,6 +660,23 @@ func (b *changeBuilder) mod(id string, evs []*store.Event, info map[int64]*store
 		say = append(say, f.text)
 	}
 	r.Text = strings.Join(say, tx.T("; "))
+	var others []string
+	for _, f := range sorted {
+		if !f.file && len(others) < 3 {
+			others = append(others, f.text)
+		}
+	}
+	r.Others = strings.Join(others, tx.T("; "))
+	for _, g := range groups {
+		if g.kind == fkAbout && !g.loadFolders {
+			continue // About.xml's own changes are the facts above
+		}
+		fc := FileCount{Kind: kindName(tx, g.kind), Added: g.added, Changed: g.changed, Gone: g.gone}
+		if g.kind == fkTextures || g.kind == fkSounds {
+			fc.Delta = g.delta // media say their size, as the details do
+		}
+		r.Files = append(r.Files, fc)
+	}
 	if filesMissing {
 		r.Details = append(r.Details, tx.T("(file lists no longer stored)"))
 	}

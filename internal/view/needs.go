@@ -159,6 +159,12 @@ type Need struct {
 	// Related: items of the other column about the same mod (16 §5: the columns point at
 	// each other).
 	Related []Related `json:"related,omitempty"`
+	// Bars: the GUI draws these in place of the sentences they name (RAM / VRAM, 16 §7
+	// principle 9) and shows BarsWhy, the rest of Why. Text and Why keep every sentence.
+	Bars    []MemoryBar `json:"bars,omitempty"`
+	BarsWhy string      `json:"barsWhy,omitempty"`
+	// Counts: a last-run group's occurrences by kind, drawn in place of Why (V3)
+	Counts *CountBar `json:"counts,omitempty"`
 
 	rank int    // order within the group (16 §5's order)
 	code string // the problem code it stands for (LaunchHint)

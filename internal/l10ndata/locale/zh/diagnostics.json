@@ -75,6 +75,8 @@
   "Patches": "Patch",
   "Player.log, %d error groups": "Player.log 中的 %d 组报错",
   "RAM / VRAM": "内存 / 显存",
+  "RAM": "内存",
+  "VRAM": "显存",
   "RAM about %s  VRAM about %s": "内存约 %s  显存约 %s",
   "RAM available now": "当前可用内存",
   "RAM includes %s of VRAM held in system memory on this computer.": "内存里含 %s 显存，这台电脑上它们放在系统内存里。",

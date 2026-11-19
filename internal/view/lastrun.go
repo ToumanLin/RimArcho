@@ -79,6 +79,7 @@ func lastRunNeed(name string, ps []*app.Problem, when string, attributed bool) N
 		return ks[i].code < ks[j].code
 	})
 	var parts []string
+	kinds := &CountBar{}
 	for i, k := range ks {
 		if i == 2 {
 			n := 0
@@ -86,8 +87,12 @@ func lastRunNeed(name string, ps []*app.Problem, when string, attributed bool) N
 				n += rest.n
 			}
 			parts = append(parts, Tf("%d other messages", n))
+			kinds.Parts = append(kinds.Parts, BarCount{Kind: "other", N: n})
+			kinds.N += n
 			break
 		}
+		kinds.Parts = append(kinds.Parts, BarCount{Kind: k.code, N: k.n})
+		kinds.N += k.n
 		word := logKindWords[k.code]
 		if k.code == "texture-missing" && k.textures {
 			word = "missing textures"
@@ -118,7 +123,7 @@ func lastRunNeed(name string, ps []*app.Problem, when string, attributed bool) N
 		}
 	}
 	ev := logEvidence(ps, when)
-	// The title already gives the occurrence counts; the chip names only the source.
+	// The title already gives the occurrence kinds; the chip names only the source.
 	if strings.HasPrefix(ev.Source, "Player.log") {
 		ev.Source = filepath.Base(act.LogPath)
 		if ev.Source == "." {
@@ -128,6 +133,21 @@ func lastRunNeed(name string, ps []*app.Problem, when string, attributed bool) N
 			ev.Source += "  " + when
 		}
 	}
+	kinds.Text = why
 	return Need{Group: GroupLastRun, Title: title, Text: title + T(": ") + why, Why: why, Evidence: ev,
-		Counted: true, Status: StatusLog, Actions: []Action{act}}
+		Counted: true, Status: StatusLog, Actions: []Action{act}, Counts: kinds}
+}
+
+// CountBar is a count drawn as a bar (16 §7 principle 9): N in all, split into Parts by
+// kind, largest first. Text is the sentence it stands for, its accessible name and tooltip.
+// The GUI scales the bars of one list to its largest.
+type CountBar struct {
+	N     int        `json:"n"`
+	Parts []BarCount `json:"parts"`
+	Text  string     `json:"text"`
+}
+
+type BarCount struct {
+	Kind string `json:"kind"`
+	N    int    `json:"n"`
 }

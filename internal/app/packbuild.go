@@ -262,6 +262,20 @@ func (a *App) StopBuild(name string) error {
 
 // DiskFree is the space free (for this user) on the drive of dir, or of its nearest
 // existing parent; -1 when it cannot be told.
+// DiskSpace is DiskFree with the volume's size (the settings page's disk meter, 16 §2.14).
+func DiskSpace(dir string) (free, total int64) {
+	for d := filepath.Clean(dir); ; {
+		if fi, err := os.Stat(d); err == nil && fi.IsDir() {
+			return diskSpace(d)
+		}
+		p := filepath.Dir(d)
+		if p == d {
+			return -1, -1
+		}
+		d = p
+	}
+}
+
 func DiskFree(dir string) int64 {
 	for d := filepath.Clean(dir); ; {
 		if fi, err := os.Stat(d); err == nil && fi.IsDir() {
