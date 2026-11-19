@@ -1979,16 +1979,11 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .xc-gi .i { width: 18px; height: 18px; }
 .xc-gh h3 { margin: 0; font-size: 15px; }
 .xc-gh p { margin: 0; font-size: 12px; color: var(--muted); }
-.xc-get { font-size: 12px; color: var(--fg-2); padding: 8px 10px; border-radius: var(--r-sm); background: var(--card-2); }
-.xc-get b { color: var(--fg); }
-.xc-from { display: flex; flex-wrap: wrap; gap: 4px; }
-.xc-from span { font-size: 12px; height: 20px; display: inline-flex; align-items: center; padding: 0 7px; border-radius: var(--r-sm); background: var(--pill); color: var(--fg-2); }
 .xc-grow { flex: 1; }
 .xc-drop { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px; border: var(--hairline) dashed var(--faint); border-radius: var(--r-lg); color: var(--fg-2); background: transparent; }
 .xc-drop:hover { border-color: var(--accent); color: var(--fg); background: var(--accent-soft); }
 .xc-drop .ic .i { width: 18px; height: 18px; }
 .xc-drop .big { font-weight: 600; font-size: 13px; }
-.xc-drop .small { font-size: 12px; color: var(--muted); }
 .pm-import .xc-goal .xc-text { min-height: 52px; }
 .xc-move .btn.link { align-self: flex-start; }
 .xc-mrows { display: flex; flex-direction: column; gap: 2px; }

@@ -46,8 +46,8 @@ export function key(e) { if (e.key === "Escape") { e.preventDefault(); cancel();
 export const hintList = () => [{ key: "tab", label: T("import destination") }, { key: "enter", label: T("import") }, { key: "esc", label: T("cancel") }, { key: "?", label: T("all keys") }];
 
 // The Import page (16 §2.18): the sidebar's Import, `i`, a dropped file, Settings and the guide
-// all open it. Three cards say what the player gets: a Mod list, a pack, or everything from
-// another manager. Picking a manager above opens a tree below to choose its parts; moving in
+// all open it. Three cards, each a title, one line on what the player gets and its input: a
+// Mod list, a pack, or everything from another manager. Picking a manager above opens a tree below to choose its parts; moving in
 // and adding a pack run as background tasks shown in place (16 §2.16).
 export async function exchange() {
   const from = S.screen === "plan-import" ? session?.from : S.screen || "plan";
@@ -77,22 +77,18 @@ function goalHead(ic, title, sub) {
   h.append(i, t);
   return h;
 }
-function chips(names) {
-  const f = el("div", "xc-from");
-  for (const n of names) f.append(el("span", "", n));
-  return f;
-}
-function get(html) { const g = el("div", "xc-get"); g.append(html); return g; }
 function marked(text, ...bold) {
-  // "You get %s, or %s." with the facts in bold
+  // "your list %s, changed since" with the name in bold
   const parts = text.split("%s"), span = el("span");
   parts.forEach((p, i) => { span.append(p); if (i < bold.length) span.append(el("b", "", bold[i])); });
   return span;
 }
-function dropButton(big, small, run) {
+// dropButton: the card's file input; what it accepts is its tooltip, not more text.
+function dropButton(big, accepts, run) {
   const b = el("button", "xc-drop");
   const i = el("span", "ic"); i.innerHTML = icon.import;
-  b.append(i, el("span", "big", big), el("span", "small", small));
+  b.append(i, el("span", "big", big));
+  b.title = accepts;
   b.onclick = run;
   return b;
 }
@@ -100,14 +96,11 @@ function dropButton(big, small, run) {
 // A Mod list: a file, a dropped file, a save, a link, a share code or pasted text.
 function listCard() {
   const c = el("section", "card xc-goal");
-  c.append(goalHead("plan", T("A Mod list"), T("to play a list someone shared, or one from another manager")),
-    get(marked(T("You get %s, or %s. You see which Mods you have before anything changes."), T("a new list"), T("changes to one of yours"))),
-    chips(["RimSort", "RimCrow", "RimPy", "RimWorld .rml", "ModsConfig.xml", T("a save's Mods"), T("Steam collection"), T("share code"), "Rentry"]),
-    el("div", "xc-grow"));
+  c.append(goalHead("plan", T("A Mod list"), T("a new list, or changes to one of yours; previewed first")), el("div", "xc-grow"));
   const fileInput = el("input"); fileInput.type = "file"; fileInput.hidden = true;
   fileInput.accept = ".xml,.rml,.json,.txt,.rws";
   fileInput.onchange = () => { if (fileInput.files[0]) readFile(fileInput.files[0]); };
-  const pick = dropButton(T("Drop a file, or choose one…"), T("a list or a save (.rws)"), async () => {
+  const pick = dropButton(T("Drop a file, or choose one…"), T("RimSort, RimCrow and RimPy lists, RimWorld .rml, ModsConfig.xml or a save (.rws)"), async () => {
     let f = "";
     try { f = await api.PickAnyImport(); } catch (e) { return say("fail", errText(e)); }
     if (f && S.screen === "plan-import") openPicked(f);
@@ -122,7 +115,8 @@ function listCard() {
   ta.value = pasted;
   ta.oninput = () => { pasted = ta.value; };
   ta.onkeydown = e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); e.stopPropagation(); go.click(); } };
-  const clip = el("button", "btn small", T("paste from the clipboard"));
+  const clip = el("button", "btn small", T("paste"));
+  clip.title = T("paste from the clipboard");
   clip.onclick = async () => {
     let t = "";
     try { t = await api.Clipboard(); } catch { /* the page asks the browser */ }
@@ -133,7 +127,8 @@ function listCard() {
   const go = el("button", "btn primary small", T("read"));
   go.onclick = () => ta.value.trim() && preview("text", ta.value);
   const row = el("div", "xc-row end");
-  row.append(el("span", "xc-hint", T("links are read from Steam or Rentry when you press read")), clip, go);
+  go.title = T("links are read from Steam or Rentry when you press read");
+  row.append(clip, go);
   c.append(pick, fileInput, ta, row);
   return c;
 }
@@ -141,9 +136,7 @@ function listCard() {
 // A pack: an .archopack file, added as a background task.
 function packCard() {
   const c = el("section", "card xc-goal");
-  c.append(goalHead("packs", T("A pack"), T("a modpack someone made with RimArcho")),
-    get(marked(T("You get %s: its Mods are copied and checked file by file. Your lists and Mods stay as they are."), T("a pack you can launch"))),
-    chips([".archopack"]), el("div", "xc-grow"),
+  c.append(goalHead("packs", T("A pack"), T("a pack you can launch; its Mods are checked first")), el("div", "xc-grow"),
     dropButton(T("Choose a pack…"), ".archopack", async () => {
       let f = "";
       try { f = await api.PickPackFile(); } catch (e) { return say("fail", errText(e)); }
@@ -162,9 +155,7 @@ function freshM() { return { managers: null, error: "", shown: new Set(), on: ne
 function managerCard() {
   M = freshM();
   const c = el("section", "card xc-goal xc-move");
-  c.append(goalHead("import", T("Everything from another manager"), T("moving in from RimSort, RimCrow or RimPy")),
-    get(marked(T("You get their %s, %s, %s and, from RimCrow, %s. Their files are only read."), T("lists"), T("notes and tags"), T("sorting rules"), T("Game Configs"))),
-    el("div", "xc-hint", T("found on this computer: pick what to move in from")),
+  c.append(goalHead("import", T("Everything from another manager"), T("lists, notes, tags and rules; their files are only read")),
     el("div", "xc-mrows"));
   const more = el("button", "btn link small", T("another folder or file…"));
   more.onclick = async () => {
