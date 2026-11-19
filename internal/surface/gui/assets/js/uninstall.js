@@ -7,6 +7,7 @@ import * as pop from "./popups.js";
 import { editablePath, copyablePath } from "./fields.js";
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { openScreen, page, button, chooseLocalPath, beginPageRead } from "./screens.js";
+import { archoSpot } from "./archo.js";
 
 const fresh = () => ({ keepLocked: false, lockedTo: "", removePacks: false, packsTo: "", removeSaves: false, savesTo: "", removeGames: false, restoreBackup: false });
 const U = { choice: fresh(), page: null, running: false, prog: null, loading: false };
@@ -57,6 +58,9 @@ async function draw(fetch) {
   for (const s of pg.steps || []) card.append(stepRow(pg, s));
   w.append(card);
   w.append(foot(pg));
+  // Archo peeks over the card: sad to go, a salute when it is done (16 §7.1 "Placements")
+  // the plan, left open, is the calm state (sad faces in turn); the rest hold
+  spot().peek(card, pg.ran ? (pg.failed ? "dizzy" : "salute") : pg.blocked ? "skeptic" : "cry", !pg.ran && !pg.blocked);
   sc.scrollTop = top;
   read?.finish();
 }
@@ -221,6 +225,8 @@ function exclusive() {
   }
 }
 
+const spot = () => archoSpot("uninstall", { size: 140, calm: ["cry", "ponder", "sleepy", "neutral"] });
+
 function drawProgress() {
   const sc = S.screen === "uninstall-progress" ? $("#screen") : openScreen("uninstall-progress");
   exclusive();
@@ -241,6 +247,7 @@ function drawProgress() {
     w.classList.add("un-progress-page");
     w.append(card, details);
     sc.append(w);
+    spot().peek(card, "think");
     // Drop focus from the old red button or navigation.
     card.tabIndex = -1;
     card.focus();

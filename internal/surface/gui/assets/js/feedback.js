@@ -8,11 +8,12 @@ import { copy } from "./fields.js";
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { icon } from "./icons.js";
 import { page, button, area, beginPageRead } from "./screens.js";
+import { archoSpot } from "./archo.js";
 
 // The draft stays for the session: leaving the page does not lose what was typed (16 §3.1).
 // sent: the issue send opened last, shown until the next draft. open: the preview's
 // attachments unfolded by the player (by key), kept while typing.
-const F = { title: "", text: "", contact: "", opts: { mods: false, paths: false, log: false }, at: null, res: null, sent: null, sending: false, open: new Set(), mine: null, fresh: new Set(), freshAt: new Set() };
+const F = { title: "", text: "", contact: "", opts: { mods: false, paths: false, log: false }, at: null, res: null, sent: null, sending: false, failed: false, open: new Set(), mine: null, fresh: new Set(), freshAt: new Set() };
 let seq = 0, typing = 0, retry = 0;
 
 export async function open() {
@@ -66,6 +67,19 @@ async function compose() {
   if (n === seq && S.screen === "feedback") { F.res = res; refresh(); }
 }
 
+// Archo peeks over the form (16 §7.1 "Placements"): thinking while you write, pondering
+// while it sends, a salute once sent, tears if sending failed, a wink at a new reply.
+const spot = () => archoSpot("feedback", { size: 128, calm: ["neutral", "ponder", "think", "wink", "smirk"] });
+function fbFace() {
+  if (F.sending) return "ponder";
+  if (F.failed) return "cry";
+  if (F.sent) return "salute";
+  if (F.title.trim() || F.text.trim()) return "think";
+  return F.landed ? "wink" : "neutral";
+}
+// only the empty form is calm: her idle faces follow there, never over a state
+const face = () => { const e = fbFace(); spot().set(e, e === "neutral"); };
+
 function draw() {
   const sc = $("#screen");
   const top = sc.scrollTop;
@@ -82,7 +96,7 @@ function draw() {
   text.value = F.text;
   text.setAttribute("aria-label", T("what happened"));
   text.placeholder = T("what happened, and what you expected; steps to make it happen again help");
-  const typed = () => { F.title = title.value; F.text = text.value; F.sent = null; clearTimeout(typing); typing = setTimeout(() => compose().catch(e => say("fail", errText(e))), 150); };
+  const typed = () => { F.title = title.value; F.text = text.value; F.sent = null; F.failed = false; face(); clearTimeout(typing); typing = setTimeout(() => compose().catch(e => say("fail", errText(e))), 150); };
   title.oninput = typed; text.oninput = typed;
   const l1 = el("label", "fb-field"); l1.append(el("span", "", T("title")), title);
   const l2 = el("label", "fb-field"); l2.append(el("span", "", T("what happened")), text);
@@ -98,6 +112,7 @@ function draw() {
   }
   w.append(lab1, form);
   area(form, lab1, () => title.focus());
+  spot().peek(form, fbFace(), fbFace() === "neutral");
 
   const lab2 = el("div", "label section", T("attach"));
   const card = el("section", "card settings");
@@ -257,6 +272,7 @@ function refresh() {
     if (n) n.textContent = p.key === "log" && F.opts.log && F.at.pending ? T("the game log is still being analysed…") : p.note;
   }
   preview(pre);
+  face();
   foot.innerHTML = "";
   const copyBtn = button(T("copy the text"), "", () => copy(F.res.body, copyBtn));
   const gh = button(F.res.full ? T("open GitHub") : T("copy and open GitHub"), "", openIssue, F.at?.send ? "" : "primary");
@@ -280,6 +296,7 @@ function refresh() {
 async function sendReport() {
   if (F.sending) return;
   F.sending = true;
+  F.failed = false;
   refresh();
   try {
     F.sent = await api.FeedbackSend(F.title, F.text, F.contact);
@@ -288,7 +305,7 @@ async function sendReport() {
     say("ok", Tf("sent as #%d", F.sent.number));
     F.res = await api.FeedbackCompose("", "");
     if (S.screen === "feedback") { F.sending = false; draw(); }
-  } catch (e) { say("fail", errText(e)); }
+  } catch (e) { F.failed = true; say("fail", errText(e)); }
   finally { F.sending = false; if (S.screen === "feedback") refresh(); }
 }
 

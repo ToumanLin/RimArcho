@@ -4,6 +4,13 @@ import { Element, loadModules, flush } from "./dom.mjs";
 
 // Archo's figure (16 §7.1) with a fake clock: the stills, their loops, their timing, the
 // rotation, the off setting and the tips.
+// Element with the tree getters archoSpot uses
+class Node extends Element {
+  get parentElement() { return this.parent || null; }
+  get nextSibling() { const c = this.parent?.children; return c ? c[c.indexOf(this) + 1] || null : null; }
+  get previousElementSibling() { const c = this.parent?.children; return c ? c[c.indexOf(this) - 1] || null : null; }
+}
+
 async function setup({ mode = "live", tips = [], reduce = false } = {}) {
   let now = 0, serial = 0;
   const timers = new Map();
@@ -18,7 +25,8 @@ async function setup({ mode = "live", tips = [], reduce = false } = {}) {
     now = until;
   };
   const archo = await loadModules("./archo.js", { "./state.js": { api: { Tips: async () => tips } } }, {
-    document: { createElement: (tag) => new Element(tag), documentElement: { dataset: reduce ? { motion: "reduced" } : {} } },
+    document: { createElement: (tag) => new Node(tag), documentElement: { dataset: reduce ? { motion: "reduced" } : {} }, body: null },
+    getComputedStyle: () => ({ overflowX: "visible", overflowY: "visible", opacity: "1" }),
     localStorage: { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)) },
     setTimeout: (fn, ms = 0) => { timers.set(++serial, { fn, at: now + ms }); return serial; },
     clearTimeout: (id) => timers.delete(id), setInterval: () => 0, clearInterval() {},
@@ -130,4 +138,79 @@ test("tips: each line takes the next one of its kind; first-run tips stay in the
   archo.tipLine(guide, "first");
   await flush();
   assert.equal(guide.textContent, "g");
+});
+
+test("a spot stands in its host, plays three loops per state and rests; a state expression never cycles", async () => {
+  const { archo, advance, pending } = await setup();
+  const col = new Node("div");
+  const spot = archo.archoSpot("t1", { size: 176, calm: ["neutral", "sleepy"] });
+  spot.stand(col, "think");
+  await flush(); await flush(); await flush();
+  const slot = col.children.at(-1);
+  assert.ok(slot.classList.contains("archo-stand"));
+  assert.match(slot.children[0].src, /anim\/think\.webp$/);
+  await advance(3 * 2160);
+  assert.match(slot.children[0].src, /stills\/think@360\.webp$/);
+  // a redraw places the same figure again: same state, no new loop
+  const col2 = new Node("div");
+  spot.stand(col2, "think");
+  assert.equal(col2.children.at(-1), slot);
+  assert.match(slot.children[0].src, /stills\/think@360\.webp$/);
+  spot.set("thumbsup");
+  await flush(); await flush(); await flush();
+  assert.match(slot.children[0].src, /anim\/thumbsup\.webp$/);
+  await advance(3 * 2160);
+  await advance(120000); // a state, not calm: nothing changes, nothing is left running
+  assert.match(slot.children[0].src, /stills\/thumbsup@360\.webp$/);
+  assert.equal(pending(), 0);
+  spot.end();
+  assert.equal(col2.children.length, 0);
+});
+
+test("a peek hangs from the element before its card; in a calm state the calm faces take turns every 45 s", async () => {
+  const { archo, advance } = await setup();
+  const page = new Node("div"), label = new Node("div"), card = new Node("section");
+  page.append(label, card);
+  const spot = archo.archoSpot("t2", { size: 140, calm: ["neutral", "ponder", "wink", "smirk"] });
+  spot.peek(card, "neutral", true);
+  const slot = label.children.at(-1);
+  assert.ok(slot.classList.contains("archo-peek") && label.classList.contains("archo-anchor"));
+  await advance(44999);
+  assert.equal(spot.expr, "neutral");
+  await advance(1);
+  assert.equal(spot.expr, "ponder");
+  await flush(); await flush(); await flush();
+  assert.match(slot.children[0].src, /anim\/ponder\.webp$/); // three loops, then the still
+  await advance(3 * 2160);
+  assert.match(slot.children[0].src, /stills\/ponder@360\.webp$/);
+  // a redraw in the same calm state keeps the turn
+  spot.peek(card, "neutral", true);
+  assert.equal(spot.expr, "ponder");
+  await advance(45000);
+  assert.equal(spot.expr, "wink");
+  // a state's face holds
+  spot.set("shake");
+  await advance(180000);
+  assert.equal(spot.expr, "shake");
+  spot.end();
+});
+
+test("still and reduced motion stop the cycling", async () => {
+  for (const opts of [{ mode: "still" }, { reduce: true }]) {
+    const { archo, advance } = await setup(opts);
+    const col = new Node("div");
+    const spot = archo.archoSpot("t4", { calm: ["neutral", "ponder", "wink"] });
+    spot.stand(col, "neutral", true);
+    await advance(200000);
+    assert.equal(spot.expr, "neutral");
+    assert.match(col.children[0].children[0].src, /stills\/neutral@360\.webp$/);
+    spot.end();
+  }
+});
+
+test("off places no spot", async () => {
+  const { archo } = await setup({ mode: "off" });
+  const col = new Node("div");
+  archo.archoSpot("t3").stand(col, "think");
+  assert.equal(col.children.length, 0);
 });

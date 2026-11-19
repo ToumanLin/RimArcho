@@ -15,6 +15,7 @@ import { still } from "./motion.js";
 import { createTable, mergeColumns } from "./datatable.js";
 import { wireSeparator } from "./separator.js";
 import { pickClick } from "./select.js";
+import { archoSpot } from "./archo.js";
 
 const COLS_KEY = "ui.gui.tasks.items.columns";
 const SIDE_KEY = "ui.gui.tasks.side";
@@ -490,6 +491,11 @@ function itemRows() {
   if (d) list.sort((a, b) => d.cmp(a, b) * X.dir * d.dir || a.name.localeCompare(b.name));
   return list;
 }
+// taskFace: Archo's expression for the selected task (16 §7.1 "Placements")
+function taskFace(r) {
+  if (!r) return "sleepy";
+  return { run: "think", queue: "think", done: "thumbsup", fail: "cry", part: "skeptic" }[r.state] || "neutral";
+}
 function drawItems() {
   const r = current();
   const has = !!(r && r.items && r.items.length);
@@ -498,6 +504,11 @@ function drawItems() {
   if (has) els.ihead.append(el("span", "r word-facts", r.counts));
   els.iscroll.hidden = !has;
   els.none.hidden = has;
+  // Archo stands in the empty detail (16 §7.1 "Placements"); a list of items fills it
+  const spot = archoSpot("tasks", { size: 176, calm: ["sleepy", "neutral", "ponder", "wink", "yum"] });
+  const face = taskFace(r);
+  // calm: nothing selected, a task done or stopped; running, failed or partly done hold
+  if (has) spot.slot.remove(); else spot.stand(els.items, face, ["sleepy", "thumbsup", "neutral"].includes(face));
   if (!has) {
     factText(els.none, r ? [r.noItems, r.line] : []);
     if (r) {
