@@ -1,7 +1,7 @@
 # UI reduction: less to read, fewer words to learn
 
-> Status: proposal for review (2026-11-19, second version). Research only; nothing here is implemented. Decisions for the user are in §8.
-> Input: player feedback 2026-11-18: the UI is still a bit much, closely related entries sit far apart, and the order should follow how the app is used. The user reads this as **too much text and too high a learning cost**, not too many elements, so this version measures words, jargon and getting-started paths. The first version (element counts) is in git history at `0cdf8221`; its cuts are kept here only where they also cut reading or concepts (§7).
+> Status: proposal for review (2026-11-19, second version). Research only; nothing here is implemented. Decisions for the user are in §9.
+> Input: player feedback 2026-11-18: the UI is still a bit much, closely related entries sit far apart, and the order should follow how the app is used. The user reads this as **too much text and too high a learning cost**, not too many elements, so this version measures words, jargon and getting-started paths. The first version (element counts) is in git history at `0cdf8221`; its cuts are kept here only where they also cut reading or concepts (§8). §7 adds the user's second principle: **visuals over text, with the text hidden but never deleted**, because the AI agent is the second user.
 > Chinese rewrites: [2026-11-19_ui-text.zh-CN.md](2026-11-19_ui-text.zh-CN.md), keyed by the same IDs (T1…). Companion note: [2026-11-18_ux-scenarios.md](2026-11-18_ux-scenarios.md).
 
 ## 1. Method
@@ -19,7 +19,7 @@ Pages are not long, but they **explain themselves in full sentences that the pla
 
 UI words at a glance, sorted by en total (UI + hint line). Caps = key caps in the page body.
 
-| Page | en UI | en hints | Caps | zh UI (characters) | zh hints | Data words (en) | After §5 rewrites (en UI + hints, est.) |
+| Page | en UI | en hints | Caps | zh UI (characters) | zh hints | Data words (en) | After §6 rewrites (en UI + hints, est.; §7 visuals cut more) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Can it run | 235 | 9 | 2 | 250 (295) | 10 | 13 | ~110 |
 | Saves | 183 | 18 | 3 | 198 (268) | 20 | 34 | ~110 |
@@ -45,7 +45,7 @@ UI words at a glance, sorted by en total (UI + hint line). Caps = key caps in th
 Two patterns:
 
 - **zh is not shorter than en**. In word-equivalents zh is 5–25% longer on most pages: zh translations add particles and keep every clause. Where zh *is* plainer, it is because the translator rewrote rather than translated (Can it run's order warning: en has 20 words with "loadBefore" in them, zh says in 12 characters that the wrong order can stop a dependency or part of the content working and that sort fixes it). §5 takes those zh rewrites back into en.
-- **The hint line is 9–26 words on every page except Launch**, more than the page's own lead. It is the single largest item a mouse player reads and never uses (§7, H1).
+- **The hint line is 9–26 words on every page except Launch**, more than the page's own lead. It is the single largest item a mouse player reads and never uses (§8, H1).
 
 ## 4. Jargon
 
@@ -153,7 +153,7 @@ Fix: when identical, say "default already matches the game" and offer nothing to
 
 ## 6. Rewrites
 
-Exact new text. The zh column is in the zh-CN note under the same ID. "Hover" means the text moves into the tooltip of the element it explains; "when" means it is shown only in that state. Word counts are en.
+Exact new text. The zh column is in the zh-CN note under the same ID. "Hover" means the text leaves the visible page but stays on it: it becomes the tooltip of the element it explains, shown on hover **and keyboard focus**, and that element's accessible description, because 16 §11 A10 fails any fact that lives only in a `title`, hover or colour (§7.1). "When" means it is shown only in that state. The view-model text (`Need.Text`, `Need.Why` and the rest) is unchanged, so the TUI, CLI and MCP keep every word. Word counts are en.
 
 | ID | Page | Today (en) | Words | New (en) | Words |
 | --- | --- | --- | --- | --- | --- |
@@ -162,7 +162,7 @@ Exact new text. The zh column is in the zh-CN note under the same ID. "Hover" me
 | T3 | Can it run, version item | "they may still work, but their authors have not said they do on this version" | 15 | "They may still work; their authors have not marked 1.6." | 10 |
 | T4 | Can it run, every item | "declared by the mod  About.xml supportedVersions", "your rule  a load-order rule you added", "inferred  file estimates and OS memory snapshot" | 5–7 each | hover, on the item's ⓘ | 0 |
 | T5 | Can it run, column heads | "found by checking the mods' files and shared logs", "seen in the game's log" | 13 | remove (16 §7.3 rule 7) | 0 |
-| T6 | Can it run, memory | "RAM: loading needs 1.9 GB–2.4 GB; available now 26.8 GB of 63.1 GB / VRAM: estimated 675.8 MB; dedicated capacity 23.6 GB / GPU: …" | 31 | "Memory: needs 1.9–2.4 GB, 26.8 GB free." The full card only when it does not fit | 7 |
+| T6 | Can it run, memory (superseded by V1) | "RAM: loading needs 1.9 GB–2.4 GB; available now 26.8 GB of 63.1 GB / VRAM: estimated 675.8 MB; dedicated capacity 23.6 GB / GPU: …" | 31 | "Memory: needs 1.9–2.4 GB, 26.8 GB free." The full card only when it does not fit | 7 |
 | T7 | Updates, lead | "First what waits for you to update, then what Steam already updated." | 12 | remove | 0 |
 | T8 | Add a subscription | lead (19) + three cards (17 + 23 + 10) + local line (17) | 86 | field placeholder "paste a Workshop, GitHub or LoversLab link"; one line "Local Mods: copy them into the Mods folder. [open it]" | 17 |
 | T9 | Mod settings, values | "a value missing from the file is at its default", "on/off, numbers and text change here while the game is closed; the file is backed up first" | 28 | hover on the values heading | 0 |
@@ -188,7 +188,184 @@ Exact new text. The zh column is in the zh-CN note under the same ID. "Hover" me
 | T29 | Launch, problem line | "▲ 1 problems break the game" | 5 | "▲ 1 problem breaks the game" (plural) | 5 |
 | T30 | Status, failed download | "completed 0, failed 1: download was not confirmed, ctrl+j" | 9 | "The download didn't finish. [see why]" | 5 |
 
-## 7. What stays from the first version
+## 7. Visuals for numbers and states
+
+The user's principle: what a glance can read beats what has to be read, but the AI agent is the second user, so **text is hidden, never deleted**. The user's own example is Can it run › RAM / VRAM:
+
+```
+today (31 words)
+  RAM: loading needs 2.3 GB–3.3 GB; available now 29.3 GB of 63.1 GB
+  VRAM: estimated 1.9 GB–1.9 GB; dedicated capacity 23.6 GB
+  GPU: NVIDIA GeForce RTX 4090 (by the system's preference)
+
+proposed (4 words)
+  RAM   [██████████|▓▓▓▒▒|··························]  64 GB
+  VRAM  [██|▓▓|·········································]  24 GB
+         in use     need   free
+```
+
+### 7.1 Where the hidden text goes
+
+Every visual below keeps its words in four places. Nothing is deleted, only taken off the visible page:
+
+1. **The view model** (16 §1). The GUI and TUI receive the same structs; the sentences stay in them. Where a visual needs numbers, they are already there or need one field (table below). Nothing in `internal/view` is removed.
+2. **The accessibility tree** (16 §11 A10: "never only in a `title`, hover, color or image"). The visual is a `role="img"` or `role="meter"` / `progressbar` element whose accessible name is the full sentence, such as `aria-label="RAM: loading needs 2.3–3.3 GB; available now 29.3 GB of 63.1 GB"`. An agent reading UIA gets exactly today's text. Meters also expose `aria-valuenow` / `aria-valuemax`.
+3. **Hover and keyboard focus**: the same sentence as a tooltip. The visual is focusable when it carries a number that is not printed beside it.
+4. **CLI and MCP** (13, 14): unchanged. They print from `app` and `cmds`, not from the GUI (`plan cost`, MCP `estimate_memory`, `archo log`, `saves show`, `loadout import` previews), so no output changes.
+5. The **TUI** (16 §9) keeps its text lines. Block bars (`▇▇░`) are an option for later, not part of this proposal; a terminal row is already one line per fact (16 §7 principle 8).
+
+| Visual | Numbers it needs | In the view model today? |
+| --- | --- | --- |
+| V1 memory bars | total, available, need low / high, VRAM capacity and estimate | Yes: `Needs.Memory` is the whole `app.MemoryAssessment` (`needs.go`), next to `Need.Text`; All lists has the same assessment |
+| V2 run summary | counted items, error groups | Yes: the counts behind `NeedsLead` |
+| V3 error-group bars | count per kind per group | Partly: the kinds and counts are in the group's text ("×501; exceptions ×1"); add a `[]{kind, n}` field |
+| V4 log cluster bars, likelihood meter | cluster count; pattern percentage and sample size | Yes: cluster `Count`; the pattern's numbers are formatted into the sentence, add them as fields |
+| V5 import bar and diff marks | installed / missing; added / removed / moved | Partly: the preview has the lists; the replace / merge diff is a sentence, add counts |
+| V6 update marks | changed Defs, Patches, files per Mod; risk level | Yes (`modchanges` page rows) |
+| V7 texture before / after | PNG count and size, DDS size after | Yes (count result) |
+| V8 size bars | size per row | Yes (table cells) |
+| V10 disk meter | free and total bytes | Free only; add the total |
+
+### 7.2 Proposals
+
+Ranked with the text cuts in §7.4. Sketches use `█` for what exists or is used, `▓` for the low estimate, `▒` for the range up to the high estimate, `·` for free, `▲` `✕` `✓` `○` for the status icons RimArcho already draws.
+
+**V1 Memory: one stacked bar per resource** (Can it run, worth knowing; All lists' memory block; the launch dialog's RAM warning).
+
+```
+RAM   [███████████|▓▓▓▒▒|·························]  64 GB
+VRAM  [██|▓▓|········································]  24 GB
+```
+
+In use = total − available (grey); the need is the accent, the range part hatched (`▒`) so low and high read without colour; free is the track. Over budget, the need runs past the end into red, and the item moves to breaks the game as today. The GPU line moves into the VRAM bar's text. All lists' three lines (Vanilla and DLC / Mods / budget) become the same bar split into "game" and "Mods" segments. Hidden text: `Need.Text` as each bar's accessible name and tooltip, the GPU and the "saves are not counted" note in the item's details. Saves ~27 words on Can it run, ~30 on All lists.
+
+**V2 Run summary instead of the lead sentence** (Can it run; the Launch problem line).
+
+```
+default   ▲ 2 to fix before you play    ✕ 2 errors last time
+```
+
+Two status icons with numbers; T1's sentence is the line's accessible name. Saves ~5 words beyond T1; the counts match the section headings, which already pulse on change (16 §7.1).
+
+**V3 Error groups as count bars** (Can it run, last run).
+
+```
+unknown source   [████████████████████████████▌]  502
+Add Cube         [▏]                                 1
+```
+
+A bar per group, scaled to the largest, the count at the end; within the bar the kinds (patched methods / exceptions / other) are shades, named in the tooltip. Today: "unknown source — 502 errors, 1 warning / errors in patched methods ×501; exceptions ×1; 1 other messages" plus "log  Player.log  Nov 18 21:51" per group. Hidden text: the group's `Text` as the row's name; file and time once in the section head. Saves ~15 words per group.
+
+**V4 Game log: cluster counts and likelihood** (Game log).
+
+```
+✕ harmony-stack  ████████████████████  ×500
+✕ patch-failed   ▏                      ×1
+try first: disable the mod that errors   [■■■■■□□□□□] 53%
+```
+
+The ×count becomes a bar beside it; "after changing 1–3 mods it went away in 53% of 255 repeat uploads (13% without any change)" becomes a 10-step meter, the sentence its name (T17 already folds it). Severity "medium" becomes a three-step meter. Saves ~20 words.
+
+**V5 Import preview: one bar and diff marks** (Import & export preview, the first-list step).
+
+```
+121 Mods  [███████████████████████████████████░░]  ✓ 121  ✕ 0
+replace default:   +7   −12   ↕31
+```
+
+Installed / not installed as a two-part bar; the destination's effect as the + − ↕ marks Saves already uses for Mod changes. Today: "RimSort list: 212 mods, 205 installed, 7 not installed" and "7 added  12 removed  31 moved  212 enabled after it". Saves ~12 words per destination.
+
+**V6 Updates: change marks instead of chips and sentences** (Mod library › Updates).
+
+```
+Add Cube        ● Defs +1
+HugsLib         ● Defs +1  Patches ~2
+sources   ✓ Workshop   ✓ local   checked 21:52
+```
+
+One risk dot (amber for "worth a look", none when harmless) instead of the identical "worth a look" chip on every row (six of six rows today); counts by kind as marks. The sources' "not checked yet / checked" lines become status icons. Saves ~25 words.
+
+**V7 Texture optimisation: before and after** (after "count the textures").
+
+```
+now     [██████████████████████████████]  1.8 GB  · 4,210 PNG
+after   [█████████▌]                         0.6 GB
+encoder ✓ todds 0.4.1
+```
+
+Replaces the result sentences and the encoder card's three lines (T10, T11 already shorten them). Saves ~25 words.
+
+**V8 Size and use as in-cell bars** (All mods size, pack page size, Packs size; "used in 3 lists").
+
+```
+Combat Extended     ███████████▌ 412 MB   ●●●
+HugsLib             ▏           1.6 KB    ●●●
+```
+
+A faint bar behind the size, scaled to the largest row; used-in as one dot per list (named in the tooltip). The numbers stay printed. Saves 0–3 words per row, gains "where is my space" at a glance.
+
+**V9 Saves: drop the words the bar already shows** (All saves, right card). "What this save needs" already has `.sv-nbar`; the two category descriptions repeat it (T13). The colony timeline (`.sv-chart`) and Mod changes' + − ↕ marks stay as they are. Saves ~36 words with T13.
+
+**V10 Guide: disk meter** (first-run step 1, if kept; Settings › folders).
+
+```
+D:\…\RimArcho   [██████████████████········]  440 GB free of 1.8 TB
+```
+
+Small; matters on a nearly full drive, where the warning turns the free part amber.
+
+**V11 Tasks and Launch: icons for states that are words today.** Task rows "done" / "failed" next to ✓ / ✕ drop the word (the icon's name keeps it); Launch's "last game  Nov 18  2 errors" becomes `last game  Nov 18  ✕ 2`. Saves ~2 words per row.
+
+Not proposed: the Game versions control on All lists (already a segmented picture of versions), the editor's unsaved dot, sidebar badges, Play review's seen meters, the saves timeline, progress bars. These are the house style the proposals reuse.
+
+### 7.3 Existing visuals to reuse, and the rules that bind them
+
+| Existing | Where | Style to reuse |
+| --- | --- | --- |
+| `.prog` | guide, exchange, pack build, uninstall, tasks | 6px track (`--pill`), accent fill, `--r-sm`, width transition at `--t-layout` |
+| `.sv-nbar` | Saves, what this save needs | 8px segmented bar, 2px gaps, `--r-sm`; the model for V1, V3, V5 |
+| `.rv-meter` | Play review seen meters | 4px, 56 / 120px wide; the model for V4's meter and V8's in-cell bars |
+| `.sv-chart` | Saves, over time | SVG line, `--line` ticks; the model for any later sparkline |
+| status icons ✓ ✕ ▲ ○ | Can it run, tasks, Launch | 16 §7 icon set (Nerd and compat forms) |
+| + − ↕ marks | Saves' Mod changes | green +, red −, muted ↕ |
+
+16 §7 rules that constrain the visuals:
+
+- **One accent, plus success green, error red, warning amber** (principle 2). The estimate or the thing being looked at is the accent; existing use is muted grey; free space is the track. No new hues.
+- **Most text is grey; only the operated object is bright** (principle 3): the bar's numbers are secondary text, never bold.
+- **No left vertical lines or colour bars** (principle 4, §7.3 rule 6, TestStyleRules): every proposal is horizontal; nothing marks a row with a strip.
+- **Hairlines only, two radii** (§7.3 rules 1, 3): bars are fills on a track with `--r-sm`, no borders; TestStyleRules already enforces this.
+- **Four font sizes, minimum 12px** (rule 4): the number at a bar's end is 12px.
+- **Keep the interface still** (principle 7, §7.1): bars may grow to a new value with the 250ms layout motion and nothing else; no shimmer except existing progress.
+- **Not by colour alone** (A10): low and high differ by hatch, severity by icon shape, so the bar reads in either theme and for colour-blind players.
+
+### 7.4 Ranking: text cuts and visuals together
+
+By en words removed from the visible page and how much faster the page reads. "Clarity" is a judgement: **high** when the visual answers the page's question without reading (does it fit, how bad is it, what changed), **medium** when it speeds a comparison, **low** when it only trims.
+
+| Rank | Item | Pages | Words saved (en, visible) | Clarity | Kind |
+| --- | --- | --- | --- | --- | --- |
+| 1 | H1 hint line in keyboard mode | 18 of 20 | 9–26 per page | medium | rule |
+| 2 | V1 memory bars (with T6) | Can it run, All lists, launch warning | ~57 | high | visual |
+| 3 | T8 subscription cards to one line | Add a subscription | ~69 | medium | text |
+| 4 | V3 error-group bars + T4 evidence on demand | Can it run | ~45 | high | visual + text |
+| 5 | T13 + V9 save categories | Saves | ~36 | medium | text, reuse |
+| 6 | V6 update marks + T7 | Updates | ~37 | high | visual + text |
+| 7 | V4 log bars and likelihood meter + T15–T17 | Game log | ~45 | high | visual + text |
+| 8 | T19–T22 guide and Add Game Config sentences | first run, P6 | ~60 over the path | medium | text |
+| 9 | V5 import bar and diff marks + T23, T24 | Import & export | ~35 | high | visual + text |
+| 10 | V7 texture before / after + T10, T11 | Textures | ~45 | high | visual + text |
+| 11 | T25 export groups and folded preview | Export | ~20 visible, the whole JSON | medium | text |
+| 12 | T14 play review lead and note | Play review | ~19 | low | text |
+| 13 | V2 run summary (with T1) | Can it run, Launch | ~14 | medium | visual |
+| 14 | T26–T28 empty states, settings, details | several | ~45 total | low | text |
+| 15 | V8 in-cell size and use bars | All mods, packs | 0–3 per row | medium | visual |
+| 16 | V11 state icons | Tasks, Launch | ~2 per row | low | visual |
+| 17 | V10 disk meter | guide, Settings | ~3 | low | visual |
+
+Can it run, the user's example page, goes from 235 visible UI words to about 70 with V1–V3, T1–T5.
+
+## 8. What stays from the first version
 
 Kept, because they also cut reading or concepts:
 
@@ -214,7 +391,7 @@ Dropped or marked, because they trade discoverability for fewer elements and do 
 | Settings folder rows as one menu each | **Trades discoverability**; instead hide rows "not used yet" (cuts words) |
 | Mod settings: three views behind "files ▾" | **Dropped** |
 
-## 8. Decisions for the user
+## 9. Decisions for the user
 
 1. **D1: Rewrites T1–T30**: apply all, en and zh (and ja to match en). *Recommended*: yes; they need no spec change except where the spec quotes the old text, and they cut 30–60% of the words on the five heaviest pages.
 2. **D2: "Game Config" in navigation and Launch**: rename to "game" (`游戏`, `ゲーム`) outside its own page, or keep it everywhere with one explaining line. *Recommended*: rename. It is the app's central idea, first met unexplained, and its name collides with the game's Config folder.
@@ -226,4 +403,10 @@ Dropped or marked, because they trade discoverability for fewer elements and do 
 8. **D8: Hint line**: keyboard mode only (H1), at most 4 groups (H2), or as is. *Recommended*: H1. It needs 16 §3.1 rule 4 and §2.2 changed.
 9. **D9: No CLI commands in GUI text**: replace the two found (launch refusal, Monitor install) with buttons, and add a static check that no `archo ` command text reaches a GUI string. *Recommended*: yes; the check belongs in 17 §4's static checks.
 
-Suggested order: D9 and D1 first (text only), then D6, D4, D5 (small flow changes), then D2, D3 and D8 (renames and spec changes).
+10. **D10: Adopt "visual first, text on demand" as a 16 §7 principle.** Proposed wording, as principle 9 after "Each TUI row occupies one line":
+
+    > **9. Show quantities, not sentences about them; keep the sentence underneath.** A count, proportion, progress, state, comparison or change that can be read at a glance is drawn: a bar, stacked bar, meter, status icon, + − ↕ mark or small timeline, in the styles that exist (`.prog`, `.sv-nbar`, `.rv-meter`, `.sv-chart`, the §7 icons). The words are never deleted. The view model keeps the full sentence (§1), the visual carries it as its accessible name or description (§11 A10) and as a tooltip on hover and keyboard focus, and CLI and MCP output (13, 14) is unchanged. A visual does not carry a fact by colour alone: a hatch, an icon's shape or a printed number carries it too. Reasons, actions and names stay text. The TUI keeps text unless its row has room for a block bar.
+
+    *Recommended*: yes, together with V1 as the first application (the user's own example), then V3–V7 page by page. A static check could follow: a `role="meter"` / `"img"` / `"progressbar"` element must have a nonempty accessible name.
+
+Suggested order: D9, D1 and D10 with V1 first (text, plus the memory bars), then D6, D4, D5 (small flow changes), then V3–V7 under D10, then D2, D3 and D8 (renames and spec changes).
