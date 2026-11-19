@@ -21,7 +21,7 @@ test('Game Config picker selects and removes the displayed row', async () => {
  });
  await choose();
  const [title,labels,pick,current,other] = chooser;
- assert.equal(title,'switch Game Config');
+ assert.equal(title,'switch game');
  assert.equal(labels[0],'second  RimWorld 1.6');
  assert.equal(current,1);
  pick(0);pick(1);pick(2);

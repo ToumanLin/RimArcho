@@ -88,7 +88,7 @@ func TestPalRankLibrary(t *testing.T) {
 		{"排序", "cmd:sort", "cmd:rules"}, // suffix: automatic sorting and sorting rules
 		{"订阅", "cmd:subscribe", ""},
 		{"预览", "cmd:preview-sort", "cmd:preview-launch"},
-		{"检查文件", "cmd:analyze", ""},
+		{"重新检查", "cmd:analyze", ""},
 	} {
 		top := palTop(c.q, all, 5)
 		if len(top) == 0 || top[0] != c.first || (c.also != "" && !strings.Contains(strings.Join(top, "|"), c.also)) {

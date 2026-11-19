@@ -114,11 +114,11 @@ func TestRunningSiblingAttribution(t *testing.T) {
 		}
 		status := e.MustRun("status")
 		if tc.want == "" {
-			if live.Running || !strings.Contains(live.Blocked, "Game Config unknown") || !strings.Contains(status, "Game Config unknown") {
+			if live.Running || !strings.Contains(live.Blocked, "which game is unknown") || !strings.Contains(status, "Game Config unknown") {
 				t.Fatalf("unknown displayed as selected: %+v\n%s", live, status)
 			}
 		} else if tc.want != sibling.Name {
-			if live.Running || !strings.Contains(live.Blocked, "Game Config "+tc.want) || !strings.Contains(status, "Game Config "+tc.want+" is running") {
+			if live.Running || !strings.Contains(live.Blocked, "game "+tc.want) || !strings.Contains(status, "Game Config "+tc.want+" is running") {
 				t.Fatalf("sibling displayed as selected: %+v\n%s", live, status)
 			}
 		} else if !live.Running || !strings.Contains(live.Owner, sibling.Name) {
