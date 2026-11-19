@@ -44,6 +44,7 @@ import * as selfUpdate from "./selfupdate.js";
 import { refreshBackgrounds } from "./bg.js";
 import { environmentReason, withEnvironmentSwitch } from "./environment.js";
 import { wireSeparator } from "./separator.js";
+import { pickClick } from "./select.js";
 import { go, openPage, initNavigation, pageEntering, pageEntered, wireHistory, travel } from "./navigation.js";
 import { checkCredit, getChoices } from "./credit.js";
 import * as problems from "./problems.js";
@@ -512,29 +513,23 @@ async function step(d) {
   await showDetail(cur(lastList), lastList === 2);
 }
 
+// click is a press on row i of list k (16 §3.4, pickClick). e.keep: a plain press on a
+// selected row keeps the selection, so a drag can move it; its mouseup without a drag
+// clicks again without keep (lists.js).
 function click(k, i, e) {
   const c = S.cols[k];
-  if (S.focus !== k) focusArea(k);
+  const seed = S.focus === k;
+  if (!seed) focusArea(k);
   const g = headOf(c, c.view[i]);
-  if (g && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+  const ctrl = e.ctrlKey || e.metaKey;
+  if (g && !e.shiftKey && !ctrl) { c.cursor = i; S.anchor = i; return toggleGroup(); }
+  const it = c.view[i] >= 0 ? c.items[c.view[i]] : null;
+  if (!(e.keep && !e.shiftKey && !ctrl && it && c.sel.has(key(it)))) {
+    const range = (j) => (c.view[j] >= 0 ? [key(c.items[c.view[j]])] : []);
     // ctrl+click on a tag group's header selects its rows shown (again: unselects them)
-    const ks = g.rows.map((j) => key(c.items[j]));
-    const all = ks.length && ks.every((x) => c.sel.has(x));
-    for (const x of ks) all ? c.sel.delete(x) : c.sel.add(x);
-    c.cursor = i; S.anchor = i;
-    return clicked(k);
+    const one = (j) => { const h = headOf(c, c.view[j]); return h ? h.rows.map((r) => key(c.items[r])) : range(j); };
+    S.anchor = pickClick(c.sel, e, { at: i, cursor: c.cursor, anchor: S.anchor, one, range, seed });
   }
-  if (g && !e.shiftKey) { c.cursor = i; S.anchor = i; return toggleGroup(); }
-  if (e.shiftKey) {
-    if (S.anchor < 0) S.anchor = c.cursor;
-    c.sel.clear();
-    const [a, b] = [Math.min(S.anchor, i), Math.max(S.anchor, i)];
-    for (let j = a; j <= b; j++) if (c.view[j] >= 0) c.sel.add(key(c.items[c.view[j]]));
-  } else if (e.ctrlKey || e.metaKey) {
-    const kk = key(c.items[c.view[i]]);
-    c.sel.has(kk) ? c.sel.delete(kk) : c.sel.add(kk);
-    S.anchor = i;
-  } else S.anchor = i;
   c.cursor = i;
   clicked(k);
 }

@@ -490,7 +490,12 @@ export function wireLists(ui) {
     box.addEventListener("mousedown", (e) => {
       const r = e.target.closest(".row");
       if (!r || e.button !== 0) return;
-      ui.click(k, +r.dataset.i, e);
+      const i = +r.dataset.i;
+      // a plain press on a selected row keeps the selection until the mouseup, so it can be
+      // dragged; released without a drag, it selects only that row (16 §3.4)
+      const plain = !e.shiftKey && !e.ctrlKey && !e.metaKey;
+      ui.click(k, i, { shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey, keep: plain });
+      if (plain && press) press.collapse = true;
       box.focus({ preventScroll: true });
     });
     box.addEventListener("dblclick", (e) => { // keys: space
@@ -546,8 +551,8 @@ function startDrag() {
   const c = S.cols[k];
   const it = c.items[c.view[i]];
   if (!it || (!it.id && k !== 1)) return; // a missing Mod moves only within Enabled
-  // Dragging a row outside the selection drags that row alone; a plain click keeps the
-  // selection (16 §3.1), so clear it first or the old selection would move instead.
+  // Dragging a row outside the selection drags that row alone (a ctrl+press that unselected
+  // it leaves the rest selected), so clear it first or the old selection would move instead.
   if (!c.sel.has(key(it)) || S.focus !== k) {
     c.sel.clear();
     ui.click(k, i, { shiftKey: false, ctrlKey: false });
@@ -613,7 +618,9 @@ function wireDragWindow() {
     overDrop();
   });
   window.addEventListener("mouseup", (e) => {
+    const p = press;
     press = null;
+    if (p && p.collapse && !drag && e.button === 0) p.ui.click(p.k, p.i, { shiftKey: false, ctrlKey: false });
     if (!drag || e.button !== 0) return;
     const d = drag;
     endDrag();

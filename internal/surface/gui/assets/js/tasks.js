@@ -14,6 +14,7 @@ import { icon } from "./icons.js";
 import { still } from "./motion.js";
 import { createTable, mergeColumns } from "./datatable.js";
 import { wireSeparator } from "./separator.js";
+import { pickClick } from "./select.js";
 
 const COLS_KEY = "ui.gui.tasks.items.columns";
 const SIDE_KEY = "ui.gui.tasks.side";
@@ -568,11 +569,10 @@ function wireList(rows) {
     const r = e.target.closest(".tk-row");
     if (!r || e.button !== 0) return;
     const id = r.dataset.id;
-    if (e.ctrlKey) X.sel.has(id) ? X.sel.delete(id) : X.sel.add(id);
-    else if (e.shiftKey && X.cur) {
-      const ids = shown().map((x) => x.id), a = ids.indexOf(X.cur), b = ids.indexOf(id);
-      ids.slice(Math.min(a, b), Math.max(a, b) + 1).forEach((x) => X.sel.add(x));
-    }
+    // as the editor's lists (16 §3.4): click selects only this task, ctrl toggles, shift ranges
+    const ids = shown().map((x) => x.id), one = (j) => (ids[j] ? [ids[j]] : []);
+    const anchor = pickClick(X.sel, e, { at: ids.indexOf(id), cursor: ids.indexOf(X.cur), anchor: ids.indexOf(X.anchor), one, range: one });
+    X.anchor = ids[anchor] ?? null;
     moveTo(id);
   });
   rows.addEventListener("dblclick", (e) => { if (e.target.closest(".tk-row")) focusItems(); }); // keys: 3 focuses the items
@@ -649,7 +649,13 @@ export function key(e) {
   const page = Math.max(1, Math.floor(els.rows.clientHeight / 46) - 1);
   const go = (j) => {
     j = Math.max(0, Math.min(ids.length - 1, j));
-    if (e.shiftKey && X.cur) { X.sel.add(X.cur); X.sel.add(ids[j]); }
+    // shift extends a range from the anchor, as in the editor's lists (16 §3.4)
+    if (e.shiftKey && X.cur && i >= 0) {
+      let a = ids.indexOf(X.anchor);
+      if (a < 0) { a = i; X.anchor = X.cur; }
+      X.sel.clear();
+      ids.slice(Math.min(a, j), Math.max(a, j) + 1).forEach((x) => X.sel.add(x));
+    } else if (!e.shiftKey) X.anchor = null;
     done();
     moveTo(ids[j]);
   };

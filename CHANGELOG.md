@@ -5,6 +5,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 ## Unreleased
 
 - Import page: less text. Each card is a title, one line on what you get and its input; the "You get…" boxes, the source chips and the hint lines are gone (what a file button accepts is its tooltip). "paste from the clipboard" reads "paste".
+- Mod lists (editor, Mod library, background tasks): selecting with the mouse now works like other lists (GitHub #9). A click selects only that Mod, so a Mod selected earlier no longer comes along into the next action; ctrl+click adds the Mod under the cursor and the clicked one, and toggles; shift+click selects a range, and ctrl+shift+click adds a range. Pressing an already selected Mod still drags the whole selection. In background tasks, shift with the arrows or Page Up / Down now selects every task in between, not only the two ends.
 - Answering "same" to an identity question now carries the new Mod's notes, tags, user rules and ignored findings over to the Mod it was, and removes the left-over empty record. Before, they stayed on a record nothing pointed to any more.
 - TUI: drawing the screen no longer reads the database; Can it run's count is brought up to date after each key or result instead.
 - Window: the top bar no longer shows the Game Config chip (`name 1.6`) beside the breadcrumb; the sidebar and the Launch page's 01 column already name and switch it.

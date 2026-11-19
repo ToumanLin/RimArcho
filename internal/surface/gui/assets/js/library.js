@@ -19,6 +19,7 @@ import { createBar } from "./filterbar.js";
 import * as ops from "./ops.js";
 import { createTable, mergeColumns } from "./datatable.js";
 import { wireSeparator } from "./separator.js";
+import { pickClick } from "./select.js";
 import { markOf, paintMark, tagCSS, tagColors, fromTagList } from "./tagcolor.js";
 import { tagPanel, tagInfo, startRename as tagStartRename, editTagNote as tagEditNote, pickMerge as tagPickMerge, confirmDelete as tagConfirmDelete } from "./tagmanager.js";
 
@@ -610,15 +611,9 @@ function land(dir) {
 function click(k, e) {
   const x = L.flat[k];
   L.focus = "rows";
-  if (e.shiftKey) {
-    if (L.anchor < 0) L.anchor = L.cur;
-    L.sel.clear();
-    const [a, b] = [Math.min(L.anchor, k), Math.max(L.anchor, k)];
-    for (let j = a; j <= b; j++) for (const i of shownCopies(L.flat[j])) L.sel.add(i.ref);
-  } else if (e.ctrlKey || e.metaKey) {
-    toggleSel(x);
-    L.anchor = k;
-  } else L.anchor = k;
+  // as the editor's lists (16 §3.4): click selects only this row, ctrl toggles, shift ranges
+  const refs = (cs) => cs.map((i) => i.ref), at = (f) => (j) => (L.flat[j] ? refs(f(L.flat[j])) : []);
+  L.anchor = pickClick(L.sel, e, { at: k, cursor: L.cur, anchor: L.anchor, one: at(copiesOf), range: at(shownCopies) });
   L.cur = k;
   // a click on a Lineage's row opens it and takes its first copy
   if (x.t === "lin") { const was = isOpen(x.r); land(1); if (!was) ensureVisible(); }

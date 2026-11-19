@@ -64,7 +64,7 @@ In the plan editor, mouse actions are another way to trigger the same verbs:
 | Action | Keyboard | Mouse |
 | --- | --- | --- |
 | Move cursor / area | `↑↓` / `←→`, `1`–`4` | Click |
-| Select | `shift+↑↓`, `ctrl+space`, `esc` clears | `shift+click` range, `ctrl+click` toggle |
+| Select | `shift+↑↓`, `ctrl+space`, `esc` clears | click selects only that row, `shift+click` range, `ctrl+click` toggle, `ctrl+shift+click` adds a range (§3.4) |
 | Enable / disable | `space` | Double-click; drag between columns |
 | Stage / put back | `t` | Drag into / out of Staging |
 | Reorder | `J` `K`, `m` position input | Drag in Enabled; drop line says position N |
