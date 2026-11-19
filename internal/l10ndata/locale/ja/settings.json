@@ -293,7 +293,6 @@
   "check for replies to my reports": "送ったレポートへの返信を確認",
   "asks the feedback relay when RimArcho starts and when Feedback opens; nothing else is sent": "RimArcho の起動時とフィードバックを開いたときに中継サーバーへ問い合わせます。ほかには何も送りません",
   "my reports": "送ったレポート",
-  "the developer may reply to a report here; there is no promise of a reply, and replies are public on GitHub": "開発者がここで返信することがあります。返信の保証はなく、返信は GitHub で公開されます",
   "checking for replies is off (Settings › network)": "返信の確認はオフです（設定 › ネットワーク）",
   "could not check for replies just now; RimArcho asks again next time": "いまは返信を確認できませんでした。次回また確認します",
   "no reports sent from this computer yet": "このパソコンからはまだレポートを送っていません",
@@ -305,8 +304,10 @@
   "still open": "オープン中",
   "replies: %d": "返信 %d 件",
   "no reply yet": "まだ返信はありません",
-  "developer, %s": "開発者、%s",
-  "send a follow-up": "続報を送る",
   "follow-up to #%d": "#%d の続報",
-  "follow-up to #%d: %s": "#%d の続報：%s"
+  "follow-up to #%d: %s": "#%d の続報：%s",
+  "the developer may reply here; not guaranteed, and public on GitHub": "開発者がここで返信することがあります。返信の保証はなく、GitHub で公開されます",
+  "open on GitHub": "GitHub で開く",
+  "follow up on #%d": "#%d の続報を送る",
+  "developer": "開発者"
 }

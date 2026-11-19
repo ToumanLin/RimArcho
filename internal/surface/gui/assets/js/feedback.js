@@ -6,12 +6,13 @@
 // leaves. A body too long for a link is copied and the link says to paste it.
 import { copy } from "./fields.js";
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
+import { icon } from "./icons.js";
 import { page, button, area, beginPageRead } from "./screens.js";
 
 // The draft stays for the session: leaving the page does not lose what was typed (16 §3.1).
 // sent: the issue send opened last, shown until the next draft. open: the preview's
 // attachments unfolded by the player (by key), kept while typing.
-const F = { title: "", text: "", contact: "", opts: { mods: false, paths: false, log: false }, at: null, res: null, sent: null, sending: false, open: new Set(), mine: null, fresh: new Set() };
+const F = { title: "", text: "", contact: "", opts: { mods: false, paths: false, log: false }, at: null, res: null, sent: null, sending: false, open: new Set(), mine: null, fresh: new Set(), freshAt: new Set() };
 let seq = 0, typing = 0, retry = 0;
 
 export async function open() {
@@ -27,7 +28,7 @@ export async function open() {
   F.landed = hit ? hit.number : 0;
   draw();
   read.finish();
-  if (hit) $(`#screen .fb-report[data-report="${hit.number}"]`)?.scrollIntoView({ block: "center" });
+  if (hit) $(`#screen .fb-rep[data-report="${hit.number}"]`)?.scrollIntoView({ block: "center" });
   else $("#screen .fb-title")?.focus({ preventScroll: true });
   checkReplies();
 }
@@ -116,6 +117,7 @@ function draw() {
   // My reports: numbered once here; drawMine fills it again after each check
   const mine = el("div", "fb-mine-wrap");
   const labM = el("div", "label section", T("my reports"));
+  labM.append(el("span", "fb-public fb-mine-note"));
   const cardM = el("section", "card settings fb-mine");
   mine.append(labM, cardM);
   w.append(mine);
@@ -134,50 +136,57 @@ function drawMine() {
   const m = F.mine;
   wrap.hidden = !m || (!F.at?.send && !m.reports.length);
   if (wrap.hidden) return;
-  const note = el("div", "set fb-mine-note");
-  const nl = el("div", "l");
-  nl.append(el("div", "sub setting-note", T("the developer may reply to a report here; there is no promise of a reply, and replies are public on GitHub")));
-  if (m.off) nl.append(el("div", "sub setting-note", T("checking for replies is off (Settings › network)")));
-  else if (m.failed) nl.append(el("div", "sub setting-note", T("could not check for replies just now; RimArcho asks again next time")));
-  note.append(nl);
-  card.append(note);
-  if (!m.reports.length) {
-    const row = el("div", "set");
-    const l = el("div", "l");
-    l.append(el("span", "muted", T("no reports sent from this computer yet")));
-    row.append(l);
-    card.append(row);
+  // beside the heading: what replies are, and why there may be none just now
+  const note = $("#screen .fb-mine-note");
+  if (note) {
+    note.textContent = T("the developer may reply here; not guaranteed, and public on GitHub");
+    const why = m.off ? T("checking for replies is off (Settings › network)") : m.failed ? T("could not check for replies just now; RimArcho asks again next time") : "";
+    if (why) note.append(el("span", "fb-mine-why", why));
   }
+  if (!m.reports.length) { card.append(el("div", "fb-mine-empty", T("no reports sent from this computer yet"))); return; }
   for (const r of m.reports) card.append(reportRow(r));
 }
 
+// reportRow is one report: its title and state on one line, the date and reply count under
+// it, then the developer's replies as plain text, then a quiet follow-up.
 function reportRow(r) {
-  const row = el("div", "set fb-report" + (r.number === F.landed ? " fb-r-hl" : ""));
+  const isNew = F.fresh.has(r.number) || r.unseen;
+  const row = el("div", "fb-rep" + (r.number === F.landed ? " landed" : ""));
   row.dataset.report = String(r.number);
-  const l = el("div", "l");
-  const head = el("div", "fb-r-head");
-  const name = button("#" + r.number + " " + (r.title || ""), "", () => r.url && api.OpenURL(r.url).catch(e => say("fail", errText(e))), "link");
-  name.classList.add("fb-r-name");
-  if (r.url) name.title = r.url;
-  head.append(name);
-  if (F.fresh.has(r.number) || r.unseen) head.append(el("span", "fb-r-new", T("new reply")));
-  l.append(head);
-  const facts = el("div", "sub setting-note word-facts");
-  facts.append(el("span", "", Tf("sent %s", day(r.sentAt))));
-  if (r.gone) facts.append(el("span", "", T("no longer on GitHub")));
-  else if (r.state === "closed") facts.append(el("span", "", r.closedAt ? Tf("closed %s", day(r.closedAt)) : T("closed")));
-  else if (r.state === "open") facts.append(el("span", "", T("still open")));
-  facts.append(el("span", "", r.replies.length ? Tf("replies: %d", r.replies.length) : T("no reply yet")));
-  l.append(facts);
-  for (const p of r.replies) {
-    const q = el("div", "fb-reply");
-    q.append(el("div", "fb-reply-when", Tf("developer, %s", day(p.created_at))), el("div", "fb-reply-text", p.body));
-    l.append(q);
+  const head = el("div", "fb-rep-head");
+  if (isNew) { const d = el("span", "fb-rep-dot"); d.title = T("new reply"); head.append(d); }
+  head.append(el("span", "fb-rep-title", r.title || "#" + r.number), el("span", "fb-rep-num num", "#" + r.number));
+  const state = r.gone ? T("no longer on GitHub") : r.state === "closed" ? T("closed") : T("still open");
+  const pill = el("span", "fb-rep-state" + (r.state === "closed" && !r.gone ? " closed" : ""), state);
+  if (r.state === "closed" && r.closedAt) pill.title = Tf("closed %s", day(r.closedAt));
+  head.append(pill);
+  if (r.url && !r.gone) {
+    const gh = button("", "", () => api.OpenURL(r.url).catch(e => say("fail", errText(e))), "icon fb-rep-open");
+    gh.innerHTML = icon.ext;
+    gh.title = T("open on GitHub");
+    gh.setAttribute("aria-label", T("open on GitHub"));
+    head.append(gh);
   }
-  row.append(l);
-  const right = el("div", "r");
-  right.append(button(T("send a follow-up"), "", () => followUp(r)));
-  row.append(right);
+  row.append(head);
+  const facts = el("div", "fb-rep-facts word-facts");
+  facts.append(el("span", "", Tf("sent %s", day(r.sentAt))));
+  facts.append(el("span", isNew ? "fb-rep-newtext" : "", r.replies.length ? (isNew ? T("new reply") : Tf("replies: %d", r.replies.length)) : T("no reply yet")));
+  row.append(facts);
+  if (r.replies.length) {
+    const thread = el("div", "fb-thread");
+    for (const p of r.replies) {
+      const fresh = F.freshAt.has(r.number + "|" + p.created_at) || (isNew && p.created_at > (r.lastSeen || ""));
+      if (fresh) F.freshAt.add(r.number + "|" + p.created_at);
+      const q = el("div", "fb-reply" + (fresh ? " new" : ""));
+      q.append(whoLine(p), el("div", "fb-reply-text", p.body));
+      thread.append(q);
+    }
+    row.append(thread);
+  }
+  if (!r.gone) {
+    const f = button(Tf("follow up on #%d", r.number), "", () => followUp(r), "link fb-rep-follow");
+    row.append(f);
+  }
   return row;
 }
 
@@ -291,4 +300,11 @@ async function openIssue() {
     await api.OpenURL(res.url);
     say("ok", res.full ? T("opened GitHub in the browser") : T("opened GitHub; paste the copied text into the issue"));
   } catch (e) { say("fail", errText(e)); }
+}
+
+// whoLine is "developer" and the reply's date, spaced like other facts (16 §7.3).
+function whoLine(p) {
+  const w = el("div", "fb-reply-who word-facts");
+  w.append(el("span", "", T("developer")), el("span", "", day(p.created_at)));
+  return w;
 }

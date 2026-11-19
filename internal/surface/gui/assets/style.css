@@ -1657,18 +1657,26 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .fb-public { margin-left: 12px; font-weight: 400; color: var(--faint); }
 /* My reports (16 §2.14): replies as plain text under each report; the sidebar's dot */
 .fb-mine { margin-bottom: 24px; }
-.fb-mine .set .l .setting-note { padding-left: 0; }
-.fb-report { align-items: flex-start; }
-.fb-report > .r { align-self: flex-start; }
-/* the report with the unseen reply the dot led to */
-.fb-report.fb-r-hl { background: var(--accent-soft); }
-.fb-r-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.fb-r-head .btn.link.fb-r-name { padding-left: 0; padding-right: 0; border-left-width: 0; }
-.fb-r-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fb-r-new { flex: none; font-size: 12px; color: var(--accent-11, var(--accent)); }
-.fb-reply { margin-top: 8px; padding: 6px 10px; border-left: var(--hairline) solid var(--line); }
-.fb-reply-when { color: var(--muted); font-size: 12px; }
-.fb-reply-text { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.fb-mine-why { margin-left: 10px; color: var(--muted); }
+.fb-mine-empty { padding: 14px; color: var(--muted); }
+.fb-rep { position: relative; padding: 12px 14px 10px; display: flex; flex-direction: column; gap: 4px; }
+.fb-rep + .fb-rep { border-top: var(--hairline) solid var(--line-2); }
+.fb-rep-head { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 24px; }
+.fb-rep-dot { position: absolute; left: 4px; top: 21px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.fb-rep-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--fg); }
+.fb-rep-num { flex: none; color: var(--faint); font-size: 12px; }
+.fb-rep-state { flex: none; margin-left: auto; height: 20px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: 999px; font-size: 12px; color: var(--green); background: color-mix(in srgb, var(--green) 14%, transparent); }
+.fb-rep-state.closed { color: var(--muted); background: var(--pill); }
+.fb-rep .fb-rep-open { flex: none; width: 24px; height: 24px; padding: 0; color: var(--muted); }
+.fb-rep .fb-rep-open svg { width: 14px; height: 14px; }
+.fb-rep-facts { color: var(--muted); font-size: 12px; }
+.fb-rep-newtext { color: var(--accent-11, var(--accent)); }
+.fb-thread { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.fb-reply { padding: 8px 12px 9px; border-radius: var(--r-sm); background: var(--card-2); max-width: 760px; }
+.fb-reply.new { background: var(--accent-soft); }
+.fb-reply-who { color: var(--muted); font-size: 12px; margin-bottom: 2px; }
+.fb-reply-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.55; user-select: text; }
+.fb-rep .btn.link.fb-rep-follow { align-self: flex-start; margin-top: 2px; padding-left: 0; padding-right: 0; border-left-width: 0; font-size: 12px; height: 20px; }
 .nav-item .reply-dot { width: 7px; height: 7px; margin: 0 2px 0 auto; border-radius: 50%; background: var(--accent); flex: none; }
 
 /* Library > Texture optimisation (10 §2): settings rows, the run's foot, the mods table */

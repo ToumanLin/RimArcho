@@ -33,6 +33,7 @@ type FeedbackReport struct {
 	ClosedAt *time.Time       `json:"closedAt,omitempty"`
 	Replies  []feedback.Reply `json:"replies"`
 	Unseen   bool             `json:"unseen"`
+	LastSeen time.Time        `json:"lastSeen"` // replies after it are new
 	Gone     bool             `json:"gone,omitempty"`
 }
 
@@ -146,7 +147,7 @@ func reportsView(a *app.App, rs []feedback.Record) FeedbackReports {
 	on := RepliesOn(a)
 	out := FeedbackReports{Checking: on, Off: cmds.Setting(a, "feedback.replies") == "off", Failed: on && lastCheckFailed, Reports: []FeedbackReport{}}
 	for _, r := range rs {
-		v := FeedbackReport{Number: r.Number, Title: r.Title, URL: r.URL, SentAt: r.SentAt, State: r.State, ClosedAt: r.ClosedAt, Replies: r.Replies, Gone: r.Gone}
+		v := FeedbackReport{Number: r.Number, Title: r.Title, URL: r.URL, SentAt: r.SentAt, State: r.State, ClosedAt: r.ClosedAt, Replies: r.Replies, Gone: r.Gone, LastSeen: r.LastSeenReply}
 		if v.Replies == nil {
 			v.Replies = []feedback.Reply{}
 		}
