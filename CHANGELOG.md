@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- List editor: Disabled can be sorted by last updated (Workshop), files modified or date added, besides A-Z (GitHub #5); the choice sits before the individual | tags switch and is kept. New Mods stay first in every order. The search also takes `version:current` for the game's own version (`-version:current`: Mods that do not declare it); `author:` and `version:1.6` already worked and are suggested as you type.
 - Import page: less text. Each card is a title, one line on what you get and its input; the "You get…" boxes, the source chips and the hint lines are gone (what a file button accepts is its tooltip). "paste from the clipboard" reads "paste".
 - Mod lists (editor, Mod library, background tasks): selecting with the mouse now works like other lists (GitHub #9). A click selects only that Mod, so a Mod selected earlier no longer comes along into the next action; ctrl+click adds the Mod under the cursor and the clicked one, and toggles; shift+click selects a range, and ctrl+shift+click adds a range. Pressing an already selected Mod still drags the whole selection. In background tasks, shift with the arrows or Page Up / Down now selects every task in between, not only the two ends.
 - Window: Texture optimisation moved into Mod library as its last sub-page; `shift+7`, the command panel and every link and background task still open it. Feedback moved from Settings › About to its own sidebar row, directly above background tasks.

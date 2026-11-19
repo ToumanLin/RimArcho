@@ -140,6 +140,10 @@ func FilterBoard(b *Board, search string, filters []string, f MatchFacts, groups
 	out := &BarFilter{Conds: []LibCond{}}
 	words, typed := splitBoardQuery(search)
 	filters = append(append([]string(nil), filters...), typed...)
+	words, filters = currentVersion(words, game), slices.Clone(filters)
+	for i, f := range filters {
+		filters[i] = currentVersion(f, game)
+	}
 	q := ParseQuery(words)
 	c := parseBar(filters)
 	var tags, vers []string
@@ -154,7 +158,7 @@ func FilterBoard(b *Board, search string, filters []string, f MatchFacts, groups
 		}
 	}
 	sort.Slice(vers, func(i, j int) bool { return versionNewer(vers[i], vers[j]) })
-	out.Complete = CompleteQueryWith(search, tags, vers)
+	out.Complete = CompleteQueryWith(search, tags, append([]string{"current"}, vers...))
 	if b.Lists != nil {
 		out.Complete = completeLists(search, b.Lists.Names, out.Complete, b.Lists.Edited)
 	}
@@ -385,4 +389,20 @@ func boardValueText(b *Board, k, v string) string {
 		return LibSourceText(v)
 	}
 	return barValueText(k, v)
+}
+
+// currentVersion reads version:current (also -version:current) as the game's own version
+// (16 §3.7), so one filter keeps meaning "runs on my game" after the game updates.
+func currentVersion(q, game string) string {
+	if game == "" || !strings.Contains(strings.ToLower(q), "version:current") {
+		return q
+	}
+	toks := strings.Fields(q)
+	for i, t := range toks {
+		neg := strings.HasPrefix(t, "-")
+		if strings.EqualFold(strings.TrimPrefix(t, "-"), "version:current") {
+			toks[i] = map[bool]string{true: "-", false: ""}[neg] + "version:" + game
+		}
+	}
+	return strings.Join(toks, " ")
 }

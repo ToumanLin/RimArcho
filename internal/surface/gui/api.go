@@ -1879,6 +1879,9 @@ func (s *API) SetSetting(key, value string) error {
 	if !strings.HasPrefix(key, "ui.gui.") {
 		return fmt.Errorf("not a GUI setting: %s", key)
 	}
+	if key == view.DisabledSortKey {
+		s.board = nil // Disabled's order is built into the board (16 §2.5)
+	}
 	return s.a.Store.SetMeta(key, value)
 }
 

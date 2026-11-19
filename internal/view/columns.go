@@ -1,8 +1,10 @@
 package view
 
 import (
+	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/identity"
@@ -69,8 +71,9 @@ type Item struct {
 	Lower string `json:"-"` // sort key
 	// New: a scan first found the Mod within app.NewFor, after the game's first scan
 	// (16 §2.5); added are its added: values.
-	New   bool `json:"new,omitempty"`
-	added []string
+	New    bool `json:"new,omitempty"`
+	added  []string
+	sortAt int64 // the Disabled sort's time for its Mod (sortDisabled)
 	// search fields (16 §3.7), lower case
 	names, author, text string
 }
@@ -189,23 +192,7 @@ func BuildBoard(a *app.App) (*Board, error) {
 			}
 		}
 	}
-	// New Mods first, so a Mod just subscribed is at the top of Not enabled (16 §2.5).
-	ina := b.Cols[Inactive]
-	sort.SliceStable(ina, func(i, j int) bool {
-		if ina[i].New != ina[j].New {
-			return ina[i].New
-		}
-		if c := order.CompareOfficial(ina[i].Package, ina[j].Package); c != 0 {
-			return c < 0
-		}
-		if ina[i].Lower != ina[j].Lower {
-			return ina[i].Lower < ina[j].Lower
-		}
-		if ina[i].Lineage != ina[j].Lineage {
-			return ina[i].Lineage < ina[j].Lineage
-		}
-		return ina[i].CopyLabel < ina[j].CopyLabel
-	})
+	sortDisabled(st, b.Cols[Inactive], added, a.Store.Meta(DisabledSortKey))
 	if c, err := a.Store.TagColors(); err == nil && len(c) > 0 {
 		b.TagColors = c
 	}
@@ -281,4 +268,65 @@ func SourceText(m *store.Mod) string {
 		return T("local copy")
 	}
 	return T("local")
+}
+
+// DisabledSortKey keeps the Disabled column's order (16 §2.5): "" or "name", "updated"
+// (the Workshop's update time), "modified" (the folder's modification time) or "added"
+// (when a scan first found the Mod).
+const DisabledSortKey = "ui.gui.plan.disabledsort"
+
+// DisabledSorts are the Disabled column's orders, the default first.
+var DisabledSorts = []string{"name", "updated", "modified", "added"}
+
+// sortDisabled orders Not enabled (16 §2.5): new Mods first in every order, then by the
+// chosen time, newest first (a Mod's newest copy counts, so its copies stay together; Mods
+// without the time follow), then the official ones, by name and by copy. Only "modified"
+// reads the disk, one stat per disabled copy.
+func sortDisabled(st *app.LoadoutState, ina []Item, added map[string]time.Time, by string) {
+	if by != "" && by != "name" {
+		at := map[string]int64{}
+		for i := range ina {
+			m := st.Ix.ByID[ina[i].ID]
+			if m == nil {
+				continue
+			}
+			var t int64
+			switch by {
+			case "updated":
+				t = m.ACFTimeUpdated
+			case "modified":
+				if fi, err := os.Stat(st.Ix.ModDir(m)); err == nil {
+					t = fi.ModTime().Unix()
+				}
+			case "added":
+				if f := added[m.LineageID]; !f.IsZero() {
+					t = f.Unix()
+				}
+			}
+			if t > at[ina[i].Lineage] {
+				at[ina[i].Lineage] = t
+			}
+		}
+		for i := range ina {
+			ina[i].sortAt = at[ina[i].Lineage]
+		}
+	}
+	sort.SliceStable(ina, func(i, j int) bool {
+		if ina[i].New != ina[j].New {
+			return ina[i].New
+		}
+		if ina[i].sortAt != ina[j].sortAt {
+			return ina[i].sortAt > ina[j].sortAt
+		}
+		if c := order.CompareOfficial(ina[i].Package, ina[j].Package); c != 0 {
+			return c < 0
+		}
+		if ina[i].Lower != ina[j].Lower {
+			return ina[i].Lower < ina[j].Lower
+		}
+		if ina[i].Lineage != ina[j].Lineage {
+			return ina[i].Lineage < ina[j].Lineage
+		}
+		return ina[i].CopyLabel < ina[j].CopyLabel
+	})
 }

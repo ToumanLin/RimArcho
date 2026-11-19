@@ -7,7 +7,8 @@ import { listGeometry, rowAt } from "./listgeometry.js";
 import { bump } from "./motion.js";
 import { beginPageRead, pageLoading } from "./screens.js";
 import { markOf, paintMark, tagCSS, tagColors } from "./tagcolor.js";
-import { G, grouped, shape, curKey, headOf, findEntry, matched, foldAll, setView } from "./disabledgroups.js";
+import { G, grouped, shape, curKey, headOf, findEntry, matched, foldAll, setView, setSort } from "./disabledgroups.js";
+import { choiceControl } from "./choices.js";
 
 const rowID = (k, it) => `editor-${k}-${encodeURIComponent(key(it))}`;
 const rowsEl = (k) => $(`.area[data-area="${k}"] .rows`);
@@ -224,6 +225,10 @@ export function detailHead(h = $('.area[data-area="3"] .head')) {
 let controls = null;
 export let onViewChange = () => {};
 export function setOnViewChange(fn) { onViewChange = fn; }
+export let onSortChange = () => {};
+export function setOnSortChange(fn) { onSortChange = fn; }
+// The Disabled orders (16 §2.5): new Mods first in each, then the time newest first.
+const sortChoices = () => [["name", T("A-Z")], ["updated", T("last updated")], ["modified", T("files modified")], ["added", T("added")]].map(([value, label]) => ({ value, label }));
 function viewControls() {
   if (controls) return controls;
   controls = el("span", "acts dview");
@@ -249,13 +254,21 @@ function viewControls() {
     b.onclick = async (e) => { e.stopPropagation(); if (await setView(v)) onViewChange(); };
     seg.append(b);
   }
-  controls.append(fold, seg);
+  const order = choiceControl(T("sort"), sortChoices(), G.sort);
+  order.classList.add("dview-sort");
+  order.title = T("sort");
+  order.onmousedown = (e) => e.stopPropagation();
+  order.onclick = (e) => e.stopPropagation();
+  order.onchange = async () => { if (await setSort(order.value)) onSortChange(); };
+  controls.append(fold, order, seg);
   return controls;
 }
 function syncViewControls() {
   if (!controls) return;
   const fold = $(".dview-fold", controls);
   fold.hidden = !grouped();
+  const order = $(".dview-sort", controls);
+  if (order && order.value !== G.sort) order.value = G.sort;
   for (const b of controls.querySelectorAll(".dview-seg > button")) {
     const on = b.dataset.view === G.view;
     b.classList.toggle("on", on);

@@ -196,6 +196,7 @@ A query consists of space-separated words. All free words must match (AND). Stru
 | `type:value` legacy | Match sources official, workshop, local, copy, git, or steamcmd; or content assembly (has a DLL), xml (no DLL, also xml-only), or language (language files only, also language-pack) |
 | `has:problem` / `has:error` | Match an actionable can it run item or a finding that causes loading to fail, respectively; has:problem leaves out rows whose only item is a corpus hint or a version reminder (§5). Also supports has:tag, has:note, and has:alias |
 | `version:1.6` | Match declared support for this game version |
+| `version:current` | The game's own version (`version:1.6` on a 1.6 game; in the list editor, where the game is known), so the filter keeps its meaning after the game updates; `-version:current` lists the Mods that do not declare it |
 | `-word`, `-tag:x` | Negate a condition |
 | `"with spaces"` | Treat the quoted text as one word |
 
