@@ -75,6 +75,7 @@ export async function openPage(id, plan = null, entry = null, save = "", guideFr
           const p = openingPlan = openingPlan.catch(() => {}).then(() => api.OpenPlan(plan));
           try { await p; } finally { if (openingPlan === p) requestedPlan = null; }
           if (!read.current()) return false;
+          S.bar?.forget(); // the filter bar searches Not enabled and Enabled (16 §2.5)
           S.cols.forEach((c, k) => {
             c.query = ""; c.cursor = 0; c.sel.clear(); c.searching = false;
             const input = $(`.area[data-area="${k}"] .search input`);

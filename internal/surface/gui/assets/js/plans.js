@@ -40,6 +40,7 @@ export async function usePlan(id) {
 // forget: the board shows another list now; the cursors, searches and selections were
 // the old list's.
 function forget() {
+  S.bar?.forget(); // the filter bar searches Not enabled and Enabled (16 §2.5)
   S.cols.forEach((c, k) => {
     c.query = ""; c.cursor = 0; c.sel.clear(); c.searching = false;
     const inp = $(`.area[data-area="${k}"] .search input`);

@@ -62,13 +62,16 @@ export function setItems(k, items) {
 
 // The filter bar over Not enabled and Enabled (16 §2.5): one search and one set of filters for both
 // lists; S.bar is the bar (filterbar.js), S.barData its last answer (view.BarFilter).
-// Both lists ask at once: one call per bar state; only the latest call's answer counts.
-let barCall = null, barSig = "";
+// Both lists ask at once: one call per bar state and board; only the latest call's answer
+// counts. The answer's rows are positions in that board's lists, so a board read again asks
+// again: opening another list changes no database state (the stamp stays), only the board.
+let barCall = null, barSig = "", barBoard = null;
 function fetchBar() {
   const on = !!S.bar;
   const sig = on ? JSON.stringify([S.bar.search, S.bar.filters, S.bar.open, S.board && S.board.stamp]) : "";
-  if (!barCall || sig !== barSig) {
+  if (!barCall || sig !== barSig || barBoard !== S.board) {
     barSig = sig;
+    barBoard = S.board;
     barCall = (on ? api.BarFilter(S.bar.search, S.bar.filters, true) : Promise.resolve(null)).catch(() => null);
   }
   const p = barCall, gameRequest = S.envSeq;
