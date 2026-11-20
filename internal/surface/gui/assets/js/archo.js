@@ -1,17 +1,23 @@
 // Archo's figure keeps the player company while RimArcho works (16 §7.1 "Archo figure"):
-// the start-up screen, page-loading cards and the first-run guide.
+// the start-up screen, page-loading cards, the first-run guide and five page placements.
 //
 //   const w = archoWait(slot);          // a loading card: nothing for 0.21 s, then the figure
 //   w.end();                            // the read finished or failed: the figure fades out
 //   const f = archoFigure(slot, "wink"); f.set("think"); f.end();   // shown at once (the guide)
 //
-// Cost (16 §10): nothing is loaded at start. With ui.archo.motion "live" and motion allowed
-// a figure only ever shows loops (animated WebP, ~450 KB, 36 frames at 66 ms): the next
-// expression's loop is fetched and decoded in an <img> beside the shown one and fades in over
-// it, so no still shows between faces. A figure shown while nothing runs (the guide, page
-// placements) gets a copy of the loop whose file says "play 3 times": the browser stops it
-// on its own last frame, so the rest is the loop's own end, with nothing swapped and no timer.
-// With motion still, or reduced, a still (~20 KB WebP, 360 px) is shown instead.
+// Cost (16 §10): nothing is loaded at start. With ui.archo.motion "live" and motion allowed a
+// figure only ever shows baked clips (animated WebP, 300 x 202, 66 ms a frame), all on one
+// 2.376 s clock of 36 phases, so they join without a cut (scripts/archopack/build.py):
+//   <e>      the expression's loop          <e>-in   from the calm idle to <e> (12 frames)
+//   <e>-out  from <e> back to the idle      bridge   idle phases between an out and an in
+//   idle     the calm idle (breath, two blinks a 4.75 s pass, slight sway; 8.4 frames a second)
+// A figure plays a program: clips spliced into one animated WebP (each clip starts with a key
+// frame over the whole canvas), in an <img> that replaces the shown one only where the two
+// meet: at the end of a loop pass or of an idle pass. A figure at rest (the guide, placements)
+// plays a new expression as in, three loops, out, bridge, then the idle for ever; the idle
+// stops (a still of its first frame, where it would start again) while the window is hidden,
+// she is off screen, or the window has been in the background for a minute. Waits loop their
+// expression for ever. With motion still, or reduced, a still (~20 KB WebP, 360 px) is shown.
 // Removing the <img> frees its frames.
 import { api } from "./state.js";
 
@@ -19,22 +25,52 @@ import { api } from "./state.js";
 export const POOL = ["neutral", "smug", "laugh", "wink", "think", "ponder", "yum"];
 
 const PACK = "/archo/archo-s/";
-const DELAY = 210, ROTATE = 4000, TIP_ROTATE = 8000, REST_LOOPS = 3, FADE = 200;
+const DELAY = 210, ROTATE = 4000, TIP_ROTATE = 8000, REST_LOOPS = 3;
+const FRAME = 66, LOOP = 36 * FRAME, CLIP = 12 * FRAME, LEAD = 300, AWAY = 60000;
 const still = (expr) => `${PACK}stills/${expr}@360.webp`;
-const loopOf = (expr) => `${PACK}anim/${expr}.webp`;
+const clipURL = (c) => `${PACK}anim/${c}.webp`;
 const reduced = () => !!globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches || globalThis.document?.documentElement?.dataset?.motion === "reduced";
 const image = () => { const i = document.createElement("img"); i.alt = ""; i.decoding = "async"; i.draggable = false; return i; };
 const decoded = (i) => i.decode?.().catch(() => {}) || Promise.resolve();
+const now = () => globalThis.performance?.now?.() ?? Date.now();
 
-// loopCopy is a fresh object URL of expression e's loop that plays `plays` times (0: for
-// ever) and then stays on its last frame. A copy is its own image, so it starts at frame 0
-// and counts its own plays even when the same face comes back; whoever shows it revokes it.
-async function loopCopy(e, plays) {
-  const r = await fetch(loopOf(e));
-  if (!r.ok) throw Error(`${loopOf(e)}: ${r.status}`);
-  const b = new Uint8Array(await r.arrayBuffer());
-  if (plays) setPlays(b, plays);
-  return URL.createObjectURL(new Blob([b], { type: "image/webp" }));
+// ---- clips ---------------------------------------------------------------------------------
+// clip reads one clip file once per window: its chunks before the first frame (VP8X, ANIM)
+// and its frames (ANMF chunks, padding included). A few recent ones are kept.
+const clips = new Map();
+function clip(name) {
+  let p = clips.get(name);
+  if (p) { clips.delete(name); clips.set(name, p); return p; }
+  p = fetch(clipURL(name)).then((r) => {
+    if (!r.ok) throw Error(`${clipURL(name)}: ${r.status}`);
+    return r.arrayBuffer();
+  }).then((b) => chunks(new Uint8Array(b)));
+  p.catch(() => clips.delete(name));
+  clips.set(name, p);
+  if (clips.size > 12) clips.delete(clips.keys().next().value);
+  return p;
+}
+const tag = (b, p) => String.fromCharCode(b[p], b[p + 1], b[p + 2], b[p + 3]);
+export function chunks(b) {
+  const v = new DataView(b.buffer, b.byteOffset, b.byteLength), head = [], frames = [];
+  for (let p = 12; p + 8 <= b.length;) {
+    const end = Math.min(b.length, p + 8 + v.getUint32(p + 4, true) + (v.getUint32(p + 4, true) & 1));
+    (tag(b, p) === "ANMF" ? frames : frames.length ? [] : head).push(b.subarray(p, end));
+    p = end;
+  }
+  return { head, frames };
+}
+// splice joins clips ([{c: chunks, n: times}]) into one animated WebP that plays `plays` times
+// (0: for ever). The first clip's VP8X and ANIM lead; the ANIM's loop count is set.
+export function splice(parts, plays) {
+  const head = parts[0].c.head.map((h) => h.slice());
+  for (const h of head) if (tag(h, 0) === "ANIM") new DataView(h.buffer).setUint16(12, plays, true);
+  const body = [...head];
+  for (const { c, n } of parts) for (let i = 0; i < n; i++) body.push(...c.frames);
+  const size = 4 + body.reduce((s, x) => s + x.length, 0);
+  const riff = new Uint8Array(12), v = new DataView(riff.buffer);
+  riff.set([82, 73, 70, 70]); v.setUint32(4, size, true); riff.set([87, 69, 66, 80], 8);
+  return new Blob([riff, ...body], { type: "image/webp" });
 }
 // setPlays writes the loop count of an animated WebP: the ANIM chunk holds the background
 // colour (4 bytes), then the count (2 bytes, little-endian; 0 = for ever).
@@ -42,11 +78,48 @@ export function setPlays(b, n) {
   const v = new DataView(b.buffer, b.byteOffset, b.byteLength);
   for (let p = 12; p + 14 <= b.length;) {
     const size = v.getUint32(p + 4, true);
-    if (String.fromCharCode(b[p], b[p + 1], b[p + 2], b[p + 3]) === "ANIM") { v.setUint16(p + 12, n, true); return true; }
+    if (tag(b, p) === "ANIM") { v.setUint16(p + 12, n, true); return true; }
     p += 8 + size + (size & 1);
   }
   return false;
 }
+
+// ---- programs ------------------------------------------------------------------------------
+// A program is a list of steps [clip, times]; `then` is the program that follows it for ever
+// (null: the program itself loops for ever). Seams: where a figure may switch, by time from the
+// program's start, with the pose there: an expression (the end of one of its loop passes) or
+// "hub" (the end of an idle pass or of the bridge: the idle's phase where an in may start).
+const ms = (c) => c === "idle" ? 2 * LOOP : c.endsWith("-in") || c.endsWith("-out") || c === "bridge" ? CLIP : LOOP;
+function seams(steps) {
+  const out = [];
+  let t = 0;
+  for (const [c, n] of steps) for (let i = 0; i < n; i++) {
+    if (c === "idle") { out.push([t + LOOP, "hub"], [t + 2 * LOOP, "hub"]); t += 2 * LOOP; continue; }
+    t += ms(c);
+    if (c === "bridge") out.push([t, "hub"]);
+    else if (!c.endsWith("-in") && !c.endsWith("-out")) out.push([t, c]);
+  }
+  return { out, total: t };
+}
+// from: the pose at a seam ("hub" or an expression); to: the expression to show, or "idle".
+// rest: back to the idle after REST_LOOPS loops; otherwise the expression loops for ever.
+function program(from, to, rest) {
+  const steps = from !== "hub" && from !== to ? [[from + "-out", 1], ["bridge", 1]] : [];
+  const idle = { steps: [["idle", 1]], then: null };
+  if (to === "idle") return from === "hub" ? idle : { steps, then: idle };
+  if (from !== to) steps.push([to + "-in", 1]);
+  if (!rest) return steps.length ? { steps, then: { steps: [[to, 1]], then: null } } : { steps: [[to, 1]], then: null };
+  steps.push([to, REST_LOOPS], [to + "-out", 1], ["bridge", 1]);
+  return { steps, then: idle };
+}
+
+// pausing: a figure at rest stops in the idle while nobody can see it move
+let focusedAt = 0, blurredAt = globalThis.document?.hasFocus?.() === false ? now() : 0;
+const awake = new Set();
+globalThis.addEventListener?.("blur", () => { blurredAt = now(); setTimeout(() => awake.forEach((f) => f()), AWAY + 50); });
+globalThis.addEventListener?.("focus", () => { blurredAt = 0; focusedAt = now(); awake.forEach((f) => f()); });
+globalThis.document?.addEventListener?.("visibilitychange", () => awake.forEach((f) => f()));
+const away = () => !!globalThis.document?.hidden || (blurredAt > focusedAt && now() - blurredAt >= AWAY);
 
 let mode = "live";
 try { mode = localStorage.getItem("ui.archo.motion") || "live"; } catch { /* Init supplies it. */ }
@@ -71,10 +144,11 @@ export function nextExpr(pool = POOL) {
 }
 
 // ---- a figure in a slot ----------------------------------------------------------------
-// show is shared by waits and figures: delay before anything appears, then the expression's
-// loop when motion is allowed (its still otherwise), and rotation over pool every ROTATE ms
-// (rotate: false keeps one face). rest: each new expression's loop plays REST_LOOPS times
-// and stops on its last frame (nothing moves at rest, 16 §10); a new expression plays again.
+// show is shared by waits and figures: delay before anything appears, then the expression
+// (baked clips when motion is allowed, its still otherwise), and rotation over pool every
+// ROTATE ms (rotate: false keeps one face). rest: a new expression plays in, REST_LOOPS loops,
+// out, and the idle follows for ever (16 §7.1); without rest the expression loops for ever.
+// A new expression waits for the shown program's next seam (at most one loop away).
 // img: an image already in the slot (the start-up screen's), kept when it shows expr.
 function show(slot, { delay = 0, expr, pool = POOL, rotate = true, rest = false, img: given } = {}) {
   const h = { ended: false, expr: expr || nextExpr(pool), slot };
@@ -83,49 +157,122 @@ function show(slot, { delay = 0, expr, pool = POOL, rotate = true, rest = false,
   slot.setAttribute("aria-hidden", "true");
   const timers = [];
   let cur = given || null, url = "", shown = false;
+  // run: the program on screen and when it started ({still: true} for a paused idle);
+  // want: an expression waiting for a seam; token: the latest plan, so older ones drop out
+  let run = null, want = null, token = 0, swap = 0, offscreen = false, ready = "";
+  // drop cancels a program that is decoded but not shown yet
+  const drop = () => { clearTimeout(swap); if (ready) URL.revokeObjectURL(ready); ready = ""; };
   const later = (ms, f) => timers.push(setTimeout(() => { if (!h.ended) f(); }, ms));
   const reveal = () => decoded(cur).then(() => { if (!h.ended) slot.classList.add("on"); });
 
-  // place makes next the figure's image. Over an image already shown it fades in on top
-  // (opacity only) and the old one is removed after the fade; the old loop's copy is revoked.
+  // place makes next the figure's image at once, in place of the old one (both show the
+  // same pose there, so nothing fades), and revokes the old program's blob
   const place = (next, nextURL) => {
     const old = cur, oldURL = url;
     cur = next; url = nextURL;
-    // the fade class goes with the old image, so moving the slot on a redraw does not replay it
-    const drop = () => { old?.remove(); if (oldURL) URL.revokeObjectURL(oldURL); next.classList.remove("archo-in"); };
-    if (old?.isConnected && old.src) {
-      next.classList.add("archo-in");
-      slot.append(next);
-      setTimeout(drop, FADE);
-    } else { drop(); slot.append(next); }
+    slot.append(next);
+    if (old !== next) old?.remove();
+    if (oldURL) URL.revokeObjectURL(oldURL);
     if (!slot.classList.contains("on")) reveal();
   };
-  // put shows expression e once its image is decoded: the loop with motion, else the still
-  const put = (e) => {
-    const mine = () => !h.ended && h.expr === e;
-    const stillOf = () => {
-      const i = image();
-      i.src = still(e);
-      return decoded(i).then(() => { if (mine()) place(i, ""); });
-    };
-    if (!canMove()) return stillOf();
-    loopCopy(e, rest ? REST_LOOPS : 0).then((u) => {
+  const stillOf = (e) => {
+    const mine = ++token, i = image();
+    drop();
+    i.src = still(e);
+    return decoded(i).then(() => { if (mine === token && !h.ended) { place(i, ""); run = null; } });
+  };
+  // start shows prog at time `at` (performance.now; null: as soon as it is decoded). An aimed
+  // program (then: run when it shows) that is not ready by its seam aims at the next one; a
+  // program that follows another shows late instead (the other holds its last frame till then).
+  const start = (prog, at, then) => {
+    const mine = ++token;
+    drop();
+    Promise.all(prog.steps.map(([c]) => clip(c))).then((cs) => {
+      if (mine !== token || h.ended) return;
+      const u = URL.createObjectURL(splice(prog.steps.map(([, n], i) => ({ c: cs[i], n })), prog.then ? 1 : 0));
       const i = image();
       i.src = u;
-      return decoded(i).then(() => { if (mine()) place(i, u); else URL.revokeObjectURL(u); });
-    }).catch(() => { if (mine()) stillOf(); });
+      ready = u;
+      return decoded(i).then(() => {
+        const go = () => {
+          if (mine !== token || h.ended) return;
+          ready = "";
+          place(i, u);
+          run = { prog, t0: now() };
+          then?.();
+          if (prog.then) start(prog.then, run.t0 + seams(prog.steps).total);
+          check();
+          if (want) aim();
+        };
+        const wait = at == null ? 0 : at - now();
+        if (mine !== token || h.ended) return;
+        if (then && wait < -FRAME) { drop(); aim(); }
+        else if (wait > 0) swap = setTimeout(go, wait);
+        else go();
+      });
+    }).catch(() => { if (mine === token && !h.ended) stillOf(prog.steps.map(([c]) => c).find((c) => !/-|idle|bridge/.test(c)) || "idle"); });
   };
+  // aim plays `want` from the shown program's first seam at least LEAD ms away. A program
+  // that ends before such a seam hands over to what follows it, which aims again.
+  const aim = () => {
+    if (!want || h.ended || !run || run.still) return;
+    const { out, total } = seams(run.prog.steps), soon = now() + LEAD - run.t0;
+    let seam = out.find(([t]) => t >= soon);
+    if (!seam && !run.prog.then) { // a program that loops for ever: its seams come again
+      const k = Math.floor((soon - out[0][0]) / total);
+      seam = [k, k + 1].flatMap((n) => out.map(([t, p]) => [t + n * total, p])).find(([t]) => t >= soon);
+    }
+    if (!seam) { if (run.prog.then) start(run.prog.then, run.t0 + total); return; }
+    const e = want;
+    start(program(seam[1], e, rest), run.t0 + seam[0], () => { if (want === e) want = null; });
+  };
+  // check stops a resting figure's idle while she cannot be seen (at once) or the window has
+  // been in the background for AWAY ms (at the idle's next seam), and starts it again
+  const idleProgram = { steps: [["idle", 1]], then: null };
+  const check = () => {
+    if (h.ended || !rest || !canMove() || !shown) return;
+    const unseen = offscreen || !!globalThis.document?.hidden;
+    if (run?.still) {
+      if (!unseen && !away()) { run = null; start(idleProgram, null); }
+      return;
+    }
+    if (!run) return;
+    const idling = run.prog === idleProgram || (run.prog.steps.length === 1 && run.prog.steps[0][0] === "idle");
+    if (!unseen && !(away() && idling)) return;
+    const mine = ++token, i = image();
+    drop();
+    want = null;
+    i.src = still("idle");
+    const at = unseen ? now() : run.t0 + Math.ceil((now() + LEAD - run.t0) / LOOP) * LOOP;
+    decoded(i).then(() => {
+      const go = () => { if (mine === token && !h.ended) { place(i, ""); run = { still: true }; } };
+      const wait = at - now();
+      if (wait > 0) swap = setTimeout(go, wait); else go();
+    });
+  };
+  awake.add(check);
+  const io = rest && typeof IntersectionObserver === "function" ? new IntersectionObserver((es) => { offscreen = !es.at(-1).isIntersecting; check(); }) : null;
+  io?.observe(slot);
+
+  const first = (e) => rest ? { steps: [[e, REST_LOOPS], [e + "-out", 1], ["bridge", 1]], then: idleProgram } : { steps: [[e, 1]], then: null };
   const appear = () => {
     shown = true;
     const kept = given?.src && given.dataset.expr === h.expr && (given.dataset.live === "1") === canMove();
-    if (kept) reveal(); else put(h.expr);
+    if (kept) { reveal(); if (canMove()) run = { prog: { steps: [[h.expr, 1]], then: null }, t0: now() }; }
+    else if (!canMove()) stillOf(h.expr);
+    else start(first(h.expr), null);
   };
   if (delay) later(delay, appear); else appear();
 
   h.set = (e) => {
     if (h.ended || !e || e === h.expr) return;
     h.expr = e;
-    if (shown) put(e);
+    if (!shown) return;
+    if (!canMove()) return stillOf(e);
+    want = e;
+    if (run?.still) { run = null; want = null; start(program("hub", e, rest), null); return; }
+    if (!run) { start(first(e), null); want = null; return; }
+    aim();
   };
   if (rotate && !reduced()) {
     const step = () => later(ROTATE, () => { h.set(nextExpr(pool)); step(); });
@@ -135,9 +282,13 @@ function show(slot, { delay = 0, expr, pool = POOL, rotate = true, rest = false,
   h.end = () => {
     if (h.ended) return;
     h.ended = true;
+    token++;
+    drop();
     timers.forEach(clearTimeout);
+    awake.delete(check);
+    io?.disconnect();
     slot.classList.remove("on");
-    const done = () => { // frees the loop's frames
+    const done = () => { // frees the program's frames
       for (const i of [...slot.children]) if (i.tagName === "IMG") i.remove();
       if (url) URL.revokeObjectURL(url);
     };
@@ -146,8 +297,6 @@ function show(slot, { delay = 0, expr, pool = POOL, rotate = true, rest = false,
   return h;
 }
 
-/** archoWait keeps the player company in a loading card: nothing for the first 0.21 s, so a
- *  fast read shows nothing new, then the figure, with the expression changing every 4 s. */
 export const archoWait = (slot, opts = {}) => show(slot, { delay: DELAY, ...opts });
 
 /** archoFigure shows Archo at once with one expression (the first-run guide); its loop

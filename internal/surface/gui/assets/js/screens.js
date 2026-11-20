@@ -597,9 +597,6 @@ function drawNeeds() {
   const grid = el("div", "cols needcols");
   grid.append(left, split, right);
   needSplit(grid, left, split);
-  // Archo looks over the right column's first card, her chest behind its top edge (16 §7.1)
-  const perch = el("div", "needs-perch");
-  rbox.append(perch);
   if (d.lastSave) lbox.append(lastSaveCard(d.lastSave));
   for (const [ci, box] of [[0, lbox], [1, rbox]]) {
     for (const si of COL_SECS[ci]) {
@@ -620,7 +617,10 @@ function drawNeeds() {
     b.onclick = () => e.page === "library" ? document.dispatchEvent(new CustomEvent("library-search", { detail: e.query || "" })) : ui.go(e.page);
     lbox.append(b);
   }
-  const face = needsFace(d);
+  // Archo stands in the right column's first card, at the left end of its heading, on the
+  // heading's line, which hides her chest (16 §7.1 "Placements"); the right column always has a card
+  const face = needsFace(d), perch = rbox.querySelector(".need-card > .need-head");
+  perch?.classList.add("with-archo");
   archoSpot("needs", { size: 140, calm: ["neutral", "smug", "wink", "smirk", "sleepy"] }).stand(perch, face, face === "thumbsup" || face === "neutral");
   w.append(grid);
   sc.append(w);
