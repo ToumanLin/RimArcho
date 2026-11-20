@@ -1,16 +1,15 @@
-// Import and export of the mod list (07 §7): to and from RimSort, RimCrow, RimWorld's
-// own .rml, share codes, Rentry and Workshop collections. An import is previewed first —
-// what is installed, what is missing and where to get it, what the enabled list becomes —
-// and applied as one undo step; nothing here writes ModsConfig.xml (that stays save).
-import { fieldError } from "./feedbacksemantics.js";
+// The Import page (16 §2.18): every way into RimArcho in one place. Lists are compared with
+// the player's list before anything changes — side by side, in order, what is added, removed
+// and moved — and applied as one undo step; nothing here writes ModsConfig.xml (that stays save).
 import { factText, S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { page, button, beginPageRead, area } from "./screens.js";
 import { icon } from "./icons.js";
 import * as pop from "./popups.js";
 import { getChoices } from "./credit.js";
 import { still } from "./motion.js";
-import { splitBar, diffMarks, stateMark, visTip } from "./membar.js";
+import { splitBar, diffMarks } from "./membar.js";
 import { archoSpot } from "./archo.js";
+import { orderDiff, orderView, legend } from "./listdiff.js";
 
 let ui = null;
 export function initExchange(u) {
@@ -20,11 +19,8 @@ export function initExchange(u) {
 
 let info = null;
 let firstRun = false;
-let pasted = "";
 let session = null;
 let previewSeq = 0;
-// kind: the import kind picked in the page's first column (16 §2.18); kept while the window lives
-let kind = "";
 
 // Import is a sub-page, including when entered from the first-run guide (16 §2.17).
 export async function importFrom(k, src) {
@@ -42,41 +38,28 @@ export function cancel() {
 }
 export function key(e) {
   if (e.key === "Escape") { e.preventDefault(); return cancel(); }
-  // ↑↓ in the kinds column move the kind, as a vertical tab list does
-  if ((e.key === "ArrowDown" || e.key === "ArrowUp") && e.target?.closest?.(".xc-kinds")) {
-    e.preventDefault();
-    const ids = KINDS().map(x => x.id), i = ids.indexOf(kind);
-    pickKind(ids[(i + (e.key === "ArrowDown" ? 1 : ids.length - 1)) % ids.length], true);
-  }
 }
-// tab and enter only mean something while a list preview is shown
-export const hintList = () => [...($("#screen .xc-preview")?.dataset.mode === "list" ? [{ key: "tab", label: T("import destination") }, { key: "enter", label: T("import") }] : []), { key: "esc", label: T("cancel") }, { key: "?", label: T("all keys") }];
+// enter only means something while a list comparison is shown
+export const hintList = () => [...($("#screen .xc-preview")?.dataset.mode === "list" ? [{ key: "enter", label: T("import") }] : []), { key: "esc", label: T("cancel") }, { key: "?", label: T("all keys") }];
 
 // layout: the page's arrangement while the user compares the variants (design note
-// 2026-11-20_import-page): "2col" (kinds | source over preview) or "3col" (kinds | source |
-// preview). <html data-import-layout> or ?import-layout= picks it.
+// 2026-11-20_import-page): "2col" (what to import | the comparison) or "3col" (what to import |
+// the comparison | Archo, the counts and the buttons). <html data-import-layout> or
+// ?import-layout= picks it.
 export function layout() {
   const v = document.documentElement?.dataset?.importLayout || new URLSearchParams(globalThis.location?.search || "").get("import-layout") || "";
   return v === "3col" ? "3col" : "2col";
 }
 
-// KINDS: what can be imported, one entry each in the first column: an icon and a short name;
-// what it takes is its tooltip (16 §7 principle 9: visuals first, the words on hover).
-const KINDS = () => [
-  { id: "game", icon: "home", name: T("game's list"), tip: T("the game's current list (ModsConfig.xml), compared with yours") },
-  { id: "file", icon: "plan", name: T("list file"), tip: T("RimSort, RimCrow and RimPy lists, RimWorld .rml, ModsConfig.xml or a save (.rws)") },
-  { id: "paste", icon: "ext", name: T("link or code"), tip: T("a Steam collection or Rentry link, a share code, or a copied list") },
-  { id: "pack", icon: "packs", name: T("pack"), tip: T("a pack you can launch; its Mods are checked first") },
-  { id: "managers", icon: "import", name: T("other managers"), tip: T("lists, notes and tags, sorting rules and, from RimCrow, Game Configs; the files are only read") },
-];
+const gameConfig = () => (S.board?.environmentRows || []).find(e => e.current)?.name || "";
 
 // The Import page (16 §2.18): the sidebar's Import, `i`, a dropped file, Settings and the guide
-// all open it. The first column lists the kinds of import; the selected kind's source (a
-// button, a drop area, a field, the managers found) and the preview of what it brings, compared
-// with what the player has now, fill the rest. Moving in and adding a pack run as background
-// tasks shown in the preview (16 §2.16).
+// all open it. The left column says what can be imported, one row each with its button; the
+// right shows what a read brings, compared with what the player has. Empty, the right is where
+// a dropped file goes, with Archo in it. Moving in and adding a pack run as background tasks
+// shown on the right (16 §2.16).
 // first: the first-run guide hands over here after its scan (A1, 16 §2.15): the game's
-// current list comes first and is picked, and "skip" ends the guide.
+// current list is the one filled button, and "skip" ends the guide.
 export async function exchange(first = false) {
   const from = S.screen === "plan-import" ? session?.from : S.screen || "plan";
   if (S.screen !== "plan-import") firstRun = first && from === "guide";
@@ -88,52 +71,48 @@ export async function exchange(first = false) {
   if (!read.current()) return;
   const sc = $("#screen"); sc.innerHTML = "";
   const lay = layout();
-  // esc leaves (the hint line says so); only the first run names its way out, "skip"
-  const w = page("plans pm-import xc-page xc-" + lay, firstRun ? T("Where does your first list come from?") : T("What do you want to bring in?"),
+  // the lead says the page's one gesture: drop it anywhere; the first run asks instead
+  const w = page("plans pm-import xc-page xc-" + lay, firstRun ? T("Where does your first list come from?") : T("Drop files or folders anywhere on this window; RimArcho tells what they are."),
     firstRun ? button(T("skip"), "esc", cancel) : null);
   const grid = el("div", "xc-lay"); grid.dataset.layout = lay;
-  const side = el("div", "xc-side"), nav = el("div", "xc-kinds");
-  nav.setAttribute("role", "tablist"); nav.setAttribute("aria-orientation", "vertical"); nav.setAttribute("aria-label", T("what to import"));
-  side.append(nav);
-  const [srcLab, srcCard] = sectionCard("");
-  const srcBlk = block(srcLab, srcCard, "xc-srcblk");
-  // the result area (a preview, the tree, a task); empty, it shows where a drop goes
+  const side = el("div", "xc-side");
+  const card = el("section", "card settings xc-do");
+  side.append(card);
+  // the right: the comparison (or the tree, a task, a refusal) and, before any, the drop pane
+  const main = el("div", "xc-main");
   const resLab = el("div", "label section xc-res-label");
   const result = el("section", "card settings xc-sec xc-preview xc-res"); result.hidden = true;
-  const resBlk = el("div", "xc-blk xc-resblk");
-  resBlk.append(resLab, result, emptyState());
-  grid.append(side, srcBlk, resBlk);
+  main.append(resLab, result, emptyState());
+  grid.append(side, main);
+  // 3col: a rail at the right for Archo, the counts and the buttons, shown with a result
+  if (lay === "3col") { const rail = el("aside", "xc-rail"); rail.append(el("div", "fig"), el("div", "rh"), el("div", "rf")); grid.append(rail); }
   w.append(grid);
   sc.append(w);
-  area(nav, null, () => $("#screen .xc-kind.on")?.focus({ preventScroll: true })); area(srcCard, srcLab); area(result, resLab);
-  labelText(resLab, T("Preview"));
+  area(card, null); area(result, resLab);
+  resLab.hidden = true;
   M = freshM();
-  if (firstRun || !kind) kind = firstRun || info?.game ? "game" : "file";
-  drawKinds();
-  drawSource();
-  // Archo stands at the foot of the kinds column, in its blank space (16 §7.1 "Placements")
-  spot().stand(side, "neutral", true);
+  drawDo();
+  placeArcho();
   read.finish(); ui.renderWhere(); ui.renderHints();
   if (!firstRun) survey();
 }
 
 const live = (active) => session === active && S.screen === "plan-import";
 
-// Archo stands under the kinds (16 §7.1 "Placements"): thinking while something is read or
-// moved in, pleased with a preview, a thumbs-up when it is in, a shake at an error or a refusal.
+// Archo (16 §7.1 "Placements"): in the middle of the empty right pane, over the words that say
+// a file can be dropped; with a result she stands under the left column (2col) or at the top
+// of the rail (3col). She thinks while something is read or moved in, is pleased with a
+// comparison, a thumbs-up when it is in, a shake at an error or a refusal.
 const spot = () => archoSpot("import", { size: 176, calm: ["neutral", "ponder", "think", "smirk", "yum"] });
 // nothing read or running is the calm state: her idle faces follow only there
 const face = (e) => spot().set(e, e === "neutral");
+function placeArcho(expr = "neutral") {
+  const res = $("#screen .xc-preview");
+  // with a result in 2col she steps away: nothing stands beside the lists
+  const host = !res || res.hidden ? $("#screen .xc-empty .fig") : $("#screen .xc-rail .fig");
+  spot().stand(host, expr, expr === "neutral");
+}
 
-function sectionCard(title) {
-  return [el("div", "label section", title), el("section", "card settings xc-sec")];
-}
-// block: a section's label and card as one cell of the page's grid
-function block(lab, card, cls = "") {
-  const b = el("div", "xc-blk" + (cls ? " " + cls : ""));
-  b.append(lab, card);
-  return b;
-}
 // row: one setting-style row; right holds its controls
 function row(name, sub, ...right) {
   const r = el("div", "set"), l = el("div", "l"), rr = el("div", "r");
@@ -150,154 +129,72 @@ function marked(text, ...bold) {
   return span;
 }
 
-// ---- the kinds column ----
+// ---- the left column: what can be imported ----
 
-// drawKinds draws the kinds: an icon, a short name and, where there is one, a count (the game
-// list's Mods, the managers found; a dot when a manager has something new).
-function drawKinds() {
-  const nav = $("#screen .xc-kinds");
-  if (!nav) return;
-  nav.textContent = "";
-  const res = $("#screen .xc-preview");
-  for (const k of KINDS()) {
-    const b = el("button", "xc-kind" + (k.id === kind ? " on" : ""));
-    b.dataset.kind = k.id;
-    b.setAttribute("role", "tab");
-    b.setAttribute("aria-selected", String(k.id === kind));
-    b.tabIndex = k.id === kind ? 0 : -1;
-    b.title = k.tip;
-    const ic = el("span", "ki"); ic.innerHTML = icon[k.icon] || "";
-    b.append(ic, el("span", "kn", k.name));
-    const n = kindCount(k.id);
-    if (n) { const c = el("span", "kc num", n.text); if (n.tip) c.title = n.tip; if (n.news) c.classList.add("news"); b.append(c); }
-    // the kind the preview came from carries a mark while the player looks at another one
-    if (res && !res.hidden && res.dataset.kind === k.id && k.id !== kind) b.append(stateMark("dot", T("shown in the preview")));
-    b.onclick = () => pickKind(k.id, false);
-    nav.append(b);
-  }
-}
-function kindCount(id) {
-  if (id === "game") return info?.game ? { text: String(info.game.mods), tip: Tf("%d mods", info.game.mods) } : null;
-  if (id === "managers") {
-    if (!M?.managers?.length) return null;
-    const fresh = M.managers.filter(m => m.imported && news(m).length).length;
-    return { text: String(M.managers.length), tip: M.managers.map(m => m.name).join(", "), news: fresh > 0 };
-  }
-  return null;
-}
-// pickKind shows a kind's source. The game's list is read at once (one click to its preview);
-// the others wait for their file, text or manager.
-function pickKind(id, focus) {
-  if (!KINDS().some(k => k.id === id)) return;
-  const again = id === kind;
-  kind = id;
-  drawKinds(); drawSource();
-  if (focus) $(`#screen .xc-kind[data-kind="${id}"]`)?.focus();
-  if (id === "game" && !again && !firstRun && info?.game && $("#screen .xc-preview")?.dataset.kind !== "game") preview("file", info.game.path);
-  if (id === "managers") drawTree();
-}
-
-// ---- the source: the selected kind's controls ----
-
-function drawSource() {
-  const card = $("#screen .xc-srcblk .xc-sec"), lab = $("#screen .xc-srcblk .label");
-  if (!card) return;
-  const k = KINDS().find(x => x.id === kind);
-  labelText(lab, k.name);
-  card.textContent = "";
-  card.dataset.src = kind === "managers" ? "m" : "in";
-  card.dataset.kind = kind;
-  if (kind === "game") card.append(gameRow());
-  else if (kind === "file") card.append(dropArea("file"));
-  else if (kind === "paste") card.append(pasteBox());
-  else if (kind === "pack") card.append(dropArea("pack"));
-  else { managerRows(card); drawRows(); }
-}
-
-// The game's current list: its ModsConfig.xml in the current Game Config. On the first run
-// it is the list the scan already made, so "use this list" ends the guide; later it is
-// previewed like any other list.
-function gameRow() {
-  const g = info?.game;
-  const use = firstRun
-    ? button(T("use this list"), "", () => { const after = ui.afterImport; ui.afterImport = null; firstRun = false; return after?.(T("use the game's list as it is")); }, "primary")
-    : button(T("read it"), "", () => g && preview("file", g.path));
-  use.disabled = !g && !firstRun;
-  // the file's name is not a word to learn: the row says how many Mods, the path is on hover
-  const r = row(T("The game's current list"), g ? Tf("%d mods", g.mods) : T("the game has no ModsConfig.xml yet"), use);
-  if (g) r.title = use.title = g.path;
-  if (firstRun) r.classList.add("on");
+// doRow: one way in: a name, what it takes, and its button
+function doRow(id, ic, name, sub, btn, meta = "") {
+  const r = el("div", "xc-dorow");
+  r.dataset.do = id;
+  const l = el("div", "l"), t = el("div", "name");
+  t.append(el("span", "nt", name));
+  if (meta) t.append(el("span", "meta", meta));
+  l.append(t);
+  if (sub) l.append(el("div", "sub", sub));
+  r.append(l);
+  if (btn) r.append(btn);
   return r;
 }
 
-// EXT: what each drop area takes, as chips; the sentence is the area's tooltip
-const EXT = { file: [".xml", ".rml", ".json", ".txt", ".rws"], pack: [".archopack"] };
-
-// dropArea: a list file or a pack, as a dashed area with one button. A file can be dropped on
-// it, or anywhere on the window (wireDrop); a click on the area opens the dialog too.
-function dropArea(which) {
-  const fileInput = el("input"); fileInput.type = "file"; fileInput.hidden = true;
-  fileInput.accept = EXT.file.join(",");
-  fileInput.onchange = () => { if (fileInput.files[0]) readFile(fileInput.files[0]); };
-  const pick = which === "pack"
-    ? button(T("choose a pack…"), "", async () => {
+// drawDo draws the left column: the game's current list (one click to the comparison), a Mod
+// list and Mod subscriptions (their own forms), and another manager's data with the managers
+// found (picked here, shown on the right).
+function drawDo() {
+  const card = $("#screen .xc-do");
+  if (!card) return;
+  card.textContent = "";
+  const g = info?.game, cfg = gameConfig();
+  const read = firstRun
+    ? button(T("use this list"), "", () => { const after = ui.afterImport; ui.afterImport = null; firstRun = false; return after?.(T("use the game's list as it is")); }, "primary")
+    : button(T("read"), "", () => g && preview("file", g.path, "", "game"));
+  read.disabled = !g && !firstRun;
+  const gr = doRow("game", "play", cfg ? Tf("The current list of %s", cfg) : T("The game's current list"),
+    T("the list the game loads now; other managers save theirs here too"), read, g ? Tf("%d mods", g.mods) : "");
+  if (g) gr.title = g.path;
+  if (!g) gr.querySelector(".sub").textContent = T("the game has no ModsConfig.xml yet");
+  const list = doRow("list", "plan", T("Import a Mod list"), T("a share code, a Steam collection link, a list file…"),
+    button(T("import"), "", () => ui.newList("import")));
+  const subs = doRow("subs", "workshop", T("Import Mod subscriptions"), T("Steam Workshop, LoversLab or GitHub links…"),
+    button(T("import"), "", () => ui.go("subscribe")));
+  // a pack is a list with its Mods' files; it has no other way in (10 §4)
+  const pack = doRow("pack", "packs", T("Import a pack"), T("a .archopack file: a list with its Mods, checked file by file"),
+    button(T("import"), "", async () => {
       let f = "";
       try { f = await api.PickPackFile(); } catch (e) { return say("fail", errText(e)); }
       if (f && S.screen === "plan-import") importPack(f);
-    })
-    : button(T("choose a file…"), "", async () => {
-      let f = "";
-      try { f = await api.PickAnyImport(); } catch (e) { return say("fail", errText(e)); }
-      if (f && S.screen === "plan-import") openPicked(f);
-      else if (!info.dialogs) fileInput.click();
-    });
-  const zone = el("div", "xc-dz");
-  zone.dataset.drop = which;
-  zone.title = (which === "pack" ? ".archopack" : T("RimSort, RimCrow and RimPy lists, RimWorld .rml, ModsConfig.xml or a save (.rws)")) + ". " + T("a file can also be dropped anywhere on the window");
-  const ic = el("span", "dz-i"); ic.innerHTML = icon[which === "pack" ? "packs" : "import"];
-  const chips = el("span", "dz-x");
-  for (const x of EXT[which]) chips.append(el("span", "chip", x));
-  zone.append(ic, el("span", "dz-t", T("drop it here")), chips, pick, fileInput);
-  zone.onclick = e => { if (!e.target.closest("button")) pick.click(); };
-  if (which === "file") {
-    const result = () => $("#screen .xc-preview");
-    fieldError(pick, result(), () => result()?.dataset.fieldError === "file");
-  }
-  return zone;
+    }));
+  const db = el("div", "xc-db");
+  db.append(doRow("db", "library", T("Import another manager's data"), T("Mod tags, colours, notes and sorting rules from RimSort, RimCrow or RimPy")));
+  managerRows(db);
+  card.append(gr, list, subs, pack, db);
+  markShown();
+  drawRows();
 }
 
-// pasteBox: a share code, a Rentry or collection link, or a copied list
-function pasteBox() {
-  const ta = el("textarea", "field xc-paste");
-  ta.spellcheck = false; ta.rows = 3;
-  ta.placeholder = T("a link, a share code or a list");
-  ta.setAttribute("aria-label", T("a Steam collection or Rentry link, a share code, or a copied list"));
-  ta.value = pasted;
-  ta.oninput = () => { pasted = ta.value; };
-  ta.onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); go.click(); } };
-  const clip = button(T("paste"), "", async () => {
-    let t = "";
-    try { t = await api.Clipboard(); } catch { /* the page asks the browser */ }
-    if (!t && navigator.clipboard) { try { t = await navigator.clipboard.readText(); } catch { /* not allowed */ } }
-    if (!t) return say("", T("the clipboard has no text"));
-    ta.value = pasted = t;
-  });
-  clip.title = T("paste from the clipboard");
-  const go = button(T("read"), "", () => ta.value.trim() && preview("text", ta.value));
-  go.title = T("links are read from Steam or Rentry when you press read");
-  const box = el("div", "xc-pastebox");
-  const acts = el("div", "xc-pacts");
-  acts.append(clip, go);
-  box.append(ta, acts);
-  return box;
+// markShown marks the row whose result the right shows
+function markShown() {
+  const res = $("#screen .xc-preview"), at = res && !res.hidden ? res.dataset.kind : "";
+  for (const r of $("#screen")?.querySelectorAll?.(".xc-dorow") || []) r.classList.toggle("on", !!at && r.dataset.do === at);
 }
 
-// emptyState: the preview before anything is read: where a drop goes, as a picture
+// emptyState: the right before anything is read: Archo in the middle, the drop under her
 function emptyState() {
   const e = el("div", "xc-empty");
-  const ic = el("span", "dz-i"); ic.innerHTML = icon.import;
-  e.append(ic, el("span", "dz-t", T("drop a list, a pack or a manager's file anywhere")));
-  e.title = T("the preview shows what comes in next to what you have: new, already there, another version, not installed");
+  e.append(el("div", "fig"), el("div", "dz-t", T("Drop the files or folders to import anywhere on this window")));
+  const kinds = el("div", "dz-k");
+  for (const [ic, tip] of [["plan", T("Mod lists: .xml, .rml, .json, .txt, a save (.rws)")], ["packs", T("packs: .archopack")], ["library", T("another manager's data: a folder, a .db file, userRules.json")]]) {
+    const s = el("span", "ki"); s.innerHTML = icon[ic]; s.title = tip; s.setAttribute("aria-label", tip); kinds.append(s);
+  }
+  e.append(kinds);
   return e;
 }
 
@@ -323,9 +220,7 @@ function dropOverlay() {
   o.setAttribute("aria-hidden", "true");
   const box = el("div", "box"), ic = el("span", "dz-i"); ic.innerHTML = icon.import;
   const kinds = el("span", "dz-k");
-  for (const k of KINDS().filter(k => k.id === "file" || k.id === "pack" || k.id === "managers")) {
-    const s = el("span", "ki"); s.innerHTML = icon[k.icon]; s.title = k.name; kinds.append(s);
-  }
+  for (const k of ["plan", "packs", "library"]) { const s = el("span", "ki"); s.innerHTML = icon[k]; kinds.append(s); }
   box.append(ic, el("span", "dz-t", T("drop to import")), kinds);
   o.append(box);
   document.body.append(o);
@@ -337,9 +232,9 @@ export function showDropOver(on) {
 }
 
 // wireDrop: a file dragged over any page shows the overlay; dropped, it opens the Import page
-// with its kind picked. A form that takes drops itself (the lists' new / import) handles them
-// first. Under WebView2 composition hosting the native window receives no drops yet (16 §8.2);
-// the browser harness does.
+// and goes where it belongs. A form that takes drops itself (the lists' new / import) handles
+// them first. Under WebView2 composition hosting the native window receives no drops yet
+// (16 §8.2); the browser harness does.
 function wireDrop() {
   const files = e => e.dataTransfer?.types?.includes?.("Files");
   document.addEventListener("dragenter", e => { if (!files(e)) return; dragDepth++; showDropOver(true); });
@@ -366,23 +261,23 @@ export async function dropped(d) {
   if (S.screen !== "plan-import") return;
   if (d.more > 0) say("", Tf("one file at a time: reading %s", d.name));
   if (!k) return refuse(d.name);
-  pickKind(k === "list" ? "file" : k === "pack" ? "pack" : "managers", false);
   if (d.path) return k === "folder" ? addManagerSource(d.path) : openPicked(d.path);
   if (k === "list") return readFile(d.file);
   // the browser gives no path: the dialog does
-  return refuse(d.name, k === "folder" ? T("choose the folder with “another folder or file…”") : T("choose this file with “choose a file…”"), "warn");
+  return refuse(d.name, k === "folder" || k === "manager" ? T("add it with “add…” under another manager's data") : T("choose it with “import” in Import a pack"), "warn");
 }
 
-// refuse says why a drop is not imported, in the preview, and keeps the page as it was
+// refuse says why a drop is not imported, on the right, and keeps the page as it was
 function refuse(name, why = "", cls = "") {
   const res = showResult("refused", "", T("Not imported"));
   if (!res) return;
-  const r = errorRow(name, why || T("RimArcho imports lists (.xml, .rml, .json, .txt, .rws), packs (.archopack) and RimSort, RimCrow or RimPy data"));
+  const r = errorRow(name, why || T("RimArcho imports Mod lists (.xml, .rml, .json, .txt, .rws), packs (.archopack) and RimSort, RimCrow or RimPy data"));
   if (cls) r.classList.add(cls);
   // a refusal reads at a glance: the file's name after a stop mark (an ask for the dialog: a warning)
   const mk = el("span", "xc-refuse" + (cls ? " " + cls : "")); mk.innerHTML = cls ? icon.warn : icon.err;
   r.querySelector(".name").prepend(mk);
   res.append(r, footer("", button(T("close"), "", hideResult)));
+  place();
   face("shake");
   say("fail", (why ? "" : T("not imported") + ": ") + (why || name));
 }
@@ -394,25 +289,33 @@ function refuse(name, why = "", cls = "") {
 let M = null;
 function freshM() { return { managers: null, error: "", shown: new Set(), on: new Set(), mode: new Map(), open: new Set(), extra: M?.extra || [], run: null }; }
 
-// managerRows: one row per manager found (drawRows fills them in), then "another folder or
-// file…" as the section's last row.
+// managerRows: one card per manager found (drawRows fills them in), then "Not found? Add it
+// yourself" with its button.
 function managerRows(card) {
-  const more = button(T("another folder or file…"), "", async () => {
+  const more = button(T("add…"), "", async () => {
     let f = "";
     try { f = await api.PickManagerImport(); } catch (e) { return say("fail", errText(e)); }
     if (!f || S.screen !== "plan-import") return;
     addManagerSource(f);
   });
-  const elsewhere = row(T("Somewhere else"), "", more);
-  elsewhere.title = T("a data folder or file kept elsewhere; it is only read");
+  more.title = T("a data folder or file kept elsewhere; it is only read");
+  const elsewhere = el("div", "xc-else");
+  elsewhere.append(el("span", "", T("Not found? Add it yourself")), more);
   card.append(el("div", "xc-mrows"), elsewhere);
 }
 
 // addManagerSource adds a manager's folder or file kept elsewhere (the dialog, or a dropped one)
+// and shows what it holds; a folder or file with no manager's data in it is refused on the right.
 async function addManagerSource(f) {
+  const active = session;
   const k = await api.ManagerFileKind(f).catch(() => "list");
   M.extra.push({ manager: k === "list" ? T("a file") : "", kind: k, path: f });
-  return survey();
+  await survey();
+  if (!live(active)) return;
+  const norm = x => String(x || "").replace(/\\/g, "/").toLowerCase();
+  const m = M.managers?.find(m => m.groups.some(g => norm(g.path).startsWith(norm(f))));
+  if (!m) return refuse(f.replace(/^.*[\\/]/, ""), T("no RimSort, RimCrow or RimPy data in it"));
+  if (!M.shown.has(mKey(m))) showManager(m);
 }
 
 // survey asks what each manager holds (dry runs in their own session); rows fill in.
@@ -425,7 +328,7 @@ async function survey() {
     if (!live(active)) return;
     M.managers = managers || [];
   } catch (e) { if (!live(active)) return; M.managers = []; M.error = errText(e); }
-  drawRows(); drawTree(); drawKinds();
+  drawRows(); drawTree();
 }
 
 const PART = () => ({ aliases: T("aliases"), notes: T("notes"), groups: T("groups"), tags: T("tags"), colours: T("colour marks"), ignored: T("ignored warnings"),
@@ -624,6 +527,7 @@ function drawTree() {
     button(T("bring over the selected"), "", startRun, "primary"));
   acts.lastChild.disabled = !any;
   res.append(tree, sum, acts);
+  place();
 }
 
 function partRow(m, g, p) {
@@ -749,6 +653,7 @@ function drawRun() {
     f.append(button(T("done"), "", again, "primary"));
   }
   res.append(head, pg, f);
+  place();
 }
 
 // again closes the run: the page asks the managers again, so what came in shows as imported
@@ -764,13 +669,12 @@ function again() {
 // manager's database or rules join the managers above, anything else gets the list preview.
 async function openPicked(path) {
   const active = session;
-  if (/\.archopack$/i.test(path)) { pickKind("pack", false); return importPack(path); }
+  if (/\.archopack$/i.test(path)) return importPack(path);
   let kind = "list";
   try { kind = await api.ManagerFileKind(path); } catch { /* read it as a list */ }
   if (!live(active)) return;
   if (kind === "list") return preview("file", path);
   M.extra.push({ manager: "", kind, path });
-  if (S.screen === "plan-import" && live(active)) pickKind("managers", false);
   await survey();
   const m = M.managers?.find(m => m.groups.some(g => g.path === path));
   if (m && !M.shown.has(mKey(m))) showManager(m);
@@ -786,7 +690,7 @@ async function importPack(path, update = null) {
   }
   const active = session, seq = ++previewSeq;
   const name = path.replace(/^.*[\\/]/, "");
-  const result = showResult("pack", "in", T("Adding a pack"));
+  const result = showResult("pack", "pack", T("Adding a pack"));
   if (!result) return;
   let id;
   try { id = await api.StartPackImport(path, !!update); }
@@ -811,6 +715,7 @@ async function importPack(path, update = null) {
     else if (t.state === "done") f.append(el("span", "note", T("The pack is ready to launch.")), button(T("open packs"), "enter", () => ui.go("packs"), "primary"));
     else f.append(el("span", "note", ""), button(T("close"), "", hideResult), button(T("choose another pack…"), "", async () => { const p = await api.PickPackFile().catch(() => ""); if (p) importPack(p); }));
     result.append(head, pg, f);
+    place();
     if (first) { first = false; reveal(); }
     if (running) setTimeout(tick, 500);
     else { await ui.reload(); say(t.state === "done" ? "ok" : "fail", t.state === "done" ? T("pack added") : t.result); }
@@ -829,12 +734,12 @@ async function readFile(f) {
   } catch (e) { say("fail", errText(e)); }
 }
 
-// ---- import, step 2: the preview ----
-// The preview is a card of rows under the section it came from (16 §2.18): the source on top,
-// the Mods (not installed, installed), where it goes, the Mod settings, and a footer with the
-// page's one filled button.
+// ---- import, step 2: the order comparison ----
+// A list read here (the game's, a dropped or chosen file) is shown next to the player's list,
+// in order (16 §2.18 "Order comparison"): its source, the counts, the two lists side by side,
+// and the buttons — apply it to the list, save it as a new list, or add only what the list lacks.
 
-async function preview(kind, src, fileName) {
+async function preview(kind, src, fileName, from = "file") {
   const body = $("#screen .xc-preview");
   const active = session, seq = ++previewSeq;
   const current = () => S.screen === "plan-import" && session === active && S.screenSeq === active.epoch && seq === previewSeq;
@@ -843,7 +748,7 @@ async function preview(kind, src, fileName) {
   const link = kind === "text" && /^\s*\S+\s*$/.test(src) && /steamcommunity|rentry|^\s*\d{6,}\s*$/.test(src);
   say("busy", link ? T("reading the link…") : T("reading the list…"));
   let p;
-  showResult("list", "in", T("Preview"));
+  showResult("list", from, T("Mod order comparison"));
   const wait = row(link ? T("reading the link…") : T("reading the list…"), "", progBar(0, true));
   wait.classList.add("xc-wait");
   body.append(wait);
@@ -854,7 +759,8 @@ async function preview(kind, src, fileName) {
     if (!current()) return;
     body.textContent = "";
     body.dataset.fieldError = fileName || kind === "file" ? "file" : "text";
-    body.append(errorRow(T("could not read it"), errText(e)));
+    body.append(errorRow(T("could not read it"), errText(e)), footer("", button(T("close"), "", hideResult)));
+    place();
     face("shake");
     say("fail", errText(e)); reveal(); return;
   }
@@ -862,155 +768,127 @@ async function preview(kind, src, fileName) {
   say("", "");
   if (fileName) p.source = fileName;
   body.textContent = "";
-
   face("smug");
-  showImportSummary(body, p, !!(p.sourcePath || fileName));
-  body.append(compare(p, active.name));
-  showImportContents(body, p);
-  // the game's own list, or any list, that the list already is: nothing to import (16 §2.18)
+
   const fromGame = kind === "file" && !!info?.game && src === info.game.path;
+  const cfg = gameConfig();
+  const theirs = fromGame ? (cfg ? Tf("%s (the game)", cfg) : T("the game's list")) : p.name || (p.source || "").replace(/^.*[\\/]/, "") || p.format;
+  const d = orderDiff(p.current || [], p.incoming || []);
+  // where it comes from (format, file, game version) is the incoming list's header tooltip;
+  // another game version is an amber mark there
+  const tip = [p.format, p.source, p.game ? "RimWorld " + p.game : "", p.gameNote].filter(Boolean).join("\n");
+  const ov = orderView(d, { left: active.name || T("your list"), right: theirs, rightTip: tip, rightNote: p.gameNote ? "RimWorld " + (p.game || "").split(".").slice(0, 2).join(".") : "", rightNoteTip: p.gameNote || "" });
+
+  // the head is one line: the counts, what is not installed (subscribe them all), close
+  const head = el("div", "xc-rhead");
+  head.append(legend(d, active.name || T("your list"), theirs));
+  if (p.missing.length) {
+    const ids = workshopIDs(p.missing);
+    const m = el("div", "xc-miss");
+    const t = el("span", "mt", Tf("%d not installed", p.missing.length));
+    t.title = p.missing.map(r => r.name).join(", ");
+    m.append(t);
+    if (ids.length) { const go = button(Tf("subscribe all %d", ids.length), "", () => getAll(ids, go), "small", "subscribe"); go.type = "button"; go.title = T("subscribed mods take their place in the list once downloaded"); m.append(go); }
+    head.append(m);
+  }
+  const two = layout() === "2col";
+  if (two) { const x = el("button", "xc-x"); x.type = "button"; x.innerHTML = icon.close; x.title = T("close"); x.setAttribute("aria-label", T("close")); x.onclick = hideResult; head.append(x); }
+  body.append(head, ov.el);
+
+  // the list already is this one: nothing to import (16 §2.18)
   if (p.replace?.same && !p.settings && !p.collection) {
-    body.append(row(fromGame ? Tf("%s already matches the game.", active.name) : Tf("%s already is this list.", active.name), ""));
-    body.append(footer("", button(T("close"), "", hideResult)));
-    reveal();
+    body.append(footer(fromGame ? Tf("%s already matches the game.", active.name) : Tf("%s already is this list.", active.name), button(T("close"), "", hideResult)));
+    place(); reveal();
     return;
   }
 
-  // A destination is selected first; only the final import button changes data (16 §2.17).
-  let destination = "new", busy = false;
-  const name = el("input", "field xc-name"); name.spellcheck = false;
-  name.setAttribute("aria-label", T("new list name"));
-  // the game's list is named after its Game Config, not after its file (ModsConfig)
-  const gameName = fromGame ? (S.board?.environmentRows || []).find(e => e.current)?.name : "";
-  const base = gameName || p.name || (p.source || "").replace(/^.*[\\/]/, "").replace(/\.[^.]*$/, "");
-  const free = await api.CheckPlanName(base, "", 0).catch(() => ({ free: base }));
-  if (!current()) return;
-  name.value = free.free;
-  const why = el("div", "sub warn plan-why"); fieldError(name, why);
-  const submit = button(T("import"), "enter", perform, "primary", "import-apply");
-  submit.title = T("does not write game files");
-  body.append(groupHead(T("import destination")));
-  const ways = el("div", "xc-dests"); ways.setAttribute("role", "radiogroup"); ways.setAttribute("aria-label", T("import destination"));
-  const options = [["new", T("import as a new list"), Tf("%d mods; the current list stays as it is", p.total)],
-    ["replace", Tf("replace %s", active.name), p.replace], ["merge", T("add the ones you lack"), p.merge]];
-  const choices = [];
-  for (const [value, title, text] of options) {
-    // a destination's effect as + − ↕ marks, named by its sentence (V5); nothing to change stays words
-    const marks = typeof text === "object" && !text.same;
-    const r = choiceRow("radio", title, typeof text === "object" ? (marks ? "" : text.text) : text, value === destination, () => {
-      destination = value;
-      for (const c of choices) c.set(c.value === value);
-      name.disabled = value !== "new"; checkName();
-    });
-    r.value = value; choices.push(r);
-    if (marks) r.el.querySelector(".l").append(diffMarks(text));
-    if (value === "new") {
-      const lab = el("label", "xc-namef"); lab.append(el("span", "", T("new list name")), name);
-      lab.onclick = e => e.stopPropagation();
-      r.el.querySelector(".r").append(lab);
-      r.el.querySelector(".l").append(why);
-    }
-    ways.append(r.el);
-  }
-  body.append(ways);
-  let nameSeq = 0;
-  async function checkName() {
-    const n = ++nameSeq;
-    if (destination !== "new") { why.textContent = ""; submit.disabled = busy; return true; }
-    submit.disabled = true;
-    try {
-      const r = await api.CheckPlanName("", name.value, 0);
-      if (!current() || n !== nameSeq) return false;
-      why.textContent = r.problem; submit.disabled = busy || !!r.problem; return !r.problem;
-    } catch (e) { if (current()) why.textContent = errText(e); return false; }
-  }
-  name.oninput = checkName;
-  name.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); perform(); } };
-  let follow = true;
-  // a Steam Workshop collection: the list can follow it (07 §7.6); ticked by default
-  if (p.collection) {
-    const c = choiceRow("checkbox", T("follow this collection from now on"), T("RimArcho tells you when it changes; catching up is one undoable step"), true, () => { follow = !follow; c.set(follow); });
-    ways.append(c.el);
-  }
-  // a RimArcho list's Mod settings (07 §7.3): offered, applied after the import
-  const settings = p.settings ? settingsChoice(body, current) : null;
-  async function perform() {
-    if (busy || !(await checkName()) || !current()) return;
-    busy = true; submit.disabled = true;
+  // the choices that ride along: follow a Workshop collection (07 §7.6), a list's Mod settings (07 §7.3)
+  let follow = !!p.collection, settings = false;
+  const opts = [];
+  if (p.collection) opts.push(checkLine(T("follow this collection"), T("RimArcho tells you when it changes; catching up is one undoable step"), () => follow, v => { follow = v; }));
+  if (p.settings) opts.push(checkLine(Tf("apply the Mod settings of %d mods", p.settings), T("after the import; settings files you have are kept"), () => settings, v => { settings = v; }));
+
+  let busy = false;
+  const name0 = fromGame && cfg ? cfg : p.name || (p.source || "").replace(/^.*[\\/]/, "").replace(/\.[^.]*$/, "");
+  async function perform(dest, btn, listName = "") {
+    if (busy || !current()) return;
+    busy = true;
+    for (const b of acts.querySelectorAll("button")) b.disabled = true;
     // the import runs: the button says so and Archo thinks until it is in
-    submit.setAttribute("aria-busy", "true"); submit.classList.add("xc-working");
-    const spin = el("span", "icon spin"); spin.innerHTML = icon.rescan; submit.prepend(spin);
+    btn.setAttribute("aria-busy", "true"); btn.classList.add("xc-working");
+    const spin = el("span", "icon spin"); spin.innerHTML = icon.rescan; btn.prepend(spin);
     say("busy", T("importing…")); face("think");
     try {
       await api.ImportFollow(follow);
-      const r = destination === "new" ? await api.ImportAsPlan(name.value) : await api.ImportApplyTo(active.target, destination === "merge");
+      const r = dest === "new" ? await api.ImportAsPlan(listName) : await api.ImportApplyTo(active.target, dest === "merge");
       if (!current()) return;
       let extra = "";
-      if (settings && settings.on()) {
-        try { extra = settingsLine(await api.ImportSettings(settings.mods(), settings.replace(), false)); }
-        catch (e) { extra = errText(e); }
+      if (settings) {
+        try {
+          const pl = await api.ImportSettings([], false, true);
+          extra = settingsLine(await api.ImportSettings(pl.mods.filter(m => !m.missing).map(m => m.package), false, false));
+        } catch (e) { extra = errText(e); }
       }
       for (const c of S.cols) { c.sel.clear(); c.query = ""; c.cursor = 0; }
       const after = active.from === "guide" ? ui.afterImport : null;
       ui.afterImport = null;
       await ui.reload();
       if (after) return after();
-      const id = destination === "new" ? +r.page.slice(5) : active.target;
+      const id = dest === "new" ? +r.page.slice(5) : active.target;
       await ui.manageLists(id);
-      say("ok", (destination === "new" ? r.text : r) + (extra ? "  " + extra : ""), destination !== "new" ? async () => {
+      say("ok", (dest === "new" ? r.text : r) + (extra ? "  " + extra : ""), dest !== "new" ? async () => {
         try { await api.OpenPlan(id); const t = await api.Undo(); await ui.reload(); await ui.manageLists(id); say("ok", t); }
         catch (e) { say("fail", errText(e)); }
       } : false);
-    } catch (e) { if (current()) { say("fail", errText(e)); busy = false; submit.removeAttribute("aria-busy"); submit.classList.remove("xc-working"); spin.remove(); face("shake"); checkName(); } }
+    } catch (e) {
+      if (!current()) return;
+      say("fail", errText(e)); busy = false; face("shake");
+      btn.removeAttribute("aria-busy"); btn.classList.remove("xc-working"); spin.remove();
+      for (const b of acts.querySelectorAll("button")) b.disabled = false;
+    }
   }
-  checkName();
-  body.append(footer("", button(T("close"), "", hideResult), submit));
+  // a new list: its name is asked, starting from a free one (the game's list is named after its Game Config)
+  const saveNew = async (btn) => {
+    const free = await api.CheckPlanName(name0, "", 0).catch(() => ({ free: name0 }));
+    if (!current()) return;
+    pop.ask(T("new list name"), T("new list name"), async (v) => {
+      const r = await api.CheckPlanName("", v, 0).catch(e => ({ problem: errText(e) }));
+      if (r.problem) return say("fail", r.problem);
+      perform("new", btn, v);
+    }, free.free || name0);
+  };
+  const apply = button(Tf("apply to %s", active.name || T("your list")), "", () => perform("replace", apply), fromGame ? "primary" : "", "import-apply");
+  apply.title = p.replace?.text || "";
+  const merge = button(T("add only what it lacks"), "", () => perform("merge", merge));
+  merge.title = p.merge?.text || "";
+  merge.hidden = !!p.merge?.same;
+  const asNew = button(T("save as a new list…"), "", () => saveNew(asNew), fromGame ? "" : "primary");
+  asNew.title = Tf("%d mods; the current list stays as it is", p.total);
+  const acts = footer("", two ? null : button(T("close"), "", hideResult), merge, asNew, apply);
+  acts.classList.add("xc-lacts");
+  // the filled button last (16 §7.3): the game's list applies, any other list saves as new
+  if (!fromGame) acts.append(asNew);
+  if (opts.length) { const o = el("div", "xc-opts"); o.append(...opts); acts.prepend(o); acts.querySelector(".note")?.remove(); }
+  acts.querySelector(".note")?.append?.(diffMarks(p.replace));
+  body.append(acts);
+  place();
   body.onkeydown = e => {
-    if (e.key === "Enter" && !e.target.matches("button, a, select, textarea")) { e.preventDefault(); e.stopPropagation(); perform(); }
+    if (e.key === "Enter" && !e.target.matches("button, a, select, textarea, input")) { e.preventDefault(); e.stopPropagation(); (fromGame ? apply : asNew).click(); }
   };
   reveal();
 }
 
-// compare: what the list brings next to what the player has now (16 §2.18 "Preview"), as one
-// bar of four kinds with an icon and a count each, then what it does to the current list as
-// + − ↕ ⇄ marks. Each part is named by its words (V5); the words are on hover and for agents.
-export function compareParts(p) {
-  const inst = p.installed || [];
-  const other = inst.filter(r => r.other).length;
-  const inList = inst.filter(r => r.enabled && !r.other).length;
-  return [
-    { k: "have", n: inList, word: Tf("%d already in your list", inList) },
-    { k: "new", n: inst.length - inList - other, word: Tf("%d installed, not in your list", inst.length - inList - other) },
-    { k: "other", n: other, word: Tf("%d in another version", other) },
-    { k: "miss", n: (p.missing || []).length, word: Tf("%d not installed", (p.missing || []).length) },
-  ];
-}
-const SIGN = { have: "ok", new: "plus", other: "vers", miss: "close" };
-function compare(p, name) {
-  const parts = compareParts(p), r = el("div", "set xc-cmp"), l = el("div", "l");
-  const words = parts.filter(x => x.n).map(x => x.word).join(", ");
-  const bar = el("span", "xc-cbar");
-  visTip(bar, words, "img", false);
-  for (const x of parts) if (x.n) { const i = el("i", "c-" + x.k); i.style.flexGrow = String(x.n); bar.append(i); }
-  const counts = el("span", "ccounts");
-  for (const x of parts) {
-    const c = el("span", "cn c-" + x.k + (x.n ? "" : " zero"));
-    visTip(c, x.word, "img", false);
-    const ic = el("span", "ci"); ic.innerHTML = icon[SIGN[x.k]] || "";
-    c.append(ic, el("span", "num", String(x.n)));
-    counts.append(c);
-  }
-  l.append(bar, counts);
-  r.append(l);
-  // against the current list: the replace destination's effect, the list named on hover
-  if (p.replace && !p.replace.same && name) {
-    const rr = el("div", "r xc-vs");
-    const lb = el("span", "vs-n", name);
-    lb.title = Tf("compared with %s", name);
-    rr.append(lb, diffMarks(p.replace));
-    r.append(rr);
-  }
-  return r;
+// checkLine: a ticked choice that rides along with the import
+function checkLine(title, tip, get, set) {
+  const b = el("button", "xc-ride");
+  b.type = "button";
+  const cb = box(get() ? "checked" : "");
+  b.append(cb, el("span", "", title));
+  b.title = tip;
+  b.setAttribute("role", "checkbox");
+  b.setAttribute("aria-checked", String(get()));
+  b.onclick = () => { const v = !get(); set(v); cb.classList.toggle("on", v); b.setAttribute("aria-checked", String(v)); };
+  return b;
 }
 
 // ---- the result area: a card of rows under the section that produced it ----
@@ -1021,9 +899,13 @@ function showResult(mode, at, label) {
   const res = $("#screen .xc-preview"), lab = $("#screen .xc-res-label");
   if (!res) return null;
   res.dataset.mode = mode; res.hidden = false; res.textContent = "";
-  res.dataset.kind = at === "m" ? "managers" : kind;
-  if (lab) labelText(lab, label);
-  drawKinds();
+  res.dataset.kind = at === "m" ? "db" : at;
+  if (lab) { lab.hidden = false; labelText(lab, label); }
+  const grid = $("#screen .xc-lay");
+  if (grid) grid.dataset.showing = mode;
+  for (const x of $("#screen")?.querySelectorAll?.(".xc-rail .rh, .xc-rail .rf") || []) x.textContent = "";
+  markShown();
+  placeArcho(spot().expr);
   ui?.renderHints?.();
   return res;
 }
@@ -1037,10 +919,21 @@ function hideResult() {
   ++previewSeq;
   const res = $("#screen .xc-preview"), lab = $("#screen .xc-res-label");
   if (res) { res.hidden = true; res.textContent = ""; delete res.dataset.mode; delete res.dataset.fieldError; delete res.dataset.kind; }
-  if (lab) labelText(lab, T("Preview"));
-  drawKinds();
-  face("neutral");
+  if (lab) lab.hidden = true;
+  const grid = $("#screen .xc-lay");
+  if (grid) delete grid.dataset.showing;
+  for (const x of $("#screen")?.querySelectorAll?.(".xc-rail .rh, .xc-rail .rf") || []) x.textContent = "";
+  markShown();
+  placeArcho("neutral");
   ui?.renderHints?.();
+}
+// place: in 3col the result's head (the counts) and foot (the buttons) go to the rail
+function place() {
+  const res = $("#screen .xc-preview"), rh = $("#screen .xc-rail .rh"), rf = $("#screen .xc-rail .rf");
+  if (!res || !rh || !rf) return;
+  const kids = [...res.children];
+  for (const x of kids.filter(c => c.classList?.contains("xc-rhead"))) rh.append(x);
+  for (const x of kids.filter(c => c.classList?.contains("xc-acts") || c.classList?.contains("xc-tsum"))) rf.append(x);
 }
 // reveal scrolls the result into view and keeps its label in view: a tall result shows from
 // its top, a short one as far as needed.
@@ -1071,84 +964,6 @@ function errorRow(name, why) {
   r.classList.add("xc-err");
   return r;
 }
-// choiceRow: a row picked with a click, with a radio or a check box drawn like the managers'
-// (16 §2.18); text is facts parted by two spaces.
-function choiceRow(kind, title, text, on, pick) {
-  const r = el("div", "set xc-choice"), l = el("div", "l"), rr = el("div", "r");
-  const b = kind === "radio" ? el("button", "xc-rb") : box(on ? "checked" : "", "button");
-  b.setAttribute("role", kind);
-  const t = el("div", "name");
-  const sub = text ? factText(el("div", "sub"), text) : null;
-  l.append(t); t.append(title); if (sub) l.append(sub);
-  r.append(b, l, rr);
-  const set = v => {
-    r.classList.toggle("on", v);
-    b.setAttribute("aria-checked", v ? "true" : "false");
-    if (kind === "radio") b.classList.toggle("on", v); else b.classList.toggle("on", v);
-  };
-  set(on);
-  r.onclick = e => { if (e.target.closest(".r input, .r .btn")) return; pick(); };
-  b.onclick = e => { e.stopPropagation(); pick(); };
-  return { el: r, set };
-}
-
-// settingsChoice is the import's "apply settings" (07 §7.3): off at first; on, it shows the
-// per-Mod preview (what is written, kept or replaced) with a box per Mod.
-function settingsChoice(body, current) {
-  body.append(groupHead(T("Mod settings")));
-  const off = new Set();
-  let on = false, replace = false;
-  const apply = choiceRow("checkbox", T("apply settings"), T("after the import; settings files you have are kept unless you replace them"), false, () => {
-    on = !on; apply.set(on); rep.el.hidden = list.hidden = !on; if (on) draw();
-  });
-  apply.el.classList.add("xc-apply");
-  const rep = choiceRow("checkbox", T("replace settings files I have"), T("the old ones go to the recycle bin"), false, () => { replace = !replace; rep.set(replace); draw(); });
-  const list = el("div", "xc-list xc-mods");
-  rep.el.hidden = list.hidden = true;
-  let all = [];
-  async function draw() {
-    let pl;
-    try { pl = await api.ImportSettings([], replace, true); } catch (e) { list.textContent = errText(e); return; }
-    if (!current()) return;
-    all = pl.mods;
-    list.textContent = "";
-    for (const m of pl.mods) {
-      const d = el("div", "xc-mod" + (m.missing ? " dis" : ""));
-      const mc = box(!m.missing && !off.has(m.package) ? "checked" : "", "button");
-      mc.disabled = !!m.missing;
-      const flip = () => {
-        if (m.missing) return;
-        if (off.has(m.package)) off.delete(m.package); else off.add(m.package);
-        const v = !off.has(m.package);
-        mc.classList.toggle("on", v); mc.setAttribute("aria-checked", v ? "true" : "false");
-      };
-      mc.onclick = e => { e.stopPropagation(); flip(); };
-      d.onclick = flip;
-      d.append(mc, el("span", "n", m.mod), el("span", "dim", settingsNote(m)));
-      list.append(d);
-    }
-  }
-  body.append(apply.el, rep.el, list);
-  return {
-    on: () => on && all.some(m => !m.missing && !off.has(m.package)),
-    mods: () => all.filter(m => !m.missing && !off.has(m.package)).map(m => m.package),
-    replace: () => replace,
-  };
-}
-
-// settingsNote says what applying does to one Mod's files.
-function settingsNote(m) {
-  if (m.missing) return T("not installed");
-  let n = 0, kept = 0, same = 0, repl = 0;
-  for (const f of m.files) {
-    if (f.same) same++;
-    else if (f.write && f.exists) repl++;
-    else if (f.write) n++;
-    else kept++;
-  }
-  return [n && Tf("%d new", n), repl && Tf("%d replaced", repl), kept && Tf("%d kept", kept), same && Tf("%d the same", same)].filter(Boolean).join(", ");
-}
-
 function settingsLine(pl) {
   let n = 0, failed = 0;
   for (const m of pl.mods) for (const f of m.files) { if (f.error) failed++; else if (f.write) n++; }

@@ -177,6 +177,19 @@ type ImportPreview struct {
 	// Settings: how many Mods a RimArcho list carries Mod settings of (07 §7.3); applying
 	// them is the player's choice after the import.
 	Settings int `json:"settings,omitempty"`
+	// Current and Incoming are the compared list and the imported one in their order, for the
+	// side-by-side order comparison (16 §2.18). A row's key is its package id.
+	Current  []OrderRow `json:"current"`
+	Incoming []OrderRow `json:"incoming"`
+}
+
+// OrderRow is one Mod of a list as the order comparison draws it.
+type OrderRow struct {
+	Key     string `json:"key"`
+	Name    string `json:"name"`
+	Missing bool   `json:"missing,omitempty"` // not installed
+	Other   bool   `json:"other,omitempty"`   // installed in another version than the list's
+	URL     string `json:"url,omitempty"`     // a missing Mod's Workshop page
 }
 
 // PreviewImport compares an imported list with the installed mods and the workspace;
@@ -265,6 +278,24 @@ func PreviewImportFor(a *app.App, imp *Import, id int64) (*ImportPreview, error)
 		}
 		p.Missing = append(p.Missing, missingRow(a, r, ws))
 	}
+	p.Current, p.Incoming = orderRows(st, st.List, nil, nil), orderRows(st, list, il, unresolved)
+	for i, r := range p.Incoming {
+		if ws, ok := strings.CutPrefix(r.Key, "ws:"); ok {
+			if t := imp.Titles[ws]; t != "" {
+				p.Incoming[i].Name = t
+			}
+			p.Incoming[i].URL = workshopURL(ws)
+			continue
+		}
+		if r.Missing {
+			for _, m := range p.Missing {
+				if m.Name == r.Name || (m.Package != "" && strings.EqualFold(m.Package, r.Key)) {
+					p.Incoming[i].URL = m.URL
+					break
+				}
+			}
+		}
+	}
 	p.Replace = effect(st, list)
 	p.Merge = effect(st, app.MergedEntries(st, il))
 	p.Summary = Tf("%s: %d mods, %d installed, %d not installed", p.Format, p.Total, len(p.Installed), len(p.Missing))
@@ -272,6 +303,39 @@ func PreviewImportFor(a *app.App, imp *Import, id int64) (*ImportPreview, error)
 		p.Summary += "  " + Tf("%d in another version", p.Other)
 	}
 	return p, nil
+}
+
+// orderRows names a list's entries in order; il (the imported list) names the ones not
+// installed and marks the ones installed in another version; unresolved Workshop items come last.
+func orderRows(st *app.LoadoutState, list loadout.List, il *app.ImportedList, unresolved []string) []OrderRow {
+	out := make([]OrderRow, 0, len(list)+len(unresolved))
+	for _, e := range list {
+		if m := st.Ix.ByID[e.Instance]; e.Instance != "" && m != nil {
+			r := OrderRow{Key: strings.ToLower(m.PackageID), Name: m.DisplayName()}
+			if il != nil {
+				if h := il.Hash(m.PackageID); h != "" && !app.SameContent(m, h) {
+					r.Other = true
+				}
+			}
+			out = append(out, r)
+			continue
+		}
+		r := OrderRow{Key: strings.ToLower(e.Missing), Name: e.Name, Missing: true}
+		if r.Key == "" {
+			r.Key = e.Key()
+		}
+		if r.Name == "" && il != nil {
+			r.Name = il.Names[e.Missing]
+		}
+		if r.Name == "" {
+			r.Name = e.Missing
+		}
+		out = append(out, r)
+	}
+	for _, ws := range unresolved {
+		out = append(out, OrderRow{Key: "ws:" + ws, Name: "ws:" + ws, Missing: true})
+	}
+	return out
 }
 
 func missingRow(a *app.App, r ImportRow, ws string) ImportRow {

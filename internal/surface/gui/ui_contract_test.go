@@ -80,6 +80,8 @@ func TestUICommandsWork(t *testing.T) {
 // Bridge methods no page script calls. Each is kept for a reason or waits for a decision.
 var bridgeUncalled = map[string]string{
 	"Close":                      "gui.go closes the page reader when the window ends (defer api.Close()); spikes/guidev too",
+	"Clipboard":                  "unused since 2026-11-20: the Import page's paste field moved to All lists' new / import; kept while the page's layout is under review (16 §2.18)",
+	"PickAnyImport":              "unused since 2026-11-20: the Import page's list file moved to All lists' new / import; kept while the page's layout is under review (16 §2.18)",
 	"ListProblems":               "unused; open question: 16 §8.7 says the editor reads its findings with it, but the page uses Board.problems and the list-problems event",
 	"AccountStatus":              "unused; open question",
 	"Changes":                    "unused; open question (the updates page reads SubscriptionsPage)",
