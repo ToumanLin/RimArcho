@@ -954,7 +954,7 @@ export function hintList() {
 // ---- the export sub-page (Library / Lists / <list> / export) ----
 
 // exportOf opens the export of list id; from is where esc goes back to: "plans" (this
-// page), "editor" (the plan editor's e) or "import" (Import & export's current list).
+// page) or "editor" (the plan editor's e).
 export async function exportOf(id, from = "plans") {
   X.id = id; X.from = from; X.settings = false;
   S.planExport = { id, from };
@@ -1075,7 +1075,6 @@ async function choose(id) {
 function back() {
   S.planExport = null;
   if (X.from === "editor") return ui.go("plan");
-  if (X.from === "import") return ui.go("import");
   return ui.go("plans");
 }
 

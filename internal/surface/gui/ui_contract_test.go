@@ -91,7 +91,7 @@ var bridgeUncalled = map[string]string{
 	"NewPlan":                    "unused; open question (All lists creates with CreatePlan)",
 	"PlanFroms":                  "unused; open question",
 	"ImportPreview":              "unused; open question",
-	"PackImport":                 "unused since the first-run guide hands over to Import & export (16 §2.15), which adds packs with StartPackImport; subscriptions_test still calls it",
+	"PackImport":                 "unused since the first-run guide hands over to Import (16 §2.15), which adds packs with StartPackImport; subscriptions_test still calls it",
 	"ImportApply":                "unused; open question",
 	"ExportSave":                 "unused; open question",
 	"ExportCopy":                 "unused; open question",

@@ -2023,36 +2023,102 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .pm-import .xc-check .xc-note { flex-basis: 100%; padding-left: 22px; }
 .pm-import .xc-preview[hidden] { display: none; }
 
-/* Import & export (16 §2.18): drawn like Game Config and Settings, numbered sections of
-   setting rows (.settings .set); a manager picked in its section opens a tree of its parts
-   below, which turns into the run (a background task) in place. */
-/* The sections sit in a grid: one column on a narrow page; from 880 px Bring in spans it with
-   its sources two to a line, From another manager and Share stand side by side, and a result
-   spans the grid under its section (dense placement puts Share beside From another manager
-   while the tree follows it in the document, so tab goes from the managers to their tree). */
-.xc-cols { container: xc / inline-size; }
-.xc-grid { display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-flow: row dense; gap: var(--card-gap) 16px; align-items: start; }
-.xc-blk { display: flex; flex-direction: column; gap: var(--card-gap); min-width: 0; }
-@container xc (min-width: 880px) {
-  .xc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .xc-grid > .xc-blk.wide, .xc-grid > .xc-res-label, .xc-grid > .xc-res { grid-column: 1 / -1; }
-  .pm-import .xc-sec.xc-in { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .pm-import .xc-sec.xc-in > .set:nth-child(2) { border-top: 0; }
-  .pm-import .xc-sec.xc-in > .set:nth-child(even) { border-left: var(--hairline) solid var(--line-2); }
-  .pm-import .xc-blk .xc-textrow .xc-pastebox { max-width: none; }
+/* Import (16 §2.18): the kinds of import in a first column; the picked kind's source and the
+   preview of what it brings fill the rest. Two arrangements while the user compares them
+   (docs/design/2026-11-20_import-page.md): "2col" puts the source over the preview, "3col"
+   puts them side by side from 960 px of page width (narrower it falls back to 2col).
+   The kinds column is sticky: its icons and Archo, in the blank space under them, stay in view
+   while a long preview scrolls. */
+.page.xc-page { container: xcp / inline-size; }
+.page.xc-page.xc-2col { padding-left: max(12px, calc(50% - 700px)); padding-right: max(12px, calc(50% - 700px)); }
+.page.xc-page.xc-3col { padding-left: 12px; padding-right: 12px; }
+.xc-lay { display: grid; gap: var(--card-gap) 16px; align-items: start; grid-template-columns: 200px minmax(0, 1fr); grid-template-areas: "side src" "side res"; }
+.xc-lay > .xc-side { grid-area: side; position: sticky; top: 0; display: flex; flex-direction: column; min-width: 0; }
+.xc-lay > .xc-srcblk { grid-area: src; }
+.xc-lay > .xc-resblk { grid-area: res; }
+@container xcp (min-width: 960px) {
+  .xc-lay[data-layout="3col"] { grid-template-columns: 200px minmax(260px, 1fr) minmax(0, 2fr); grid-template-areas: "side src res"; }
+  .xc-lay[data-layout="3col"] .xc-srcblk .xc-dz { min-height: 260px; }
+  .xc-lay[data-layout="3col"] .xc-paste { min-height: 160px; }
 }
+@container xcp (max-width: 640px) {
+  .xc-lay { grid-template-columns: minmax(0, 1fr); grid-template-areas: "side" "src" "res"; }
+  .xc-lay > .xc-side { position: static; }
+  .xc-kinds { flex-direction: row; flex-wrap: wrap; }
+}
+.xc-blk { display: flex; flex-direction: column; gap: var(--card-gap); min-width: 0; }
+.xc-kinds { display: flex; flex-direction: column; gap: 2px; padding-top: 22px; }
+.xc-kind { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border: 0; border-radius: var(--r-sm);
+  background: transparent; color: var(--fg-2); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.xc-kind .ki { display: inline-flex; width: 20px; height: 20px; }
+.xc-kind .ki svg { width: 20px; height: 20px; }
+.xc-kind .kn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xc-kind .kc { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
+.xc-kind .kc.news::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.xc-kind:hover { background: var(--card-2); color: var(--fg); }
+.xc-kind.on { background: var(--accent-soft); color: var(--accent-11, var(--accent)); font-weight: 600; }
+.xc-side > .archo-spot.archo-stand { margin: 16px auto 0 12px; }
+/* a drop area: one big icon, what it takes as chips, its button; the dialog on a click */
+.xc-dz { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 168px; margin: 12px; padding: 16px;
+  border: var(--hairline) dashed var(--line); border-radius: var(--r-lg); color: var(--muted); cursor: pointer; text-align: center; }
+.xc-dz:hover { border-color: var(--accent); color: var(--fg-2); }
+.xc-dz .dz-i, .xc-empty .dz-i, .xc-dropover .dz-i { display: inline-flex; }
+.xc-dz .dz-i svg, .xc-empty .dz-i svg { width: 36px; height: 36px; }
+.xc-dz .dz-t, .xc-empty .dz-t { font-size: 13px; }
+.dz-x { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.dz-x .chip { font-size: 12px; }
+/* the preview before anything is read: where a drop goes, quietly */
+.xc-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 240px; padding: 24px;
+  border: var(--hairline) dashed var(--line-2); border-radius: var(--r-lg); color: var(--faint); text-align: center; }
+.xc-res:not([hidden]) ~ .xc-empty { display: none; }
+/* pasted text: a field over its two buttons */
+.xc-srcblk .xc-pastebox { display: flex; flex-direction: column; gap: 8px; padding: 12px; max-width: none; }
+.xc-srcblk .xc-paste { width: 100%; min-height: 76px; resize: vertical; padding: 8px 10px; font: inherit; font-size: 13px; line-height: 18px; }
+.xc-pacts { display: flex; justify-content: flex-end; gap: 8px; }
+/* the comparison: four kinds in one bar, an icon and a count each, then + − ↕ ⇄ against the current list */
+.xc-cmp { align-items: center; }
+.xc-cmp .l { display: flex; flex-direction: column; gap: 8px; flex: 1 1 260px; min-width: 0; }
+.xc-cbar { display: flex; gap: 2px; height: 10px; max-width: 520px; border-radius: var(--r-sm); overflow: hidden; background: var(--line-2); }
+.xc-cbar > i { min-width: 3px; }
+.xc-cbar > .c-have { background: var(--green); }
+.xc-cbar > .c-new { background: var(--accent); }
+.xc-cbar > .c-other { background: var(--amber); }
+.xc-cbar > .c-miss { background: var(--red); }
+.ccounts { display: flex; gap: 16px; flex-wrap: wrap; }
+.ccounts .cn { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
+.ccounts .ci { display: inline-flex; width: 14px; height: 14px; }
+.ccounts .ci svg { width: 14px; height: 14px; }
+.ccounts .c-have { color: var(--green); }
+.ccounts .c-new { color: var(--accent-11, var(--accent)); }
+.ccounts .c-other { color: var(--amber); }
+.ccounts .c-miss { color: var(--red); }
+.ccounts .cn.zero { color: var(--faint); }
+.xc-vs { display: flex; align-items: center; gap: 8px; flex: 0 1 auto; }
+.xc-vs .vs-n { font-size: 12px; color: var(--muted); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* a file dragged over the window: the whole window says it takes it; the drop goes through */
+.xc-dropover { position: fixed; inset: 0; z-index: 900; display: none; align-items: center; justify-content: center; pointer-events: none;
+  background: color-mix(in srgb, var(--bg) 72%, transparent); }
+.xc-dropover.on { display: flex; }
+.xc-dropover .box { display: flex; flex-direction: column; align-items: center; gap: 12px; min-width: 320px; padding: 36px 56px; border: var(--hairline) dashed var(--accent);
+  border-radius: var(--r-lg); background: var(--card); color: var(--fg); font-size: 15px; font-weight: 600; }
+.xc-dropover .box .dz-i { color: var(--accent); }
+.xc-dropover .box .dz-i svg { width: 48px; height: 48px; }
+.xc-dropover .dz-k { display: flex; gap: 14px; color: var(--muted); }
+.xc-dropover .dz-k svg { width: 20px; height: 20px; }
+.xc-err.warn .sub.warn { color: var(--amber); }
+.btn.xc-working { cursor: progress; }
+.xc-refuse { display: inline-flex; width: 16px; height: 16px; margin-right: 8px; vertical-align: -3px; color: var(--red); }
+.xc-refuse.warn { color: var(--amber); }
+.xc-refuse svg { width: 16px; height: 16px; }
+.btn.xc-working .icon.spin { display: inline-flex; width: 14px; height: 14px; margin-right: 6px; }
+.btn.xc-working .icon.spin svg { width: 14px; height: 14px; }
 /* a section's rows: the controls follow the name, and drop under it only when they do not fit */
 .pm-import .xc-blk .xc-sec .set { flex-wrap: wrap; row-gap: 6px; }
 .pm-import .xc-blk .xc-sec .set .l { flex: 1 1 160px; }
 .pm-import .xc-blk .xc-sec .set .r { flex: 0 1 auto; margin-left: auto; }
-.pm-import .xc-blk .xc-sec .xc-textrow .l { flex: none; }
-.pm-import .xc-blk .xc-sec .xc-textrow .r { flex: 1 1 240px; flex-wrap: nowrap; }
-.pm-import .xc-blk .xc-textrow .xc-pastebox { flex-basis: 120px; }
 .pm-import .xc-sec .set .l { flex: 0 1 46%; }
 .pm-import .xc-sec .set .r { flex-wrap: wrap; }
 .pm-import .xc-sec .set.on .name { color: var(--accent-11, var(--accent)); }
-.xc-sec .xc-paste { flex: 1 1 auto; width: 100%; height: 26px; min-height: 26px; padding: 4px 9px; resize: none; overflow: hidden; line-height: 16px; font: inherit; font-size: 13px; white-space: nowrap; }
-.xc-sec .xc-paste:focus { height: auto; min-height: 64px; overflow: auto; white-space: pre; }
 .xc-mrows { display: flex; flex-direction: column; }
 .xc-mrows > .xc-hint, .xc-mrows > .xc-note { padding: 14px; font-size: 12px; color: var(--muted); }
 .xc-mrows + .set { border-top: var(--hairline) solid var(--line-2); }
@@ -2066,7 +2132,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .xc-mrow .t { font-weight: 500; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .xc-mrow .when { font-size: 12px; font-weight: 400; color: var(--faint); white-space: nowrap; }
 .xc-mrow .s { grid-column: 3; font-size: 12px; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.xc-mrow .pick, .pm-import .set .sub.xc-busy { color: var(--accent); }
+.xc-mrow .pick { color: var(--accent); }
 .xc-mrow .nline { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .xc-mrow .nt { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--fg-2); }
 .xc-mrow .chip-n { flex: none; font-size: 12px; height: 18px; display: inline-flex; align-items: center; padding: 0 6px; border-radius: var(--r-sm); background: var(--accent-soft); color: var(--accent); }
@@ -3103,13 +3169,6 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 
 
 .pm-inline-preview .xc-check { padding: 0 14px 10px; }
-/* the paste field: one line; not focused, a long paste ends in an ellipsis */
-.xc-pastebox { position: relative; display: flex; flex: 1 1 220px; max-width: 420px; min-width: 0; align-self: flex-start; }
-.xc-paste-shown { display: none; position: absolute; inset: 0 0 auto 0; height: 26px; padding: 0 10px; line-height: 26px; font-size: 13px; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
-.xc-pastebox.filled:not(:focus-within) .xc-paste-shown { display: block; }
-.xc-pastebox.filled:not(:focus-within) .xc-paste { color: transparent; }
-.xc-textrow .r { align-items: flex-start; }
-.xc-textrow { align-items: center; }
 .xc-pi .rs.word-facts { justify-content: flex-end; justify-self: end; flex-wrap: nowrap; }
 /* a confirmation's lines (popups.confirm): body type, "name: value" as fact rows */
 .confirm-lines { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--fg-2); overflow-wrap: anywhere; user-select: text; }

@@ -8,39 +8,28 @@ import { page, button, beginPageRead, area } from "./screens.js";
 import { icon } from "./icons.js";
 import * as pop from "./popups.js";
 import { getChoices } from "./credit.js";
-import { choiceControl } from "./choices.js";
-import { copyablePath, editablePath } from "./fields.js";
 import { still } from "./motion.js";
-import { splitBar, diffMarks } from "./membar.js";
+import { splitBar, diffMarks, stateMark, visTip } from "./membar.js";
 import { archoSpot } from "./archo.js";
 
 let ui = null;
 export function initExchange(u) {
   ui = u;
-  // File drops anywhere in the window enter the same import flow (16 §2.17).
-  document.addEventListener("dragover", e => { if (e.dataTransfer?.types.includes("Files")) e.preventDefault(); });
-  document.addEventListener("drop", async e => {
-    if (e.defaultPrevented) return;
-    const f = e.dataTransfer?.files?.[0];
-    if (!f) return;
-    e.preventDefault();
-    if (S.screen !== "plan-import") await exchange();
-    readFile(f);
-  });
+  wireDrop();
 }
 
 let info = null;
 let firstRun = false;
-// firstMore: the first run's "something else…" opened the whole page (16 §2.15)
-let firstMore = false;
 let pasted = "";
 let session = null;
 let previewSeq = 0;
+// kind: the import kind picked in the page's first column (16 §2.18); kept while the window lives
+let kind = "";
 
 // Import is a sub-page, including when entered from the first-run guide (16 §2.17).
-export async function importFrom(kind, src) {
+export async function importFrom(k, src) {
   await exchange();
-  if (S.screen === "plan-import") return preview(kind, src);
+  if (S.screen === "plan-import") return preview(k, src);
 }
 
 export function cancel() {
@@ -51,22 +40,46 @@ export function cancel() {
   ui.afterImport = null;
   return from === "guide" ? ui.resumeGuide() : ui.go(from);
 }
-export function key(e) { if (e.key === "Escape") { e.preventDefault(); cancel(); } }
+export function key(e) {
+  if (e.key === "Escape") { e.preventDefault(); return cancel(); }
+  // ↑↓ in the kinds column move the kind, as a vertical tab list does
+  if ((e.key === "ArrowDown" || e.key === "ArrowUp") && e.target?.closest?.(".xc-kinds")) {
+    e.preventDefault();
+    const ids = KINDS().map(x => x.id), i = ids.indexOf(kind);
+    pickKind(ids[(i + (e.key === "ArrowDown" ? 1 : ids.length - 1)) % ids.length], true);
+  }
+}
 // tab and enter only mean something while a list preview is shown
 export const hintList = () => [...($("#screen .xc-preview")?.dataset.mode === "list" ? [{ key: "tab", label: T("import destination") }, { key: "enter", label: T("import") }] : []), { key: "esc", label: T("cancel") }, { key: "?", label: T("all keys") }];
 
+// layout: the page's arrangement while the user compares the variants (design note
+// 2026-11-20_import-page): "2col" (kinds | source over preview) or "3col" (kinds | source |
+// preview). <html data-import-layout> or ?import-layout= picks it.
+export function layout() {
+  const v = document.documentElement?.dataset?.importLayout || new URLSearchParams(globalThis.location?.search || "").get("import-layout") || "";
+  return v === "3col" ? "3col" : "2col";
+}
+
+// KINDS: what can be imported, one entry each in the first column: an icon and a short name;
+// what it takes is its tooltip (16 §7 principle 9: visuals first, the words on hover).
+const KINDS = () => [
+  { id: "game", icon: "home", name: T("game's list"), tip: T("the game's current list (ModsConfig.xml), compared with yours") },
+  { id: "file", icon: "plan", name: T("list file"), tip: T("RimSort, RimCrow and RimPy lists, RimWorld .rml, ModsConfig.xml or a save (.rws)") },
+  { id: "paste", icon: "ext", name: T("link or code"), tip: T("a Steam collection or Rentry link, a share code, or a copied list") },
+  { id: "pack", icon: "packs", name: T("pack"), tip: T("a pack you can launch; its Mods are checked first") },
+  { id: "managers", icon: "import", name: T("other managers"), tip: T("lists, notes and tags, sorting rules and, from RimCrow, Game Configs; the files are only read") },
+];
+
 // The Import page (16 §2.18): the sidebar's Import, `i`, a dropped file, Settings and the guide
-// all open it. It is drawn like Game Config and Settings: numbered sections, each a card of
-// rows with a name and one line on the left and its controls on the right. "Bring in" has a
-// row per kind of source (the game's list, a list file, pasted text, a pack); "From another
-// manager" has a row per manager found, picked with a click, and the tree below to choose its
-// parts; "Share" exports. Moving in and adding a pack run as background tasks shown in place
-// (16 §2.16).
+// all open it. The first column lists the kinds of import; the selected kind's source (a
+// button, a drop area, a field, the managers found) and the preview of what it brings, compared
+// with what the player has now, fill the rest. Moving in and adding a pack run as background
+// tasks shown in the preview (16 §2.16).
 // first: the first-run guide hands over here after its scan (A1, 16 §2.15): the game's
 // current list comes first and is picked, and "skip" ends the guide.
 export async function exchange(first = false) {
   const from = S.screen === "plan-import" ? session?.from : S.screen || "plan";
-  if (S.screen !== "plan-import") { firstRun = first && from === "guide"; firstMore = false; }
+  if (S.screen !== "plan-import") firstRun = first && from === "guide";
   const target = from === "plans" ? ui.selectedList() : S.shell?.plan?.id || 0;
   const read = beginPageRead("plan-import", { replace: true });
   session = { from, target, name: S.shell?.plans?.find(p => p.id === target)?.name || "", epoch: S.screenSeq };
@@ -74,60 +87,48 @@ export async function exchange(first = false) {
   try { info = await api.ExchangeInfo(); } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
   const sc = $("#screen"); sc.innerHTML = "";
+  const lay = layout();
   // esc leaves (the hint line says so); only the first run names its way out, "skip"
-  const w = page("plans pm-import", firstRun ? T("Where does your first list come from?") : T("What do you want to bring in?"),
+  const w = page("plans pm-import xc-page xc-" + lay, firstRun ? T("Where does your first list come from?") : T("What do you want to bring in?"),
     firstRun ? button(T("skip"), "esc", cancel) : null);
-  // the result area (a preview, the tree, a task) sits under the section it came from
-  const resLab = el("div", "label section xc-res-label"); resLab.hidden = true;
+  const grid = el("div", "xc-lay"); grid.dataset.layout = lay;
+  const side = el("div", "xc-side"), nav = el("div", "xc-kinds");
+  nav.setAttribute("role", "tablist"); nav.setAttribute("aria-orientation", "vertical"); nav.setAttribute("aria-label", T("what to import"));
+  side.append(nav);
+  const [srcLab, srcCard] = sectionCard("");
+  const srcBlk = block(srcLab, srcCard, "xc-srcblk");
+  // the result area (a preview, the tree, a task); empty, it shows where a drop goes
+  const resLab = el("div", "label section xc-res-label");
   const result = el("section", "card settings xc-sec xc-preview xc-res"); result.hidden = true;
-  const [inLab, inCard] = sectionCard(T("Bring in"));
-  const [mLab, mCard] = sectionCard(T("From another manager"));
-  inCard.dataset.src = "in"; mCard.dataset.src = "m";
-  inCard.classList.add("xc-in");
-  // the sections sit in a grid (16 §2.18 "Layout"): on a wide page Bring in spans it with its
-  // sources two to a line, and From another manager and Share stand side by side under it; a
-  // result spans the grid under its section. Narrow, it is one column in the same order.
-  const cols = el("div", "xc-cols"), grid = el("div", "xc-grid"); cols.append(grid);
-  // the first run shows the game's list and one way to the rest: the other sources are for
-  // players who are not new (16 §2.15)
-  const brief = firstRun && !firstMore;
-  grid.append(block(inLab, inCard, "wide"));
-  if (!brief) grid.append(block(mLab, mCard));
-  grid.append(resLab, result);
-  w.append(cols);
-  area(inCard, inLab); if (!brief) area(mCard, mLab);
-  spot().peek(inCard, "neutral", true);
-  // the export side (C1): share what you have, beside bringing things in from other managers
-  if (!firstRun) { const [sLab, sCard] = sectionCard(T("Share")); shareRows(sCard); grid.append(block(sLab, sCard)); area(sCard, sLab); }
+  const resBlk = el("div", "xc-blk xc-resblk");
+  resBlk.append(resLab, result, emptyState());
+  grid.append(side, srcBlk, resBlk);
+  w.append(grid);
   sc.append(w);
-  // the rows are filled in on the page: the file row's error watches the result area
-  if (brief) {
-    const more = button(T("show"), "", () => { firstMore = true; exchange(true); });
-    const other = row(T("something else…"), "", more);
-    other.title = T("a list file, a share code, a pack or another manager");
-    inCard.append(gameRow(), other);
-    read.finish(); ui.renderWhere(); ui.renderHints();
-    return;
-  }
-  inCard.append(gameRow(), ...listRows(), packRow());
-  managerRows(mCard);
+  area(nav, null, () => $("#screen .xc-kind.on")?.focus({ preventScroll: true })); area(srcCard, srcLab); area(result, resLab);
+  labelText(resLab, T("Preview"));
+  M = freshM();
+  if (firstRun || !kind) kind = firstRun || info?.game ? "game" : "file";
+  drawKinds();
+  drawSource();
+  // Archo stands at the foot of the kinds column, in its blank space (16 §7.1 "Placements")
+  spot().stand(side, "neutral", true);
   read.finish(); ui.renderWhere(); ui.renderHints();
-  survey();
+  if (!firstRun) survey();
 }
 
 const live = (active) => session === active && S.screen === "plan-import";
 
-// section: a numbered label over a card of rows, as on Game Config and Settings
-// Archo peeks over the first card (16 §7.1 "Placements"): thinking while something is read
-// or moved in, pleased with a preview, a thumbs-up when it is in, a shake at an error.
-const spot = () => archoSpot("import", { size: 140, calm: ["neutral", "ponder", "think", "smirk", "yum"] });
+// Archo stands under the kinds (16 §7.1 "Placements"): thinking while something is read or
+// moved in, pleased with a preview, a thumbs-up when it is in, a shake at an error or a refusal.
+const spot = () => archoSpot("import", { size: 176, calm: ["neutral", "ponder", "think", "smirk", "yum"] });
 // nothing read or running is the calm state: her idle faces follow only there
 const face = (e) => spot().set(e, e === "neutral");
 
 function sectionCard(title) {
   return [el("div", "label section", title), el("section", "card settings xc-sec")];
 }
-// block: a section's label and card as one cell of the page's grid; "wide" spans it
+// block: a section's label and card as one cell of the page's grid
 function block(lab, card, cls = "") {
   const b = el("div", "xc-blk" + (cls ? " " + cls : ""));
   b.append(lab, card);
@@ -149,6 +150,70 @@ function marked(text, ...bold) {
   return span;
 }
 
+// ---- the kinds column ----
+
+// drawKinds draws the kinds: an icon, a short name and, where there is one, a count (the game
+// list's Mods, the managers found; a dot when a manager has something new).
+function drawKinds() {
+  const nav = $("#screen .xc-kinds");
+  if (!nav) return;
+  nav.textContent = "";
+  const res = $("#screen .xc-preview");
+  for (const k of KINDS()) {
+    const b = el("button", "xc-kind" + (k.id === kind ? " on" : ""));
+    b.dataset.kind = k.id;
+    b.setAttribute("role", "tab");
+    b.setAttribute("aria-selected", String(k.id === kind));
+    b.tabIndex = k.id === kind ? 0 : -1;
+    b.title = k.tip;
+    const ic = el("span", "ki"); ic.innerHTML = icon[k.icon] || "";
+    b.append(ic, el("span", "kn", k.name));
+    const n = kindCount(k.id);
+    if (n) { const c = el("span", "kc num", n.text); if (n.tip) c.title = n.tip; if (n.news) c.classList.add("news"); b.append(c); }
+    // the kind the preview came from carries a mark while the player looks at another one
+    if (res && !res.hidden && res.dataset.kind === k.id && k.id !== kind) b.append(stateMark("dot", T("shown in the preview")));
+    b.onclick = () => pickKind(k.id, false);
+    nav.append(b);
+  }
+}
+function kindCount(id) {
+  if (id === "game") return info?.game ? { text: String(info.game.mods), tip: Tf("%d mods", info.game.mods) } : null;
+  if (id === "managers") {
+    if (!M?.managers?.length) return null;
+    const fresh = M.managers.filter(m => m.imported && news(m).length).length;
+    return { text: String(M.managers.length), tip: M.managers.map(m => m.name).join(", "), news: fresh > 0 };
+  }
+  return null;
+}
+// pickKind shows a kind's source. The game's list is read at once (one click to its preview);
+// the others wait for their file, text or manager.
+function pickKind(id, focus) {
+  if (!KINDS().some(k => k.id === id)) return;
+  const again = id === kind;
+  kind = id;
+  drawKinds(); drawSource();
+  if (focus) $(`#screen .xc-kind[data-kind="${id}"]`)?.focus();
+  if (id === "game" && !again && !firstRun && info?.game && $("#screen .xc-preview")?.dataset.kind !== "game") preview("file", info.game.path);
+  if (id === "managers") drawTree();
+}
+
+// ---- the source: the selected kind's controls ----
+
+function drawSource() {
+  const card = $("#screen .xc-srcblk .xc-sec"), lab = $("#screen .xc-srcblk .label");
+  if (!card) return;
+  const k = KINDS().find(x => x.id === kind);
+  labelText(lab, k.name);
+  card.textContent = "";
+  card.dataset.src = kind === "managers" ? "m" : "in";
+  card.dataset.kind = kind;
+  if (kind === "game") card.append(gameRow());
+  else if (kind === "file") card.append(dropArea("file"));
+  else if (kind === "paste") card.append(pasteBox());
+  else if (kind === "pack") card.append(dropArea("pack"));
+  else { managerRows(card); drawRows(); }
+}
+
 // The game's current list: its ModsConfig.xml in the current Game Config. On the first run
 // it is the list the scan already made, so "use this list" ends the guide; later it is
 // previewed like any other list.
@@ -165,108 +230,161 @@ function gameRow() {
   return r;
 }
 
-// A Mod list: a file (or one dropped anywhere on the window), or pasted text: a share code,
-// a Rentry or collection link, a copied list. What the file input accepts is its tooltip.
-function listRows() {
+// EXT: what each drop area takes, as chips; the sentence is the area's tooltip
+const EXT = { file: [".xml", ".rml", ".json", ".txt", ".rws"], pack: [".archopack"] };
+
+// dropArea: a list file or a pack, as a dashed area with one button. A file can be dropped on
+// it, or anywhere on the window (wireDrop); a click on the area opens the dialog too.
+function dropArea(which) {
   const fileInput = el("input"); fileInput.type = "file"; fileInput.hidden = true;
-  fileInput.accept = ".xml,.rml,.json,.txt,.rws";
+  fileInput.accept = EXT.file.join(",");
   fileInput.onchange = () => { if (fileInput.files[0]) readFile(fileInput.files[0]); };
-  const pick = button(T("choose a file…"), "", async () => {
-    let f = "";
-    try { f = await api.PickAnyImport(); } catch (e) { return say("fail", errText(e)); }
-    if (f && S.screen === "plan-import") openPicked(f);
-    else if (!info.dialogs) fileInput.click();
-  });
-  pick.title = T("RimSort, RimCrow and RimPy lists, RimWorld .rml, ModsConfig.xml or a save (.rws)") + ". " + T("a file can also be dropped anywhere on the window");
-  const result = () => $("#screen .xc-preview");
-  fieldError(pick, result(), () => result()?.dataset.fieldError === "file");
-  // one line tall; a copied list keeps its lines (it is a textarea)
+  const pick = which === "pack"
+    ? button(T("choose a pack…"), "", async () => {
+      let f = "";
+      try { f = await api.PickPackFile(); } catch (e) { return say("fail", errText(e)); }
+      if (f && S.screen === "plan-import") importPack(f);
+    })
+    : button(T("choose a file…"), "", async () => {
+      let f = "";
+      try { f = await api.PickAnyImport(); } catch (e) { return say("fail", errText(e)); }
+      if (f && S.screen === "plan-import") openPicked(f);
+      else if (!info.dialogs) fileInput.click();
+    });
+  const zone = el("div", "xc-dz");
+  zone.dataset.drop = which;
+  zone.title = (which === "pack" ? ".archopack" : T("RimSort, RimCrow and RimPy lists, RimWorld .rml, ModsConfig.xml or a save (.rws)")) + ". " + T("a file can also be dropped anywhere on the window");
+  const ic = el("span", "dz-i"); ic.innerHTML = icon[which === "pack" ? "packs" : "import"];
+  const chips = el("span", "dz-x");
+  for (const x of EXT[which]) chips.append(el("span", "chip", x));
+  zone.append(ic, el("span", "dz-t", T("drop it here")), chips, pick, fileInput);
+  zone.onclick = e => { if (!e.target.closest("button")) pick.click(); };
+  if (which === "file") {
+    const result = () => $("#screen .xc-preview");
+    fieldError(pick, result(), () => result()?.dataset.fieldError === "file");
+  }
+  return zone;
+}
+
+// pasteBox: a share code, a Rentry or collection link, or a copied list
+function pasteBox() {
   const ta = el("textarea", "field xc-paste");
-  ta.spellcheck = false; ta.rows = 1;
+  ta.spellcheck = false; ta.rows = 3;
   ta.placeholder = T("a link, a share code or a list");
+  ta.setAttribute("aria-label", T("a Steam collection or Rentry link, a share code, or a copied list"));
   ta.value = pasted;
-  // not focused, a long paste shows its start with an ellipsis (a textarea cannot cut its
-  // own text), whole in the tooltip
-  const shown = el("span", "xc-paste-shown");
-  const wrap = el("span", "xc-pastebox"); wrap.append(ta, shown);
-  const sync = () => { const one = ta.value.replace(/\s+/g, " ").trim(); shown.textContent = one; wrap.classList.toggle("filled", !!one); ta.title = one.length > 60 ? one.slice(0, 400) : ""; };
-  ta.oninput = () => { pasted = ta.value; sync(); };
-  ta.onblur = () => { ta.scrollTop = ta.scrollLeft = 0; sync(); };
-  sync();
+  ta.oninput = () => { pasted = ta.value; };
   ta.onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); go.click(); } };
   const clip = button(T("paste"), "", async () => {
     let t = "";
     try { t = await api.Clipboard(); } catch { /* the page asks the browser */ }
     if (!t && navigator.clipboard) { try { t = await navigator.clipboard.readText(); } catch { /* not allowed */ } }
     if (!t) return say("", T("the clipboard has no text"));
-    ta.value = pasted = t; sync();
+    ta.value = pasted = t;
   });
   clip.title = T("paste from the clipboard");
   const go = button(T("read"), "", () => ta.value.trim() && preview("text", ta.value));
   go.title = T("links are read from Steam or Rentry when you press read");
-  const file = row(T("A Mod list"), T("a new list, or changes to one of yours; previewed first"), pick, fileInput);
-  const text = row(T("Pasted text"), "", wrap, clip, go);
-  text.title = T("a Steam collection or Rentry link, a share code, or a copied list");
-  text.classList.add("xc-textrow");
-  return [file, text];
+  const box = el("div", "xc-pastebox");
+  const acts = el("div", "xc-pacts");
+  acts.append(clip, go);
+  box.append(ta, acts);
+  return box;
 }
 
-// A pack: an .archopack file, added as a background task.
-function packRow() {
-  const b = button(T("choose a pack…"), "", async () => {
-    let f = "";
-    try { f = await api.PickPackFile(); } catch (e) { return say("fail", errText(e)); }
-    if (f && S.screen === "plan-import") importPack(f);
+// emptyState: the preview before anything is read: where a drop goes, as a picture
+function emptyState() {
+  const e = el("div", "xc-empty");
+  const ic = el("span", "dz-i"); ic.innerHTML = icon.import;
+  e.append(ic, el("span", "dz-t", T("drop a list, a pack or a manager's file anywhere")));
+  e.title = T("the preview shows what comes in next to what you have: new, already there, another version, not installed");
+  return e;
+}
+
+// ---- dropping files on the window (16 §2.18 "Dropping files") ----
+
+// dropKind names what a dropped file or folder is by its name: "list", "pack", "manager" (a
+// RimCrow or RimSort database, RimSort's userRules.json), "folder", or "" when the page cannot
+// import it.
+export function dropKind(name, dir = false) {
+  if (dir) return "folder";
+  const n = String(name || "").toLowerCase().replace(/^.*[\\/]/, "");
+  if (n.endsWith(".archopack")) return "pack";
+  if (n.endsWith(".db") || n === "userrules.json") return "manager";
+  if (/\.(xml|rml|json|txt|rws)$/.test(n)) return "list";
+  return "";
+}
+
+let dragDepth = 0;
+function dropOverlay() {
+  let o = document.querySelector(".xc-dropover");
+  if (o) return o;
+  o = el("div", "xc-dropover");
+  o.setAttribute("aria-hidden", "true");
+  const box = el("div", "box"), ic = el("span", "dz-i"); ic.innerHTML = icon.import;
+  const kinds = el("span", "dz-k");
+  for (const k of KINDS().filter(k => k.id === "file" || k.id === "pack" || k.id === "managers")) {
+    const s = el("span", "ki"); s.innerHTML = icon[k.icon]; s.title = k.name; kinds.append(s);
+  }
+  box.append(ic, el("span", "dz-t", T("drop to import")), kinds);
+  o.append(box);
+  document.body.append(o);
+  return o;
+}
+export function showDropOver(on) {
+  const o = on ? dropOverlay() : document.querySelector(".xc-dropover");
+  if (o) o.classList.toggle("on", on);
+}
+
+// wireDrop: a file dragged over any page shows the overlay; dropped, it opens the Import page
+// with its kind picked. A form that takes drops itself (the lists' new / import) handles them
+// first. Under WebView2 composition hosting the native window receives no drops yet (16 §8.2);
+// the browser harness does.
+function wireDrop() {
+  const files = e => e.dataTransfer?.types?.includes?.("Files");
+  document.addEventListener("dragenter", e => { if (!files(e)) return; dragDepth++; showDropOver(true); });
+  document.addEventListener("dragleave", e => { if (!files(e)) return; if (--dragDepth <= 0) { dragDepth = 0; showDropOver(false); } });
+  document.addEventListener("dragover", e => { if (files(e)) e.preventDefault(); });
+  document.addEventListener("drop", async e => {
+    dragDepth = 0; showDropOver(false);
+    if (e.defaultPrevented) return;
+    const item = [...(e.dataTransfer?.items || [])].find(i => i.kind === "file");
+    const f = item?.getAsFile?.() || e.dataTransfer?.files?.[0];
+    if (!f) return;
+    e.preventDefault();
+    const dir = !!item?.webkitGetAsEntry?.()?.isDirectory;
+    await dropped({ name: f.name, file: f, dir, more: (e.dataTransfer.files?.length || 1) - 1 });
   });
-  b.title = ".archopack";
-  return row(T("A pack (with Mod files)"), T("a pack you can launch; its Mods are checked first"), b);
 }
 
-// ---- share: the current list in its formats, and packs (C1) ----
-// Each export is its own row builder, so export options (what a pack carries, revisions)
-// can be added to one without touching the others.
+// dropped opens a dropped file or folder in the Import page. With a path (a native drop) it
+// goes where a chosen file goes; without one (the browser) a list is read from its content
+// and a pack, a database or a folder asks for the dialog.
+export async function dropped(d) {
+  const k = dropKind(d.path || d.name, d.dir);
+  if (S.screen !== "plan-import") await exchange();
+  if (S.screen !== "plan-import") return;
+  if (d.more > 0) say("", Tf("one file at a time: reading %s", d.name));
+  if (!k) return refuse(d.name);
+  pickKind(k === "list" ? "file" : k === "pack" ? "pack" : "managers", false);
+  if (d.path) return k === "folder" ? addManagerSource(d.path) : openPicked(d.path);
+  if (k === "list") return readFile(d.file);
+  // the browser gives no path: the dialog does
+  return refuse(d.name, k === "folder" ? T("choose the folder with “another folder or file…”") : T("choose this file with “choose a file…”"), "warn");
+}
 
-function shareRows(card) {
-  card.append(listExportRow(), packExportRow());
-}
-function listExportRow() {
-  const id = S.shell?.plan?.id || 0, name = S.shell?.plans?.find(p => p.id === id)?.name || "";
-  const ex = button(name ? Tf("export %s…", name) : T("export…"), "", () => id && ui.exportList(id, "import"));
-  ex.disabled = !id;
-  return row(T("The current list"), T("RimSort, RimCrow, RimPy, .rml, a share code or Workshop links"), ex);
-}
-function packExportRow() {
-  const r = row(T("A pack (with Mod files)"), T("the pack as a file (.archopack), or only its list"));
-  const right = r.querySelector(".r"), sub = r.querySelector(".sub");
-  api.Packs().then(l => {
-    const names = (l?.rows || []).map(x => x.name);
-    if (!names.length) { sub.textContent = T("no packs yet"); return; }
-    let pick = names[0];
-    const sel = choiceControl(T("pack"), names.map(n => ({ value: n, label: n })), pick);
-    sel.onchange = () => { pick = sel.value; };
-    // while the file is written (a pack's Mods can take minutes) the row says so and its
-    // controls wait
-    const line = sub.textContent;
-    const busy = (on) => {
-      for (const c of right.querySelectorAll("button, select")) c.disabled = on;
-      sub.textContent = on ? T("exporting…") : line; sub.classList.toggle("xc-busy", on);
-    };
-    const one = (list) => async () => {
-      busy(true);
-      try { const t = await api.PackExport(pick, "", list); if (t) say("ok", t); }
-      catch {
-        pop.ask(list ? T("export the list") : T("export the pack"), T("the new file") + ": " + pick + (list ? ".archolist.json" : ".archopack"), async (file) => {
-          if (!file) return;
-          busy(true);
-          try { say("ok", await api.PackExport(pick, file, list)); } catch (e2) { say("fail", errText(e2)); }
-          finally { busy(false); }
-        });
-      }
-      finally { busy(false); }
-    };
-    right.append(sel, button(T("export the list"), "", one(true)), button(T("export the pack"), "", one(false)));
-  }).catch(e => { sub.textContent = errText(e); });
-  return r;
+// refuse says why a drop is not imported, in the preview, and keeps the page as it was
+function refuse(name, why = "", cls = "") {
+  const res = showResult("refused", "", T("Not imported"));
+  if (!res) return;
+  const r = errorRow(name, why || T("RimArcho imports lists (.xml, .rml, .json, .txt, .rws), packs (.archopack) and RimSort, RimCrow or RimPy data"));
+  if (cls) r.classList.add(cls);
+  // a refusal reads at a glance: the file's name after a stop mark (an ask for the dialog: a warning)
+  const mk = el("span", "xc-refuse" + (cls ? " " + cls : "")); mk.innerHTML = cls ? icon.warn : icon.err;
+  r.querySelector(".name").prepend(mk);
+  res.append(r, footer("", button(T("close"), "", hideResult)));
+  face("shake");
+  say("fail", (why ? "" : T("not imported") + ": ") + (why || name));
 }
 
 // ---- everything from another manager ----
@@ -279,18 +397,22 @@ function freshM() { return { managers: null, error: "", shown: new Set(), on: ne
 // managerRows: one row per manager found (drawRows fills them in), then "another folder or
 // file…" as the section's last row.
 function managerRows(card) {
-  M = freshM();
   const more = button(T("another folder or file…"), "", async () => {
     let f = "";
     try { f = await api.PickManagerImport(); } catch (e) { return say("fail", errText(e)); }
     if (!f || S.screen !== "plan-import") return;
-    const kind = await api.ManagerFileKind(f).catch(() => "list");
-    M.extra.push({ manager: kind === "list" ? T("a file") : "", kind, path: f });
-    survey();
+    addManagerSource(f);
   });
   const elsewhere = row(T("Somewhere else"), "", more);
   elsewhere.title = T("a data folder or file kept elsewhere; it is only read");
   card.append(el("div", "xc-mrows"), elsewhere);
+}
+
+// addManagerSource adds a manager's folder or file kept elsewhere (the dialog, or a dropped one)
+async function addManagerSource(f) {
+  const k = await api.ManagerFileKind(f).catch(() => "list");
+  M.extra.push({ manager: k === "list" ? T("a file") : "", kind: k, path: f });
+  return survey();
 }
 
 // survey asks what each manager holds (dry runs in their own session); rows fill in.
@@ -303,7 +425,7 @@ async function survey() {
     if (!live(active)) return;
     M.managers = managers || [];
   } catch (e) { if (!live(active)) return; M.managers = []; M.error = errText(e); }
-  drawRows(); drawTree();
+  drawRows(); drawTree(); drawKinds();
 }
 
 const PART = () => ({ aliases: T("aliases"), notes: T("notes"), groups: T("groups"), tags: T("tags"), colours: T("colour marks"), ignored: T("ignored warnings"),
@@ -642,12 +764,13 @@ function again() {
 // manager's database or rules join the managers above, anything else gets the list preview.
 async function openPicked(path) {
   const active = session;
-  if (/\.archopack$/i.test(path)) return importPack(path);
+  if (/\.archopack$/i.test(path)) { pickKind("pack", false); return importPack(path); }
   let kind = "list";
   try { kind = await api.ManagerFileKind(path); } catch { /* read it as a list */ }
   if (!live(active)) return;
   if (kind === "list") return preview("file", path);
   M.extra.push({ manager: "", kind, path });
+  if (S.screen === "plan-import" && live(active)) pickKind("managers", false);
   await survey();
   const m = M.managers?.find(m => m.groups.some(g => g.path === path));
   if (m && !M.shown.has(mKey(m))) showManager(m);
@@ -742,6 +865,7 @@ async function preview(kind, src, fileName) {
 
   face("smug");
   showImportSummary(body, p, !!(p.sourcePath || fileName));
+  body.append(compare(p, active.name));
   showImportContents(body, p);
   // the game's own list, or any list, that the list already is: nothing to import (16 §2.18)
   const fromGame = kind === "file" && !!info?.game && src === info.game.path;
@@ -813,6 +937,10 @@ async function preview(kind, src, fileName) {
   async function perform() {
     if (busy || !(await checkName()) || !current()) return;
     busy = true; submit.disabled = true;
+    // the import runs: the button says so and Archo thinks until it is in
+    submit.setAttribute("aria-busy", "true"); submit.classList.add("xc-working");
+    const spin = el("span", "icon spin"); spin.innerHTML = icon.rescan; submit.prepend(spin);
+    say("busy", T("importing…")); face("think");
     try {
       await api.ImportFollow(follow);
       const r = destination === "new" ? await api.ImportAsPlan(name.value) : await api.ImportApplyTo(active.target, destination === "merge");
@@ -833,7 +961,7 @@ async function preview(kind, src, fileName) {
         try { await api.OpenPlan(id); const t = await api.Undo(); await ui.reload(); await ui.manageLists(id); say("ok", t); }
         catch (e) { say("fail", errText(e)); }
       } : false);
-    } catch (e) { if (current()) { say("fail", errText(e)); busy = false; checkName(); } }
+    } catch (e) { if (current()) { say("fail", errText(e)); busy = false; submit.removeAttribute("aria-busy"); submit.classList.remove("xc-working"); spin.remove(); face("shake"); checkName(); } }
   }
   checkName();
   body.append(footer("", button(T("close"), "", hideResult), submit));
@@ -843,26 +971,74 @@ async function preview(kind, src, fileName) {
   reveal();
 }
 
+// compare: what the list brings next to what the player has now (16 §2.18 "Preview"), as one
+// bar of four kinds with an icon and a count each, then what it does to the current list as
+// + − ↕ ⇄ marks. Each part is named by its words (V5); the words are on hover and for agents.
+export function compareParts(p) {
+  const inst = p.installed || [];
+  const other = inst.filter(r => r.other).length;
+  const inList = inst.filter(r => r.enabled && !r.other).length;
+  return [
+    { k: "have", n: inList, word: Tf("%d already in your list", inList) },
+    { k: "new", n: inst.length - inList - other, word: Tf("%d installed, not in your list", inst.length - inList - other) },
+    { k: "other", n: other, word: Tf("%d in another version", other) },
+    { k: "miss", n: (p.missing || []).length, word: Tf("%d not installed", (p.missing || []).length) },
+  ];
+}
+const SIGN = { have: "ok", new: "plus", other: "vers", miss: "close" };
+function compare(p, name) {
+  const parts = compareParts(p), r = el("div", "set xc-cmp"), l = el("div", "l");
+  const words = parts.filter(x => x.n).map(x => x.word).join(", ");
+  const bar = el("span", "xc-cbar");
+  visTip(bar, words, "img", false);
+  for (const x of parts) if (x.n) { const i = el("i", "c-" + x.k); i.style.flexGrow = String(x.n); bar.append(i); }
+  const counts = el("span", "ccounts");
+  for (const x of parts) {
+    const c = el("span", "cn c-" + x.k + (x.n ? "" : " zero"));
+    visTip(c, x.word, "img", false);
+    const ic = el("span", "ci"); ic.innerHTML = icon[SIGN[x.k]] || "";
+    c.append(ic, el("span", "num", String(x.n)));
+    counts.append(c);
+  }
+  l.append(bar, counts);
+  r.append(l);
+  // against the current list: the replace destination's effect, the list named on hover
+  if (p.replace && !p.replace.same && name) {
+    const rr = el("div", "r xc-vs");
+    const lb = el("span", "vs-n", name);
+    lb.title = Tf("compared with %s", name);
+    rr.append(lb, diffMarks(p.replace));
+    r.append(rr);
+  }
+  return r;
+}
+
 // ---- the result area: a card of rows under the section that produced it ----
 
-// showResult empties the result area for one mode and puts it, with its label, under the
-// section the source belongs to ("in": Bring in; "m": From another manager).
+// showResult empties the result area for one mode, names it and marks the kind it came from
+// (at: "m" for the managers, else the kind picked now).
 function showResult(mode, at, label) {
-  const res = $("#screen .xc-preview"), lab = $("#screen .xc-res-label"), sec = $(`#screen .xc-sec[data-src="${at}"]`);
+  const res = $("#screen .xc-preview"), lab = $("#screen .xc-res-label");
   if (!res) return null;
   res.dataset.mode = mode; res.hidden = false; res.textContent = "";
-  if (lab) { lab.textContent = label; lab.hidden = false; }
-  // after the section's grid cell: the result spans the grid there (16 §2.18 "Layout")
-  const cell = sec?.closest(".xc-blk") || sec;
-  if (cell && cell.nextElementSibling !== (lab || res)) cell.after(lab || res, ...(lab ? [res] : []));
+  res.dataset.kind = at === "m" ? "managers" : kind;
+  if (lab) labelText(lab, label);
+  drawKinds();
   ui?.renderHints?.();
   return res;
+}
+// labelText sets a section label's words and keeps its area number
+function labelText(lab, text) {
+  let lt = lab.querySelector(".lt");
+  if (!lt) { lt = el("span", "lt"); lab.append(lt); }
+  lt.textContent = text;
 }
 function hideResult() {
   ++previewSeq;
   const res = $("#screen .xc-preview"), lab = $("#screen .xc-res-label");
-  if (res) { res.hidden = true; res.textContent = ""; delete res.dataset.mode; delete res.dataset.fieldError; }
-  if (lab) lab.hidden = true;
+  if (res) { res.hidden = true; res.textContent = ""; delete res.dataset.mode; delete res.dataset.fieldError; delete res.dataset.kind; }
+  if (lab) labelText(lab, T("Preview"));
+  drawKinds();
   face("neutral");
   ui?.renderHints?.();
 }
