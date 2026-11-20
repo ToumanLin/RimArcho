@@ -80,16 +80,15 @@ export async function exchange(first = false) {
   side.append(card);
   // the right: the comparison (or the tree, a task, a refusal) and, before any, the drop pane
   const main = el("div", "xc-main");
-  const resLab = el("div", "label section xc-res-label");
   const result = el("section", "card settings xc-sec xc-preview xc-res"); result.hidden = true;
-  main.append(resLab, result, emptyState());
+  // no label above the right card: it is as tall as the left one and says what it is itself
+  main.append(result, emptyState());
   grid.append(side, main);
   // 3col: a rail at the right for Archo, the counts and the buttons, shown with a result
   if (lay === "3col") { const rail = el("aside", "xc-rail"); rail.append(el("div", "fig"), el("div", "rh"), el("div", "rf")); grid.append(rail); }
   w.append(grid);
   sc.append(w);
-  area(card, null); area(result, resLab);
-  resLab.hidden = true;
+  area(card, null); area(result, null);
   M = freshM();
   drawDo();
   placeArcho();

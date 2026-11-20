@@ -2030,17 +2030,21 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
    card; "3col" adds a rail at the right for Archo, the counts and the buttons once there is a
    result. The left column is sticky. */
 .page.xc-page { container: xcp / inline-size; padding-left: max(12px, calc(50% - 860px)); padding-right: max(12px, calc(50% - 860px)); }
-.xc-lay { display: grid; gap: 16px; align-items: start; grid-template-columns: minmax(320px, 400px) minmax(0, 1fr); }
+/* both columns are one height, the view's: the left card and the right card (or the drop pane) end on one line */
+.xc-lay { display: grid; gap: 16px; align-items: stretch; height: max(480px, calc(100vh - 150px)); grid-template-columns: minmax(320px, 400px) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
 .xc-lay[data-layout="3col"][data-showing] { grid-template-columns: minmax(280px, 340px) minmax(0, 1fr) 220px; }
-.xc-lay[data-layout="3col"] .ld-body { max-height: max(360px, calc(100vh - 200px)); }
-.xc-lay > .xc-side { position: sticky; top: 0; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.xc-main { display: flex; flex-direction: column; gap: var(--card-gap); min-width: 0; }
+.xc-lay > .xc-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; }
+.xc-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.xc-main > .xc-preview:not([hidden]) { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
+.xc-main > .xc-preview > .ld { flex: 1 1 auto; min-height: 0; }
 @container xcp (max-width: 820px) {
-  .xc-lay, .xc-lay[data-layout="3col"][data-showing] { grid-template-columns: minmax(0, 1fr); }
+  .xc-lay, .xc-lay[data-layout="3col"][data-showing] { height: auto; grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+  .xc-empty { min-height: 360px; }
+  .ld-body { max-height: 70vh; }
   .xc-lay > .xc-side, .xc-lay > .xc-rail { position: static; }
 }
 /* the left column: a row per way in, an icon tile, a name with its count, what it takes, a button */
-.xc-do { display: flex; flex-direction: column; overflow: hidden; }
+.xc-do { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
 .xc-dorow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 16px; align-items: center; padding: 14px 16px; }
 .xc-do > * + * { border-top: var(--hairline) solid var(--line-2); }
 .xc-dorow .l { min-width: 0; }
@@ -2059,7 +2063,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .xc-db .xc-mrows > .xc-hint, .xc-db .xc-mrows > .xc-note { padding: 4px 0; }
 .xc-else { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 16px 0; font-size: 12px; color: var(--muted); }
 /* empty: the drop pane, Archo in its middle and the words under her */
-.xc-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; min-height: max(420px, calc(100vh - 210px)); padding: 32px;
+.xc-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; flex: 1 1 auto; min-height: 0; padding: 32px;
   border: var(--hairline) dashed var(--line); border-radius: var(--r-lg); background: color-mix(in srgb, var(--card) 55%, transparent); text-align: center; }
 .xc-res:not([hidden]) ~ .xc-empty { display: none; }
 .xc-empty .fig { display: flex; justify-content: center; min-height: 120px; }
@@ -2088,13 +2092,13 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .xc-x svg { width: 14px; height: 14px; }
 .xc-miss .mt { color: var(--fg-2); }
 /* the order comparison: two numbered lists and the lines of what moves between them */
-.ld { display: flex; flex-direction: column; min-width: 0; }
+.ld { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .ld-heads, .ld-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 12px; }
 .ld-heads { padding: 8px 0; border-bottom: var(--hairline) solid var(--line-2); font-size: 12px; color: var(--muted); }
 .ld-h { display: flex; align-items: baseline; gap: 6px; min-width: 0; padding: 0 12px 0 44px; }
 .ld-h .hw { flex: none; color: var(--amber); }
 .ld-h .hn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--fg-2); }
-.ld-body { max-height: max(360px, calc(100vh - 340px)); overflow: auto; overscroll-behavior: contain; }
+.ld-body { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 
 .ld-col { display: flex; flex-direction: column; min-width: 0; }
 .ld-row { --ec: transparent; position: relative; display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 8px; height: 30px; padding: 0 12px 0 0;
@@ -2124,7 +2128,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .xc-ride:hover { background: var(--card-2); }
 /* 3col: the rail, shown with a result: Archo at its top, the counts as a column, the buttons stacked */
 .xc-rail { display: none; }
-.xc-lay[data-layout="3col"][data-showing] > .xc-rail { position: sticky; top: 0; display: flex; flex-direction: column; gap: 14px; min-width: 0; padding-top: 20px; }
+.xc-lay[data-layout="3col"][data-showing] > .xc-rail { display: flex; flex-direction: column; gap: 14px; min-width: 0; min-height: 0; overflow: auto; }
 .xc-rail .fig { display: flex; justify-content: center; }
 .xc-rail .fig > .archo-spot.archo-stand { margin: 0; }
 .xc-rail .rh, .xc-rail .rf { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
