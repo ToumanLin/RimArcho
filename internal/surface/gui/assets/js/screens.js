@@ -561,14 +561,14 @@ function needsFace(d) {
 }
 
 // ---- TEMPORARY: Archo spot variants on Can it run (design note 2026-11-20) ----------------
-const SPOTS = "abcdef";
+const SPOTS = "abcdefg";
 function spotVariant() {
   const q = new URLSearchParams(globalThis.location?.search || "").get("archo-spot");
   const v = (document.documentElement.dataset.archoSpot || q || "a").toLowerCase();
   return SPOTS.includes(v) && v.length === 1 ? v : "a";
 }
 let spotRO = null;
-function needsArcho(v, face, { w, grid, right, rbox }) {
+function needsArcho(v, face, { w, grid, right, rbox, lbox }) {
   const calmFace = face === "thumbsup" || face === "neutral";
   const head = w.querySelector(".page-head");
   w.dataset.archoSpot = v;
@@ -605,7 +605,15 @@ function needsArcho(v, face, { w, grid, right, rbox }) {
     card.prepend(s.slot);
     return s;
   }
-  // F: the bottom-right of the right column's blank space, rising from its bottom edge; when
+  const save = v === "g" && lbox.querySelector(":scope > .need-save");
+  if (save) { // G: the last-save card shortened; she stands in the freed space at its right
+    const row = el("div", "archo-save-row");
+    save.replaceWith(row);
+    row.append(save);
+    return needsSpot(140, row, face, calmFace);
+  }
+  if (v === "g") w.dataset.archoSpot = "f";
+  // F (and G without a last save): the bottom-right of the right column's blank space, rising from its bottom edge; when
   // the column's cards reach down to her, she follows its last card instead (right-aligned)
   const s = needsSpot(140, right, face, calmFace);
   const place = () => {
@@ -691,7 +699,7 @@ function drawNeeds() {
   // shipped placement. A follow-up keeps only the variant the user picks.
   const face = needsFace(d);
   w.append(grid);
-  needsArcho(spotVariant(), face, { w, grid, right, rbox });
+  needsArcho(spotVariant(), face, { w, grid, right, rbox, lbox });
   sc.append(w);
   sc.querySelectorAll(".needcol > .scroll").forEach((s, i) => { s.scrollTop = keep[i] || 0; });
   // 1–9: the cards in the order shown, the left column's first (16 §3.5); a card without

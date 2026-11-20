@@ -5,7 +5,7 @@ The variants are real CSS/JS behind a temporary switch; a follow-up keeps only t
 
 ## The switch (temporary)
 
-`data-archo-spot="a".."f"` on `<html>` (or `?archo-spot=` in the dev harness URL) picks the
+`data-archo-spot="a".."g"` on `<html>` (or `?archo-spot=` in the dev harness URL) picks the
 variant; anything else is A, the shipped placement. Code: `needsArcho` / `needsSpot` in
 `internal/surface/gui/assets/js/screens.js`, CSS under "TEMPORARY (2026-11-20)" in `style.css`.
 `archo.js` is unchanged (each variant uses `archoSpot(...).stand`).
@@ -23,7 +23,9 @@ list can run, one log card) and a long one (blocked, eight log cards in four blo
 and 1280 a "scrolled to her" row shows where she is when the first view does not include her;
 at 860 (one column) every cell where she is below the first view is scrolled to her (marked).
 Single shots: `shots/<en-light|zh-dark>/<variant>-<short|long>-<width>[-seen].png`.
-Synthetic data only (canitrun `states.js`), dev harness, reduced motion (her still).
+Synthetic data only (canitrun `states.js`), dev harness. A–F with reduced motion (her still); G
+animated, plus two 16 s GIFs from opening the page: `g-en-light-1280-short.gif`,
+`g-zh-dark-1280-long.gif`.
 
 ## Variants
 
@@ -35,6 +37,7 @@ Synthetic data only (canitrun `states.js`), dev harness, reduced motion (her sti
 | D | Small (96 px) in the page heading, left of check again / game log | page heading grows ~37 px | in view | in view | in view at the top |
 | E | Her own card first in the right column: face + the verdict's icons (✓, or ▲ n ✕ n), chest behind its bottom edge | one ~75 px card added; logs move down | in view | in view | in view, mid-page |
 | F | Bottom right of the right column's blank space, rising from its bottom; when the cards reach her, after the last card, right-aligned | none | in view, far corner | below the fold until scrolled to the end | at the page's end, right |
+| G | Right of the last-save card (the left column's first card), shortened by her width; chest fades at the card's bottom line (added at the user's request) | last-save card ~150 px narrower; no height changes | in view | in view | in view at the top |
 
 ### Pros and cons
 
@@ -58,9 +61,20 @@ Synthetic data only (canitrun `states.js`), dev harness, reduced motion (her sti
   short column, so she is far from the centre and from every control. With a long column she
   falls back to after the last card (seen only at the column's end), like C.
 
+- **G**: in view in every state and width, at the top, and nothing grows: the last-save card's
+  content is short (a name, a verdict, one button), so its right part was blank anyway. She sits
+  between the two columns rather than inside either one's content, not in the centre. Without a
+  last save (no save loaded yet) there is no card to stand beside; G falls back to F. With a
+  long chip list (missing DLC/Mods) the chips wrap one item earlier.
+
 ## Recommendation
 
-**F**, with **B** as the alternative if she must be in view in every state.
+**G** (added after the first round). It is the only variant that is in view in every state and
+width without growing anything: the space beside the short last-save card was already blank. F
+is its fallback when there is no last save.
+
+Before G, the recommendation was F, with B as the alternative if she must be in view in every
+state:
 
 F is the only variant that uses blank space that already exists in the common case (a short
 right column) without moving anything, and her rising from the bottom edge gives head-to-chest

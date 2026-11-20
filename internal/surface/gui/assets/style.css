@@ -618,6 +618,11 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 /* F: the bottom right of the right column's blank space, rising from its bottom edge; with
    cards down to there, after the last card, right-aligned (archo-f-flow) */
 .page[data-archo-spot=f] .needcol > .archo-spot.archo-stand { position: absolute; right: 18px; bottom: 0; margin: 0; }
+/* G: the last-save card shortened; she stands at its right in the freed space, her chest
+   fading at the card's bottom line */
+.archo-save-row { display: flex; align-items: flex-end; gap: 8px; min-width: 0; }
+.archo-save-row > .need-save { flex: 1 1 auto; min-width: 0; }
+.archo-save-row > .archo-spot.archo-stand { margin: 0 12px 0 0; }
 @media (max-width: 900px) {
   .page[data-archo-spot=b] .page-head { min-height: 28px; align-items: center; }
   .page[data-archo-spot=b] .needcol:last-child { margin-top: calc(84px - var(--card-gap)); }
