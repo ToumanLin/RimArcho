@@ -37,7 +37,7 @@ animated, plus two 16 s GIFs from opening the page: `g-en-light-1280-short.gif`,
 | D | Small (96 px) in the page heading, left of check again / game log | page heading grows ~37 px | in view | in view | in view at the top |
 | E | Her own card first in the right column: face + the verdict's icons (✓, or ▲ n ✕ n), chest behind its bottom edge | one ~75 px card added; logs move down | in view | in view | in view, mid-page |
 | F | Bottom right of the right column's blank space, rising from its bottom; when the cards reach her, after the last card, right-aligned | none | in view, far corner | below the fold until scrolled to the end | at the page's end, right |
-| G | Right of the last-save card (the left column's first card), shortened by her width; chest fades at the card's bottom line (added at the user's request) | last-save card ~150 px narrower; no height changes | in view | in view | in view at the top |
+| G | Right of the last-save card (the left column's first card), shortened by her width, 176 px (was 140; changed at the user's request); chest fades at the card's bottom line | last-save card ~190 px narrower; it stretches to her height (119 px) when its own content is shorter (+~7 px with a loadable save) | in view | in view | in view at the top |
 
 ### Pros and cons
 
@@ -66,6 +66,11 @@ animated, plus two 16 s GIFs from opening the page: `g-en-light-1280-short.gif`,
   between the two columns rather than inside either one's content, not in the centre. Without a
   last save (no save loaded yet) there is no card to stand beside; G falls back to F. With a
   long chip list (missing DLC/Mods) the chips wrap one item earlier.
+  Size: 176 px (a size 16 §7.1 already uses: guide, background tasks); 264 device px at 150 %,
+  under the 300 px loop. At 140 she was shorter than every save card; at 176 (119 px tall) she
+  is taller than a loadable save's card, so the card stretches to her height to keep its top
+  level with the right column's first card. Comparison: `g140-vs-176-<width>.png`, GIFs
+  `g140-*.gif` and `g176-*.gif`.
 
 ## Recommendation
 

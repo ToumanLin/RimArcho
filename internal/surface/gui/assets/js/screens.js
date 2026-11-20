@@ -606,11 +606,11 @@ function needsArcho(v, face, { w, grid, right, rbox, lbox }) {
     return s;
   }
   const save = v === "g" && lbox.querySelector(":scope > .need-save");
-  if (save) { // G: the last-save card shortened; she stands in the freed space at its right
+  if (save) { // G: the last-save card shortened; she stands in the freed space at its right, 176 px
     const row = el("div", "archo-save-row");
     save.replaceWith(row);
     row.append(save);
-    return needsSpot(140, row, face, calmFace);
+    return needsSpot(176, row, face, calmFace);
   }
   if (v === "g") w.dataset.archoSpot = "f";
   // F (and G without a last save): the bottom-right of the right column's blank space, rising from its bottom edge; when
@@ -630,7 +630,7 @@ function needsArcho(v, face, { w, grid, right, rbox, lbox }) {
 function needsSpot(size, host, face, calmFace) {
   // one archoSpot per size: a variant's size is fixed when its figure is first made
   const s = archoSpot("needs-" + size, { size, calm: ["neutral", "smug", "wink", "smirk", "sleepy"] });
-  for (const k of [96, 120, 140]) if (k !== size) archoSpot("needs-" + k).end();
+  for (const k of [96, 120, 140, 176]) if (k !== size) archoSpot("needs-" + k).end();
   s.stand(host, face, calmFace);
   return s;
 }
