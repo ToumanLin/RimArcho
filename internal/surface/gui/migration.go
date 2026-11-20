@@ -181,3 +181,26 @@ func (s *API) StartPackImport(path string, update bool) (string, error) {
 	}()
 	return id, nil
 }
+
+// ManagerPartView is what one part of another manager's data holds, read without bringing it
+// over: the Import page's "view" (16 §2.18). A list or a Game Config gives its list file (the
+// page compares it); Mod data and rules give their values one by one.
+func (s *API) ManagerPartView(id string) (*app.PartView, error) {
+	p, err := app.ParseMigrationID(id)
+	if err != nil {
+		return nil, err
+	}
+	r, err := s.detachedReader()
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	s.mu.Lock()
+	r.ReadIndex(s.a)
+	s.mu.Unlock()
+	v, err := r.MigrationPartView(p, view.ManagerTags())
+	if err != nil {
+		return nil, errors.New(view.Humanize(nil, err.Error()))
+	}
+	return v, nil
+}

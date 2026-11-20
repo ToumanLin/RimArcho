@@ -95,8 +95,10 @@ func (t *tagImport) add(part, lin string, cur *store.PlayerData, tag string) err
 	if containsFold(cur.Tags, tag) {
 		t.rep.TagSame++
 		t.rep.part(part).Same++
+		t.rep.item(part, lin, tag, "", true)
 		return nil
 	}
+	t.rep.item(part, lin, tag, "", false)
 	cur.Tags = append(cur.Tags, tag)
 	t.rep.TagNew++
 	t.rep.part(part).New++

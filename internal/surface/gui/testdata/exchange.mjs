@@ -80,12 +80,13 @@ test("the page has no export; the left column lists the ways in, two of them ope
   assert.match(h.screen.querySelector(".xc-empty").textContent, /Drop/);
 });
 
-test("the layout follows data-import-layout, 2col by default; 3col has a rail", async () => {
-  for (const [layout, want] of [["", "2col"], ["3col", "3col"], ["2col", "2col"], ["bogus", "2col"]]) {
+test("the layout follows data-import-layout, 2col by default; 3col has a rail, 2col-new a bar", async () => {
+  for (const [layout, want] of [["", "2col"], ["3col", "3col"], ["2col", "2col"], ["2col-new", "2col-new"], ["bogus", "2col"]]) {
     const h = await setup({}, { layout });
     await h.m.exchange();
     assert.equal(h.screen.querySelector(".xc-lay").dataset.layout, want, layout);
     assert.equal(!!h.screen.querySelector(".xc-rail"), want === "3col", layout);
+    assert.equal(!!h.screen.querySelector(".xc-main .xc-bar"), want === "2col-new", layout);
   }
 });
 
@@ -117,6 +118,69 @@ test("3col puts the counts and the buttons in the rail", async () => {
   assert.ok(h.screen.querySelector(".xc-rail .xc-acts"));
   assert.ok(h.screen.querySelector(".xc-preview .ld-grid"));
   assert.equal(h.screen.querySelector(".xc-lay").dataset.showing, "list");
+});
+
+test("2col-new puts the counts and the buttons in the bar over the comparison", async () => {
+  const preview = { summary: "s", format: "ModsConfig.xml", total: 1, missing: [], installed: [], replace: { added: 1 }, merge: {}, current: [row("a")], incoming: [row("b")] };
+  const h = await setup({ ImportPreviewFor: async () => preview }, { layout: "2col-new" });
+  await h.m.exchange();
+  h.screen.querySelector('.xc-dorow[data-do="game"] .btn').onclick();
+  await flush(); await flush(); await flush();
+  assert.ok(h.screen.querySelector(".xc-bar .ld-legend"));
+  assert.ok(h.screen.querySelector(".xc-bar .xc-acts"));
+  assert.ok(!h.screen.querySelector(".xc-preview .xc-acts"));
+});
+
+// a manager with a list and notes, imported before, so its groups open with it
+const MGR = () => [{ name: "RimSort", imported: 1, groups: [
+  { kind: "lists", path: "C:/l", parts: [{ id: "L1", state: "new", default: true, name: "Medieval run", list: { mods: 2 } }] },
+  { kind: "player", path: "C:/aux.db", parts: [{ id: "N1", part: "notes", state: "new", default: true, new: 2, same: 1 }] }] }];
+
+test("one row is shown at a time: reading the game's list drops the manager picked, and back", async () => {
+  const preview = { summary: "s", format: "ModsConfig.xml", total: 1, missing: [], installed: [], replace: { added: 1 }, merge: {}, current: [row("a")], incoming: [row("b")] };
+  const h = await setup({ ImportSurvey: async () => MGR(), ImportPreviewFor: async () => preview });
+  await h.m.exchange();
+  await flush(); await flush();
+  const card = () => h.screen.querySelector(".xc-mrow");
+  const game = () => h.screen.querySelector('.xc-dorow[data-do="game"]');
+  card().onclick();
+  assert.ok(card().classList.contains("on"));
+  game().querySelector(".btn").onclick();
+  await flush(); await flush(); await flush();
+  assert.ok(game().classList.contains("on"));
+  assert.ok(!card().classList.contains("on"), "the manager is no longer picked");
+  card().onclick();
+  assert.ok(card().classList.contains("on"));
+  assert.ok(!game().classList.contains("on"));
+});
+
+test("view shows what a part holds without bringing it over; back returns to the tree as it was", async () => {
+  const preview = { summary: "s", format: "RimSort list", total: 2, missing: [], installed: [], replace: { added: 1 }, merge: {}, current: [row("a")], incoming: [row("a"), row("b")] };
+  const views = { N1: { items: [{ part: "notes", mod: "Alpha", value: "a note", had: false }, { part: "notes", mod: "Beta", value: "old", had: true }] }, L1: { list: "C:/l/Medieval run.xml", items: [] } };
+  const h = await setup({ ImportSurvey: async () => MGR(), ManagerPartView: async (id) => views[id], ImportPreviewFor: async () => preview });
+  await h.m.exchange();
+  await flush(); await flush();
+  h.screen.querySelector(".xc-mrow").onclick();
+  const viewOf = (label) => h.screen.querySelectorAll(".xc-tn.lv2").find((r) => r.textContent.includes(label)).querySelector(".xc-view");
+  viewOf("notes").onclick();
+  await flush(); await flush();
+  assert.deepEqual(h.calls.find((c) => c[0] === "ManagerPartView").slice(1), ["N1"]);
+  assert.deepEqual(h.screen.querySelectorAll(".xc-item").map((r) => r.textContent), ["Alphaa note", "Betaold"]);
+  assert.ok(h.screen.querySelector(".xc-item.had"));
+  assert.ok(!h.calls.some((c) => c[0] === "StartMigration"));
+  const back = () => h.screen.querySelectorAll(".xc-acts .btn").find((b) => b.textContent === "back");
+  back().onclick();
+  assert.ok(h.screen.querySelector(".xc-tree"));
+  assert.ok(h.screen.querySelector(".xc-mrow").classList.contains("on"), "the picks are kept");
+  // a list is compared as any list, with only a way back
+  viewOf("Medieval run").onclick();
+  await flush(); await flush(); await flush(); await flush();
+  assert.deepEqual(h.calls.find((c) => c[0] === "ImportPreviewFor").slice(2), ["file", "C:/l/Medieval run.xml"]);
+  assert.ok(h.screen.querySelector(".ld-grid"));
+  assert.deepEqual(h.screen.querySelectorAll(".xc-acts .btn").map((b) => b.textContent), ["back"]);
+  assert.ok(h.screen.querySelector(".xc-mrow").classList.contains("on"));
+  back().onclick();
+  assert.ok(h.screen.querySelector(".xc-tree"));
 });
 
 test("orderDiff keeps the longest common order and marks the rest as moved, in blocks", async () => {

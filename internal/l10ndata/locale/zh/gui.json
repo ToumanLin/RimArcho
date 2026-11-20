@@ -494,5 +494,14 @@
   "save as a new list…": "存为新列表…",
   "the game's list": "游戏的列表",
   "the list the game loads now; other managers save theirs here too": "游戏当前加载的列表，别的管理器也会保存到这里",
-  "%d unchanged": "未变 %d"
+  "%d unchanged": "未变 %d",
+  "nothing in it": "里面没有内容",
+  "only the first %d are shown": "只显示前 %d 条",
+  "%d already in RimArcho": "已在 RimArcho 中 %d",
+  "loads after %s": "排在 %s 之后",
+  "loads before %s": "排在 %s 之前",
+  "incompatible with %s": "与 %s 不兼容",
+  "attached to %s": "跟随 %s",
+  "loads at the top": "排在最前",
+  "loads at the bottom": "排在最后"
 }

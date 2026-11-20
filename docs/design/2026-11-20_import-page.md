@@ -1,11 +1,11 @@
-# Import page: the user's sketch, two arrangements of the right, drag and drop (2026-11-20)
+# Import page: the user's sketch, three arrangements of the right, drag and drop (2026-11-20)
 
 Status: export removed, drag and drop and the left column decided (16 §2.18, CHANGELOG,
 release-vm-tests); the arrangement of the right side is **for the user to pick**. Until then
-`<html data-import-layout="2col|3col">` or `?import-layout=2col|3col` switches it (`layout()` in
-`exchange.js`; default 2col). Once one is picked: drop the other's CSS (`.xc-rail` and the
-`[data-layout="3col"]` rules, or nothing for 2col), the switch and `place()`, the “under review” words in
-16 §2.18 and §7.1, and add the layout's VM row.
+`<html data-import-layout="2col|2col-new|3col">` or `?import-layout=…` switches it (`layout()` in
+`exchange.js`; default 2col). Once one is picked: drop the others' CSS (`.xc-rail`, `.xc-bar` and their
+`[data-layout]` rules), the switch, `dock()` and `place()` if neither 3col nor 2col-new is kept, the
+“under review” words in 16 §2.18 and §7.1, and add the layout's VM row.
 
 ## What the user asked
 
@@ -57,16 +57,38 @@ there.
 - **2col**: the comparison card fills the right; its head is the counts line, its foot the buttons
   (“add only what it lacks”, “save as a new list…”, “apply to <list>”). Archo appears only in the
   empty pane.
-- **3col**: with a result, a 220 px rail appears at the right: Archo at its top, the counts as a
-  column, the buttons stacked full width. The comparison card is only the two lists and gets the full
-  height. Empty, the page is the same as 2col.
+- **3col**: a 220 px rail at the right: Archo at its top, the counts as a column, the buttons stacked
+  full width. The comparison card is only the two lists and gets the full height. The rail is there
+  before any result too (Archo in it, the drop pane without her): when it appeared only with a result
+  the left column shrank by 130 px on the first click (the user saw it jump on picking a manager).
+- **2col-new** (the user, round 4): the 3col rail's content over the result in the right column: the
+  counts card (one line) and the buttons under it at the left, inset 14 px, and Archo at her full size
+  at the right (a first try laid it out as a 72 px bar with a small Archo; the user: keep her size, the
+  card at the left), shown with a result. The lists keep 2col's width; the buttons sit at the top instead of the
+  foot. Empty, the page is the same as 2col.
+
+The left column keeps its width in all three whatever the right shows (measured in the harness:
+330 / 549 px at 1280 / 2000 in 2col and 2col-new, 300 / 419 px in 3col, before and after a result).
+
+## Round 4 (the user, on the 3col build)
+
+- **One row at a time**: reading the game's list kept a picked manager's card marked next to the
+  game row. A result from any other row now drops the managers' picks (`showResult`).
+- **No jump**: see 3col above.
+- **“view” on each part of another manager's data** (`API.ManagerPartView`, `app.MigrationPartView`):
+  a saved list or a RimCrow profile gives its list file (a profile's `Config/ModsConfig.xml`), shown
+  as the order comparison with only “back”; Mod data and rules come from the importers' dry runs, which
+  now record each value (`RimCrowReport.Items`, `PartItem`: the Mod by lineage, the value, a rule's
+  second Mod, whether RimArcho has a value there), at most 20,000 per run, shown as rows (Mod, value),
+  grey where RimArcho has it. “back” redraws the tree with the picks kept.
 
 At 1280 px 2col gives each list ~290 px (names rarely cut); 3col ~200 px (long names cut, the
 full name on hover). At 2000 both are comfortable; 3col keeps Archo and the buttons in view beside a
 long list.
 
-**Recommendation: 2col.** It is the user's sketch as drawn, the lists get the width, and the right
-has one place to look. 3col only wins on very wide windows.
+**Recommendation: 2col-new.** It keeps 2col's list width and Archo beside a result, and the counts and
+buttons are in view at the top of a long list without a third column. 2col stays the simplest; 3col
+only wins on very wide windows.
 
 ## Drag and drop
 
@@ -107,7 +129,7 @@ Options:
 ## Evidence
 
 `D:\RimArcho-test\import-redesign\v3\`: `shots\<layout>-<state>-<1280|2000>-<light-en|dark-zh>.png`,
-contact sheets `sheet-<width>-<combo>.png` (rows: states; columns: 2col, 3col) and
+contact sheets `sheet-<width>-<combo>.png` (rows: states; columns: 2col, 2col-new, 3col) and
 `sheet-compare-<width>.png`. States: empty, first run, the game's list compared, a 205-vs-212 list
 with 7 not installed and another game version, a list already the same, the managers' tree, loading,
 apply busy, pack busy, move-in busy, read error, drag over Import and over Start, a refused drop, a pack

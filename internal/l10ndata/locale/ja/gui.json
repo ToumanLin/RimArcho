@@ -494,5 +494,14 @@
   "save as a new list…": "新しいリストとして保存…",
   "the game's list": "ゲームのリスト",
   "the list the game loads now; other managers save theirs here too": "ゲームが今読み込むリスト。他のマネージャーもここに保存します",
-  "%d unchanged": "変化なし：%d件"
+  "%d unchanged": "変化なし：%d件",
+  "nothing in it": "中身はありません",
+  "only the first %d are shown": "最初の%d件のみ表示",
+  "%d already in RimArcho": "RimArchoにあり：%d件",
+  "loads after %s": "%sの後に読み込む",
+  "loads before %s": "%sの前に読み込む",
+  "incompatible with %s": "%sと非互換",
+  "attached to %s": "%sに付随",
+  "loads at the top": "先頭に読み込む",
+  "loads at the bottom": "末尾に読み込む"
 }

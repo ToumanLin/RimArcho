@@ -44,12 +44,12 @@ export function key(e) {
 export const hintList = () => [...($("#screen .xc-preview")?.dataset.mode === "list" ? [{ key: "enter", label: T("import") }] : []), { key: "esc", label: T("cancel") }, { key: "?", label: T("all keys") }];
 
 // layout: the page's arrangement while the user compares the variants (design note
-// 2026-11-20_import-page): "2col" (what to import | the comparison) or "3col" (what to import |
-// the comparison | Archo, the counts and the buttons). <html data-import-layout> or
-// ?import-layout= picks it.
+// 2026-11-20_import-page): "2col" (what to import | the comparison), "3col" (what to import |
+// the comparison | a rail with Archo, the counts and the buttons) or "2col-new" (the rail
+// laid across the top of the comparison). <html data-import-layout> or ?import-layout= picks it.
 export function layout() {
   const v = document.documentElement?.dataset?.importLayout || new URLSearchParams(globalThis.location?.search || "").get("import-layout") || "";
-  return v === "3col" ? "3col" : "2col";
+  return v === "3col" || v === "2col-new" ? v : "2col";
 }
 
 const gameConfig = () => (S.board?.environmentRows || []).find(e => e.current)?.name || "";
@@ -82,6 +82,8 @@ export async function exchange(first = false) {
   // the right: the comparison (or the tree, a task, a refusal) and, before any, the drop pane
   const main = el("div", "xc-main");
   const result = el("section", "card settings xc-preview xc-res"); result.hidden = true;
+  // 2col-new: over the result, the counts and the buttons at the left and Archo at the right
+  if (lay === "2col-new") main.append(dock("xc-bar"));
   // no label above the right card: it is as tall as the left one and says what it is itself
   main.append(result, emptyState());
   // the gap between the two cards is the card gap, and drags (16 §7.3 "Card spacing")
@@ -94,8 +96,9 @@ export async function exchange(first = false) {
     set: setSide, reset: () => setSide(0),
     restore: (v) => setSide(+v ? Math.max(300, +v) : 0),
   });
-  // 3col: a rail at the right for Archo, the counts and the buttons, shown with a result
-  if (lay === "3col") { const rail = el("aside", "xc-rail"); rail.append(el("div", "fig"), el("div", "rh"), el("div", "rf")); grid.append(rail); }
+  // 3col: a rail at the right for Archo, the counts and the buttons; always there, so the
+  // columns keep their widths when a result comes
+  if (lay === "3col") grid.append(dock("xc-rail"));
   w.append(grid);
   sc.append(w);
   area(card, null); area(result, null);
@@ -108,6 +111,13 @@ export async function exchange(first = false) {
 
 const live = (active) => session === active && S.screen === "plan-import";
 
+// dock: the rail (3col) or the bar (2col-new): Archo, the result's head and its buttons
+function dock(cls) {
+  const d = el(cls === "xc-rail" ? "aside" : "div", "xc-dock " + cls);
+  d.append(el("div", "fig"), el("div", "rh"), el("div", "rf"));
+  return d;
+}
+
 // Archo (16 §7.1 "Placements"): in the middle of the empty right pane, over the words that say
 // a file can be dropped; with a result she stands under the left column (2col) or at the top
 // of the rail (3col). She thinks while something is read or moved in, is pleased with a
@@ -116,9 +126,11 @@ const spot = () => archoSpot("import", { size: 176, calm: ["neutral", "ponder", 
 // nothing read or running is the calm state: her idle faces follow only there
 const face = (e) => spot().set(e, e === "neutral");
 function placeArcho(expr = "neutral") {
-  const res = $("#screen .xc-preview");
-  // with a result in 2col she steps away: nothing stands beside the lists
-  const host = !res || res.hidden ? $("#screen .xc-empty .fig") : $("#screen .xc-rail .fig");
+  const res = $("#screen .xc-preview"), showing = res && !res.hidden;
+  const lay = $("#screen .xc-lay")?.dataset.layout;
+  // 3col: always at the top of the rail; 2col-new: at the right of the bar over a result; 2col: with a
+  // result she steps away, nothing stands beside the lists
+  const host = lay === "3col" ? $("#screen .xc-rail .fig") : !showing ? $("#screen .xc-empty .fig") : $("#screen .xc-bar .fig");
   spot().stand(host, expr, expr === "neutral");
 }
 
@@ -198,7 +210,9 @@ function markShown() {
 // emptyState: the right before anything is read: Archo in the middle, the drop under her
 function emptyState() {
   const e = el("div", "xc-empty");
-  e.append(el("div", "fig"), el("div", "dz-t", T("Drop the files or folders to import anywhere on this window")));
+  // in 3col she stands in the rail, not here
+  if (layout() !== "3col") e.append(el("div", "fig"));
+  e.append(el("div", "dz-t", T("Drop the files or folders to import anywhere on this window")));
   const kinds = el("div", "dz-k");
   for (const [ic, tip] of [["plan", T("Mod lists: .xml, .rml, .json, .txt, a save (.rws)")], ["packs", T("packs: .archopack")], ["library", T("another manager's data: a folder, a .db file, userRules.json")]]) {
     const s = el("span", "ki"); s.innerHTML = icon[ic]; s.title = tip; s.setAttribute("aria-label", tip); kinds.append(s);
@@ -568,7 +582,55 @@ function partRow(m, g, p) {
   });
   if (p.state === "had") row.classList.add("had");
   if (p.state === "blocked") row.classList.add("dis");
+  // view: what the part holds, read without bringing it over
+  if (p.state !== "blocked") {
+    const v = el("button", "xc-lnk xc-view", T("view"));
+    v.type = "button";
+    v.onclick = () => viewPart(m, g, p);
+    row.append(v);
+  }
   return row;
+}
+
+// viewPart shows what one part holds: a list or a Game Config as the order comparison, Mod
+// data and rules value by value. "back" returns to the tree with the picks as they were.
+async function viewPart(m, g, p) {
+  const active = session, seq = ++previewSeq;
+  say("busy", T("reading…"));
+  let v;
+  try { v = await api.ManagerPartView(p.id); } catch (e) { if (live(active)) say("fail", errText(e)); return; }
+  if (!live(active) || seq !== previewSeq) return;
+  say("", "");
+  const back = () => { const res = $("#screen .xc-preview"); if (res) res.dataset.mode = "move"; ++previewSeq; drawTree(); };
+  if (v.list) return preview("file", v.list, "", "db", { back, name: partLabel(g, p) });
+  const res = showResult("view", "m", "");
+  if (!res) return;
+  const items = v.items || [], had = items.filter(i => i.had).length;
+  const head = el("div", "xc-rhead xc-vhead");
+  const t = el("span", "xc-vt");
+  t.append(mark(m.name, 20), el("b", "", m.name), el("span", "", groupLabel(g) + " / " + partLabel(g, p)));
+  const n = el("span", "xc-vn");
+  n.append(el("span", "", Tf("%d new", items.length - had)));
+  if (had) n.append(el("span", "had", Tf("%d already in RimArcho", had)));
+  head.append(t, n);
+  const list = el("div", "xc-items");
+  const SHOW = 3000;
+  for (const it of items.slice(0, SHOW)) {
+    const r = el("div", "xc-item" + (it.had ? " had" : ""));
+    r.append(el("span", "md", it.mod), el("span", "vl", itemValue(it)));
+    r.title = it.mod + "\n" + itemValue(it) + (it.had ? "\n" + T("already in RimArcho") : "");
+    list.append(r);
+  }
+  if (!items.length) list.append(el("div", "xc-hint", T("nothing in it")));
+  if (items.length > SHOW || v.more) list.append(el("div", "xc-hint", Tf("only the first %d are shown", Math.min(SHOW, items.length))));
+  res.append(head, list, footer("", button(T("back"), "", back)));
+  place();
+  face("smug");
+}
+const RULE = () => ({ after: T("loads after %s"), before: T("loads before %s"), incompatible: T("incompatible with %s"), attach: T("attached to %s"), top: T("loads at the top"), bottom: T("loads at the bottom") });
+function itemValue(it) {
+  if (it.part === "rules" || it.part === "rules-off" || it.part === "interlocks") return Tf(RULE()[it.value] || it.value, it.with || "");
+  return it.value;
 }
 
 // a box turns its whole branch on (what is new), or off when all of it is on
@@ -749,7 +811,7 @@ async function readFile(f) {
 // in order (16 §2.18 "Order comparison"): its source, the counts, the two lists side by side,
 // and the buttons — apply it to the list, save it as a new list, or add only what the list lacks.
 
-async function preview(kind, src, fileName, from = "file") {
+async function preview(kind, src, fileName, from = "file", view = null) {
   const body = $("#screen .xc-preview");
   const active = session, seq = ++previewSeq;
   const current = () => S.screen === "plan-import" && session === active && S.screenSeq === active.epoch && seq === previewSeq;
@@ -782,7 +844,7 @@ async function preview(kind, src, fileName, from = "file") {
 
   const fromGame = kind === "file" && !!info?.game && src === info.game.path;
   const cfg = gameConfig();
-  const theirs = fromGame ? (cfg ? Tf("%s (the game)", cfg) : T("the game's list")) : p.name || (p.source || "").replace(/^.*[\\/]/, "") || p.format;
+  const theirs = fromGame ? (cfg ? Tf("%s (the game)", cfg) : T("the game's list")) : view?.name || p.name || (p.source || "").replace(/^.*[\\/]/, "") || p.format;
   const d = orderDiff(p.current || [], p.incoming || []);
   // where it comes from (format, file, game version) is the incoming list's header tooltip;
   // another game version is an amber mark there
@@ -802,6 +864,9 @@ async function preview(kind, src, fileName, from = "file") {
     head.append(m);
   }
   body.append(head, ov.el);
+
+  // a list viewed from another manager's tree: only a way back (bringing it over is the tree's)
+  if (view) { body.append(footer("", button(T("back"), "", view.back))); place(); reveal(); return; }
 
   // the list already is this one: nothing to import (16 §2.18)
   if (p.replace?.same && !p.settings && !p.collection) {
@@ -906,11 +971,13 @@ function showResult(mode, at, label) {
   const res = $("#screen .xc-preview"), lab = $("#screen .xc-res-label");
   if (!res) return null;
   res.dataset.mode = mode; res.hidden = false; res.textContent = "";
-  res.dataset.kind = at === "m" ? "db" : at;
+  res.dataset.kind = at === "m" || at === "db" ? "db" : at;
+  // one thing is shown at a time: a result of another row drops the managers' picks
+  if (at !== "m" && at !== "db" && M && !M.run && M.shown.size) { M.shown.clear(); M.on.clear(); M.mode.clear(); drawRows(); }
   if (lab) { lab.hidden = false; labelText(lab, label); }
   const grid = $("#screen .xc-lay");
   if (grid) grid.dataset.showing = mode;
-  for (const x of $("#screen")?.querySelectorAll?.(".xc-rail .rh, .xc-rail .rf") || []) x.textContent = "";
+  for (const x of $("#screen")?.querySelectorAll?.(".xc-dock .rh, .xc-dock .rf") || []) x.textContent = "";
   markShown();
   placeArcho(spot().expr);
   ui?.renderHints?.();
@@ -929,14 +996,15 @@ function hideResult() {
   if (lab) lab.hidden = true;
   const grid = $("#screen .xc-lay");
   if (grid) delete grid.dataset.showing;
-  for (const x of $("#screen")?.querySelectorAll?.(".xc-rail .rh, .xc-rail .rf") || []) x.textContent = "";
+  for (const x of $("#screen")?.querySelectorAll?.(".xc-dock .rh, .xc-dock .rf") || []) x.textContent = "";
   markShown();
   placeArcho("neutral");
   ui?.renderHints?.();
 }
-// place: in 3col the result's head (the counts) and foot (the buttons) go to the rail
+// place: in 3col and 2col-new the result's head (the counts) and foot (the buttons) go to the
+// rail or the bar
 function place() {
-  const res = $("#screen .xc-preview"), rh = $("#screen .xc-rail .rh"), rf = $("#screen .xc-rail .rf");
+  const res = $("#screen .xc-preview"), rh = $("#screen .xc-dock .rh"), rf = $("#screen .xc-dock .rf");
   if (!res || !rh || !rf) return;
   const kids = [...res.children];
   for (const x of kids.filter(c => c.classList?.contains("xc-rhead"))) rh.append(x);

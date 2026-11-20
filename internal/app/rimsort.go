@@ -116,6 +116,7 @@ func (a *App) ImportRimSortRules(path string, dryRun bool) (*RimCrowReport, erro
 						break
 					}
 				}
+				rep.item(PartRules, la, kind, lb, duplicate)
 				if duplicate {
 					rep.RuleSame++
 					continue
