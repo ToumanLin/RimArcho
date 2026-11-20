@@ -592,6 +592,36 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .need-head.with-archo { position: relative; align-items: flex-end; padding-top: 6px; padding-left: 8px; }
 .need-head.with-archo > .archo-spot.archo-stand { order: -1; margin: 0 4px -19px 0; mask-image: none; clip-path: inset(-40px -40px 12px -40px); }
 .need-head.with-archo > .t { flex-shrink: 0; max-width: 60%; }
+/* TEMPORARY (2026-11-20): Archo spot variants B–F on Can it run, picked by data-archo-spot
+   (docs/design/2026-11-20_can-it-run-archo-spot.md); a follow-up keeps one. 82px: her height
+   above an edge at 140 px (94.5 px) less the 12 px the edge hides */
+.page[data-archo-spot] .needcol { position: relative; }
+/* B: behind the top edge of the right column's first card, at its left end; the page heading
+   grows to her height, its lead and actions on its bottom line */
+.page[data-archo-spot=b] .page-head { min-height: calc(84px - var(--card-gap)); align-items: flex-end; }
+.page[data-archo-spot=b] .needcol > .archo-spot.archo-stand { position: absolute; left: 14px; bottom: calc(100% - 12px); margin: 0; z-index: 3; mask-image: none; clip-path: inset(-40px -40px 12px -40px); }
+/* C: below the right column's last card, at its left end, fading out at her chest */
+.page[data-archo-spot=c] .needcol > .scroll > .archo-spot { margin: calc(4px - var(--card-gap)) auto 0 14px; }
+/* D: small, in the page heading, left of check again and game log, fading out at her chest */
+.page-head.archo-d > .archo-spot.archo-stand { order: 1; margin: 0 4px 0 auto; align-self: flex-end; }
+.page-head.archo-d > .page-acts { order: 2; margin-left: 0; align-self: flex-end; }
+/* E: her own card, first in the right column: her face beside the verdict's icons, her chest
+   behind the card's bottom edge */
+.archo-card { display: flex; align-items: flex-end; gap: 20px; padding: 6px 16px 0; overflow: visible; }
+.archo-card > .archo-spot.archo-stand { margin: 0 0 -10px; mask-image: none; clip-path: inset(-40px -40px 10px -40px); }
+.archo-verdict { display: flex; align-items: center; gap: 18px; align-self: center; font-size: 15px; font-weight: 600; }
+.archo-verdict .av { display: inline-flex; align-items: center; gap: 6px; }
+.archo-verdict .av svg { width: 24px; height: 24px; }
+.archo-verdict .av.ok { color: var(--green); }
+.archo-verdict .av.warn { color: var(--amber); }
+.archo-verdict .av.err { color: var(--red); }
+/* F: the bottom right of the right column's blank space, rising from its bottom edge; with
+   cards down to there, after the last card, right-aligned (archo-f-flow) */
+.page[data-archo-spot=f] .needcol > .archo-spot.archo-stand { position: absolute; right: 18px; bottom: 0; margin: 0; }
+@media (max-width: 900px) {
+  .page[data-archo-spot=b] .page-head { min-height: 28px; align-items: center; }
+  .page[data-archo-spot=b] .needcol:last-child { margin-top: calc(84px - var(--card-gap)); }
+}
 .need-away { align-self: flex-start; margin: 6px 2px 0; padding: 2px 4px; border-radius: var(--r-sm); color: var(--muted); font-size: 12px; }
 .need-away:hover { color: var(--accent-11, var(--accent)); background: var(--accent-soft); }
 @media (max-width: 900px) { .cols.needcols { grid-template-columns: 1fr; gap: var(--card-gap); } .needsplit { display: none; } .needcol > .scroll { overflow: visible; } .need-head { position: static; } }
