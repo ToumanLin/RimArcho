@@ -18,7 +18,7 @@ alive; head and hair never cut; shown head-to-chest.
 ## Evidence
 
 Contact sheets in `D:\RimArcho-test\archo-spot-variants\`: `sheet-2000.png`, `sheet-1280.png`,
-`sheet-860.png`. Columns A–F; rows: light en and dark zh, each with a short right column (the
+`sheet-860.png`. Columns A–G; rows: light en and dark zh, each with a short right column (the
 list can run, one log card) and a long one (blocked, eight log cards in four blocks). At 2000
 and 1280 a "scrolled to her" row shows where she is when the first view does not include her;
 at 860 (one column) every cell where she is below the first view is scrolled to her (marked).
