@@ -30,7 +30,7 @@
   "%d mods do not list game version %s": "%d件のMODはゲームバージョン%sへの対応を宣言していません",
   "%d mods gone": "削除されたMOD：%d件",
   "%d mods updated": "更新されたMOD：%d件",
-  "%d moved": "%d件移動",
+  "%d moved": "移動：%d件",
   "%d new": "新規：%d件",
   "%d new mods": "新規MOD：%d件",
   "%d new subscription": "新しいサブスクリプション：%d件",
