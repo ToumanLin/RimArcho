@@ -560,79 +560,35 @@ function needsFace(d) {
   return d.never ? "neutral" : "thumbsup";
 }
 
-// ---- TEMPORARY: Archo spot variants on Can it run (design note 2026-11-20) ----------------
-const SPOTS = "abcdefg";
-function spotVariant() {
-  const q = new URLSearchParams(globalThis.location?.search || "").get("archo-spot");
-  const v = (document.documentElement.dataset.archoSpot || q || "a").toLowerCase();
-  return SPOTS.includes(v) && v.length === 1 ? v : "a";
-}
-let spotRO = null;
-function needsArcho(v, face, { w, grid, right, rbox, lbox }) {
+// needsArcho places Archo on Can it run (16 §7.1 "Placements"), 176 px: beside the last-save
+// card, which gives up her width at its right (its content is short), her chest fading at the
+// card's bottom line; the card stretches to her height when it is shorter. Without a last save
+// she stands at the bottom right of the right column's blank space, or after its last card
+// when the cards reach down to her.
+const NEEDS_ARCHO = 176;
+let needsRO = null;
+function needsArcho(face, { grid, right, rbox, lbox }) {
+  const s = archoSpot("needs", { size: NEEDS_ARCHO, calm: ["neutral", "smug", "wink", "smirk", "sleepy"] });
   const calmFace = face === "thumbsup" || face === "neutral";
-  const head = w.querySelector(".page-head");
-  w.dataset.archoSpot = v;
-  spotRO?.disconnect(); spotRO = null;
-  if (v === "a") { // A: left end of the right column's first card heading (shipped, V2)
-    const perch = rbox.querySelector(".need-card > .need-head");
-    perch?.classList.add("with-archo");
-    return needsSpot(140, perch, face, calmFace);
-  }
-  if (v === "b") // B: behind the top edge of the right column's first card, at its left end
-    return needsSpot(140, right, face, calmFace);
-  if (v === "c") // C: below the right column's last card, at its left end
-    return needsSpot(140, rbox, face, calmFace);
-  if (v === "d") { // D: small, in the page heading, left of check again / game log
-    head.classList.add("archo-d");
-    return needsSpot(96, head, face, calmFace);
-  }
-  if (v === "e") { // E: her own card first in the right column: her face beside the verdict's icons
-    const card = el("section", "card archo-card");
-    const ver = el("div", "archo-verdict");
-    const left = N.cols[0].filter((x) => !x.done && x.counted).length;
-    const runs = N.cols[1].filter((x) => !x.done && x.counted).length;
-    if (!left && !runs) { const c = el("span", "av ok"); c.innerHTML = icon.ok; ver.append(c); }
-    for (const [n, ic, cls] of [[left, icon.warn, "warn"], [runs, icon.err, "err"]]) {
-      if (!n) continue;
-      const c = el("span", "av " + cls);
-      c.innerHTML = ic;
-      c.append(el("span", "num", String(n)));
-      ver.append(c);
-    }
-    card.append(ver);
-    rbox.prepend(card);
-    const s = needsSpot(120, card, face, calmFace);
-    card.prepend(s.slot);
-    return s;
-  }
-  const save = v === "g" && lbox.querySelector(":scope > .need-save");
-  if (save) { // G: the last-save card shortened; she stands in the freed space at its right, 176 px
+  needsRO?.disconnect?.(); needsRO = null;
+  const save = lbox.querySelector(":scope > .need-save");
+  if (save) {
     const row = el("div", "archo-save-row");
     save.replaceWith(row);
     row.append(save);
-    return needsSpot(176, row, face, calmFace);
+    s.stand(row, face, calmFace);
+    return;
   }
-  if (v === "g") w.dataset.archoSpot = "f";
-  // F (and G without a last save): the bottom-right of the right column's blank space, rising from its bottom edge; when
-  // the column's cards reach down to her, she follows its last card instead (right-aligned)
-  const s = needsSpot(140, right, face, calmFace);
+  s.stand(right, face, calmFace);
   const place = () => {
     const room = rbox.getBoundingClientRect().bottom - (rbox.lastElementChild?.getBoundingClientRect().bottom || 0);
-    const flow = rbox.scrollHeight > rbox.clientHeight + 1 || room < 140 * 27 / 40 + 8 || getComputedStyle(rbox).overflowY === "visible";
-    right.classList.toggle("archo-f-flow", flow);
+    const flow = rbox.scrollHeight > rbox.clientHeight + 1 || room < NEEDS_ARCHO * 27 / 40 + 8 || getComputedStyle(rbox).overflowY === "visible";
+    right.classList.toggle("archo-corner", !flow);
     const host = flow ? rbox : right;
     if (s.slot.parentElement !== host) host.append(s.slot);
   };
-  if (typeof ResizeObserver === "function") { spotRO = new ResizeObserver(() => requestAnimationFrame(place)); spotRO.observe(grid); }
-  setTimeout(place, 0);
-  return s;
-}
-function needsSpot(size, host, face, calmFace) {
-  // one archoSpot per size: a variant's size is fixed when its figure is first made
-  const s = archoSpot("needs-" + size, { size, calm: ["neutral", "smug", "wink", "smirk", "sleepy"] });
-  for (const k of [96, 120, 140, 176]) if (k !== size) archoSpot("needs-" + k).end();
-  s.stand(host, face, calmFace);
-  return s;
+  if (typeof ResizeObserver === "function") { needsRO = new ResizeObserver(() => requestAnimationFrame(place)); needsRO.observe?.(grid); }
+  globalThis.setTimeout?.(place, 0); // once the page is in the document
 }
 
 // askShown: drawNeeds drew N.ask's confirmation row.
@@ -694,12 +650,8 @@ function drawNeeds() {
   }
   // Archo stands in the right column's first card, at the left end of its heading, on the
   // heading's line, which hides her chest (16 §7.1 "Placements"); the right column always has a card
-  // TEMPORARY (2026-11-20 spot comparison): data-archo-spot on <html> or ?archo-spot= picks
-  // one of the variants A–F in docs/design/2026-11-20_can-it-run-archo-spot.md; A is the
-  // shipped placement. A follow-up keeps only the variant the user picks.
-  const face = needsFace(d);
   w.append(grid);
-  needsArcho(spotVariant(), face, { w, grid, right, rbox, lbox });
+  needsArcho(needsFace(d), { grid, right, rbox, lbox });
   sc.append(w);
   sc.querySelectorAll(".needcol > .scroll").forEach((s, i) => { s.scrollTop = keep[i] || 0; });
   // 1–9: the cards in the order shown, the left column's first (16 §3.5); a card without

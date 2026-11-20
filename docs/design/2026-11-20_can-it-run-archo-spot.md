@@ -1,14 +1,8 @@
 # Can it run: where Archo sits (2026-11-20)
 
-Status: comparison for the user to choose from. Nothing in the specs or CHANGELOG changes yet.
-The variants are real CSS/JS behind a temporary switch; a follow-up keeps only the chosen one.
-
-## The switch (temporary)
-
-`data-archo-spot="a".."g"` on `<html>` (or `?archo-spot=` in the dev harness URL) picks the
-variant; anything else is A, the shipped placement. Code: `needsArcho` / `needsSpot` in
-`internal/surface/gui/assets/js/screens.js`, CSS under "TEMPORARY (2026-11-20)" in `style.css`.
-`archo.js` is unchanged (each variant uses `archoSpot(...).stand`).
+Status: decided 2026-11-20. The user chose **G at 176 px**; it is the shipped placement
+(16 §7.1 "Placements", `needsArcho` in `screens.js`), with F as its fallback when there is no
+last save. The switch and the other variants were removed; this note keeps the comparison.
 
 ## Rules the variants are judged by
 
