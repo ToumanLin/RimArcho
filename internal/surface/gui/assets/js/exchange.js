@@ -7,8 +7,9 @@ import { icon } from "./icons.js";
 import * as pop from "./popups.js";
 import { getChoices } from "./credit.js";
 import { still } from "./motion.js";
-import { splitBar, diffMarks } from "./membar.js";
+import { splitBar } from "./membar.js";
 import { archoSpot } from "./archo.js";
+import { wireSeparator } from "./separator.js";
 import { orderDiff, orderView, legend } from "./listdiff.js";
 
 let ui = null;
@@ -80,10 +81,19 @@ export async function exchange(first = false) {
   side.append(card);
   // the right: the comparison (or the tree, a task, a refusal) and, before any, the drop pane
   const main = el("div", "xc-main");
-  const result = el("section", "card settings xc-sec xc-preview xc-res"); result.hidden = true;
+  const result = el("section", "card settings xc-preview xc-res"); result.hidden = true;
   // no label above the right card: it is as tall as the left one and says what it is itself
   main.append(result, emptyState());
-  grid.append(side, main);
+  // the gap between the two cards is the card gap, and drags (16 §7.3 "Card spacing")
+  const gap = el("div", "split xc-split");
+  grid.append(side, gap, main);
+  const setSide = (v) => { if (v) grid.style.setProperty("--xc-side", v + "px"); else grid.style.removeProperty("--xc-side"); };
+  wireSeparator(gap, {
+    key: "ui.gui.import.side", range: () => [300, Math.max(300, grid.clientWidth - 480)],
+    get: () => side.getBoundingClientRect().width,
+    set: setSide, reset: () => setSide(0),
+    restore: (v) => setSide(+v ? Math.max(300, +v) : 0),
+  });
   // 3col: a rail at the right for Archo, the counts and the buttons, shown with a result
   if (lay === "3col") { const rail = el("aside", "xc-rail"); rail.append(el("div", "fig"), el("div", "rh"), el("div", "rf")); grid.append(rail); }
   w.append(grid);
@@ -182,7 +192,7 @@ function drawDo() {
 // markShown marks the row whose result the right shows
 function markShown() {
   const res = $("#screen .xc-preview"), at = res && !res.hidden ? res.dataset.kind : "";
-  for (const r of $("#screen")?.querySelectorAll?.(".xc-dorow") || []) r.classList.toggle("on", !!at && r.dataset.do === at);
+  for (const r of $("#screen")?.querySelectorAll?.(".xc-dorow") || []) r.classList.toggle("on", !!at && at !== "db" && r.dataset.do === at); // a picked manager shows on its own card
 }
 
 // emptyState: the right before anything is read: Archo in the middle, the drop under her
@@ -409,7 +419,8 @@ function drawRows() {
     else if (m.imported && nws.length) { const n = el("span", "nline"); n.title = nws.join(", "); n.append(el("span", "chip-n", T("new")), el("span", "nt", nws.join(", "))); s.append(n); }
     else if (m.imported) s.append(T("nothing new since then"));
     else s.append(holds(m));
-    b.append(box(st), mark(m.name, 24), t, s);
+    // the card itself shows it is picked (its accent edge): no box in front of it
+    b.append(mark(m.name, 24), t, s);
     b.onclick = () => showManager(m);
     rows.append(b);
   }
@@ -790,8 +801,6 @@ async function preview(kind, src, fileName, from = "file") {
     if (ids.length) { const go = button(Tf("subscribe all %d", ids.length), "", () => getAll(ids, go), "small", "subscribe"); go.type = "button"; go.title = T("subscribed mods take their place in the list once downloaded"); m.append(go); }
     head.append(m);
   }
-  const two = layout() === "2col";
-  if (two) { const x = el("button", "xc-x"); x.type = "button"; x.innerHTML = icon.close; x.title = T("close"); x.setAttribute("aria-label", T("close")); x.onclick = hideResult; head.append(x); }
   body.append(head, ov.el);
 
   // the list already is this one: nothing to import (16 §2.18)
@@ -863,12 +872,11 @@ async function preview(kind, src, fileName, from = "file") {
   merge.hidden = !!p.merge?.same;
   const asNew = button(T("save as a new list…"), "", () => saveNew(asNew), fromGame ? "" : "primary");
   asNew.title = Tf("%d mods; the current list stays as it is", p.total);
-  const acts = footer("", two ? null : button(T("close"), "", hideResult), merge, asNew, apply);
+  const acts = footer("", button(T("close"), "", hideResult), merge, asNew, apply);
   acts.classList.add("xc-lacts");
   // the filled button last (16 §7.3): the game's list applies, any other list saves as new
   if (!fromGame) acts.append(asNew);
   if (opts.length) { const o = el("div", "xc-opts"); o.append(...opts); acts.prepend(o); acts.querySelector(".note")?.remove(); }
-  acts.querySelector(".note")?.append?.(diffMarks(p.replace));
   body.append(acts);
   place();
   body.onkeydown = e => {

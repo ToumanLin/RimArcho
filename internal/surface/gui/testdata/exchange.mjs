@@ -34,6 +34,7 @@ async function setup(api = {}, { layout = "" } = {}) {
     "./popups.js": { confirm() {}, choose() {}, ask() {} },
     "./credit.js": { getChoices: () => [] },
     "./motion.js": { still: () => true },
+    "./separator.js": { wireSeparator() {} },
     "./membar.js": { splitBar: () => el("div", "sbar-row"), diffMarks: () => el("span", "dmarks") },
   }, { document, location: { search: "" }, URLSearchParams, navigator: {}, setTimeout: () => 0 });
   const went = [];

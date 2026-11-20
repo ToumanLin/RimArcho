@@ -124,7 +124,7 @@ export function orderView(d, opts) {
   };
   heads.append(head(opts.left, d.left.length, "l"), head(opts.right, d.right.length, "r", opts.rightTip, opts.rightNote, opts.rightNoteTip));
   const body = el("div", "ld-body");
-  root.append(heads, body);
+  root.append(body);
   const redraw = () => {
     body.textContent = "";
     const L = folded(d.left, "l", true, open), R = folded(d.right, "r", true, open);
@@ -135,7 +135,7 @@ export function orderView(d, opts) {
       return c;
     };
     grid.append(col(L, "l"), col(R, "r"));
-    body.append(grid);
+    body.append(heads, grid); // the heads scroll with the rows (sticky), so both share the scroller's width
     grid.onmouseover = e => {
       const k = e.target.closest?.(".ld-row")?.dataset.key || "";
       if (k === grid.dataset.hl) return;
