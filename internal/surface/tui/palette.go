@@ -28,6 +28,7 @@ const (
 
 type palItem struct {
 	kind  palKind
+	id    string // a command's ID (view.Commands)
 	name  string // shown
 	alias string // English alias of a command
 	match string // matches but is not shown: a command's ID
@@ -251,7 +252,7 @@ func (m *model) palRunOf(id string) func(m *model) tea.Cmd {
 func (m *model) palCommands() []palItem {
 	var out []palItem
 	for _, e := range view.CommandEntries() {
-		out = append(out, palItem{kind: palCommand, name: e.Name, alias: e.Alias, match: e.Match, desc: e.Desc, run: m.palRun(e.ID)})
+		out = append(out, palItem{kind: palCommand, id: e.ID, name: e.Name, alias: e.Alias, match: e.Match, desc: e.Desc, run: m.palRun(e.ID)})
 	}
 	return out
 }
@@ -309,13 +310,23 @@ func palScore(q string, it palItem) int {
 func (m *model) palFilter() {
 	p := m.pal
 	all := m.palAll()
+	// a command's entry carries its ID, so the screen's own commands come first (16 §3.5),
+	// as in the window; the rest carry their index
 	entries := make([]view.PalEntry, len(all))
+	cmdAt := map[string]int{}
 	for i, it := range all {
-		entries[i] = view.PalEntry{Kind: int(it.kind), ID: strconv.Itoa(i), Name: it.name, Alias: it.alias, Match: it.match, Desc: it.desc}
+		id := strconv.Itoa(i)
+		if it.kind == palCommand && it.id != "" {
+			id, cmdAt[it.id] = it.id, i
+		}
+		entries[i] = view.PalEntry{Kind: int(it.kind), ID: id, Name: it.name, Alias: it.alias, Match: it.match, Desc: it.desc}
 	}
 	p.results = p.results[:0]
-	for _, e := range view.PalRank(p.query, entries) {
-		n, _ := strconv.Atoi(e.ID)
+	for _, e := range view.PalRankPage(p.query, m.pageName(), entries) {
+		n, ok := cmdAt[e.ID]
+		if !ok || e.Kind != int(palCommand) {
+			n, _ = strconv.Atoi(e.ID)
+		}
 		it := all[n]
 		it.score = e.Score
 		p.results = append(p.results, it)

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1853,11 +1854,18 @@ func (s *API) startAnalyzeOf(list string) bool {
 
 // ---- palette and the rest ----
 
-// Palette ranks commands, mods and the other environments for a query (16 §3.5).
-func (s *API) Palette(query string) []view.PalEntry {
+// Palette ranks commands, mods and the other environments for a query on page (named as
+// for Keys), the page's own commands first; parts are the page's places (its numbered
+// areas), returned as PalPart entries whose ID is the index in parts (16 §3.5).
+func (s *API) Palette(query, page string, parts []string) []view.PalEntry {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	all := view.CommandEntries()
+	for i, name := range parts {
+		if name = strings.TrimSpace(name); name != "" {
+			all = append(all, view.PalEntry{Kind: view.PalPart, ID: strconv.Itoa(i), Name: name})
+		}
+	}
 	cur := ""
 	if s.board != nil {
 		cur = s.board.EnvName
@@ -1886,7 +1894,7 @@ func (s *API) Palette(query string) []view.PalEntry {
 			}
 		}
 	}
-	out := view.PalRank(query, all)
+	out := view.PalRankPage(query, page, all)
 	if len(out) > 50 {
 		out = out[:50]
 	}

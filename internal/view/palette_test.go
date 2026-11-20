@@ -110,3 +110,61 @@ func BenchmarkPalRank(b *testing.B) {
 		PalRank("vanila expnd", all)
 	}
 }
+
+// 16 §3.5: every page command is a command, and no page lists one twice.
+func TestPageCommandsExist(t *testing.T) {
+	ids := map[string]bool{}
+	for _, c := range Commands {
+		ids[c.ID] = true
+	}
+	for page, list := range pageCommands {
+		seen := map[string]bool{}
+		for _, id := range list {
+			if !ids[id] || seen[id] {
+				t.Errorf("%s: %q unknown or listed twice", page, id)
+			}
+			seen[id] = true
+		}
+	}
+}
+
+// 16 §3.5: on a page, the empty query suggests its own commands in table order, then its
+// parts, then the rest; a typed query matches everything, the page's own first among equals.
+func TestPalRankPage(t *testing.T) {
+	all := append(CommandEntries(), PalEntry{Kind: PalPart, ID: "0", Name: "interface"}, PalEntry{Kind: PalMod, ID: "m", Name: "Recheck Mod"})
+	got := PalRankPage("", "needs", all)
+	own := PageCommands("needs")
+	for i, id := range own {
+		if got[i].ID != id || !got[i].Own {
+			t.Fatalf("needs, empty: #%d is %q, want %q", i, got[i].ID, id)
+		}
+	}
+	if p := got[len(own)]; p.Kind != PalPart || !p.Own {
+		t.Fatalf("needs, empty: after the commands %+v, want the part", p)
+	}
+	if r := got[len(own)+1]; r.Own || r.Kind != PalCommand {
+		t.Fatalf("needs, empty: then %+v, want the other commands", r)
+	}
+	for _, e := range got {
+		if e.Kind == PalMod {
+			t.Fatal("empty query lists a Mod")
+		}
+	}
+	// equal scores: the page's own first, in table order
+	if g := PalRankPage("pre", EditorPage, all); g[0].ID != "preview-sort" {
+		t.Fatalf("editor, pre: first %q", g[0].ID)
+	}
+	if g := PalRankPage("re", "needs", all); g[0].ID != "rescan" {
+		t.Fatalf("needs, re: first %q, want the page's rescan before redo", g[0].ID)
+	}
+	if g := PalRankPage("re", EditorPage, all); g[0].ID != "redo" {
+		t.Fatalf("editor, re: first %q, want the page's redo", g[0].ID)
+	}
+	if g := PalRankPage("recheck", "needs", all); len(g) == 0 || g[0].Kind != PalMod {
+		t.Fatalf("typed queries still find Mods: %+v", g)
+	}
+	// without a page the order is PalRank's
+	if g := PalRank("", all); g[0].ID != Commands[0].ID || g[0].Own {
+		t.Fatalf("no page: first %+v", g[0])
+	}
+}
