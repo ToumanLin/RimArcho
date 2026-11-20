@@ -175,7 +175,7 @@ func TestPlansInWindow(t *testing.T) {
 	}
 	// The palette goes to the other plans.
 	var plans []string
-	for _, p := range api.Palette("") {
+	for _, p := range api.Palette("", "", nil) {
 		if p.Kind == view.PalPlan {
 			plans = append(plans, p.Name)
 		}

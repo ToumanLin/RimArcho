@@ -209,9 +209,11 @@ function inputLine(pop, prompt, placeholder) {
 export function palette() {
   if (S.popup?.kind === "palette") { close(); return; }
   hideMenu();
+  // the page it opens on: its own commands and areas come first (16 §3.5)
+  const { page = "", parts = [] } = ui.paletteContext?.() || {};
   open("palette", T("command palette"), (pop, p) => {
     $("#popup").classList.add("command-dock");
-    buildCommandPanel(pop, p, { close, pick: ui.palette, reload: ui.commandDone || ui.reload, uninstall: ui.uninstallStarted });
+    buildCommandPanel(pop, p, { close, pick: ui.palette, reload: ui.commandDone || ui.reload, uninstall: ui.uninstallStarted, page, parts });
   });
 }
 

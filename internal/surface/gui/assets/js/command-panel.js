@@ -1,6 +1,6 @@
 // Shared search/CLI panel (16 §3.5); closing preserves draft and the last output.
 import { fieldError } from "./feedbacksemantics.js";
-import { S, el, api, T, errText } from "./state.js";
+import { S, el, api, T, errText, keyCaps } from "./state.js";
 import { copy } from "./fields.js";
 let draft = "", result = null, paint = null, polling = false, afterRun = null;
 async function poll() {
@@ -16,7 +16,9 @@ async function poll() {
     else { polling = false; if (ended) await afterRun?.(); }
   } catch { polling = false; }
 }
-export function buildCommandPanel(pop, p, { close, pick, reload, uninstall }) {
+// page and parts: the page it opens on and that page's places ({ name, key, run }), whose
+// own commands and areas the empty input suggests first (16 §3.5).
+export function buildCommandPanel(pop, p, { close, pick, reload, uninstall, page = "", parts = [] }) {
   const previous = document.activeElement, live = () => S.popup === p;
   pop.classList.add("command-panel");
   const head = el("div", "command-head"), output = el("pre", "command-output"), list = el("div", "opts"), row = el("div", "in"), input = el("input"), foot = el("div", "command-foot");
@@ -65,21 +67,23 @@ export function buildCommandPanel(pop, p, { close, pick, reload, uninstall }) {
     if (o.cli) return run();
     if (o.completion) { applyCompletion(o.completion); completion = null; options = []; draw(); refresh(); input.focus(); return; }
     if (o.id === "cli") { input.value = "archo "; changed(); input.focus(); return; }
+    if (o.kind === 4) { const part = parts[+o.id]; close(); part?.run(); return; }
     close(); pick(o);
   };
   const draw = () => {
     list.replaceChildren();
     options.forEach((o, i) => {
-      const item = el("button", "opt" + (i === selected ? " on" : "")); item.type = "button";
+      // a hairline after the page's own entries, before the rest
+      const last = o.own && options[i + 1] && !options[i + 1].own;
+      const item = el("button", "opt" + (i === selected ? " on" : "") + (last ? " own-end" : "")); item.type = "button";
       item.id = "command-result-" + i;
       item.setAttribute("role", "option"); item.setAttribute("aria-selected", String(i === selected));
       item.setAttribute("aria-posinset", String(i + 1)); item.setAttribute("aria-setsize", String(options.length));
       item.append(el("span", "", o.name));
-      if (o.desc && o.kind !== 2) {
-        const desc = el("span", "d", o.desc);
-        if (o.desc === o.name) desc.setAttribute("aria-hidden", "true");
-        item.append(desc);
-      }
+      // right: a part's key, or a command's English name where the name is translated; never
+      // the name again
+      if (o.key) item.append(keyCaps(o.key));
+      else if (o.desc && o.kind !== 2 && o.desc.toLowerCase() !== o.name.toLowerCase()) item.append(el("span", "d", o.desc));
       item.onclick = () => choose(o); item.onmousemove = () => { if (selected !== i) { selected = i; draw(); } }; list.append(item);
     });
     const active = list.querySelector("#command-result-" + selected);
@@ -90,9 +94,9 @@ export function buildCommandPanel(pop, p, { close, pick, reload, uninstall }) {
   const refresh = async () => {
     const n = ++sequence, text = input.value;
     try {
-      const found = await api.Palette(text);
+      const found = await api.Palette(text, page, parts.map(x => x.name));
       if (!live() || n !== sequence || text !== input.value) return;
-      options = (found || []).map(o => ({ ...o, desc: o.kind === 0 ? o.alias : o.desc }));
+      options = (found || []).map(o => ({ ...o, desc: o.kind === 0 ? o.alias : o.desc, key: o.kind === 4 ? parts[+o.id]?.key : "" }));
       if (text.trim()) {
         const c = { cli: true, name: "archo " + text.replace(/^archo\s+/, ""), desc: T("run") };
         if (/\s/.test(text.trim()) || !options.length) options.unshift(c); else options.push(c);

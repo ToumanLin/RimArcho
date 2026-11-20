@@ -276,7 +276,7 @@ export function resetAreas() { areas = []; }
 export function area(box, head, focus) {
   const n = areas.length + 1;
   if (n > 9 || !box) return;
-  areas.push({ box, focus: focus || (() => { const f = box.querySelector("button, input, select, [tabindex]"); if (f) f.focus({ preventScroll: true }); }) });
+  areas.push({ box, head, focus: focus || (() => { const f = box.querySelector("button, input, select, [tabindex]"); if (f) f.focus({ preventScroll: true }); }) });
   box.dataset.area = String(n);
   box.classList.toggle("area-on", n === onArea);
   if (!head) return;
@@ -289,14 +289,32 @@ export function area(box, head, focus) {
 // areaKey takes 1–9 on a page: the area is marked, shown and focused. true when taken.
 export function areaKey(e) {
   if (e.ctrlKey || e.metaKey || e.altKey || !/^[1-9]$/.test(e.key)) return false;
-  const a = areas[+e.key - 1];
-  if (!a || !a.box.isConnected) return false;
+  if (!goArea(+e.key)) return false;
   e.preventDefault();
-  onArea = +e.key;
+  return true;
+}
+
+function goArea(n) {
+  const a = areas[n - 1];
+  if (!a || !a.box.isConnected) return false;
+  onArea = n;
   for (const x of areas) x.box.classList.toggle("area-on", x === a);
   a.box.scrollIntoView({ block: "nearest" });
   a.focus();
   return true;
+}
+
+// pageParts are the shown page's numbered areas that have a heading, for the command
+// palette (16 §3.5): the heading's words, the area's key, and going there as 1–9 does.
+export function pageParts() {
+  const out = [];
+  areas.forEach((a, i) => {
+    const head = a.head;
+    if (!head || !a.box.isConnected) return;
+    const name = Array.from(head.childNodes).filter((n) => !n.classList?.contains("anum")).map((n) => n.textContent).join(" ").replace(/\s+/g, " ").trim();
+    if (name) out.push({ name, key: String(i + 1), run: () => goArea(i + 1) });
+  });
+  return out;
 }
 
 // archoMark is the small bow in front of Archo's name where the portrait would be too small
