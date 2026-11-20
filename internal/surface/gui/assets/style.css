@@ -585,13 +585,15 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .need-live .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
 .need-none .need.lv-ok .need-ic { color: var(--green); }
 .need-none .need .body { color: var(--muted); }
-/* Archo in the right column's first card: she stands at the left end of its heading, on the
-   heading's line, which hides her chest (her last 12 px reach under it and are clipped), and
-   the title follows beside her on that line. The heading does not stick, or she would stay
-   over the list (16 §7.1 "Placements") */
-.need-head.with-archo { position: relative; align-items: flex-end; padding-top: 6px; padding-left: 8px; }
-.need-head.with-archo > .archo-spot.archo-stand { order: -1; margin: 0 4px -19px 0; mask-image: none; clip-path: inset(-40px -40px 12px -40px); }
-.need-head.with-archo > .t { flex-shrink: 0; max-width: 60%; }
+/* Archo on Can it run (16 §7.1 "Placements"): beside the last-save card, which gives up her
+   width; her chest fades at the card's bottom line and the card stretches to her height when it
+   is shorter, so its top stays level with the right column's. Without a last save she stands at
+   the bottom right of the right column's blank space (archo-corner), or after its last card */
+.archo-save-row { display: flex; align-items: stretch; gap: 8px; min-width: 0; }
+.archo-save-row > .need-save { flex: 1 1 auto; min-width: 0; }
+.archo-save-row > .archo-spot.archo-stand { margin: 0 12px 0 0; align-self: flex-end; }
+.needcol.archo-corner { position: relative; }
+.needcol.archo-corner > .archo-spot.archo-stand { position: absolute; right: 18px; bottom: 0; margin: 0; }
 .need-away { align-self: flex-start; margin: 6px 2px 0; padding: 2px 4px; border-radius: var(--r-sm); color: var(--muted); font-size: 12px; }
 .need-away:hover { color: var(--accent-11, var(--accent)); background: var(--accent-soft); }
 @media (max-width: 900px) { .cols.needcols { grid-template-columns: 1fr; gap: var(--card-gap); } .needsplit { display: none; } .needcol > .scroll { overflow: visible; } .need-head { position: static; } }

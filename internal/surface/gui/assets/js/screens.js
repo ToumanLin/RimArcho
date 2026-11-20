@@ -560,6 +560,37 @@ function needsFace(d) {
   return d.never ? "neutral" : "thumbsup";
 }
 
+// needsArcho places Archo on Can it run (16 §7.1 "Placements"), 176 px: beside the last-save
+// card, which gives up her width at its right (its content is short), her chest fading at the
+// card's bottom line; the card stretches to her height when it is shorter. Without a last save
+// she stands at the bottom right of the right column's blank space, or after its last card
+// when the cards reach down to her.
+const NEEDS_ARCHO = 176;
+let needsRO = null;
+function needsArcho(face, { grid, right, rbox, lbox }) {
+  const s = archoSpot("needs", { size: NEEDS_ARCHO, calm: ["neutral", "smug", "wink", "smirk", "sleepy"] });
+  const calmFace = face === "thumbsup" || face === "neutral";
+  needsRO?.disconnect?.(); needsRO = null;
+  const save = lbox.querySelector(":scope > .need-save");
+  if (save) {
+    const row = el("div", "archo-save-row");
+    save.replaceWith(row);
+    row.append(save);
+    s.stand(row, face, calmFace);
+    return;
+  }
+  s.stand(right, face, calmFace);
+  const place = () => {
+    const room = rbox.getBoundingClientRect().bottom - (rbox.lastElementChild?.getBoundingClientRect().bottom || 0);
+    const flow = rbox.scrollHeight > rbox.clientHeight + 1 || room < NEEDS_ARCHO * 27 / 40 + 8 || getComputedStyle(rbox).overflowY === "visible";
+    right.classList.toggle("archo-corner", !flow);
+    const host = flow ? rbox : right;
+    if (s.slot.parentElement !== host) host.append(s.slot);
+  };
+  if (typeof ResizeObserver === "function") { needsRO = new ResizeObserver(() => requestAnimationFrame(place)); needsRO.observe?.(grid); }
+  globalThis.setTimeout?.(place, 0); // once the page is in the document
+}
+
 // askShown: drawNeeds drew N.ask's confirmation row.
 let askShown = false;
 function drawNeeds() {
@@ -619,10 +650,8 @@ function drawNeeds() {
   }
   // Archo stands in the right column's first card, at the left end of its heading, on the
   // heading's line, which hides her chest (16 §7.1 "Placements"); the right column always has a card
-  const face = needsFace(d), perch = rbox.querySelector(".need-card > .need-head");
-  perch?.classList.add("with-archo");
-  archoSpot("needs", { size: 140, calm: ["neutral", "smug", "wink", "smirk", "sleepy"] }).stand(perch, face, face === "thumbsup" || face === "neutral");
   w.append(grid);
+  needsArcho(needsFace(d), { grid, right, rbox, lbox });
   sc.append(w);
   sc.querySelectorAll(".needcol > .scroll").forEach((s, i) => { s.scrollTop = keep[i] || 0; });
   // 1–9: the cards in the order shown, the left column's first (16 §3.5); a card without
