@@ -74,6 +74,7 @@
   "%s replaces it": "用 %s 代替",
   "%s now stands in for %s (a rule: remove it under load-order rules)": "%s 现在代替 %s（这是一条规则，可在加载顺序规则里删除）",
   "ignored; shown again when the mod that needs it changes": "已忽略；需要它的 Mod 更新后会再次提示",
+  "ignored; shown again when %s changes": "已忽略；%s 更新后会再次提示",
   "%s is locked to another copy, and the workshop version has been updated since": "%s 锁定在另一份上，工坊版之后有更新",
   "%s is now listed independently": "已将 %s 单独列出",
   "%s is now number %d": "%s 现在是第 %d 个",

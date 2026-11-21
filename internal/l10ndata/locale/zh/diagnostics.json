@@ -31,7 +31,7 @@
   "%s is in the lock library": "%s 已移入锁定库",
   "%s is left over": "%s 的文件夹还留着",
   "%s is mentioned in %s; it may supply the missing content": "%s 被 %s 提到，可能提供缺少的内容",
-  "%s is no longer kept up; %s does the same and is": "%s 的替代品 %s 仍在更新；换用前请检查简介和存档兼容性。",
+  "%s is no longer kept up; %s does the same and is kept up": "%s 的替代品 %s 仍在更新；换用前请检查简介和存档兼容性。",
   "%s is not safe to play yet: %d to handle before you start, %d error groups in the last run": "%s 还不能放心玩：开始之前要处理 %d 项，上次运行有 %d 组报错",
   "%s needs it, but it is not enabled.": "%s 需要它，但它没有启用。",
   "%s needs it, but it is not installed.": "%s 需要它，但它没有安装。",

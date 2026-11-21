@@ -160,6 +160,24 @@ func (a *App) replacementFor(st *LoadoutState, m *store.Mod) *Replacement {
 	return r
 }
 
+// ignoredReplacements: the player ignored this Mod's mod.replaced finding (05 §4.2), so the
+// window after Sort does not suggest the replacement again until the Mod changes.
+func (a *App) ignoredReplacements(st *LoadoutState) func(m *store.Mod, r *Replacement) bool {
+	type key struct{ lin, ws string }
+	snap := map[key]int64{}
+	if gs, err := a.Store.Ignores(st.Ix.Env.ID); err == nil {
+		for _, g := range gs {
+			if g.Code == "mod.replaced" {
+				snap[key{g.LineageID, g.Key}] = g.SnapshotID
+			}
+		}
+	}
+	return func(m *store.Mod, r *Replacement) bool {
+		s, ok := snap[key{m.LineageID, r.NewWorkshopID}]
+		return ok && s == m.SnapID
+	}
+}
+
 func replacementCandidate(st *LoadoutState, old *store.Mod, r *Replacement) *store.Mod {
 	var fallback, blocked *store.Mod
 	for _, m := range st.Ix.Mods {
@@ -196,6 +214,7 @@ func replacementCandidate(st *LoadoutState, old *store.Mod, r *Replacement) *sto
 func (a *App) ReplacementSuggestions(st *LoadoutState) []ReplacementSuggestion {
 	var out []ReplacementSuggestion
 	seen := map[string]bool{}
+	ignored := a.ignoredReplacements(st)
 	for _, e := range st.List {
 		m := st.Ix.ByID[e.Instance]
 		if m == nil || seen[m.ID] {
@@ -203,7 +222,7 @@ func (a *App) ReplacementSuggestions(st *LoadoutState) []ReplacementSuggestion {
 		}
 		seen[m.ID] = true
 		r := a.replacementFor(st, m)
-		if r == nil {
+		if r == nil || ignored(m, r) {
 			continue
 		}
 		target := SortMod{Name: r.NewName, PackageID: dependencyPackage(r.NewPackageID), WorkshopID: numericWorkshopID(r.NewWorkshopID)}

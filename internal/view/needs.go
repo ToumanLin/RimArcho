@@ -687,8 +687,11 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			if y != "" {
 				acts = []Action{enable(st, y), disable(st, x, Tf("disable %s", nm(x)))}
 			}
+			// The player may keep another version on purpose (an unofficial port for a newer game).
+			acts = append(acts, Action{Kind: ActIgnore, Key: "I", Label: T("ignore it"), Refs: []string{p.Ref}, Problem: p.Ref,
+				Done: Tf("ignored; shown again when %s changes", nm(x))})
 			add(Need{rank: 5, Group: GroupList, Text: Tf("%s has a maintained replacement: %s", nm(x), name), Actions: acts, Counted: true, Mods: ids, Status: s,
-				Title: Tf("%s has a maintained replacement", nm(x)), Why: Tf("%s is no longer kept up; %s does the same and is", nm(x), name), Evidence: ev})
+				Title: Tf("%s has a maintained replacement", nm(x)), Why: Tf("%s is no longer kept up; %s does the same and is kept up", nm(x), name), Evidence: ev})
 		case "mod.unloadable":
 			add(Need{rank: 4, Group: GroupList, Text: Tf("%s is enabled, but the game cannot load it", nm(x)), Actions: []Action{disable(st, x, T("disable it"))}, Counted: true, Mods: ids, Status: s,
 				Title: Tf("the game cannot load %s", nm(x)), Why: T("it is enabled, but the game skips it; disabling it changes nothing in play"), Evidence: ev})

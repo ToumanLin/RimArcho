@@ -74,6 +74,7 @@
   "%s replaces it": "%sが代替します",
   "%s now stands in for %s (a rule: remove it under load-order rules)": "%sは%sの代替になります（ルールは読み込み順のルールから削除できます）",
   "ignored; shown again when the mod that needs it changes": "無視しました。必要とするMODが変更されると再度表示されます",
+  "ignored; shown again when %s changes": "無視しました。%s が変更されると再度表示されます",
   "%s is locked to another copy, and the workshop version has been updated since": "%sは別のコピーに固定されており、その後ワークショップ版が更新されています",
   "%s is now listed independently": "%sを独立したMODとして一覧に表示します",
   "%s is now number %d": "%sは%d番目になりました",

@@ -31,7 +31,7 @@
   "%s is in the lock library": "%sは固定ライブラリにあります",
   "%s is left over": "%sは残存ファイルです",
   "%s is mentioned in %s; it may supply the missing content": "%sが%sで言及されています。不足するコンテンツを提供するMODかもしれません",
-  "%s is no longer kept up; %s does the same and is": "%sは現在メンテナンスされていません。同等の機能を持つ%sが引き続き更新されています",
+  "%s is no longer kept up; %s does the same and is kept up": "%sは現在メンテナンスされていません。同等の機能を持つ%sが引き続き更新されています",
   "%s is not safe to play yet: %d to handle before you start, %d error groups in the last run": "%sはまだ安全にプレイできません。起動前に%d件の対処が必要で、前回の実行には%d件のエラーグループがあります",
   "%s needs it, but it is not enabled.": "%sに必要ですが、有効になっていません",
   "%s needs it, but it is not installed.": "%sに必要ですが、インストールされていません",
