@@ -185,6 +185,11 @@ func Run(ctx context.Context, o Options) (result *Result, runErr error) {
 	cmd := exec.Command(exe, args...)
 	cmd.Dir = o.GameRoot
 	detach(cmd)
+	if waylith {
+		if err := utf8Console(cmd, o.RunDir); err != nil {
+			return nil, err
+		}
+	}
 	// Bound output draining if a child inherits the capture pipe.
 	cmd.WaitDelay = time.Second
 	cmd.Stdout, cmd.Stderr = stdout, stdout

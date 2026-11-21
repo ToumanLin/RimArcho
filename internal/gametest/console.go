@@ -7,10 +7,12 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 var (
-	consoleMessage = regexp.MustCompile(`^(\d\d:\d\d:\d\d)  (INFO|WARN|ERROR|DEBUG|TRACE|FATAL|CRIT) (.*)$`)
+	// Waylith pads level names to five characters after one space: "12:00:00  INFO", "12:00:00 ERROR".
+	consoleMessage = regexp.MustCompile(`^(\d\d:\d\d:\d\d) {1,2}(INFO|WARN|ERROR|DEBUG|TRACE|FATAL|CRIT) (.*)$`)
 	consoleTime    = regexp.MustCompile(`^\d\d:\d\d:\d\d `)
 	versionRev     = regexp.MustCompile(`^(\d+\.\d+\.\d+) rev(\d+)$`)
 )
@@ -20,13 +22,15 @@ type consoleLog struct {
 	w       io.Writer
 	date    string
 	pending []byte
+	// decode reads a line that is not UTF-8: the system ANSI code page by default.
+	decode func([]byte) string
 }
 
 func newConsoleLog(w io.Writer, version string, now time.Time) (*consoleLog, error) {
 	version = strings.TrimSpace(version)
 	version = versionRev.ReplaceAllString(version, `${1}.${2}`)
 	_, err := fmt.Fprintf(w, "=== Waylith log ===\nVersion:   %s\n\n", version)
-	return &consoleLog{w: w, date: now.Format("2006-01-02")}, err
+	return &consoleLog{w: w, date: now.Format("2006-01-02"), decode: decodeANSI}, err
 }
 
 func (c *consoleLog) Write(p []byte) (int, error) {
@@ -53,7 +57,11 @@ func (c *consoleLog) flush() error {
 }
 
 func (c *consoleLog) line(b []byte) error {
-	line := strings.TrimSuffix(string(b), "\r")
+	b = bytes.TrimSuffix(b, []byte("\r"))
+	line := string(b)
+	if !utf8.Valid(b) {
+		line = c.decode(b)
+	}
 	if m := consoleMessage.FindStringSubmatch(line); m != nil {
 		_, err := fmt.Fprintf(c.w, "%s %s.000  %s %s\n", c.date, m[1], m[2], m[3])
 		return err
