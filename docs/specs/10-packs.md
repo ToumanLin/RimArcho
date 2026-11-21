@@ -123,7 +123,7 @@ Before moving a blocking copy (step 2), plan the incoming links from all games u
 - **UI.** Show one "for you to confirm" item with a one-click "remove the links" action and no confirmation, since relaunching the pack rebuilds them. Launching through RimArcho removes the links anyway, so this is not a "breaks the game" item. If there are no game-breaking findings, the notice on the Launch page shows this message and links to Can it run (16 §2.3).
 - **Removal.** `archo pack unlink [--dry-run]` and MCP `manage_packs action=unlink` remove only the links under 09 §3, leaving the pack unchanged. Refuse if any game is running.
 
-**Pack Player.log.** Launch arguments and previous-log rotation follow 03 §6.3 using the pack's userdata. Log following uses the pack's own file without borrowing the selected environment's log (06 §4, §6). Real-game verification of the explicit-log launch remains pending, including 1.7 Waylith.
+**Pack Player.log.** Launch arguments and previous-log rotation follow 03 §6.3 using the pack's userdata. Log following uses the pack's own file without borrowing the selected environment's log (06 §4, §6). On 1.7 Waylith, which ignores `-logfile`, it follows the default folder's `Logs/Player.log` while the pack's launch is the newest Waylith launch before that file was written (03 §6.3). Real-game verification of the explicit-log launch remains pending, including 1.7 Waylith.
 
 ## 4. Import, export and deletion
 

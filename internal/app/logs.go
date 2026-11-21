@@ -139,11 +139,18 @@ func (a *App) LogPaths(st *LoadoutState) (cur, prev string) {
 // environment: Waylith ignores -logfile and always writes the default folder's Logs/
 // (03 §6.3). A file there counts only when the newest plan launch of any Waylith game
 // before it was written is this environment's, so a default-folder sibling's, a pack's
-// or another 1.7 install's run is never borrowed.
+// or another 1.7 install's run is never borrowed. A pack's run reads it the same way
+// (waylithRunLogs, RunLog).
 func (a *App) waylithDefaultLogs(st *LoadoutState) (cur, prev string) {
-	e := st.Ix.Env
+	return a.waylithRunLogs(st.Ix.Env, st.Ix.Env.UserDataRoot, "")
+}
+
+// waylithRunLogs is waylithDefaultLogs for a run with data folder userData: e's own
+// (pack "") or pack's. The launch that owns the file must be that run's: same data folder,
+// and the same pack (none for e's list, then also e's launch).
+func (a *App) waylithRunLogs(e *env.Environment, userData, pack string) (cur, prev string) {
 	def := a.DefaultUserData(e.GameRoot)
-	if def == "" || samePath(e.UserDataRoot, def) || !isWaylith(e) {
+	if def == "" || userData == "" || samePath(userData, def) || !isWaylith(e) {
 		return "", ""
 	}
 	envs, err := a.Store.Envs()
@@ -163,7 +170,7 @@ func (a *App) waylithDefaultLogs(st *LoadoutState) (cur, prev string) {
 			return ""
 		}
 		r, err := a.Store.LaunchRecordBefore(ids, fi.ModTime())
-		if err != nil || r == nil || r.EnvID != e.ID || r.Pack() != "" || !samePath(r.UserDataRoot, e.UserDataRoot) {
+		if err != nil || r == nil || !strings.EqualFold(r.Pack(), pack) || pack == "" && r.EnvID != e.ID || !samePath(r.UserDataRoot, userData) {
 			return ""
 		}
 		return p

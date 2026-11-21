@@ -247,3 +247,46 @@ func TestWaylithOwnConfigReadsDefaultLogs(t *testing.T) {
 		t.Fatalf("1.6 read Logs/: %q", got)
 	}
 }
+
+// A 1.7 pack's run also writes the default folder's Logs/Player.log: RunLog follows it
+// while the pack's launch is the newest one before it, and never a plan's run.
+func TestWaylithPackReadsDefaultLogs(t *testing.T) {
+	t.Parallel()
+	e := loadoutEnv(t)
+	scanNow(t, e)
+	e.WriteFile(filepath.Join(e.Game, "Waylith.dll"), "MZ")
+	st, _ := e.App.Loadout()
+	main := st.Ix.Env
+	packData := filepath.Join(e.App.PacksDir(), "Synthetic", "userdata")
+	w := app.RunWhat{Pack: "Synthetic", UserData: packData}
+	cur := filepath.Join(e.UserData, "Logs", "Player.log")
+	touch := func() {
+		e.Advance(time.Minute)
+		e.WriteFile(cur, "=== Waylith log ===\nVersion:   1.7.5014 rev1195\n")
+		if err := os.Chtimes(cur, e.Now(), e.Now()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	launch := func(method, root string) {
+		e.Advance(time.Minute)
+		if err := e.App.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: main.ID, GameID: main.GameID, UserDataRoot: root, Method: method, Started: e.Now()}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	launch("pack:Synthetic", packData)
+	touch()
+	if p := e.App.RunLog(st, w); p != cur {
+		t.Fatalf("pack run's log not found: %q", p)
+	}
+	// Another pack, then the plan, ran since: neither is this pack's log.
+	launch("pack:Other", filepath.Join(e.App.PacksDir(), "Other", "userdata"))
+	touch()
+	if p := e.App.RunLog(st, w); p != "" {
+		t.Fatalf("borrowed another pack's log: %q", p)
+	}
+	launch("direct", main.UserDataRoot)
+	touch()
+	if p := e.App.RunLog(st, w); p != "" {
+		t.Fatalf("borrowed the plan's log: %q", p)
+	}
+}

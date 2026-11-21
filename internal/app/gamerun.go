@@ -369,7 +369,8 @@ func (a *App) packOfDir(dir string) string {
 }
 
 // RunLog prefers the explicit Player.log in the run's own data folder (03 §6.3).
-// A pack never falls back to the selected environment's log.
+// A pack never falls back to the selected environment's log; on 1.7 it reads the default
+// folder's Logs/ when its own launch wrote it.
 func (a *App) RunLog(st *LoadoutState, w RunWhat) string {
 	if w.UserData != "" && env.PathKey(w.UserData) != env.PathKey(st.Ix.Env.UserDataRoot) {
 		for _, p := range []string{filepath.Join(w.UserData, "Player.log"), env.PlayerLog(w.UserData, st.GameMM())} {
@@ -377,7 +378,9 @@ func (a *App) RunLog(st *LoadoutState, w RunWhat) string {
 				return p
 			}
 		}
-		return ""
+		// 1.7 ignores -logfile: a pack's run writes the default folder's Logs/ (03 §6.3).
+		cur, _ := a.waylithRunLogs(st.Ix.Env, w.UserData, w.Pack)
+		return cur
 	}
 	cur, _ := a.LogPaths(st)
 	return cur
