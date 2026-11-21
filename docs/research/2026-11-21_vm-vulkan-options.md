@@ -60,7 +60,7 @@ For anything about **performance** (frame rate, load times, GPU memory), use rea
 
 ## 5. Option A, first measurements (2026-11-21, 4 vCPUs only)
 
-Snapshot `RimArcho-Real-Vulkan-17` reverted and resumed (live, Steam running). Each run starts `C:\Games\RimWorld-1.7\RimWorld.exe -savedatafolder=<fresh sandbox> -NoFileLog -quicktest` (Core and the five DLCs in official order, dev mode on, 1280×720 windowed). Steam's 1.7 pipeline cache (`steamapps\shadercache94100`) and the sandbox's own shader cache are deleted before each run. A guest script timestamps every console line as it arrives, and records when the map's bottom tab bar first shows on screen ("map ready"). The 1.7 console log has 1-second timestamps and logs nothing when the map is done, so the screen check is the end mark. The scripts are throwaway files in `D:\VMs\Transferkopt` (`run17.ps1`, `hold.mjs`), not repo tooling.
+Snapshot `RimArcho-Real-Vulkan-17` reverted and resumed (live, Steam running). Each run starts `C:\Games\RimWorld-1.7\RimWorld.exe -savedatafolder=<fresh sandbox> -NoFileLog -quicktest` (Core and the five DLCs in official order, dev mode on, 1280×720 windowed). Steam's 1.7 pipeline cache (`steamapps\shadercache\294100`) and the sandbox's own shader cache are deleted before each run. A guest script timestamps every console line as it arrives, and records when the map's bottom tab bar first shows on screen ("map ready"). The 1.7 console log has 1-second timestamps and logs nothing when the map is done, so the screen check is the end mark. The scripts are throwaway files in `D:\VMs\Transfer\vkopt` (`run17.ps1`, `hold.mjs`), not repo tooling.
 
 | Run (4 vCPUs) | GpuProbe | "Initializing new game" | Map ready |
 | --- | --- | --- | --- |
