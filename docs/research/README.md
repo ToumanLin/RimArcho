@@ -10,6 +10,7 @@ Investigations, measurements and open questions; once a report's conclusions are
 | [01-pattern-library-integration-draft.md](01-pattern-library-integration-draft.md) | Pre-integration draft of the error pattern library in MCP | Integrated (06 §5); kept as the corpus track's record |
 | [02-common-mod-authoring-error-patterns.md](02-common-mod-authoring-error-patterns.md) | The most common loading-phase errors in player logs, for Mod authors | Active (v1; runtime and save errors still to do, §5) |
 | [decisions-corpus.md](decisions-corpus.md) | Corpus P1 decisions and measurements (attribution, ordering, severity calibration) | Evidence for severities and constraint strength (05 §4.3, 08) |
+| [2026-11-21_no-match-reasons.md](2026-11-21_no-match-reasons.md) | `patch.no-match` reasons on 1,995 1.6 logs: share, observed / chance, logged FailKey | Evidence for 05 §4.4 "Player-facing use"; open: full run, `exception`, `target-missing` (§4) |
 | [mcp-eval-design.md](mcp-eval-design.md) | Design, cases and aggregate results of the Archo MCP A/B evaluation | Active |
 | [2026-11-04_mcp-transcript-review.md](2026-11-04_mcp-transcript-review.md) | Round 1 transcript review: where agents lost time with `archo mcp` | Evidence for known noise (06 §1); proposals in §7, status in round 2 §6 |
 | [2026-11-05_mcp-transcript-review-round2.md](2026-11-05_mcp-transcript-review-round2.md) | Round 2 transcript review (h1, h2, h5; Pi and dsh) | Open: proposals in §7 |
