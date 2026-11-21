@@ -221,6 +221,11 @@ namespace ArchoMonitor
             {
                 done = CrossRef(m, c);
             }
+            else if (QuotedDef(m, out string named))
+            {
+                // "Could not load Texture2D at '…' for def 'X' …": X's file, as for a Config error.
+                done = DefConfig(named, c);
+            }
             if (!done && op != null)
             {
                 string pmod = XmlTracker.ModOf(op);
@@ -247,6 +252,26 @@ namespace ArchoMonitor
             {
                 c.AddMod(Mods.OfAssemblyName(a.Groups[1].Value), "text");
             }
+        }
+
+        // QuotedDef finds "for def 'X'" in a message (the game's texture and graphic errors).
+        internal static bool QuotedDef(string m, out string name)
+        {
+            name = null;
+            const string key = "for def '";
+            int at = m.IndexOf(key, StringComparison.Ordinal);
+            if (at < 0)
+            {
+                return false;
+            }
+            at += key.Length;
+            int end = m.IndexOf('\'', at);
+            if (end <= at || end - at > 200)
+            {
+                return false;
+            }
+            name = m.Substring(at, end - at);
+            return true;
         }
 
         static bool DefConfig(string name, Context c)
