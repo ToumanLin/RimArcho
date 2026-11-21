@@ -214,7 +214,7 @@ The rules are:
 
 | `code` | Severity | Observed / chance | Reason |
 | --- | --- | --- | --- |
-| `patch.no-match` | warning | 37.3% / 4.5% (8.3×); `patch-failed` errors 29.7% / 0.9% | The strongest error predictor, but kept below error: 70% have no matching logged patch failure (for example optional targets), and error would keep half of the lists from building packs. |
+| `patch.no-match` | warning | 37.3% / 4.5% (8.3×); `patch-failed` errors 29.7% / 0.9% | The strongest error predictor, but kept below error: 70% have no matching logged patch failure (for example optional targets), and error would keep half of the lists from building packs. On current code (2026-11-21): 54.8% / 4.7% (11.6×); per reason and what players see, §4.4. |
 | `def.parent-missing` | error | 16.3% / 4.1% (3.9×) | Meets the error rule. |
 | `incompat.active` | error | 26.4% / 7.3% (3.6×) | Meets the error rule. |
 | `def.abstract-collision` | warning | 25.4% / 8.3% (3.0×); 3.2× excluding Harmony stack errors | Meets the warning rule. |
@@ -253,6 +253,24 @@ Classify the reasons at the innermost failed operation. An operation may have mu
 **Guards** include the match branch of `PatchOperationFindMod`, `Conditional`, `Sequence` children with `MayRequire`, and conditional loading folders (§1). Ignore top-level `MayRequire`, as the game does, and explain this in the details.
 
 **Expected targets** are the names in `FindMod` (display names, or directory names for DLC), `MayRequire` packages, conditional-folder packages, and hard dependencies other than Harmony and Ludeon.
+
+**Player-facing use by reason (corpus, 2026-11-21).** The data is the §4.3.1 method per reason, on 1,995 of the 6,734 `1.6` logs (docs/research/2026-11-21_no-match-reasons.md). Each unit is one (log, Mod, reason). The table shows the patching Mod as an error source, observed / chance, and how often the log itself reports the same operation as failed (same `FailKey`, §5.2), with 95% bootstrap intervals over logs. Every reason except `target-missing` is 8–14× chance as a source, because a Mod with failing patches tends to have other errors as well (4–7× when patch-failed clusters are left out). The reasons differ in the logged share, and that share is what "this patch fails in your game" means.
+
+| Reason | Units (share) | Source, observed / chance | Logged, same `FailKey` | Can it run item | Row mark |
+| --- | --- | --- | --- | --- | --- |
+| `target-inactive` + `unguarded-optional` | 139 (5.7%) | 58.3% / 5.4% (10.8×) | 47.5% [39–55] | warning: enable the target (16 §5) | warning |
+| `target-inactive`, guarded or a hard dependency | 333 (13.7%) | 32.7% / 4.1% (8.0×) | 17.7% [13–22] | only when logged; a hard dependency is already `dep.inactive` | warning |
+| `node-absent` | 1,189 (48.8%) | 50.3% / 3.6% (14.2×) | 30.4% [28–33] | only when logged | warning |
+| `target-later` | 103 (4.2%) | 45.6% / 3.3% (13.8×) | 35.9% [27–45] | only when logged | warning |
+| `unclassified` | 53 (2.2%) | 56.6% / 4.7% (12.1×) | 43.4% [28–58] | only when logged | warning |
+| `wrong-version-route` | 525 (21.6%) | 29.1% / 3.3% (8.8×) | 7.8% [6–10]; per finding 1.8% | only when logged | info (muted) |
+| `stale-name` | 322 (13.2%) | 25.2% / 2.8% (8.9×) | 0.3% [0–1] | only when logged | info (muted) |
+| `target-missing` | 67 (2.8%) | 3.0% / 3.6% (0.8×) | 0% | none | none: technical details only |
+| `exception` | 9 (0.4%) | 0 of 9 | 0 of 9 | only when logged | none until there is data |
+
+- **Promote any reason to a Can it run warning when the current, non-stale log reports the same `FailKey`.** Logged units are a source 24.5× chance. Without such a log, a no-match is a row mark and not a counted item. Only `target-inactive` with `unguarded-optional` keeps its item before any log, because the player can fix it in one step.
+- **Warning row marks** (amber) go to reasons that the game reports for 18–48% of Mods. **Muted info marks** go to `wrong-version-route` and `stale-name`: the game seldom fails them (the library often has a newer target than the player), but their Mods have other errors 6–7× chance, so the mark reads as "may be out of date", not as "broken".
+- **The corpus cannot grade `target-missing`.** There, the research library lacks a definer that the player had (the `dep.missing (lib)` artefact of §4.3.1). In a real install, the guarded form never fails, and the unguarded form is the author's bug, which the player cannot fix. Keep it out of player views until logs with the player's installed set can measure it.
 
 ### 4.5 Default display
 
