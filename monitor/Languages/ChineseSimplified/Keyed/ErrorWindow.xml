@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <ArchoMonitor_OpenErrors>按 Mod 查看错误…</ArchoMonitor_OpenErrors>
+  <ArchoMonitor_ErrorsTitle>本次运行的错误</ArchoMonitor_ErrorsTitle>
+  <ArchoMonitor_Warnings>包括警告</ArchoMonitor_Warnings>
+  <ArchoMonitor_StatErrors>个错误</ArchoMonitor_StatErrors>
+  <ArchoMonitor_StatProblems>个错误和警告</ArchoMonitor_StatProblems>
+  <ArchoMonitor_StatMods>个 Mod</ArchoMonitor_StatMods>
+  <ArchoMonitor_Stopped>游戏于 {1} 停止写日志：此后又出现 {0} 次</ArchoMonitor_Stopped>
+  <ArchoMonitor_StoppedTip>消息满 10000 条后，游戏不再写日志。Archo Monitor 会继续计数：琥珀色的数字是此后又出现、Player.log 里没有的次数。</ArchoMonitor_StoppedTip>
+  <ArchoMonitor_After>游戏停止写日志后又出现 {0} 次</ArchoMonitor_After>
+  <ArchoMonitor_FileFull>ArchoMonitor.log 已满：之后只记次数</ArchoMonitor_FileFull>
+  <ArchoMonitor_Dropped>不同的消息超过 4000 种：较早的已丢弃</ArchoMonitor_Dropped>
+  <ArchoMonitor_NoErrors>本次运行没有错误</ArchoMonitor_NoErrors>
+  <ArchoMonitor_NoErrorsSub>Archo Monitor 会记下每个错误，游戏停止写日志后也一样。</ArchoMonitor_NoErrorsSub>
+  <ArchoMonitor_NoMod>未找到 Mod</ArchoMonitor_NoMod>
+  <ArchoMonitor_Distinct>{0} 种不同的消息</ArchoMonitor_Distinct>
+  <ArchoMonitor_More>还有 {0} 条</ArchoMonitor_More>
+  <ArchoMonitor_Copy>复制</ArchoMonitor_Copy>
+  <ArchoMonitor_Copied>已复制</ArchoMonitor_Copied>
+  <ArchoMonitor_Loading>加载时</ArchoMonitor_Loading>
+  <ArchoMonitor_AlsoMods>还涉及：</ArchoMonitor_AlsoMods>
+  <ArchoMonitor_Role_xml>它的 XML</ArchoMonitor_Role_xml>
+  <ArchoMonitor_Role_def>定义其父 Def</ArchoMonitor_Role_def>
+  <ArchoMonitor_Role_patch>补丁</ArchoMonitor_Role_patch>
+  <ArchoMonitor_Role_stack>调用栈上的代码</ArchoMonitor_Role_stack>
+  <ArchoMonitor_Role_text>消息中提到</ArchoMonitor_Role_text>
+  <ArchoMonitor_Kind_DefConfigError>Def 配置</ArchoMonitor_Kind_DefConfigError>
+  <ArchoMonitor_Kind_CrossRefError>引用缺失</ArchoMonitor_Kind_CrossRefError>
+  <ArchoMonitor_Kind_PatchError>XML 补丁</ArchoMonitor_Kind_PatchError>
+  <ArchoMonitor_Kind_XMLSyntaxError>XML 加载</ArchoMonitor_Kind_XMLSyntaxError>
+  <ArchoMonitor_Kind_AssemblyConflict>程序集冲突</ArchoMonitor_Kind_AssemblyConflict>
+  <ArchoMonitor_Kind_TickException>Tick 异常</ArchoMonitor_Kind_TickException>
+  <ArchoMonitor_Kind_DrawException>绘制异常</ArchoMonitor_Kind_DrawException>
+  <ArchoMonitor_Kind_NullReference>空引用</ArchoMonitor_Kind_NullReference>
+  <ArchoMonitor_Kind_OutOfMemory>内存不足</ArchoMonitor_Kind_OutOfMemory>
+  <ArchoMonitor_Kind_MissingTexture>贴图缺失</ArchoMonitor_Kind_MissingTexture>
+  <ArchoMonitor_Kind_Warning>警告</ArchoMonitor_Kind_Warning>
+  <ArchoMonitor_Kind_Other>其他</ArchoMonitor_Kind_Other>
+</LanguageData>
