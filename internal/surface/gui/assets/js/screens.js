@@ -1199,7 +1199,7 @@ function checkState(d) {
     stale: T("the files changed since the last check"),
     current: T("up to date"),
   }[kind];
-  const tip = d.checked && kind !== "never" ? words + ", " + d.checked : words;
+  const tip = d.checked && (kind === "current" || kind === "stale") ? words + ", " + d.checked : words;
   const s = el("span", "check-state " + kind);
   s.innerHTML = icon[{ checking: "rescan", never: "warn", stale: "warn", current: "ok" }[kind]] || "";
   s.title = tip;

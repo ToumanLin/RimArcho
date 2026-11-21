@@ -169,3 +169,28 @@ func TestBeginOnceKeepsOneRow(t *testing.T) {
 		}
 	}
 }
+
+// An earlier window's finished check gives its row too: one row across launches.
+func TestBeginOnceReplacesAnEarlierWindowsRow(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "tasks.json")
+	first := OpenTasks(path)
+	first.Finish(first.BeginOnce("analyze", "Main", nil), TaskDone, "analysis done")
+	first.Close()
+	second := OpenTasks(path)
+	defer second.Close()
+	if n := len(second.List()); n != 1 {
+		t.Fatalf("the new window reads %d rows, want the earlier check", n)
+	}
+	id := second.BeginOnce("analyze", "Main", nil)
+	second.Finish(id, TaskDone, "analysis done")
+	rows := second.List()
+	if len(rows) != 1 || rows[0].ID != id {
+		t.Fatalf("rows %+v, want only the new check", rows)
+	}
+	third := OpenTasks(path)
+	defer third.Close()
+	if rows := third.List(); len(rows) != 1 || rows[0].ID != id {
+		t.Fatalf("the record keeps %+v, want only the new check", rows)
+	}
+}

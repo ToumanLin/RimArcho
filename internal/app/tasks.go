@@ -275,14 +275,17 @@ func (ts *Tasks) Begin(kind, obj string, stop func() error) string {
 }
 
 // BeginOnce is Begin for work that repeats by itself (the files' check, 16 §8.9): an
-// earlier task of this window with the same kind and object that ended done gives its
-// row to this one, so the task list keeps one row for it, updated in place, instead of a
-// line of finished copies. Failed, stopped and partial ones stay.
+// earlier task with the same kind and object that ended done, this window's or an earlier
+// window's, gives its row to this one, so the task list keeps one row for it, updated in
+// place, instead of a line of finished copies. Failed, stopped and partial ones stay.
 func (ts *Tasks) BeginOnce(kind, obj string, stop func() error) string {
 	ts.mu.Lock()
 	keep := ts.list[:0:0]
 	for _, t := range ts.list {
-		if t.Kind == kind && t.Obj == obj && t.Owner == ts.owner && t.State == TaskDone {
+		if t.Kind == kind && t.Obj == obj && t.State == TaskDone {
+			if t.Owner != ts.owner {
+				ts.gone[t.ID] = true // as Forget: the record's merge does not bring it back
+			}
 			continue
 		}
 		keep = append(keep, t)
