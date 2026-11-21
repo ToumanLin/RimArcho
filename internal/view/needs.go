@@ -193,6 +193,9 @@ type Needs struct {
 	Count   int                 `json:"count"` // the top bar's number
 	Never   bool                `json:"never"` // the mods' files were never checked
 	Stale   bool                `json:"stale"` // the files changed since the last check
+	// Checked is when the shown check of the files ran ("last checked …"; "" never): the
+	// page shows the last result with its age and reruns only on check again (16 §8.9).
+	Checked string `json:"checked,omitempty"`
 	// Launch is the most likely trouble of a launch (app.LaunchChecks among the counted
 	// items), for the launch page's tab and the TUI's launch line (16 §2.3); nil when none.
 	Launch *LaunchHint `json:"launch,omitempty"`
@@ -358,6 +361,9 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 	n := &Needs{Status: map[string]int{}, Reasons: map[string][]Reason{}}
 	n.Never = ps.Analysis == nil || ps.Analysis.Run == nil
 	n.Stale = !n.Never && !ps.Analysis.Fresh
+	if !n.Never {
+		n.Checked = lastChecked(a, ps.Analysis.Run.Finished)
+	}
 	if st == nil {
 		return n
 	}

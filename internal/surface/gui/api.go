@@ -57,14 +57,25 @@ type API struct {
 	needsAt         string // the database state the needs were built at
 	content         view.ContentCache
 	busy            map[string]bool // scan, analyze, pack
+	flight          flights         // page reads on their way (flight.go)
+	feedbackAt      time.Time       // the last relay check of FeedbackCheck
+	// analyzedKey, analyzedAt: the inputs and end of the last check that succeeded; check
+	// again with the same inputs right after it does not start another (Analyze)
+	analyzedKey     string
+	analyzedAt      time.Time
 	workspace       *workspaceSnapshot
 	needsCache      map[string]*needsSnapshot
 	needsJobs       sync.WaitGroup
 	needsRefreshing bool
 	needsClosed     bool
-	needsWanted     bool
-	needsSequence   uint64
-	listEdits       uint64
+	// needsWanted: Can it run is on screen (set by Needs, cleared by Leave): only then may a
+	// stale check start again by itself (autoAnalyzeLocked, 16 §8.9).
+	needsWanted bool
+	// autoAnalyzed: the inputs (scope and analysis key) an automatic check already ran for
+	// this session; the same inputs never start another by themselves.
+	autoAnalyzed  map[string]bool
+	needsSequence uint64
+	listEdits     uint64
 	// building is the pack this window's build child is making ("" none).
 	building  string
 	buildRead buildPageReader
@@ -323,6 +334,10 @@ type PackList struct {
 
 // Packs lists the current environment's packs (10).
 func (s *API) Packs() (*PackList, error) {
+	return join(&s.flight, "Packs", s.packsRead)
+}
+
+func (s *API) packsRead() (*PackList, error) {
 	r, err := s.detachedReader()
 	if err != nil {
 		return nil, err
@@ -598,6 +613,11 @@ func (s *API) Directories() ([]app.ManagedDirectory, error) {
 
 // Settings is the settings page (16 §2.14).
 func (s *API) Settings() []view.SettingGroup {
+	v, _ := join(&s.flight, "Settings", func() ([]view.SettingGroup, error) { return s.settingsRead(), nil })
+	return v
+}
+
+func (s *API) settingsRead() []view.SettingGroup {
 	r, err := s.detachedReader()
 	if err != nil {
 		return nil
@@ -611,6 +631,11 @@ func (s *API) Settings() []view.SettingGroup {
 // Environment is the environment page: the environments, the current one's folders and
 // launch.
 func (s *API) Environment() *view.EnvPage {
+	v, _ := join(&s.flight, "Environment", func() (*view.EnvPage, error) { return s.environmentRead(), nil })
+	return v
+}
+
+func (s *API) environmentRead() *view.EnvPage {
 	r, err := s.detachedReader()
 	if err != nil {
 		return &view.EnvPage{}
@@ -1257,8 +1282,8 @@ func (s *API) Needs() *view.Needs {
 			s.refreshNeedsLocked(c)
 			st, _ := s.a.Loadout()
 			n := view.RefreshMemory(s.a, st, c.n)
-			if c.eager && n.Error == "" && (n.Stale || n.Never) && !s.busy["analyze"] {
-				s.startAnalyze()
+			if c.eager {
+				s.autoAnalyzeLocked(n, st)
 			}
 			out := *n
 			out.Updating = s.needsWorkLocked()
@@ -1299,9 +1324,7 @@ func (s *API) Needs() *view.Needs {
 		// The eager pass may have saved a parsed log report. Read its ProblemSet again.
 		ps, _ = r.Problems(false, nil)
 		s.saveFreshNeedsLocked(ps, n, true)
-		if (n.Stale || n.Never) && !s.busy["analyze"] {
-			s.startAnalyze()
-		}
+		s.autoAnalyzeLocked(n, current)
 		n.Updating = s.needsWorkLocked()
 	}
 	return n
@@ -1559,6 +1582,10 @@ func (s *API) Logs() []string {
 
 // LogPage analyses a log for the Game log tab (the newest when path is empty).
 func (s *API) LogPage(path string) (*view.LogPage, error) {
+	return join(&s.flight, "LogPage|"+path, func() (*view.LogPage, error) { return s.logPageRead(path) })
+}
+
+func (s *API) logPageRead(path string) (*view.LogPage, error) {
 	// Serialise log reads with each other, not with the board, navigation or textures.
 	// Keeping this reader also preserves pending cross-version analysis between polls.
 	s.logRead.mu.Lock()
@@ -1775,10 +1802,29 @@ func (s *API) startScanLocked(auto bool) bool {
 
 // Analyze checks the mods' files again in a child process; "analyze" events carry the
 // progress lines and the end.
+//
+// Check again a few seconds after a check of the same inputs ended (a held key, a burst
+// of clicks) starts nothing: that result is the current one (16 §8.9).
 func (s *API) Analyze() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.analyzedKey != "" && time.Since(s.analyzedAt) < analyzeAgain && s.analyzedKey == s.analysisInputsLocked() {
+		return false
+	}
 	return s.startAnalyze()
+}
+
+// analyzeAgain: how long after a check its inputs count as just checked (Analyze).
+const analyzeAgain = 5 * time.Second
+
+// analysisInputsLocked is what a check of the open list depends on: its scope and
+// app.AnalysisKey ("" without a loadout). s.mu is held.
+func (s *API) analysisInputsLocked() string {
+	st, _ := s.a.Loadout()
+	if st == nil {
+		return ""
+	}
+	return s.needsScopeLocked() + "|" + s.a.AnalysisKey(st, "")
 }
 
 func (s *API) startAnalyze() bool { return s.startAnalyzeOf("") }
@@ -1793,6 +1839,10 @@ func (s *API) startAnalyzeOf(list string) bool {
 	home, env, exe, plan := s.a.Home, s.a.EnvName, s.Exe, s.a.OpenPlanName()
 	mm := s.a.GameVersion
 	scope, _, _, _ := s.needsKeyLocked()
+	inputs := ""
+	if list == "" {
+		inputs = s.analysisInputsLocked()
+	}
 	obj := env
 	if s.board != nil && s.board.St != nil && s.board.St.Plan != nil {
 		obj = s.board.St.Plan.Name
@@ -1825,6 +1875,9 @@ func (s *API) startAnalyzeOf(list string) bool {
 		}
 		s.mu.Lock()
 		s.busy["analyze"], s.needs = false, nil
+		if err == nil && inputs != "" {
+			s.analyzedKey, s.analyzedAt = inputs, time.Now()
+		}
 		if err != nil {
 			if c, _ := s.cachedNeedsLocked(); c != nil && c.scope == scope {
 				n := *c.n

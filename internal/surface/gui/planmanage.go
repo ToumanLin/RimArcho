@@ -2,6 +2,7 @@ package gui
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -124,6 +125,10 @@ func (s *API) cancelLoadCost(close bool) {
 
 // PlanManage is the page with the list sel picked (0: the current one). No network.
 func (s *API) PlanManage(sel int64) (*view.PlanManage, error) {
+	return join(&s.flight, fmt.Sprint("PlanManage|", sel), func() (*view.PlanManage, error) { return s.planManageRead(sel) })
+}
+
+func (s *API) planManageRead(sel int64) (*view.PlanManage, error) {
 	s.plansRead.mu.Lock()
 	defer s.plansRead.mu.Unlock()
 	defer s.retainReader(&s.plansRead)

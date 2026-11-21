@@ -91,3 +91,52 @@ func TestSelfTasksCancelAndClose(t *testing.T) {
 		}
 	}
 }
+
+// 16 §8.9: repeated requests while one runs give one waiting task, not a line of them.
+func TestSelfTasksJoinAWaitingTwin(t *testing.T) {
+	t.Parallel()
+	ts := OpenTasks("")
+	defer ts.Close()
+	started, release := make(chan struct{}), make(chan struct{})
+	var runs sync.WaitGroup
+	runs.Add(2)
+	count := 0
+	var mu sync.Mutex
+	run := func(string) (string, error) {
+		mu.Lock()
+		count++
+		first := count == 1
+		mu.Unlock()
+		if first {
+			close(started)
+			<-release
+		}
+		runs.Done()
+		return "checked", nil
+	}
+	req := Task{Kind: "source-check", Obj: "RimArcho", Args: []string{"source-check", "workshop"}}
+	first := ts.EnqueueSelf(req, run)
+	<-started
+	var queued []string
+	for i := 0; i < 10; i++ {
+		queued = append(queued, ts.EnqueueSelf(req, run).ID)
+	}
+	for _, id := range queued[1:] {
+		if id != queued[0] || id == first.ID {
+			t.Fatalf("clicks queued %v after %s", queued, first.ID)
+		}
+	}
+	other := req
+	other.Args = []string{"source-check", "git"}
+	if ts.EnqueueSelf(other, func(string) (string, error) { return "", nil }).ID == queued[0] {
+		t.Fatal("another source joined the workshop check")
+	}
+	close(release)
+	runs.Wait()
+	waitEnded(t, ts, queued[0])
+	mu.Lock()
+	defer mu.Unlock()
+	if count != 2 {
+		t.Fatalf("11 requests ran %d times, want 2", count)
+	}
+}

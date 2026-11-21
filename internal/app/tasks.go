@@ -275,11 +275,23 @@ func (ts *Tasks) Begin(kind, obj string, stop func() error) string {
 }
 
 // EnqueueSelf schedules work in the RimArcho lane: one of each kind at a time,
-// different kinds concurrently (16 §2.16). run reports progress through Update.
+// different kinds concurrently (16 §2.16). run reports progress through Update. A request
+// equal to a task still waiting (kind, object, arguments, Game Config) joins it: that task
+// is returned and nothing more is queued (16 §8.9). So repeated clicks give at most one
+// run after the one running, never a line of the same work.
 func (ts *Tasks) EnqueueSelf(request Task, run func(string) (string, error)) Task {
 	ts.mu.Lock()
 	if ts.selfRuns == nil {
 		ts.selfRuns = map[string]func(string) (string, error){}
+	}
+	if request.ID == "" {
+		for _, t := range ts.list {
+			if t.Lane == LaneSelf && t.State == TaskQueued && t.Kind == request.Kind && t.Obj == request.Obj && t.Env == request.Env && slices.Equal(t.Args, request.Args) {
+				cp := *t
+				ts.mu.Unlock()
+				return cp
+			}
+		}
 	}
 	t := &Task{ID: ts.newID(), Kind: request.Kind, Lane: LaneSelf, Obj: request.Obj, Args: slices.Clone(request.Args), Env: request.Env, State: TaskQueued, Queued: ts.stamp(), Owner: ts.owner}
 	if prior := ts.find(request.ID); prior != nil && prior.WorkshopSubscription() {

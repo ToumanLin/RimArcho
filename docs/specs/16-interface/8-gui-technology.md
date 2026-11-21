@@ -142,3 +142,28 @@ List edits use `App.IncrementalProblems` to synchronously recalculate the declar
 ### 8.8 Steam credit API
 
 The Wails methods, JSON, task and events behind the Steam credit prompt and the gradual replacement task (§2.16) are in the [Steam credit GUI API contract](../../api/steam-credit.md); the batch rules are in 11 §1.
+
+### 8.9 Repeated work
+
+Clicking fast, switching pages and editing a list must not run the same work again and again (a player's task list showed "Can it run" checks of the same lists every minute or two). Four rules hold for every page and verb:
+
+1. **One run at a time, repeats join it.** A page read asked for while the same read (method and arguments) is on its way waits for that read and gets its answer (`API.flight`, `join` in `flight.go`); a read asked for after it ended runs again, so no answer is older than the request that started its read. Started work refuses a second start while it runs (`busy["scan"]`, `busy["analyze"]`, `busy["pack"]`, `busy["textures"]`). A queued task equal to a new request (kind, object, arguments, Game Config) takes the request (`Tasks.EnqueueSelf`): repeated clicks give at most one run after the one running.
+2. **Leaving a page abandons its reads.** Answers for a page no longer shown are dropped (`beginPageRead`, `read.current()`); `API.Leave` cancels what can stop (memory estimate, texture count, file search) and ends what only that page asked for (a stale check starting by itself, below).
+3. **Heavy automatic work runs by itself only the first time.** The table says which work starts by itself and which waits for a button. Work that starts by itself does so once per inputs (data stamp) a session; afterwards the page shows the last result with its age and its button.
+4. **A button that starts work shows it.** It is disabled and `aria-busy` while the work runs, whoever started it (Can it run's check again follows `S.busy.analyze` through the `analyze` start event, without a page read); its key does nothing then either.
+
+| Work | Starts by itself | Otherwise |
+| --- | --- | --- |
+| Checking the mods' files (analysis, 05 §3) | A list never checked: once, wherever its findings are read. A stale check: only while Can it run is shown, once per inputs (scope and `app.AnalysisKey`) a session (`API.autoAnalyzeLocked`); a check that leaves its inputs stale, or failed, does not start again by itself. Edits in the editor do not start one | Can it run's check again (`A`); within 5 s of a check of the same inputs it starts nothing (`API.Analyze`) |
+| Can it run's needs and the list's findings | Read on entering, from the change-keyed cache (§8.7) | — |
+| Reading a new game log | Once per new log (§2.1 "New logs are read automatically") | Game log page |
+| Memory estimate (Launch, Can it run, All lists) | When missing or over an hour old; a new estimate cancels the previous one | — |
+| Scan | At start and on file changes (04) | Rescan |
+| Feedback replies | Entering Feedback, at most once a minute; in between the recorded replies show (`API.FeedbackCheck`) | — |
+| Followed collections (All lists) | Older than ten minutes, once per list a session | — |
+| Build page folder measurement | Entering the page, a texture choice; the same choice while measuring joins that measurement (`API.BuildPage`) | — |
+| Texture count, file search | Entering their page; a new one cancels the previous, and so does leaving | Their buttons |
+| Saves index | Entering Saves; one run at a time (`startSavesIndex`) | — |
+| Update checks, source checks, Workshop updates | Scheduled (§2.16.1) | Their buttons; repeats join the queued task |
+
+The joined reads are `Home`, `HomeMemory`, `LogPage`, `Library`, `PlanManage`, `SubscriptionsPage`, `Packs`, `Settings`, `Environment`, `ModSettings`, `FileSearchInfo`, `TexturesInfo` and `FeedbackCheck`. Measured counts before and after: 18 §2.

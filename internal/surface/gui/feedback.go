@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/feedback"
@@ -76,10 +77,27 @@ func sentTitle(title, text string) string {
 // FeedbackReports is Feedback › My reports as recorded, without asking the relay.
 func (s *API) FeedbackReports() view.FeedbackReports { return view.ReadFeedbackReports(s.a) }
 
+// feedbackAgain is how long a relay answer stands: entering Feedback again within it
+// shows the recorded replies without asking the relay (16 §8.9).
+const feedbackAgain = time.Minute
+
 // FeedbackCheck asks the relay for replies (the Feedback page opened) and updates the
-// sidebar's dot.
+// sidebar's dot. Entries while a check is on its way join it; within feedbackAgain of the
+// last one the recorded replies stand.
 func (s *API) FeedbackCheck() view.FeedbackReports {
-	r := view.CheckFeedbackReplies(context.Background(), s.a)
+	r, _ := join(&s.flight, "FeedbackCheck", func() (view.FeedbackReports, error) {
+		s.mu.Lock()
+		recent := !s.feedbackAt.IsZero() && time.Since(s.feedbackAt) < feedbackAgain
+		s.mu.Unlock()
+		if recent {
+			return view.ReadFeedbackReports(s.a), nil
+		}
+		r := view.CheckFeedbackReplies(context.Background(), s.a)
+		s.mu.Lock()
+		s.feedbackAt = time.Now()
+		s.mu.Unlock()
+		return r, nil
+	})
 	s.send("feedback-replies", map[string]any{"unseen": r.Unseen})
 	return r
 }

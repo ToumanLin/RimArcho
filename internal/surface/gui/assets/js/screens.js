@@ -621,10 +621,16 @@ function drawNeeds() {
   if (S.busy.analyze) state = T("checking the mods' files…");
   else if (d.never) state = T("the mods' files are not checked yet");
   else if (d.stale) state = T("the files changed since the last check");
+  // the last result stays with its age; a stale one reruns only on check again (16 §8.9)
+  const checked = !S.busy.analyze && d.checked ? el("span", "state-note", d.checked) : null;
+  const again = act(T("check again"), "rescan", () => ui.cmd("analyze"), "A", "analyze");
+  again.classList.add("analyze-again");
+  markAgain(again);
   const w = page("needs fill", needsLead(d),
     state ? el("span", "state-note", state) : null,
+    checked,
     autoFix(),
-    act(T("check again"), "rescan", () => ui.cmd("analyze"), "A", "analyze"),
+    again,
     act(T("game log"), "log", () => ui.go("log"), "l"));
   runSummary(w);
   N.els = [[], []];
@@ -1175,6 +1181,18 @@ export function needsKey(e) {
 
 export function analyzeEvent(ev) {
   if (S.screen === "needs" && ev.done) needs(true);
+  else againChanged();
+}
+
+// againChanged: the shown check again follows S.busy.analyze (no page read).
+export function againChanged() { markAgain(document.querySelector(".page .analyze-again")); }
+
+// markAgain: check again is busy and disabled while a check runs, whoever started it.
+function markAgain(b) {
+  if (!b) return;
+  b.disabled = !!S.busy.analyze;
+  if (S.busy.analyze) b.setAttribute("aria-busy", "true");
+  else b.removeAttribute("aria-busy");
 }
 
 // ---- game log (16 §2.10) and Mod library › Updates (16 §2.9) ----

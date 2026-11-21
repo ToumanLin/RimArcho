@@ -157,7 +157,6 @@ func (s *API) ListProblems() *view.ListProblems {
 	return view.ProblemsOf(s.Needs())
 }
 func (s *API) editProblemsLocked() *view.ListProblems {
-	s.needsWanted = true
 	scope, _, index, list := s.needsKeyLocked()
 	previous := s.needsCache[scope]
 	if previous != nil && previous.index == index {
@@ -227,9 +226,7 @@ func (s *API) refreshNeedsLocked(c *needsSnapshot) {
 		var event *view.ListProblems
 		if n != nil {
 			s.saveFreshNeedsLocked(ps, n, true)
-			if s.needsWanted && (n.Stale || n.Never) && !s.busy["analyze"] {
-				s.startAnalyze()
-			}
+			s.autoAnalyzeLocked(n, ps.State)
 			event = s.problemsNowLocked(n)
 		} else {
 			copy := *c.n
@@ -245,4 +242,32 @@ func (s *API) refreshNeedsLocked(c *needsSnapshot) {
 		s.mu.Unlock()
 		s.send("list-problems", event)
 	}()
+}
+
+// autoAnalyzeLocked starts the files' check by itself, the automatic part of 16 §8.9: a
+// list never checked starts one wherever its findings are read (the editor too); a stale
+// check starts again only while Can it run is on screen (needsWanted). Either happens once
+// per inputs (scope and app.AnalysisKey) a session: a check that ran for these inputs, or
+// one that left them stale or failed, waits for the page's check again (A). So list edits
+// in the editor, page switches and repeated visits never chain checks. s.mu is held; st is
+// the loadout n was built for.
+func (s *API) autoAnalyzeLocked(n *view.Needs, st *app.LoadoutState) bool {
+	if n == nil || st == nil || n.Error != "" || !(n.Stale || n.Never) || s.busy["analyze"] || s.needsClosed {
+		return false
+	}
+	if !n.Never && !s.needsWanted {
+		return false
+	}
+	key := s.needsScopeLocked() + "|" + s.a.AnalysisKey(st, "")
+	if s.autoAnalyzed[key] || key == s.analyzedKey {
+		return false
+	}
+	if !s.startAnalyze() {
+		return false
+	}
+	if s.autoAnalyzed == nil {
+		s.autoAnalyzed = map[string]bool{}
+	}
+	s.autoAnalyzed[key] = true
+	return true
 }

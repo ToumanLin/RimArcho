@@ -41,3 +41,49 @@ test("enter after the asked item vanished runs nothing", async () => {
   await flush();
   assert.deepEqual(actions, []);
 });
+
+// 16 §8.9: the last check stays with its age; check again is busy and disabled while a
+// check runs, whoever started it, and the start event changes only the button (no read).
+test("check again is disabled while a check runs and shows the last check's age", async () => {
+  class Node extends Element {
+    prepend(n) { this.insertBefore(n, this.firstChild); }
+    checkVisibility() { return true; }
+    constructor(...args) { super(...args); this.style.removeProperty = (k) => { delete this.style[k]; }; }
+  }
+  const el = (tag, cls, text) => new Node(tag, cls, text);
+  const screen = el("div");
+  let reads = 0;
+  const S = { screen: "needs", screenSeq: 1, busy: {}, board: { env: "game-a" }, live: null };
+  const api = { Needs: async () => { reads++; return { items: [], stale: true, checked: "last checked 21:04", memory: { estimated: true } }; } };
+  const query = sel => sel === "#screen" ? screen : screen.querySelector(sel.replace(/^#screen /, ""));
+  const screens = await loadModules("./screens.js", {
+    "./state.js": { S, $: query, el, api, T: s => s, Tf: s => s, errText: e => e.message, say() {}, cur() {}, slideThumb() {} },
+    "./icons.js": { icon: {}, statusIcon: () => "", bowMark: () => "" },
+    "./motion.js": { bump() {}, shimmer: () => el("div") },
+    "./popups.js": {},
+    "./bg.js": { bgSection: async () => el("div") },
+    "./virtualrows.js": { virtualRows() {} },
+    "./api.js": { on() {} },
+    "./separator.js": { wireSeparator() {} },
+    "./needtext.js": { initNeedText() {}, needText: (tag, cls, text) => el(tag, cls, text), needParts: () => el("div"), needEvidence: () => el("div"), evidenceMark: () => el("div") },
+    "./fulldetail.js": { full() {}, fullKey() {}, fullSection() {} },
+  }, { document: { activeElement: null, dispatchEvent() {}, querySelector: s => screen.querySelector(s), querySelectorAll: s => screen.querySelectorAll(s) }, URL, CSS: { escape: s => s }, requestAnimationFrame: fn => fn() });
+  screens.initScreens({ reload: async () => {}, renderHints() {}, renderWhere() {}, edited: async () => null });
+  await screens.needs(false);
+  const again = () => screen.querySelector(".analyze-again");
+  assert.ok(again(), "check again is shown");
+  assert.equal(again().disabled, false);
+  assert.ok(screen.querySelectorAll(".state-note").some(n => n.textContent === "last checked 21:04"), "the last check's age shows");
+  // a check starts (Go started it, or a click): busy and disabled, no read of the page
+  S.busy.analyze = true;
+  screens.analyzeEvent({ line: "reading Defs" });
+  assert.equal(again().disabled, true);
+  assert.equal(again().getAttribute("aria-busy"), "true");
+  assert.equal(reads, 1, "a start reads nothing");
+  // done: the page reads once and the button works again
+  S.busy.analyze = false;
+  screens.analyzeEvent({ done: true, ok: true });
+  await flush();
+  assert.equal(reads, 2);
+  assert.equal(again().disabled, false);
+});

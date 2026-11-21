@@ -993,7 +993,7 @@ async function cmd(id) {
       await busyStart("scan", T("scanning…"), () => api.Scan(), () => scr.busyChanged());
       return;
     case "analyze":
-      await busyStart("analyze", T("checking the mods' files…"), () => api.Analyze());
+      await busyStart("analyze", T("checking the mods' files…"), () => api.Analyze(), () => scr.againChanged());
       return;
     case "env": return chooseEnv();
     case "plans": return plans.chooser();
@@ -1573,7 +1573,13 @@ async function start() {
     if (S.screen === "home") homePage.home();
   });
   on("analyze", async (ev) => {
-    if (ev.line) { S.busy.analyze = true; say("busy", T("checking the mods' files…") + " " + ev.line); return; }
+    if (ev.line) {
+      const was = S.busy.analyze;
+      S.busy.analyze = true;
+      say("busy", T("checking the mods' files…") + " " + ev.line);
+      if (!was) scr.analyzeEvent(ev);
+      return;
+    }
     S.busy.analyze = false;
     say(ev.ok ? "ok" : "fail", ev.ok ? T("analysis done") : ev.error);
     await reload();

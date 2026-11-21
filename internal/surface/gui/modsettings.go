@@ -26,6 +26,10 @@ func (s *API) modSettingsReader() (*app.App, error) {
 
 // ModSettings is the page's table: one row per settings file of the current list's Mods.
 func (s *API) ModSettings() (*view.ModSettingsPage, error) {
+	return join(&s.flight, "ModSettings", s.modSettingsRead)
+}
+
+func (s *API) modSettingsRead() (*view.ModSettingsPage, error) {
 	r, err := s.modSettingsReader()
 	if err != nil {
 		return nil, err

@@ -79,6 +79,9 @@ func (s *API) Leave(page string) {
 			s.texCancel = nil
 		}
 	case "needs", "log":
+		if page == "needs" {
+			s.needsWanted = false // a stale check no longer starts by itself (16 §8.9)
+		}
 		s.a.DropLogCaches()
 		s.logLinks = nil
 	case "home":
