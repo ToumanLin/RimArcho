@@ -48,6 +48,7 @@ Investigations, measurements and open questions; once a report's conclusions are
 | [2026-10-27_vm-scenarios-5-6-9.md](2026-10-27_vm-scenarios-5-6-9.md) | VM scenarios 5, 6, 9 on real data (subscribe, unsubscribe and recycle, save and launch) | Method cited by release-vm-tests.md; open: B6, B7, B10, B12–B15 (§7) |
 | [2026-10-27_vm-real-home-round-and-scenarios-7-8.md](2026-10-27_vm-real-home-round-and-scenarios-7-8.md) | Real-home random-player rounds, export/reimport, post-sort repair | Open: §5 item 3 (save says "no changes" while links are pending) |
 | [2026-10-28_vm-phase-markers.md](2026-10-28_vm-phase-markers.md) | Full real rounds with Archo Monitor phase markers on 1.6 and 1.7 | Cited by release-vm-tests.md; open: B2 (game download also fetches subscribed Workshop items), B3 (a 1.7 Vulkan crash is not shown) |
+| [2026-11-21_vm-vulkan-options.md](2026-11-21_vm-vulkan-options.md) | Faster Vulkan for 1.7 in a test VM: Dozen (no D3D12 in VMware SVGA), Hyper-V GPU-P, Sandbox, a second machine | Dozen ruled out; open: lavapipe with more vCPUs (§5) |
 
 ## Other
 
