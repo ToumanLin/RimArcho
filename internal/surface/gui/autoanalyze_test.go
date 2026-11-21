@@ -117,6 +117,19 @@ func TestAutoAnalysisKeepsFindingsCurrent(t *testing.T) {
 	s.analyzeSettle = time.Hour // the edit alone would not start it during this test
 	s.mu.Unlock()
 	toggle(view.Active, bb)
+	// while the edit settles, the editor's findings say they are updating (16 §8.7)
+	for {
+		s.mu.Lock()
+		refreshing, pending, work := s.needsRefreshing, s.analyzeTimer != nil, s.needsWorkLocked()
+		s.mu.Unlock()
+		if !refreshing {
+			if !pending || !work {
+				t.Fatalf("after an edit: check pending %v, updating %v; want both", pending, work)
+			}
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
 	if s.Home() == nil {
 		t.Fatal("no Launch page")
 	}

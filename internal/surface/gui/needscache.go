@@ -142,9 +142,12 @@ func (s *API) saveNeedsOfLocked(ps *app.ProblemSet, n *view.Needs, eager, fresh 
 }
 
 // needsWorkLocked reports whether background work will replace the shown findings: a
-// refresh of the list's problems or a content analysis. Only then is `updating` true
-// (16 §8.7): a cache-only read, a stale or a never-run analysis alone is not work.
-func (s *API) needsWorkLocked() bool { return s.needsRefreshing || s.busy["analyze"] }
+// refresh of the list's problems, a content analysis, or one about to start by itself
+// (analyzeTimer, 16 §8.9). Only then is `updating` true (16 §8.7): a cache-only read, a
+// stale or a never-run analysis alone is not work.
+func (s *API) needsWorkLocked() bool {
+	return s.needsRefreshing || s.busy["analyze"] || s.analyzeTimer != nil
+}
 
 // problemsNowLocked is the summary of n with `updating` as of now.
 func (s *API) problemsNowLocked(n *view.Needs) *view.ListProblems {
@@ -293,6 +296,16 @@ func (s *API) analyzeSettled() {
 		s.analyzeAfter = true
 		return
 	}
+	started := false
+	defer func() {
+		// not needed after all: the findings shown as updating are the current ones
+		if !started && !s.needsWorkLocked() {
+			if c, _ := s.cachedNeedsLocked(); c != nil {
+				ev := s.problemsNowLocked(c.n)
+				go s.send("list-problems", ev)
+			}
+		}
+	}()
 	st, err := s.a.Loadout()
 	if err != nil || st == nil {
 		return
@@ -307,6 +320,7 @@ func (s *API) analyzeSettled() {
 	if !s.startAnalyze() {
 		return
 	}
+	started = true
 	if s.autoAnalyzed == nil {
 		s.autoAnalyzed = map[string]bool{}
 	}
