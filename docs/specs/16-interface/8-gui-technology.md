@@ -121,7 +121,7 @@ The main `ListProblems` JSON fields are:
 | `listVersion` | The fingerprint of the list content used for this result. |
 | `revision` | The cache input fingerprint; identical inputs are reused. Do not compare it lexicographically. |
 | `sequence` | An increasing publication number within the API session; for the same Game Config and list, accept only a sequence at least as large as the displayed one. |
-| `updating`, `error?` | While background work completes, retain the previous content findings with `updating=true`. The work is a refresh of the list's problems or a content analysis (`API.needsWorkLocked`); starting an analysis publishes `list-problems` with `updating=true`. A cache-only read (first paint, the log not yet parsed), or a stale or never-run analysis with no analysis running, is not updating. On failure, retain the findings and return the error text. |
+| `updating`, `error?` | While background work completes, retain the previous content findings with `updating=true`. The work is a refresh of the list's problems, a content analysis, or one about to start by itself (an edit settling, §8.9) (`API.needsWorkLocked`); starting an analysis publishes `list-problems` with `updating=true`, and a pending one that turns out not to be needed publishes it with `updating=false`. A cache-only read (first paint, the log not yet parsed), or a stale or never-run analysis with no analysis running or pending, is not updating. On failure, retain the findings and return the error text. |
 | `count`, `severity` | The shared needs count and maximum severity, `error` / `warning` / `info`; hidden maintenance and muted information items follow needs counting rules. |
 | `mods` | An Instance-ID index whose values contain `count`, `severity`, `summary`, and `problemIds`. An absent Mod has no displayable finding. |
 | `items` | The full list-level `Need` array, with each finding sent once and looked up through `problemIds`. |
@@ -142,3 +142,28 @@ List edits use `App.IncrementalProblems` to synchronously recalculate the declar
 ### 8.8 Steam credit API
 
 The Wails methods, JSON, task and events behind the Steam credit prompt and the gradual replacement task (§2.16) are in the [Steam credit GUI API contract](../../api/steam-credit.md); the batch rules are in 11 §1.
+
+### 8.9 Repeated work
+
+Clicking fast, switching pages and editing a list must not run the same work again and again (a player's task list showed "Can it run" checks of the same lists every minute or two). Four rules hold for every page and verb:
+
+1. **One run at a time, repeats join it.** A page read asked for while the same read (method and arguments) is on its way waits for that read and gets its answer (`API.flight`, `join` in `flight.go`); a read asked for after it ended runs again, so no answer is older than the request that started its read. Started work refuses a second start while it runs (`busy["scan"]`, `busy["analyze"]`, `busy["pack"]`, `busy["textures"]`). A queued task equal to a new request (kind, object, arguments, Game Config) takes the request (`Tasks.EnqueueSelf`): repeated clicks give at most one run after the one running.
+2. **Leaving a page abandons its reads.** Answers for a page no longer shown are dropped (`beginPageRead`, `read.current()`); `API.Leave` cancels what can stop (memory estimate, texture count, file search).
+3. **What is shown is current, at bounded cost.** The player should not have to press a button to see findings that match the list. Automatic work follows the data, but settles and coalesces: a run of changes ends in one run for the final state; work already running is left to end and at most one more follows it for the state as it is then (the newest state wins); the same inputs (data stamp) start by themselves once a session, so work that fails or leaves its inputs as they were does not loop. The table says which work starts by itself and what its button is for.
+4. **A button that starts work shows it.** It is disabled and `aria-busy` while the work runs, whoever started it (Can it run's check again follows `S.busy.analyze` through the `analyze` start event, without a page read); its key does nothing then either. A button that would only repeat a current result is off and says so (check again reads "up to date").
+
+| Work | Starts by itself | Otherwise |
+| --- | --- | --- |
+| Checking the mods' files (analysis, 05 §3) | Whenever a list's findings are read and its check is stale or never ran: entering Can it run or Launch starts it at once; edits in the editor start it 2 s after the last edit (`analyzeSettle`), so a run of edits ends in one check (`API.autoAnalyzeLocked`, `analyzeSettled`). An edit while a check runs: that check ends, then one more (`analyzeAfter`). Once per inputs (scope and `app.AnalysisKey`) a session: a check that failed or left its inputs stale waits for the button. The task list keeps one row per list for it, updated in place (`Tasks.BeginOnce`; failures stay) | Can it run's check again (`A`), for a failed or stale-leaving check or to force one: "up to date" and off while the shown check is current; within 5 s of a check of the same inputs it starts nothing (`API.Analyze`). Can it run shows the check's state as an icon (current, checking, stale, never), with its words and "last checked …" as the tooltip |
+| Can it run's needs and the list's findings | Read on entering, from the change-keyed cache (§8.7) | — |
+| Reading a new game log | Once per new log (§2.1 "New logs are read automatically") | Game log page |
+| Memory estimate (Launch, Can it run, All lists) | When missing or over an hour old; a new estimate cancels the previous one | — |
+| Scan | At start and on file changes (04) | Rescan |
+| Feedback replies | Entering Feedback, at most once a minute; in between the recorded replies show (`API.FeedbackCheck`) | — |
+| Followed collections (All lists) | Older than ten minutes, once per list a session | — |
+| Build page folder measurement | Entering the page, a texture choice; the same choice while measuring joins that measurement (`API.BuildPage`) | — |
+| Texture count, file search | Entering their page; a new one cancels the previous, and so does leaving | Their buttons |
+| Saves index | Entering Saves; one run at a time (`startSavesIndex`) | — |
+| Update checks, source checks, Workshop updates | Scheduled (§2.16.1) | Their buttons; repeats join the queued task |
+
+The joined reads are `Home`, `HomeMemory`, `LogPage`, `Library`, `PlanManage`, `SubscriptionsPage`, `Packs`, `Settings`, `Environment`, `ModSettings`, `FileSearchInfo`, `TexturesInfo` and `FeedbackCheck`. Measured counts before and after: 18 §2.

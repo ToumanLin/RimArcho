@@ -120,6 +120,11 @@ func (s *API) withCopyLibrary(ref string, read func(*app.App, *app.Library) erro
 
 // Library is the page for a search, filters ("key:value", "-key:value" excludes) and a sort.
 func (s *API) Library(search string, filters []string, sort string) (*view.LibPage, error) {
+	key := "Library|" + search + "|" + strings.Join(filters, "\n") + "|" + sort
+	return join(&s.flight, key, func() (*view.LibPage, error) { return s.libraryRead(search, filters, sort) })
+}
+
+func (s *API) libraryRead(search string, filters []string, sort string) (*view.LibPage, error) {
 	defer s.free.soon()
 	lib, err := s.library()
 	if err != nil {

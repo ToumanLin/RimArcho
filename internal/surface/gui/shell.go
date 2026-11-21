@@ -132,6 +132,17 @@ func (s *API) shellLocked(n *view.Needs) *Shell {
 
 // Home is the home page (16 §2.3).
 func (s *API) Home() *view.Home {
+	v, _ := join(&s.flight, "Home", func() (*view.Home, error) { return s.homeRead(), nil })
+	if v != nil && v.Error == "" {
+		// Launch's warnings come from the stored check: keep it current (16 §8.9)
+		s.mu.Lock()
+		s.autoAnalyzeLocked(nil, false)
+		s.mu.Unlock()
+	}
+	return v
+}
+
+func (s *API) homeRead() *view.Home {
 	defer perftrace.Span("Home")()
 	s.logRead.mu.Lock()
 	defer s.logRead.mu.Unlock()

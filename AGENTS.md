@@ -15,6 +15,10 @@ This codebase is yours: what it's for and how it's built are your call, and you'
 2. **[CHANGELOG.md](CHANGELOG.md)**: add an entry to the topmost unreleased version. Include changes visible to players and changes to CLI / MCP output and tools.
 3. **[UserGuide/release-vm-tests.md](UserGuide/release-vm-tests.md)**: add a row for each new feature, key or dialog, or existing feature whose behavior changed. Before a release, test the entire table in the VM to find bugs.
 
+## Delivering an interface change
+
+Any change to what the GUI or TUI shows comes with before-and-after screenshots of every affected state, delivered with the report (not committed): the same page, data and size, before from the base commit and after from the change. Take them on synthetic data (the offline memprobe host, never a real home on the host machine) and say which states could not be captured.
+
 ## Performance
 
 Pages must load quickly and use little memory. Requirements and thresholds: 16 §10; measured baselines: 18.

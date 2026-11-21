@@ -2,6 +2,7 @@ package gui
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -10,6 +11,10 @@ import (
 )
 
 func (s *API) SubscriptionsPage(library bool, of string) (*view.SubscriptionsPage, error) {
+	return join(&s.flight, fmt.Sprint("SubscriptionsPage|", library, "|", of), func() (*view.SubscriptionsPage, error) { return s.subscriptionsPageRead(library, of) })
+}
+
+func (s *API) subscriptionsPageRead(library bool, of string) (*view.SubscriptionsPage, error) {
 	w := &s.subRead
 	w.mu.Lock()
 	defer w.mu.Unlock()

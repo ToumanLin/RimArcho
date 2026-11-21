@@ -256,7 +256,7 @@ var endlessWhileWorking = map[string]string{
 	".hm-go.switching::before":            "launch block while a list or game is applied",
 	".hm-go .bar::after":                  "launch block while a list or game is applied",
 	".prog .bar.busy i::after":            "task progress without a value",
-	".page-acts .chip.prob.updating .dot": "problems refresh or analysis running (needsWorkLocked)",
+	".page-acts .chip.prob.updating .dot": "problems refresh, analysis running or about to start (needsWorkLocked)",
 	".sv-progress.indeterminate .fill":    "saves listing before its first count",
 }
 

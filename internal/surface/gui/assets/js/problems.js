@@ -39,7 +39,8 @@ export function chip() {
   if (!p || (!n && !its.some((it) => it.status === -1))) { if (isOpen()) close(); return null; }
   const b = el("button", "chip prob " + (n ? (p.severity === "error" ? "err" : "warn") : "hint") + (p.updating ? " updating" : "") + (isOpen() ? " on" : ""));
   b.append(el("span", "dot"), el("span", "t", n ? Tf("%d problems", n) : T("suggestions")), keyCaps("p"));
-  b.title = T(n ? "what is wrong with this list, and the fixes" : "suggestions") + T("; ") + "p";
+  b.title = (p.updating ? T("updating…") + T("; ") : "") + T(n ? "what is wrong with this list, and the fixes" : "suggestions") + T("; ") + "p";
+  if (p.updating) b.setAttribute("aria-busy", "true");
   b.setAttribute("aria-haspopup", "dialog"); b.setAttribute("aria-expanded", String(isOpen())); if (isOpen()) b.setAttribute("aria-controls", box.id);
   b.onclick = (e) => { e.stopPropagation(); toggle(b, e.detail === 0); };
   return b;
