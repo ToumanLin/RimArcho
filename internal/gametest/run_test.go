@@ -1,6 +1,7 @@
 package gametest
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -61,7 +62,14 @@ func testOptions(t *testing.T, mode string, waylith bool) Options {
 		if _, err := os.Stat(filepath.Join(o.DataDir, "Config", "Knowledge.xml")); !os.IsNotExist(err) {
 			t.Errorf("old knowledge marker not removed: %v", err)
 		}
-		cmd.Env = append(os.Environ(), "RIMARCHO_GAME_HELPER="+mode,
+		hook := filepath.Join(o.RunDir, consoleHookName)
+		if hasHook := slices.Contains(cmd.Environ(), "DOTNET_STARTUP_HOOKS="+hook); hasHook != waylith {
+			t.Errorf("UTF-8 console hook in environment: %t, want %t", hasHook, waylith)
+		}
+		if b, err := os.ReadFile(hook); waylith && (err != nil || !bytes.Equal(b, consoleHook)) {
+			t.Errorf("console hook file: %v", err)
+		}
+		cmd.Env = append(cmd.Environ(), "RIMARCHO_GAME_HELPER="+mode,
 			"RIMARCHO_HELPER_DATA="+o.DataDir, "RIMARCHO_HELPER_LOG="+filepath.Join(o.RunDir, "Player.log"),
 			fmt.Sprintf("RIMARCHO_HELPER_WAYLITH=%t", waylith))
 		cmd.Path = testExe

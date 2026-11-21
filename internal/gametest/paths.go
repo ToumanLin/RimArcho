@@ -64,7 +64,7 @@ func preparePaths(o *Options) error {
 	}
 	for _, item := range []struct{ dir, name string }{
 		{o.DataDir, "Config"}, {o.DataDir, filepath.Join("Config", "Knowledge.xml")}, {o.DataDir, "Saves"},
-		{o.RunDir, "Player.log"}, {o.RunDir, "stdout.log"}, {o.RunDir, "result.json"},
+		{o.RunDir, "Player.log"}, {o.RunDir, "stdout.log"}, {o.RunDir, "result.json"}, {o.RunDir, consoleHookName},
 	} {
 		path := filepath.Join(item.dir, item.name)
 		real, err := resolvedPath(path)
