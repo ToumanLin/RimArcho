@@ -129,7 +129,59 @@ func (a *App) LogPaths(st *LoadoutState) (cur, prev string) {
 		return ""
 	}
 	cur, prev = pick("Player.log"), pick("Player-prev.log")
+	if cur == "" && prev == "" {
+		cur, prev = a.waylithDefaultLogs(st)
+	}
 	return cur, prev
+}
+
+// waylithDefaultLogs are the logs a 1.7+ (Waylith) game wrote for an own-folder
+// environment: Waylith ignores -logfile and always writes the default folder's Logs/
+// (03 §6.3). A file there counts only when the newest plan launch of any Waylith game
+// before it was written is this environment's, so a default-folder sibling's, a pack's
+// or another 1.7 install's run is never borrowed.
+func (a *App) waylithDefaultLogs(st *LoadoutState) (cur, prev string) {
+	e := st.Ix.Env
+	def := a.DefaultUserData(e.GameRoot)
+	if def == "" || samePath(e.UserDataRoot, def) || !isWaylith(e) {
+		return "", ""
+	}
+	envs, err := a.Store.Envs()
+	if err != nil {
+		return "", ""
+	}
+	var ids []string
+	for _, o := range envs {
+		if isWaylith(o) {
+			ids = append(ids, o.ID)
+		}
+	}
+	owned := func(name string) string {
+		p := filepath.Join(def, "Logs", name)
+		fi, err := os.Stat(p)
+		if err != nil || fi.IsDir() {
+			return ""
+		}
+		r, err := a.Store.LaunchRecordBefore(ids, fi.ModTime())
+		if err != nil || r == nil || r.EnvID != e.ID || r.Pack() != "" || !samePath(r.UserDataRoot, e.UserDataRoot) {
+			return ""
+		}
+		return p
+	}
+	cur = owned("Player.log")
+	if cur == "" {
+		return "", "" // the previous run alone would be read as the last one
+	}
+	return cur, owned("Player-prev.log")
+}
+
+// isWaylith says whether e's game is 1.7 or later (Waylith.dll or its version, 20 §2).
+func isWaylith(e *env.Environment) bool {
+	if _, err := os.Stat(filepath.Join(e.GameRoot, "Waylith.dll")); err == nil {
+		return true
+	}
+	mm := env.MajorMinor(e.GameVersion)
+	return mm != "" && !env.VersionLess(mm, "1.7")
 }
 
 type logCacheEntry struct {

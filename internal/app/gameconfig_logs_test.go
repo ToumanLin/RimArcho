@@ -187,3 +187,63 @@ func TestRedirectedSiblingDoesNotClaimDefaultLog(t *testing.T) {
 		t.Fatalf("redirected sibling stole default log: %+v", r.Source)
 	}
 }
+
+// Waylith (1.7) ignores -logfile and writes the default folder's Logs/Player.log, so an
+// own-folder config reads that file when its own launch is the newest one before it, and
+// never when a default-folder sibling ran since (VM round 2026-11-21).
+func TestWaylithOwnConfigReadsDefaultLogs(t *testing.T) {
+	t.Parallel()
+	e := loadoutEnv(t)
+	scanNow(t, e)
+	e.WriteFile(filepath.Join(e.Game, "Waylith.dll"), "MZ")
+	e.MustRun("env", "set", "main", "--launch", "direct")
+	e.MustRun("env", "add", "own", "--like", "main", "--saves", "own")
+	e.MustRun("env", "use", "own")
+	e.MustRun("launch")
+	st, _ := e.App.Loadout()
+	logs := filepath.Join(e.UserData, "Logs")
+	cur, prev := filepath.Join(logs, "Player.log"), filepath.Join(logs, "Player-prev.log")
+	e.Advance(time.Minute)
+	e.WriteFile(cur, "=== Waylith log ===\nVersion:   1.7.5014 rev1195\n")
+	e.WriteFile(prev, "older")
+	if err := os.Chtimes(cur, e.Now(), e.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(prev, e.Now().Add(-2*time.Hour), e.Now().Add(-2*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	got, old := e.App.LogPaths(st)
+	if got != cur || old != "" {
+		t.Fatalf("own run's log not found: %q %q", got, old)
+	}
+	if err := e.App.CheckLogOwner(st, got); err != nil {
+		t.Fatal(err)
+	}
+	// The default-folder sibling runs next: the file is now its run, not this config's.
+	e.Advance(time.Minute)
+	e.MustRun("env", "use", "main")
+	e.MustRun("launch")
+	e.MustRun("env", "use", "own")
+	e.Advance(time.Minute)
+	if err := os.Chtimes(cur, e.Now(), e.Now()); err != nil {
+		t.Fatal(err)
+	}
+	st, _ = e.App.Loadout()
+	if got, old := e.App.LogPaths(st); got != "" || old != "" {
+		t.Fatalf("borrowed the sibling's log: %q %q", got, old)
+	}
+	// A 1.6 own-folder config never looks there.
+	e.MustRun("launch")
+	e.Advance(time.Minute)
+	if err := os.Chtimes(cur, e.Now(), e.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(e.Game, "Waylith.dll")); err != nil {
+		t.Fatal(err)
+	}
+	st, _ = e.App.Loadout()
+	st.Ix.Env.GameVersion = "1.6"
+	if got, _ := e.App.LogPaths(st); got != "" {
+		t.Fatalf("1.6 read Logs/: %q", got)
+	}
+}
