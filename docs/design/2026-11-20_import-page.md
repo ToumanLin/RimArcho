@@ -1,11 +1,9 @@
 # Import page: the user's sketch, three arrangements of the right, drag and drop (2026-11-20)
 
-Status: export removed, drag and drop and the left column decided (16 §2.18, CHANGELOG,
-release-vm-tests); the arrangement of the right side is **for the user to pick**. Until then
-`<html data-import-layout="2col|2col-new|3col">` or `?import-layout=…` switches it (`layout()` in
-`exchange.js`; default 2col). Once one is picked: drop the others' CSS (`.xc-rail`, `.xc-bar` and their
-`[data-layout]` rules), the switch, `dock()` and `place()` if neither 3col nor 2col-new is kept, the
-“under review” words in 16 §2.18 and §7.1, and add the layout's VM row.
+Status: decided (16 §2.18, CHANGELOG, release-vm-tests). The user picked **2col-new** on 2026-11-20:
+the bar over a result (`.xc-bar`, `dock()` and `place()` in `exchange.js`). The layout switch
+(`data-import-layout`), 2col's in-card head and foot and 3col's rail are gone; the sections below keep
+how the three compared.
 
 ## What the user asked
 
@@ -86,7 +84,7 @@ At 1280 px 2col gives each list ~290 px (names rarely cut); 3col ~200 px (long n
 full name on hover). At 2000 both are comfortable; 3col keeps Archo and the buttons in view beside a
 long list.
 
-**Recommendation: 2col-new.** It keeps 2col's list width and Archo beside a result, and the counts and
+**Picked: 2col-new** (the user, 2026-11-20; 2col and 3col were removed from the code). The recommendation was the same: It keeps 2col's list width and Archo beside a result, and the counts and
 buttons are in view at the top of a long list without a third column. 2col stays the simplest; 3col
 only wins on very wide windows.
 

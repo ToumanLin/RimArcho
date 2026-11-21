@@ -43,14 +43,6 @@ export function key(e) {
 // enter only means something while a list comparison is shown
 export const hintList = () => [...($("#screen .xc-preview")?.dataset.mode === "list" ? [{ key: "enter", label: T("import") }] : []), { key: "esc", label: T("cancel") }, { key: "?", label: T("all keys") }];
 
-// layout: the page's arrangement while the user compares the variants (design note
-// 2026-11-20_import-page): "2col" (what to import | the comparison), "3col" (what to import |
-// the comparison | a rail with Archo, the counts and the buttons) or "2col-new" (the rail
-// laid across the top of the comparison). <html data-import-layout> or ?import-layout= picks it.
-export function layout() {
-  const v = document.documentElement?.dataset?.importLayout || new URLSearchParams(globalThis.location?.search || "").get("import-layout") || "";
-  return v === "3col" || v === "2col-new" ? v : "2col";
-}
 
 const gameConfig = () => (S.board?.environmentRows || []).find(e => e.current)?.name || "";
 
@@ -71,19 +63,18 @@ export async function exchange(first = false) {
   try { info = await api.ExchangeInfo(); } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
   const sc = $("#screen"); sc.innerHTML = "";
-  const lay = layout();
   // the lead says the page's one gesture: drop it anywhere; the first run asks instead
-  const w = page("plans pm-import xc-page xc-" + lay, firstRun ? T("Where does your first list come from?") : T("Drop files or folders anywhere on this window; RimArcho tells what they are."),
+  const w = page("plans pm-import xc-page", firstRun ? T("Where does your first list come from?") : T("Drop files or folders anywhere on this window; RimArcho tells what they are."),
     firstRun ? button(T("skip"), "esc", cancel) : null);
-  const grid = el("div", "xc-lay"); grid.dataset.layout = lay;
+  const grid = el("div", "xc-lay");
   const side = el("div", "xc-side");
   const card = el("section", "card settings xc-do");
   side.append(card);
   // the right: the comparison (or the tree, a task, a refusal) and, before any, the drop pane
   const main = el("div", "xc-main");
   const result = el("section", "card settings xc-preview xc-res"); result.hidden = true;
-  // 2col-new: over the result, the counts and the buttons at the left and Archo at the right
-  if (lay === "2col-new") main.append(dock("xc-bar"));
+  // over a result: its counts and buttons at the left, Archo at the right (the user's pick, 2026-11-20)
+  main.append(dock());
   // no label above the right card: it is as tall as the left one and says what it is itself
   main.append(result, emptyState());
   // the gap between the two cards is the card gap, and drags (16 §7.3 "Card spacing")
@@ -96,9 +87,6 @@ export async function exchange(first = false) {
     set: setSide, reset: () => setSide(0),
     restore: (v) => setSide(+v ? Math.max(300, +v) : 0),
   });
-  // 3col: a rail at the right for Archo, the counts and the buttons; always there, so the
-  // columns keep their widths when a result comes
-  if (lay === "3col") grid.append(dock("xc-rail"));
   w.append(grid);
   sc.append(w);
   area(card, null); area(result, null);
@@ -111,26 +99,24 @@ export async function exchange(first = false) {
 
 const live = (active) => session === active && S.screen === "plan-import";
 
-// dock: the rail (3col) or the bar (2col-new): Archo, the result's head and its buttons
-function dock(cls) {
-  const d = el(cls === "xc-rail" ? "aside" : "div", "xc-dock " + cls);
+// dock: the bar over a result: its head and buttons at the left, Archo at the right
+function dock() {
+  const d = el("div", "xc-bar");
   d.append(el("div", "fig"), el("div", "rh"), el("div", "rf"));
   return d;
 }
 
 // Archo (16 §7.1 "Placements"): in the middle of the empty right pane, over the words that say
-// a file can be dropped; with a result she stands under the left column (2col) or at the top
-// of the rail (3col). She thinks while something is read or moved in, is pleased with a
-// comparison, a thumbs-up when it is in, a shake at an error or a refusal.
+// a file can be dropped; with a result she stands at the right over it. She thinks while
+// something is read or moved in, is pleased with a comparison, a thumbs-up when it is in, a
+// shake at an error or a refusal.
 const spot = () => archoSpot("import", { size: 176, calm: ["neutral", "ponder", "think", "smirk", "yum"] });
 // nothing read or running is the calm state: her idle faces follow only there
 const face = (e) => spot().set(e, e === "neutral");
 function placeArcho(expr = "neutral") {
   const res = $("#screen .xc-preview"), showing = res && !res.hidden;
-  const lay = $("#screen .xc-lay")?.dataset.layout;
-  // 3col: always at the top of the rail; 2col-new: at the right of the bar over a result; 2col: with a
-  // result she steps away, nothing stands beside the lists
-  const host = lay === "3col" ? $("#screen .xc-rail .fig") : !showing ? $("#screen .xc-empty .fig") : $("#screen .xc-bar .fig");
+  // empty: in the middle of the drop pane; with a result: at the right of the bar over it
+  const host = !showing ? $("#screen .xc-empty .fig") : $("#screen .xc-bar .fig");
   spot().stand(host, expr, expr === "neutral");
 }
 
@@ -210,8 +196,7 @@ function markShown() {
 // emptyState: the right before anything is read: Archo in the middle, the drop under her
 function emptyState() {
   const e = el("div", "xc-empty");
-  // in 3col she stands in the rail, not here
-  if (layout() !== "3col") e.append(el("div", "fig"));
+  e.append(el("div", "fig"));
   e.append(el("div", "dz-t", T("Drop the files or folders to import anywhere on this window")));
   const kinds = el("div", "dz-k");
   for (const [ic, tip] of [["plan", T("Mod lists: .xml, .rml, .json, .txt, a save (.rws)")], ["packs", T("packs: .archopack")], ["library", T("another manager's data: a folder, a .db file, userRules.json")]]) {
@@ -977,7 +962,7 @@ function showResult(mode, at, label) {
   if (lab) { lab.hidden = false; labelText(lab, label); }
   const grid = $("#screen .xc-lay");
   if (grid) grid.dataset.showing = mode;
-  for (const x of $("#screen")?.querySelectorAll?.(".xc-dock .rh, .xc-dock .rf") || []) x.textContent = "";
+  for (const x of $("#screen")?.querySelectorAll?.(".xc-bar .rh, .xc-bar .rf") || []) x.textContent = "";
   markShown();
   placeArcho(spot().expr);
   ui?.renderHints?.();
@@ -996,15 +981,14 @@ function hideResult() {
   if (lab) lab.hidden = true;
   const grid = $("#screen .xc-lay");
   if (grid) delete grid.dataset.showing;
-  for (const x of $("#screen")?.querySelectorAll?.(".xc-dock .rh, .xc-dock .rf") || []) x.textContent = "";
+  for (const x of $("#screen")?.querySelectorAll?.(".xc-bar .rh, .xc-bar .rf") || []) x.textContent = "";
   markShown();
   placeArcho("neutral");
   ui?.renderHints?.();
 }
-// place: in 3col and 2col-new the result's head (the counts) and foot (the buttons) go to the
-// rail or the bar
+// place: the result's head (the counts) and foot (the buttons) go to the bar over it
 function place() {
-  const res = $("#screen .xc-preview"), rh = $("#screen .xc-dock .rh"), rf = $("#screen .xc-dock .rf");
+  const res = $("#screen .xc-preview"), rh = $("#screen .xc-bar .rh"), rf = $("#screen .xc-bar .rf");
   if (!res || !rh || !rf) return;
   const kids = [...res.children];
   for (const x of kids.filter(c => c.classList?.contains("xc-rhead"))) rh.append(x);

@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Element, loadModules, flush } from "./dom.mjs";
 
-// The Import page (16 §2.18): the ways in, the order comparison, the layout switch, no export, and drops.
-async function setup(api = {}, { layout = "" } = {}) {
+// The Import page (16 §2.18): the ways in, the order comparison, the bar over a result, no export, and drops.
+async function setup(api = {}) {
   const screen = new Element("div"); screen.id = "screen";
   const S = { screen: "", screenSeq: 1, shell: { plan: { id: 1 }, plans: [{ id: 1, name: "Main" }] }, cols: [] };
   const el = (tag, cls = "", text = "") => new Element(tag, cls, text);
@@ -22,7 +22,6 @@ async function setup(api = {}, { layout = "" } = {}) {
   const page = (cls, lead) => { const w = el("div", cls); w.append(el("p", "lead", lead)); return w; };
   const docEl = new Element("html"), body = new Element("body"), listeners = {};
   const document = { documentElement: docEl, body, createElement: (t) => new Element(t), querySelector: (s) => body.querySelector(s), addEventListener: (t, f) => { listeners[t] = f; } };
-  if (layout) docEl.dataset.importLayout = layout;
   const m = await loadModules("./exchange.js", {
     "./state.js": {
       factText: (e, t) => { e.text = [].concat(t).map((x) => x?.text ?? x).join("  "); return e; },
@@ -80,16 +79,6 @@ test("the page has no export; the left column lists the ways in, two of them ope
   assert.match(h.screen.querySelector(".xc-empty").textContent, /Drop/);
 });
 
-test("the layout follows data-import-layout, 2col by default; 3col has a rail, 2col-new a bar", async () => {
-  for (const [layout, want] of [["", "2col"], ["3col", "3col"], ["2col", "2col"], ["2col-new", "2col-new"], ["bogus", "2col"]]) {
-    const h = await setup({}, { layout });
-    await h.m.exchange();
-    assert.equal(h.screen.querySelector(".xc-lay").dataset.layout, want, layout);
-    assert.equal(!!h.screen.querySelector(".xc-rail"), want === "3col", layout);
-    assert.equal(!!h.screen.querySelector(".xc-main .xc-bar"), want === "2col-new", layout);
-  }
-});
-
 test("reading the game's list shows it next to yours, in order, with what is removed, added and moved", async () => {
   const preview = { summary: "s", format: "ModsConfig.xml", total: 4, missing: [{ name: "Gone", url: "https://steamcommunity.com/sharedfiles/filedetails/?id=42" }], installed: [], replace: { added: 1, text: "1 added" }, merge: { text: "" },
     current: [row("core"), row("a"), row("b"), row("old")], incoming: [row("core"), row("b"), row("a"), row("gone", { missing: true })] };
@@ -108,27 +97,18 @@ test("reading the game's list shows it next to yours, in order, with what is rem
   assert.match(h.screen.querySelector(".xc-miss").textContent, /subscribe all 1/);
 });
 
-test("3col puts the counts and the buttons in the rail", async () => {
+test("a result puts its counts and buttons in the bar over it, with Archo; empty, there is no bar", async () => {
   const preview = { summary: "s", format: "ModsConfig.xml", total: 1, missing: [], installed: [], replace: { added: 1 }, merge: {}, current: [row("a")], incoming: [row("b")] };
-  const h = await setup({ ImportPreviewFor: async () => preview }, { layout: "3col" });
+  const h = await setup({ ImportPreviewFor: async () => preview });
   await h.m.exchange();
+  assert.equal(h.screen.querySelector(".xc-lay").dataset.showing, undefined);
   h.screen.querySelector('.xc-dorow[data-do="game"] .btn').onclick();
   await flush(); await flush(); await flush();
-  assert.ok(h.screen.querySelector(".xc-rail .ld-legend"));
-  assert.ok(h.screen.querySelector(".xc-rail .xc-acts"));
-  assert.ok(h.screen.querySelector(".xc-preview .ld-grid"));
   assert.equal(h.screen.querySelector(".xc-lay").dataset.showing, "list");
-});
-
-test("2col-new puts the counts and the buttons in the bar over the comparison", async () => {
-  const preview = { summary: "s", format: "ModsConfig.xml", total: 1, missing: [], installed: [], replace: { added: 1 }, merge: {}, current: [row("a")], incoming: [row("b")] };
-  const h = await setup({ ImportPreviewFor: async () => preview }, { layout: "2col-new" });
-  await h.m.exchange();
-  h.screen.querySelector('.xc-dorow[data-do="game"] .btn').onclick();
-  await flush(); await flush(); await flush();
-  assert.ok(h.screen.querySelector(".xc-bar .ld-legend"));
+  assert.ok(h.screen.querySelector(".xc-main .xc-bar .ld-legend"));
   assert.ok(h.screen.querySelector(".xc-bar .xc-acts"));
   assert.ok(!h.screen.querySelector(".xc-preview .xc-acts"));
+  assert.ok(h.screen.querySelector(".xc-preview .ld-grid"));
 });
 
 // a manager with a list and notes, imported before, so its groups open with it

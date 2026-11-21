@@ -2025,17 +2025,13 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 
 /* Import (16 §2.18): what can be imported in the left column, one row each with its button;
    the right shows what a read brings next to the player's list. Empty, the right is the drop
-   pane with Archo in its middle. Two arrangements while the user compares them
-   (docs/design/2026-11-20_import-page.md): "2col" keeps the counts and buttons in the result's
-   card; "3col" adds a rail at the right for Archo, the counts and the buttons (always there, so
-   no column changes width when a result comes); "2col-new" lays that rail across the top of the
-   result. The left column is sticky. */
+   pane with Archo in its middle. Over a result, its counts and buttons stand at the left and Archo
+   at the right (.xc-bar; the user's pick of three arrangements, docs/design/2026-11-20_import-page.md).
+   The left column keeps its width whatever the right shows. */
 .page.xc-page { container: xcp / inline-size; padding-left: max(12px, calc(50% - 860px)); padding-right: max(12px, calc(50% - 860px)); }
 /* both columns are one height, the view's: the left card and the right card (or the drop pane) end on one line */
 .xc-lay { display: grid; gap: 0; align-items: stretch; height: max(480px, calc(100vh - 126px)); grid-template-columns: minmax(300px, var(--xc-side, 32fr)) var(--card-gap) minmax(0, 68fr); grid-template-rows: minmax(0, 1fr); }
 .xc-split { margin: 0; }
-.xc-lay[data-layout="3col"] { grid-template-columns: minmax(300px, var(--xc-side, 28fr)) var(--card-gap) minmax(0, 72fr) 220px; column-gap: 0; }
-.xc-lay[data-layout="3col"] > .xc-rail { margin-left: 12px; }
 .xc-lay > .xc-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; }
 .xc-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .xc-main > .xc-preview:not([hidden]) { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
@@ -2043,11 +2039,11 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 /* every result's buttons sit at the card's foot, as the comparison's do */
 .xc-main > .xc-preview > .xc-acts { margin-top: auto; }
 @container xcp (max-width: 820px) {
-  .xc-lay, .xc-lay[data-layout="3col"] { height: auto; grid-template-columns: minmax(0, 1fr); grid-template-rows: none; row-gap: var(--card-gap); }
+  .xc-lay { height: auto; grid-template-columns: minmax(0, 1fr); grid-template-rows: none; row-gap: var(--card-gap); }
   .xc-split { display: none; }
   .xc-empty { min-height: 360px; }
   .ld-body { max-height: 70vh; }
-  .xc-lay > .xc-side, .xc-lay > .xc-rail { position: static; }
+  .xc-lay > .xc-side { position: static; }
 }
 /* the left column: a row per way in, an icon tile, a name with its count, what it takes, a button */
 .xc-do { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
@@ -2129,21 +2125,6 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .xc-opts { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-right: auto; }
 .xc-ride { display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 6px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--fg-2); font: inherit; font-size: 12px; cursor: pointer; }
 .xc-ride:hover { background: var(--card-2); }
-/* 3col: the rail, shown with a result: Archo at its top, the counts as a column, the buttons stacked */
-.xc-lay[data-layout="3col"] > .xc-rail { display: flex; flex-direction: column; gap: 14px; min-width: 0; min-height: 0; overflow: auto; }
-.xc-rail .fig { display: flex; justify-content: center; }
-.xc-rail .fig > .archo-spot.archo-stand { margin: 0; }
-.xc-rail .rh, .xc-rail .rf { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-.xc-rail .xc-rhead { flex-direction: column; align-items: stretch; padding: 0; border: 0; }
-.xc-rail .ld-legend { flex-direction: column; gap: 8px; margin: 0; padding: 12px 14px; border-radius: var(--r-lg); background: var(--card); }
-.xc-rail .xc-miss { flex-wrap: wrap; }
-.xc-rail .xc-acts { position: static; flex-direction: column; align-items: stretch; gap: 6px; padding: 0; border: 0; background: transparent; }
-.xc-rail .xc-acts .btn { justify-content: center; }
-.xc-rail .xc-acts .note { flex: none; }
-.xc-rail .xc-acts .note:empty { display: none; }
-.xc-rail .xc-acts.xc-lacts { flex-wrap: wrap; }
-.xc-rail .xc-opts { flex-direction: column; margin: 0 0 4px; }
-.xc-rail .xc-tsum { padding: 0; }
 /* a file dragged over the window: the whole window says it takes it; the drop goes through */
 .xc-dropover { position: fixed; inset: 0; z-index: 900; display: none; align-items: center; justify-content: center; pointer-events: none;
   background: color-mix(in srgb, var(--bg) 72%, transparent); }
@@ -3308,10 +3289,10 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .folder-fold-rows { border-top: var(--hairline) solid var(--line-2); }
 .folder-fold-rows .set { padding-left: 42px; }
 
-/* 2col-new: the rail's content over the result: the counts card and the buttons at the left,
-   inset a little, Archo at her full size at the right; shown with a result only */
+/* over a result: the counts card and the buttons at the left, inset a little, Archo at her
+   full size at the right; shown with a result only */
 .xc-bar { display: none; }
-.xc-lay[data-layout="2col-new"][data-showing] .xc-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 8px 14px; align-items: end; flex: none; margin-bottom: var(--card-gap); padding-left: 14px; }
+.xc-lay[data-showing] .xc-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 8px 14px; align-items: end; flex: none; margin-bottom: var(--card-gap); padding-left: 14px; }
 .xc-bar .fig { grid-column: 2; grid-row: 1 / span 2; display: flex; align-self: end; }
 .xc-bar .fig > .archo-spot.archo-stand { margin: 0; }
 .xc-bar .rh { grid-column: 1; grid-row: 1; min-width: 0; }
@@ -3321,7 +3302,8 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .xc-bar .xc-acts { position: static; flex-wrap: wrap; justify-content: flex-start; gap: 6px; padding: 0 0 8px; border: 0; background: transparent; }
 .xc-bar .xc-acts .note:empty { display: none; }
 .xc-bar .xc-opts { margin: 0 6px 0 0; }
-.xc-bar .xc-tsum { padding: 0; }
+.xc-bar .xc-tsum { padding: 0 0 6px; border: 0; }
+.xc-bar .xc-acts .note:not(:empty) { flex: 1 1 100%; max-width: 560px; }
 
 /* a part viewed from another manager's tree: its values one by one */
 .xc-vhead { justify-content: space-between; }
