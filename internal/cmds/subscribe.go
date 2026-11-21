@@ -64,6 +64,11 @@ func init() {
 			op, err := c.App.SubscribePage(a.Pos[0], a.Bool("git"), a.Str("from"), a.Bool("dry-run"))
 			return subscriptionDoc(op, err)
 		}})
+	register(&Command{Name: "subscribe local", Args: "<zip|folder>", Summary: "copy a Mod folder or zip into the game's Mods folder as a local Mod (no subscription)", MinArgs: 1, MaxArgs: 1,
+		Flags: dry, Run: func(c *Ctx, a *Args) (*render.Doc, error) {
+			op, err := c.App.InstallLocalMod(a.Pos[0], a.Bool("dry-run"))
+			return subscriptionDoc(op, err)
+		}})
 	register(&Command{Name: "subscribe workshop", Args: "<id|url…>", Summary: "subscribe through Steam, with SteamCMD fallback when Steam is unavailable", MinArgs: 1, MaxArgs: -1,
 		Flags: []Flag{{Name: "steamcmd", Help: "download with SteamCMD directly"}, dry[0]}, Run: func(c *Ctx, a *Args) (*render.Doc, error) {
 			op, err := c.App.SubscribeWorkshop(a.Pos, a.Bool("steamcmd"), a.Bool("dry-run"))
@@ -163,7 +168,11 @@ func subscriptionDoc(op *app.SubscribeOp, err error) (*render.Doc, error) {
 	if op == nil {
 		return nil, err
 	}
-	head := op.Action + ": " + render.Plural(len(op.Items), "subscription")
+	noun := "subscription"
+	if op.Action == "install local" {
+		noun = "local Mod"
+	}
+	head := op.Action + ": " + render.Plural(len(op.Items), noun)
 	if op.DryRun {
 		head = "dry run, nothing changed: " + head
 	}

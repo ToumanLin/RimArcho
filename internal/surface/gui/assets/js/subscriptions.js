@@ -646,6 +646,15 @@ export function changesKey(e) {
 
 // ---- Mod library › add a subscription ----
 
+// addWith opens add a subscription with text in its box (a link, a Mod folder or zip dropped
+// on the window), or fills the box when the page is open; its card asks before anything is done.
+let addForm_ = null;
+export function addWith(text) {
+  if (S.screen === "subscribe" && addForm_) { addForm_.setText(text); addForm_.focus(); return; }
+  pasted = text;
+  return ui.go("subscribe");
+}
+
 // openAdd shows the add page; a paste on updates arrives filled in.
 export async function openAdd() {
   const read = beginPageRead("subscribe");
@@ -656,6 +665,7 @@ export async function openAdd() {
   sc.innerHTML = "";
   const w = page("subscribe-page", "");
   const form = addForm({ data, back: () => ui.go("changes"), done: () => {} });
+  addForm_ = form;
   w.append(form.el);
   sc.append(w);
   const text = pasted;

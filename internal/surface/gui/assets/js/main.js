@@ -1501,6 +1501,7 @@ async function start() {
   packsPage.initPacks(ui);
   planManage.initPlanManage(ui);
   guide.initGuide(ui);
+  ui.addWith = scr.addWith; // a dropped link, Mod folder or zip (16 §2.18)
   initExchange(ui);
   plans.initPlans(ui);
   library.initLibrary(ui);

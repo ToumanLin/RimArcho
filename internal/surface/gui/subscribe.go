@@ -163,6 +163,9 @@ func (s *API) runSubscriptionTask(a *app.App, id, kind string, args []string) (s
 		target = args[2]
 	}
 	s.tasks.Update(id, func(t *app.Task) { t.Target = target })
+	if len(args) > 1 && args[1] == "local" {
+		return view.T("installed as a local Mod"), nil
+	}
 	if strings.Contains(out, "Steam downloads it; it appears after the next scan.") {
 		return view.T("Steam downloads it; it appears after the next scan"), nil
 	}

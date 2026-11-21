@@ -34,10 +34,11 @@ async function setup(api = {}) {
     "./credit.js": { getChoices: () => [] },
     "./motion.js": { still: () => true },
     "./separator.js": { wireSeparator() {} },
+    "./api.js": { on() {} },
     "./membar.js": { splitBar: () => el("div", "sbar-row"), diffMarks: () => el("span", "dmarks") },
   }, { document, location: { search: "" }, URLSearchParams, navigator: {}, setTimeout: () => 0 });
   const went = [];
-  m.initExchange({ selectedList: () => 1, renderWhere() {}, renderHints() {}, go: (p) => went.push(["go", p]), newList: (f) => went.push(["newList", f]), reload: async () => {}, resumeGuide() {} });
+  m.initExchange({ selectedList: () => 1, renderWhere() {}, renderHints() {}, go: (p) => went.push(["go", p]), addWith: (t) => went.push(["addWith", t]), newList: (f) => went.push(["newList", f]), reload: async () => {}, resumeGuide() {} });
   return { m, screen, calls, said, listeners, S, body, went };
 }
 
@@ -198,6 +199,28 @@ test("a dropped list is read and compared", async () => {
   const call = h.calls.find((c) => c[0] === "ImportPreviewFor");
   assert.deepEqual(call.slice(2), ["text", "<ModsConfigData/>"]);
   assert.equal(h.screen.querySelector(".xc-preview").dataset.mode, "list");
+});
+
+test("a dropped Mod folder or zip, or a link, goes to add a subscription to be confirmed there", async () => {
+  const kinds = { "D:/Downloads/Colony Tweaks": "mod", "D:/RimSort": "folder" };
+  const h = await setup({ DropFolderKind: async (p) => kinds[p] });
+  await h.m.dropped({ name: "Colony Tweaks.zip", path: "D:/Downloads/Colony Tweaks.zip" });
+  await h.m.dropped({ name: "Colony Tweaks", path: "D:/Downloads/Colony Tweaks", dir: true });
+  await h.m.dropped({ text: "https://github.com/Example/colony" });
+  await h.m.dropped({ text: "not a link" });
+  assert.deepEqual(h.went, [["addWith", "D:/Downloads/Colony Tweaks.zip"], ["addWith", "D:/Downloads/Colony Tweaks"], ["addWith", "https://github.com/Example/colony"]]);
+  assert.ok(!h.calls.some((c) => c[0] === "Subscribe"), "nothing is installed or subscribed without the player's yes");
+  // a folder with no Mod in it is another manager's data, on the Import page
+  await h.m.dropped({ name: "RimSort", path: "D:/RimSort", dir: true });
+  assert.equal(h.went.length, 3);
+  assert.equal(h.S.screen, "plan-import");
+  // a browser drop gives no path: a zip is answered on the Import page
+  await h.listeners.drop(fileDrop("Colony.zip"));
+  assert.equal(h.screen.querySelector(".xc-preview").dataset.mode, "refused");
+  assert.match(h.screen.querySelector(".xc-preview").textContent, /choose zip/);
+  // a link dragged from a browser
+  await h.listeners.drop({ dataTransfer: { types: ["text/uri-list"], items: [], files: [], getData: (t) => t === "text/uri-list" ? "# comment\r\nhttps://www.loverslab.com/files/file/1-x/" : "" }, defaultPrevented: false, preventDefault() {} });
+  assert.deepEqual(h.went.at(-1), ["addWith", "https://www.loverslab.com/files/file/1-x/"]);
 });
 
 test("a dropped pack or folder without a path asks for the button; with a path it is added", async () => {

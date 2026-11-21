@@ -115,3 +115,61 @@ func importFile(path string, r io.Reader) error {
 	}
 	return closeErr
 }
+
+// Probe says whether a folder or zip holds one Mod, without copying it: About/About.xml at
+// its root or inside one top-level folder (what Import accepts).
+func Probe(from string) error {
+	st, err := os.Stat(from)
+	if err != nil {
+		return err
+	}
+	if st.IsDir() {
+		if source.AboutState(from) == source.AboutPresent {
+			return nil
+		}
+		entries, err := os.ReadDir(from)
+		if err != nil {
+			return err
+		}
+		if len(entries) == 1 && entries[0].IsDir() && source.AboutState(filepath.Join(from, entries[0].Name())) == source.AboutPresent {
+			return nil
+		}
+		return fmt.Errorf("not a Mod folder: no About/About.xml at the root or inside one top-level folder")
+	}
+	if !strings.EqualFold(filepath.Ext(from), ".zip") {
+		return fmt.Errorf("use a .zip archive or an extracted folder")
+	}
+	z, err := zip.OpenReader(from)
+	if err != nil {
+		return err
+	}
+	defer z.Close()
+	tops := map[string]bool{}
+	about := map[string]bool{} // top folder ("" for the root) → has About/About.xml
+	for _, f := range z.File {
+		parts := strings.Split(strings.Trim(strings.ReplaceAll(f.Name, "\\", "/"), "/"), "/")
+		if len(parts) > 1 || f.FileInfo().IsDir() {
+			tops[parts[0]] = true
+		} else {
+			tops[""] = true
+		}
+		n := len(parts)
+		if n >= 2 && strings.EqualFold(parts[n-1], "About.xml") && strings.EqualFold(parts[n-2], "About") {
+			switch n {
+			case 2:
+				about[""] = true
+			case 3:
+				about[parts[0]] = true
+			}
+		}
+	}
+	if about[""] || (len(tops) == 1 && func() bool {
+		for t := range tops {
+			return about[t]
+		}
+		return false
+	}()) {
+		return nil
+	}
+	return fmt.Errorf("not a Mod zip: no About/About.xml at the root or inside one top-level folder")
+}

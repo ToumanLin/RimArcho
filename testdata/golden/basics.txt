@@ -156,6 +156,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     subscribe git <url>                       install a Git mod and track its branch, tag or commit
     subscribe list                            list installed subscriptions and their last update check
     subscribe page <url>                      inspect a download page or install its Git repository or a downloaded archive
+    subscribe local <zip|folder>              copy a Mod folder or zip into the game's Mods folder as a local Mod (no subscription)
     subscribe workshop <id|url…>              subscribe through Steam, with SteamCMD fallback when Steam is unavailable
     subscribe check [ref…]                    check upstream references for updates (default: all subscriptions)
     subscribe update [ref…]                   update subscriptions (--all: every one); page subscriptions require --from (refused while the game runs)

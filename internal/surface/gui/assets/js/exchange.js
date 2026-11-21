@@ -11,6 +11,7 @@ import { splitBar } from "./membar.js";
 import { archoSpot } from "./archo.js";
 import { wireSeparator } from "./separator.js";
 import { orderDiff, orderView, legend } from "./listdiff.js";
+import { on } from "./api.js";
 
 let ui = null;
 export function initExchange(u) {
@@ -209,12 +210,14 @@ function emptyState() {
 // ---- dropping files on the window (16 §2.18 "Dropping files") ----
 
 // dropKind names what a dropped file or folder is by its name: "list", "pack", "manager" (a
-// RimCrow or RimSort database, RimSort's userRules.json), "folder", or "" when the page cannot
-// import it.
+// RimCrow or RimSort database, RimSort's userRules.json), "mod" (a .zip: a Mod to install),
+// "folder" (a Mod folder or another manager's data folder: DropFolderKind tells), or "" when
+// RimArcho cannot take it.
 export function dropKind(name, dir = false) {
   if (dir) return "folder";
   const n = String(name || "").toLowerCase().replace(/^.*[\\/]/, "");
   if (n.endsWith(".archopack")) return "pack";
+  if (n.endsWith(".zip")) return "mod";
   if (n.endsWith(".db") || n === "userrules.json") return "manager";
   if (/\.(xml|rml|json|txt|rws)$/.test(n)) return "list";
   return "";
@@ -236,38 +239,72 @@ function dropOverlay() {
 }
 export function showDropOver(on) {
   const o = on ? dropOverlay() : document.querySelector(".xc-dropover");
-  if (o) o.classList.toggle("on", on);
+  if (!o) return;
+  // on add a subscription a drop adds a Mod there; anywhere else it imports
+  const t = o.querySelector(".dz-t");
+  if (t && on) t.textContent = S.screen === "subscribe" ? T("drop to add") : T("drop to import");
+  o.classList.toggle("on", on);
 }
 
-// wireDrop: a file dragged over any page shows the overlay; dropped, it opens the Import page
-// and goes where it belongs. A form that takes drops itself (the lists' new / import) handles
-// them first. Under WebView2 composition hosting the native window receives no drops yet
-// (16 §8.2); the browser harness does.
+// isLink: one line that is a web address (a link dragged from a browser)
+const isLink = (s) => /^https?:\/\/\S+$/.test(String(s || "").trim());
+
+// wireDrop: a file or a link dragged over any page shows the overlay; dropped, it goes where it
+// belongs (dropped). A form that takes drops itself (the lists' new / import) handles them
+// first. In the window the drag and the drop come from RimArcho's own drop target
+// ("file-drag", "files-dropped": WebView2 composition hosting gives the page none, 16 §8.2);
+// in a browser from the page's drag events.
 function wireDrop() {
-  const files = e => e.dataTransfer?.types?.includes?.("Files");
-  document.addEventListener("dragenter", e => { if (!files(e)) return; dragDepth++; showDropOver(true); });
-  document.addEventListener("dragleave", e => { if (!files(e)) return; if (--dragDepth <= 0) { dragDepth = 0; showDropOver(false); } });
-  document.addEventListener("dragover", e => { if (files(e)) e.preventDefault(); });
+  const carries = e => e.dataTransfer?.types?.includes?.("Files") || e.dataTransfer?.types?.includes?.("text/uri-list");
+  document.addEventListener("dragenter", e => { if (!carries(e)) return; dragDepth++; showDropOver(true); });
+  document.addEventListener("dragleave", e => { if (!carries(e)) return; if (--dragDepth <= 0) { dragDepth = 0; showDropOver(false); } });
+  document.addEventListener("dragover", e => { if (carries(e)) e.preventDefault(); });
   document.addEventListener("drop", async e => {
     dragDepth = 0; showDropOver(false);
     if (e.defaultPrevented) return;
     const item = [...(e.dataTransfer?.items || [])].find(i => i.kind === "file");
     const f = item?.getAsFile?.() || e.dataTransfer?.files?.[0];
-    if (!f) return;
+    if (!f) {
+      const link = (e.dataTransfer?.getData?.("text/uri-list") || "").split(/\r?\n/).find(l => l && !l.startsWith("#")) || "";
+      if (!isLink(link)) return;
+      e.preventDefault();
+      return dropped({ text: link.trim() });
+    }
     e.preventDefault();
     const dir = !!item?.webkitGetAsEntry?.()?.isDirectory;
     await dropped({ name: f.name, file: f, dir, more: (e.dataTransfer.files?.length || 1) - 1 });
   });
+  try {
+    on("file-drag", (v) => showDropOver(!!v));
+    on("files-dropped", (d) => {
+      showDropOver(false);
+      const paths = d?.paths || [];
+      if (!paths.length) return d?.text ? dropped({ text: d.text }) : undefined;
+      return dropped({ path: paths[0], name: paths[0].replace(/^.*[\\/]/, ""), dir: !!d.dirs?.[0], more: paths.length - 1 });
+    });
+  } catch { /* no window runtime (a test) */ }
 }
 
-// dropped opens a dropped file or folder in the Import page. With a path (a native drop) it
-// goes where a chosen file goes; without one (the browser) a list is read from its content
-// and a pack, a database or a folder asks for the dialog.
+// dropped sends a dropped file, folder or link where it belongs. Only the first of several
+// files is taken. A link, a Mod folder or a Mod zip goes to add a subscription, filled in: its
+// card asks before it subscribes or installs (16 §2.9). Anything else opens the Import page:
+// with a path (the window) it goes where a chosen file goes; without one (a browser) a list
+// is read from its content and a pack, a database or a folder asks for the dialog.
 export async function dropped(d) {
-  const k = dropKind(d.path || d.name, d.dir);
+  if (d.text && !d.path && !d.name) {
+    if (!isLink(d.text)) return;
+    return ui.addWith(d.text.trim());
+  }
+  let k = dropKind(d.path || d.name, d.dir);
+  if (k === "folder" && d.path) k = (await api.DropFolderKind(d.path).catch(() => "folder")) === "mod" ? "mod" : "folder";
+  if (k === "mod" && d.path) {
+    if (d.more > 0) say("", Tf("one file at a time: reading %s", d.name));
+    return ui.addWith(d.path);
+  }
   if (S.screen !== "plan-import") await exchange();
   if (S.screen !== "plan-import") return;
   if (d.more > 0) say("", Tf("one file at a time: reading %s", d.name));
+  if (k === "mod") return refuse(d.name, T("a Mod zip needs its path: choose it with “choose zip…” in add a subscription"), "warn");
   if (!k) return refuse(d.name);
   if (d.path) return k === "folder" ? addManagerSource(d.path) : openPicked(d.path);
   if (k === "list") return readFile(d.file);
