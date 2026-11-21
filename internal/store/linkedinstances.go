@@ -95,3 +95,34 @@ func (s *Store) MergeLinkedInstances(replace map[string]string) error {
 		return recomputeAllPrimaries(tx)
 	})
 }
+
+// SameItemInstances pairs each live Instance of source from with the live Instance of
+// source to in the folder of the same name (a Workshop ID): a game's own Workshop folder
+// against the Steam client's (03 §2 item 3).
+func (s *Store) SameItemInstances(from, to string) (map[string]string, error) {
+	rows, err := s.DB.Query(`SELECT o.id, n.id FROM instance o
+		JOIN instance n ON n.source_id=? AND n.tombstone_at IS NULL AND lower(n.rel_path)=lower(o.rel_path)
+		WHERE o.source_id=? AND o.tombstone_at IS NULL`, to, from)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	m := map[string]string{}
+	for rows.Next() {
+		var o, n string
+		if err := rows.Scan(&o, &n); err != nil {
+			return nil, err
+		}
+		m[o] = n
+	}
+	return m, rows.Err()
+}
+
+// SwitchListInstances makes every plan list (workspaces, undo steps, versions, staged
+// Mods) use instance m[old] where it used old. Unlike a merge, both Instances stay.
+func (s *Store) SwitchListInstances(m map[string]string) error {
+	if len(m) == 0 {
+		return nil
+	}
+	return s.inTx(func(tx *sql.Tx) error { return rewriteInstanceLists(tx, m) })
+}

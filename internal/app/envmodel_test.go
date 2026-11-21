@@ -189,9 +189,10 @@ func TestFolderCommands(t *testing.T) {
 	}
 }
 
-// 03 §2: a SteamCMD game keeps its own Workshop folder inside the game folder. It becomes a
-// shared SteamCMD folder on env add (and, for an environment added earlier, on a scan); it
-// never moves the Steam client's Workshop folder, and a removed one stays removed.
+// 03 §2: a SteamCMD game keeps its own Workshop folder inside the game folder. Without the
+// Steam client's Workshop folder on disk it becomes a shared SteamCMD folder on env add (and,
+// for an environment added earlier, on a scan); it never moves the Steam client's Workshop
+// folder, and a removed one stays removed. With the client's folder: gamemirror_test.go.
 func TestGameWorkshopIsSteamCMD(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
@@ -199,6 +200,7 @@ func TestGameWorkshopIsSteamCMD(t *testing.T) {
 	e.AddEnv(false)
 	scanNow(t, e)
 	wsRoot := sourcesOf(t, e)["workshop"].Root
+	e.Move(e.Workshop, filepath.Join(e.Root, "NoSteamClient")) // a SteamCMD-only player
 
 	g2 := secondGame(e, "Game16")
 	own := filepath.Join(g2, "steamapps", "workshop", "content", "294100")
