@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/analyze"
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/env"
@@ -381,6 +382,9 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 	for i := range n.Items {
 		if n.Items[i].code != "memory.capacity" {
 			n.Items[i].Section = SectionOf(n.Items[i].Group)
+			if n.Items[i].Status == StatusHint && !n.Items[i].Counted {
+				n.Items[i].Section = SectionHint // a quiet hint is worth knowing, not a break
+			}
 		}
 		n.Items[i].Kind = n.Items[i].code
 		if ev := n.Items[i].Evidence; ev != nil && ev.Kind == EvCorpus {
@@ -536,6 +540,9 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 		}
 	}
 	var versions []*app.Problem
+	// patch.no-match with no inactive target, by subject mod: one row mark each (16 §5)
+	var patchOrder []string
+	patchOther := map[string][]*app.Problem{}
 	var order []Need                    // order.violated: folded into one item when there are several
 	var weak []Need                     // order.violated of weak or harmless constraints: one dimmed item (08 §1.3)
 	logs := map[string][]*app.Problem{} // current log problems by subject mod ("" unattributed)
@@ -731,7 +738,13 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 				continue
 			}
 			if y == "" {
-				continue // no inactive target: nothing the player can do (technical information)
+				// no inactive target: the Mod does not fit what it changes; one quiet item per
+				// Mod, after the loop (patchItems)
+				if patchOther[x] == nil {
+					patchOrder = append(patchOrder, x)
+				}
+				patchOther[x] = append(patchOther[x], p)
+				continue
 			}
 			merge("patch|"+x+"|"+y, nm(x), nm(y), Need{Group: GroupDeps, Target: dependencyTarget(st, y), RequiredBy: owners(st, x), Text: Tf("part of %s does not take effect: %s, which it targets, is not enabled", nm(x), nm(y)),
 				Actions: []Action{enable(st, y), problemAction(p.Ref)}, Counted: true, Mods: ids, Status: s,
@@ -784,6 +797,23 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 		default:
 			// Harmony warnings without log evidence, overlapping Defs and patches whose target
 			// is simply absent stay in the technical information (16 §5).
+		}
+	}
+	cur, linkProblem = "patch.no-match", nil
+	var quiet []Need
+	for _, x := range patchOrder {
+		if it := patchItem(st, x, nm(x), patchOther[x], logs[finding.InstID(x)]); it.Counted {
+			add(it) // the log showed it: its own item
+		} else {
+			quiet = append(quiet, it)
+		}
+	}
+	if len(quiet) > 3 {
+		// many Mods (an old list on a new game): one folded item, each row keeps its reason
+		add(foldPatchItems(quiet))
+	} else {
+		for _, it := range quiet {
+			add(it)
 		}
 	}
 	// what is added from here on says its own code: cur is the last problem's
@@ -1637,4 +1667,65 @@ func cycleResolution(st *app.LoadoutState, p *app.Problem) string {
 		}
 	}
 	return Tf("requirements set aside by sorting: %s", strings.Join(broken, "; "))
+}
+
+// patchItem is the one item for a Mod's patches that find nothing without an inactive
+// target (16 §5, 05 §4.4): the Mod does not fit the game version or a Mod it changes, or
+// it changes a Mod that is not installed. A quiet hint with a row mark, not counted; when
+// the current game log shows a patch of the Mod failing, a counted warning, since the
+// player saw the red error it explains. problems are the findings; logs the Mod's current
+// log problems.
+func patchItem(st *app.LoadoutState, x, name string, problems []*app.Problem, logs []*app.Problem) Need {
+	reasons := map[string]bool{}
+	for _, p := range problems {
+		for _, e := range p.Evidence {
+			if r, ok := strings.CutPrefix(e.Text, "reason "); ok {
+				reasons[r] = true
+			}
+		}
+	}
+	why := T("it changes things that are not there (renamed, removed or in another version): those changes do not take effect; an update of it, or of the Mod it changes, usually fixes this")
+	switch {
+	case reasons[analyze.ReasonTargetLater]:
+		why = T("it changes things a Mod loaded after it adds: move it after that Mod")
+	case reasons[analyze.ReasonWrongVersion]:
+		why = T("what it changes is only in another game version's files: an update of it, or of the Mod it changes, usually fixes this")
+	case len(reasons) == 1 && reasons[analyze.ReasonTargetMissing]:
+		why = T("it changes a Mod that is not installed: usually an optional compatibility patch; harmless, but the game logs a red error for it")
+	}
+	title := Tf("%d patches of %s find nothing", len(problems), name)
+	if len(problems) == 1 {
+		title = Tf("a patch of %s finds nothing", name)
+	}
+	n := Need{Group: GroupConflict, Title: title, Text: title + T(": ") + why, Why: why,
+		Actions: []Action{problemAction(problems[0].Ref)}, Mods: []string{finding.InstID(x)},
+		Status: StatusHint, Dim: true, Evidence: evidenceFor(problems[0]), linkProblems: problems}
+	for _, l := range logs {
+		if l.Code == "log.patch-failed" { // logs.ClassPatchFailed
+			n.Status, n.Counted, n.Dim = StatusWarn, true, false
+			n.Why = T("it failed in the last run") + T("; ") + why
+			n.Text = title + T(": ") + n.Why
+			break
+		}
+	}
+	return n
+}
+
+// foldPatchItems folds the quiet patch items of many Mods into one (16 §5): the rows keep
+// each Mod's own title and reason.
+func foldPatchItems(items []Need) Need {
+	f := Need{Group: GroupConflict, Status: StatusHint, Dim: true, Fold: true, rowReasons: map[string]Reason{},
+		Title: Tf("patches of %d Mods find nothing", len(items)),
+		Why:   T("those changes do not take effect; the Mods may not fit this game version or the Mods they change"),
+		Evidence: items[0].Evidence, Actions: []Action{{Kind: ActFold, Key: "f", Label: T("show which")}}}
+	f.Text = f.Title
+	for _, it := range items {
+		f.Mods = append(f.Mods, it.Mods...)
+		f.linkProblems = append(f.linkProblems, it.linkProblems...)
+		f.Parts = append(f.Parts, it.Title)
+		for _, id := range it.Mods {
+			f.rowReasons[id] = Reason{Status: StatusHint, Text: it.Title, Why: it.Why, Evidence: it.Evidence, Actions: popActions(it.Actions)}
+		}
+	}
+	return f
 }

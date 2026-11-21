@@ -35,6 +35,12 @@ const (
 	ReasonRuntimeException = "exception"
 )
 
+// ReasonGuarded marks an operation that succeeded but touched its defs only from inside a
+// guard (FindMod, MayRequire, Conditional, a conditional load folder): without the guarded
+// Mod it does not run, so it does not fail either. It is not a failure reason; the app's
+// quick check after a list edit skips such operations (05 §4.4 "Between checks").
+const ReasonGuarded = "guarded"
+
 // PatchFact is one top-level PatchOperation and its simulated outcome (05 §2).
 type PatchFact struct {
 	Instance string   `json:"-"`
@@ -148,6 +154,9 @@ func (s *sim) facts(tops []*topOp, k *knowledge) []*PatchFact {
 			f.Result = ResultUnknown
 		case t.ok:
 			f.Result = ResultOK
+			if len(f.Targets) > 0 && !s.openTouch[t] {
+				f.Reasons = []string{ReasonGuarded}
+			}
 		default:
 			f.Result = ResultFailed
 			leaf := t.op.failedLeaf()

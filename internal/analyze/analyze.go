@@ -22,6 +22,11 @@ import (
 // Version of the analyzers; facts written by another version are rebuilt (05 §2).
 const Version = 12 // 12: unresolved content classification fields (12 §2).
 
+// PatchVersion versions the patch facts alone: it is in the run key (app.AnalysisKey), so
+// lists are simulated again, but not in the Def and assembly fact keys, which stay. 1:
+// succeeded operations reached only through a guard are marked (ReasonGuarded, Stats.Guards).
+const PatchVersion = 1
+
 // Mod is one installed instance.
 type Mod struct {
 	Instance string
@@ -124,6 +129,9 @@ type Stats struct {
 	Assemblies, AssemblyErrors int
 	HarmonyPatches, Types      int
 	HarmonyMs                  int64
+	// Guards: the run marks guarded operations (PatchVersion ≥ 1); the app's quick patch
+	// check between runs trusts only such runs (05 §4.4 "Between checks")
+	Guards bool `json:",omitempty"`
 }
 
 func (in *Input) progress(f string, a ...any) {
@@ -155,6 +163,7 @@ func Run(in Input) (*Output, error) {
 
 	out := &Output{Content: map[string]*ContentState{}, NewDefs: map[string][]DefFact{}}
 	out.Stats.ActiveMods, out.Stats.InstalledMods = len(active), len(in.Mods)
+	out.Stats.Guards = true
 	folders := map[string][]string{}
 	requires := map[string]map[string][]string{}
 	for _, m := range in.Mods {

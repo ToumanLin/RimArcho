@@ -207,7 +207,7 @@ env:main  RimWorld 1.6.4633 rev1261
   plan: plan:default
   loadout: 6 active, 1 change unsaved (archo loadout diff)
   automatic checks: on; nothing waiting (not checked yet)
-  problems: 1 error, 1 warning, 2 info; Def/Patch analysis stale (archo problems)
+  problems: 1 error, 0 warning, 2 info; Def/Patch analysis stale (archo problems)
 next:
   archo save
 

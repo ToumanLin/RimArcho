@@ -485,5 +485,14 @@
   "RAM: loading needs %s; available memory is unavailable; total capacity %s": "RAM：読み込みに必要な容量 %s／空き容量は不明（総容量 %s）",
   "VRAM: estimated %s; dedicated capacity is unknown": "VRAM：推定使用量 %s／専用容量は不明",
   "the mod's files changed after RimArcho wrote its DDS": "RimArchoがDDSを作成した後にMODのファイルが変更されました",
-  "%d file": "%dファイル"
+  "%d file": "%dファイル",
+  "it changes things that are not there (renamed, removed or in another version): those changes do not take effect; an update of it, or of the Mod it changes, usually fixes this": "変更対象が存在しません（名前変更・削除・別バージョン）：その変更は反映されません。このMODか変更先MODの更新で通常は直ります",
+  "it changes things a Mod loaded after it adds: move it after that Mod": "変更対象は後に読み込まれるMODが追加します：そのMODの後ろに移動してください",
+  "what it changes is only in another game version's files: an update of it, or of the Mod it changes, usually fixes this": "変更対象は別のゲームバージョンのファイルにしかありません：このMODか変更先MODの更新で通常は直ります",
+  "it changes a Mod that is not installed: usually an optional compatibility patch; harmless, but the game logs a red error for it": "インストールされていないMODを変更します：通常は任意の互換パッチで無害ですが、ゲームは赤いエラーを記録します",
+  "%d patches of %s find nothing": "%[2]sのパッチ%[1]d件が対象を見つけられません",
+  "a patch of %s finds nothing": "%sのパッチが対象を見つけられません",
+  "it failed in the last run": "前回の実行で失敗しました",
+  "patches of %d Mods find nothing": "%d個のMODのパッチが対象を見つけられません",
+  "those changes do not take effect; the Mods may not fit this game version or the Mods they change": "その変更は反映されません。MODがこのゲームバージョンや変更先MODに合っていない可能性があります"
 }
