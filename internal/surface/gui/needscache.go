@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -226,7 +227,7 @@ func (s *API) refreshNeedsLocked(c *needsSnapshot) {
 		var event *view.ListProblems
 		if n != nil {
 			s.saveFreshNeedsLocked(ps, n, true)
-			s.autoAnalyzeLocked(n, ps.State)
+			s.autoAnalyzeLocked(n, true)
 			event = s.problemsNowLocked(n)
 		} else {
 			copy := *c.n
@@ -244,30 +245,70 @@ func (s *API) refreshNeedsLocked(c *needsSnapshot) {
 	}()
 }
 
-// autoAnalyzeLocked starts the files' check by itself, the automatic part of 16 §8.9: a
-// list never checked starts one wherever its findings are read (the editor too); a stale
-// check starts again only while Can it run is on screen (needsWanted). Either happens once
-// per inputs (scope and app.AnalysisKey) a session: a check that ran for these inputs, or
-// one that left them stale or failed, waits for the page's check again (A). So list edits
-// in the editor, page switches and repeated visits never chain checks. s.mu is held; st is
-// the loadout n was built for.
-func (s *API) autoAnalyzeLocked(n *view.Needs, st *app.LoadoutState) bool {
-	if n == nil || st == nil || n.Error != "" || !(n.Stale || n.Never) || s.busy["analyze"] || s.needsClosed {
+// autoAnalyzeLocked keeps the shown findings current, the automatic part of 16 §8.9:
+// wherever a list's findings are read (Can it run, the editor's problems, Launch) and its
+// files' check is stale or never ran, a check follows by itself. Edits settle first: each
+// call puts the start analyzeSettle later (analyzeSoonLocked), so a run of edits ends in
+// one check of the final list. Entering a page (settle false) starts it at once. s.mu is
+// held; n is what was just read (nil: analyzeSettled reads the state itself).
+func (s *API) autoAnalyzeLocked(n *view.Needs, settle bool) bool {
+	if s.needsClosed || n != nil && (n.Error != "" || !(n.Stale || n.Never)) {
 		return false
 	}
-	if !n.Never && !s.needsWanted {
-		return false
+	d := time.Duration(0)
+	if settle {
+		d = s.analyzeSettle
+		if d == 0 {
+			d = analyzeSettle
+		}
+	}
+	s.analyzeSoonLocked(d)
+	return true
+}
+
+// analyzeSettle: how long after the last edit the automatic check starts.
+const analyzeSettle = 2 * time.Second
+
+// analyzeSoonLocked (re)arms the one pending automatic check d from now; s.mu is held.
+func (s *API) analyzeSoonLocked(d time.Duration) {
+	if s.analyzeTimer != nil {
+		s.analyzeTimer.Stop()
+	}
+	s.analyzeTimer = time.AfterFunc(d, s.analyzeSettled) // not scheduled: an edit settle (16 §8.9), once per edit run
+}
+
+// analyzeSettled starts the automatic check if the open list still needs one. The newest
+// state wins: a check already running is left to end (it writes its result only at the
+// end) and one more follows it for the list as it is then (analyzeAfter). The same inputs
+// (scope and app.AnalysisKey) start by themselves once a session: a check that failed or
+// left them stale waits for check again, so nothing loops.
+func (s *API) analyzeSettled() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.analyzeTimer = nil
+	if s.needsClosed {
+		return
+	}
+	if s.busy["analyze"] {
+		s.analyzeAfter = true
+		return
+	}
+	st, err := s.a.Loadout()
+	if err != nil || st == nil {
+		return
+	}
+	if as, err := s.a.Analysis(st); err != nil || as.Run != nil && as.Fresh {
+		return
 	}
 	key := s.needsScopeLocked() + "|" + s.a.AnalysisKey(st, "")
 	if s.autoAnalyzed[key] || key == s.analyzedKey {
-		return false
+		return
 	}
 	if !s.startAnalyze() {
-		return false
+		return
 	}
 	if s.autoAnalyzed == nil {
 		s.autoAnalyzed = map[string]bool{}
 	}
 	s.autoAnalyzed[key] = true
-	return true
 }

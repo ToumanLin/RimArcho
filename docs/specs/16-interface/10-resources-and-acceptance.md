@@ -7,7 +7,7 @@
 **Pages must load fast and use little memory.** This sets RimArcho apart from RimCrow, which uses 400–500 MB while resident (18). New features must not give it up:
 
 - **Show the page first.** On navigation, show existing data immediately. Fill in slow parts, such as file reads, analysis, network access, and Steam, in the background without blocking the page or keys.
-- **Do the same work once.** A repeat while work runs joins it, leaving a page abandons its reads, and heavy work starts by itself only the first time (§8.9).
+- **Do the same work once.** A repeat while work runs joins it, leaving a page abandons its reads, and automatic work keeps what is shown current but settles, coalesces and runs once per inputs (§8.9).
 - **Do not retain memory indefinitely.** Release a page's data when leaving it (17 §7.3). Caches must have a limit or become invalid when their data changes. Idle memory must not grow with usage time.
 - **The table sets merge thresholds.** Do not merge a change that exceeds any threshold. When changing page loading, lists, scans, or caches, measure before and after and record the numbers in the commit description and 18. Measured values are in 18 §2.
 

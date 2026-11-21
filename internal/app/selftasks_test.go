@@ -140,3 +140,32 @@ func TestSelfTasksJoinAWaitingTwin(t *testing.T) {
 		t.Fatalf("11 requests ran %d times, want 2", count)
 	}
 }
+
+// 16 §8.9: work that repeats by itself keeps one row: a finished copy of the same kind and
+// object gives its row to the next run; failures and other objects stay.
+func TestBeginOnceKeepsOneRow(t *testing.T) {
+	t.Parallel()
+	ts := OpenTasks(filepath.Join(t.TempDir(), "tasks.json"))
+	defer ts.Close()
+	a := ts.BeginOnce("analyze", "Main", nil)
+	ts.Finish(a, TaskDone, "analysis done")
+	other := ts.BeginOnce("analyze", "Other", nil)
+	ts.Finish(other, TaskDone, "analysis done")
+	failed := ts.BeginOnce("analyze", "Main", nil)
+	ts.Finish(failed, TaskFailed, "no disk")
+	last := ts.BeginOnce("analyze", "Main", nil)
+	ts.Finish(last, TaskDone, "analysis done")
+	var ids []string
+	for _, task := range ts.List() {
+		ids = append(ids, task.ID)
+	}
+	want := map[string]bool{last: true, failed: true, other: true}
+	if len(ids) != 3 {
+		t.Fatalf("rows %v, want the last Main, the failed Main and Other", ids)
+	}
+	for _, id := range ids {
+		if !want[id] {
+			t.Fatalf("row %s should have given way (rows %v)", id, ids)
+		}
+	}
+}

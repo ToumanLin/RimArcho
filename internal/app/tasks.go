@@ -274,6 +274,27 @@ func (ts *Tasks) Begin(kind, obj string, stop func() error) string {
 	return t.ID
 }
 
+// BeginOnce is Begin for work that repeats by itself (the files' check, 16 §8.9): an
+// earlier task of this window with the same kind and object that ended done gives its
+// row to this one, so the task list keeps one row for it, updated in place, instead of a
+// line of finished copies. Failed, stopped and partial ones stay.
+func (ts *Tasks) BeginOnce(kind, obj string, stop func() error) string {
+	ts.mu.Lock()
+	keep := ts.list[:0:0]
+	for _, t := range ts.list {
+		if t.Kind == kind && t.Obj == obj && t.Owner == ts.owner && t.State == TaskDone {
+			continue
+		}
+		keep = append(keep, t)
+	}
+	if len(keep) < len(ts.list) {
+		ts.list = keep
+		ts.saveLocked()
+	}
+	ts.mu.Unlock()
+	return ts.Begin(kind, obj, stop)
+}
+
 // EnqueueSelf schedules work in the RimArcho lane: one of each kind at a time,
 // different kinds concurrently (16 §2.16). run reports progress through Update. A request
 // equal to a task still waiting (kind, object, arguments, Game Config) joins it: that task

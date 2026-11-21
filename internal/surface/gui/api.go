@@ -68,12 +68,14 @@ type API struct {
 	needsJobs       sync.WaitGroup
 	needsRefreshing bool
 	needsClosed     bool
-	// needsWanted: Can it run is on screen (set by Needs, cleared by Leave): only then may a
-	// stale check start again by itself (autoAnalyzeLocked, 16 §8.9).
-	needsWanted bool
 	// autoAnalyzed: the inputs (scope and analysis key) an automatic check already ran for
 	// this session; the same inputs never start another by themselves.
-	autoAnalyzed  map[string]bool
+	autoAnalyzed map[string]bool
+	// analyzeTimer: the pending automatic check (autoAnalyzeLocked); analyzeAfter: one more
+	// follows the running check; analyzeSettle: the edit settle time (0: analyzeSettle).
+	analyzeTimer  *time.Timer
+	analyzeAfter  bool
+	analyzeSettle time.Duration
 	needsSequence uint64
 	listEdits     uint64
 	// building is the pack this window's build child is making ("" none).
@@ -1276,14 +1278,13 @@ func (s *API) tagDone(t string, err error) (string, error) {
 // starts the files' check when it is stale, as the TUI does.
 func (s *API) Needs() *view.Needs {
 	s.mu.Lock()
-	s.needsWanted = true
 	if c, key := s.cachedNeedsLocked(); c != nil {
 		if c.key == key {
 			s.refreshNeedsLocked(c)
 			st, _ := s.a.Loadout()
 			n := view.RefreshMemory(s.a, st, c.n)
 			if c.eager {
-				s.autoAnalyzeLocked(n, st)
+				s.autoAnalyzeLocked(n, false)
 			}
 			out := *n
 			out.Updating = s.needsWorkLocked()
@@ -1324,7 +1325,7 @@ func (s *API) Needs() *view.Needs {
 		// The eager pass may have saved a parsed log report. Read its ProblemSet again.
 		ps, _ = r.Problems(false, nil)
 		s.saveFreshNeedsLocked(ps, n, true)
-		s.autoAnalyzeLocked(n, current)
+		s.autoAnalyzeLocked(n, false)
 		n.Updating = s.needsWorkLocked()
 	}
 	return n
@@ -1850,7 +1851,7 @@ func (s *API) startAnalyzeOf(list string) bool {
 	if list != "" {
 		plan, obj = list, list
 	}
-	task := s.beginSelf(view.TaskAnalyze, obj, nil)
+	task := s.tasks.BeginOnce(view.TaskAnalyze, obj, nil) // one row, updated in place (16 §8.9)
 	// the open list's findings will change: its problems button says so while this runs
 	if c, _ := s.cachedNeedsLocked(); c != nil && c.scope == scope {
 		ev := s.problemsNowLocked(c.n)
@@ -1893,6 +1894,11 @@ func (s *API) startAnalyzeOf(list string) bool {
 			if c, _ := s.cachedNeedsLocked(); c != nil {
 				s.refreshNeedsLocked(c)
 			}
+		}
+		if s.analyzeAfter {
+			// the list changed while this ran: one more check for it as it is now
+			s.analyzeAfter = false
+			s.analyzeSoonLocked(0)
 		}
 		s.mu.Unlock()
 		s.endSelf(task, err, view.T("analysis done"))

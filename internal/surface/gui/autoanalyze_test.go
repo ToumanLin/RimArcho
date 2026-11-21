@@ -8,34 +8,48 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// settle waits until no needs refresh or analysis is running.
+// settle waits until no automatic check is pending and no needs refresh or analysis runs.
 func settle(s *API) {
 	for {
 		s.needsJobs.Wait()
 		s.mu.Lock()
-		idle := !s.busy["analyze"] && !s.needsRefreshing
+		idle := !s.busy["analyze"] && !s.needsRefreshing && s.analyzeTimer == nil
 		s.mu.Unlock()
 		if idle {
 			return
 		}
+		time.Sleep(5 * time.Millisecond)
 	}
 }
 
-// 16 §8.9: the files' check starts by itself once per inputs. Repeated visits, a check that
-// leaves the list stale, and edits in the editor never chain checks; check again (Analyze)
-// always runs, and a repeat while one runs joins it.
-func TestAutoAnalysisRunsOncePerInputs(t *testing.T) {
+// 16 §8.9: the shown findings stay current with at most one check per settled state. A
+// list never checked checks on entry; a run of edits ends in one check of the final list;
+// an edit during a check gets one check after it; Launch starts one too. The same inputs
+// never start by themselves twice (a check that leaves the list stale does not loop), and
+// check again right after a check of the same inputs starts nothing.
+func TestAutoAnalysisKeepsFindingsCurrent(t *testing.T) {
 	t.Parallel()
 	e, s, _ := fixture(t)
+	s.mu.Lock()
+	s.analyzeSettle = 300 * time.Millisecond
+	s.mu.Unlock()
 	inner := e.App.AnalyzeRunner
 	var runs atomic.Int32
-	noop := false
+	var noop atomic.Bool
+	// hold: a check that has read its list waits (ran says so) until release closes
+	type held struct{ ran, release chan struct{} }
+	var hold atomic.Pointer[held]
 	e.App.AnalyzeRunner = func(env string, p func(string)) error {
 		runs.Add(1)
-		if noop {
-			return nil // a check that leaves the list as it was (the player's loop)
+		var err error
+		if !noop.Load() { // a no-op check leaves the list as it was (the player's loop)
+			err = inner(env, p)
 		}
-		return inner(env, p)
+		if h := hold.Load(); h != nil {
+			close(h.ran)
+			<-h.release
+		}
+		return err
 	}
 	// first visit: never checked, so it checks once
 	s.Needs()
@@ -52,40 +66,81 @@ func TestAutoAnalysisRunsOncePerInputs(t *testing.T) {
 	if got := runs.Load(); got != 1 {
 		t.Fatalf("unchanged visits ran %d checks, want 1", got)
 	}
-	// edits in the editor while Can it run is not shown: stale, no check by itself
+	// a run of edits in the editor, Can it run not shown: one check of the final list
 	s.Leave("needs")
 	b := s.Board()
-	a, _ := b.St.Ix.ResolveOne("pkg:tester.a")
-	for i := 0; i < 3; i++ {
-		if _, err := s.Toggle(int(view.Active), []string{a.ID}, nil); err != nil {
-			t.Fatal(err)
-		}
-		settle(s)
-		if _, err := s.Toggle(int(view.Inactive), []string{a.ID}, nil); err != nil {
-			t.Fatal(err)
-		}
-		settle(s)
+	// each enabled set keeps its own check (app.Analysis), so every step makes a set not
+	// checked yet; a, b, h: tester.a (enabled), tester.b and Harmony (disabled)
+	id := func(ref string) string {
+		m, _ := b.St.Ix.ResolveOne(ref)
+		return m.ID
 	}
-	if _, err := s.Toggle(int(view.Active), []string{a.ID}, nil); err != nil {
-		t.Fatal(err)
+	a, bb, h := id("pkg:tester.a"), id("pkg:tester.b"), id("pkg:brrainz.harmony")
+	toggle := func(c view.Column, mod string) {
+		t.Helper()
+		if _, err := s.Toggle(int(c), []string{mod}, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := 0; i < 3; i++ {
+		toggle(view.Active, a)
+		toggle(view.Inactive, a)
+	}
+	toggle(view.Inactive, bb)
+	settle(s)
+	if got := runs.Load(); got != 2 {
+		t.Fatalf("seven edits ran %d checks, want 1", got-1)
+	}
+	if n := s.Needs(); n.Stale || n.Never {
+		t.Fatal("after the edits settled the findings are not current")
 	}
 	settle(s)
-	if got := runs.Load(); got != 1 {
-		t.Fatalf("editor edits ran %d checks, want none", got-1)
+	// an edit while a check runs: that check ends, then one more for the list as it is
+	hd := &held{make(chan struct{}), make(chan struct{})}
+	hold.Store(hd)
+	toggle(view.Inactive, h)
+	<-hd.ran
+	hold.Store(nil)
+	toggle(view.Active, a)
+	time.Sleep(400 * time.Millisecond) // the edit settles while the check is held
+	close(hd.release)
+	settle(s)
+	if got := runs.Load(); got != 4 {
+		t.Fatalf("edits during a check ran %d checks, want 2 (the running one and one after)", got-2)
 	}
-	// Can it run shown with a stale check: once for these inputs, even when the check
-	// leaves them stale
-	noop = true
+	if n := s.Needs(); n.Stale || n.Never {
+		t.Fatal("the check after the running one should leave the findings current")
+	}
+	settle(s)
+	// Launch reads the stored check: it starts one at once when the list changed
+	s.mu.Lock()
+	s.analyzeSettle = time.Hour // the edit alone would not start it during this test
+	s.mu.Unlock()
+	toggle(view.Active, bb)
+	if s.Home() == nil {
+		t.Fatal("no Launch page")
+	}
+	settle(s)
+	if got := runs.Load(); got != 5 {
+		t.Fatalf("Launch after an edit ran %d checks, want 1", got-4)
+	}
+	// a check that leaves its inputs stale does not start again by itself
+	noop.Store(true)
+	toggle(view.Active, h)
+	s.Home()
+	settle(s)
 	for i := 0; i < 4; i++ {
 		s.Needs()
+		s.Home()
 		settle(s)
 	}
-	if got := runs.Load(); got != 2 {
-		t.Fatalf("stale visits ran %d checks, want 1", got-1)
+	if got := runs.Load(); got != 6 {
+		t.Fatalf("a stale-leaving check ran %d times by itself, want 1", got-5)
 	}
 	if n := s.Needs(); !n.Stale {
 		t.Fatal("the no-op check should have left the list stale")
 	}
+	settle(s)
 	// check again right after a check of the same inputs starts nothing
 	if s.Analyze() {
 		t.Fatal("check again just after a check of the same inputs started another")
@@ -110,8 +165,18 @@ func TestAutoAnalysisRunsOncePerInputs(t *testing.T) {
 		}
 	}
 	settle(s)
-	if started != 1 || runs.Load() != 3 {
-		t.Fatalf("10 clicks started %d checks (runs %d), want 1", started, runs.Load()-2)
+	if started != 1 || runs.Load() != 7 {
+		t.Fatalf("10 clicks started %d checks (runs %d), want 1", started, runs.Load()-6)
+	}
+	// the task list keeps one row for the check of this list, updated in place
+	rows := 0
+	for _, task := range s.tasks.List() {
+		if task.Kind == view.TaskAnalyze && task.State == "done" {
+			rows++
+		}
+	}
+	if rows != 1 {
+		t.Fatalf("%d finished check rows, want 1", rows)
 	}
 }
 

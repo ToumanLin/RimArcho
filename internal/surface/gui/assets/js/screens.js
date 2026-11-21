@@ -617,21 +617,17 @@ function drawNeeds() {
   const focused = document.activeElement && sc.contains(document.activeElement) ? document.activeElement.closest(".need")?.dataset.id : "";
   sc.innerHTML = "";
   const d = N.data;
-  let state = "";
-  if (S.busy.analyze) state = T("checking the mods' files…");
-  else if (d.never) state = T("the mods' files are not checked yet");
-  else if (d.stale) state = T("the files changed since the last check");
-  // the last result stays with its age; a stale one reruns only on check again (16 §8.9)
-  const checked = !S.busy.analyze && d.checked ? el("span", "state-note", d.checked) : null;
-  const again = act(T("check again"), "rescan", () => ui.cmd("analyze"), "A", "analyze");
+  // The check's state is an icon; its words and the last check's time are its tooltip
+  // (16 §8.9). A stale or missing check starts by itself, so the button is the spare way:
+  // "up to date" and off while the shown check is current.
+  const again = act(checkCurrent(d) ? T("up to date") : T("check again"), "rescan", () => ui.cmd("analyze"), "A", "analyze");
   again.classList.add("analyze-again");
-  markAgain(again);
   const w = page("needs fill", needsLead(d),
-    state ? el("span", "state-note", state) : null,
-    checked,
+    checkState(d),
     autoFix(),
     again,
     act(T("game log"), "log", () => ui.go("log"), "l"));
+  markAgain(again);
   runSummary(w);
   N.els = [[], []];
   const live = N.cols[1].some((x) => x.group === 6);
@@ -1184,13 +1180,39 @@ export function analyzeEvent(ev) {
   else againChanged();
 }
 
-// againChanged: the shown check again follows S.busy.analyze (no page read).
-export function againChanged() { markAgain(document.querySelector(".page .analyze-again")); }
+// againChanged: the shown state and check again follow S.busy.analyze (no page read).
+export function againChanged() {
+  markAgain(document.querySelector(".page .analyze-again"));
+  const st = document.querySelector(".page .check-state");
+  if (st && N.data) st.replaceWith(checkState(N.data));
+}
 
-// markAgain: check again is busy and disabled while a check runs, whoever started it.
+// checkCurrent: the shown findings come from a check of the list as it is.
+function checkCurrent(d) { return !!d && !d.never && !d.stale && !d.error && !S.busy.analyze; }
+
+// checkState is the files' check as an icon: current, checking, stale or never checked.
+function checkState(d) {
+  const kind = S.busy.analyze ? "checking" : d.never ? "never" : d.stale || d.error ? "stale" : "current";
+  const words = {
+    checking: T("checking the mods' files…"),
+    never: T("the mods' files are not checked yet"),
+    stale: T("the files changed since the last check"),
+    current: T("up to date"),
+  }[kind];
+  const tip = d.checked && kind !== "never" ? words + ", " + d.checked : words;
+  const s = el("span", "check-state " + kind);
+  s.innerHTML = icon[{ checking: "rescan", never: "warn", stale: "warn", current: "ok" }[kind]] || "";
+  s.title = tip;
+  s.setAttribute("role", "img");
+  s.setAttribute("aria-label", tip);
+  return s;
+}
+
+// markAgain: check again is busy and off while a check runs, whoever started it, and off
+// while the shown check is current (drawNeeds labels it "up to date" then).
 function markAgain(b) {
   if (!b) return;
-  b.disabled = !!S.busy.analyze;
+  b.disabled = !!S.busy.analyze || checkCurrent(N.data);
   if (S.busy.analyze) b.setAttribute("aria-busy", "true");
   else b.removeAttribute("aria-busy");
 }

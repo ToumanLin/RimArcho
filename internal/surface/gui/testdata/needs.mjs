@@ -42,9 +42,10 @@ test("enter after the asked item vanished runs nothing", async () => {
   assert.deepEqual(actions, []);
 });
 
-// 16 §8.9: the last check stays with its age; check again is busy and disabled while a
-// check runs, whoever started it, and the start event changes only the button (no read).
-test("check again is disabled while a check runs and shows the last check's age", async () => {
+// 16 §8.9: the files' check is an icon with its words and time in the tooltip; check again
+// is off and reads "up to date" while the shown check is current, and is busy and off while
+// a check runs, whoever started it; the start event changes only the page head (no read).
+test("the check's state is an icon and check again is spare while the check is current", async () => {
   class Node extends Element {
     prepend(n) { this.insertBefore(n, this.firstChild); }
     checkVisibility() { return true; }
@@ -52,9 +53,9 @@ test("check again is disabled while a check runs and shows the last check's age"
   }
   const el = (tag, cls, text) => new Node(tag, cls, text);
   const screen = el("div");
-  let reads = 0;
+  let reads = 0, stale = true;
   const S = { screen: "needs", screenSeq: 1, busy: {}, board: { env: "game-a" }, live: null };
-  const api = { Needs: async () => { reads++; return { items: [], stale: true, checked: "last checked 21:04", memory: { estimated: true } }; } };
+  const api = { Needs: async () => { reads++; return { items: [], stale, checked: "last checked 21:04", memory: { estimated: true } }; } };
   const query = sel => sel === "#screen" ? screen : screen.querySelector(sel.replace(/^#screen /, ""));
   const screens = await loadModules("./screens.js", {
     "./state.js": { S, $: query, el, api, T: s => s, Tf: s => s, errText: e => e.message, say() {}, cur() {}, slideThumb() {} },
@@ -69,21 +70,30 @@ test("check again is disabled while a check runs and shows the last check's age"
     "./fulldetail.js": { full() {}, fullKey() {}, fullSection() {} },
   }, { document: { activeElement: null, dispatchEvent() {}, querySelector: s => screen.querySelector(s), querySelectorAll: s => screen.querySelectorAll(s) }, URL, CSS: { escape: s => s }, requestAnimationFrame: fn => fn() });
   screens.initScreens({ reload: async () => {}, renderHints() {}, renderWhere() {}, edited: async () => null });
-  await screens.needs(false);
   const again = () => screen.querySelector(".analyze-again");
-  assert.ok(again(), "check again is shown");
+  const state = () => screen.querySelector(".check-state");
+  // stale (a check failed or left it so): the icon says so with the time, the button works
+  await screens.needs(false);
+  assert.ok(state().classList.contains("stale"));
+  assert.equal(state().getAttribute("aria-label"), "the files changed since the last check, last checked 21:04");
+  assert.ok(!screen.querySelectorAll(".state-note").some(n => n.textContent.includes("files changed")), "no words on the page");
   assert.equal(again().disabled, false);
-  assert.ok(screen.querySelectorAll(".state-note").some(n => n.textContent === "last checked 21:04"), "the last check's age shows");
-  // a check starts (Go started it, or a click): busy and disabled, no read of the page
+  assert.ok(again().textContent.startsWith("check again"));
+  // a check starts (Go started it, or a click): checking, busy and off, no read of the page
   S.busy.analyze = true;
   screens.analyzeEvent({ line: "reading Defs" });
   assert.equal(again().disabled, true);
   assert.equal(again().getAttribute("aria-busy"), "true");
+  assert.ok(state().classList.contains("checking"));
   assert.equal(reads, 1, "a start reads nothing");
-  // done: the page reads once and the button works again
+  // done: the page reads once; the check is current, so the button is off and says so
   S.busy.analyze = false;
+  stale = false;
   screens.analyzeEvent({ done: true, ok: true });
   await flush();
   assert.equal(reads, 2);
-  assert.equal(again().disabled, false);
+  assert.ok(state().classList.contains("current"));
+  assert.equal(again().disabled, true);
+  assert.equal(again().getAttribute("aria-busy"), null);
+  assert.ok(again().textContent.startsWith("up to date"));
 });
