@@ -98,10 +98,9 @@ only wins on very wide windows.
   imported” with what RimArcho imports; a list that cannot be read → “could not read it” and why; a
   folder or file with no manager's data → “no RimSort, RimCrow or RimPy data in it”; several files →
   the first, and the status line says one at a time; no path (browser only) → amber, which button to use.
-- Open questions for the user: several files queued as several imports; a Mod folder or `.zip`
-  installed as a local Mod; a dragged Workshop / LoversLab / GitHub link sent to add a subscription.
+- The user's answers to the open questions are under “Drops that are not imports” below.
 
-### Finding: the Windows window receives no drops (app bug)
+### Finding: the Windows window received no drops (app bug, fixed 2026-11-20 with option 1)
 
 Wails v3 beta.28 delivers dropped paths through `EnableFileDrop` + `WindowFilesDropped` (the runtime
 posts the `File` objects with `chrome.webview.postMessageWithAdditionalObjects`, Go reads
@@ -123,6 +122,25 @@ Options:
 3. **Turn off composition hosting**: `EnableFileDrop` then works, but the maximise button loses Win11
    Snap Layouts (16 §8.2).
 4. **Wait for Wails** to forward drops under composition hosting.
+
+**Done (2026-11-20, at the user's word)**: option 1, `internal/surface/gui/drop_windows.go`. A Go COM object
+(its vtable from `syscall.NewCallback`, typed pointer arguments so `go vet` passes) is registered with
+`RegisterDragDrop` on the window's handle on the UI thread once the runtime is ready. It accepts a drag
+that offers `CF_HDROP`, `UniformResourceLocatorW` or one http(s) address as text, and refuses the rest
+(so the page's own drags still never drop). It sends `file-drag` and `files-dropped` (paths, folder or
+not, link). Tried on the host with the real window on a synthetic home (`RIMARCHO_HOME`): a list and a
+Mod folder dragged from Explorer arrived. Internal HTML5 drags (the tag order chips) still do not drop in
+the window; forwarding to the composition controller (option 2) would fix that too.
+
+## Drops that are not imports (the user's answers, round 5)
+
+- Several files: only the first is taken.
+- A Mod folder or zip, and a link: go to Library › add a subscription with it in the box; its card asks
+  (dry run, then “install it” or “subscribe”) and only then installs as a local Mod or subscribes.
+  `archo subscribe local <zip|folder>` (`app.InstallLocalMod`) copies into the game's Mods folder under
+  a free name; `subscribe.Probe` checks for About/About.xml without copying.
+- Add a subscription takes drops the same way (it is filled in place), and gets “choose zip…” and
+  “choose folder…” for a local Mod.
 
 ## Evidence
 
