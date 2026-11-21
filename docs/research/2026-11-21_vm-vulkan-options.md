@@ -48,17 +48,33 @@ Host, read-only: NVIDIA GeForce RTX 4090 (driver 32.0.16.1088, i.e. 610.88, 2026
 
 Notes:
 
-- **A** is the only option inside the current workflow. lavapipe draws with one thread per CPU (llvmpipe's `LP_NUM_THREADS` defaults to the CPU count), and the host has 32 threads with 4 given to the VM. More vCPUs should raise the frame rate, but by how much is **not measured**: Unity's own main thread and the game's simulation also compete for those CPUs, and the gain flattens once rasterization stops being the bottleneck. It will never give performance figures that apply to players.
+- **A** is the only option inside the current workflow. lavapipe draws with one thread per CPU (llvmpipe's `LP_NUM_THREADS` defaults to the CPU count), and the host has 32 threads with 4 given to the VM. More vCPUs should raise the frame rate, but by how much is **not measured** (§5): Unity's own main thread and the game's simulation also compete for those CPUs, and the gain flattens once rasterization stops being the bottleneck. It will never give performance figures that apply to players.
 - **B** fails at the first requirement (Vulkan). Some community reports say NVIDIA's Vulkan ICD can be made to load in GPU-PV guests by copying more host driver files; that is undocumented, breaks with driver updates, and still leaves the checkpoint limitation.
 - Any new VM, a Hyper-V install or hardware purchase needs the user's OK; none was started.
 
 ## 4. Recommendation
 
-Keep lavapipe in the VMware VM for **functional** 1.7 checks (logs, Monitor, RimArcho behaviour, saves): it is slow but it works with the snapshot-and-revert workflow, and nothing else in a VM gives a hardware Vulkan. As a cheap improvement, try option A once: with the user's OK, power off, set 12 vCPUs, cold boot, time menu-to-map and the click-hold needed, and take a new live snapshot if it helps.
+Keep lavapipe in the VMware VM for **functional** 1.7 checks (logs, Monitor, RimArcho behaviour, saves): it is slow but it works with the snapshot-and-revert workflow, and nothing else in a VM gives a hardware Vulkan. As a cheap improvement, try option A once: with the user's OK, power off, set 12 vCPUs, cold boot, time menu-to-map and the click-hold needed, and take a new live snapshot if it helps. First measurements and what blocked the 12-vCPU run: §5.
 
 For anything about **performance** (frame rate, load times, GPU memory), use real hardware: a second physical machine (option D) if 1.7 performance checks become regular, otherwise a one-off run on a player's or the user's machine. Do not build a Hyper-V GPU-P VM: it gives no Vulkan and loses saved-state snapshots.
 
-## 5. Open
+## 5. Option A, first measurements (2026-11-21, 4 vCPUs only)
 
-- The vCPU experiment in §4 (needs the user's OK for the cold boot and the new snapshot).
-- A baseline lavapipe frame rate and menu-to-map time on 4 vCPUs was not recorded in this round (the task stopped once Dozen was ruled out); measure it together with the vCPU experiment.
+Snapshot `RimArcho-Real-Vulkan-17` reverted and resumed (live, Steam running). Each run starts `C:\Games\RimWorld-1.7\RimWorld.exe -savedatafolder=<fresh sandbox> -NoFileLog -quicktest` (Core and the five DLCs in official order, dev mode on, 1280×720 windowed). Steam's 1.7 pipeline cache (`steamapps\shadercache94100`) and the sandbox's own shader cache are deleted before each run. A guest script timestamps every console line as it arrives, and records when the map's bottom tab bar first shows on screen ("map ready"). The 1.7 console log has 1-second timestamps and logs nothing when the map is done, so the screen check is the end mark. The scripts are throwaway files in `D:\VMs\Transferkopt` (`run17.ps1`, `hold.mjs`), not repo tooling.
+
+| Run (4 vCPUs) | GpuProbe | "Initializing new game" | Map ready |
+| --- | --- | --- | --- |
+| 1 | incomplete after 4.8 s | 51 s | 51–84 s (screenshots at 15:04:39 "Generating map", 15:05:02 map) |
+| 2 | incomplete after 9.4 s | 150 s | **168 s** |
+
+- Launch to map varies by 3× between two runs on the same state (the slow part is Def loading, before "Initializing new game"). A comparison with 12 vCPUs needs at least three runs per setting.
+- On the map, **a 30 ms click registers** (opening and closing the TweakValues window, run 2). The "hold about 700 ms" rule in `scripts/vm/README.md` did not apply here, so click hold is no measure of frame time. Typed text did not reach the game: the dev settings search box stayed empty, both for Unicode input and for single key presses.
+- Frame rate was not measured. 1.7 has an FPS counter (`DebugViewSettings.showFpsCounter`, dev mode › settings window), but it is not saved between runs, and turning it on needs the settings window's search box (which did not take input) or scrolling to the toggle. In-game time barely moved: the clock showed 6h on 7th of Aprimay in screenshots taken at least a minute apart.
+- The game's GPU probe gives up after 5–9 s with 0 GFLOP/s and picks the "conservative (low)" graphics tier on lavapipe.
+
+**12 and 16 vCPUs: not run.** A cold boot stops at the Windows sign-in screen (no automatic sign-in for `Player`), and the game needs a signed-in desktop. Typing the guest's password is left to the user. The `.vmx` was not changed (`numvcpus = "4"`, `cpuid.coresPerSocket = "4"`), and no snapshot was taken.
+
+## 6. Open
+
+- The 12 / 16 vCPU runs: power off, set `numvcpus` and `cpuid.coresPerSocket` to 12, cold boot, **the user signs in as `Player`**, then three runs with `run17.ps1` each, the same for 4 vCPUs after a cold boot so both sides start alike. Reverting to `RimArcho-Real-Vulkan-17` brings back 4 vCPUs.
+- Frame rate: turn on `showFpsCounter` once per run (dev settings window, scroll to the toggle) and read the counter on the map, or keep it to load times.
