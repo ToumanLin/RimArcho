@@ -76,7 +76,7 @@ func (a *App) AnalysisKey(st *LoadoutState, mm string) string {
 	}
 	all, pos := analysisMods(st)
 	h := sha256.New()
-	fmt.Fprintf(h, "v%d|c%d|%s\n", analyze.Version, analyze.DefContentVersion, mm)
+	fmt.Fprintf(h, "v%d|c%d|p%d|%s\n", analyze.Version, analyze.DefContentVersion, analyze.PatchVersion, mm)
 	for _, m := range all {
 		fmt.Fprintf(h, "%s %x %d\n", m.ID, m.SnapHash, pos[m.ID])
 	}

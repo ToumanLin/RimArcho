@@ -64,6 +64,7 @@ func (a *App) IncrementalProblems(previous *ProblemSet) (*ProblemSet, error) {
 			ps.List = append(ps.List, &p)
 		}
 	}
+	a.quickPatchIncremental(ps)
 	for _, old := range previous.Logs {
 		if run := judge(old); run != nil {
 			ps.Logs = append(ps.Logs, run)

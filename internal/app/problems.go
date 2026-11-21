@@ -215,6 +215,7 @@ func (a *App) collectProblems(ps *ProblemSet) error {
 			}
 			all = append(all, f)
 		}
+		all = a.quickPatchTargets(st, ps.Analysis, all) // a stale run: follow the list (05 §4.4)
 	}
 	lfs, hot, run := a.logFindings(st)
 	if run != nil {

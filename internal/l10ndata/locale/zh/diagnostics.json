@@ -485,5 +485,14 @@
   "RAM: loading needs %s; available memory is unavailable; total capacity %s": "内存：载入时需要 %s；无法读取当前可用内存；总容量 %s",
   "VRAM: estimated %s; dedicated capacity is unknown": "显存：预计 %s；显卡专用显存容量未知",
   "the mod's files changed after RimArcho wrote its DDS": "RimArcho 写 DDS 之后，Mod 的文件更新过",
-  "%d file": "%d 个文件"
+  "%d file": "%d 个文件",
+  "it changes things that are not there (renamed, removed or in another version): those changes do not take effect; an update of it, or of the Mod it changes, usually fixes this": "它要改的东西不存在（被改名、删掉或在另一个版本里）：这些改动不会生效；更新它或它改的那个 Mod 通常能解决",
+  "it changes things a Mod loaded after it adds: move it after that Mod": "它要改的东西由排在它后面的 Mod 添加：把它移到那个 Mod 之后",
+  "what it changes is only in another game version's files: an update of it, or of the Mod it changes, usually fixes this": "它要改的东西只在其他游戏版本的文件里：更新它或它改的那个 Mod 通常能解决",
+  "it changes a Mod that is not installed: usually an optional compatibility patch; harmless, but the game logs a red error for it": "它改的是一个没有安装的 Mod：通常是可选的兼容补丁，无害，但游戏会为它记一条红色错误",
+  "%d patches of %s find nothing": "%[2]s 的 %[1]d 个补丁找不到要改的东西",
+  "a patch of %s finds nothing": "%s 的一个补丁找不到要改的东西",
+  "it failed in the last run": "上次运行时它失败了",
+  "patches of %d Mods find nothing": "%d 个 Mod 的补丁找不到要改的东西",
+  "those changes do not take effect; the Mods may not fit this game version or the Mods they change": "这些改动不会生效；这些 Mod 可能不适配当前游戏版本或它们改的 Mod"
 }

@@ -53,6 +53,8 @@ type sim struct {
 	cur      *topOp
 	contests map[string]map[*Mod][]*topOp // node key → mods that Replace/Remove it
 	targets  map[*topOp]map[string]bool   // top-level defs touched
+	// openTouch: the operation touched a def from outside any guard (ReasonGuarded)
+	openTouch map[*topOp]bool
 }
 
 var errRuntime = errors.New("runtime exception")
@@ -60,7 +62,7 @@ var errRuntime = errors.New("runtime exception")
 func newSim(doc *xdoc.Doc, root int32, active []*Mod, mm string, folders map[string][]string) *sim {
 	s := &sim{doc: doc, root: root, mm: mm, folderOf: folders, activePkg: map[string]bool{}, activeNm: map[string]bool{},
 		cache: map[string]*xpath.Expr{}, plans: map[string]*fastPlan{}, guards: map[*Op]guard{},
-		contests: map[string]map[*Mod][]*topOp{}, targets: map[*topOp]map[string]bool{}}
+		contests: map[string]map[*Mod][]*topOp{}, targets: map[*topOp]map[string]bool{}, openTouch: map[*topOp]bool{}}
 	for _, m := range active {
 		s.activePkg[m.Pkg] = true
 		s.activeNm[m.Name] = true
@@ -133,6 +135,9 @@ func (s *sim) selectNodes(o *Op, one bool) ([]xdoc.Ref, error) {
 		}
 	}
 	o.hits += len(out)
+	if len(out) > 0 && !s.guards[o].any() {
+		s.openTouch[s.cur] = true
+	}
 	s.noteTargets(out)
 	return out, nil
 }
