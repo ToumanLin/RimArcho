@@ -2875,10 +2875,12 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .page-acts .chip.prob { margin: 0; white-space: nowrap; flex: none; cursor: pointer; border: 0; display: inline-flex; align-items: center; gap: 6px; color: var(--amber); background: var(--amber-soft); }
 .page-acts .chip.prob.err { color: var(--red); background: var(--red-soft); }
 .page-acts .chip.prob .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.page-acts .chip.prob.updating .dot { animation: prob-pulse 1.2s ease-in-out infinite; }
+/* updating (16 §8.7): the dot turns into a small spinning ring and the count fades, so old
+   findings do not read as current; the words are in the tooltip */
+.page-acts .chip.prob.updating .dot { width: 10px; height: 10px; margin: -2px; background: conic-gradient(currentColor 0 270deg, transparent 0); -webkit-mask: radial-gradient(circle, transparent 3px, currentColor 3.2px); mask: radial-gradient(circle, transparent 3px, currentColor 3.2px); animation: spin .9s linear infinite; }
+.page-acts .chip.prob.updating .t { opacity: .55; }
 .page-acts .chip.prob kbd { font-size: 12px; opacity: .6; }
 .page-acts .chip.prob.on { box-shadow: inset 0 0 0 var(--hairline) currentColor; }
-@keyframes prob-pulse { 50% { opacity: .3; } }
 .prob-pop { position: fixed; z-index: 18; display: flex; flex-direction: column; background: var(--card); border: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); box-shadow: var(--shadow); color: var(--fg); font-size: 13px; animation: pop-in var(--t-enter) var(--ease); overflow: hidden; }
 .prob-pop .pp-head { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: var(--hairline) solid var(--line-2); flex-wrap: wrap; }
 .prob-pop .pp-lead { display: flex; gap: 8px; align-items: baseline; }
