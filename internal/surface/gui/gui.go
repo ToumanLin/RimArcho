@@ -83,6 +83,7 @@ func Run(o Options) error {
 		DefaultContextMenuDisabled: true,
 	})
 	win.RegisterHook(events.Common.WindowClosing, api.guardWindowClose)
+	wireNativeDrop(win, api) // files and links dropped on the window (16 §2.18)
 	api.uninstall.shutdownBlock = uninstallShutdownBlock(win)
 	win.OnWindowEvent(events.Common.WindowShow, func(*application.WindowEvent) { perftrace.Mark("window-show") })
 	win.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) { perftrace.Mark("webview-runtime-ready") })

@@ -85,7 +85,7 @@ const (
 	PageLog      = "log"
 	PageSettings = "settings"
 	PageTextures = "textures" // Texture optimisation (10 §2), under Library
-	// PageImport: Library › Import & export, where every import starts (16 §2.18)
+	// PageImport: Library › Import, where every import starts (16 §2.18)
 	PageImport = "import"
 	// PageSubscribe: Mod library › add a subscription (16 §2.9)
 	PageSubscribe = "subscribe"
@@ -194,9 +194,9 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 			// what the game loads faster (10 §2); a sub-entry since 2026-11-18, keeping shift+7
 			{ID: PageTextures, Label: T("texture optimisation")}}},
 		{ID: PageEnv, Label: T("Game Config")},
-		// every import starts here, and sharing sits beside it (16 §2.18); last in the group
-		// since 2026-11-18, still without a shift key (below)
-		{ID: PageImport, Label: T("import & export")},
+		// every import starts here (16 §2.18); last in the group since 2026-11-18, still
+		// without a shift key (below)
+		{ID: PageImport, Label: T("import")},
 	}
 	// Saves is a group of its own (16 §2.11): the saves, and the play review (12 §3); below
 	// Library since 2026-11-18. Its own name: the plain "saves" key is translated for settings rows.
@@ -242,7 +242,7 @@ func NavPath(groups []NavGroup, id string) []Crumb {
 		return []Crumb{{Label: T("background tasks"), ID: PageTasks}}
 	}
 	for _, g := range groups {
-		// the group's crumb opens its first page; Library's is Lists, not Import & export
+		// the group's crumb opens its first page; Library's is Lists, not Import
 		// above it (16 §2.18)
 		top := g.Items[0].ID
 		if top == PageImport && len(g.Items) > 1 {

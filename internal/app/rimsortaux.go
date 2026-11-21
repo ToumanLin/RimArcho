@@ -177,6 +177,9 @@ func (a *App) ImportRimSortAux(opt RimSortAuxOptions) (*RimCrowReport, error) {
 			cur = &store.PlayerData{}
 			pd[lin] = cur
 		}
+		if m.note != "" {
+			rep.item(PartNotes, lin, m.note, "", cur.Note != "")
+		}
 		switch {
 		case m.note == "":
 		case cur.Note == m.note:

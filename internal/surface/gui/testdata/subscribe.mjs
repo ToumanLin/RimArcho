@@ -67,6 +67,24 @@ test("Git: the default branch previews at once; another ref needs its name; subs
   assert.equal(h.form.el.querySelector(".subscribe-card"), null, "the box is empty again");
 });
 
+test("a Mod folder or zip (dropped or chosen) is installed as a local Mod after its dry run", async () => {
+  const h = await setup();
+  assert.ok(h.mod.localPath("D:\\Downloads\\Colony Tweaks.zip") && h.mod.localPath("\\\\nas\\mods\\Colony") && !h.mod.localPath("https://github.com/a/b"));
+  await h.paste("D:\\Downloads\\Colony Tweaks.zip");
+  assert.deepEqual(h.calls[0], ["preview", { kind: "local", from: "D:\\Downloads\\Colony Tweaks.zip" }]);
+  assert.ok(h.root.textContent.includes("local Mod"));
+  assert.ok(!h.button("subscribe"), "nothing is subscribed");
+  assert.equal(h.button("install it").disabled, false);
+  await h.click("install it");
+  assert.deepEqual(h.calls.at(-1), ["subscribe", { kind: "local", from: "D:\\Downloads\\Colony Tweaks.zip" }]);
+  // the local line chooses one too: the box is filled and recognised
+  await h.paste("");
+  h.api.PickSubscriptionZip = async () => "D:\\Downloads\\Other.zip";
+  await h.click("choose zip…");
+  await flush();
+  assert.deepEqual(h.calls.at(-1), ["preview", { kind: "local", from: "D:\\Downloads\\Other.zip" }]);
+});
+
 test("a preview for older text cannot enable subscribe", async () => {
   const h = await setup(), reply = deferred();
   h.api.SubscribePreview = () => reply.promise;

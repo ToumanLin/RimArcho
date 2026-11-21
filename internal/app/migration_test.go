@@ -82,6 +82,25 @@ func TestMigrationByParts(t *testing.T) {
 		t.Fatalf("list facts: %+v", l)
 	}
 
+	// 16 §2.18 "view": a part's values one by one, read without bringing them over; a list
+	// gives its file
+	view := func(src, path, part string) *app.PartView {
+		v, err := e.App.MigrationPartView(app.MigrationPick{Source: src, Path: path, Part: part}, app.ManagerTagNames{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return v
+	}
+	if v := view("rimcrow", db, app.PartNotes); len(v.Items) != 1 || v.Items[0].Mod != "Alpha" || v.Items[0].Value != "a note" || v.Items[0].Had {
+		t.Fatalf("notes view: %+v", v)
+	}
+	if v := view("rimcrow", db, app.PartInterlocks); len(v.Items) != 1 || v.Items[0].Mod != "Beta" || v.Items[0].Value != "attach" || v.Items[0].With != "Alpha" {
+		t.Fatalf("interlocks view: %+v", v)
+	}
+	if v := view("list", list, ""); v.List != list {
+		t.Fatalf("list view: %+v", v)
+	}
+
 	// notes alone
 	if _, err := e.App.MigratePart(app.MigrationPick{Source: "rimcrow", Path: db, Part: app.PartNotes}, app.ManagerTagNames{}); err != nil {
 		t.Fatal(err)
@@ -90,6 +109,9 @@ func TestMigrationByParts(t *testing.T) {
 		t.Fatalf("only the notes should have come over:\n%s", out)
 	}
 	second := survey()
+	if v := view("rimcrow", db, app.PartNotes); len(v.Items) != 1 || !v.Items[0].Had {
+		t.Fatalf("notes view after the import: %+v", v)
+	}
 	if p := second["RimCrow player notes"]; p.State != app.PartHad || p.Same != 1 {
 		t.Fatalf("notes after import: %+v", p)
 	}
@@ -155,6 +177,9 @@ func TestMigrationRulesBOMAndBrokenGroup(t *testing.T) {
 	}
 	if g := group(); g.Error != "" || len(g.Parts) != 1 || g.Parts[0].New != 1 {
 		t.Fatalf("rules with a BOM: %+v", g)
+	}
+	if v, err := e.App.MigrationPartView(app.MigrationPick{Source: "rimsort-rules", Path: rules, Part: app.PartRules}, app.ManagerTagNames{}); err != nil || len(v.Items) != 1 || v.Items[0].Mod != "Beta" || v.Items[0].Value != "after" || v.Items[0].With != "Alpha" {
+		t.Fatalf("rules view: %+v %v", v, err)
 	}
 	os.WriteFile(rules, []byte(`{"rules": `), 0o644)
 	if g := group(); g.Error == "" || g.Parts == nil {

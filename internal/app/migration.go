@@ -446,3 +446,70 @@ func (a *App) freePlanName(base string) (string, error) {
 	}
 	return "", err
 }
+
+// PartView is what one part holds, for the Import page's "view" (16 §2.18): a list file to
+// compare (a list, a Game Config's ModsConfig.xml), or the part's values one by one.
+type PartView struct {
+	List  string     `json:"list,omitempty"`
+	Items []PartItem `json:"items"`
+	More  bool       `json:"more,omitempty"` // there are more values than Items holds
+}
+
+// MigrationPartView reads what a part would bring over, without bringing it (dry runs).
+func (a *App) MigrationPartView(p MigrationPick, tags ManagerTagNames) (*PartView, error) {
+	var rep *RimCrowReport
+	var err error
+	switch {
+	case p.Source == "list":
+		return &PartView{List: p.Path, Items: []PartItem{}}, nil
+	case p.Source == "rimcrow" && strings.HasPrefix(p.Part, "profile:"):
+		id := strings.TrimPrefix(p.Part, "profile:")
+		rep, err = a.ImportRimCrow(RimCrowOptions{DB: p.Path, DryRun: true, SelectProfiles: true, ProfileIDs: []string{id}, Parts: map[string]bool{}, Tags: tags})
+		if err != nil {
+			return nil, err
+		}
+		for _, pr := range rep.Profiles {
+			if pr.ID == id && pr.UserData != "" {
+				return &PartView{List: filepath.Join(pr.UserData, "Config", "ModsConfig.xml"), Items: []PartItem{}}, nil
+			}
+		}
+		return nil, fmt.Errorf("no list found for the profile %q", id)
+	case p.Source == "rimcrow":
+		rep, err = a.ImportRimCrow(RimCrowOptions{DB: p.Path, DryRun: true, IncludeDisabledRules: true, Parts: map[string]bool{p.Part: true}, Tags: tags})
+	case p.Source == "rimsort-aux":
+		rep, err = a.ImportRimSortAux(RimSortAuxOptions{DB: p.Path, DryRun: true, Parts: map[string]bool{p.Part: true}, Tags: tags})
+	case p.Source == "rimsort-rules":
+		rep, err = a.ImportRimSortRules(p.Path, true)
+	default:
+		return nil, fmt.Errorf("cannot read %q", p.Source)
+	}
+	if err != nil {
+		return nil, err
+	}
+	names := map[string]string{}
+	if ix, err := a.Index(); err == nil {
+		for _, m := range ix.Mods {
+			if m.TombstoneAt.IsZero() && names[m.LineageID] == "" {
+				names[m.LineageID] = m.DisplayName()
+			}
+		}
+	}
+	name := func(lin string) string {
+		if n := names[lin]; n != "" {
+			return n
+		}
+		return lin
+	}
+	out := &PartView{Items: []PartItem{}, More: len(rep.Items) >= maxPartItems}
+	for _, it := range rep.Items {
+		if it.Part != p.Part {
+			continue
+		}
+		it.Mod = name(it.Lin)
+		if it.Other != "" {
+			it.With = name(it.Other)
+		}
+		out.Items = append(out.Items, it)
+	}
+	return out, nil
+}

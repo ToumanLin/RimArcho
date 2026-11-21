@@ -1473,7 +1473,6 @@ const ui = {
   resumeGuide: () => guide.resume(),
   importManagers: () => exchange(),
   importFirstList: () => exchange(true), // the first-run guide's hand-over (16 §2.15)
-  exportList: (id, from) => planManage.exportOf(id, from), // Import & export's current list (16 §2.18)
   manageLists: (id = 0) => { planManage.select(id); return go("plans"); },
   edited: (call, undoable = true) => edited(call, undoable),
   ruleTarget: () => actionContext().sel[0],
@@ -1502,6 +1501,7 @@ async function start() {
   packsPage.initPacks(ui);
   planManage.initPlanManage(ui);
   guide.initGuide(ui);
+  ui.addWith = scr.addWith; // a dropped link, Mod folder or zip (16 §2.18)
   initExchange(ui);
   plans.initPlans(ui);
   library.initLibrary(ui);

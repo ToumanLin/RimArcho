@@ -52,6 +52,10 @@ type RimCrowReport struct {
 	// new and what RimArcho already has.
 	Parts map[string]*PartCount
 
+	// Items are a dry run's values one by one, for the Import page's "view" of a part:
+	// what each Mod gets, and whether RimArcho has it already.
+	Items []PartItem `json:",omitempty"`
+
 	// About-disabled (04 §1.2): RimCrow renames About.xml to About.xml.disabled.
 	CrowDisabled  int            // modasset rows with disabled=1
 	AboutDisabled []string       // RimArcho instances marked unloadable: about-disabled
@@ -87,6 +91,29 @@ const (
 // PartCount is one part of a migration: values RimArcho does not have yet, and values it
 // already has.
 type PartCount struct{ New, Same int }
+
+// PartItem is one value of a part: a Mod (by lineage) and what it gets; Other is a rule's
+// second Mod. Had: RimArcho already has a value there (its own stays).
+type PartItem struct {
+	Part  string `json:"part"`
+	Lin   string `json:"-"`
+	Other string `json:"-"`
+	Mod   string `json:"mod"`
+	Value string `json:"value"`
+	With  string `json:"with,omitempty"` // a rule's second Mod, by name
+	Had   bool   `json:"had"`
+}
+
+// maxPartItems bounds a dry run's items: a view shows a part, not a database
+const maxPartItems = 20000
+
+// item records one value of a part during a dry run
+func (r *RimCrowReport) item(part, lin, value, other string, had bool) {
+	if !r.DryRun || len(r.Items) >= maxPartItems {
+		return
+	}
+	r.Items = append(r.Items, PartItem{Part: part, Lin: lin, Value: value, Other: other, Had: had})
+}
 
 func (r *RimCrowReport) part(p string) *PartCount {
 	if r.Parts == nil {
@@ -373,7 +400,11 @@ func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
 			pd[lin] = cur
 		}
 		apply := func(what, v, have string, set func(env, lin, v string) error, n, same *int) error {
-			part := rep.part(map[string]string{"alias": PartAliases, "note": PartNotes}[what])
+			pn := map[string]string{"alias": PartAliases, "note": PartNotes}[what]
+			part := rep.part(pn)
+			if v != "" {
+				rep.item(pn, lin, v, "", have != "")
+			}
 			switch {
 			case v == "":
 			case have == v:
@@ -456,11 +487,13 @@ func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
 			if r.Kind == kind && r.A == la && r.B == lb {
 				rep.RuleSame++
 				rep.part(part).Same++
+				rep.item(part, la, kind, lb, true)
 				return nil
 			}
 		}
 		rep.RuleNew++
 		rep.part(part).New++
+		rep.item(part, la, kind, lb, false)
 		r := &store.UserRule{Kind: kind, A: la, B: lb, Note: "imported from RimCrow", Created: a.Now().UTC()}
 		existing = append(existing, r)
 		if opt.DryRun {

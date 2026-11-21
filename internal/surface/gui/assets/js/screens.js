@@ -1721,7 +1721,7 @@ function patternCard(c) {
 }
 
 // ---- Mod library › updates and add a subscription (16 §2.9): subscriptions.js ----
-export { changes, changesHints, changesFiltered, changesPlan, openAdd, addHints } from "./subscriptions.js";
+export { changes, changesHints, changesFiltered, changesPlan, openAdd, addHints, addWith } from "./subscriptions.js";
 
 export function rescanButton(label) {
   const b = button(S.busy.scan ? T("scanning…") : label || T("rescan"), "R", () => ui.cmd("rescan"), "", "rescan");

@@ -33,7 +33,7 @@ let session = 0, activeSession = null;
 export const historySession = () => activeSession;
 export const previewing = () => S.guideFrom === "preview";
 
-// Two steps: where the first list comes from is the Import & export page, which the guide
+// Two steps: where the first list comes from is the Import page, which the guide
 // opens after the scan (A1, 16 §2.15).
 const STEPS = ["find the game", "read the mods"];
 // G.folder: the managed folder (FirstRunFolder) while the first run still has to choose it;
@@ -701,7 +701,7 @@ function step2(card) {
 }
 
 // ---- then: where the first list comes from ----
-// The Import & export page in its first-run view (16 §2.18): the game's current list first
+// The Import page in its first-run view (16 §2.18): the game's current list first
 // and picked, then a Mod list, a pack and other managers. Whatever the player brings in, or
 // "use this list" / "skip", ends the guide. A preview ends here: it never imports.
 
