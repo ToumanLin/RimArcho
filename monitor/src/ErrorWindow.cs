@@ -24,26 +24,22 @@ namespace ArchoMonitor
 
     internal sealed class ErrorWindow : Window
     {
-        const float RowH = 30f, LineH = 22f, SubH = 18f, Indent = 26f, CopyW = 72f, MaxShown = 40;
-        static readonly Color Amber = new Color(1f, 0.72f, 0.25f);
-        static readonly Color Dim = new Color(0.62f, 0.62f, 0.62f);
-        static readonly Color Track = new Color(1f, 1f, 1f, 0.06f);
-
-        // Kind colours: loading (blue to violet), code (red to yellow), the rest grey.
-        static readonly Dictionary<string, Color> colors = new Dictionary<string, Color>
+        const float RowH = 28f, LineH = 24f, SubH = 22f, Indent = 20f, KindW = 110f, CopyW = 64f, MaxShown = 40;
+        // One font size and few colours: grey text, three muted bar tones, amber only for what
+        // came after the game stopped logging.
+        static readonly Color Amber = new Color(0.90f, 0.72f, 0.42f);
+        static readonly Color Dim = new Color(0.60f, 0.60f, 0.60f);
+        static readonly Color Track = new Color(1f, 1f, 1f, 0.05f);
+        static readonly Color LoadTone = new Color(0.50f, 0.58f, 0.68f);  // XML, Defs, patches, textures
+        static readonly Color CodeTone = new Color(0.70f, 0.52f, 0.46f);  // exceptions in code
+        static readonly Color OtherTone = new Color(0.48f, 0.48f, 0.48f); // warnings, other
+        static readonly HashSet<string> loadKinds = new HashSet<string>
         {
-            { "DefConfigError", new Color(0.36f, 0.58f, 0.95f) },
-            { "CrossRefError", new Color(0.48f, 0.46f, 0.95f) },
-            { "PatchError", new Color(0.66f, 0.42f, 0.92f) },
-            { "XMLSyntaxError", new Color(0.30f, 0.72f, 0.86f) },
-            { "AssemblyConflict", new Color(0.92f, 0.30f, 0.30f) },
-            { "TickException", new Color(0.95f, 0.50f, 0.22f) },
-            { "DrawException", new Color(0.92f, 0.78f, 0.25f) },
-            { "NullReference", new Color(0.88f, 0.40f, 0.36f) },
-            { "OutOfMemory", new Color(0.86f, 0.30f, 0.66f) },
-            { "MissingTexture", new Color(0.30f, 0.78f, 0.62f) },
-            { "Warning", new Color(0.80f, 0.74f, 0.45f) },
-            { "Other", new Color(0.55f, 0.55f, 0.58f) },
+            "DefConfigError", "CrossRefError", "PatchError", "XMLSyntaxError", "MissingTexture",
+        };
+        static readonly HashSet<string> codeKinds = new HashSet<string>
+        {
+            "AssemblyConflict", "TickException", "DrawException", "NullReference", "OutOfMemory",
         };
 
         readonly List<EntryView> views = new List<EntryView>();
@@ -158,24 +154,26 @@ namespace ArchoMonitor
                 Build();
             }
             // Heading, then the switch for warnings.
-            Text.Font = GameFont.Medium;
-            Widgets.Label(new Rect(r.x, r.y, r.width - 200f, 34f), "ArchoMonitor_ErrorsTitle".Translate());
             Text.Font = GameFont.Small;
+            Text.Anchor = TextAnchor.MiddleLeft;
+            Widgets.Label(new Rect(r.x, r.y, r.width - 200f, LineH), "ArchoMonitor_ErrorsTitle".Translate());
+            Text.Anchor = TextAnchor.UpperLeft;
             bool w = warnings;
-            Widgets.CheckboxLabeled(new Rect(r.xMax - 190f, r.y + 4f, 160f, 26f), "ArchoMonitor_Warnings".Translate(), ref w);
+            Widgets.CheckboxLabeled(new Rect(r.xMax - 190f, r.y, 160f, LineH), "ArchoMonitor_Warnings".Translate(), ref w);
             if (w != warnings)
             {
                 warnings = w;
                 Build();
             }
-            float y = r.y + 40f;
-            y = Strip(new Rect(r.x, y, r.width, 28f));
+            float y = r.y + LineH + 4f;
+            y = Strip(new Rect(r.x, y, r.width, LineH));
+            Widgets.DrawLineHorizontal(r.x, y + 5f, r.width);
             if (groups.Count == 0)
             {
                 Empty(new Rect(r.x, y, r.width, r.yMax - y));
                 return;
             }
-            var outer = new Rect(r.x, y + 6f, r.width, r.yMax - y - 6f);
+            var outer = new Rect(r.x, y + 10f, r.width, r.yMax - y - 10f);
             float h = 0f;
             foreach (var g in groups)
             {
@@ -209,7 +207,7 @@ namespace ArchoMonitor
             Widgets.EndScrollView();
         }
 
-        // Strip: the counts in one line; amber when the game stopped logging.
+        // Strip: the counts in one line; amber text when the game stopped logging.
         float Strip(Rect r)
         {
             int mods = 0;
@@ -217,60 +215,49 @@ namespace ArchoMonitor
             {
                 if (g.Id.Length > 0) mods++;
             }
+            Text.Anchor = TextAnchor.MiddleLeft;
             float x = r.x;
-            x = Stat(x, r.y, total.ToString("N0"), warnings ? "ArchoMonitor_StatProblems".Translate() : "ArchoMonitor_StatErrors".Translate(), Color.white);
-            x = Stat(x + 18f, r.y, mods.ToString(), "ArchoMonitor_StatMods".Translate(), Color.white);
+            x = Stat(x, r, total.ToString("N0"), warnings ? "ArchoMonitor_StatProblems".Translate() : "ArchoMonitor_StatErrors".Translate());
+            x = Stat(x + 16f, r, mods.ToString(), "ArchoMonitor_StatMods".Translate());
             if (stopped)
             {
-                var pill = new Rect(x + 18f, r.y, 0f, 24f);
                 string s = "ArchoMonitor_Stopped".Translate(after.ToString("N0"), stoppedAt.ToString("HH:mm"));
-                pill.width = Text.CalcSize(s).x + 16f;
-                Widgets.DrawBoxSolid(pill, new Color(Amber.r, Amber.g, Amber.b, 0.18f));
+                var note = new Rect(x + 16f, r.y, Text.CalcSize(s).x + 4f, r.height);
                 GUI.color = Amber;
-                Text.Anchor = TextAnchor.MiddleCenter;
-                Widgets.Label(pill, s);
-                Text.Anchor = TextAnchor.UpperLeft;
-                GUI.color = Color.white;
-                TooltipHandler.TipRegion(pill, "ArchoMonitor_StoppedTip".Translate());
-                x = pill.xMax;
+                Widgets.Label(note, s);
+                TooltipHandler.TipRegion(note, "ArchoMonitor_StoppedTip".Translate());
+                x = note.xMax;
             }
             if (fileFull || dropped > 0)
             {
-                Text.Font = GameFont.Tiny;
                 GUI.color = Dim;
                 string s = fileFull ? "ArchoMonitor_FileFull".Translate() : "ArchoMonitor_Dropped".Translate();
-                var note = new Rect(x + 18f, r.y + 4f, r.xMax - x - 18f, 20f);
-                Widgets.Label(note, s);
-                GUI.color = Color.white;
-                Text.Font = GameFont.Small;
+                var note = new Rect(x + 16f, r.y, r.xMax - x - 16f, r.height);
+                Widgets.Label(note, s.Clip(note.width, truncCache));
+                TooltipHandler.TipRegion(note, s);
             }
+            GUI.color = Color.white;
+            Text.Anchor = TextAnchor.UpperLeft;
             return r.yMax;
         }
 
-        static float Stat(float x, float y, string n, string what, Color c)
+        static float Stat(float x, Rect r, string n, string what)
         {
-            Text.Font = GameFont.Medium;
             float nw = Text.CalcSize(n).x;
-            GUI.color = c;
-            Widgets.Label(new Rect(x, y - 4f, nw + 2f, 32f), n);
-            Text.Font = GameFont.Small;
+            Widgets.Label(new Rect(x, r.y, nw + 2f, r.height), n);
             GUI.color = Dim;
             float ww = Text.CalcSize(what).x;
-            Widgets.Label(new Rect(x + nw + 6f, y + 3f, ww + 2f, 24f), what);
+            Widgets.Label(new Rect(x + nw + 4f, r.y, ww + 2f, r.height), what);
             GUI.color = Color.white;
-            return x + nw + 6f + ww;
+            return x + nw + 4f + ww;
         }
 
         static void Empty(Rect r)
         {
-            var box = new Rect(r.x, r.y + r.height * 0.3f, r.width, 60f);
-            Text.Font = GameFont.Medium;
             Text.Anchor = TextAnchor.MiddleCenter;
-            GUI.color = new Color(0.55f, 0.85f, 0.55f);
-            Widgets.Label(new Rect(box.x, box.y, box.width, 34f), "ArchoMonitor_NoErrors".Translate());
-            Text.Font = GameFont.Small;
+            Widgets.Label(new Rect(r.x, r.y + r.height * 0.3f, r.width, LineH), "ArchoMonitor_NoErrors".Translate());
             GUI.color = Dim;
-            Widgets.Label(new Rect(box.x, box.y + 36f, box.width, 24f), "ArchoMonitor_NoErrorsSub".Translate());
+            Widgets.Label(new Rect(r.x, r.y + r.height * 0.3f + LineH, r.width, LineH), "ArchoMonitor_NoErrorsSub".Translate());
             GUI.color = Color.white;
             Text.Anchor = TextAnchor.UpperLeft;
         }
@@ -290,7 +277,7 @@ namespace ArchoMonitor
             Widgets.Label(new Rect(r.x + 20f, r.y, nameW - 20f, r.height), name.Clip(nameW - 24f, truncCache));
             GUI.color = Color.white;
             float countW = 130f;
-            var bar = new Rect(r.x + nameW + 8f, r.y + 8f, r.width - nameW - countW - 16f, r.height - 16f);
+            var bar = new Rect(r.x + nameW + 8f, r.y + 10f, r.width - nameW - countW - 16f, r.height - 20f);
             Widgets.DrawBoxSolid(bar, Track);
             float full = Mathf.Max(3f, bar.width * g.Total / max);
             float x = bar.x;
@@ -300,12 +287,6 @@ namespace ArchoMonitor
                 if (wk <= 0f) continue;
                 Widgets.DrawBoxSolid(new Rect(x, bar.y, Mathf.Max(1f, wk), bar.height), KindColor(k.Key));
                 x += wk;
-            }
-            if (g.After > 0)
-            {
-                // The part that came after the game stopped logging, as an amber edge under the bar.
-                float wa = full * g.After / Math.Max(1, g.Total);
-                Widgets.DrawBoxSolid(new Rect(bar.x + full - wa, bar.yMax + 1f, Mathf.Max(2f, wa), 3f), Amber);
             }
             var cr = new Rect(bar.xMax + 8f, r.y, countW, r.height);
             string count = "×" + g.Total.ToString("N0");
@@ -353,7 +334,7 @@ namespace ArchoMonitor
             return false;
         }
 
-        static float EntryHeight(EntryView e, string primary) => LineH + (HasLoad(e) ? SubH : 0f) + (HasOthers(e, primary) ? SubH : 0f) + 6f;
+        static float EntryHeight(EntryView e, string primary) => LineH + (HasLoad(e) ? SubH : 0f) + (HasOthers(e, primary) ? SubH : 0f) + 4f;
 
         static float EntriesHeight(ModGroup g)
         {
@@ -374,11 +355,11 @@ namespace ArchoMonitor
             {
                 if (n++ >= MaxShown)
                 {
-                    Text.Font = GameFont.Tiny;
                     GUI.color = Dim;
-                    Widgets.Label(new Rect(Indent, y, width - Indent, SubH), "ArchoMonitor_More".Translate((g.Entries.Count - (int)MaxShown).ToString()));
+                    Text.Anchor = TextAnchor.MiddleLeft;
+                    Widgets.Label(new Rect(Indent + KindW, y, width - Indent - KindW, SubH), "ArchoMonitor_More".Translate((g.Entries.Count - (int)MaxShown).ToString()));
+                    Text.Anchor = TextAnchor.UpperLeft;
                     GUI.color = Color.white;
-                    Text.Font = GameFont.Small;
                     return y + SubH;
                 }
                 float h = EntryHeight(e, g.Id);
@@ -391,39 +372,30 @@ namespace ArchoMonitor
             return y;
         }
 
-        // Entry: kind, count, a sample of the message and copy; under it what was loading and the
-        // other Mods on the stack.
+        // Entry: aligned columns (kind, count, message, copy); under the message what was loading
+        // and the other Mods on the stack.
         void Entry(Rect r, EntryView e, string primary)
         {
-            Widgets.DrawBoxSolid(new Rect(r.x, r.y + 2f, 3f, r.height - 6f), KindColor(ErrorSummary.Kind(e)));
-            float x = r.x + 10f;
             string kind = ErrorSummary.Kind(e);
-            Text.Font = GameFont.Tiny;
-            float kw = Mathf.Min(150f, Text.CalcSize(KindName(kind)).x + 12f);
-            var chip = new Rect(x, r.y + 3f, kw, LineH - 6f);
-            var kc = KindColor(kind);
-            Widgets.DrawBoxSolid(chip, new Color(kc.r, kc.g, kc.b, 0.25f));
-            Text.Anchor = TextAnchor.MiddleCenter;
-            Widgets.Label(chip, KindName(kind).Clip(kw - 4f, truncCache));
             Text.Anchor = TextAnchor.MiddleLeft;
-            Text.Font = GameFont.Small;
-            x = chip.xMax + 8f;
+            GUI.color = Dim;
+            Widgets.Label(new Rect(r.x, r.y, KindW - 8f, LineH), KindName(kind).Clip(KindW - 8f, truncCache));
+            GUI.color = Color.white;
+            float x = r.x + KindW;
+            const float countCol = 84f;
             string count = "×" + e.Total.ToString("N0");
             float cw = Text.CalcSize(count).x;
             Widgets.Label(new Rect(x, r.y, cw + 2f, LineH), count);
-            x += cw + 4f;
             if (e.After > 0)
             {
                 string a = "+" + e.After.ToString("N0");
-                float aw = Text.CalcSize(a).x;
+                var ar = new Rect(x + cw + 4f, r.y, Mathf.Max(0f, countCol - cw - 4f), LineH);
                 GUI.color = Amber;
-                var ar = new Rect(x, r.y, aw + 2f, LineH);
-                Widgets.Label(ar, a);
+                Widgets.Label(ar, a.Clip(ar.width, truncCache));
                 TooltipHandler.TipRegion(ar, "ArchoMonitor_After".Translate(e.After.ToString("N0")));
                 GUI.color = Color.white;
-                x += aw + 4f;
             }
-            x += 6f;
+            x += countCol;
             var copy = new Rect(r.xMax - CopyW, r.y + 1f, CopyW - 4f, LineH - 2f);
             var msg = new Rect(x, r.y, copy.x - x - 8f, LineH);
             string first = FirstLine(e.Message);
@@ -436,8 +408,8 @@ namespace ArchoMonitor
                 copiedId = e.Id;
                 copiedUntil = Time.realtimeSinceStartup + 2f;
             }
+            Text.Anchor = TextAnchor.MiddleLeft;
             float y = r.y + LineH;
-            Text.Font = GameFont.Tiny;
             GUI.color = Dim;
             var c = e.Ctx;
             if (HasLoad(e))
@@ -469,7 +441,6 @@ namespace ArchoMonitor
                 TooltipHandler.TipRegion(lr, s);
             }
             GUI.color = Color.white;
-            Text.Font = GameFont.Small;
             Text.Anchor = TextAnchor.UpperLeft;
         }
 
@@ -497,7 +468,7 @@ namespace ArchoMonitor
             return m;
         }
 
-        static Color KindColor(string k) => colors.TryGetValue(k, out var c) ? c : colors["Other"];
+        static Color KindColor(string k) => loadKinds.Contains(k) ? LoadTone : codeKinds.Contains(k) ? CodeTone : OtherTone;
 
         static string KindName(string k)
         {
