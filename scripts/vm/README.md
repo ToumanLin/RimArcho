@@ -6,7 +6,7 @@ Credentials come from `D:\VMs\Setup\Invoke-VMRun.ps1`, which reads them from DPA
 
 ## Once per VM (again after a snapshot revert)
 
-Real-data rounds revert to the snapshot `RimArcho-Real-Vulkan`, a live one: Player signed in, Steam up, the game, the Workshop mods and software Vulkan installed. If Steam shows its sign-in window after a revert (Steam can reject the snapshot's saved session; it did on 2026-10-30), the VM's owner signs in; game rounds need Steam for the Workshop mods. Never type the account's password from a script.
+Real-data rounds revert to the snapshot `RimArcho-Real-Vulkan-17`, a live one: Player signed in, Steam up, RimWorld 1.6 (Steam) and 1.7 (`C:\Games\RimWorld-1.7`), the Workshop mods and software Vulkan installed. Its RimArcho home (built from dev/1.1 on 2026-11-21) has two Game Configs: `1.6` (current; shared saves, so its saves reach Steam Cloud) and `1.7` (own saves in `%APPDATA%\RimArcho\userdata\1.7`; plan Harmony, Archo Monitor, Core and the five DLCs). A 1.7 round is `archo env use 1.7` and no download. Its parent `RimArcho-Real-Vulkan` has only 1.6 and a pre-1.0 RimArcho home that current builds refuse to open. If Steam shows its sign-in window after a revert (Steam can reject the snapshot's saved session; it did on 2026-10-30), the VM's owner signs in; game rounds need Steam for the Workshop mods. Never type the account's password from a script.
 
 ```powershell
 pwsh scripts/vm/vm.ps1 status    # running, Tools "running", guest IP
@@ -139,6 +139,7 @@ In a test script, `connectReal(ip)` from `input.mjs` gives both connections and 
 - GUI tests run as **Player** (an administrator), because Player is the user logged in on the guest screen. `-StandardUser` only applies to `exec` and `cli`. Before a release, also do the first run as **the standard test account (`\u65b0\u73a9\u5bb6`, Unicode escapes)**: log in as \u65b0\u73a9\u5bb6 in the guest, then run `launch -StandardUser`.
 - Files copied in by VMware Tools have no download mark, so SmartScreen warnings aren't tested.
 - The guest has no GPU driver. Vulkan comes from Mesa lavapipe (software, `C:\Mesa\x64`, in the snapshot; a host copy is in `D:\RimArcho-test\mesa`), so RimWorld 1.7 starts, at a very low frame rate. Game performance is checked on a real machine.
+- `round.ps1` does not drive 1.7: Archo Drive stops at "Entry busy" on the 1.7 engine (2026-11-21), and the round still prints `PASS round` when the driver never started. Play a 1.7 round by hand with `input.mjs`. Hold each click about 700 ms, and give each screen time to redraw: typed text shows up only on the next frame. Esc from `input.mjs` did not open the game menu, so use the menu button at the bottom right.
 - Leftovers in the guest: `C:\Users\Public\Documents\VM-Test`, `%APPDATA%\RimArcho` and `%LOCALAPPDATA%\RimArcho` of the user who ran it. Delete the last two for a first run again.
 
 
