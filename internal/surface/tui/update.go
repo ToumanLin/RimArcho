@@ -50,46 +50,12 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *model) handle(msg tea.Msg) (tea.Model, tea.Cmd) {
 	defer m.fsLeft() // leaving Search files stops its search (16 §3.1 rule 9)
 	if m.uninstallRun != nil {
-		switch msg := msg.(type) {
-		case uninstallStepMsg, uninstallDoneMsg:
-			return m, m.onUninstall(msg)
-		case tea.KeyMsg:
-			return m, m.key(msg)
-		case tea.WindowSizeMsg:
-			m.w, m.h = msg.Width, msg.Height
-		case tea.MouseMsg: // the mouse does nothing during the run
-		default:
-			// Other work's results wait for the end of the run (onUninstall).
-			m.uninstallRun.held = append(m.uninstallRun.held, msg)
-		}
-		return m, nil
+		return m, m.handleUninstalling(msg)
+	}
+	if cmd, done := m.handleWork(msg); done {
+		return m, cmd
 	}
 	switch msg := msg.(type) {
-	case memoryMeasuredMsg:
-		m.memoryMeasured(msg)
-		if msg.err == nil && m.tab == tabHome && m.panel == nil {
-			return m, m.openHome()
-		}
-		return m, nil
-	case feedbackSentMsg:
-		if msg.err != nil {
-			m.say(sayFail, msg.err.Error())
-		} else {
-			m.say(sayOK, Tf("sent as #%d", msg.sent.Number)+"  "+msg.sent.URL)
-		}
-		return m, nil
-	case automaticDoneMsg:
-		if msg.kind == "data" {
-			m.app.DropCommunityData()
-		}
-		if notice := view.AutomaticNotice(m.app, msg.before, msg.after); notice != "" {
-			kind := sayOK
-			if msg.kind == "session" {
-				kind = sayWarn
-			}
-			m.say(kind, notice)
-		}
-		return m, nil
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
 		for k := range m.cols {
@@ -122,52 +88,113 @@ func (m *model) handle(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.detailRef, m.detail = msg.ref, msg.lines
 		}
 		return m, nil
-	case taskEndedMsg:
-		return m, m.taskEnded(msg.t)
-	case bgMsg:
-		return m, msg.apply(m)
-	case fsTickMsg:
-		if m.fs.running && msg.seq == m.fs.seq {
-			m.fsPoll()
-			if m.fs.running {
-				return m, fsNext(msg.seq)
-			}
-		}
-		return m, nil
-	case addTick:
-		if m.tab == tabSubscribe && msg.seq == m.add.seq {
-			return m, m.recognise()
-		}
-		return m, nil
-	case scanDoneMsg:
-		m.scanning = false
-		m.tasks.scanning.Store(false)
-		m.reload()
-		m.detailRef = ""
-		if msg.err != nil {
-			m.openPanel(T("scan failed"), msg.out+"\n"+msg.err.Error())
-		} else {
-			m.say(sayOK, m.scanSummary(msg.out))
-			if m.tab == tabChanges {
-				m.loadChanges()
-			}
-			if m.tab == tabLibrary {
-				m.loadLibrary()
-			}
-		}
-		return m, m.requestDetail()
-	case cmdDoneMsg:
-		return m, m.cmdDone(msg)
-	case selfStepMsg, selfDoneMsg:
-		return m, m.onSelfUpdate(msg)
-	case analyzeLineMsg, analyzeDoneMsg:
-		return m, m.analyzeMsg(msg)
 	case tea.KeyMsg:
 		return m, m.key(msg)
 	case tea.MouseMsg:
 		return m, m.mouse(msg)
 	}
 	return m, nil
+}
+
+// handleUninstalling handles a message during the uninstall run: only its steps, keys and
+// the window size; other work's results wait for the end of the run (onUninstall).
+func (m *model) handleUninstalling(msg tea.Msg) tea.Cmd {
+	switch msg := msg.(type) {
+	case uninstallStepMsg, uninstallDoneMsg:
+		return m.onUninstall(msg)
+	case tea.KeyMsg:
+		return m.key(msg)
+	case tea.WindowSizeMsg:
+		m.w, m.h = msg.Width, msg.Height
+	case tea.MouseMsg: // the mouse does nothing during the run
+	default:
+		// Other work's results wait for the end of the run (onUninstall).
+		m.uninstallRun.held = append(m.uninstallRun.held, msg)
+	}
+	return nil
+}
+
+// handleWork handles the results of background work: measurements, sends, tasks, scans,
+// commands, updates and checks; done is false for the other messages.
+func (m *model) handleWork(msg tea.Msg) (cmd tea.Cmd, done bool) {
+	switch msg := msg.(type) {
+	case memoryMeasuredMsg:
+		m.memoryMeasured(msg)
+		if msg.err == nil && m.tab == tabHome && m.panel == nil {
+			return m.openHome(), true
+		}
+		return nil, true
+	case feedbackSentMsg:
+		if msg.err != nil {
+			m.say(sayFail, msg.err.Error())
+		} else {
+			m.say(sayOK, Tf("sent as #%d", msg.sent.Number)+"  "+msg.sent.URL)
+		}
+		return nil, true
+	case automaticDoneMsg:
+		m.automaticDone(msg)
+		return nil, true
+	case taskEndedMsg:
+		return m.taskEnded(msg.t), true
+	case bgMsg:
+		return msg.apply(m), true
+	case fsTickMsg:
+		if m.fs.running && msg.seq == m.fs.seq {
+			m.fsPoll()
+			if m.fs.running {
+				return fsNext(msg.seq), true
+			}
+		}
+		return nil, true
+	case addTick:
+		if m.tab == tabSubscribe && msg.seq == m.add.seq {
+			return m.recognise(), true
+		}
+		return nil, true
+	case scanDoneMsg:
+		return m.scanDone(msg), true
+	case cmdDoneMsg:
+		return m.cmdDone(msg), true
+	case selfStepMsg, selfDoneMsg:
+		return m.onSelfUpdate(msg), true
+	case analyzeLineMsg, analyzeDoneMsg:
+		return m.analyzeMsg(msg), true
+	}
+	return nil, false
+}
+
+// automaticDone says what an automatic download changed.
+func (m *model) automaticDone(msg automaticDoneMsg) {
+	if msg.kind == "data" {
+		m.app.DropCommunityData()
+	}
+	if notice := view.AutomaticNotice(m.app, msg.before, msg.after); notice != "" {
+		kind := sayOK
+		if msg.kind == "session" {
+			kind = sayWarn
+		}
+		m.say(kind, notice)
+	}
+}
+
+// scanDone reloads after a scan and says how it went.
+func (m *model) scanDone(msg scanDoneMsg) tea.Cmd {
+	m.scanning = false
+	m.tasks.scanning.Store(false)
+	m.reload()
+	m.detailRef = ""
+	if msg.err != nil {
+		m.openPanel(T("scan failed"), msg.out+"\n"+msg.err.Error())
+	} else {
+		m.say(sayOK, m.scanSummary(msg.out))
+		if m.tab == tabChanges {
+			m.loadChanges()
+		}
+		if m.tab == tabLibrary {
+			m.loadLibrary()
+		}
+	}
+	return m.requestDetail()
 }
 
 // scanSummary: "scan complete · 12 changes" (16 §2.9); the CLI line keeps the scan id.
@@ -230,42 +257,8 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		m.say(sayInfo, T("cancelled"))
 		return nil
 	}
-	switch {
-	case m.cmdOn:
-		return m.cmdKey(k)
-	case m.menu != nil:
-		return m.menuKey(s)
-	case m.pal != nil:
-		return m.paletteKey(k)
-	case s == "ctrl+k" && m.prompt == nil && !m.editing && m.pos == nil && m.loadErr == nil:
-		m.panel, m.insp, m.tags = nil, nil, nil
-		return m.openPalette()
-	case m.tags != nil:
-		return m.tagBarKey(k)
-	case m.pos != nil:
-		return m.posKey(k)
-	case m.prompt != nil:
-		return m.promptKey(k)
-	case m.panel != nil:
-		return m.panelKey(s)
-	case m.insp != nil && s != "?":
-		return m.inspectKey(s)
-	case m.editing:
-		return m.filterKey(k)
-	case m.tab == tabSubscribe:
-		return m.addKey(k) // letters go into the paste box
-	case m.fsTyping():
-		return m.fsTypeKey(k) // letters go into the box
-	case m.rulesTyping():
-		return m.rulesKey(k) // the rule's form
-	case m.tab == tabChanges && k.Paste:
-		return m.openAdd(string(k.Runes)) // a pasted address goes to add a subscription (16 §2.9 ctrl+v)
-	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().typing:
-		return m.barTypeKey(k)
-	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().open:
-		return m.barOpenKey(k)
-	case m.full && s != "?":
-		return m.fullKey(s)
+	if cmd, done := m.modalKey(k, s); done {
+		return cmd
 	}
 	if m.loadErr != nil {
 		return m.noGameKey(s) // nothing below has a list or a Game Config to act on
@@ -277,55 +270,14 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 			return cmd
 		}
 	}
-	switch s {
-	case "q":
-		m.quitting = true
-		return tea.Quit
-	case "?":
-		return m.helpPage()
-	case ":":
-		return m.openCmdLine()
-	case "E":
-		return m.chooseEnv()
-	case "P":
-		return m.choosePlan()
-	case "R":
-		return m.startScan()
-	case "tab":
-		return m.subPage(1)
-	case "shift+tab":
-		return m.subPage(-1)
-	case "f10", "shift+f10", "f16": // the menu key and shift+F10 (menu.go says what terminals send)
-		return m.openRowMenu()
+	if cmd, done := m.globalKey(s); done {
+		return cmd
 	}
 	if n, ok := navKeys[s]; ok && !(m.tab == tabList && m.detailFocus) {
 		return m.goPage(n)
 	}
-	switch m.tab {
-	case tabProblems:
-		switch s {
-		case "esc":
-			m.tab = tabList
-			return m.requestDetail()
-		}
-		return m.needsKey(s)
-	case tabChanges:
-		if s == "esc" && m.chg.of != "" {
-			return m.openChangesOf("", "") // esc first shows every mod again
-		}
-		if s == "esc" {
-			m.tab = tabList
-			return m.requestDetail()
-		}
-		return m.changesKey(s)
-	case tabLibrary:
-		return m.libraryKey(s)
-	case tabSearch:
-		return m.fsKey(s)
-	case tabRules:
-		return m.rulesKey(k)
-	case tabHome:
-		return m.homeKey(s)
+	if cmd, done := m.subPageKey(k, s); done {
+		return cmd
 	}
 	if m.detailFocus {
 		if cmd, ok := m.detailKey(s); ok {
@@ -343,56 +295,162 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	return m.listKey(s)
 }
 
+// modalKey gives the key to what has it first: the command line, a menu, the palette,
+// a bar, a prompt, a panel, a typing box or the full detail; done is false when none has.
+func (m *model) modalKey(k tea.KeyMsg, s string) (cmd tea.Cmd, done bool) {
+	switch {
+	case m.cmdOn:
+		return m.cmdKey(k), true
+	case m.menu != nil:
+		return m.menuKey(s), true
+	case m.pal != nil:
+		return m.paletteKey(k), true
+	case s == "ctrl+k" && m.prompt == nil && !m.editing && m.pos == nil && m.loadErr == nil:
+		m.panel, m.insp, m.tags = nil, nil, nil
+		return m.openPalette(), true
+	case m.tags != nil:
+		return m.tagBarKey(k), true
+	case m.pos != nil:
+		return m.posKey(k), true
+	case m.prompt != nil:
+		return m.promptKey(k), true
+	case m.panel != nil:
+		return m.panelKey(s), true
+	case m.insp != nil && s != "?":
+		return m.inspectKey(s), true
+	case m.editing:
+		return m.filterKey(k), true
+	case m.tab == tabSubscribe:
+		return m.addKey(k), true // letters go into the paste box
+	case m.fsTyping():
+		return m.fsTypeKey(k), true // letters go into the box
+	case m.rulesTyping():
+		return m.rulesKey(k), true // the rule's form
+	case m.tab == tabChanges && k.Paste:
+		return m.openAdd(string(k.Runes)), true // a pasted address goes to add a subscription (16 §2.9 ctrl+v)
+	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().typing:
+		return m.barTypeKey(k), true
+	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().open:
+		return m.barOpenKey(k), true
+	case m.full && s != "?":
+		return m.fullKey(s), true
+	}
+	return nil, false
+}
+
+// globalKey handles the keys every page has; done is false for the others.
+func (m *model) globalKey(s string) (cmd tea.Cmd, done bool) {
+	switch s {
+	case "q":
+		m.quitting = true
+		return tea.Quit, true
+	case "?":
+		return m.helpPage(), true
+	case ":":
+		return m.openCmdLine(), true
+	case "E":
+		return m.chooseEnv(), true
+	case "P":
+		return m.choosePlan(), true
+	case "R":
+		return m.startScan(), true
+	case "tab":
+		return m.subPage(1), true
+	case "shift+tab":
+		return m.subPage(-1), true
+	case "f10", "shift+f10", "f16": // the menu key and shift+F10 (menu.go says what terminals send)
+		return m.openRowMenu(), true
+	}
+	return nil, false
+}
+
+// subPageKey gives the key to the page other than the list; done is false on the list.
+func (m *model) subPageKey(k tea.KeyMsg, s string) (cmd tea.Cmd, done bool) {
+	switch m.tab {
+	case tabProblems:
+		switch s {
+		case "esc":
+			m.tab = tabList
+			return m.requestDetail(), true
+		}
+		return m.needsKey(s), true
+	case tabChanges:
+		if s == "esc" && m.chg.of != "" {
+			return m.openChangesOf("", ""), true // esc first shows every mod again
+		}
+		if s == "esc" {
+			m.tab = tabList
+			return m.requestDetail(), true
+		}
+		return m.changesKey(s), true
+	case tabLibrary:
+		return m.libraryKey(s), true
+	case tabSearch:
+		return m.fsKey(s), true
+	case tabRules:
+		return m.rulesKey(k), true
+	case tabHome:
+		return m.homeKey(s), true
+	}
+	return nil, false
+}
+
 // listKey: the keys of the list areas (16 §3.3). The arrows only navigate.
 func (m *model) listKey(s string) tea.Cmd {
+	if cmd, done := m.listMoveKey(s); done {
+		return cmd
+	}
+	if cmd, done := m.listRowKey(s); done {
+		return cmd
+	}
+	return m.listEditKey(s)
+}
+
+// listMoveKey handles the list keys that move the cursor, the area, the selection or
+// the search; done is false for the others.
+func (m *model) listMoveKey(s string) (cmd tea.Cmd, done bool) {
 	c := m.col()
 	switch s {
 	case "up", "k", "ctrl+up":
 		m.sel.anchor = ""
-		return m.moveCursor(-1)
+		return m.moveCursor(-1), true
 	case "down", "j", "ctrl+down":
 		m.sel.anchor = ""
-		return m.moveCursor(1)
+		return m.moveCursor(1), true
 	case "shift+up":
-		return m.selExtend(-1)
+		return m.selExtend(-1), true
 	case "shift+down":
-		return m.selExtend(1)
+		return m.selExtend(1), true
 	case "home":
-		return m.moveCursor(-len(c.view))
+		return m.moveCursor(-len(c.view)), true
 	case "end":
-		return m.moveCursor(len(c.view))
+		return m.moveCursor(len(c.view)), true
 	case "pgup":
-		return m.moveCursor(-m.detailPage()) // the list's cursor, a page (16 §3.3)
+		return m.moveCursor(-m.detailPage()), true // the list's cursor, a page (16 §3.3)
 	case "pgdown":
-		return m.moveCursor(m.detailPage())
+		return m.moveCursor(m.detailPage()), true
 	case "ctrl+a":
-		return m.selectAll()
-	case "g":
-		return m.tagKey()
-	case "n":
-		return m.noteKey()
-	case "delete":
-		return m.delKey(m.editorOps(), m.runEditorOp)
+		return m.selectAll(), true
 	case "left", "h":
-		return m.areaStep(-1)
+		return m.areaStep(-1), true
 	case "right", "l":
-		return m.areaStep(1)
+		return m.areaStep(1), true
 	case "1", "2", "3", "4":
-		return m.goArea(int(s[0] - '0'))
+		return m.goArea(int(s[0] - '0')), true
 	case "[":
-		return m.goArea((int(m.focus)+2)%3 + 1)
+		return m.goArea((int(m.focus)+2)%3 + 1), true
 	case "]":
-		return m.goArea((int(m.focus)+1)%3 + 1)
+		return m.goArea((int(m.focus)+1)%3 + 1), true
 	case "/", "ctrl+f":
 		m.detailFocus = false
 		if m.focus == cStaging {
 			m.editing = true // Staging keeps its own search
-			return nil
+			return nil, true
 		}
 		m.bar.typing = true
-		return nil
+		return nil, true
 	case `\`:
-		return m.toggleBar()
+		return m.toggleBar(), true
 	case "esc":
 		// back one level (16 §3.1): the selection, then the search and the filters
 		switch {
@@ -403,11 +461,71 @@ func (m *model) listKey(s string) tea.Cmd {
 			m.refilterCol(m.focus, c.curID())
 		case m.bar.active():
 			m.bar.search, m.bar.filters = "", nil
-			return m.barChanged()
+			return m.barChanged(), true
 		}
-		return nil
+		return nil, true
 	case "ctrl+@", "ctrl+ ", "v":
-		return m.selToggle()
+		return m.selToggle(), true
+	}
+	return nil, false
+}
+
+// listRowKey handles the list keys that act on the cursor's row; done is false for the others.
+func (m *model) listRowKey(s string) (cmd tea.Cmd, done bool) {
+	c := m.col()
+	switch s {
+	case "x":
+		if it := c.cur(); it != nil && it.id != "" {
+			m.act(Tf("switched the version of %s", it.name), "swap", it.ref)
+		}
+		return m.requestDetail(), true
+	case "enter":
+		if it := c.cur(); it != nil && it.id != "" {
+			m.full, m.fullOff, m.fullSec = true, 0, 0
+			return tea.Batch(m.requestDetail(), m.loadFullSecs()), true
+		}
+		return nil, true
+	case "ctrl+o":
+		if it := c.cur(); it != nil {
+			return m.openFolderOf(it.id), true
+		}
+		return nil, true
+	case "ctrl+w":
+		if it := c.cur(); it != nil {
+			return m.openWorkshopID(m.workshopOf(it.id)), true
+		}
+		return nil, true
+	case "ctrl+s":
+		if it := c.cur(); it != nil {
+			return m.openWorkshopSteamID(m.workshopOf(it.id)), true
+		}
+		return nil, true
+	case "C":
+		if it := c.cur(); it != nil && it.id != "" {
+			return m.openChangesOf(it.id, it.name), true
+		}
+		return nil, true
+	case "r":
+		// Load-order rules with the form for this mod (16 §2.5): the window's rules card
+		it := c.cur()
+		if it == nil || it.id == "" {
+			m.say(sayInfo, T("choose a mod in the lists first"))
+			return nil, true
+		}
+		return m.openRules(it), true
+	}
+	return nil, false
+}
+
+// listEditKey handles the list keys that change the list or open its tools.
+func (m *model) listEditKey(s string) tea.Cmd {
+	switch s {
+	case "g":
+		return m.tagKey()
+	case "n":
+		return m.noteKey()
+	case "delete":
+		return m.delKey(m.editorOps(), m.runEditorOp)
 	case "c":
 		return m.openChangesOf("", "")
 	case "e":
@@ -421,21 +539,7 @@ func (m *model) listKey(s string) tea.Cmd {
 	case "t":
 		return m.stageKey()
 	case "T":
-		// in staging: everything back in place; elsewhere: every enabled mod into staging,
-		// as in the window (16 §3.5)
-		if m.focus != cStaging {
-			m.verb(view.StageAll(m.app))
-			m.clearSel()
-			return m.requestDetail()
-		}
-		n := len(m.cols[cStaging].items)
-		if n == 0 {
-			m.say(sayInfo, T("staging is empty"))
-			return nil
-		}
-		m.act(Tf("put %s back in place", plural(n, "mod")), "stage", "restore", "--all")
-		m.clearSel()
-		return m.requestDetail()
+		return m.stageAllKey()
 	case "K":
 		return m.moveBy(-1)
 	case "J":
@@ -466,47 +570,26 @@ func (m *model) listKey(s string) tea.Cmd {
 		return m.requestDetail()
 	case "L":
 		return m.goLaunch() // Start first, as in the window (16 §2.5)
-	case "x":
-		if it := c.cur(); it != nil && it.id != "" {
-			m.act(Tf("switched the version of %s", it.name), "swap", it.ref)
-		}
-		return m.requestDetail()
-	case "enter":
-		if it := c.cur(); it != nil && it.id != "" {
-			m.full, m.fullOff, m.fullSec = true, 0, 0
-			return tea.Batch(m.requestDetail(), m.loadFullSecs())
-		}
-		return nil
-	case "ctrl+o":
-		if it := c.cur(); it != nil {
-			return m.openFolderOf(it.id)
-		}
-		return nil
-	case "ctrl+w":
-		if it := c.cur(); it != nil {
-			return m.openWorkshopID(m.workshopOf(it.id))
-		}
-		return nil
-	case "ctrl+s":
-		if it := c.cur(); it != nil {
-			return m.openWorkshopSteamID(m.workshopOf(it.id))
-		}
-		return nil
-	case "C":
-		if it := c.cur(); it != nil && it.id != "" {
-			return m.openChangesOf(it.id, it.name)
-		}
-		return nil
-	case "r":
-		// Load-order rules with the form for this mod (16 §2.5): the window's rules card
-		it := c.cur()
-		if it == nil || it.id == "" {
-			m.say(sayInfo, T("choose a mod in the lists first"))
-			return nil
-		}
-		return m.openRules(it)
 	}
 	return nil
+}
+
+// stageAllKey is T: in staging, everything back in place; elsewhere, every enabled mod
+// into staging, as in the window (16 §3.5).
+func (m *model) stageAllKey() tea.Cmd {
+	if m.focus != cStaging {
+		m.verb(view.StageAll(m.app))
+		m.clearSel()
+		return m.requestDetail()
+	}
+	n := len(m.cols[cStaging].items)
+	if n == 0 {
+		m.say(sayInfo, T("staging is empty"))
+		return nil
+	}
+	m.act(Tf("put %s back in place", plural(n, "mod")), "stage", "restore", "--all")
+	m.clearSel()
+	return m.requestDetail()
 }
 
 // filterKey: typing the search of the focused list (16 §3.7). The status line counts the
@@ -856,16 +939,27 @@ func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
 		}
 	}
 	if m.prompt != nil || m.editing || m.panel != nil || m.insp != nil || m.tab != tabList || m.full || m.pal != nil || m.tags != nil || m.pos != nil {
-		var cmds []tea.Cmd
-		for i := 0; i < 3 && wheel != 0; i++ { // the wheel scrolls three lines
-			if wheel > 0 {
-				cmds = append(cmds, m.key(tea.KeyMsg{Type: tea.KeyDown}))
-			} else {
-				cmds = append(cmds, m.key(tea.KeyMsg{Type: tea.KeyUp}))
-			}
-		}
-		return tea.Batch(cmds...)
+		return m.wheelKeys(wheel)
 	}
+	return m.listMouse(e, wheel)
+}
+
+// wheelKeys turns the wheel into arrow keys for what is open over the list.
+func (m *model) wheelKeys(wheel int) tea.Cmd {
+	var cmds []tea.Cmd
+	for i := 0; i < 3 && wheel != 0; i++ { // the wheel scrolls three lines
+		if wheel > 0 {
+			cmds = append(cmds, m.key(tea.KeyMsg{Type: tea.KeyDown}))
+		} else {
+			cmds = append(cmds, m.key(tea.KeyMsg{Type: tea.KeyUp}))
+		}
+	}
+	return tea.Batch(cmds...)
+}
+
+// listMouse handles the mouse on the list page: the wheel, the detail column, column
+// widths, a row's menu and clicks on rows.
+func (m *model) listMouse(e tea.MouseMsg, wheel int) tea.Cmd {
 	// The wheel scrolls the detail wherever the pointer is; the focus stays (16 §3.3).
 	if wheel != 0 {
 		return m.scrollDetail(wheel)
@@ -909,8 +1003,13 @@ func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
 	if e.Action != tea.MouseActionPress || e.Button != tea.MouseButtonLeft || !ok {
 		return nil
 	}
-	// Click: the cursor; shift+click: a range from the cursor; ctrl+click: add or remove
-	// one row. Another list drops the selection (16 §3.4). Moving is done with verbs.
+	return m.listClick(e, k, i)
+}
+
+// listClick is a left click on row i of list k. Click: the cursor; shift+click: a range
+// from the cursor; ctrl+click: add or remove one row. Another list drops the selection
+// (16 §3.4). Moving is done with verbs.
+func (m *model) listClick(e tea.MouseMsg, k colKind, i int) tea.Cmd {
 	m.setFocus(k)
 	c := &m.cols[k]
 	if i < 0 {

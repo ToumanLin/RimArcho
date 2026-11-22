@@ -110,26 +110,12 @@ func MCPCall(cmdline string) (string, bool) {
 		return "", false
 	}
 	toks = toks[1:]
-	var sp *hintSpec
-	for i := range hintSpecs {
-		words := strings.Fields(hintSpecs[i].cmd)
-		if len(toks) < len(words) || (sp != nil && len(strings.Fields(sp.cmd)) >= len(words)) {
-			continue
-		}
-		match := true
-		for j, w := range words {
-			match = match && toks[j] == w
-		}
-		if match {
-			sp = &hintSpecs[i]
-		}
-	}
+	sp := hintSpecFor(toks)
 	if sp == nil || sp.tool == "" {
 		return "", false
 	}
 	toks = toks[len(strings.Fields(sp.cmd)):]
-	type kv struct{ k, v string }
-	var out []kv
+	var out []hintKV
 	lists := map[string][]string{}
 	var listOrder []string
 	setList := func(k, v string) {
@@ -139,7 +125,7 @@ func MCPCall(cmdline string) (string, bool) {
 		lists[k] = append(lists[k], v)
 	}
 	for _, f := range sp.fixed {
-		out = append(out, kv{f[0], f[1]})
+		out = append(out, hintKV{f[0], f[1]})
 	}
 	var pos []string
 	set := map[string]bool{}
@@ -153,16 +139,16 @@ func MCPCall(cmdline string) (string, bool) {
 		switch {
 		case sp.ignore[name]:
 		case name == "active" && sp.cmd == "source search":
-			out = append(out, kv{"scope", "active"})
+			out = append(out, hintKV{"scope", "active"})
 		case sp.flag[name] != "":
-			out = append(out, kv{sp.flag[name], "true"})
+			out = append(out, hintKV{sp.flag[name], "true"})
 			set[sp.flag[name]] = true
 		case sp.value[name] != "":
 			if i+1 >= len(toks) {
 				return "", false
 			}
 			i++
-			out = append(out, kv{sp.value[name], toks[i]})
+			out = append(out, hintKV{sp.value[name], toks[i]})
 			set[sp.value[name]] = true
 		case sp.list[name] != "":
 			if i+1 >= len(toks) {
@@ -177,21 +163,49 @@ func MCPCall(cmdline string) (string, bool) {
 	if len(pos) < minPos(sp) || !sp.posList && len(pos) > len(sp.pos) {
 		return "", false
 	}
-	var head []kv
+	var head []hintKV
 	for i, p := range pos {
 		switch {
 		case sp.posList && i >= len(sp.pos)-1:
 			setList(sp.pos[len(sp.pos)-1], p)
 		case i < len(sp.pos):
-			head = append(head, kv{sp.pos[i], p})
+			head = append(head, hintKV{sp.pos[i], p})
 		}
 	}
 	// list_problems shows warning and above unless a severity is given; the CLI shows
 	// everything.
 	if sp.minInfo && !set["severity"] && !set["min_severity"] && !set["all"] && !set["include_muted"] && !set["ref"] {
-		out = append(out, kv{"min_severity", "info"})
+		out = append(out, hintKV{"min_severity", "info"})
 	}
-	parts := []string{sp.tool}
+	return hintCallText(sp.tool, head, out, listOrder, lists), true
+}
+
+// hintKV is one argument of an MCP call.
+type hintKV struct{ k, v string }
+
+// hintSpecFor is the spec whose command words are the longest prefix of toks, or nil.
+func hintSpecFor(toks []string) *hintSpec {
+	var sp *hintSpec
+	for i := range hintSpecs {
+		words := strings.Fields(hintSpecs[i].cmd)
+		if len(toks) < len(words) || (sp != nil && len(strings.Fields(sp.cmd)) >= len(words)) {
+			continue
+		}
+		match := true
+		for j, w := range words {
+			match = match && toks[j] == w
+		}
+		if match {
+			sp = &hintSpecs[i]
+		}
+	}
+	return sp
+}
+
+// hintCallText writes an MCP call: the tool, the positional arguments, the other
+// arguments, then the lists in first-set order.
+func hintCallText(tool string, head, out []hintKV, listOrder []string, lists map[string][]string) string {
+	parts := []string{tool}
 	for _, p := range head {
 		parts = append(parts, p.k+"="+hintValue(p.v))
 	}
@@ -205,7 +219,7 @@ func MCPCall(cmdline string) (string, bool) {
 		}
 		parts = append(parts, k+"=["+strings.Join(vs, ",")+"]")
 	}
-	return strings.Join(parts, " "), true
+	return strings.Join(parts, " ")
 }
 
 // minPos is how many positional arguments a command needs.

@@ -57,147 +57,177 @@ func harmonyCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			return notAnalysed("harmony"), nil
 		}
 	}
-	stale := func(root *render.Node) {
-		if !s.Fresh {
-			root.KV("analysis", "stale (archo analyze)")
-		}
-	}
 	switch {
 	case a.Str("target") != "":
-		t := a.Str("target")
-		rows, err := c.App.Store.HarmonyPatches(store.HarmonyFilter{Target: t, Instance: inst})
-		if err != nil {
-			return nil, err
-		}
-		like := false
-		if len(rows) == 0 {
-			rows, err = c.App.Store.HarmonyPatches(store.HarmonyFilter{Target: t, Instance: inst, Like: true})
-			if err != nil {
-				return nil, err
-			}
-			like = true
-		}
-		mods := map[string]bool{}
-		for _, h := range rows {
-			mods[h.Instance] = true
-		}
-		head := fmt.Sprintf("harmony:%s  %d patches from %d mods", t, len(rows), len(mods))
-		if like {
-			head = fmt.Sprintf("harmony targets matching %q: %d patches from %d mods", t, len(rows), len(mods))
-		}
-		d, root := render.New(head)
-		stale(root)
-		byKind := map[string][]*store.HarmonyRow{}
-		for _, h := range rows {
-			byKind[h.Kind] = append(byKind[h.Kind], h)
-		}
-		for _, k := range []string{"prefix", "postfix", "transpiler", "finalizer"} {
-			if len(byKind[k]) == 0 {
-				continue
-			}
-			sec := root.Section(map[string]string{"prefix": "prefixes", "postfix": "postfixes", "transpiler": "transpilers", "finalizer": "finalizers"}[k])
-			sort.SliceStable(byKind[k], func(i, j int) bool {
-				return st.Position(byKind[k][i].Instance) < st.Position(byKind[k][j].Instance)
-			})
-			for _, h := range byKind[k] {
-				line := modLabel(ix, h.Instance) + "  " + h.PatchType + "." + h.PatchMethod
-				if like {
-					line += "  on " + h.Target
-				}
-				if h.Skips {
-					line += "  (returns bool: may skip the original)"
-				}
-				sec.Add(line)
-			}
-			sec.Truncate(limit, "add --all")
-		}
-		if len(rows) == 0 && !dynamicOnTarget(c, st, root, t, inst) {
-			root.Add("no declared patches (mods that patch from code are listed by archo problems --code harmony.manual)")
-		}
-		seenT := map[string]bool{}
-		for _, h := range rows {
-			if len(d.Next) >= 3 || seenT[h.PatchType] {
-				continue
-			}
-			seenT[h.PatchType] = true
-			typ := h.PatchType
-			if i := strings.IndexByte(typ, '+'); i >= 0 {
-				typ = typ[:i] // ilspycmd decompiles the outer type with its nested ones
-			}
-			d.AddNext(fmt.Sprintf("archo source %s --type %s", ix.Ref(h.Instance), typ))
-		}
-		return d, nil
+		return harmonyTarget(c, st, s, a.Str("target"), inst, limit)
 	case inst != "":
-		m := ix.ByID[inst]
-		asms, err := c.App.Store.Assemblies(inst)
-		if err != nil {
-			return nil, err
-		}
-		rows, err := c.App.Store.HarmonyPatches(store.HarmonyFilter{Instance: inst})
-		if err != nil {
-			return nil, err
-		}
-		d, root := render.New(fmt.Sprintf("%s  harmony: %d patches", modLabel(ix, m.ID), len(rows)))
-		stale(root)
-		if len(asms) == 0 {
-			root.Add("no assemblies in the effective content")
-		}
-		sec := root.Section("assemblies")
-		manual := false
-		for _, as := range asms {
-			l := fmt.Sprintf("%s  types %d, patches %d", as.File, as.Types, as.Patches)
-			switch {
-			case as.Err != "":
-				l += "  (unreadable: " + as.Err + ")"
-			case as.Skipped:
-				l += "  (known library: patches not collected)"
-			case as.Manual:
-				l += "  (calls Harmony.Patch from code)"
-				manual = true
-			}
-			sec.Add(l)
-		}
-		sec.Truncate(limit, "")
-		if len(rows) > 0 {
-			ps := root.Section("patches")
-			for _, h := range rows {
-				ps.Add(harmonyLine(ix, h, false, true))
-			}
-			ps.Truncate(limit, "archo harmony --mod "+ix.Ref(m.ID)+" --all")
-		}
-		if manual {
-			// G9 (05 §5.3): the targets of Harmony.Patch calls read from IL, and why the
-			// others could not be resolved.
-			found := 0
-			var open []*store.HarmonyRow
-			for _, h := range rows {
-				switch {
-				case h.Manual && h.Dynamic:
-					open = append(open, h)
-				case h.Manual:
-					found++
-				}
-			}
-			mn := root.Add(fmt.Sprintf("manual: %d patch targets found in Harmony.Patch calls, %d not resolved (archo source search \".Patch(\" --in %s)", found, len(open), ix.Ref(m.ID)))
-			for _, h := range open {
-				why := strings.TrimSuffix(strings.TrimPrefix(h.Target, "<manual: "), ">")
-				mn.Addf("%-10s %s.%s  not resolved: %s", h.Kind, h.PatchType, h.PatchMethod, why)
-			}
-			mn.Truncate(limit, "archo harmony --mod "+ix.Ref(m.ID)+" --all")
-		} else if len(rows) == 0 && len(asms) > 0 {
-			root.Add("no Harmony patches declared")
-		}
-		if a.Bool("shared") {
-			addShared(c, ix, root, inst, limit)
-		}
-		return d, nil
+		return harmonyMod(c, a, st, s, inst, limit)
 	default:
 		d, root := render.New(fmt.Sprintf("harmony: %d patches in %d assemblies", s.Run.Stats.HarmonyPatches, s.Run.Stats.Assemblies))
-		stale(root)
+		harmonyStale(s, root)
 		addShared(c, ix, root, "", limit)
 		d.AddNext("archo harmony --target <Type.Method>", "archo problems --code harmony")
 		return d, nil
 	}
+}
+
+// harmonyStale notes a stale analysis.
+func harmonyStale(s *app.AnalysisState, root *render.Node) {
+	if !s.Fresh {
+		root.KV("analysis", "stale (archo analyze)")
+	}
+}
+
+// harmonyTarget is harmony --target: the patches on one target method (or on targets
+// matching t), by kind, in load order.
+func harmonyTarget(c *Ctx, st *app.LoadoutState, s *app.AnalysisState, t, inst string, limit int) (*render.Doc, error) {
+	ix := st.Ix
+	rows, err := c.App.Store.HarmonyPatches(store.HarmonyFilter{Target: t, Instance: inst})
+	if err != nil {
+		return nil, err
+	}
+	like := false
+	if len(rows) == 0 {
+		rows, err = c.App.Store.HarmonyPatches(store.HarmonyFilter{Target: t, Instance: inst, Like: true})
+		if err != nil {
+			return nil, err
+		}
+		like = true
+	}
+	mods := map[string]bool{}
+	for _, h := range rows {
+		mods[h.Instance] = true
+	}
+	head := fmt.Sprintf("harmony:%s  %d patches from %d mods", t, len(rows), len(mods))
+	if like {
+		head = fmt.Sprintf("harmony targets matching %q: %d patches from %d mods", t, len(rows), len(mods))
+	}
+	d, root := render.New(head)
+	harmonyStale(s, root)
+	harmonyByKind(st, root, rows, like, limit)
+	if len(rows) == 0 && !dynamicOnTarget(c, st, root, t, inst) {
+		root.Add("no declared patches (mods that patch from code are listed by archo problems --code harmony.manual)")
+	}
+	seenT := map[string]bool{}
+	for _, h := range rows {
+		if len(d.Next) >= 3 || seenT[h.PatchType] {
+			continue
+		}
+		seenT[h.PatchType] = true
+		typ := h.PatchType
+		if i := strings.IndexByte(typ, '+'); i >= 0 {
+			typ = typ[:i] // ilspycmd decompiles the outer type with its nested ones
+		}
+		d.AddNext(fmt.Sprintf("archo source %s --type %s", ix.Ref(h.Instance), typ))
+	}
+	return d, nil
+}
+
+// harmonyByKind adds one section per patch kind, its rows in load order.
+func harmonyByKind(st *app.LoadoutState, root *render.Node, rows []*store.HarmonyRow, like bool, limit int) {
+	byKind := map[string][]*store.HarmonyRow{}
+	for _, h := range rows {
+		byKind[h.Kind] = append(byKind[h.Kind], h)
+	}
+	for _, k := range []string{"prefix", "postfix", "transpiler", "finalizer"} {
+		if len(byKind[k]) == 0 {
+			continue
+		}
+		sec := root.Section(map[string]string{"prefix": "prefixes", "postfix": "postfixes", "transpiler": "transpilers", "finalizer": "finalizers"}[k])
+		sort.SliceStable(byKind[k], func(i, j int) bool {
+			return st.Position(byKind[k][i].Instance) < st.Position(byKind[k][j].Instance)
+		})
+		for _, h := range byKind[k] {
+			line := modLabel(st.Ix, h.Instance) + "  " + h.PatchType + "." + h.PatchMethod
+			if like {
+				line += "  on " + h.Target
+			}
+			if h.Skips {
+				line += "  (returns bool: may skip the original)"
+			}
+			sec.Add(line)
+		}
+		sec.Truncate(limit, "add --all")
+	}
+}
+
+// harmonyMod is harmony --mod: one mod's assemblies and patches.
+func harmonyMod(c *Ctx, a *Args, st *app.LoadoutState, s *app.AnalysisState, inst string, limit int) (*render.Doc, error) {
+	ix := st.Ix
+	m := ix.ByID[inst]
+	asms, err := c.App.Store.Assemblies(inst)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := c.App.Store.HarmonyPatches(store.HarmonyFilter{Instance: inst})
+	if err != nil {
+		return nil, err
+	}
+	d, root := render.New(fmt.Sprintf("%s  harmony: %d patches", modLabel(ix, m.ID), len(rows)))
+	harmonyStale(s, root)
+	if len(asms) == 0 {
+		root.Add("no assemblies in the effective content")
+	}
+	manual := harmonyAssemblies(root, asms, limit)
+	if len(rows) > 0 {
+		ps := root.Section("patches")
+		for _, h := range rows {
+			ps.Add(harmonyLine(ix, h, false, true))
+		}
+		ps.Truncate(limit, "archo harmony --mod "+ix.Ref(m.ID)+" --all")
+	}
+	if manual {
+		harmonyManual(ix, root, m.ID, rows, limit)
+	} else if len(rows) == 0 && len(asms) > 0 {
+		root.Add("no Harmony patches declared")
+	}
+	if a.Bool("shared") {
+		addShared(c, ix, root, inst, limit)
+	}
+	return d, nil
+}
+
+// harmonyAssemblies adds a mod's assemblies and reports whether one calls Harmony.Patch
+// from code.
+func harmonyAssemblies(root *render.Node, asms []*store.AssemblyRow, limit int) bool {
+	sec := root.Section("assemblies")
+	manual := false
+	for _, as := range asms {
+		l := fmt.Sprintf("%s  types %d, patches %d", as.File, as.Types, as.Patches)
+		switch {
+		case as.Err != "":
+			l += "  (unreadable: " + as.Err + ")"
+		case as.Skipped:
+			l += "  (known library: patches not collected)"
+		case as.Manual:
+			l += "  (calls Harmony.Patch from code)"
+			manual = true
+		}
+		sec.Add(l)
+	}
+	sec.Truncate(limit, "")
+	return manual
+}
+
+// harmonyManual adds G9 (05 §5.3): the targets of Harmony.Patch calls read from IL, and
+// why the others could not be resolved.
+func harmonyManual(ix *app.Index, root *render.Node, id string, rows []*store.HarmonyRow, limit int) {
+	found := 0
+	var open []*store.HarmonyRow
+	for _, h := range rows {
+		switch {
+		case h.Manual && h.Dynamic:
+			open = append(open, h)
+		case h.Manual:
+			found++
+		}
+	}
+	mn := root.Add(fmt.Sprintf("manual: %d patch targets found in Harmony.Patch calls, %d not resolved (archo source search \".Patch(\" --in %s)", found, len(open), ix.Ref(id)))
+	for _, h := range open {
+		why := strings.TrimSuffix(strings.TrimPrefix(h.Target, "<manual: "), ">")
+		mn.Addf("%-10s %s.%s  not resolved: %s", h.Kind, h.PatchType, h.PatchMethod, why)
+	}
+	mn.Truncate(limit, "archo harmony --mod "+ix.Ref(id)+" --all")
 }
 
 // addShared lists targets patched by several mods (only those involving inst, if set).

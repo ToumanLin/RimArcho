@@ -138,50 +138,8 @@ func (s *API) RunCLI(line string) (CommandResult, error) {
 		defer w.wg.Done()
 		defer a.Close()
 		defer cancel()
-		var out string
-		var code int
-		if child {
-			s.filesMu.Lock()
-			if argv[0] == "scan" && s.ScanRunner != nil {
-				out, err = s.ScanRunner(a.EnvName)
-				if err != nil {
-					out += "error: " + err.Error() + "\n"
-					code = cmds.ExitError
-				}
-			} else {
-				childArgs := slices.Clone(argv)
-				if plan := a.OpenPlanName(); argv[0] == "analyze" && plan != "" {
-					childArgs = append(childArgs, "--open-plan", plan)
-				}
-				out, code = app.ChildCommandContext(ctx, s.Exe, a.Home, a.EnvName, childArgs)
-			}
-			s.filesMu.Unlock()
-		} else {
-			s.filesMu.RLock()
-			out, code = cmds.ExecuteContext(ctx, a, argv)
-			s.filesMu.RUnlock()
-		}
-		if code != cmds.ExitUsage {
-			hist := cmdline.Remember(cmdline.DecodeHistory(a.Store.Meta(guiHistoryKey)), strings.TrimSpace(line))
-			if b, e := json.Marshal(hist); e == nil {
-				_ = a.Store.SetMeta(guiHistoryKey, string(b))
-			}
-		}
-		s.mu.Lock()
-		if child {
-			s.busy[argv[0]] = false
-		}
-		s.board, s.needs, s.lib = nil, nil, nil
-		if code == cmds.ExitOK && len(argv) >= 2 && (argv[0] == "env" || argv[0] == "plan") && argv[1] == "use" {
-			s.a.EnvName, s.a.PlanName, s.a.OpenPlan = "", "", 0
-		}
-		if code == cmds.ExitOK && len(argv) >= 3 && argv[0] == "config" && argv[1] == "set" && argv[2] == "ui.lang" {
-			view.SetLang(cmds.Setting(a, "ui.lang"))
-		}
-		if a.Uninstalled {
-			s.a.Uninstalled = true
-		}
-		s.mu.Unlock()
+		out, code := s.execCLI(ctx, a, argv, child)
+		s.afterCLI(a, argv, line, child, code)
 		s.subRevision.Add(1)
 		slow.Stop()
 		taskMu.Lock()
@@ -200,6 +158,60 @@ func (s *API) RunCLI(line string) (CommandResult, error) {
 		w.mu.Unlock()
 	}()
 	return initial, nil
+}
+
+// execCLI runs one command line of the window's command panel: scan and analyze as a
+// child process holding the files lock, the rest in this process under its read lock.
+func (s *API) execCLI(ctx context.Context, a *app.App, argv []string, child bool) (out string, code int) {
+	if !child {
+		s.filesMu.RLock()
+		out, code = cmds.ExecuteContext(ctx, a, argv)
+		s.filesMu.RUnlock()
+		return out, code
+	}
+	s.filesMu.Lock()
+	if argv[0] == "scan" && s.ScanRunner != nil {
+		var err error
+		out, err = s.ScanRunner(a.EnvName)
+		if err != nil {
+			out += "error: " + err.Error() + "\n"
+			code = cmds.ExitError
+		}
+	} else {
+		childArgs := slices.Clone(argv)
+		if plan := a.OpenPlanName(); argv[0] == "analyze" && plan != "" {
+			childArgs = append(childArgs, "--open-plan", plan)
+		}
+		out, code = app.ChildCommandContext(ctx, s.Exe, a.Home, a.EnvName, childArgs)
+	}
+	s.filesMu.Unlock()
+	return out, code
+}
+
+// afterCLI records a finished command line: its history, the busy flag of a child
+// command, the dropped page caches, and what env/plan use, ui.lang and uninstall change.
+func (s *API) afterCLI(a *app.App, argv []string, line string, child bool, code int) {
+	if code != cmds.ExitUsage {
+		hist := cmdline.Remember(cmdline.DecodeHistory(a.Store.Meta(guiHistoryKey)), strings.TrimSpace(line))
+		if b, e := json.Marshal(hist); e == nil {
+			_ = a.Store.SetMeta(guiHistoryKey, string(b))
+		}
+	}
+	s.mu.Lock()
+	if child {
+		s.busy[argv[0]] = false
+	}
+	s.board, s.needs, s.lib = nil, nil, nil
+	if code == cmds.ExitOK && len(argv) >= 2 && (argv[0] == "env" || argv[0] == "plan") && argv[1] == "use" {
+		s.a.EnvName, s.a.PlanName, s.a.OpenPlan = "", "", 0
+	}
+	if code == cmds.ExitOK && len(argv) >= 3 && argv[0] == "config" && argv[1] == "set" && argv[2] == "ui.lang" {
+		view.SetLang(cmds.Setting(a, "ui.lang"))
+	}
+	if a.Uninstalled {
+		s.a.Uninstalled = true
+	}
+	s.mu.Unlock()
 }
 
 type CommandCompletion struct {

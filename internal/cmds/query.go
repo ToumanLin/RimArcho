@@ -12,6 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/modchanges"
 	"github.com/ToumanLin/RimArcho/internal/render"
+	"github.com/ToumanLin/RimArcho/internal/scan"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
@@ -487,48 +488,8 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 	ref := ix.Ref(m.ID)
 	d, root := render.New(fmt.Sprintf("%s %s  %s", ref, m.DisplayName(), tags(c, ix, m)))
 	decl := m.Decl()
-	switch {
-	case m.Status == identity.Tombstone:
-		until := m.TombstoneAt.AddDate(0, 0, c.App.Config.TombstoneDays)
-		root.KV("status", fmt.Sprintf("tombstone since %s (kept until %s)", c.App.FormatDate(m.TombstoneAt), c.App.FormatDate(until)))
-	case m.Residue:
-		root.KV("status", "residue: not subscribed in Steam; the game will not load it")
-	default:
-		root.KV("status", "live")
-	}
-	pkg := m.PackageID
-	if decl.PackageIDDerived {
-		pkg += " (inferred: About.xml has no <packageId>)"
-	} else if m.PackageIDRaw != "" && m.PackageIDRaw != m.PackageID {
-		pkg += " (declared " + m.PackageIDRaw + ")"
-	}
-	root.KV("package", pkg)
-	if m.Alias != "" {
-		root.KV("alias", fmt.Sprintf("%s (About.xml name: %s)", m.Alias, m.Name))
-	}
-	if len(m.Tags) > 0 {
-		root.KV("tags", strings.Join(m.Tags, ", "))
-	}
-	if m.Note != "" {
-		root.KV("note", m.Note)
-	}
-	lin := ix.LRef(m.LineageID)
-	if l := ix.Lineages[m.LineageID]; l != nil && l.PrimaryID != "" && l.PrimaryID != m.ID {
-		lin += ", primary " + ix.Ref(l.PrimaryID)
-	}
-	if b := app.Basis(m.LineageBasis); b != "" {
-		lin += ", membership " + b
-	}
-	ln := root.KV("lineage", lin)
-	var others []*store.Mod
-	for _, o := range ix.ByLineage[m.LineageID] {
-		if o.ID != m.ID {
-			others = append(others, o)
-		}
-	}
-	if len(others) > 0 {
-		addMods(c, ln, ix, others, 10, "archo list --filter lineage:"+ix.LRef(m.LineageID)[2:])
-	}
+	modDocStatus(c, root, m)
+	modDocLineage(c, ix, root, m)
 	root.KV("authors", strings.Join(decl.Authors, ", "))
 	root.KV("version", decl.ModVersion)
 	root.KV("supports", strings.Join(decl.SupportedVersions, " "))
@@ -538,84 +499,13 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 		}
 	}
 	mm := env.MajorMinor(ix.Env.GameVersion)
-	var deps []string
-	for _, x := range decl.Dependencies {
-		deps = append(deps, x.PackageID)
-	}
-	byV := map[string][]string{}
-	for v, l := range decl.DependenciesByVersion {
-		for _, x := range l {
-			byV[v] = append(byV[v], x.PackageID)
-		}
-	}
-	if dl := forVersion(deps, byV, mm); len(dl) > 0 {
-		dn := root.KV("depends", pkgRefs(ix, dl))
-		// A dependency met by another enabled Mod (16 §4.1): say which, as the window does.
-		if st, err := c.App.Loadout(); err == nil && dn != nil {
-			all := append(slices.Clone(decl.Dependencies), decl.DependenciesByVersion["v"+mm]...)
-			seen := map[string]bool{}
-			for _, x := range all {
-				if seen[strings.ToLower(x.PackageID)] {
-					continue
-				}
-				seen[strings.ToLower(x.PackageID)] = true
-				if s, how := c.App.DependencyStandIn(st, x); s != nil {
-					why := map[string]string{app.StandInAlternative: "an alternative it accepts", app.StandInReplacement: "Use This Instead", app.StandInRule: "your replaces rule"}[how]
-					dn.Addf("pkg:%s met by %s %s (%s)", strings.ToLower(x.PackageID), ix.Ref(s.ID), s.DisplayName(), why)
-				}
-			}
-		}
-	}
-	for _, r := range []struct {
-		key  string
-		base []string
-		byV  map[string][]string
-	}{
-		{"load-before", decl.LoadBefore, decl.LoadBeforeByVersion},
-		{"load-after", decl.LoadAfter, decl.LoadAfterByVersion},
-		{"force-load-before", decl.ForceLoadBefore, nil},
-		{"force-load-after", decl.ForceLoadAfter, nil},
-		{"incompatible", decl.IncompatibleWith, decl.IncompatibleByVersion},
-	} {
-		if l := forVersion(r.base, r.byV, mm); len(l) > 0 {
-			var ps []string
-			for _, p := range l {
-				ps = append(ps, "pkg:"+strings.ToLower(p))
-			}
-			root.KV(r.key, strings.Join(ps, " "))
-		}
-	}
+	modDocDepends(c, ix, root, &decl, mm)
+	modDocRules(root, &decl, mm)
 	if err := addModProblems(c, ix, m, root); err != nil {
 		return nil, err
 	}
-	loc := root.KV("location", fmt.Sprintf("src:%s %s", m.SourceLabel, m.Rel))
-	if s := ix.Source(m.SourceID); s != nil {
-		path := s.Root + string(pathSep) + m.Rel
-		loc.KV("path", path)
-		realRoot, err := source.RealPath(s.Root)
-		if err != nil {
-			realRoot = s.Root
-		}
-		if m.RealPath != "" && !strings.EqualFold(m.RealPath, realRoot+string(pathSep)+m.Rel) {
-			loc.KV("links-to", m.RealPath)
-		}
-	}
-	aliases, err := c.App.Store.Aliases(m.ID)
-	if err != nil {
+	if err := modDocLocation(c, ix, root, m); err != nil {
 		return nil, err
-	}
-	if len(aliases) > 0 {
-		an := root.Section("aliases")
-		for _, al := range aliases {
-			an.Addf("src:%s %s", al.SourceLabel, al.Rel)
-		}
-	}
-	if ws := m.WorkshopID(); ws != "" {
-		w := "ws:" + ws
-		if m.ACFManifest != "" {
-			w += fmt.Sprintf(", manifest %s, updated %s", m.ACFManifest, c.App.FormatDate(unix(m.ACFTimeUpdated)))
-		}
-		root.KV("workshop", w)
 	}
 	// Whether its files are the Workshop copy's, from what the last scan stored (04 §1.4).
 	root.KV("provenance", c.App.Provenance(ix, m))
@@ -634,22 +524,8 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 		last := evs[len(evs)-1]
 		root.KV("changes", fmt.Sprintf("%d, latest %s %s (archo changes %s)", len(evs), last.Kind, c.App.FormatDate(last.ScanTime), ref))
 	}
-	qs, err := c.App.Store.Questions(ix.Env.GameID, false)
-	if err != nil {
+	if err := modDocQuestions(c, ix, root, m); err != nil {
 		return nil, err
-	}
-	for _, q := range qs {
-		switch m.ID {
-		case q.InstanceID:
-			root.KV("question", fmt.Sprintf("q:%d may be %s back (archo identity list)", q.ID, ix.Ref(q.CandidateID)))
-		case q.CandidateID:
-			root.KV("question", fmt.Sprintf("q:%d %s may be this mod back (archo identity list)", q.ID, ix.Ref(q.InstanceID)))
-		}
-		if m.ID == q.InstanceID || m.ID == q.CandidateID {
-			if err := addIdentityReasons(c.App.Store, q, func(line string) { root.Add(line) }); err != nil {
-				return nil, err
-			}
-		}
 	}
 	// Its settings as the game reads them now (16 §2.9 "Mod settings").
 	if m.Status == identity.Live && m.Kind != source.Official {
@@ -670,6 +546,172 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 		d.AddNext("archo changes " + ref)
 	}
 	return d, nil
+}
+
+// modDocStatus adds a mod's status, package id, alias, tags and note.
+func modDocStatus(c *Ctx, root *render.Node, m *store.Mod) {
+	switch {
+	case m.Status == identity.Tombstone:
+		until := m.TombstoneAt.AddDate(0, 0, c.App.Config.TombstoneDays)
+		root.KV("status", fmt.Sprintf("tombstone since %s (kept until %s)", c.App.FormatDate(m.TombstoneAt), c.App.FormatDate(until)))
+	case m.Residue:
+		root.KV("status", "residue: not subscribed in Steam; the game will not load it")
+	default:
+		root.KV("status", "live")
+	}
+	pkg := m.PackageID
+	if m.Decl().PackageIDDerived {
+		pkg += " (inferred: About.xml has no <packageId>)"
+	} else if m.PackageIDRaw != "" && m.PackageIDRaw != m.PackageID {
+		pkg += " (declared " + m.PackageIDRaw + ")"
+	}
+	root.KV("package", pkg)
+	if m.Alias != "" {
+		root.KV("alias", fmt.Sprintf("%s (About.xml name: %s)", m.Alias, m.Name))
+	}
+	if len(m.Tags) > 0 {
+		root.KV("tags", strings.Join(m.Tags, ", "))
+	}
+	if m.Note != "" {
+		root.KV("note", m.Note)
+	}
+}
+
+// modDocLineage adds a mod's lineage and its other copies.
+func modDocLineage(c *Ctx, ix *app.Index, root *render.Node, m *store.Mod) {
+	lin := ix.LRef(m.LineageID)
+	if l := ix.Lineages[m.LineageID]; l != nil && l.PrimaryID != "" && l.PrimaryID != m.ID {
+		lin += ", primary " + ix.Ref(l.PrimaryID)
+	}
+	if b := app.Basis(m.LineageBasis); b != "" {
+		lin += ", membership " + b
+	}
+	ln := root.KV("lineage", lin)
+	var others []*store.Mod
+	for _, o := range ix.ByLineage[m.LineageID] {
+		if o.ID != m.ID {
+			others = append(others, o)
+		}
+	}
+	if len(others) > 0 {
+		addMods(c, ln, ix, others, 10, "archo list --filter lineage:"+ix.LRef(m.LineageID)[2:])
+	}
+}
+
+// modDocDepends adds a mod's dependencies for game version mm, with those another
+// enabled mod meets.
+func modDocDepends(c *Ctx, ix *app.Index, root *render.Node, decl *scan.Decl, mm string) {
+	var deps []string
+	for _, x := range decl.Dependencies {
+		deps = append(deps, x.PackageID)
+	}
+	byV := map[string][]string{}
+	for v, l := range decl.DependenciesByVersion {
+		for _, x := range l {
+			byV[v] = append(byV[v], x.PackageID)
+		}
+	}
+	dl := forVersion(deps, byV, mm)
+	if len(dl) == 0 {
+		return
+	}
+	dn := root.KV("depends", pkgRefs(ix, dl))
+	// A dependency met by another enabled Mod (16 §4.1): say which, as the window does.
+	st, err := c.App.Loadout()
+	if err != nil || dn == nil {
+		return
+	}
+	all := append(slices.Clone(decl.Dependencies), decl.DependenciesByVersion["v"+mm]...)
+	seen := map[string]bool{}
+	for _, x := range all {
+		if seen[strings.ToLower(x.PackageID)] {
+			continue
+		}
+		seen[strings.ToLower(x.PackageID)] = true
+		if s, how := c.App.DependencyStandIn(st, x); s != nil {
+			why := map[string]string{app.StandInAlternative: "an alternative it accepts", app.StandInReplacement: "Use This Instead", app.StandInRule: "your replaces rule"}[how]
+			dn.Addf("pkg:%s met by %s %s (%s)", strings.ToLower(x.PackageID), ix.Ref(s.ID), s.DisplayName(), why)
+		}
+	}
+}
+
+// modDocRules adds a mod's load-order and incompatibility declarations for mm.
+func modDocRules(root *render.Node, decl *scan.Decl, mm string) {
+	for _, r := range []struct {
+		key  string
+		base []string
+		byV  map[string][]string
+	}{
+		{"load-before", decl.LoadBefore, decl.LoadBeforeByVersion},
+		{"load-after", decl.LoadAfter, decl.LoadAfterByVersion},
+		{"force-load-before", decl.ForceLoadBefore, nil},
+		{"force-load-after", decl.ForceLoadAfter, nil},
+		{"incompatible", decl.IncompatibleWith, decl.IncompatibleByVersion},
+	} {
+		if l := forVersion(r.base, r.byV, mm); len(l) > 0 {
+			var ps []string
+			for _, p := range l {
+				ps = append(ps, "pkg:"+strings.ToLower(p))
+			}
+			root.KV(r.key, strings.Join(ps, " "))
+		}
+	}
+}
+
+// modDocLocation adds where a mod is: its folder, link target, aliases and Workshop item.
+func modDocLocation(c *Ctx, ix *app.Index, root *render.Node, m *store.Mod) error {
+	loc := root.KV("location", fmt.Sprintf("src:%s %s", m.SourceLabel, m.Rel))
+	if s := ix.Source(m.SourceID); s != nil {
+		path := s.Root + string(pathSep) + m.Rel
+		loc.KV("path", path)
+		realRoot, err := source.RealPath(s.Root)
+		if err != nil {
+			realRoot = s.Root
+		}
+		if m.RealPath != "" && !strings.EqualFold(m.RealPath, realRoot+string(pathSep)+m.Rel) {
+			loc.KV("links-to", m.RealPath)
+		}
+	}
+	aliases, err := c.App.Store.Aliases(m.ID)
+	if err != nil {
+		return err
+	}
+	if len(aliases) > 0 {
+		an := root.Section("aliases")
+		for _, al := range aliases {
+			an.Addf("src:%s %s", al.SourceLabel, al.Rel)
+		}
+	}
+	if ws := m.WorkshopID(); ws != "" {
+		w := "ws:" + ws
+		if m.ACFManifest != "" {
+			w += fmt.Sprintf(", manifest %s, updated %s", m.ACFManifest, c.App.FormatDate(unix(m.ACFTimeUpdated)))
+		}
+		root.KV("workshop", w)
+	}
+	return nil
+}
+
+// modDocQuestions adds the open identity questions that involve a mod, with their reasons.
+func modDocQuestions(c *Ctx, ix *app.Index, root *render.Node, m *store.Mod) error {
+	qs, err := c.App.Store.Questions(ix.Env.GameID, false)
+	if err != nil {
+		return err
+	}
+	for _, q := range qs {
+		switch m.ID {
+		case q.InstanceID:
+			root.KV("question", fmt.Sprintf("q:%d may be %s back (archo identity list)", q.ID, ix.Ref(q.CandidateID)))
+		case q.CandidateID:
+			root.KV("question", fmt.Sprintf("q:%d %s may be this mod back (archo identity list)", q.ID, ix.Ref(q.InstanceID)))
+		}
+		if m.ID == q.InstanceID || m.ID == q.CandidateID {
+			if err := addIdentityReasons(c.App.Store, q, func(line string) { root.Add(line) }); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // changesCmd is the change history (16 §2.9) in text: one row per mod, by tier, for the

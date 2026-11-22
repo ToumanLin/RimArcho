@@ -204,8 +204,15 @@ func (m *model) statusText(w int) string {
 // hintLine: "key label   key label", only what the object can do now, at most 7 (16 §6,
 // §13.2 rule 4); ? lists everything and is never the one left out.
 func (m *model) hintLine() string {
-	var pairs [][2]string
-	prefix := ""
+	if m.menu == nil && m.pal == nil && m.pos == nil && m.prompt != nil {
+		return sAccent.Render(markPrompt+" ") + sSecond.Render(m.prompt.label) + sText.Render(m.prompt.text+"_")
+	}
+	pairs, prefix := m.hintPairs()
+	return m.hintRender(pairs, prefix)
+}
+
+// hintPairs is the hint line's key pairs for what has the keys, and a prefix before them.
+func (m *model) hintPairs() (pairs [][2]string, prefix string) {
 	switch {
 	case m.menu != nil:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("run")}, {"esc", T("close")}}
@@ -213,8 +220,6 @@ func (m *model) hintLine() string {
 		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("run")}, {"esc", T("close")}}
 	case m.pos != nil:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("move")}, {"tab", T("before / after")}, {"esc", T("close")}}
-	case m.prompt != nil:
-		return sAccent.Render(markPrompt+" ") + sSecond.Render(m.prompt.label) + sText.Render(m.prompt.text+"_")
 	case m.editing:
 		pairs = [][2]string{{"enter", T("done")}, {"esc", T("clear")}, {"tab", T("next area with matches")}, {"↑↓", T("move")}}
 	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().typing:
@@ -234,6 +239,15 @@ func (m *model) hintLine() string {
 		pairs = [][2]string{{"esc", T("back")}, {"backspace", T("previous page")}, {"tab", T("section")}, {"↑↓", T("scroll")}}
 	case m.full:
 		pairs = [][2]string{{"↑↓", T("scroll")}, {"←→", T("previous / next mod")}, {"tab", T("sections")}, {"g", T("tags")}, {"ctrl+w", T("Workshop page")}, {"esc", T("back")}, {"?", T("all keys")}}
+	default:
+		return m.hintPagePairs()
+	}
+	return pairs, ""
+}
+
+// hintPagePairs is hintPairs for a page with nothing open over it.
+func (m *model) hintPagePairs() (pairs [][2]string, prefix string) {
+	switch {
 	case m.tab == tabProblems:
 		// each item shows its own keys; F, A and l are the page's, in the context row unless
 		// the conclusion takes its room (needsLayout)
@@ -276,6 +290,12 @@ func (m *model) hintLine() string {
 		}
 		pairs = append(pairs, [2]string{"?", T("all keys")})
 	}
+	return pairs, prefix
+}
+
+// hintRender writes the hint line: at most 7 pairs, and when too wide it drops from the
+// middle, so the first actions and "? all keys" stay.
+func (m *model) hintRender(pairs [][2]string, prefix string) string {
 	if len(pairs) > 7 {
 		pairs = append(pairs[:6], pairs[len(pairs)-1])
 	}

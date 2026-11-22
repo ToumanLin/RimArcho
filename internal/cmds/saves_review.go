@@ -35,28 +35,10 @@ func savesReview(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
-	colony, all := a.Str("colony"), a.Bool("all")
-	var cols []*app.Colony
-	found := colony == ""
-	for _, col := range l.Colonies {
-		if colony != "" && !strings.EqualFold(col.Name, colony) && (col.GameName == "" || !strings.EqualFold(col.GameName, colony)) {
-			continue
-		}
-		found = true
-		cc := *col
-		cc.Saves = nil
-		for _, s := range col.Saves {
-			if envName != "" && !inEnv(s, envName) || pkgs != nil && !saveHasMod(s, pkgs, ws) {
-				continue
-			}
-			cc.Saves = append(cc.Saves, s)
-		}
-		if len(cc.Saves) > 0 {
-			cols = append(cols, &cc)
-		}
-	}
-	if !found {
-		return nil, fmt.Errorf("no colony named %s (archo saves list)", colony)
+	all := a.Bool("all")
+	cols, err := reviewColonies(l, saveListFilter{envName: envName, colony: a.Str("colony"), pkgs: pkgs, ws: ws})
+	if err != nil {
+		return nil, err
 	}
 	var progress func(int, int)
 	if a.Bool("progress") && Progress != nil {
@@ -235,4 +217,31 @@ func reviewMarked(ms []app.ReviewMod) string {
 		return ""
 	}
 	return fmt.Sprintf(" (%d marked by you)", n)
+}
+
+// reviewColonies copies the colonies the filters keep, each with only its kept saves.
+func reviewColonies(l *app.SaveList, f saveListFilter) ([]*app.Colony, error) {
+	var cols []*app.Colony
+	found := f.colony == ""
+	for _, col := range l.Colonies {
+		if f.colony != "" && !strings.EqualFold(col.Name, f.colony) && (col.GameName == "" || !strings.EqualFold(col.GameName, f.colony)) {
+			continue
+		}
+		found = true
+		cc := *col
+		cc.Saves = nil
+		for _, s := range col.Saves {
+			if f.envName != "" && !inEnv(s, f.envName) || f.pkgs != nil && !saveHasMod(s, f.pkgs, f.ws) {
+				continue
+			}
+			cc.Saves = append(cc.Saves, s)
+		}
+		if len(cc.Saves) > 0 {
+			cols = append(cols, &cc)
+		}
+	}
+	if !found {
+		return nil, fmt.Errorf("no colony named %s (archo saves list)", f.colony)
+	}
+	return cols, nil
 }

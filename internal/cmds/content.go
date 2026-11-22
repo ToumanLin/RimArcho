@@ -351,13 +351,7 @@ func whyCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	d, root := render.New(fmt.Sprintf("%s ↔ %s", modLabel(ix, ma.ID), modLabel(ix, mb.ID)))
 	pa, pb := st.Position(ma.ID), st.Position(mb.ID)
-	posText := func(p int) string {
-		if p == 0 {
-			return "not enabled"
-		}
-		return fmt.Sprintf("enabled at %d", p)
-	}
-	root.KV("positions", posText(pa)+" / "+posText(pb))
+	root.KV("positions", whyPosText(pa)+" / "+whyPosText(pb))
 	if ma.LineageID == mb.LineageID {
 		root.KV("lineage", "same lineage "+ix.LRef(ma.LineageID)+" (copies of one mod)")
 	}
@@ -366,156 +360,20 @@ func whyCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	mm := st.GameMM()
 	rel := root.Section("declared")
-	declRel := func(x, y *store.Mod) {
-		dx := x.Decl()
-		pkgY := strings.TrimSuffix(strings.ToLower(y.PackageID), "_steam")
-		for _, dep := range append(append([]string{}, depPkgs(dx.Dependencies)...), depPkgs(dx.DependenciesByVersion["v"+mm])...) {
-			if dep == pkgY {
-				rel.Addf("%s depends on %s (About.xml modDependencies)", ix.Ref(x.ID), ix.Ref(y.ID))
-			}
-		}
-		for _, f := range []struct {
-			name string
-			l    []string
-		}{
-			{"loadAfter", forVersion(dx.LoadAfter, dx.LoadAfterByVersion, mm)}, {"loadBefore", forVersion(dx.LoadBefore, dx.LoadBeforeByVersion, mm)},
-			{"forceLoadAfter", dx.ForceLoadAfter}, {"forceLoadBefore", dx.ForceLoadBefore},
-			{"incompatibleWith", forVersion(dx.IncompatibleWith, dx.IncompatibleByVersion, mm)},
-		} {
-			for _, p := range f.l {
-				if strings.EqualFold(strings.TrimSpace(p), pkgY) {
-					rel.Addf("%s %s %s (About.xml)", ix.Ref(x.ID), f.name, ix.Ref(y.ID))
-				}
-			}
-		}
-	}
-	declRel(ma, mb)
-	declRel(mb, ma)
+	whyDeclared(rel, ix, mm, ma, mb)
+	whyDeclared(rel, ix, mm, mb, ma)
 	if len(rel.Children) == 0 {
 		rel.Add("(nothing between them)")
 	}
 	// Sort constraints between the two, as the sorter sees them (community and user rules too).
 	if pa > 0 && pb > 0 {
-		in, err := c.App.SortInput(st, st.List)
-		if err != nil {
+		if err := whyConstraints(c, st, root, pa, pb); err != nil {
 			return nil, err
-		}
-		r := order.Sort(in)
-		cs := root.Section("order-constraints")
-		for _, e := range r.Edges {
-			if (e.From == pa-1 && e.To == pb-1) || (e.From == pb-1 && e.To == pa-1) {
-				ev, _ := constraintText(st, in, e)
-				state := "satisfied"
-				if e.From > e.To {
-					state = "VIOLATED"
-				}
-				cs.Addf("%s before %s: %s  (%s)", ix.Ref(in.Nodes[e.From].Instance), ix.Ref(in.Nodes[e.To].Instance), ev, state)
-			}
-		}
-		if len(cs.Children) == 0 {
-			cs.Add("(none)")
 		}
 	}
 	// Content: shared defs and patches of one onto the other's defs.
 	if s, err := c.App.Analysis(st); err == nil && s.Run != nil {
-		da, _ := c.App.Store.DefsOf(ma.ID)
-		db, _ := c.App.Store.DefsOf(mb.ID)
-		inB := map[string]bool{}
-		for _, f := range db {
-			if f.DefName != "" {
-				inB[f.Type+"/"+f.DefName] = true
-			}
-		}
-		var shared []string
-		for _, f := range da {
-			if k := f.Type + "/" + f.DefName; f.DefName != "" && inB[k] {
-				shared = append(shared, k)
-			}
-		}
-		if len(shared) > 0 {
-			sec := root.Section(fmt.Sprintf("both-define (%d defs; the later one wins)", len(shared)))
-			for _, k := range shared {
-				sec.Add("def:" + k)
-			}
-			sec.Truncate(8, "")
-		}
-		onto := func(x *store.Mod, ydefs []analyze.DefFact) {
-			own := map[string]bool{}
-			for _, f := range ydefs {
-				if f.DefName != "" {
-					own[f.Type+"/"+f.DefName] = true
-				}
-				if f.Name != "" {
-					own[f.Type+"@"+f.Name] = true
-				}
-			}
-			pfs, _ := c.App.Store.PatchFacts(s.Run.ID, store.PatchFilter{Instance: x.ID})
-			var lines []string
-			for _, p := range pfs {
-				for _, t := range p.Targets {
-					if own[t] {
-						lines = append(lines, patchLine(ix, p, false))
-						break
-					}
-				}
-			}
-			if len(lines) > 0 {
-				other := mb
-				if x == mb {
-					other = ma
-				}
-				sec := root.Section(fmt.Sprintf("%s patches defs of %s", ix.Ref(x.ID), ix.Ref(other.ID)))
-				for _, l := range lines {
-					sec.Add(l)
-				}
-				sec.Truncate(8, "archo patches --mod "+ix.Ref(x.ID))
-			}
-		}
-		onto(ma, db)
-		onto(mb, da)
-		// Methods both mods patch with Harmony (13 §4.2: shared patches).
-		ha, _ := c.App.Store.HarmonyPatches(store.HarmonyFilter{Instance: ma.ID})
-		hb, _ := c.App.Store.HarmonyPatches(store.HarmonyFilter{Instance: mb.ID})
-		kinds := map[string][2][]string{}
-		for i, rows := range [][]*store.HarmonyRow{ha, hb} {
-			for _, r := range rows {
-				k := kinds[r.Target]
-				if !slices.Contains(k[i], r.Kind) {
-					k[i] = append(k[i], r.Kind)
-				}
-				kinds[r.Target] = k
-			}
-		}
-		var hshared []string
-		for t, k := range kinds {
-			if len(k[0]) > 0 && len(k[1]) > 0 {
-				hshared = append(hshared, fmt.Sprintf("%s  %s / %s", t, strings.Join(k[0], "+"), strings.Join(k[1], "+")))
-			}
-		}
-		if len(hshared) > 0 {
-			sort.Strings(hshared)
-			sec := root.Section("shared-harmony-targets")
-			for _, l := range hshared {
-				sec.Add(l)
-			}
-			sec.Truncate(8, "archo harmony --mod "+ix.Ref(ma.ID)+" --shared")
-		}
-		if fs, err := c.App.Store.Findings(s.Run.ID); err == nil {
-			ta, tb := finding.Inst(ma.ID), finding.Inst(mb.ID)
-			var both []*finding.Finding
-			for _, f := range fs {
-				if contains(f.Subjects, ta) && contains(f.Subjects, tb) {
-					both = append(both, f)
-				}
-			}
-			if len(both) > 0 {
-				sec := root.Section("shared-problems")
-				for _, f := range both {
-					sec.Addf("%s %s  %s", f.Severity, f.Code, expand(ix, f.Claim, ""))
-				}
-				sec.Truncate(8, fmt.Sprintf("archo problems --subject %s", ix.Ref(ma.ID)))
-			}
-		}
+		whyContent(c, s, root, ix, ma, mb)
 		if !s.Fresh {
 			root.KV("analysis", "stale (archo analyze)")
 		}
@@ -523,6 +381,182 @@ func whyCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		root.KV("content", "not analysed (archo analyze)")
 	}
 	return d, nil
+}
+
+// whyPosText is a load-order position as why prints it.
+func whyPosText(p int) string {
+	if p == 0 {
+		return "not enabled"
+	}
+	return fmt.Sprintf("enabled at %d", p)
+}
+
+// whyDeclared adds what x's About.xml declares about y.
+func whyDeclared(rel *render.Node, ix *app.Index, mm string, x, y *store.Mod) {
+	dx := x.Decl()
+	pkgY := strings.TrimSuffix(strings.ToLower(y.PackageID), "_steam")
+	for _, dep := range append(append([]string{}, depPkgs(dx.Dependencies)...), depPkgs(dx.DependenciesByVersion["v"+mm])...) {
+		if dep == pkgY {
+			rel.Addf("%s depends on %s (About.xml modDependencies)", ix.Ref(x.ID), ix.Ref(y.ID))
+		}
+	}
+	for _, f := range []struct {
+		name string
+		l    []string
+	}{
+		{"loadAfter", forVersion(dx.LoadAfter, dx.LoadAfterByVersion, mm)}, {"loadBefore", forVersion(dx.LoadBefore, dx.LoadBeforeByVersion, mm)},
+		{"forceLoadAfter", dx.ForceLoadAfter}, {"forceLoadBefore", dx.ForceLoadBefore},
+		{"incompatibleWith", forVersion(dx.IncompatibleWith, dx.IncompatibleByVersion, mm)},
+	} {
+		for _, p := range f.l {
+			if strings.EqualFold(strings.TrimSpace(p), pkgY) {
+				rel.Addf("%s %s %s (About.xml)", ix.Ref(x.ID), f.name, ix.Ref(y.ID))
+			}
+		}
+	}
+}
+
+// whyConstraints adds the sorter's edges between the enabled positions pa and pb.
+func whyConstraints(c *Ctx, st *app.LoadoutState, root *render.Node, pa, pb int) error {
+	ix := st.Ix
+	in, err := c.App.SortInput(st, st.List)
+	if err != nil {
+		return err
+	}
+	r := order.Sort(in)
+	cs := root.Section("order-constraints")
+	for _, e := range r.Edges {
+		if (e.From == pa-1 && e.To == pb-1) || (e.From == pb-1 && e.To == pa-1) {
+			ev, _ := constraintText(st, in, e)
+			state := "satisfied"
+			if e.From > e.To {
+				state = "VIOLATED"
+			}
+			cs.Addf("%s before %s: %s  (%s)", ix.Ref(in.Nodes[e.From].Instance), ix.Ref(in.Nodes[e.To].Instance), ev, state)
+		}
+	}
+	if len(cs.Children) == 0 {
+		cs.Add("(none)")
+	}
+	return nil
+}
+
+// whyContent adds the analysed overlap of ma and mb: shared defs, patches onto each
+// other's defs, shared Harmony targets and shared problems.
+func whyContent(c *Ctx, s *app.AnalysisState, root *render.Node, ix *app.Index, ma, mb *store.Mod) {
+	da, _ := c.App.Store.DefsOf(ma.ID)
+	db, _ := c.App.Store.DefsOf(mb.ID)
+	whySharedDefs(root, da, db)
+	whyPatchesOnto(c, s, root, ix, ma, mb, db)
+	whyPatchesOnto(c, s, root, ix, mb, ma, da)
+	// Methods both mods patch with Harmony (13 §4.2: shared patches).
+	whySharedHarmony(c, root, ix, ma, mb)
+	whySharedProblems(c, s, root, ix, ma, mb)
+}
+
+// whySharedDefs adds the defs both mods define.
+func whySharedDefs(root *render.Node, da, db []analyze.DefFact) {
+	inB := map[string]bool{}
+	for _, f := range db {
+		if f.DefName != "" {
+			inB[f.Type+"/"+f.DefName] = true
+		}
+	}
+	var shared []string
+	for _, f := range da {
+		if k := f.Type + "/" + f.DefName; f.DefName != "" && inB[k] {
+			shared = append(shared, k)
+		}
+	}
+	if len(shared) > 0 {
+		sec := root.Section(fmt.Sprintf("both-define (%d defs; the later one wins)", len(shared)))
+		for _, k := range shared {
+			sec.Add("def:" + k)
+		}
+		sec.Truncate(8, "")
+	}
+}
+
+// whyPatchesOnto adds x's patches that target the defs of other (ydefs).
+func whyPatchesOnto(c *Ctx, s *app.AnalysisState, root *render.Node, ix *app.Index, x, other *store.Mod, ydefs []analyze.DefFact) {
+	own := map[string]bool{}
+	for _, f := range ydefs {
+		if f.DefName != "" {
+			own[f.Type+"/"+f.DefName] = true
+		}
+		if f.Name != "" {
+			own[f.Type+"@"+f.Name] = true
+		}
+	}
+	pfs, _ := c.App.Store.PatchFacts(s.Run.ID, store.PatchFilter{Instance: x.ID})
+	var lines []string
+	for _, p := range pfs {
+		for _, t := range p.Targets {
+			if own[t] {
+				lines = append(lines, patchLine(ix, p, false))
+				break
+			}
+		}
+	}
+	if len(lines) > 0 {
+		sec := root.Section(fmt.Sprintf("%s patches defs of %s", ix.Ref(x.ID), ix.Ref(other.ID)))
+		for _, l := range lines {
+			sec.Add(l)
+		}
+		sec.Truncate(8, "archo patches --mod "+ix.Ref(x.ID))
+	}
+}
+
+// whySharedHarmony adds the methods both mods patch with Harmony.
+func whySharedHarmony(c *Ctx, root *render.Node, ix *app.Index, ma, mb *store.Mod) {
+	ha, _ := c.App.Store.HarmonyPatches(store.HarmonyFilter{Instance: ma.ID})
+	hb, _ := c.App.Store.HarmonyPatches(store.HarmonyFilter{Instance: mb.ID})
+	kinds := map[string][2][]string{}
+	for i, rows := range [][]*store.HarmonyRow{ha, hb} {
+		for _, r := range rows {
+			k := kinds[r.Target]
+			if !slices.Contains(k[i], r.Kind) {
+				k[i] = append(k[i], r.Kind)
+			}
+			kinds[r.Target] = k
+		}
+	}
+	var hshared []string
+	for t, k := range kinds {
+		if len(k[0]) > 0 && len(k[1]) > 0 {
+			hshared = append(hshared, fmt.Sprintf("%s  %s / %s", t, strings.Join(k[0], "+"), strings.Join(k[1], "+")))
+		}
+	}
+	if len(hshared) > 0 {
+		sort.Strings(hshared)
+		sec := root.Section("shared-harmony-targets")
+		for _, l := range hshared {
+			sec.Add(l)
+		}
+		sec.Truncate(8, "archo harmony --mod "+ix.Ref(ma.ID)+" --shared")
+	}
+}
+
+// whySharedProblems adds the findings whose subjects include both mods.
+func whySharedProblems(c *Ctx, s *app.AnalysisState, root *render.Node, ix *app.Index, ma, mb *store.Mod) {
+	fs, err := c.App.Store.Findings(s.Run.ID)
+	if err != nil {
+		return
+	}
+	ta, tb := finding.Inst(ma.ID), finding.Inst(mb.ID)
+	var both []*finding.Finding
+	for _, f := range fs {
+		if contains(f.Subjects, ta) && contains(f.Subjects, tb) {
+			both = append(both, f)
+		}
+	}
+	if len(both) > 0 {
+		sec := root.Section("shared-problems")
+		for _, f := range both {
+			sec.Addf("%s %s  %s", f.Severity, f.Code, expand(ix, f.Claim, ""))
+		}
+		sec.Truncate(8, fmt.Sprintf("archo problems --subject %s", ix.Ref(ma.ID)))
+	}
 }
 
 func depPkgs(l []scan.Dependency) []string {
