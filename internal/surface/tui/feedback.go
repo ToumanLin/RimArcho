@@ -56,6 +56,10 @@ func (m *model) feedbackPanel(p view.FeedbackProblem) tea.Cmd {
 		}
 		fmt.Fprintf(&b, "%s %d %s  %s\n", mark, i+1, t.Label, t.Lead)
 	}
+	if seed := m.fbSeed[p.Kind]; len(seed) > 0 {
+		// filled in from the item W reported: the rest of the questions are the player's
+		fmt.Fprintf(&b, "  %s\n", strings.TrimSpace(seed["mod"]+"  "+seed["finding"]))
+	}
 	if t := feedback.TemplateOf(p.Kind); t.Note != "" {
 		b.WriteString("\n" + T(t.Note) + "\n")
 	}
@@ -95,7 +99,7 @@ func (m *model) feedbackPanel(p view.FeedbackProblem) tea.Cmd {
 		kind := t.Kind
 		m.panel.keys[fmt.Sprint(i+1)] = again(func() {
 			if p.Kind != kind {
-				p = view.FeedbackProblem{Kind: kind, Title: p.Title, Answers: map[string]string{}, Opts: templateOpts(kind)}
+				p = view.FeedbackProblem{Kind: kind, Title: p.Title, Answers: seedOf(m.fbSeed, kind), Opts: templateOpts(kind)}
 			}
 		})
 	}
@@ -138,6 +142,27 @@ func (m *model) feedbackPanel(p view.FeedbackProblem) tea.Cmd {
 		return nil
 	}
 	return nil
+}
+
+// reportNeed is W on a Can it run item: the feedback panel on the wrong diagnosis template
+// with the item's ID; an item that rests on shared-log data or the replacement library also
+// fills outdated data (4) with its Mod and the item.
+func (m *model) reportNeed(id, mod string) tea.Cmd {
+	m.fbSeed = map[string]map[string]string{feedback.KindDiagnosis: {"finding": id}}
+	if mod != "" {
+		m.fbSeed[feedback.KindData] = map[string]string{"mod": mod, feedback.DataFinding: id}
+	}
+	kind := feedback.KindDiagnosis
+	return m.feedbackPanel(view.FeedbackProblem{Kind: kind, Answers: seedOf(m.fbSeed, kind), Opts: templateOpts(kind)})
+}
+
+// seedOf is a copy of the answers a template starts with.
+func seedOf(seed map[string]map[string]string, kind string) map[string]string {
+	out := map[string]string{}
+	for k, v := range seed[kind] {
+		out[k] = v
+	}
+	return out
 }
 
 // templateOpts are the attachments a template ticks when it is chosen.

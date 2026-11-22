@@ -7,6 +7,8 @@ import { fieldList } from "./fields.js";
 
 import * as ops from "./ops.js";
 import { versionNotice } from "./versionwarnings.js";
+import { reportMark } from "./reportmark.js";
+import { evidenceMark } from "./needtext.js";
 
 let seq = 0, detailTimer;
 
@@ -246,6 +248,7 @@ export function detailFrame(box, sc, o = {}) {
       P.facts.append(facts);
       P.version.replaceChildren();
       if (d.version) P.version.append(versionNotice(d.version));
+      if (d.data?.length) P.version.append(dataNotes(d.data));
       if (!o.ownFields) f.fields(d.fields);
       P.desc.innerHTML = "";
       P.desc.append(description(d));
@@ -364,6 +367,7 @@ export function renderDetail(d, box, sc, keepScroll, opts = {}) {
   box.append(img, el("h1", "", d.name));
   if (d.authors) box.append(el("div", "who", d.authors));
   if (d.version) box.append(versionNotice(d.version));
+  if (d.data?.length) box.append(dataNotes(d.data));
   // a copy's details on Mod library draw their own note, actions and field list (16 §2.9)
   if (!opts.page) {
     const facts = el("div", "facts");
@@ -506,4 +510,18 @@ function host(u) {
 export function scrollDetail(dy, page) {
   const sc = $(".detail .scroll");
   sc.scrollTop += page ? dy * sc.clientHeight * 0.9 : dy * 40;
+}
+
+// dataNotes: what Can it run says of this Mod from shared logs or the replacement library,
+// one quiet line each with its source and the flag "the data is outdated" (16 §2.9).
+function dataNotes(notes) {
+  const box = el("div", "md-data");
+  for (const n of notes) {
+    const r = el("div", "md-data-row");
+    r.append(el("span", "t", n.text));
+    if (n.evidence) r.append(evidenceMark(n.evidence));
+    r.append(reportMark({ finding: n.finding, mod: n.mod, wrong: false }));
+    box.append(r);
+  }
+  return box;
 }

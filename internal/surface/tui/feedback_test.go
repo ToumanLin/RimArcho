@@ -154,3 +154,46 @@ func TestSettingsAboutFirst(t *testing.T) {
 		}
 	}
 }
+
+// W on a Can it run item (16 §2.4): the feedback panel on wrong diagnosis with the item's ID;
+// an item that rests on the replacement library also fills outdated data (4) with its Mod.
+func TestFeedbackFromNeedW(t *testing.T) {
+	view.SetLang("en")
+	e := testkit.New(t)
+	e.AddWorkshop("1001", testkit.Mod{PackageID: "fan.port", Name: "Unofficial port"})
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "fan.port")
+	e.WriteFile(filepath.Join(e.Home, "cache", "replacements.json.gz"), `{"rules":[{"oldPackageId":"fan.port","newPackageId":"author.official","newName":"Official","newWorkshopId":"2002","newVersions":["1.6"]}]}`)
+	e.AddEnv(false)
+	e.MustRun("scan")
+	m := direct(t, e, 140, 40)
+	m.tab = tabProblems
+	m.loadProblems()
+	m.panel = nil
+	at := -1
+	for i, it := range m.prob.items {
+		if strings.Contains(it.text, "maintained replacement") {
+			at = i
+		}
+	}
+	if at < 0 {
+		t.Fatalf("no replacement item in %+v", m.prob.items)
+	}
+	m.prob.cursor = at
+	if _, ok := m.needItemKey("W"); !ok || m.panel == nil || m.panel.title != "feedback" {
+		t.Fatal("W did not open the feedback panel")
+	}
+	text := strings.Join(m.panel.lines, "\n")
+	if !strings.Contains(text, "> 3 wrong diagnosis") || !strings.Contains(text, "the diagnosis need:") || !strings.Contains(text, "kind: mod.replaced") {
+		t.Fatalf("W: wrong diagnosis filled in:\n%s", text)
+	}
+	m.panelKey("4")
+	text = strings.Join(m.panel.lines, "\n")
+	if !strings.Contains(text, "> 4 outdated data") || !strings.Contains(text, "the Mod fan.port") || !strings.Contains(text, "the diagnosis need:") {
+		t.Fatalf("4: outdated data filled in:\n%s", text)
+	}
+	// the command panel's feedback starts empty again
+	m.palRun("feedback")(m)
+	if text = strings.Join(m.panel.lines, "\n"); strings.Contains(text, "fan.port") {
+		t.Fatalf("a fresh panel kept the item:\n%s", text)
+	}
+}

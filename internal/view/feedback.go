@@ -175,6 +175,9 @@ func feedbackFinding(n *Needs, id string) []string {
 			if len(it.Mods) > 0 {
 				out = append(out, "mods: "+strings.Join(it.Mods, ", "))
 			}
+			if e := it.Evidence; e != nil {
+				out = append(out, strings.TrimSpace("evidence: "+e.Kind+"  "+e.Source))
+			}
 			return out
 		}
 	}
@@ -414,6 +417,9 @@ func (p FeedbackProblem) Options() FeedbackOptions {
 		o.Finding = strings.TrimSpace(p.Answers["finding"])
 	case feedback.KindData:
 		o.Mod = strings.TrimSpace(p.Answers["mod"])
+		// reported from a Can it run item or a Mod's details: the item that showed the data
+		// goes with it, so the maintainer reads which data (feedback.DataFinding)
+		o.Finding = strings.TrimSpace(p.Answers[feedback.DataFinding])
 	}
 	if feedback.Priority(o.Kind, p.Answers) {
 		o.Ops = true

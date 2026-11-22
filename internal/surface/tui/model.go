@@ -102,6 +102,10 @@ const (
 )
 
 type model struct {
+	// fbSeed: the answers each template starts with in the feedback panel, from the Can it
+	// run item W reported (16 §2.4): its ID, and its Mod when the item rests on data
+	fbSeed map[string]map[string]string
+
 	opts Options
 	app  *app.App
 	w, h int
