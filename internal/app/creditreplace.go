@@ -95,8 +95,64 @@ func (a *App) replaceCreditLocked(it store.CreditItem, old, target *store.Mod, u
 	}
 	envName, openPlan, planName := a.EnvName, a.OpenPlan, a.PlanName
 	defer func() { a.EnvName, a.OpenPlan, a.PlanName = envName, openPlan, planName }()
-	// Lists are global: every game able to use the old copy must also be able
-	// to use the new one, even if it has never written that list to ModsConfig.
+	if retained, err := a.creditLoadableEverywhere(old, target); err != nil || retained != "" {
+		return retained, err
+	}
+	if retained, err := a.creditStagingReadable(); err != nil || retained != "" {
+		return retained, err
+	}
+	if it.State != "switching" {
+		if err := a.recordCreditDeployments(&it, old, target); err != nil {
+			return "", err
+		}
+	}
+	deployments, err := a.Store.CreditDeployments(it)
+	if err != nil {
+		return "", err
+	}
+	sw, err := a.switchCreditDeployments(it, old, target, deployments)
+	if err != nil {
+		return "", err
+	}
+	if len(sw.unfinished) > 0 {
+		why := fmt.Sprintf("%d of %d games switched to Workshop; %s", sw.switched, len(deployments), strings.Join(sw.unfinished, "; "))
+		if sw.gone == len(sw.unfinished) {
+			// nothing left can change by waiting: keep the SteamCMD copy for good
+			return "retained: " + why, nil
+		}
+		return "", errors.New(why)
+	}
+	if err := a.checkNoGame(); err != nil {
+		return "", err
+	}
+	plans, err := a.Store.Plans()
+	if err != nil {
+		return "", err
+	}
+	planIDs := make([]int64, 0, len(plans))
+	for _, p := range plans {
+		planIDs = append(planIDs, p.ID)
+	}
+	// Deployment snapshots above still need the old identity to disambiguate
+	// _steam tokens. Only after handoff, atomically remap every restorable list state.
+	if err := a.Store.RemapCreditPlans(planIDs, old.ID, target.ID, a.Now()); err != nil {
+		return "", err
+	}
+	if retained, err := a.creditStillHeld(it, old, sw.blocked); err != nil || retained != "" {
+		return retained, err
+	}
+	staged, err := a.recycleCreditCopy(it, old)
+	if err != nil {
+		return "", err
+	}
+	unlock()
+	return a.finishCreditRecycle(it, staged)
+}
+
+// creditLoadableEverywhere checks that every game able to use the old copy can also use
+// the new one: lists are global, even if a game never wrote that list to ModsConfig. It
+// returns the "retained:" result of a game that cannot ("" all can).
+func (a *App) creditLoadableEverywhere(old, target *store.Mod) (string, error) {
 	envs, err := a.Store.Envs()
 	if err != nil {
 		return "", err
@@ -116,12 +172,17 @@ func (a *App) replaceCreditLocked(it store.CreditItem, old, target *store.Mod, u
 			return fmt.Sprintf("retained: Workshop copy cannot be loaded in %s; shared lists unchanged", e.Name), nil
 		}
 	}
+	return "", nil
+}
+
+// creditStagingReadable validates every list's staging, even when another reference would
+// short-circuit the search. It returns the "retained:" result of one that is unreadable.
+func (a *App) creditStagingReadable() (string, error) {
 	plans, err := a.Store.Plans()
 	if err != nil {
 		return "", err
 	}
 	for _, p := range plans {
-		// Validate staging even when another reference would short-circuit the search.
 		var staged []StageItem
 		if raw := a.Store.Meta(store.StageKey(p.ID)); raw != "" {
 			if err := json.Unmarshal([]byte(raw), &staged); err != nil {
@@ -129,139 +190,137 @@ func (a *App) replaceCreditLocked(it store.CreditItem, old, target *store.Mod, u
 			}
 		}
 	}
-	blocked := []string{}
-	if it.State != "switching" {
-		// Capture the actual writer before workspace edits. The deployment obligations
-		// outlive the task and prevent an interrupted switch from forgetting a game.
-		envs, err := a.Store.Envs()
-		if err != nil {
-			return "", err
-		}
-		seen := map[string]bool{}
-		for _, e := range envs {
-			if e.UserDataRoot == "" || seen[store.UserDataKey(e.UserDataRoot)] {
-				continue
-			}
-			seen[store.UserDataKey(e.UserDataRoot)] = true
-			rec, err := a.Store.ModsConfigStateAt(e.UserDataRoot)
-			if err != nil {
-				return "", err
-			}
-			writer := e
-			if rec.WriterEnv != "" {
-				writer, err = a.Store.EnvByID(rec.WriterEnv)
-				if err != nil {
-					return "", err
-				}
-				if writer == nil {
-					return "", fmt.Errorf("unknown ModsConfig writer %s", rec.WriterEnv)
-				}
-			}
-			a.EnvName, a.OpenPlan, a.PlanName = writer.Name, rec.WriterPlan, ""
-			if err := a.checkNoGame(); err != nil {
-				return "", err
-			}
-			st, err := a.Loadout()
-			if err != nil {
-				return "", err
-			}
-			if st.FileErr != nil {
-				return "", st.FileErr
-			}
-			if st.File == nil {
-				continue
-			}
-			list, err := a.creditGameProjection(st, rec, old.ID)
-			if err != nil {
-				return "", err
-			}
-			if list.Index(old.ID) >= 0 {
-				if err := a.Store.AddCreditDeployment(it, writer.ID, st.Plan.ID); err != nil {
-					return "", err
-				}
-			}
-		}
-		it.State, it.TargetID = "switching", target.ID
-		if err := a.Store.SaveCreditItem(it); err != nil {
-			return "", err
-		}
-	}
-	deployments, err := a.Store.CreditDeployments(it)
+	return "", nil
+}
+
+// recordCreditDeployments records, per user data folder, the game and list whose
+// ModsConfig.xml holds the old copy, then marks the item switching. The actual writer is
+// captured before workspace edits; the deployment obligations outlive the task and keep an
+// interrupted switch from forgetting a game.
+func (a *App) recordCreditDeployments(it *store.CreditItem, old, target *store.Mod) error {
+	envs, err := a.Store.Envs()
 	if err != nil {
-		return "", err
+		return err
 	}
-	// A root that cannot be switched now keeps its obligation (done=0) and the item stays
-	// switching, so the next pass retries it; the roots switched meanwhile stay switched.
-	// Until every root is switched, lists are not remapped and the SteamCMD copy stays.
-	var unfinished []string
-	switched, gone := 0, 0
+	seen := map[string]bool{}
+	for _, e := range envs {
+		if e.UserDataRoot == "" || seen[store.UserDataKey(e.UserDataRoot)] {
+			continue
+		}
+		seen[store.UserDataKey(e.UserDataRoot)] = true
+		if err := a.recordCreditDeployment(*it, e, old); err != nil {
+			return err
+		}
+	}
+	it.State, it.TargetID = "switching", target.ID
+	return a.Store.SaveCreditItem(*it)
+}
+
+// recordCreditDeployment records the deployment of one user data folder when its
+// ModsConfig.xml holds the old copy.
+func (a *App) recordCreditDeployment(it store.CreditItem, e *env.Environment, old *store.Mod) error {
+	rec, err := a.Store.ModsConfigStateAt(e.UserDataRoot)
+	if err != nil {
+		return err
+	}
+	writer := e
+	if rec.WriterEnv != "" {
+		writer, err = a.Store.EnvByID(rec.WriterEnv)
+		if err != nil {
+			return err
+		}
+		if writer == nil {
+			return fmt.Errorf("unknown ModsConfig writer %s", rec.WriterEnv)
+		}
+	}
+	a.EnvName, a.OpenPlan, a.PlanName = writer.Name, rec.WriterPlan, ""
+	if err := a.checkNoGame(); err != nil {
+		return err
+	}
+	st, err := a.Loadout()
+	if err != nil {
+		return err
+	}
+	if st.FileErr != nil {
+		return st.FileErr
+	}
+	if st.File == nil {
+		return nil
+	}
+	list, err := a.creditGameProjection(st, rec, old.ID)
+	if err != nil {
+		return err
+	}
+	if list.Index(old.ID) >= 0 {
+		if err := a.Store.AddCreditDeployment(it, writer.ID, st.Plan.ID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// creditSwitch is how far switching the deployed games got.
+type creditSwitch struct {
+	switched, gone int
+	unfinished     []string // roots that cannot be switched now
+	blocked        []string // games that cannot load the Workshop copy
+}
+
+// switchCreditDeployments writes each deployed game's list with the Workshop copy. A root
+// that cannot be switched now keeps its obligation (done=0) and the item stays switching,
+// so the next pass retries it; the roots switched meanwhile stay switched. Until every root
+// is switched, lists are not remapped and the SteamCMD copy stays.
+func (a *App) switchCreditDeployments(it store.CreditItem, old, target *store.Mod, deployments []store.CreditDeployment) (*creditSwitch, error) {
+	sw := &creditSwitch{blocked: []string{}}
 	for _, d := range deployments {
 		if err := a.checkNoGame(); err != nil {
-			return "", err
+			return nil, err
 		}
 		a.OpenPlan, a.PlanName = d.PlanID, ""
 		st, err := a.creditDeploymentState(d)
 		if err != nil {
 			if errors.As(err, new(creditGone)) {
-				gone++
+				sw.gone++
 			}
-			unfinished = append(unfinished, err.Error())
+			sw.unfinished = append(sw.unfinished, err.Error())
 			continue
 		}
 		e := st.Ix.Env
 		if !st.Reg.Loadable(target.ID) {
-			blocked = append(blocked, fmt.Sprintf("Workshop copy cannot be loaded in deployed game %s", e.Name))
+			sw.blocked = append(sw.blocked, fmt.Sprintf("Workshop copy cannot be loaded in deployed game %s", e.Name))
 			continue
 		}
 		// Save owns registry tokens, _steam, link journal, external-edit checks and backups.
 		if st.File == nil {
-			unfinished = append(unfinished, fmt.Sprintf("deployment ModsConfig is missing in %s", e.Name))
+			sw.unfinished = append(sw.unfinished, fmt.Sprintf("deployment ModsConfig is missing in %s", e.Name))
 			continue
 		}
 		rec, err := a.Store.ModsConfigStateAt(e.UserDataRoot)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		projection, err := a.creditGameProjection(st, rec, old.ID)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		st.List, _ = creditSwap(projection, old.ID, target.ID)
 		if err := a.checkNoGame(); err != nil {
-			return "", err
+			return nil, err
 		}
 		if _, err := a.writeGame(st, false, false, false, old); err != nil {
-			return "", err
+			return nil, err
 		}
 		if err := a.Store.FinishCreditRoot(it, d.RootKey); err != nil {
-			return "", err
+			return nil, err
 		}
-		switched++
+		sw.switched++
 	}
-	if len(unfinished) > 0 {
-		why := fmt.Sprintf("%d of %d games switched to Workshop; %s", switched, len(deployments), strings.Join(unfinished, "; "))
-		if gone == len(unfinished) {
-			// nothing left can change by waiting: keep the SteamCMD copy for good
-			return "retained: " + why, nil
-		}
-		return "", errors.New(why)
-	}
-	if err := a.checkNoGame(); err != nil {
-		return "", err
-	}
-	plans, err = a.Store.Plans()
-	if err != nil {
-		return "", err
-	}
-	planIDs := make([]int64, 0, len(plans))
-	for _, p := range plans {
-		planIDs = append(planIDs, p.ID)
-	}
-	// Deployment snapshots above still need the old identity to disambiguate
-	// _steam tokens. Only after handoff, atomically remap every restorable list state.
-	if err := a.Store.RemapCreditPlans(planIDs, old.ID, target.ID, a.Now()); err != nil {
-		return "", err
-	}
+	return sw, nil
+}
+
+// creditStillHeld returns the "retained:" result when something still references the old
+// copy after the remap ("" nothing does): a blocked game, a list or fixed pack, or a link.
+func (a *App) creditStillHeld(it store.CreditItem, old *store.Mod, blocked []string) (string, error) {
 	if len(blocked) > 0 {
 		// Report only when an unremapped reference really remains below.
 		if held, err := a.creditReferenced(old.ID); err != nil {
@@ -289,8 +348,13 @@ func (a *App) replaceCreditLocked(it store.CreditItem, old, target *store.Mod, u
 	if len(links) > 0 {
 		return "retained: links still reference the SteamCMD copy", nil
 	}
-	// Reserve a non-loadable sibling under the handoff lock. Persist the obligation
-	// before rename so a crash can resume recycling without exposing the old copy.
+	return "", nil
+}
+
+// recycleCreditCopy moves the SteamCMD copy to a non-loadable sibling, reserved under the
+// handoff lock; the obligation is persisted before the rename so a crash can resume
+// recycling without exposing the old copy. It returns the sibling's path.
+func (a *App) recycleCreditCopy(it store.CreditItem, old *store.Mod) (string, error) {
 	if err := a.trashAllowed(old.RealPath); err != nil {
 		return "", err
 	}
@@ -301,7 +365,7 @@ func (a *App) replaceCreditLocked(it store.CreditItem, old, target *store.Mod, u
 	if err := a.Store.SetMeta("credit.recycle:"+it.InstanceID, staged); err != nil {
 		return "", err
 	}
-	err = a.withIncomingLinks(old.RealPath, "", func() error {
+	err := a.withIncomingLinks(old.RealPath, "", func() error {
 		if err := a.checkNoGame(); err != nil {
 			return err
 		}
@@ -328,8 +392,7 @@ func (a *App) replaceCreditLocked(it store.CreditItem, old, target *store.Mod, u
 	if err != nil {
 		return "", err
 	}
-	unlock()
-	return a.finishCreditRecycle(it, staged)
+	return staged, nil
 }
 
 func (a *App) finishCreditRecycle(it store.CreditItem, staged string) (string, error) {
