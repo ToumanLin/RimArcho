@@ -1,0 +1,194 @@
+[
+ {
+  "code": "harmony.shared-target",
+  "severity": "info",
+  "subjects": [
+   "@{b}",
+   "@{c}"
+  ],
+  "claim": "2 mods patch RimWorld.Need.NeedInterval",
+  "evidence": [
+   {
+    "source": "declared",
+    "ref": "@{b}",
+    "text": "postfix B.Post.Post (Assemblies/B.dll)"
+   },
+   {
+    "source": "declared",
+    "ref": "@{b}",
+    "text": "transpiler B.T2.Tr (Assemblies/B.dll)"
+   },
+   {
+    "source": "declared",
+    "ref": "@{c}",
+    "text": "prefix C.Pre.Pre (Assemblies/C.dll) returns bool: may skip the original"
+   }
+  ],
+  "confidence": "certain",
+  "suggestions": [
+   "archo harmony --target RimWorld.Need.NeedInterval"
+  ],
+  "key": "RimWorld.Need.NeedInterval",
+  "layer": "harmony"
+ },
+ {
+  "code": "harmony.skip-prefix",
+  "severity": "info",
+  "subjects": [
+   "@{c}",
+   "@{b}"
+  ],
+  "claim": "@{c} has a bool prefix on RimWorld.Need.NeedInterval that can skip the original; 1 other mods patch it",
+  "evidence": [
+   {
+    "source": "declared",
+    "ref": "@{c}",
+    "text": "prefix C.Pre.Pre (Assemblies/C.dll) returns bool: may skip the original"
+   }
+  ],
+  "confidence": "possible",
+  "suggestions": [
+   "archo harmony --target RimWorld.Need.NeedInterval",
+   "archo source @{c} --type C.Pre"
+  ],
+  "key": "RimWorld.Need.NeedInterval|C.Pre.Pre",
+  "layer": "harmony"
+ },
+ {
+  "code": "harmony.shared-target",
+  "severity": "info",
+  "subjects": [
+   "@{b}",
+   "@{c}",
+   "@{a}"
+  ],
+  "claim": "3 mods patch Verse.Pawn.Tick",
+  "evidence": [
+   {
+    "source": "declared",
+    "ref": "@{a}",
+    "text": "prefix A.P.Pre (Assemblies/A.dll) returns bool: may skip the original"
+   },
+   {
+    "source": "declared",
+    "ref": "@{a}",
+    "text": "transpiler A.T.Tr (Assemblies/A.dll)"
+   },
+   {
+    "source": "declared",
+    "ref": "@{b}",
+    "text": "transpiler B.T.Tr (Assemblies/B.dll)"
+   },
+   {
+    "source": "declared",
+    "ref": "@{c}",
+    "text": "postfix C.Post.Post (Assemblies/C.dll)"
+   }
+  ],
+  "confidence": "certain",
+  "suggestions": [
+   "archo harmony --target Verse.Pawn.Tick"
+  ],
+  "key": "Verse.Pawn.Tick",
+  "layer": "harmony"
+ },
+ {
+  "code": "harmony.multi-transpiler",
+  "severity": "info",
+  "subjects": [
+   "@{b}",
+   "@{a}"
+  ],
+  "claim": "2 mods rewrite Verse.Pawn.Tick with transpilers; their IL edits can conflict",
+  "evidence": [
+   {
+    "source": "declared",
+    "ref": "@{a}",
+    "text": "transpiler A.T.Tr (Assemblies/A.dll)"
+   },
+   {
+    "source": "declared",
+    "ref": "@{b}",
+    "text": "transpiler B.T.Tr (Assemblies/B.dll)"
+   }
+  ],
+  "confidence": "likely",
+  "suggestions": [
+   "archo harmony --target Verse.Pawn.Tick",
+   "archo source search \"Tick\" --in @{b} --in @{a}"
+  ],
+  "key": "Verse.Pawn.Tick",
+  "layer": "harmony"
+ },
+ {
+  "code": "harmony.skip-prefix",
+  "severity": "info",
+  "subjects": [
+   "@{a}",
+   "@{b}",
+   "@{c}"
+  ],
+  "claim": "@{a} has a bool prefix on Verse.Pawn.Tick that can skip the original; 2 other mods patch it",
+  "evidence": [
+   {
+    "source": "declared",
+    "ref": "@{a}",
+    "text": "prefix A.P.Pre (Assemblies/A.dll) returns bool: may skip the original"
+   }
+  ],
+  "confidence": "possible",
+  "suggestions": [
+   "archo harmony --target Verse.Pawn.Tick",
+   "archo source @{a} --type A.P"
+  ],
+  "key": "Verse.Pawn.Tick|A.P.Pre",
+  "layer": "harmony"
+ },
+ {
+  "code": "harmony.manual",
+  "severity": "info",
+  "subjects": [
+   "@{a}"
+  ],
+  "claim": "@{a} calls Harmony.Patch from code; 2 of 5 calls have a target found statically",
+  "evidence": [
+   {
+    "source": "declared",
+    "ref": "@{a}",
+    "text": "Harmony.Patch calls in Assemblies/A.dll, Assemblies/A2.dll"
+   },
+   {
+    "source": "declared",
+    "ref": "@{a}",
+    "text": "not resolved: arg 1, field 2"
+   }
+  ],
+  "confidence": "certain",
+  "suggestions": [
+   "archo source search \".Patch(\" --in @{a}"
+  ],
+  "key": "manual",
+  "layer": "harmony"
+ },
+ {
+  "code": "harmony.manual",
+  "severity": "info",
+  "subjects": [
+   "@{b}"
+  ],
+  "claim": "@{b} calls Harmony.Patch from code; those targets cannot be determined statically",
+  "evidence": [
+   {
+    "source": "declared",
+    "ref": "@{b}",
+    "text": "Harmony.Patch calls in Assemblies/B2.dll"
+   }
+  ],
+  "confidence": "certain",
+  "suggestions": [
+   "archo source search \".Patch(\" --in @{b}"
+  ],
+  "key": "manual",
+  "layer": "harmony"
+ }
+]
