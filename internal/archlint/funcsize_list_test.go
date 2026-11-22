@@ -21,8 +21,6 @@ internal/app/loadout.go (*App).writeGameOnce 58 191
 internal/app/logrefs.go (*attrCtx).referrers 89 277
 internal/app/logs.go (*attrCtx).attributeCluster 99 291
 internal/app/logtrace.go (*attrCtx).nullTrace 53 191
-internal/app/pack.go (*App).BuildPackWith 41 135
-internal/app/pack.go (*App).launchPackWith 64 233
 internal/app/pack_archive.go (*App).exportPackArchive 50 161
 internal/app/pack_archive.go scanPackArchive 44 118
 internal/app/packsettings.go (*App).ApplyListSettings 52 166
