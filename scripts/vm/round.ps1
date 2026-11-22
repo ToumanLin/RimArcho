@@ -173,6 +173,12 @@ Move-Item -Force '__WORK__\__NAME__-drive.zip' "$run\drive.zip"
 Move-Item -Force '__WORK__\__NAME__-round.txt' "$run\round.txt"
 Expand-Archive -Force "$run\drive.zip" "$run\drive"
 if (Games) { 'FAIL start: a game is already running in the guest'; return }
+# Guest launches are direct: a launch through Steam signs the VM's Steam session into the game
+# and can kick the account's owner out of their own game on another machine.
+$dry = (& $archo launch --dry-run 2>&1 | Out-String)
+if ($dry -notmatch 'dry run \(direct\)' -or $dry -match '(?i)steam\.exe|-applaunch|steam://') {
+  "FAIL start: the current Game Config does not launch direct (archo env set <name> --launch direct)"; return
+}
 $stale = @(RemoveDriver)
 if ('__KEEPMON__' -ne '1') {
   # What the RimArcho window does when it opens (19 §6): install or update the bundled
