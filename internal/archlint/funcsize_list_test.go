@@ -48,7 +48,6 @@ internal/app/scan.go (*App).scanEnvironment 58 224
 internal/app/source.go (*App).SourceSearchContext 49 174
 internal/app/subscribe.go (*App).UpdateSubscriptionsWith 61 240
 internal/app/subscribeworkshop.go (*App).downloadWorkshopGroup 57 197
-internal/app/uninstall.go (*App).planUninstall 150 467
 internal/app/workshopsub.go (*App).Workshop 48 134
 internal/cmds/content.go whyCmd 56 189
 internal/cmds/files.go filesSearchCmd 67 170
