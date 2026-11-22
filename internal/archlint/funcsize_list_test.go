@@ -37,7 +37,6 @@ internal/app/pack_archive.go scanPackArchive 44 118
 internal/app/packsettings.go (*App).ApplyListSettings 52 166
 internal/app/parentproblems.go (*App).ParentHelp 54 153
 internal/app/problems.go (*App).DeclFindings 111 426
-internal/app/rimcrowprofiles.go (*App).importCrowProfiles 80 291
 internal/app/rimsortaux.go (*App).ImportRimSortAux 60 188
 internal/app/savecheck.go (*App).CheckSave 76 242
 internal/app/savecontent.go (*App).saveContent 87 309
