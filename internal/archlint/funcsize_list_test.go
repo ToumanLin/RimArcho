@@ -6,7 +6,6 @@ package archlint
 // line: written before the rule; to be split. Never add a line. A plain table, not a Go
 // map, so that deleting a line never realigns the others.
 const oversizedTable = `
-internal/accounts/browser_windows.go (*Session).login 75 338
 internal/analyze/analyze.go Run 41 229
 internal/analyze/harmony.go harmonyFindings 35 153
 internal/analyze/sim.go (*sim).worker 76 223
@@ -63,7 +62,6 @@ internal/cmds/saves.go savesShow 69 203
 internal/cmds/saves_review.go savesReview 42 136
 internal/cmds/test.go testRunCmd 58 177
 internal/csharp/outline.go tokenize 82 158
-internal/gametest/run.go Run 92 300
 internal/identity/reconcile.go Reconcile 44 119
 internal/modchanges/modchanges.go (*changeBuilder).mod 128 321
 internal/modsearch/context.go contexts 58 147
@@ -73,7 +71,6 @@ internal/order/order.go Sort 97 309
 internal/savefile/scan_content.go (*scanner).contentRef 75 176
 internal/savefile/scan_rules.go (*extract).rule 76 132
 internal/scan/observe.go Collect 31 163
-internal/steamworks/publish_windows.go publishWorker 35 159
 internal/store/maintenance.go (*Store).Maintain 47 171
 internal/subscribe/loverslab.go (*LoversLab).parsePage 49 96
 internal/surface/cli/cli.go Run 66 150
