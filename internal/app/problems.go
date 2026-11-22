@@ -352,31 +352,77 @@ func (a *App) IgnoreProblem(ref string, undo bool) (*Problem, error) {
 
 // DeclFindings computes the declaration layer (05 §4.3) for the workspace.
 func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
-	mm := st.GameMM()
-	var out []*finding.Finding
-	add := func(f *finding.Finding) {
-		f.Layer = "decl"
-		if f.Confidence == "" {
-			f.Confidence = finding.Certain
-		}
-		out = append(out, f)
+	d := &declRun{a: a, st: st, mm: st.GameMM(), activePos: map[string]int{}, activeByPkg: map[string][]*store.Mod{}}
+	d.listFindings()
+	if err := a.Store.LoadDecls(d.active); err != nil {
+		return nil, err
 	}
-	inst := finding.Inst
+	d.locked = st.Locked()
+	d.lockedCopy = map[string]string{} // copy ID → upstream ID
+	for _, l := range d.locked {
+		d.lockedCopy[l.Copy.ID] = l.Upstream.ID
+	}
+	d.deps = a.newDependencyIndex(st, d.activeByPkg)
+	d.installed = d.deps.installed
+
+	for _, m := range d.active {
+		d.modFindings(m)
+	}
+	// What the log corpus observed (undeclared prerequisites, known-bad combinations).
+	a.knownFindings(st.Ix.Known(), d.active, d.activeByPkg, d.installed, d.add)
+	d.duplicateFindings()
+	d.hiddenFindings()
+	d.lockedFindings()
+	d.installedFindings()
+	if err := d.orderFindings(); err != nil {
+		return nil, err
+	}
+	return d.out, nil
+}
+
+// declRun is one computation of the declaration layer: the enabled Mods and the findings so far.
+type declRun struct {
+	a           *App
+	st          *LoadoutState
+	mm          string
+	out         []*finding.Finding
+	activePos   map[string]int // enabled copy → 1-based position
+	activeByPkg map[string][]*store.Mod
+	active      []*store.Mod
+	locked      []*Locked
+	lockedCopy  map[string]string // copy ID → upstream ID
+	deps        *dependencyIndex
+	installed   map[string][]*store.Mod
+	// the sort of the list, for the order findings
+	in order.Input
+	r  order.Result
+}
+
+// add records a declaration finding, certain unless it says otherwise.
+func (d *declRun) add(f *finding.Finding) {
+	f.Layer = "decl"
+	if f.Confidence == "" {
+		f.Confidence = finding.Certain
+	}
+	d.out = append(d.out, f)
+}
+
+// listFindings reports the list's entries that match no installed Mod and collects the
+// enabled Mods.
+func (d *declRun) listFindings() {
+	st := d.st
 	missingInfo := map[string]SortMod{}
-	for _, m := range a.MissingMods(st) {
+	for _, m := range d.a.MissingMods(st) {
 		missingInfo[m.PackageID] = m.SortMod
 	}
-	activePos := map[string]int{}
-	activeByPkg := map[string][]*store.Mod{}
-	var active []*store.Mod
 	for i, e := range st.List {
 		if e.Instance == "" {
-			add(&finding.Finding{Code: "entry.missing", Severity: finding.Warning, Key: e.Missing,
+			d.add(&finding.Finding{Code: "entry.missing", Severity: finding.Warning, Key: e.Missing,
 				Subjects:    []string{"pkg:" + e.Missing},
 				Claim:       fmt.Sprintf("pkg:%s in the Loadout matches no installed mod (kept in ModsConfig.xml)", e.Missing),
 				Suggestions: []string{"archo find " + e.Missing, "archo disable pkg:" + e.Missing}})
 			if w := missingInfo[dependencyPackage(e.Missing)]; w.WorkshopID != "" {
-				f := out[len(out)-1]
+				f := d.out[len(d.out)-1]
 				f.Suggestions = append(f.Suggestions, "subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id="+w.WorkshopID)
 			}
 			continue
@@ -385,194 +431,219 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 		if m == nil {
 			continue
 		}
-		if _, dup := activePos[m.ID]; !dup {
-			activePos[m.ID] = i + 1
-			active = append(active, m)
+		if _, dup := d.activePos[m.ID]; !dup {
+			d.activePos[m.ID] = i + 1
+			d.active = append(d.active, m)
 			p := strings.TrimSuffix(strings.ToLower(m.PackageID), "_steam")
-			activeByPkg[p] = append(activeByPkg[p], m)
+			d.activeByPkg[p] = append(d.activeByPkg[p], m)
 		}
 	}
-	if err := a.Store.LoadDecls(active); err != nil {
-		return nil, err
-	}
-	locked := st.Locked()
-	lockedCopy := map[string]string{} // copy ID → upstream ID
-	for _, l := range locked {
-		lockedCopy[l.Copy.ID] = l.Upstream.ID
-	}
-	depsIndex := a.newDependencyIndex(st, activeByPkg)
-	installed := depsIndex.installed
+}
 
-	for _, m := range active {
-		d := m.Decl()
-		// Use This Instead (08 §2.3): the community knows a maintained replacement for this game version.
-		if r := a.replacementFor(st, m); r != nil {
-			f := &finding.Finding{Code: "mod.replaced", Severity: finding.Warning, Key: r.NewWorkshopID, Subjects: []string{inst(m.ID)},
-				Claim:    fmt.Sprintf("%s has a replacement for %s: %s by %s", inst(m.ID), mm, r.NewName, r.NewAuthor),
-				Evidence: []finding.Evidence{{Source: finding.Inferred, Ref: "replacements.json", Text: fmt.Sprintf("Use This Instead: ws:%s → ws:%s", r.OldWorkshopID, r.NewWorkshopID)}}}
-			if c := replacementCandidate(st, m, r); c != nil && swapBlocker(st, c, m) == "" {
-				f.Subjects = append(f.Subjects, inst(c.ID))
-				f.Suggestions = []string{"archo disable " + inst(m.ID), "archo enable " + inst(c.ID)}
-			} else if r.NewWorkshopID != "" {
-				f.Suggestions = []string{"subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id=" + r.NewWorkshopID}
+// modFindings reports what an enabled Mod declares: a replacement, unloadability, missing
+// dependencies, incompatibilities and unsupported versions.
+func (d *declRun) modFindings(m *store.Mod) {
+	st, mm, inst := d.st, d.mm, finding.Inst
+	// Use This Instead (08 §2.3): the community knows a maintained replacement for this game version.
+	if r := d.a.replacementFor(st, m); r != nil {
+		f := &finding.Finding{Code: "mod.replaced", Severity: finding.Warning, Key: r.NewWorkshopID, Subjects: []string{inst(m.ID)},
+			Claim:    fmt.Sprintf("%s has a replacement for %s: %s by %s", inst(m.ID), mm, r.NewName, r.NewAuthor),
+			Evidence: []finding.Evidence{{Source: finding.Inferred, Ref: "replacements.json", Text: fmt.Sprintf("Use This Instead: ws:%s → ws:%s", r.OldWorkshopID, r.NewWorkshopID)}}}
+		if c := replacementCandidate(st, m, r); c != nil && swapBlocker(st, c, m) == "" {
+			f.Subjects = append(f.Subjects, inst(c.ID))
+			f.Suggestions = []string{"archo disable " + inst(m.ID), "archo enable " + inst(c.ID)}
+		} else if r.NewWorkshopID != "" {
+			f.Suggestions = []string{"subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id=" + r.NewWorkshopID}
+		}
+		d.add(f)
+	}
+	if why := whyNotLoadable(st, m); why != "" {
+		d.add(&finding.Finding{Code: "mod.unloadable", Severity: finding.Error, Key: "active", Subjects: []string{inst(m.ID)},
+			Claim:       fmt.Sprintf("%s is enabled but the game will not load it: %s", inst(m.ID), why),
+			Suggestions: []string{"archo disable " + inst(m.ID)}})
+	}
+	d.depFindings(m)
+	d.incompatFindings(m)
+	d.versionFinding(m)
+}
+
+// depFindings reports m's declared dependencies that are not enabled: installed but
+// disabled, or not installed.
+func (d *declRun) depFindings(m *store.Mod) {
+	inst := finding.Inst
+	for _, dep := range d.deps.missing(m) {
+		p := dep.pkg
+		ev := finding.Evidence{Source: finding.Declared, Ref: inst(m.ID), Text: "About.xml modDependencies: " + p}
+		if cands := d.deps.candidates(p); len(cands) > 0 {
+			f := &finding.Finding{Code: "dep.inactive", Severity: finding.Error, Key: p, Subjects: []string{inst(m.ID), inst(cands[0].ID)},
+				Claim:    fmt.Sprintf("%s requires pkg:%s; %s is installed but not enabled", inst(m.ID), p, inst(cands[0].ID)),
+				Evidence: []finding.Evidence{ev}}
+			for _, c := range cands {
+				f.Suggestions = append(f.Suggestions, "archo enable "+inst(c.ID))
 			}
-			add(f)
+			d.add(f)
+			continue
 		}
-		if why := whyNotLoadable(st, m); why != "" {
-			add(&finding.Finding{Code: "mod.unloadable", Severity: finding.Error, Key: "active", Subjects: []string{inst(m.ID)},
-				Claim:       fmt.Sprintf("%s is enabled but the game will not load it: %s", inst(m.ID), why),
-				Suggestions: []string{"archo disable " + inst(m.ID)}})
+		name := dep.name
+		if name == "" {
+			name = p
 		}
-		// Dependencies.
-		for _, dep := range depsIndex.missing(m) {
-			p := dep.pkg
-			ev := finding.Evidence{Source: finding.Declared, Ref: inst(m.ID), Text: "About.xml modDependencies: " + p}
-			if cands := depsIndex.candidates(p); len(cands) > 0 {
-				f := &finding.Finding{Code: "dep.inactive", Severity: finding.Error, Key: p, Subjects: []string{inst(m.ID), inst(cands[0].ID)},
-					Claim:    fmt.Sprintf("%s requires pkg:%s; %s is installed but not enabled", inst(m.ID), p, inst(cands[0].ID)),
-					Evidence: []finding.Evidence{ev}}
-				for _, c := range cands {
-					f.Suggestions = append(f.Suggestions, "archo enable "+inst(c.ID))
-				}
-				add(f)
+		f := &finding.Finding{Code: "dep.missing", Severity: finding.Error, Key: p, Subjects: []string{inst(m.ID), "pkg:" + p},
+			Claim: fmt.Sprintf("%s requires %s (pkg:%s), which is not installed", inst(m.ID), name, p), Evidence: []finding.Evidence{ev}}
+		if p == "ludeon.rimworld" || strings.HasPrefix(p, "ludeon.rimworld.") {
+			f.Claim = fmt.Sprintf("%s requires the %s DLC (pkg:%s), which is not installed", inst(m.ID), name, p)
+		} else {
+			ws, _ := d.a.dependencyWorkshop(dep)
+			if dep.url != "" {
+				f.Suggestions = append(f.Suggestions, "subscribe: "+dep.url)
+			} else if ws != "" {
+				f.Suggestions = append(f.Suggestions, "subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id="+ws)
+			}
+			if ws != "" {
+				f.Suggestions = append(f.Suggestions, "steam://url/CommunityFilePage/"+ws)
+			}
+		}
+		d.add(f)
+	}
+}
+
+// incompatFindings reports the enabled Mods m declares itself incompatible with, once per pair.
+func (d *declRun) incompatFindings(m *store.Mod) {
+	inst, decl := finding.Inst, m.Decl()
+	inc := append(append([]string{}, decl.IncompatibleWith...), decl.IncompatibleByVersion["v"+d.mm]...)
+	for _, x := range inc {
+		p := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(x)), "_steam")
+		for _, o := range d.activeByPkg[p] {
+			if o.ID == m.ID {
 				continue
 			}
-			name := dep.name
-			if name == "" {
-				name = p
+			a1, b1 := m, o
+			if d.activePos[b1.ID] < d.activePos[a1.ID] {
+				a1, b1 = b1, a1
 			}
-			f := &finding.Finding{Code: "dep.missing", Severity: finding.Error, Key: p, Subjects: []string{inst(m.ID), "pkg:" + p},
-				Claim: fmt.Sprintf("%s requires %s (pkg:%s), which is not installed", inst(m.ID), name, p), Evidence: []finding.Evidence{ev}}
-			if p == "ludeon.rimworld" || strings.HasPrefix(p, "ludeon.rimworld.") {
-				f.Claim = fmt.Sprintf("%s requires the %s DLC (pkg:%s), which is not installed", inst(m.ID), name, p)
-			} else {
-				ws, _ := a.dependencyWorkshop(dep)
-				if dep.url != "" {
-					f.Suggestions = append(f.Suggestions, "subscribe: "+dep.url)
-				} else if ws != "" {
-					f.Suggestions = append(f.Suggestions, "subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id="+ws)
-				}
-				if ws != "" {
-					f.Suggestions = append(f.Suggestions, "steam://url/CommunityFilePage/"+ws)
+			key := a1.LineageID + "|" + b1.LineageID
+			dup := false
+			for _, f := range d.out {
+				if f.Code == "incompat.active" && f.Key == key {
+					f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Declared, Ref: inst(m.ID), Text: "About.xml incompatibleWith: " + p})
+					dup = true
 				}
 			}
-			add(f)
+			if dup {
+				continue
+			}
+			d.add(&finding.Finding{Code: "incompat.active", Severity: finding.Error, Key: key, Subjects: []string{inst(m.ID), inst(o.ID)},
+				Claim:       fmt.Sprintf("%s is incompatible with %s, and both are enabled", inst(m.ID), inst(o.ID)),
+				Evidence:    []finding.Evidence{{Source: finding.Declared, Ref: inst(m.ID), Text: "About.xml incompatibleWith: " + p}},
+				Suggestions: []string{"archo disable " + inst(o.ID), "archo disable " + inst(m.ID), "archo why " + inst(m.ID) + " " + inst(o.ID)}})
 		}
-		// Incompatibilities (reported once per pair).
-		inc := append(append([]string{}, d.IncompatibleWith...), d.IncompatibleByVersion["v"+mm]...)
-		for _, x := range inc {
-			p := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(x)), "_steam")
-			for _, o := range activeByPkg[p] {
-				if o.ID == m.ID {
-					continue
-				}
-				a1, b1 := m, o
-				if activePos[b1.ID] < activePos[a1.ID] {
-					a1, b1 = b1, a1
-				}
-				key := a1.LineageID + "|" + b1.LineageID
-				dup := false
-				for _, f := range out {
-					if f.Code == "incompat.active" && f.Key == key {
-						f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Declared, Ref: inst(m.ID), Text: "About.xml incompatibleWith: " + p})
-						dup = true
-					}
-				}
-				if dup {
-					continue
-				}
-				add(&finding.Finding{Code: "incompat.active", Severity: finding.Error, Key: key, Subjects: []string{inst(m.ID), inst(o.ID)},
-					Claim:       fmt.Sprintf("%s is incompatible with %s, and both are enabled", inst(m.ID), inst(o.ID)),
-					Evidence:    []finding.Evidence{{Source: finding.Declared, Ref: inst(m.ID), Text: "About.xml incompatibleWith: " + p}},
-					Suggestions: []string{"archo disable " + inst(o.ID), "archo disable " + inst(m.ID), "archo why " + inst(m.ID) + " " + inst(o.ID)}})
-			}
+	}
+}
+
+// versionFinding reports a Mod whose supportedVersions leave out the game's version.
+func (d *declRun) versionFinding(m *store.Mod) {
+	inst, decl, mm := finding.Inst, m.Decl(), d.mm
+	if m.Kind == "official" || len(decl.SupportedVersions) == 0 || mm == "" {
+		return
+	}
+	for _, v := range decl.SupportedVersions {
+		if strings.TrimSpace(v) == mm {
+			return
 		}
-		// Supported versions.
-		if m.Kind != "official" && len(d.SupportedVersions) > 0 && mm != "" {
-			ok := false
-			for _, v := range d.SupportedVersions {
-				if strings.TrimSpace(v) == mm {
-					ok = true
-				}
-			}
-			if !ok {
-				// Measured on 6,734 logs of 1.6 (decisions-corpus §2, G8; 05 §4.5): a mod that
-				// stops at the previous minor version is an error source 2.6× as often as chance
-				// (its code was built for the previous game): warning. A mod for older versions
-				// that players still run is 0.3× chance (the ones that broke were dropped long
-				// ago): info. The fold into one row keeps the count quiet.
-				sev := finding.Info
-				if prev := PrevMinor(mm); prev != "" {
-					for _, v := range d.SupportedVersions {
-						if strings.TrimSpace(v) == prev {
-							sev = finding.Warning
-						}
-					}
-				}
-				add(&finding.Finding{Code: "version.unsupported", Severity: sev, Key: mm, Subjects: []string{inst(m.ID)},
-					Claim:    fmt.Sprintf("%s does not list %s in supportedVersions (%s)", inst(m.ID), mm, strings.Join(d.SupportedVersions, " ")),
-					Evidence: []finding.Evidence{{Source: finding.Declared, Ref: inst(m.ID), Text: "About.xml supportedVersions"}}})
+	}
+	// Measured on 6,734 logs of 1.6 (decisions-corpus §2, G8; 05 §4.5): a mod that
+	// stops at the previous minor version is an error source 2.6× as often as chance
+	// (its code was built for the previous game): warning. A mod for older versions
+	// that players still run is 0.3× chance (the ones that broke were dropped long
+	// ago): info. The fold into one row keeps the count quiet.
+	sev := finding.Info
+	if prev := PrevMinor(mm); prev != "" {
+		for _, v := range decl.SupportedVersions {
+			if strings.TrimSpace(v) == prev {
+				sev = finding.Warning
 			}
 		}
 	}
-	// What the log corpus observed (undeclared prerequisites, known-bad combinations).
-	a.knownFindings(st.Ix.Known(), active, activeByPkg, installed, add)
-	// Duplicated packages.
+	d.add(&finding.Finding{Code: "version.unsupported", Severity: sev, Key: mm, Subjects: []string{inst(m.ID)},
+		Claim:    fmt.Sprintf("%s does not list %s in supportedVersions (%s)", inst(m.ID), mm, strings.Join(decl.SupportedVersions, " ")),
+		Evidence: []finding.Evidence{{Source: finding.Declared, Ref: inst(m.ID), Text: "About.xml supportedVersions"}}})
+}
+
+// duplicateFindings reports packages with more than one enabled copy, or more than one
+// installed copy.
+func (d *declRun) duplicateFindings() {
 	var pkgs []string
-	for p := range installed {
+	for p := range d.installed {
 		pkgs = append(pkgs, p)
 	}
 	sort.Strings(pkgs)
 	for _, p := range pkgs {
-		if as := activeByPkg[p]; len(as) > 1 {
-			f := &finding.Finding{Code: "pkg.duplicate-active", Severity: finding.Error, Key: p,
-				Claim: fmt.Sprintf("%d copies of pkg:%s are enabled; the game loads only one", len(as), p)}
-			for _, m := range as {
-				f.Subjects = append(f.Subjects, inst(m.ID))
-				f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Inferred, Ref: inst(m.ID), Text: fmt.Sprintf("enabled at %d (src:%s)", activePos[m.ID], m.SourceLabel)})
-			}
-			for _, m := range as[1:] {
-				f.Suggestions = append(f.Suggestions, "archo disable "+inst(m.ID))
-			}
-			add(f)
-		} else if ins := installed[p]; p != MonitorPackage && len(ins) > 1 && !onlyLocks(ins, lockedCopy) {
-			subj := ins[0]
-			if len(as) == 1 {
-				subj = as[0]
-			}
-			f := &finding.Finding{Code: "pkg.duplicate-installed", Severity: finding.Info, Key: p, Subjects: []string{inst(subj.ID)},
-				Claim: fmt.Sprintf("%d copies of pkg:%s are installed", len(ins), p)}
-			anyLoadable := false
-			for _, m := range ins {
-				if st.Reg.Loadable(m.ID) {
-					anyLoadable = true
-				}
-			}
-			for _, m := range ins {
-				if m != subj {
-					f.Subjects = append(f.Subjects, inst(m.ID))
-				}
-				note := "installed"
-				if activePos[m.ID] > 0 {
-					note = fmt.Sprintf("enabled at %d", activePos[m.ID])
-				} else if !st.Reg.Loadable(m.ID) && anyLoadable {
-					note = "ignored by the game (another copy wins)"
-				}
-				f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Inferred, Ref: inst(m.ID), Text: fmt.Sprintf("src:%s %s", m.SourceLabel, note)})
-			}
-			// swap needs an enabled copy (host round 2026-11-05: `archo swap` on a copy that is not
-			// in the list fails with "not enabled").
-			if len(as) == 1 {
-				f.Suggestions = []string{"archo swap " + inst(subj.ID)}
-			}
-			add(f)
+		if as := d.activeByPkg[p]; len(as) > 1 {
+			d.duplicateActive(p, as)
+		} else if ins := d.installed[p]; p != MonitorPackage && len(ins) > 1 && !onlyLocks(ins, d.lockedCopy) {
+			d.duplicateInstalled(p, as, ins)
 		}
 	}
-	// About.xml renamed away (about-disabled) on installed mods that are not enabled: pinned
-	// by a copy, unsubscribed, or hidden on their own (09 §5).
-	for _, h := range st.Hidden() {
+}
+
+// duplicateActive reports the enabled copies as of package p.
+func (d *declRun) duplicateActive(p string, as []*store.Mod) {
+	inst := finding.Inst
+	f := &finding.Finding{Code: "pkg.duplicate-active", Severity: finding.Error, Key: p,
+		Claim: fmt.Sprintf("%d copies of pkg:%s are enabled; the game loads only one", len(as), p)}
+	for _, m := range as {
+		f.Subjects = append(f.Subjects, inst(m.ID))
+		f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Inferred, Ref: inst(m.ID), Text: fmt.Sprintf("enabled at %d (src:%s)", d.activePos[m.ID], m.SourceLabel)})
+	}
+	for _, m := range as[1:] {
+		f.Suggestions = append(f.Suggestions, "archo disable "+inst(m.ID))
+	}
+	d.add(f)
+}
+
+// duplicateInstalled reports the installed copies ins of package p, of which as (at most
+// one) are enabled.
+func (d *declRun) duplicateInstalled(p string, as, ins []*store.Mod) {
+	st, inst := d.st, finding.Inst
+	subj := ins[0]
+	if len(as) == 1 {
+		subj = as[0]
+	}
+	f := &finding.Finding{Code: "pkg.duplicate-installed", Severity: finding.Info, Key: p, Subjects: []string{inst(subj.ID)},
+		Claim: fmt.Sprintf("%d copies of pkg:%s are installed", len(ins), p)}
+	anyLoadable := false
+	for _, m := range ins {
+		if st.Reg.Loadable(m.ID) {
+			anyLoadable = true
+		}
+	}
+	for _, m := range ins {
+		if m != subj {
+			f.Subjects = append(f.Subjects, inst(m.ID))
+		}
+		note := "installed"
+		if d.activePos[m.ID] > 0 {
+			note = fmt.Sprintf("enabled at %d", d.activePos[m.ID])
+		} else if !st.Reg.Loadable(m.ID) && anyLoadable {
+			note = "ignored by the game (another copy wins)"
+		}
+		f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Inferred, Ref: inst(m.ID), Text: fmt.Sprintf("src:%s %s", m.SourceLabel, note)})
+	}
+	// swap needs an enabled copy (host round 2026-11-05: `archo swap` on a copy that is not
+	// in the list fails with "not enabled").
+	if len(as) == 1 {
+		f.Suggestions = []string{"archo swap " + inst(subj.ID)}
+	}
+	d.add(f)
+}
+
+// hiddenFindings reports About.xml renamed away (about-disabled) on installed mods that are
+// not enabled: pinned by a copy, unsubscribed, or hidden on their own (09 §5).
+func (d *declRun) hiddenFindings() {
+	inst := finding.Inst
+	for _, h := range d.st.Hidden() {
 		m := h.Mod
-		if activePos[m.ID] != 0 {
+		if d.activePos[m.ID] != 0 {
 			continue
 		}
 		switch h.Kind {
@@ -585,22 +656,26 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 				f.Claim = fmt.Sprintf("%s is pinned to %s, and the workshop copy has been updated since", inst(m.ID), inst(h.Copy.ID))
 				f.Suggestions = []string{"archo mod " + inst(h.Copy.ID) + " --diff " + inst(m.ID), "archo unpin " + inst(m.ID)}
 			}
-			add(f)
+			d.add(f)
 		case HiddenResidue:
-			add(&finding.Finding{Code: "mod.hidden-residue", Severity: finding.Warning, Key: "residue", Subjects: []string{inst(m.ID)},
+			d.add(&finding.Finding{Code: "mod.hidden-residue", Severity: finding.Warning, Key: "residue", Subjects: []string{inst(m.ID)},
 				Claim:       fmt.Sprintf("%s is hidden (About.xml renamed) and no longer subscribed; its folder is left over", inst(m.ID)),
 				Suggestions: []string{"archo trash " + inst(m.ID)}})
 		default:
-			add(&finding.Finding{Code: "mod.hidden", Severity: finding.Warning, Key: "hidden", Subjects: []string{inst(m.ID)},
+			d.add(&finding.Finding{Code: "mod.hidden", Severity: finding.Warning, Key: "hidden", Subjects: []string{inst(m.ID)},
 				Claim:       fmt.Sprintf("%s is hidden from the game (About.xml renamed, probably by another mod manager)", inst(m.ID)),
 				Suggestions: []string{"archo unhide " + inst(m.ID), "archo trash " + inst(m.ID)}})
 		}
 	}
-	// Locked versions RimArcho made (07 §5): the upstream stays visible; the copy is what
-	// the plan uses. Reported while the upstream itself is not enabled.
-	for _, l := range locked {
+}
+
+// lockedFindings reports the locked versions RimArcho made (07 §5): the upstream stays
+// visible; the copy is what the plan uses. Reported while the upstream itself is not enabled.
+func (d *declRun) lockedFindings() {
+	inst := finding.Inst
+	for _, l := range d.locked {
 		up, cp := l.Upstream, l.Copy
-		if activePos[up.ID] != 0 {
+		if d.activePos[up.ID] != 0 {
 			continue
 		}
 		f := &finding.Finding{Code: "mod.pinned", Severity: finding.Info, Key: "copy:" + cp.ID, Subjects: []string{inst(up.ID), inst(cp.ID)},
@@ -613,42 +688,60 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 			f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Inferred, Ref: inst(up.ID), Text: "current snapshot " + shortHash(hex.EncodeToString(up.SnapHash))})
 			f.Suggestions = []string{"archo mod " + inst(cp.ID) + " --diff " + inst(up.ID), "archo pin --update " + inst(cp.ID), "archo unpin " + inst(cp.ID)}
 		}
-		add(f)
+		d.add(f)
 	}
+}
+
+// installedFindings reports stale converted textures and installed Mods that cannot load.
+func (d *declRun) installedFindings() {
+	inst := finding.Inst
 	// Texture optimisation: a mod updated since RimArcho wrote its DDS may show its old textures (a DDS
 	// shadows the PNG of the same name).
-	for _, m := range a.StaleTextures(st.Ix) {
-		add(&finding.Finding{Code: "texture.stale", Severity: finding.Warning, Key: "textures", Subjects: []string{inst(m.ID)},
+	for _, m := range d.a.StaleTextures(d.st.Ix) {
+		d.add(&finding.Finding{Code: "texture.stale", Severity: finding.Warning, Key: "textures", Subjects: []string{inst(m.ID)},
 			Claim:       fmt.Sprintf("%s changed since its textures were converted to DDS; the game may show its old textures", inst(m.ID)),
 			Suggestions: []string{"archo textures optimize " + inst(m.ID), "archo textures clean " + inst(m.ID)}})
 	}
-	for _, m := range st.Ix.Mods {
-		if m.TombstoneAt.IsZero() && m.Unloadable != "" && m.Unloadable != scan.UnloadableAboutDisabled && activePos[m.ID] == 0 {
-			add(&finding.Finding{Code: "mod.unloadable", Severity: finding.Info, Key: m.Unloadable, Subjects: []string{inst(m.ID)},
+	for _, m := range d.st.Ix.Mods {
+		if m.TombstoneAt.IsZero() && m.Unloadable != "" && m.Unloadable != scan.UnloadableAboutDisabled && d.activePos[m.ID] == 0 {
+			d.add(&finding.Finding{Code: "mod.unloadable", Severity: finding.Info, Key: m.Unloadable, Subjects: []string{inst(m.ID)},
 				Claim: fmt.Sprintf("%s is installed but cannot be loaded: %s", inst(m.ID), m.Unloadable)})
 		}
 	}
-	// Order: violations and cycles from the sort constraints.
-	in, err := a.SortInput(st, st.List)
-	if err != nil {
-		return nil, err
+}
+
+// nodeTok is how a finding names node i of the sort: its copy, or its package.
+func (d *declRun) nodeTok(i int) string {
+	if nd := d.in.Nodes[i]; nd.Instance != "" {
+		return finding.Inst(nd.Instance)
 	}
-	r := order.Sort(in)
+	return "pkg:" + d.in.Nodes[i].PackageID
+}
+
+// orderFindings reports the violations and cycles of the sort constraints.
+func (d *declRun) orderFindings() error {
+	in, err := d.a.SortInput(d.st, d.st.List)
+	if err != nil {
+		return err
+	}
+	d.in, d.r = in, order.Sort(in)
+	d.violationFindings()
+	d.cycleFindings()
+	return nil
+}
+
+// violationFindings reports the broken constraints: one order.violated finding each, and
+// official content out of place (mostly a DLC enabled later, appended to the end of the
+// list) as one official.order finding with the cheapest moves. Constraints from an official
+// package to a mod are part of it rather than findings of their own.
+func (d *declRun) violationFindings() {
+	st, in, r := d.st, d.in, d.r
 	inCycle := map[int]bool{}
 	for _, cy := range r.Cycles {
 		for _, m := range cy.Members {
 			inCycle[m] = true
 		}
 	}
-	nodeTok := func(i int) string {
-		if nd := in.Nodes[i]; nd.Instance != "" {
-			return inst(nd.Instance)
-		}
-		return "pkg:" + in.Nodes[i].PackageID
-	}
-	// Official content out of place (mostly a DLC enabled later, appended to the end of the
-	// list): one official.order finding with the cheapest moves. Constraints from an official
-	// package to a mod are part of it rather than findings of their own.
 	officialBroken := false
 	for _, e := range r.Edges {
 		if e.C.Kind == order.KindOfficial && e.From > e.To {
@@ -664,7 +757,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 		ev, ig := edgeText(st, in, e)
 		if e.C.Kind == order.KindOfficial {
 			if officialSubject == "" {
-				officialSubject = nodeTok(e.To)
+				officialSubject = d.nodeTok(e.To)
 			}
 			official = append(official, finding.Evidence{Source: finding.Inferred, Text: ev})
 			continue
@@ -676,72 +769,91 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 			}
 			continue
 		}
-		src := finding.Declared
-		switch e.C.Kind {
-		case order.KindCommunity:
-			src = finding.Community
-		case order.KindUser:
-			src = finding.User
-		}
-		// Severity by constraint strength (08 §1.3): dependencies, loadBefore, forced orders
-		// and user rules are warnings; loadAfter and community preferences, and rules the
-		// log corpus saw broken without effect, are information.
-		sev := finding.Warning
-		claim := fmt.Sprintf("%s should load after %s but is at %d, before %d", nodeTok(e.To), nodeTok(e.From), e.To+1, e.From+1)
-		switch as.Strength {
-		case order.Weak:
-			sev = finding.Info
-		case order.Harmless:
-			sev = finding.Info
-			claim += " (declared, but breaking it is not known to cause errors)"
-		}
-		key := in.Nodes[e.From].PackageID + ">" + in.Nodes[e.To].PackageID
-		f := &finding.Finding{Code: "order.violated", Severity: sev, Key: key, Subjects: []string{nodeTok(e.To), nodeTok(e.From)},
-			Claim:       claim,
-			Evidence:    []finding.Evidence{{Source: src, Text: ev}},
-			Suggestions: []string{"archo sort --dry-run", "archo move " + nodeTok(e.To) + " --after " + nodeTok(e.From)}}
-		if as.Why != "" {
-			f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Inferred, Text: as.Why})
-		}
-		f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Inferred, Text: StrengthPrefix + as.Strength.String()})
-		if !strings.HasPrefix(ig, "archo ") {
-			f.Suggestions = append(f.Suggestions, "archo rule add ignore "+ig)
-			if as.Strength == order.Harmless {
-				f.Suggestions = []string{"archo rule add ignore " + ig}
-			}
-		}
-		add(f)
+		d.add(d.violation(e, as, ev, ig))
 	}
 	if len(official) > 0 {
-		// Warning, not error (G8): a mod ahead of a DLC is an error source about twice as often
-		// as chance (G4 2.1×, G2 pairs 1.8×), like a broken dependency order, not like a
-		// missing dependency.
-		f := &finding.Finding{Code: "official.order", Severity: finding.Warning, Key: "official", Subjects: []string{officialSubject},
-			Claim:    "Core and the DLCs are not first in the list, in release order",
-			Evidence: official, Suggestions: []string{"archo sort --dry-run"}}
-		if moves := order.OfficialMoves(in, r.Edges, 3); len(moves) > 0 {
-			var cmds []string
-			dlc := true
-			for _, m := range moves {
-				cmds = append(cmds, "archo move "+nodeTok(m.Node)+" --after "+nodeTok(m.After))
-				dlc = dlc && order.IsOfficial(in.Nodes[m.Node].PackageID)
-			}
-			f.Subjects = []string{nodeTok(moves[0].Node)}
-			if dlc {
-				f.Claim = fmt.Sprintf("%s loads after mods (a DLC enabled later goes to the end of the list); move it back after %s",
-					nodeTok(moves[0].Node), nodeTok(moves[0].After))
-				if len(moves) > 1 {
-					f.Claim = fmt.Sprintf("%d DLCs load after mods (a DLC enabled later goes to the end of the list); move them back to the official position", len(moves))
-				}
-			}
-			f.Suggestions = append(cmds, f.Suggestions...)
-		}
-		add(f)
+		d.officialFinding(official, officialSubject)
 	}
+}
+
+// violation is the order.violated finding of edge e, assessed as as; ev and ig are its
+// evidence text and how to ignore it.
+func (d *declRun) violation(e order.Edge, as order.Assessment, ev, ig string) *finding.Finding {
+	in := d.in
+	src := finding.Declared
+	switch e.C.Kind {
+	case order.KindCommunity:
+		src = finding.Community
+	case order.KindUser:
+		src = finding.User
+	}
+	// Severity by constraint strength (08 §1.3): dependencies, loadBefore, forced orders
+	// and user rules are warnings; loadAfter and community preferences, and rules the
+	// log corpus saw broken without effect, are information.
+	sev := finding.Warning
+	claim := fmt.Sprintf("%s should load after %s but is at %d, before %d", d.nodeTok(e.To), d.nodeTok(e.From), e.To+1, e.From+1)
+	switch as.Strength {
+	case order.Weak:
+		sev = finding.Info
+	case order.Harmless:
+		sev = finding.Info
+		claim += " (declared, but breaking it is not known to cause errors)"
+	}
+	key := in.Nodes[e.From].PackageID + ">" + in.Nodes[e.To].PackageID
+	f := &finding.Finding{Code: "order.violated", Severity: sev, Key: key, Subjects: []string{d.nodeTok(e.To), d.nodeTok(e.From)},
+		Claim:       claim,
+		Evidence:    []finding.Evidence{{Source: src, Text: ev}},
+		Suggestions: []string{"archo sort --dry-run", "archo move " + d.nodeTok(e.To) + " --after " + d.nodeTok(e.From)}}
+	if as.Why != "" {
+		f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Inferred, Text: as.Why})
+	}
+	f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Inferred, Text: StrengthPrefix + as.Strength.String()})
+	if !strings.HasPrefix(ig, "archo ") {
+		f.Suggestions = append(f.Suggestions, "archo rule add ignore "+ig)
+		if as.Strength == order.Harmless {
+			f.Suggestions = []string{"archo rule add ignore " + ig}
+		}
+	}
+	return f
+}
+
+// officialFinding reports Core and the DLCs out of place, with the cheapest moves.
+func (d *declRun) officialFinding(official []finding.Evidence, officialSubject string) {
+	in := d.in
+	// Warning, not error (G8): a mod ahead of a DLC is an error source about twice as often
+	// as chance (G4 2.1×, G2 pairs 1.8×), like a broken dependency order, not like a
+	// missing dependency.
+	f := &finding.Finding{Code: "official.order", Severity: finding.Warning, Key: "official", Subjects: []string{officialSubject},
+		Claim:    "Core and the DLCs are not first in the list, in release order",
+		Evidence: official, Suggestions: []string{"archo sort --dry-run"}}
+	if moves := order.OfficialMoves(in, d.r.Edges, 3); len(moves) > 0 {
+		var cmds []string
+		dlc := true
+		for _, m := range moves {
+			cmds = append(cmds, "archo move "+d.nodeTok(m.Node)+" --after "+d.nodeTok(m.After))
+			dlc = dlc && order.IsOfficial(in.Nodes[m.Node].PackageID)
+		}
+		f.Subjects = []string{d.nodeTok(moves[0].Node)}
+		if dlc {
+			f.Claim = fmt.Sprintf("%s loads after mods (a DLC enabled later goes to the end of the list); move it back after %s",
+				d.nodeTok(moves[0].Node), d.nodeTok(moves[0].After))
+			if len(moves) > 1 {
+				f.Claim = fmt.Sprintf("%d DLCs load after mods (a DLC enabled later goes to the end of the list); move them back to the official position", len(moves))
+			}
+		}
+		f.Suggestions = append(cmds, f.Suggestions...)
+	}
+	d.add(f)
+}
+
+// cycleFindings reports the constraint cycles and the rules sorting set aside to keep the
+// official order.
+func (d *declRun) cycleFindings() {
+	st, in, r := d.st, d.in, d.r
 	for _, cy := range r.Cycles {
 		var refs []string
 		for _, mi := range cy.Members {
-			refs = append(refs, nodeTok(mi))
+			refs = append(refs, d.nodeTok(mi))
 		}
 		// Info (G8): mods on a cycle were error sources no more often than chance (6.8% vs
 		// 6.1% in 804 logs). Sorting gives up the weakest constraints (08 §1.2).
@@ -759,23 +871,22 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 			}
 			f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Declared, Text: t})
 		}
-		add(f)
+		d.add(f)
 	}
-	for _, d := range r.Dropped {
-		if d.Reason != order.ReasonOfficialFirst {
+	for _, dr := range r.Dropped {
+		if dr.Reason != order.ReasonOfficialFirst {
 			continue
 		}
-		ev, _ := edgeText(st, in, d.Edge)
+		ev, _ := edgeText(st, in, dr.Edge)
 		var refs []string
-		for _, i := range d.Members {
-			refs = append(refs, nodeTok(i))
+		for _, i := range dr.Members {
+			refs = append(refs, d.nodeTok(i))
 		}
-		add(&finding.Finding{Code: "order.cycle", Severity: finding.Info, Key: "official:" + ev,
+		d.add(&finding.Finding{Code: "order.cycle", Severity: finding.Info, Key: "official:" + ev,
 			Subjects: refs,
 			Claim:    "sorting keeps the official order and sets aside a contradictory rule",
 			Evidence: []finding.Evidence{{Source: finding.Declared, Text: ev + "  [not used by sorting]"}}})
 	}
-	return out, nil
 }
 
 // scanDep is one declared dependency; alts are its alternativePackageIds.

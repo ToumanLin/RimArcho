@@ -27,7 +27,6 @@ internal/app/pack.go (*App).launchPackWith 64 233
 internal/app/pack_archive.go (*App).exportPackArchive 50 161
 internal/app/pack_archive.go scanPackArchive 44 118
 internal/app/packsettings.go (*App).ApplyListSettings 52 166
-internal/app/problems.go (*App).DeclFindings 111 426
 internal/app/rimcrow.go (*App).ImportRimCrow 128 428
 internal/app/rimcrowprofiles.go (*App).importCrowProfiles 80 291
 internal/app/rimsortaux.go (*App).ImportRimSortAux 60 188
