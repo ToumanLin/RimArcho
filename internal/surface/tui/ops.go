@@ -70,6 +70,11 @@ func (m *model) runEditorOp(code string) tea.Cmd {
 			return m.openFolderOf(it.id)
 		}
 		return nil
+	case view.OpLinked:
+		if it := m.current(); it != nil {
+			return m.showLinkOf(it.id)
+		}
+		return nil
 	case view.OpWorkshop, view.OpSteam:
 		if it := m.current(); it != nil {
 			return m.openWorkshopPage(m.workshopOf(it.id), code == view.OpSteam)

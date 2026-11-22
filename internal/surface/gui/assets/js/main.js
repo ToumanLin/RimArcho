@@ -785,7 +785,7 @@ function actionContext() {
 }
 
 async function verb(name) {
-  if (environmentReason() && !["full", "workshop", "folder", "workshop-id", "steam", "needs"].includes(name)) return say("busy", environmentReason());
+  if (environmentReason() && !["full", "workshop", "folder", "linked", "workshop-id", "steam", "needs"].includes(name)) return say("busy", environmentReason());
   const { k, sel } = actionContext();
   const ids = idsOf(sel);
   switch (name) {
@@ -825,10 +825,11 @@ async function verb(name) {
       if (S.detail && S.detail.url) return api.OpenURL(S.detail.url).then(() => say("ok", T("opened the Workshop page")), (e) => say("fail", errText(e)));
       return say("", T("not a workshop mod"));
     // ctrl+o / ctrl+w: the cursor's mod, not the details (they may still be loading)
-    case "folder": case "workshop-id": case "steam": {
+    case "folder": case "linked": case "workshop-id": case "steam": {
       const it = S.focus < 3 ? cur() : sel[0];
-      if (!it || !it.id) return say("", name === "folder" ? T("RimArcho has not seen this copy: no folder") : T("no Workshop ID: not a Workshop mod"));
+      if (!it || !it.id) return say("", name === "folder" || name === "linked" ? T("RimArcho has not seen this copy: no folder") : T("no Workshop ID: not a Workshop mod"));
       if (name === "folder") return api.OpenFolder(it.id).then(() => say("ok", T("opened the folder")), (e) => say("fail", errText(e)));
+      if (name === "linked") return api.ShowLink(it.id).then((t) => say("", t), (e) => say("fail", errText(e)));
       if (name === "steam") return api.OpenSteamWorkshop(it.id).then((t) => say("ok", t), (e) => say("", errText(e)));
       return api.OpenWorkshop(it.id).then((t) => say("ok", t), (e) => say("", errText(e)));
     }
@@ -1201,7 +1202,7 @@ function menuAtCursor() {
 // rowOp runs an op of the menu on the object: the plan's own as their verbs, the version
 // and disk ops as Mod library runs them (a dry run first when they change files).
 async function rowOp(code, only = null) {
-  const verbs = { enable: "toggle", disable: "toggle", "put-back": "toggle", "enable-at": "move", "move-to": "move", stage: "stage", swap: "swap", tags: "tags", note: "note", folder: "folder", workshop: "workshop-id", steam: "steam" };
+  const verbs = { enable: "toggle", disable: "toggle", "put-back": "toggle", "enable-at": "move", "move-to": "move", stage: "stage", swap: "swap", tags: "tags", note: "note", folder: "folder", linked: "linked", workshop: "workshop-id", steam: "steam" };
   if (verbs[code] && !only) return verb(verbs[code]);
   const ids = only || idsOf(actionContext().sel);
   if (!ids.length) return;

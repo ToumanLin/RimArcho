@@ -406,5 +406,9 @@
   "stop keeping this version": "このバージョンを残すのをやめる",
   "Updating replaces this copy. To keep the old one, keep this version first.": "更新するとこのコピーが置き換わります。旧版を残す場合は先にバージョンを固定してください。",
   "After unsubscribing, you cannot download it again; keep this version to hold on to it.": "サブスクライブを解除すると再取得できません。残したい場合は先にこのバージョンを固定してください。",
-  "check again": "もう一度チェック"
+  "check again": "もう一度チェック",
+  "a link, not a folder: show where it is": "フォルダではなくリンク：場所を表示",
+  "%s is a link another tool made: delete the link there or in this folder; its target stays": "%sは別のツールが作ったリンクです。そのツールか、このフォルダでリンクを削除してください。リンク先は残ります",
+  "%s is a link %s made: remove it in %s, or delete the link in this folder; its target stays": "%sは%sが作ったリンクです。%sで外すか、このフォルダでリンクを削除してください。リンク先は残ります",
+  "⚠ pack %s uses this copy: it still goes, and the pack launches with its own copy": "⚠ パック%sがこのコピーを使っています。処理は行われ、パックは同梱のコピーで起動します"
 }

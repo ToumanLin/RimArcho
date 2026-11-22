@@ -975,6 +975,7 @@ async function run(code, copies) {
       if (selected().length === 1 && i0.subscriptionKind === "page") return updatePage(i0.ref);
       break;
     case "folder": return api.OpenFolder(i0.id).then(() => say("ok", T("opened the folder")), (e) => say("fail", errText(e)));
+    case "linked": return api.ShowLink(i0.id).then((t) => say("", t), (e) => say("fail", errText(e)));
     case "steam": return api.OpenSteamWorkshop(i0.id || i0.ref).then((t) => say("ok", t), (e) => say("fail", errText(e)));
     case "workshop":
       if (i0.id) return api.OpenWorkshop(i0.id).then((t) => say("ok", t), (e) => say("", errText(e)));
