@@ -31,63 +31,93 @@ var copyText = func(s string) error {
 	return c.Run()
 }
 
-// feedbackPanel is Settings > Feedback in the terminal (16 §2.14, §9): the same attachments as the
-// window, m / p / l / o tick them, the whole text below. s sends it through the feedback relay
-// (asked for the title, what happened and a contact on the input line; only when RimArcho
-// has a relay); enter opens GitHub with it filled in (the title and text are written there).
-func (m *model) feedbackPanel(o view.FeedbackOptions) tea.Cmd {
-	at := view.FeedbackAttachments(m.app, m.st, o)
-	res := view.ComposeFeedback("", "", at)
-	on := map[string]bool{"mods": o.Mods, "paths": o.Paths, "log": o.Log, "ops": o.Ops}
-	key := map[string]string{"mods": "m", "paths": "p", "log": "l", "ops": "o"}
+// feedbackPanel is Feedback in the terminal (16 §2.14, §9): 1–5 pick the report's template,
+// m / p / l / o / b tick the attachments (the template ticks its own first), the whole text
+// below. s asks the template's questions on the input line and sends it through the feedback
+// relay (only when RimArcho has one); enter opens GitHub with the questions as headings to
+// answer there. One problem per send: the window's "add another problem" splits.
+func (m *model) feedbackPanel(p view.FeedbackProblem) tea.Cmd {
+	if p.Kind == "" {
+		p.Kind = feedback.Templates[0].Kind
+		p.Opts = templateOpts(p.Kind)
+	}
+	if p.Answers == nil {
+		p.Answers = map[string]string{}
+	}
+	o := p.Options()
+	at := view.FeedbackAttachments(m.app, m.st, o, m.feedbackNeeds())
+	res := view.ComposeFeedback(p.TitleOrFirst(), view.FeedbackSkeleton(p), at)
 	var b strings.Builder
-	fmt.Fprintf(&b, "[x]   %s  %s\n", T("basic information"), strings.Join(at.Basic, "  "))
-	for _, p := range at.Parts {
+	tpls := view.FeedbackTemplates()
+	for i, t := range tpls {
+		mark := " "
+		if t.Kind == p.Kind {
+			mark = ">"
+		}
+		fmt.Fprintf(&b, "%s %d %s  %s\n", mark, i+1, t.Label, t.Lead)
+	}
+	if t := feedback.TemplateOf(p.Kind); t.Note != "" {
+		b.WriteString("\n" + T(t.Note) + "\n")
+	}
+	on := map[string]bool{"mods": o.Mods, "paths": o.Paths, "log": o.Log, "ops": o.Ops, "problems": o.Problems}
+	key := map[string]string{"mods": "m", "paths": "p", "log": "l", "ops": "o", "problems": "b"}
+	fmt.Fprintf(&b, "\n[x]   %s  %s\n", T("basic information"), strings.Join(at.Basic, "  "))
+	for _, part := range at.Parts {
 		mark := "[ ]"
-		if on[p.Key] {
+		if on[part.Key] {
 			mark = "[x]"
 		}
-		if p.None {
-			mark, key[p.Key] = "   ", " "
+		if part.None {
+			mark, key[part.Key] = "   ", " "
 		}
-		note := p.Note
-		if p.Key == "log" && o.Log && at.Pending {
+		note := part.Note
+		if part.Key == "log" && o.Log && at.Pending {
 			note = T("the game log is still being analysed…") + "  " + T("r: again")
 		}
-		fmt.Fprintf(&b, "%s %s %s  %s\n", mark, key[p.Key], p.Label, note)
+		fmt.Fprintf(&b, "%s %s %s  %s\n", mark, key[part.Key], part.Label, note)
 	}
 	// what the player reads; the Markdown sent or copied stays out of sight (res.Body)
-	b.WriteString("\n" + T("preview") + "  " + T("public on GitHub") + "\n\n" + view.FeedbackPreview("", at) + "\n")
+	b.WriteString("\n" + T("preview") + "  " + T("public on GitHub") + "\n\n" + view.FeedbackPreview(p.Text(), at) + "\n")
 	if at.Send {
-		b.WriteString(T("s: send it here, no GitHub account needed") + "\n")
+		b.WriteString(T("s: answer the questions here and send it, no GitHub account needed") + "\n")
 	}
 	if res.Full {
-		b.WriteString(T("enter: open GitHub with this text; write the title and what happened there") + "\n")
+		b.WriteString(T("enter: open GitHub with this text; answer the questions there") + "\n")
 	} else {
 		b.WriteString(T("enter: copy the text and open GitHub; paste it into the issue") + "\n")
 	}
 	m.openPanel(T("feedback"), b.String())
-	toggle := func(f func()) func(*model) tea.Cmd {
-		return func(m *model) tea.Cmd { f(); return m.feedbackPanel(o) }
+	again := func(f func()) func(*model) tea.Cmd {
+		return func(m *model) tea.Cmd { f(); return m.feedbackPanel(p) }
 	}
-	m.panel.keys = map[string]func(*model) tea.Cmd{"r": toggle(func() {})}
-	for _, p := range at.Parts {
-		if p.None {
+	m.panel.keys = map[string]func(*model) tea.Cmd{"r": again(func() {})}
+	for i, t := range tpls {
+		kind := t.Kind
+		m.panel.keys[fmt.Sprint(i+1)] = again(func() {
+			if p.Kind != kind {
+				p = view.FeedbackProblem{Kind: kind, Title: p.Title, Answers: map[string]string{}, Opts: templateOpts(kind)}
+			}
+		})
+	}
+	for _, part := range at.Parts {
+		if part.None {
 			continue
 		}
-		switch p.Key {
+		switch part.Key {
 		case "mods":
-			m.panel.keys["m"] = toggle(func() { o.Mods = !o.Mods })
+			m.panel.keys["m"] = again(func() { p.Opts.Mods = !p.Opts.Mods })
 		case "paths":
-			m.panel.keys["p"] = toggle(func() { o.Paths = !o.Paths })
+			m.panel.keys["p"] = again(func() { p.Opts.Paths = !p.Opts.Paths })
 		case "log":
-			m.panel.keys["l"] = toggle(func() { o.Log = !o.Log })
+			m.panel.keys["l"] = again(func() { p.Opts.Log = !p.Opts.Log })
 		case "ops":
-			m.panel.keys["o"] = toggle(func() { o.Ops = !o.Ops })
+			m.panel.keys["o"] = again(func() { p.Opts.Ops = !p.Opts.Ops })
+		case "problems":
+			m.panel.keys["b"] = again(func() { p.Opts.Problems = !p.Opts.Problems })
 		}
 	}
 	if at.Send {
-		m.panel.keys["s"] = func(m *model) tea.Cmd { m.panel = nil; return m.askFeedback(at) }
+		m.panel.keys["s"] = func(m *model) tea.Cmd { m.panel = nil; return m.askFeedback(p, 0) }
 	}
 	m.panel.onEnter = func(m *model) tea.Cmd {
 		if !res.Full {
@@ -110,27 +140,93 @@ func (m *model) feedbackPanel(o view.FeedbackOptions) tea.Cmd {
 	return nil
 }
 
-// askFeedback asks for the title, what happened and the contact, one input line each (esc
-// stops), then sends in the background; feedbackSentMsg says how it went.
-func (m *model) askFeedback(at *view.FeedbackAttach) tea.Cmd {
-	m.prompt = &prompt{label: T("title") + ": ", submit: func(m *model, title string) tea.Cmd {
-		m.prompt = &prompt{label: T("what happened") + ": ", submit: func(m *model, text string) tea.Cmd {
-			if title == "" && text == "" {
-				m.say(sayFail, T("write a title or what happened first"))
-				return nil
-			}
-			m.prompt = &prompt{label: T("contact (optional, not public)") + ": ", submit: func(m *model, contact string) tea.Cmd {
-				m.say(sayBusy, T("sending…"))
-				a := m.app
-				return func() tea.Msg {
-					s, err := view.SendFeedback(context.Background(), title, text, contact, at)
-					if err == nil {
-						view.RecordFeedbackSent(a, s, title)
-					}
-					return feedbackSentMsg{s, err}
+// templateOpts are the attachments a template ticks when it is chosen.
+func templateOpts(kind string) view.FeedbackOptions {
+	var o view.FeedbackOptions
+	for _, k := range feedback.TemplateOf(kind).Attach {
+		switch k {
+		case "mods":
+			o.Mods = true
+		case "paths":
+			o.Paths = true
+		case "log":
+			o.Log = true
+		case "ops":
+			o.Ops = true
+		case "problems":
+			o.Problems = true
+		}
+	}
+	return o
+}
+
+// feedbackNeeds is Can it run for the problems attachment and the diagnosis: the problems
+// RimArcho already knows, without a new check.
+func (m *model) feedbackNeeds() *view.Needs {
+	ps, err := m.app.Problems(false, nil)
+	if err != nil || ps == nil {
+		return nil
+	}
+	return view.BuildNeeds(m.app, m.st, ps)
+}
+
+// askFeedback asks the template's questions one input line each (esc stops; an optional one
+// may be left empty), then the title and the contact, then sends in the background;
+// feedbackSentMsg says how it went.
+func (m *model) askFeedback(p view.FeedbackProblem, i int) tea.Cmd {
+	qs := view.FeedbackTemplates()
+	var t feedback.Template
+	for _, x := range qs {
+		if x.Kind == p.Kind {
+			t = x
+		}
+	}
+	if i < len(t.Questions) {
+		q := t.Questions[i]
+		label := q.Label
+		switch q.Form {
+		case feedback.FormCheck:
+			label += " (y/n)"
+		case feedback.FormChoice:
+			label += " (" + strings.Join(q.Choices, " / ") + ")"
+		}
+		if q.Optional {
+			label += " " + T("(optional)")
+		}
+		m.prompt = &prompt{label: label + ": ", submit: func(m *model, v string) tea.Cmd {
+			v = strings.TrimSpace(v)
+			if q.Form == feedback.FormCheck {
+				if strings.HasPrefix(strings.ToLower(v), "y") {
+					v = "yes"
+				} else {
+					v = ""
 				}
-			}}
+			}
+			p.Answers[q.Key] = v
+			return m.askFeedback(p, i+1)
+		}}
+		return nil
+	}
+	m.prompt = &prompt{label: T("title") + ": ", submit: func(m *model, title string) tea.Cmd {
+		p.Title = title
+		if p.Empty() {
+			m.say(sayFail, T("write a title or what happened first"))
 			return nil
+		}
+		m.prompt = &prompt{label: T("contact (optional, not public)") + ": ", submit: func(m *model, contact string) tea.Cmd {
+			m.say(sayBusy, T("sending…"))
+			a, st := m.app, m.st
+			n := m.feedbackNeeds()
+			return func() tea.Msg {
+				at := view.FeedbackAttachments(a, st, p.Options(), n)
+				s, err := view.SendFeedbackProblems(context.Background(), []view.FeedbackProblem{p}, []*view.FeedbackAttach{at}, contact)
+				var one feedback.Sent
+				if len(s) > 0 {
+					one = s[0]
+					view.RecordFeedbackSent(a, one, p.TitleOrFirst())
+				}
+				return feedbackSentMsg{one, err}
+			}
 		}}
 		return nil
 	}}

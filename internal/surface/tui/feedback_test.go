@@ -104,11 +104,12 @@ func TestFeedbackSendTUI(t *testing.T) {
 	t.Setenv("RIMARCHO_FEEDBACK_RELAY", srv.URL+"/report")
 	m.panel = nil
 	m.palRun("feedback")(m)
-	if !strings.Contains(strings.Join(m.panel.lines, "\n"), "s: send it here") {
+	if !strings.Contains(strings.Join(m.panel.lines, "\n"), "s: answer the questions here") {
 		t.Fatalf("s offered:\n%s", strings.Join(m.panel.lines, "\n"))
 	}
+	m.panelKey("5") // other / help: one question
 	m.panelKey("s")
-	for _, typed := range []string{"Crash", "on load"} {
+	for _, typed := range []string{"on load", "Crash"} {
 		if m.prompt == nil {
 			t.Fatal("asks on the input line")
 		}
@@ -119,7 +120,7 @@ func TestFeedbackSendTUI(t *testing.T) {
 		t.Fatal("sends in the background")
 	}
 	m.update(cmd())
-	if got.Title != "Crash" || got.Contact != "me#1" || !strings.HasPrefix(got.Body, "on load\n\n---\n") || !strings.Contains(m.status, "#7") {
+	if got.Title != "Crash" || got.Contact != "me#1" || got.Kind != "other" || !strings.HasPrefix(got.Body, "on load\n\n---\nreport: other / help\n") || !strings.Contains(m.status, "#7") {
 		t.Fatalf("sent %+v; status %q", got, m.status)
 	}
 }

@@ -19,7 +19,7 @@ const (
 	maxInstructions = 2000     // characters
 	maxDescription  = 320      // characters, any one tool
 	maxBrief        = 12000    // characters: Instructions plus every tool description
-	maxToolsList    = 49 << 10 // bytes: the tools/list result as JSON, schemas included (raised from 48 KB for list_operations, 13 §1.3)
+	maxToolsList    = 50 << 10 // bytes: the tools/list result as JSON, schemas included (raised from 48 KB for list_operations, 13 §1.3, and from 49 KB for draft_feedback, 16 §2.14)
 )
 
 func TestInitialContextBudget(t *testing.T) {

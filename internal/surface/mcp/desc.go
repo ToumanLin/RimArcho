@@ -55,6 +55,8 @@ const descTestRun = `Run a plan in isolated data to the menu (or map, save, prob
 
 const descPlans = `The environment's plans (named mod lists): list, new, use (switch; writes no game file), rename, remove, import, versions, follow / unfollow / sync a Workshop collection. remove deletes a plan with its whole history: ask the player first, naming the plan.`
 
+const descFeedback = `Drafts a report for RimArcho's developer from a Feedback template (read-only): its text and a GitHub link. Nothing is sent; the player sends it from the Feedback page. No kind: the templates`
+
 const descOps = `What RimArcho did to the player's files, newest first (read-only), with each row's origin (agent = Archo) and result. Answers "what changed?"`
 
 const descHistory = `The current plan's history (read-only): log lists its versions (lists saved to or read from the game), diff compares two versions or a version with the current list, steps shows the undo steps. Go back with edit_loadout action=checkout.`

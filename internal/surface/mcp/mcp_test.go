@@ -83,7 +83,7 @@ func TestToolsAndAnnotations(t *testing.T) {
 		// 11 §1: subscriptions RimArcho installs and updates (Git, download pages, SteamCMD).
 		"manage_subscriptions": "destructive",
 		// Uninstall: only its dry run (14 §2).
-		"preview_uninstall": "ro",
+		"preview_uninstall": "ro", "draft_feedback": "ro",
 		// Texture optimisation (10 §2).
 		"manage_textures": "destructive",
 		// Saves (12 §1.6, §4.4): a fix subscribes through Steam, so it is open-world.
@@ -194,6 +194,8 @@ func TestCLIParity(t *testing.T) {
 		{"search_files", map[string]any{"pattern": "Lib_Gun", "page": -1}, []string{"files", "search", "Lib_Gun", "--page", "-1"}},
 		{"save_loadout", map[string]any{"dry_run": true}, []string{"save", "--dry-run"}},
 		{"preview_uninstall", map[string]any{"keep_locked": true}, []string{"uninstall", "--dry-run", "--keep-locked"}},
+		{"draft_feedback", nil, []string{"feedback"}},
+		{"draft_feedback", map[string]any{"kind": "bug", "title": "T", "answers": map[string]any{"did": "x", "files": "yes"}, "attach": []any{"mods", "ops"}}, []string{"feedback", "bug", "--title", "T", "--did", "x", "--files", "--attach", "mods,ops"}},
 		{"manage_textures", map[string]any{"action": "optimize", "plan": true, "scale": 50, "dry_run": true}, []string{"textures", "optimize", "--plan", "--scale", "50", "--dry-run"}},
 		{"manage_textures", map[string]any{"action": "status", "refs": []string{modA}}, []string{"textures", "status", modA}},
 		{"edit_loadout", map[string]any{"action": "sort", "dry_run": true}, []string{"sort", "--dry-run"}},

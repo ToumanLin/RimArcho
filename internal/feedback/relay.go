@@ -38,7 +38,14 @@ type Report struct {
 	Title   string `json:"title"`
 	Body    string `json:"body"`
 	Contact string `json:"contact,omitempty"`
+	// Kind is the report's template (templates.go); the relay turns it into a label.
+	Kind string `json:"kind,omitempty"`
+	// Priority: files were changed or lost (Priority); the relay adds the priority label.
+	Priority bool `json:"priority,omitempty"`
 }
+
+// MaxSplit is how many problems one send may carry; the relay files each as its own issue.
+const MaxSplit = 3
 
 // Sent is the issue the relay opened. Token reads its replies later (replies.go); it stays
 // in RimArcho's record of sent reports and never reaches the page or the issue.
@@ -55,6 +62,9 @@ type RelayError struct {
 	Status int
 	Code   string
 }
+
+// Older relays read only one report; a batch reaches them as an empty one.
+const codeEmpty = "empty"
 
 func (e *RelayError) Error() string { return fmt.Sprintf("feedback relay: %d %s", e.Status, e.Code) }
 
@@ -96,6 +106,97 @@ func Send(ctx context.Context, endpoint, agent string, r Report) (Sent, error) {
 	}
 	out.Sent.Token = out.Token
 	return out.Sent, nil
+}
+
+// SendAll posts several reports at once: the relay files each as its own issue, one after
+// another, with one contact and one minute of the sender's allowance. One report goes as Send
+// sends it. When GitHub fails partway, the issues filed so far come back with the error.
+func SendAll(ctx context.Context, endpoint, agent string, rs []Report, contact string) ([]Sent, error) {
+	if len(rs) == 1 {
+		r := rs[0]
+		r.Contact = contact
+		s, err := Send(ctx, endpoint, agent, r)
+		if err != nil {
+			return nil, err
+		}
+		return []Sent{s}, nil
+	}
+	type item struct {
+		Title    string `json:"title"`
+		Body     string `json:"body"`
+		Kind     string `json:"kind,omitempty"`
+		Priority bool   `json:"priority,omitempty"`
+	}
+	in := struct {
+		Reports []item `json:"reports"`
+		Contact string `json:"contact,omitempty"`
+	}{Contact: contact}
+	for _, r := range rs {
+		in.Reports = append(in.Reports, item{r.Title, r.Body, r.Kind, r.Priority})
+	}
+	var out struct {
+		Issues []struct {
+			Sent
+			Token string `json:"token"`
+		} `json:"issues"`
+		Error string `json:"error"`
+	}
+	status, err := post(ctx, endpoint, agent, in, &out)
+	if err != nil {
+		return nil, err
+	}
+	var sent []Sent
+	for _, i := range out.Issues {
+		if i.Number > 0 {
+			i.Sent.Token = i.Token
+			sent = append(sent, i.Sent)
+		}
+	}
+	if status != http.StatusOK || out.Error != "" || len(sent) < len(rs) {
+		code := out.Error
+		if code == codeEmpty {
+			code = "one_at_a_time" // a relay from before batches
+		}
+		if code == "" {
+			code = http.StatusText(status)
+		}
+		return sent, &RelayError{Status: status, Code: code}
+	}
+	return sent, nil
+}
+
+// post sends in as JSON to the relay at endpoint and reads the answer into out.
+func post(ctx context.Context, endpoint, agent string, in, out any) (int, error) {
+	if err := relayAddress(endpoint); err != nil {
+		return 0, err
+	}
+	data, err := json.Marshal(in)
+	if err != nil {
+		return 0, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(data))
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", agent)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer res.Body.Close()
+	b, _ := io.ReadAll(io.LimitReader(res.Body, 64<<10))
+	_ = json.Unmarshal(b, out)
+	return res.StatusCode, nil
+}
+
+// relayAddress refuses anything but https, and http to this computer (tests).
+func relayAddress(endpoint string) error {
+	u, err := url.Parse(endpoint)
+	if err != nil || u.Host == "" || (u.Scheme != "https" && !(u.Scheme == "http" && loopback(u.Hostname()))) {
+		return fmt.Errorf("feedback relay address %q is not https", endpoint)
+	}
+	return nil
 }
 
 func loopback(host string) bool {
