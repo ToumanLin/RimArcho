@@ -118,6 +118,10 @@ func patternCard(st *app.LoadoutState, lc *app.LogCluster) *PatternCard {
 		}
 		c.Known = Tf("%s has this error itself in %s shared logs (%s); a newer version may have fixed it",
 			TokName(st, sourceTok(st, p.Mod)), patterns.Thousands(p.Logs), when)
+		if p.MayBeFixed {
+			c.Known = Tf("%s has this error itself in %s shared logs (%s); may be fixed: it was updated after the last of them",
+				TokName(st, sourceTok(st, p.Mod)), patterns.Thousands(p.Logs), when)
+		}
 	}
 	return c
 }

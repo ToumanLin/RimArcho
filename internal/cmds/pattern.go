@@ -77,6 +77,9 @@ func addClusterPatterns(root *render.Node, ix *app.Index, lc *app.LogCluster) {
 			when += " – " + p.Last
 		}
 		s := fmt.Sprintf("%s  this error of %s was seen in %s (%s); a newer version of the mod may have fixed it", p.Ref(), p.Mod, d.Seen(p), when)
+		if p.MayBeFixed {
+			s = fmt.Sprintf("%s  this error of %s was seen in %s (%s); may be fixed: the mod was updated on the Workshop after the last of these logs (%s)", p.Ref(), p.Mod, d.Seen(p), when, p.LastLog)
+		}
 		if len(p.Versions) > 0 {
 			s += "; versions seen: " + strings.Join(p.Versions, ", ")
 		}

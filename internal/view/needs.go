@@ -214,6 +214,8 @@ type Needs struct {
 	// LastSave is Before you start's first card: whether the save the last run loaded
 	// loads with this list (16 §2.4); nil when no run names a save.
 	LastSave *LastSaveView `json:"lastSave,omitempty"`
+	// Corpus is the shared-log data the corpus items use (05 §4.6), a chip in the head.
+	Corpus *CorpusChip `json:"corpus,omitempty"`
 }
 
 // LastSaveView is the save the last run loaded, checked against the list as it is now
@@ -359,7 +361,7 @@ type Reason struct {
 // BuildNeeds turns the problem set and the environment's open questions into items, and
 // counts them (16 §7, §4.2, §7).
 func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
-	n := &Needs{Status: map[string]int{}, Reasons: map[string][]Reason{}}
+	n := &Needs{Status: map[string]int{}, Reasons: map[string][]Reason{}, Corpus: corpusChip(a)}
 	n.Never = ps.Analysis == nil || ps.Analysis.Run == nil
 	n.Stale = !n.Never && !ps.Analysis.Fresh
 	if !n.Never {
@@ -1715,8 +1717,8 @@ func patchItem(st *app.LoadoutState, x, name string, problems []*app.Problem, lo
 // each Mod's own title and reason.
 func foldPatchItems(items []Need) Need {
 	f := Need{Group: GroupConflict, Status: StatusHint, Dim: true, Fold: true, rowReasons: map[string]Reason{},
-		Title: Tf("patches of %d Mods find nothing", len(items)),
-		Why:   T("those changes do not take effect; the Mods may not fit this game version or the Mods they change"),
+		Title:    Tf("patches of %d Mods find nothing", len(items)),
+		Why:      T("those changes do not take effect; the Mods may not fit this game version or the Mods they change"),
 		Evidence: items[0].Evidence, Actions: []Action{{Kind: ActFold, Key: "f", Label: T("show which")}}}
 	f.Text = f.Title
 	for _, it := range items {

@@ -63,11 +63,13 @@ func (a *App) knownFindings(active []*store.Mod, activeByPkg, installed map[stri
 					add(comboFinding(m, nil, c))
 				}
 			default:
-				add(&finding.Finding{Code: "mod.known-error", Severity: finding.Info, Confidence: finding.Likely, Key: c.Templates[0],
+				added := &finding.Finding{Code: "mod.known-error", Severity: finding.Info, Confidence: finding.Likely, Key: c.Templates[0],
 					Subjects: []string{inst(m.ID)},
 					Claim: fmt.Sprintf("%s logs a known error in %.0f%% of the shared logs that enable it: %s",
 						inst(m.ID), 100*c.Rate(), short(c.Templates[0])),
-					Evidence: comboEvidence(c, m, nil)})
+					Evidence: comboEvidence(c, m, nil)}
+				mayBeFixed(added, c.Seen, c.Mods[0])
+				add(added)
 			}
 		}
 	}
@@ -126,7 +128,19 @@ func observedMissing(a *App, m *store.Mod, pr *known.Prereq, cands []*store.Mod)
 		ev = append(ev, finding.Evidence{Source: finding.Community, Ref: "log corpus", Text: t})
 	}
 	f.Evidence = ev
+	mayBeFixed(f, pr.Seen, pr.Mod)
 	return f
+}
+
+// mayBeFixed lowers an entry whose Mod was updated on the Workshop after its last shared log
+// (05 §4.6): information, possible, and the reason in the evidence.
+func mayBeFixed(f *finding.Finding, s known.Seen, pkg string) {
+	if !s.MayBeFixed {
+		return
+	}
+	f.Severity, f.Confidence = finding.Info, finding.Possible
+	f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Community, Ref: "log corpus",
+		Text: fmt.Sprintf("may be fixed: pkg:%s was updated on the Workshop after the last shared log with this error (%s)", pkg, s.LastLog)})
 }
 
 func comboFinding(m, o *store.Mod, c *known.Combo) *finding.Finding {
@@ -149,6 +163,7 @@ func comboFinding(m, o *store.Mod, c *known.Combo) *finding.Finding {
 		f.Suggestions = []string{"archo mod " + inst(m.ID)}
 	}
 	f.Evidence = comboEvidence(c, m, o)
+	mayBeFixed(f, c.Seen, c.Mods[0])
 	return f
 }
 

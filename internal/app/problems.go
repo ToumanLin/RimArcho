@@ -119,7 +119,7 @@ func (a *App) problems(ensure bool, progress func(string)) (*ProblemSet, error) 
 	// Cached until the database or ModsConfig.xml changes (the TUI asks often).
 	key := ""
 	if a.stCache != nil && a.stCache.Ix == st.Ix {
-		key = a.stKey + "|" + a.GameVersion
+		key = a.stKey + "|" + a.GameVersion + "|" + a.corpusStamp()
 		if p := a.ProblemLog(st); p != "" {
 			key += "|" + p + "|" + logStamp(p) + fmt.Sprint(a.LogCacheOnly)
 		}

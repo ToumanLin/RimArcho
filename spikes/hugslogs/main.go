@@ -70,6 +70,7 @@ func main() {
 	perMonth := fs.Int("per-month", 2500, "even: kept logs per month to reach (logs kept earlier count)")
 	listOnly := fs.Bool("list-only", false, "api: index the listing, download nothing")
 	day := fs.Int("day", 15, "sample: day of the month (UTC) to download")
+	fs.Float64Var(&share16, "share-16", 0, "api, sample, even: keep this share of the 1.6 logs, chosen by gist id (0 = all); 1.7 logs are always kept")
 	fs.Parse(os.Args[2:])
 	var err error
 	switch os.Args[1] {

@@ -914,6 +914,7 @@ func loadoutStatus(c *Ctx, root *render.Node, d *render.Doc) {
 	if s, err := c.App.MonitorState(); err == nil && (s.Bundled != nil || s.Source != nil || s.Newest != nil || s.InPlan != nil) {
 		root.KV("monitor", MonitorPlanLine(c, s))
 	}
+	root.KV("corpus", CorpusLine(c.App.Corpus()))
 	if g, err := c.App.RunningGame(); err != nil {
 		root.KV("game", "unavailable: "+err.Error())
 	} else if g != nil {

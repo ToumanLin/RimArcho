@@ -3,8 +3,8 @@
 // (docs/research/decisions-corpus.md §2, generator spikes/knowndeps). Aggregate counts only: no log
 // ids, no full mod lists; every entry was seen in the logs of at least five different players.
 //
-// The data is embedded: `archo data update` only fetches third-party datasets, and RimArcho
-// has no data repository of its own yet (the same choice as internal/order/observed.json).
+// The embedded data is the fallback; newer weekly data comes in the corpus bundle shipped
+// with Archo Monitor (internal/corpus, 05 §4.6).
 package known
 
 import (
@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 // Prereq: when Mod is enabled and Needs is not, an error names Needs as the provider of
@@ -31,6 +32,15 @@ type Prereq struct {
 	Cosmetic  bool     `json:"cosmetic,omitempty"`  // only sounds or textures are missing
 	LoadAfter bool     `json:"loadAfter,omitempty"` // Mod lists Needs in loadAfter (optional on purpose)
 	Fix       *Fix     `json:"fix,omitempty"`
+	Seen
+}
+
+// Seen is when an entry was last supported (weekly corpus data, 05 §4.6): the newest shared
+// log with the error, and whether Mod's Workshop item was updated after it, which lowers the
+// entry's confidence.
+type Seen struct {
+	LastLog    string `json:"lastLog,omitempty"` // YYYY-MM-DD
+	MayBeFixed bool   `json:"mayBeFixed,omitempty"`
 }
 
 // Combo: an error attributed to Mods[0] alone (RimArcho named it the source). Three kinds:
@@ -49,6 +59,7 @@ type Combo struct {
 	WithoutErr int      `json:"withoutErr"` // … that still have the error
 	Fix        *Fix     `json:"fix,omitempty"`
 	G5         *G5      `json:"g5,omitempty"`
+	Seen
 }
 
 // Combination kinds.
@@ -138,10 +149,30 @@ var embedded = sync.OnceValue(func() *Data {
 
 var override *Data
 
+var provider atomic.Pointer[func() *Data]
+
+// SetProvider makes Get return what f returns (internal/corpus picks the dataset of the
+// current game version); f returning nil falls back to the embedded dataset. nil removes it.
+func SetProvider(f func() *Data) {
+	if f == nil {
+		provider.Store(nil)
+		return
+	}
+	provider.Store(&f)
+}
+
+// EmbeddedJSON is the embedded dataset file (the 1.6 section of the embedded bundle).
+func EmbeddedJSON() []byte { return knownJSON }
+
 // Get returns the dataset in use.
 func Get() *Data {
 	if override != nil {
 		return override
+	}
+	if p := provider.Load(); p != nil {
+		if d := (*p)(); d != nil {
+			return d
+		}
 	}
 	return embedded()
 }

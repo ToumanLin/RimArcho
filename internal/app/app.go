@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/corpus"
 	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/ids"
@@ -214,6 +215,11 @@ type App struct {
 
 	logCache          *logCacheEntry
 	subscriptionCache map[string]subscriptionCacheEntry
+
+	// Corpus data in use (corpus.go), chosen for the environment Env returned.
+	corpusKey    string
+	corpusChoice corpus.Choice
+	corpusSet    bool
 }
 
 // Open opens (creating if needed) the data directory home.
@@ -337,6 +343,7 @@ func (a *App) Env() (*env.Environment, error) {
 		if e == nil {
 			return nil, fmt.Errorf("no Game Config named %q (archo env list)", a.EnvName)
 		}
+		a.CorpusFor(e)
 		return e, nil
 	}
 	e, err := a.Store.CurrentEnv()
@@ -346,6 +353,7 @@ func (a *App) Env() (*env.Environment, error) {
 	if e == nil {
 		return nil, ErrNoEnv
 	}
+	a.CorpusFor(e)
 	return e, nil
 }
 

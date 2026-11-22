@@ -74,6 +74,9 @@ func analysedAs(c *Ctx, root *render.Node, r *app.LogReport) {
 	} else if r.Unanalysed > 0 {
 		root.KV("analysis", "assemblies not analysed yet for "+app.EnabledMods(r.Unanalysed)+": their types and Harmony IDs name no mod (archo analyze)")
 	}
+	if r.CompanionNewer != "" {
+		root.KV("monitor", r.CompanionNewer+" ("+r.Companion+" not read)")
+	}
 	if r.AnalysedAs != "" {
 		root.KV("analysed", fmt.Sprintf("as %s (log version); Game Config is %s", r.AnalysedAs, r.EnvMM))
 	}

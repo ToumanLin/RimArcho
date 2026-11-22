@@ -102,6 +102,9 @@ type LogReport struct {
 	// Companion is the companion log read with it (06 §7); CompanionBad its bad lines.
 	Companion    string `json:",omitempty"`
 	CompanionBad int    `json:",omitempty"`
+	// CompanionNewer: the companion is a newer Monitor's log (schema above
+	// logs.MonitorSchema), not read; logs.TooNewText.
+	CompanionNewer string `json:",omitempty"`
 	// Cursor marks how much of the log and its companion this report covers: get_log
 	// since=<cursor> lists what is new after it (06 §6). Empty for pasted text.
 	Cursor string `json:",omitempty"`
@@ -306,6 +309,9 @@ func (a *App) analyzeLog(path string, cacheOnly bool) (*LogReport, error) {
 		comp, cm = readCompanion(compPath, -1)
 		if comp != nil {
 			rep.Companion, rep.CompanionBad = filepath.Base(compPath), comp.BadLines
+			if comp.TooNew > 0 {
+				rep.CompanionNewer = logs.TooNewText
+			}
 			cur.CompSize, cur.CompSum = cm.size, cm.sum
 		}
 	}

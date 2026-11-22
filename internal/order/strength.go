@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 // Strength says how much breaking a constraint matters (08 §1.3). It comes from the log
@@ -67,14 +68,18 @@ type Observed struct {
 //go:embed observed.json
 var observedJSON []byte
 
-var observed = sync.OnceValue(func() map[string]map[string]*Observed {
+// ObservedSet is a parsed observed.json.
+type ObservedSet map[string]map[string]*Observed
+
+// ParseObserved reads an observed.json file.
+func ParseObserved(b []byte) (ObservedSet, error) {
 	var raw struct {
 		Harmless []*Observed `json:"harmless"`
 		Harmful  []*Observed `json:"harmful"`
 	}
-	out := map[string]map[string]*Observed{"harmless": {}, "harmful": {}}
-	if json.Unmarshal(observedJSON, &raw) != nil {
-		return out
+	out := ObservedSet{"harmless": {}, "harmful": {}}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return out, err
 	}
 	for _, o := range raw.Harmless {
 		out["harmless"][obsKey(o.Kind, o.From, o.To)] = o
@@ -82,8 +87,37 @@ var observed = sync.OnceValue(func() map[string]map[string]*Observed {
 	for _, o := range raw.Harmful {
 		out["harmful"][obsKey(o.Kind, o.From, o.To)] = o
 	}
+	return out, nil
+}
+
+// ObservedJSON is the embedded observed.json (the 1.6 section of the embedded bundle).
+func ObservedJSON() []byte { return observedJSON }
+
+var embeddedObserved = sync.OnceValue(func() ObservedSet {
+	out, _ := ParseObserved(observedJSON)
 	return out
 })
+
+var observedProvider atomic.Pointer[func() ObservedSet]
+
+// SetObservedProvider makes the strength rules use what f returns (internal/corpus: the
+// section of the current game version); f returning nil falls back to the embedded file.
+func SetObservedProvider(f func() ObservedSet) {
+	if f == nil {
+		observedProvider.Store(nil)
+		return
+	}
+	observedProvider.Store(&f)
+}
+
+func observed() ObservedSet {
+	if p := observedProvider.Load(); p != nil {
+		if o := (*p)(); o != nil {
+			return o
+		}
+	}
+	return embeddedObserved()
+}
 
 func obsKey(kind, from, to string) string {
 	return kind + " " + strings.ToLower(from) + " " + strings.ToLower(to)

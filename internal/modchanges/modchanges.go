@@ -3,12 +3,14 @@ package modchanges
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/corpus"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/render"
 	"github.com/ToumanLin/RimArcho/internal/scan"
@@ -338,6 +340,9 @@ func (b *changeBuilder) build(evs []*store.Event) ([]Row, *Group) {
 	var arrived, gone []Row
 	for _, id := range order {
 		r, kind := b.mod(id, by[id], info)
+		if kind == "" && b.corpusOnly(ix.ByID[id], r) {
+			continue // a weekly data update of Archo Monitor (19 §6): not a change to show
+		}
 		switch kind {
 		case identity.EvDiscovered:
 			arrived = append(arrived, r)
@@ -833,6 +838,30 @@ type fileChange struct {
 	op         byte
 	rel        string
 	size, prev int64
+}
+
+// corpusOnly: an Archo Monitor change that touched only its corpus data folder, which the
+// game never loads (19 §6). Such data-only updates are hidden from Updates.
+func (b *changeBuilder) corpusOnly(m *store.Mod, r Row) bool {
+	if !app.IsMonitor(m) || r.Before == 0 || r.After == 0 || r.Before == r.After {
+		return false
+	}
+	x, err1 := b.a.Store.SnapshotFiles(r.Before)
+	y, err2 := b.a.Store.SnapshotFiles(r.After)
+	if err1 != nil || err2 != nil || x == nil || y == nil {
+		return false
+	}
+	cs := diffFiles(x, y)
+	if len(cs) == 0 {
+		return false
+	}
+	d := strings.ToLower(corpus.Dir) + "/"
+	for _, c := range cs {
+		if !strings.HasPrefix(strings.ToLower(filepath.ToSlash(c.rel)), d) {
+			return false
+		}
+	}
+	return true
 }
 
 func diffFiles(x, y map[string]store.SnapFile) []fileChange {
