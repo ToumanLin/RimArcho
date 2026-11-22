@@ -56,7 +56,7 @@ func main() {
 	corpus := fs.String("corpus", "", "run: the hugslogs folder of RimArcho-corpus (parsed.jsonl, raw/)")
 	parsed := fs.String("parsed", "", "run: hugslogs parsed records (comma-separated, .gz allowed; default <corpus>/parsed.jsonl)")
 	out := fs.String("out", "", "run: results JSONL (appended; logs already in it are skipped)")
-	mm := fs.String("mm", "1.6", "run: game major.minor of the logs to process")
+	mm := fs.String("mm", "1.6", "setup: the game version the ModsConfig is written for; run: game major.minor of the logs to process")
 	cpuprof := fs.String("cpuprofile", "", "write a CPU profile to this file")
 	maxN := fs.Int("max", 0, "run: process at most this many logs (0 = all)")
 	shard := fs.String("shard", "", "run: i/n, process only the logs whose id hashes to shard i of n (one home per shard)")
@@ -87,7 +87,7 @@ func main() {
 	var err error
 	switch os.Args[1] {
 	case "setup":
-		err = setup(*home, *game, *userData, *workshop, *rules, extra)
+		err = setup(*home, *game, *userData, *workshop, *rules, *mm, extra)
 	case "run":
 		var sel func(string) bool
 		if sel, err = selector(*shard, *idsFile); err == nil {
@@ -118,7 +118,7 @@ func open(home string) (*app.App, error) {
 	return a, nil
 }
 
-func setup(home, game, userData, workshop, rules string, extra []string) error {
+func setup(home, game, userData, workshop, rules, mm string, extra []string) error {
 	if userData == "" {
 		return fmt.Errorf("-userdata is required")
 	}
@@ -126,7 +126,7 @@ func setup(home, game, userData, workshop, rules string, extra []string) error {
 		return err
 	}
 	// An empty list to start with; run replaces it per log.
-	if err := writeModsConfig(userData, "1.6", []string{"ludeon.rimworld"}); err != nil {
+	if err := writeModsConfig(userData, mm, []string{"ludeon.rimworld"}); err != nil {
 		return err
 	}
 	if rules != "" {

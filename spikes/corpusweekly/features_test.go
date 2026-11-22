@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/ToumanLin/RimArcho/internal/corpus"
 )
 
 // Dropped logs go to the dropped list and count as seen; prune deletes only committed raw logs
@@ -83,4 +85,18 @@ func silence(t *testing.T) {
 	null, _ := os.Open(os.DevNull)
 	os.Stdout = null
 	t.Cleanup(func() { os.Stdout = old; null.Close() })
+}
+
+// A section ships only when it is not smaller than the built-in data of its game version.
+func TestCompareEmbedded(t *testing.T) {
+	empty := &corpus.Section{}
+	if v := compareEmbedded("1.6", empty); !v.has || !v.smaller() {
+		t.Errorf("an empty 1.6 section: %+v, want held back", v)
+	}
+	if v := compareEmbedded("1.7", empty); v.has || v.smaller() {
+		t.Errorf("1.7 has no built-in data: %+v, want shipped", v)
+	}
+	if v := compareEmbedded("1.6", corpus.EmbeddedBundle().Sections["1.6"]); v.smaller() {
+		t.Errorf("the built-in section against itself: %+v", v)
+	}
 }
