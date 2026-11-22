@@ -92,6 +92,11 @@ func (a *App) logTrash(h *oplog.Handle, path string, err error, refused bool) {
 	a.opAdd(h, r)
 }
 
+// logDelete records one folder deleted for good (quick delete): its name, path and error.
+func (a *App) logDelete(h *oplog.Handle, path string, err error, refused bool) {
+	a.opAdd(h, oplog.Row{Op: oplog.Delete, Subject: trashSubject(path), Target: path, Result: opResult(err, refused), Detail: errText(err)})
+}
+
 // logUnsubscribe records a Workshop unsubscribe, one row per item: the Steam result from rep,
 // or err (refused before Steam was asked, or the call failed). why marks the unsubscribe
 // half of a resubscribe.

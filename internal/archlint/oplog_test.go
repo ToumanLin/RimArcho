@@ -13,7 +13,8 @@ import (
 // log (13 §1.3, 02 §1): file → function names (methods by name). A new write path of the
 // same kind joins this table, or it silently skips the log.
 var opPrimitives = map[string][]string{
-	"internal/app/trash.go":          {"toTrash", "recycleTarget"},
+	"internal/app/trash.go":          {"toTrash", "recycleTargetIn", "deleteChecked", "deleteTree"},
+	"internal/app/subscribe.go":      {"RemoveSubscriptionsWith"},
 	"internal/app/workshopsub.go":    {"Workshop", "resubscribe"},
 	"internal/app/loadout.go":        {"writeGame"},
 	"internal/app/linkdeployment.go": {"applyLinks"},
@@ -23,6 +24,14 @@ var opPrimitives = map[string][]string{
 	"internal/app/uninstall.go":      {"Uninstall", "uninstallItem"},
 	"internal/app/launch.go":         {"LaunchWith"},
 	"internal/app/pack.go":           {"LaunchPackWith", "launchPackWith"},
+}
+
+// permanentDeletes are the functions that delete a player's folder for good, skipping the
+// recycle bin, each with the only function allowed to call it: a logged primitive of
+// opPrimitives. A new caller (another quick-delete path) must go through that primitive, or
+// it deletes the player's Mods with no row.
+var permanentDeletes = map[string]string{
+	"removeModTree": "internal/app/trash.go deleteTree",
 }
 
 // opLogFile holds the App's log helpers: a primitive calls one of them or App.Ops itself.
@@ -113,6 +122,34 @@ func opLogProblems(files []*goFile) []string {
 			})
 		}
 	}
+	for _, g := range files {
+		if g.test {
+			continue
+		}
+		for _, d := range g.f.Decls {
+			fd, ok := d.(*ast.FuncDecl)
+			if !ok || fd.Body == nil {
+				continue
+			}
+			ast.Inspect(fd.Body, func(n ast.Node) bool {
+				c, ok := n.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				name := ""
+				switch f := c.Fun.(type) {
+				case *ast.Ident:
+					name = f.Name
+				case *ast.SelectorExpr:
+					name = f.Sel.Name
+				}
+				if want, ok := permanentDeletes[name]; ok && g.path+" "+fd.Name.Name != want {
+					out = append(out, fmt.Sprintf("13 §1.3: %s %s calls %s, which deletes a player's folder for good with no operation-log row; call %s instead", loc(g.fset.Position(c.Pos()), g.path), fd.Name.Name, name, want))
+				}
+				return true
+			})
+		}
+	}
 	for file, fns := range opPrimitives {
 		for _, fn := range fns {
 			if !found[file+" "+fn] && len(files) > 0 && hasFile(files, file) {
@@ -150,14 +187,16 @@ func TestArchOpLog(t *testing.T) {
 func TestArchOpLogDetection(t *testing.T) {
 	t.Parallel()
 	got := opLogProblems(synthetic(t, map[string]string{
-		"internal/app/oplog.go":       "package app\nfunc (a *App) logTrash() { a.Ops.Add() }\n",
-		"internal/app/trash.go":       "package app\nfunc (a *App) toTrash() { a.logTrash() }\nfunc (a *App) recycleTarget() { trash() }\n",
+		"internal/app/oplog.go":       "package app\nfunc (a *App) logTrash() { a.Ops.Add() }\nfunc (a *App) logDelete() { a.Ops.Add() }\n",
+		"internal/app/trash.go":       "package app\nfunc (a *App) toTrash() { a.logTrash() }\nfunc (a *App) recycleTargetIn() { trash() }\nfunc (a *App) deleteChecked() { a.logDelete() }\nfunc (a *App) deleteTree() { removeModTree(); a.logDelete() }\n",
+		"internal/app/subscribe.go":   "package app\nfunc (a *App) RemoveSubscriptionsWith() { a.Ops.Add() }\nfunc (a *App) quick() { removeModTree() }\n",
 		"internal/app/workshopsub.go": "package app\nimport \"x/internal/oplog\"\nvar o = map[string]string{oplog.EnvVar: oplog.Agent}\nfunc (a *App) Workshop() { a.Ops.SetOrigin(oplog.Agent) }\n",
 		"internal/app/agent.go":       "package app\nimport \"x/internal/oplog\"\nvar o = oplog.EnvVar + \"=\" + oplog.Agent\n",
 		"internal/view/x.go":          "package view\nimport \"x/internal/oplog\"\nvar label = map[string]string{oplog.Agent: \"Archo\"}\n",
 		"internal/cmds/x.go":          "package cmds\nvar e = \"ARCHO_ORIGIN=agent\"\n",
 	}))
-	// recycleTarget logs nothing; the agent origin set twice outside agent.go (a reading
-	// in view is fine); ARCHO_ORIGIN spelled; resubscribe missing.
-	expect(t, "op log", got, 5)
+	// recycleTargetIn logs nothing; quick calls removeModTree outside deleteTree; the agent
+	// origin set twice outside agent.go (a reading in view is fine); ARCHO_ORIGIN spelled;
+	// resubscribe missing.
+	expect(t, "op log", got, 6)
 }

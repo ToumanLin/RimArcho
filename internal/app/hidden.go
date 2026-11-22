@@ -258,7 +258,7 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 	if dryRun {
 		return op, nil
 	}
-	op.Scan, err = a.removeMod(st.Ix, m, real, false)
+	op.Scan, err = a.removeMod(nil, st.Ix, m, real, false)
 	return op, err
 }
 

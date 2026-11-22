@@ -34,10 +34,38 @@ func (a *App) toTrash(h *oplog.Handle, path string) error {
 
 // recycleTarget is used inside an already journalled lifecycle. It retains the
 // existing trash allow-list; detaching a link never goes through this function.
-func (a *App) recycleTarget(path string) error {
+func (a *App) recycleTarget(path string) error { return a.recycleTargetIn(nil, path) }
+
+// recycleTargetIn is recycleTarget whose row belongs to the parent row h (a subscription
+// removal).
+func (a *App) recycleTargetIn(h *oplog.Handle, path string) error {
 	err := a.recycleChecked(path)
-	a.logTrash(nil, path, err, errors.Is(err, ErrNotInTrashList) || errors.Is(err, os.ErrNotExist))
+	a.logTrash(h, path, err, refusedRemoval(err))
 	return err
+}
+
+// deleteChecked deletes a Mod folder for good (quick delete, skipping the recycle bin),
+// inside an already journalled lifecycle: the path must be on the recycle bin's allow-list
+// all the same (02 §3). Every call is a delete row (13 §1.3), the refusals too.
+func (a *App) deleteChecked(h *oplog.Handle, path string) error {
+	if err := a.trashAllowed(path); err != nil {
+		a.logDelete(h, path, err, true)
+		return err
+	}
+	return a.deleteTree(h, path)
+}
+
+// deleteTree is the only caller of removeModTree: every folder RimArcho deletes without
+// the recycle bin is a delete row (13 §1.3; TestArchOpLog checks the callers).
+func (a *App) deleteTree(h *oplog.Handle, path string) error {
+	err := removeModTree(path)
+	a.logDelete(h, path, err, errors.Is(err, os.ErrNotExist))
+	return err
+}
+
+// refusedRemoval: a recycle or delete turned down before anything changed.
+func refusedRemoval(err error) bool {
+	return errors.Is(err, ErrNotInTrashList) || errors.Is(err, os.ErrNotExist)
 }
 
 func (a *App) recycleChecked(path string) error {

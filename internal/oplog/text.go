@@ -40,6 +40,10 @@ func Where(r Row) string {
 	switch r.Op {
 	case Trash, SaveTrash:
 		return "the recycle bin"
+	case SubscriptionRemove:
+		if !strings.HasPrefix(r.Detail, Permanent) {
+			return "the recycle bin"
+		}
 	case ModsConfigWrite:
 		if v := VersionOf(r.Detail); v != "" {
 			return "the plan's history (archo history; archo loadout checkout " + v + " lists it again)"

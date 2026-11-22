@@ -14,6 +14,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/identity"
+	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/scan"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
@@ -664,26 +665,42 @@ func (a *App) RemoveSubscriptionsWith(refs []string, opts RemoveSubscriptionOpti
 	if len(refs) == 0 {
 		return nil, fmt.Errorf("give at least one subscription reference")
 	}
+	// Each subscription is a subscription.remove row with its recycle or delete as a step
+	// (13 §1.3); a refusal before anything changed is a refused row for each (a dry run
+	// writes none).
+	var ss []Subscription
+	refuse := func(err error) (*SubscribeOp, error) {
+		if opts.DryRun {
+			return nil, err
+		}
+		if len(ss) == 0 {
+			a.Ops.Add(oplog.Row{Op: oplog.SubscriptionRemove, EnvID: a.opEnv(), Subject: strings.Join(refs, ", "), Result: oplog.Refused, Detail: err.Error()})
+		}
+		for _, s := range ss {
+			a.Ops.Add(oplog.Row{Op: oplog.SubscriptionRemove, EnvID: a.opEnv(), Subject: s.Mod.DisplayName(), Target: s.Folder, Result: oplog.Refused, Detail: err.Error()})
+		}
+		return nil, err
+	}
 	ss, err := a.selectSubscriptions(refs)
 	if err != nil {
-		return nil, err
+		return refuse(err)
 	}
 	st, err := a.Loadout()
 	if err != nil {
-		return nil, err
+		return refuse(err)
 	}
 	op := &SubscribeOp{Action: "remove", DryRun: opts.DryRun}
 	for _, s := range ss {
 		it := subscriptionItem(s)
 		it.Links, err = a.PlanIncomingLinks(s.Folder, "")
 		if err != nil {
-			return nil, err
+			return refuse(err)
 		}
 		if it.UsedBy, err = a.usedBy(st, s.Mod.ID); err != nil {
-			return nil, err
+			return refuse(err)
 		}
 		if !samePath(filepath.Dir(s.Folder), a.SubscribedDir()) && s.Mod.Kind != source.SteamCMD {
-			return nil, fmt.Errorf("%s is not directly inside a subscription source", s.Ref)
+			return refuse(fmt.Errorf("%s is not directly inside a subscription source", s.Ref))
 		}
 		op.Items = append(op.Items, it)
 	}
@@ -696,7 +713,18 @@ func (a *App) RemoveSubscriptionsWith(refs []string, opts RemoveSubscriptionOpti
 			calls.Start(i)
 		}
 		it := &op.Items[i]
-		_, err := worker.removeMod(st.Ix, ss[i].Mod, it.Folder, opts.Permanent)
+		how := ""
+		if opts.Permanent {
+			how = oplog.Permanent
+		}
+		run := worker.opStart(false, func() oplog.Row {
+			return oplog.Row{Op: oplog.SubscriptionRemove, EnvID: worker.opEnv(), Subject: it.Name, Target: it.Folder, Detail: how}
+		})
+		_, err := worker.removeMod(run.parent(), st.Ix, ss[i].Mod, it.Folder, opts.Permanent)
+		if err != nil && !refusedRemoval(err) {
+			run.begin()
+		}
+		run.end(err, how)
 		if err == nil {
 			it.Result = "moved to recycle bin"
 			if opts.Permanent {

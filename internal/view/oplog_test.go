@@ -43,7 +43,29 @@ func TestOperationsPage(t *testing.T) {
 	if old.Op != oplog.SaveRename || !old.Bad || old.Day == "today" {
 		t.Fatalf("old %+v", old)
 	}
-	if len(p.Origins) == 0 || len(p.Results) == 0 {
-		t.Fatalf("facets %+v %+v", p.Results, p.Origins)
+	// One mark, only where something went wrong: the launch's own, the refusal's; none on
+	// the recycled Mod.
+	if launch.Mark != oplog.Failed || old.Mark != oplog.Refused || trash.Mark != "" {
+		t.Fatalf("marks %q %q %q", launch.Mark, old.Mark, trash.Mark)
+	}
+}
+
+// An action that went well but has a failed step shows the step's mark in its one mark
+// column; a quick delete says nowhere to get it back (16 §2.16).
+func TestOperationsMarkOfAStep(t *testing.T) {
+	e := testkit.New(t)
+	h := e.App.Ops.Begin(oplog.Row{Op: oplog.Uninstall, Subject: "RimArcho"})
+	h.Child(oplog.Row{Op: oplog.Trash, Subject: "Saves", Result: oplog.Refused})
+	h.End(oplog.OK, "")
+	s := e.App.Ops.Begin(oplog.Row{Op: oplog.SubscriptionRemove, Subject: "Fat Bodies"})
+	s.Child(oplog.Row{Op: oplog.Delete, Subject: "3771446780"})
+	s.End(oplog.OK, oplog.Permanent)
+	p, err := view.Operations(e.App)
+	if err != nil || len(p.Rows) != 2 {
+		t.Fatal(p, err)
+	}
+	sub, un := p.Rows[0], p.Rows[1]
+	if un.Mark != oplog.Refused || !un.Bad || sub.Mark != "" || sub.Back != "" || sub.Steps[0].Back != "" || sub.Icon != "bin" {
+		t.Fatalf("uninstall %+v, subscription %+v", un, sub)
 	}
 }

@@ -18,23 +18,29 @@ import (
 
 // Op codes (stable English; the surfaces translate them).
 const (
-	Trash           = "trash"
-	Unsubscribe     = "workshop.unsubscribe"
-	ModsConfigWrite = "modsconfig.write"
-	LinkCreate      = "link.create"
-	LinkRemove      = "link.remove"
-	SaveRename      = "save.rename"
-	SaveCopy        = "save.copy"
-	SaveBackup      = "save.backup"
-	SaveTrash       = "save.trash"
-	UpdateApply     = "update.apply"
-	UpdateRollback  = "update.rollback"
-	Uninstall       = "uninstall"
-	Launch          = "launch"
+	Trash              = "trash"
+	Delete             = "delete" // deleted for good, skipping the recycle bin (quick delete)
+	SubscriptionRemove = "subscription.remove"
+	Unsubscribe        = "workshop.unsubscribe"
+	ModsConfigWrite    = "modsconfig.write"
+	LinkCreate         = "link.create"
+	LinkRemove         = "link.remove"
+	SaveRename         = "save.rename"
+	SaveCopy           = "save.copy"
+	SaveBackup         = "save.backup"
+	SaveTrash          = "save.trash"
+	UpdateApply        = "update.apply"
+	UpdateRollback     = "update.rollback"
+	Uninstall          = "uninstall"
+	Launch             = "launch"
 )
 
 // Codes lists every op code, in the order the filters show them.
-var Codes = []string{Launch, ModsConfigWrite, LinkCreate, LinkRemove, Trash, Unsubscribe, SaveRename, SaveCopy, SaveBackup, SaveTrash, UpdateApply, UpdateRollback, Uninstall}
+var Codes = []string{Launch, ModsConfigWrite, LinkCreate, LinkRemove, Trash, Delete, Unsubscribe, SubscriptionRemove, SaveRename, SaveCopy, SaveBackup, SaveTrash, UpdateApply, UpdateRollback, Uninstall}
+
+// Permanent begins the detail of a subscription.remove whose folder was deleted for good
+// (quick delete) instead of moved to the recycle bin.
+const Permanent = "permanently deleted"
 
 // Results.
 const (

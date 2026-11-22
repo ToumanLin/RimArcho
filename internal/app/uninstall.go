@@ -972,7 +972,7 @@ func (a *App) uninstallItem(h *oplog.Handle, step string, it *UninstallItem) err
 		if step == UnSource {
 			return a.uninstallSource(it.Path)
 		}
-		return a.withIncomingLinks(it.Path, "", func() error { return removeModTree(it.Path) })
+		return a.withIncomingLinks(it.Path, "", func() error { return a.deleteTree(h, it.Path) })
 	case DoDDS:
 		return a.deleteTexturesIn(it.Path)
 	case DoMove:

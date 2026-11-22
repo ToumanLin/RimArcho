@@ -17,7 +17,7 @@ func init() {
 	register(&Command{Name: "ops", Summary: "what RimArcho did to your files (the operation log), newest first", MaxArgs: 0, Run: opsCmd,
 		Flags: []Flag{
 			{Name: "since", Value: "<when>", Help: "only rows since <n>h, <n>d or YYYY-MM-DD"},
-			{Name: "op", Value: "<code>", Help: "only one operation (trash, workshop.unsubscribe, modsconfig.write, link.create, link.remove, save.rename, save.copy, save.backup, save.trash, update.apply, update.rollback, uninstall, launch) or a family (save, link, update)"},
+			{Name: "op", Value: "<code>", Help: "only one operation (trash, delete, subscription.remove, workshop.unsubscribe, modsconfig.write, link.create, link.remove, save.rename, save.copy, save.backup, save.trash, update.apply, update.rollback, uninstall, launch) or a family (save, link, update)"},
 			{Name: "failed", Help: "only failed, refused and partly done rows"},
 			{Name: "all", Help: "every row kept (default: the newest 20)"},
 		}})

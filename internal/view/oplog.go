@@ -16,32 +16,26 @@ import (
 
 // OpsPage is the list.
 type OpsPage struct {
-	Rows    []OpRow    `json:"rows"` // newest first
-	Count   int        `json:"count"`
-	Failed  int        `json:"failed"` // actions that failed, were refused or partly done, or have such a step
-	Results []OpsFacet `json:"results"`
-	Origins []OpsFacet `json:"origins"`
-	Kept    string     `json:"kept"` // how long rows are kept
-	Empty   string     `json:"empty,omitempty"`
-}
-
-// OpsFacet is one filter chip: a result or an origin, with its count.
-type OpsFacet struct {
-	Key   string `json:"key"`
-	Label string `json:"label"`
-	Count int    `json:"count"`
+	Rows   []OpRow `json:"rows"` // newest first
+	Count  int     `json:"count"`
+	Failed int     `json:"failed"` // actions that failed, were refused or partly done, or have such a step
+	Kept   string  `json:"kept"`   // how long rows are kept (the heading's hover)
+	Empty  string  `json:"empty,omitempty"`
 }
 
 // OpRow is one action.
 type OpRow struct {
-	ID         int64   `json:"id"`
-	Op         string  `json:"op"`
-	Icon       string  `json:"icon"` // the window's icon key (icons.js)
-	What       string  `json:"what"`
-	Subject    string  `json:"subject"`
-	Result     string  `json:"result"` // ok, failed, refused, partial, started
-	ResultText string  `json:"resultText"`
-	Bad        bool    `json:"bad,omitempty"` // failed, refused or partial: it stands out
+	ID         int64  `json:"id"`
+	Op         string `json:"op"`
+	Icon       string `json:"icon"` // the window's icon key (icons.js)
+	What       string `json:"what"`
+	Subject    string `json:"subject"`
+	Result     string `json:"result"` // ok, failed, refused, partial, started
+	ResultText string `json:"resultText"`
+	Bad        bool   `json:"bad,omitempty"` // failed, refused or partial: it stands out
+	// Mark is the result the row's one mark shows: its own when it did not succeed, else
+	// that of its first failed step; "" for a row that went well (no mark).
+	Mark       string  `json:"mark,omitempty"`
 	Origin     string  `json:"origin"`
 	OriginText string  `json:"originText"`
 	Day        string  `json:"day"`  // today, yesterday, or the date
@@ -58,23 +52,25 @@ type OpRow struct {
 const OpsLimit = oplog.MaxRows
 
 var opWhat = map[string]string{
-	oplog.Trash:           "moved to the recycle bin",
-	oplog.Unsubscribe:     "unsubscribed on Steam",
-	oplog.ModsConfigWrite: "wrote the list to the game",
-	oplog.LinkCreate:      "made links",
-	oplog.LinkRemove:      "removed links",
-	oplog.SaveRename:      "renamed a save",
-	oplog.SaveCopy:        "copied a save",
-	oplog.SaveBackup:      "backed up saves",
-	oplog.SaveTrash:       "recycled saves",
-	oplog.UpdateApply:     "updated RimArcho",
-	oplog.UpdateRollback:  "put RimArcho back",
-	oplog.Uninstall:       "uninstalled",
-	oplog.Launch:          "started the game",
+	oplog.Trash:              "moved to the recycle bin",
+	oplog.Delete:             "deleted for good",
+	oplog.SubscriptionRemove: "removed a subscription",
+	oplog.Unsubscribe:        "unsubscribed on Steam",
+	oplog.ModsConfigWrite:    "wrote the list to the game",
+	oplog.LinkCreate:         "made links",
+	oplog.LinkRemove:         "removed links",
+	oplog.SaveRename:         "renamed a save",
+	oplog.SaveCopy:           "copied a save",
+	oplog.SaveBackup:         "backed up saves",
+	oplog.SaveTrash:          "recycled saves",
+	oplog.UpdateApply:        "updated RimArcho",
+	oplog.UpdateRollback:     "put RimArcho back",
+	oplog.Uninstall:          "uninstalled",
+	oplog.Launch:             "started the game",
 }
 
 var opIcon = map[string]string{
-	oplog.Trash: "bin", oplog.Unsubscribe: "workshop", oplog.ModsConfigWrite: "plan", oplog.LinkCreate: "link", oplog.LinkRemove: "unlink",
+	oplog.Trash: "bin", oplog.Delete: "bin", oplog.SubscriptionRemove: "bin", oplog.Unsubscribe: "workshop", oplog.ModsConfigWrite: "plan", oplog.LinkCreate: "link", oplog.LinkRemove: "unlink",
 	oplog.SaveRename: "saves", oplog.SaveCopy: "saves", oplog.SaveBackup: "saves", oplog.SaveTrash: "bin",
 	oplog.UpdateApply: "rescan", oplog.UpdateRollback: "rescan", oplog.Uninstall: "close", oplog.Launch: "play",
 }
@@ -117,7 +113,6 @@ func Operations(a *app.App) (*OpsPage, error) {
 		}
 	}
 	steps := map[int64][]OpRow{}
-	results, origins := map[string]int{}, map[string]int{}
 	for _, r := range rows {
 		o := opRow(r, now, loc)
 		if r.Batch != 0 && parents[r.Batch] {
@@ -135,24 +130,15 @@ func Operations(a *app.App) (*OpsPage, error) {
 			if s.Bad && !r.Bad {
 				r.Bad = true
 			}
+			if s.Bad && r.Mark == "" {
+				r.Mark = s.Result
+			}
 		}
 		if r.Bad {
 			p.Failed++
 		}
-		results[r.Result]++
-		origins[r.Origin]++
 	}
 	p.Count = len(p.Rows)
-	for _, k := range []string{oplog.OK, oplog.Failed, oplog.Refused, oplog.Partial, oplog.Started} {
-		if n := results[k]; n > 0 {
-			p.Results = append(p.Results, OpsFacet{Key: k, Label: T(opResult[k]), Count: n})
-		}
-	}
-	for _, k := range oplog.Origins {
-		if n := origins[k]; n > 0 {
-			p.Origins = append(p.Origins, OpsFacet{Key: k, Label: T(opOrigin[k]), Count: n})
-		}
-	}
 	if p.Count == 0 {
 		p.Empty = T("RimArcho has not changed any of your files yet")
 	}
@@ -166,6 +152,9 @@ func opRow(r oplog.Row, now time.Time, loc *time.Location) OpRow {
 		Time: at.Format("15:04"), At: r.At.UnixMilli(), Target: r.Target, Detail: r.Detail, Back: opBack(r)}
 	if o.Icon == "" {
 		o.Icon = "log"
+	}
+	if r.Result != oplog.OK {
+		o.Mark = r.Result
 	}
 	if o.ResultText == "" {
 		o.ResultText = r.Result
@@ -192,7 +181,7 @@ func opBack(r oplog.Row) string {
 		return ""
 	}
 	switch r.Op {
-	case oplog.Trash, oplog.SaveTrash:
+	case oplog.Trash, oplog.SaveTrash, oplog.SubscriptionRemove:
 		return T("in the system recycle bin")
 	case oplog.ModsConfigWrite:
 		if v := oplog.VersionOf(r.Detail); v != "" {
