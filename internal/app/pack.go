@@ -22,6 +22,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/fsscan"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
+	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/render"
 	"github.com/ToumanLin/RimArcho/internal/scan"
 	"github.com/ToumanLin/RimArcho/internal/source"
@@ -859,16 +860,28 @@ func (a *App) LaunchPack(name string, dryRun bool) (*PackLaunch, error) {
 
 // LaunchPackWith is LaunchPack that, with move, first moves plain Mods/ folders holding
 // another version of a pack copy into the lock library (10 §3; --move-duplicates).
-func (a *App) LaunchPackWith(name string, dryRun, move bool) (*PackLaunch, error) {
+//
+// The launch is a parent row in the operation log (13 §1.3), the link counts under it.
+func (a *App) LaunchPackWith(name string, dryRun, move bool) (r *PackLaunch, err error) {
+	o := a.opStart(dryRun, func() oplog.Row {
+		return oplog.Row{Op: oplog.Launch, EnvID: a.opEnv(), Subject: "pack " + name, Target: a.packPath(name)}
+	})
+	defer func() {
+		detail := ""
+		if r != nil && r.Plan != nil {
+			detail = "method " + r.Plan.Method
+		}
+		o.end(err, detail)
+	}()
 	unlock, err := a.waitLaunch()
 	if err != nil {
 		return nil, err
 	}
 	defer unlock()
-	return a.launchPackWith(name, dryRun, move)
+	return a.launchPackWith(o, name, dryRun, move)
 }
 
-func (a *App) launchPackWith(name string, dryRun, move bool) (*PackLaunch, error) {
+func (a *App) launchPackWith(o *opRun, name string, dryRun, move bool) (*PackLaunch, error) {
 	if err := a.checkLaunchArgs(); err != nil {
 		return nil, err
 	}
@@ -961,10 +974,11 @@ func (a *App) launchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 		}
 		if !dryRun {
 			// Move them, then launch from the state after the move.
+			o.begin()
 			if _, err := a.doMoves(de.Moves); err != nil {
 				return nil, err
 			}
-			r2, err := a.launchPackWith(name, false, false)
+			r2, err := a.launchPackWith(o, name, false, false)
 			if r2 != nil {
 				r2.Moved = de.Moves
 			}
@@ -1050,7 +1064,8 @@ func (a *App) launchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 	if err := a.checkRoots(mods); err != nil {
 		return nil, err
 	}
-	if err := a.applyLinks(mods, r.Links); err != nil {
+	o.begin()
+	if err := a.applyLinksIn(o.parent(), mods, r.Links); err != nil {
 		return nil, err
 	}
 	// First run: seed settings with the same rules as --like (10 §3 step 4).

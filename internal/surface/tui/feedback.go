@@ -32,14 +32,14 @@ var copyText = func(s string) error {
 }
 
 // feedbackPanel is Settings > Feedback in the terminal (16 §2.14, §9): the same attachments as the
-// window, m / p / l tick them, the whole text below. s sends it through the feedback relay
+// window, m / p / l / o tick them, the whole text below. s sends it through the feedback relay
 // (asked for the title, what happened and a contact on the input line; only when RimArcho
 // has a relay); enter opens GitHub with it filled in (the title and text are written there).
 func (m *model) feedbackPanel(o view.FeedbackOptions) tea.Cmd {
 	at := view.FeedbackAttachments(m.app, m.st, o)
 	res := view.ComposeFeedback("", "", at)
-	on := map[string]bool{"mods": o.Mods, "paths": o.Paths, "log": o.Log}
-	key := map[string]string{"mods": "m", "paths": "p", "log": "l"}
+	on := map[string]bool{"mods": o.Mods, "paths": o.Paths, "log": o.Log, "ops": o.Ops}
+	key := map[string]string{"mods": "m", "paths": "p", "log": "l", "ops": "o"}
 	var b strings.Builder
 	fmt.Fprintf(&b, "[x]   %s  %s\n", T("basic information"), strings.Join(at.Basic, "  "))
 	for _, p := range at.Parts {
@@ -82,6 +82,8 @@ func (m *model) feedbackPanel(o view.FeedbackOptions) tea.Cmd {
 			m.panel.keys["p"] = toggle(func() { o.Paths = !o.Paths })
 		case "log":
 			m.panel.keys["l"] = toggle(func() { o.Log = !o.Log })
+		case "ops":
+			m.panel.keys["o"] = toggle(func() { o.Ops = !o.Ops })
 		}
 	}
 	if at.Send {

@@ -19,6 +19,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/netcfg"
+	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/secret"
 	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 )
@@ -315,6 +316,7 @@ func (a *App) WriteAgentConfig(s AgentStatus) error {
 			"defaultThinkingLevel": s.Thinking, "quietStartup": "header", "enableInstallTelemetry": false},
 		"mcp.json": map[string]any{"mcpServers": map[string]any{"archo": map[string]any{
 			"command": filepath.Join(programDir, archoExe()), "args": []string{"mcp"}, "exposure": "direct",
+			"env":         map[string]string{oplog.EnvVar: oplog.Agent}, // its rows say agent (13 §1.3)
 			"description": "RimArcho: the player's RimWorld installation, Mods, plans, logs and saves"}}},
 		"archo-redact.json": map[string]any{"values": a.agentRedactValues()},
 	}
@@ -391,6 +393,7 @@ func (a *App) RunAgent(console bool, stdin io.Reader, stdout, stderr io.Writer) 
 		"-e", dir)
 	cmd.Dir = filepath.Join(a.AgentConfigDir(), "work")
 	cmd.Env = append(os.Environ(),
+		oplog.EnvVar+"="+oplog.Agent, // what Archo runs is origin agent in the operation log (13 §1.3)
 		"PI_CODING_AGENT_DIR="+filepath.Join(a.AgentConfigDir(), "pi"),
 		agentKeyEnv+"="+key,
 		"PI_SKIP_VERSION_CHECK=1", "PI_TELEMETRY=0", "PI_OFFLINE=1",

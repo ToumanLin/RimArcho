@@ -313,13 +313,15 @@ type detailMsg struct {
 func (m *model) Init() tea.Cmd {
 	m.reload()
 	m.problemCounts()
+	// The operation log's retention (13 §1.3) runs beside the first frame, off the UI loop.
+	prune := func() tea.Msg { m.app.PruneOps(); return nil }
 	if m.promptDirectories() {
-		return liveNext()
+		return tea.Batch(liveNext(), prune)
 	}
 	if m.opts.ScanOnStart && m.loadErr == nil && m.neverScanned() {
-		return tea.Batch(m.startScan(), liveNext())
+		return tea.Batch(m.startScan(), liveNext(), prune)
 	}
-	return liveNext()
+	return tea.Batch(liveNext(), prune)
 }
 
 func (m *model) neverScanned() bool {

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/feedback"
+	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -28,7 +29,7 @@ func TestFeedbackAttachments(t *testing.T) {
 	if len(at.Sections) != 0 || len(at.Basic) != 3 || !strings.HasPrefix(at.Basic[0], "RimArcho ") || at.Basic[1] != "RimWorld 1.6.4633 rev1261" {
 		t.Fatalf("basics only by default: %+v", at)
 	}
-	if len(at.Parts) != 3 || at.Parts[0].Key != "mods" || at.Parts[0].None || !at.Parts[2].None {
+	if len(at.Parts) != 4 || at.Parts[0].Key != "mods" || at.Parts[0].None || !at.Parts[2].None || at.Parts[3].Key != "ops" || !at.Parts[3].None {
 		t.Fatalf("parts: %+v", at.Parts)
 	}
 	res := api.FeedbackCompose("Title", "Description")
@@ -59,6 +60,21 @@ func TestFeedbackAttachments(t *testing.T) {
 	}
 	if res := api.FeedbackCompose("t", ""); !strings.Contains(res.Body, "<summary>") || len(res.URL) > feedback.MaxURL {
 		t.Fatalf("compose uses the attachments read last; the link stays short: %d", len(res.URL))
+	}
+	// Recent operations (13 §1.3): off unless ticked, the CLI's text, the home scrubbed.
+	home, _ := os.UserHomeDir()
+	e.App.Ops.Add(oplog.Row{Op: oplog.Trash, Subject: "Old Mod", Target: filepath.Join(home, "Mods", "Old Mod"), Result: oplog.Refused, Detail: "not on the list"})
+	if at, _ := api.FeedbackAttach(view.FeedbackOptions{}); at.Parts[3].None || len(at.Sections) != 0 {
+		t.Fatalf("ops part: %+v", at.Parts[3])
+	}
+	at, _ = api.FeedbackAttach(view.FeedbackOptions{Ops: true})
+	if len(at.Sections) != 1 || at.Sections[0].Key != "ops" {
+		t.Fatalf("ops: %+v", at.Sections)
+	}
+	opsText := strings.Join(at.Sections[0].Lines, "\n")
+	if !strings.Contains(opsText, "trash") || !strings.Contains(opsText, "refused") || !strings.Contains(opsText, "Old Mod") ||
+		home != "" && strings.Contains(strings.ToLower(opsText), strings.ToLower(home)) {
+		t.Fatalf("ops text:\n%s", opsText)
 	}
 
 	log, err := os.ReadFile(filepath.Join("..", "..", "logs", "testdata", "synthetic-save-loading.log"))

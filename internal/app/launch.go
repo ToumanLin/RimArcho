@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
@@ -75,7 +76,12 @@ func (a *App) Launch(dryRun bool) (*SaveResult, error) { return a.LaunchWith(dry
 
 // LaunchWith is Launch that, with move, first moves plain Mods/ folders in the way of a
 // deployed copy into the lock library (09 §3; --move-duplicates).
-func (a *App) LaunchWith(dryRun, move bool) (*SaveResult, error) {
+//
+// The launch is a parent row in the operation log (13 §1.3); the ModsConfig.xml write and
+// the link counts hang under it.
+func (a *App) LaunchWith(dryRun, move bool) (res *SaveResult, err error) {
+	o := a.opStart(dryRun, func() oplog.Row { return oplog.Row{Op: oplog.Launch, EnvID: a.opEnv()} })
+	defer func() { o.end(err, launchDetail(res)) }()
 	unlock, err := a.waitLaunch()
 	if err != nil {
 		return nil, err
@@ -92,6 +98,15 @@ func (a *App) LaunchWith(dryRun, move bool) (*SaveResult, error) {
 		return nil, err
 	}
 	e := st.Ix.Env
+	if o != nil {
+		o.row.EnvID, o.row.Subject = e.ID, st.Plan.Name
+		st.op = &opWrite{h: o.parent()}
+		defer func() {
+			if st.op.wrote {
+				o.begin()
+			}
+		}()
+	}
 	if err := a.refuseUnhealthyLinks(modsDir(st.Ix)); err != nil {
 		return nil, err
 	}
@@ -112,6 +127,7 @@ func (a *App) LaunchWith(dryRun, move bool) (*SaveResult, error) {
 	if dryRun {
 		return r, nil
 	}
+	o.begin()
 	if err := a.startGame(p); err != nil {
 		return r, err
 	}

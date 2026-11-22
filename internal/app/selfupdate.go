@@ -21,6 +21,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/buildinfo"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/netcfg"
+	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 	"github.com/ToumanLin/RimArcho/internal/updatechannel"
 )
@@ -234,7 +235,20 @@ func (a *App) InstallSelfUpdateFrom(ctx context.Context, zipPath string, step fu
 	return a.installSelfUpdate(ctx, zipPath, step)
 }
 
-func (a *App) installSelfUpdate(ctx context.Context, picked string, step func(SelfUpdateStep)) (*SelfUpdateResult, error) {
+func (a *App) installSelfUpdate(ctx context.Context, picked string, step func(SelfUpdateStep)) (res *SelfUpdateResult, err error) {
+	// The operation log (13 §1.3) records the attempt once a release was chosen: refused
+	// while nothing changed, failed or rolled back after the files began to change.
+	var o *opRun
+	defer func() {
+		if o == nil && err != nil && a.Ops != nil && !errors.Is(err, ErrUpdateBusy) {
+			o = a.opStart(false, func() oplog.Row { return oplog.Row{Op: oplog.UpdateApply, Subject: "RimArcho " + a.SelfVersionNow()} })
+		}
+		detail := ""
+		if res != nil {
+			detail = res.From + " → " + res.To
+		}
+		o.end(err, detail)
+	}()
 	if !SelfUpdateSupported() {
 		return nil, errors.New("update RimArcho manually: " + a.SelfUpdateInstructions())
 	}
@@ -267,6 +281,9 @@ func (a *App) installSelfUpdate(ctx context.Context, picked string, step func(Se
 	if r == nil {
 		return nil, fmt.Errorf("RimArcho %s is the newest version known; check for updates first", cur)
 	}
+	o = a.opStart(false, func() oplog.Row {
+		return oplog.Row{Op: oplog.UpdateApply, Subject: "RimArcho " + r.Version, Target: picked}
+	})
 	if err := r.Installable(); err != nil {
 		return nil, fmt.Errorf("%w; download it from %s", err, r.Page)
 	}
@@ -341,6 +358,8 @@ func (a *App) installSelfUpdate(ctx context.Context, picked string, step func(Se
 	swapping.Add(1)
 	defer swapping.Done()
 	step(SelfUpdateStep{Phase: "replace"})
+	o.begin()
+	o.row.Target = program
 	old := filepath.Join(dir, fmt.Sprintf("old-%s-%d", cur, time.Now().UnixNano()))
 	swap, err := selfupdate.ApplyRelease(program, stage, old, journal, r.Version)
 	if err != nil {
@@ -348,7 +367,9 @@ func (a *App) installSelfUpdate(ctx context.Context, picked string, step func(Se
 	}
 	step(SelfUpdateStep{Phase: "check"})
 	if err := a.checkNewProgram(program, r.Version); err != nil {
-		if rb := swap.Rollback(); rb != nil {
+		rb := swap.Rollback()
+		a.logRollback(program, cur, r.Version, err, rb)
+		if rb != nil {
 			return nil, fmt.Errorf("the new program did not start (%s), and putting RimArcho %s back failed: %w; the old files are in %s, and the next start tries again", err.Error(), cur, rb, old)
 		}
 		return nil, fmt.Errorf("the new program did not start, so RimArcho %s was put back: %w", cur, err)
@@ -417,7 +438,9 @@ func (a *App) resumeSelfSwap(program, dir string) (done string, err error) {
 			return swap.Version, nil
 		}
 	}
-	if rb := swap.Rollback(); rb != nil {
+	rb := swap.Rollback()
+	a.logRollback(program, "", swap.Version, err, rb)
+	if rb != nil {
 		return "", errors.Join(err, rb)
 	}
 	os.RemoveAll(swap.Stage)

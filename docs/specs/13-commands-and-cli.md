@@ -67,6 +67,37 @@ The following table maps player actions to tools. Missing tools are marked **not
 
 Launch, `import rimcrow`, gc and `identity resolve` are MCP tools too, with annotations that say they write files or cannot be undone. The external agent's harness decides whether to permit them; Archo always asks the player to confirm (15 §2.2).
 
+### 1.3 Operation log
+
+RimArcho records every action it takes on the player's files, from every surface, in one append-only log: the table `op_log` in `archo.db` (04 §4), package `internal/oplog`, owned by `App.Ops`. It answers "my Mod disappeared" or "my list changed": who did what, when, and whether it worked. It is evidence, not authority: nothing reads it to decide an action, and it never offers an undo; a row says where the item can be got back (the recycle bin, the plan's history) instead.
+
+**What is recorded.** The rows are written by the primitives that touch the disk or Steam, never by a surface, so every caller is covered. `TestArchOpLog` (`internal/archlint/oplog_test.go`, table `opPrimitives`) checks that each primitive below writes the log.
+
+| `op` | Primitive | Subject, target, detail |
+| --- | --- | --- |
+| `trash` | `App.ToTrash` and `recycleTarget` (`internal/app/trash.go`), the recycle bin's only entry (02 §3) | folder or file name; its path; the refusal or error |
+| `workshop.unsubscribe` | `App.Workshop` and the unsubscribe half of a resubscribe (`workshopsub.go`) | the Mod's name; `workshop:<id>`; Steam's result, or `resubscribe` |
+| `modsconfig.write` | `App.writeGame` (`loadout.go`), behind save, launch and a credit handoff (07 §4) | the plan; `ModsConfig.xml`; `v<n>, <count> mods, <source>` (the version written or kept) |
+| `link.create`, `link.remove` | `App.applyLinks` (`linkdeployment.go`) and the confirmed link repair (`applyLinkRepair`) | counts only (`12 links`), one row each per call; a failed link gets its own failed row |
+| `save.rename`, `save.copy`, `save.backup`, `save.trash` | `RenameSave`, `CopySave`, `BackupSaves`, `TrashSaves` (`saveactions.go`) | the save, or `N saves`; the new name or the backup folder; a recycled save is a `trash` step of `save.trash` |
+| `update.apply`, `update.rollback` | `installSelfUpdate` and `resumeSelfSwap` (`selfupdate.go`, 17 §5.1) | the version; the program folder; `from → to`, or why the new program did not start |
+| `uninstall` | `App.Uninstall` (02 §2) | its recycle-bin moves, unlinked links and failed items are its steps |
+| `launch` | `LaunchWith`, `LaunchPackWith` (09 §2, 10 §3) | the plan or `pack <name>`; `method <direct\|steam>`; the ModsConfig.xml write and link counts are its steps |
+
+Other writes (Mod settings, packs, the lock library, environments, downloads, `config set`) are not recorded yet (01 §4). List edits are not recorded: the undo history has them (07 §3), and the `modsconfig.write` row marks the moment they reached the game. Reads, scans, previews and dry runs write no row (02 §1).
+
+**Row.** `at` (Unix milliseconds), `origin`, `env_id` (the environment, when one applies), `op`, `subject` (the player's label: Mod, plan, save), `target` (path or id, stored as is), `result`, `detail` (reason or counts, at most 400 characters), `batch` (the parent row of a multi-step action). Results: `ok`; `refused` (turned down before anything changed: the game runs, not on the recycle bin's list, an executable is missing); `failed` (it began changing files and stopped); `partial` (some items of a batch went); `started` (a parent row whose process ended before it closed). A failed or refused child marks its parent in the lists.
+
+**Multi-step actions.** A launch, a pack launch, a batch of recycled saves and uninstall open a parent row (`oplog.Log.Begin`, result `started`), pass the handle to the primitives they call (`LoadoutState.op` for the ModsConfig.xml write; `toTrash`, `applyLinksIn`), and close it with the outcome. There is no goroutine-local state, so concurrent actions in the window never attach to the wrong parent. A launch with no list change writes two rows (the launch and its write).
+
+**Origin.** One per process, set by the surface in `cli.Run` (`App.SetOrigin`): `gui` (RimArcho.exe, `archo gui`), `tui`, `mcp` (`archo mcp`), `cli` (any other command). An origin inherited through the environment variable `ARCHO_ORIGIN` (`oplog.EnvVar`) wins, and each process sets it for its children, so the scans, analyses and helpers the window starts write `gui` rows. Archo's launcher (`internal/app/agent.go`) sets `ARCHO_ORIGIN=agent` on Pi and in the MCP server entry it writes (15 §7.2), so Archo's calls are `agent` and any other MCP client is `mcp`; `TestArchOpLog` checks that nothing else sets the agent origin. `auto` is reserved for background automation (16 §2.16.1) and not written yet. The window's page sessions (`App.ReadSession`) log on their own connection with the process origin.
+
+**Failures and cost.** A row that cannot be written is reported once to the process log and otherwise ignored: the action goes on (`TestOpLogWriteFailureKeepsTheAction`). Writes are one small insert per action; reads happen only when a list, `archo ops` or the feedback attachment is opened. A nil `App.Ops` (a bare App in tests) records and reads nothing.
+
+**Retention.** The newer of 90 days and the newest 500 rows (`oplog.MaxAge`, `oplog.MaxRows`): a row survives only when it is both. The window prunes in the background once its first page has drawn (`API.Ready`), the TUI beside its first frame; the CLI and MCP never prune. Uninstall deletes the log with the data directory.
+
+**Where it is shown.** `archo ops` and MCP `list_operations` print the same text (§4.2, 14 §2): a head line per row (`#<id> <time> <origin> <op> <result> <subject>`, `(part of #<id>)` for a step), then `at:` (the target), `detail:` and `back:` (where to get it back: `oplog.Where`). The window's list is "What RimArcho did" under Background tasks (16 §2.16); the TUI's is the `ops` command in the command panel. The feedback form attaches the newest 30 rows (16 §2.14). The log never leaves the machine otherwise.
+
 ## 2. References
 
 Every object has stable references that can appear in any output and can be passed directly as arguments to another command (I2). The complete set is:
@@ -265,6 +296,7 @@ Commands and output call a plan `loadout` or `plan`. The editing commands below 
 | History | `history [--all]` | Show the current plan's edit steps (undo stack) and versions, by default the latest 10 versions. |
 | | `loadout log [--all]` / `loadout diff [<v>] [<v>] [--all]` / `loadout checkout <v>` / `loadout ignore-external` | List versions, compare them (by default, latest→workspace), load a version into the current plan in one undoable edit, or ignore an outside ModsConfig.xml version that was not loaded; it stays in the history (07 §4.3). |
 | Write/launch | `save [--dry-run] [--move-duplicates]` | **Write without launching** (called "save" in the interface), for players who launch through Steam or another route. Render the current plan into ModsConfig.xml: back it up, replace it atomically, and write the current game version. Sync links and remove pack links (07 §4.1, 09 §3). `--dry-run` previews the write. `--move-duplicates` first moves plain `Mods/` folders that hold another version of a Mod the plan links into the lock library (09 §3). |
+| | `ops [--since <when>] [--op <code>] [--failed] [--all]` | What RimArcho did to your files (the operation log, §1.3), newest first: the newest 20 rows (`--all`: every row kept). `--since` takes `<n>h`, `<n>d` or `YYYY-MM-DD`; `--op` an op code or a family (`save`, `link`, `update`); `--failed` only failed, refused and partly done rows. Read-only. |
 | | `launch [--dry-run] [--move-duplicates]` | Launch the current plan (09 §2); `--dry-run` only previews. Write before launching, refuse while a game is running, and record the launch and the game version launched. `--dry-run` shows the `save --dry-run` preview plus the launch command. `--move-duplicates` as for `save`. |
 | | `test run [<plan>] [--env <environment>] [--map \| --save <save>] [--ticks <n>] [--probe <folder> [--probe-after <packageId> \| --probe-before <packageId>]] [--timeout <duration>] [--settle <duration>] [--json]` | Run with isolated data (20 §2), by default the current plan. Launch directly, collect the loading log, then stop. The default timeout is `10m` (a map or save run: twice the previous one's load time, at least `10m`), with a 5 s wait after reaching the menu. `--save` loads a save (a `saves list` reference or name, or a `.rws` path) in the run's own data and plays `--ticks` (default 4000); `--ticks` with `--map` plays that many ticks on the test map. A report that proves nothing starts with `NOT TESTED:`. `--probe` adds a probe Mod to the tested list (last by default) and runs a test map until its `[Probe] RESULT` line, then waits up to `--settle` (default 15 s) for it to quit (20 §3). Exit 0 if the target is reached with no clusters (a probe run: its RESULT line), otherwise 1. The report goes to stdout and progress to stderr. |
 | Plans | See §4.3 | |

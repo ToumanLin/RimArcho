@@ -24,6 +24,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/ids"
 	"github.com/ToumanLin/RimArcho/internal/machine"
+	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/perftrace"
 	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/textures"
@@ -117,6 +118,8 @@ type App struct {
 	TestGameStart func(*exec.Cmd) error
 	// TrashFunc moves a folder to the recycle bin; nil means source.Trash (tests replace it).
 	TrashFunc func(path string) error
+	// Ops is the operation log (13 §1.3); nil records nothing (a bare App in tests).
+	Ops *oplog.Log
 	// SameVolume says whether a folder can be renamed from one path to another (MoveDirectory);
 	// nil uses source.SameVolume (tests replace it to copy on one volume).
 	SameVolume func(from, to string) bool
@@ -253,6 +256,8 @@ func OpenWith(home string, o OpenOptions) (*App, error) {
 		return nil, err
 	}
 	a := &App{Home: home, Store: st, Config: cfg, Now: time.Now, Rand: rand.Reader, Loc: time.Local}
+	a.Ops = oplog.New(st, oplog.OriginFromEnv(oplog.CLI))
+	a.Ops.Now = func() time.Time { return a.Now() }
 	a.ApplyNetwork()
 	a.decl, a.ownDecl = &declReads{path: st.Path}, true
 	if st.Meta("source-library:legacy-cleared") == "" {

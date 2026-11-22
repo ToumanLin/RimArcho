@@ -55,6 +55,8 @@ const descTestRun = `Run a plan in isolated data to the menu (or map, save, prob
 
 const descPlans = `The environment's plans (named mod lists): list, new, use (switch; writes no game file), rename, remove, import, versions, follow / unfollow / sync a Workshop collection. remove deletes a plan with its whole history: ask the player first, naming the plan.`
 
+const descOps = `What RimArcho did to the player's files, newest first (read-only), with each row's origin (agent = Archo) and result. Answers "what changed?"`
+
 const descHistory = `The current plan's history (read-only): log lists its versions (lists saved to or read from the game), diff compares two versions or a version with the current list, steps shows the undo steps. Go back with edit_loadout action=checkout.`
 
 const descPin = `Lock a version of a mod: copy it into RimArcho's lock library and use the copy in the current plan (one undoable edit), so Workshop updates stop reaching it. Do this before editing a mod's files. update=true remakes it from the updated upstream; dry_run=true previews.`

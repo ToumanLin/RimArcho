@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/loadout"
+	"github.com/ToumanLin/RimArcho/internal/oplog"
 )
 
 // Save actions (12 §4.4). Fixing a save edits its list (one undoable step); rename and copy
@@ -293,7 +294,12 @@ func (a *App) refuseWhileRunning() error {
 
 // RenameSave renames a save in its folder, keeping a RimSaves folder prefix (12 §4.4). It
 // refuses an existing name, a name with path characters, and while a game runs.
-func (a *App) RenameSave(s *Save, name string) (string, error) {
+func (a *App) RenameSave(s *Save, name string) (to string, err error) {
+	began := false
+	defer func() {
+		a.Ops.Add(oplog.Row{Op: oplog.SaveRename, EnvID: a.opEnv(), Subject: s.Name, Target: s.Path, Result: opResult(err, !began),
+			Detail: joinDetail(saveTo(to), errText(err))})
+	}()
 	name = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(name), ".rws"))
 	switch {
 	case name == "":
@@ -310,7 +316,7 @@ func (a *App) RenameSave(s *Save, name string) (string, error) {
 	if s.Prefix != "" {
 		file = s.Prefix + rimSavesSep + file
 	}
-	to := filepath.Join(filepath.Dir(s.Path), file)
+	to = filepath.Join(filepath.Dir(s.Path), file)
 	// Saves travel between filesystems and Steam Cloud: check every case variant,
 	// including on case-sensitive volumes, but allow this file's own case to change.
 	entries, err := os.ReadDir(filepath.Dir(s.Path))
@@ -341,18 +347,24 @@ func (a *App) RenameSave(s *Save, name string) (string, error) {
 		if errors.Is(err, os.ErrExist) {
 			return "", fmt.Errorf("a save named %s already exists", name)
 		}
+		began = true
 		return "", err
 	}
+	began = true
 	return to, nil
 }
 
 // CopySave copies a save next to itself as "<name> (copy)", never overwriting, and keeps
 // its modification time so it sorts beside the original (12 §4.4).
-func (a *App) CopySave(s *Save) (string, error) {
+func (a *App) CopySave(s *Save) (to string, err error) {
 	if s.Writing {
-		return "", fmt.Errorf("%s is being written; try again when the game has saved", s.Name)
+		err = fmt.Errorf("%s is being written; try again when the game has saved", s.Name)
+	} else {
+		to, err = copySaveInto(s, filepath.Dir(s.Path), false)
 	}
-	return copySaveInto(s, filepath.Dir(s.Path), false)
+	a.Ops.Add(oplog.Row{Op: oplog.SaveCopy, EnvID: a.opEnv(), Subject: s.Name, Target: s.Path, Result: opResult(err, s.Writing),
+		Detail: joinDetail(saveTo(to), errText(err))})
+	return to, err
 }
 
 // copySaveInto copies s into dir as "<name> (copy)", "<name> (copy 2)"… (plainFirst: its
@@ -504,7 +516,13 @@ func (a *App) BackupSaves(saves []*Save, yes bool, token string) (*SaveFilesResu
 	if !yes {
 		return r, nil
 	}
+	o := a.opStart(false, func() oplog.Row {
+		return oplog.Row{Op: oplog.SaveBackup, EnvID: a.opEnv(), Subject: plural(len(saves), "save"), Target: r.Dir}
+	})
+	o.begin()
+	defer func() { o.end(batchErr(r, len(saves)), joinDetail(strings.Join(r.Errs, "; "))) }()
 	if err := os.MkdirAll(root, 0o755); err != nil {
+		r.Errs = append(r.Errs, err.Error())
 		return nil, err
 	}
 	for n := 2; ; n++ { // a folder of its own: two backups in one second do not mix
@@ -513,9 +531,13 @@ func (a *App) BackupSaves(saves []*Save, yes bool, token string) (*SaveFilesResu
 			break
 		}
 		if !errors.Is(err, os.ErrExist) {
+			r.Errs = append(r.Errs, err.Error())
 			return nil, err
 		}
 		r.Dir = filepath.Join(root, fmt.Sprintf("%s-%d", stamp, n))
+	}
+	if o != nil {
+		o.row.Target = r.Dir
 	}
 	used := map[string]bool{}
 	r.Saves, r.Bytes = nil, 0
@@ -586,22 +608,36 @@ func (a *App) TrashSaves(saves []*Save, yes bool, token string) (*SaveFilesResul
 	for _, s := range saves {
 		r.Bytes += s.Size
 	}
+	var o *opRun
+	if yes {
+		o = a.opStart(false, func() oplog.Row {
+			return oplog.Row{Op: oplog.SaveTrash, EnvID: a.opEnv(), Subject: plural(len(saves), "save")}
+		})
+		defer func() { o.end(batchErr(r, len(saves)), strings.Join(r.Errs, "; ")) }()
+	}
 	if err := a.refuseWhileRunning(); err != nil {
+		r.Errs = append(r.Errs, err.Error())
+		r.Saves = nil
 		return nil, err
 	}
 	if !yes {
 		return r, nil
 	}
 	if _, err := checkToken(saves, token, false); err != nil {
+		r.Errs = append(r.Errs, err.Error())
+		r.Saves = nil
 		return nil, err
 	}
+	o.begin()
+	h := o.parent()
 	r.Saves, r.Bytes = nil, 0
 	for _, s := range saves {
 		if s.Writing {
 			r.Errs = append(r.Errs, s.Name+": being written")
+			a.opAdd(h, oplog.Row{Op: oplog.Trash, Subject: s.Name, Target: s.Path, Result: oplog.Refused, Detail: "being written"})
 			continue
 		}
-		if err := a.ToTrash(s.Path); err != nil {
+		if err := a.toTrash(h, s.Path); err != nil {
 			r.Errs = append(r.Errs, s.Name+": "+err.Error())
 			continue
 		}

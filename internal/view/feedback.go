@@ -16,19 +16,20 @@ import (
 
 // Settings > Feedback (16 §2.14): a GitHub issue written in RimArcho, sent through the feedback
 // relay (no GitHub account needed) or opened in the browser. RimArcho, the game and the
-// system always go with it; the enabled mods, the paths and the game log's errors only when
-// the player ticks them, and the page shows the whole text first.
+// system always go with it; the enabled mods, the paths, the game log's errors and the recent
+// operations (13 §1.3) only when the player ticks them, and the page shows the whole text first.
 
 // FeedbackOptions are the attachments the player ticked.
 type FeedbackOptions struct {
 	Mods  bool `json:"mods"`
 	Paths bool `json:"paths"`
 	Log   bool `json:"log"`
+	Ops   bool `json:"ops"`
 }
 
 // FeedbackPart is one optional attachment: its name, what it holds, and whether there is any.
 type FeedbackPart struct {
-	Key   string `json:"key"` // mods, paths, log
+	Key   string `json:"key"` // mods, paths, log, ops
 	Label string `json:"label"`
 	Note  string `json:"note"`
 	None  bool   `json:"none,omitempty"` // nothing to attach (no game, no log yet)
@@ -87,9 +88,19 @@ func FeedbackAttachments(a *app.App, st *app.LoadoutState, o FeedbackOptions) *F
 			}
 		}
 	}
-	out.Parts = []FeedbackPart{mods, paths, logPart}
+	ops := FeedbackPart{Key: "ops", Label: T("recent operations"), Note: T("nothing recorded yet"), None: true}
+	if n := min(a.Ops.Count(), FeedbackOps); n > 0 {
+		ops.Note, ops.None = Tf("the newest %d of what RimArcho did to your files", n), false
+		if o.Ops {
+			out.Sections = append(out.Sections, feedback.Section{Key: "ops", Heading: Tf("recent operations (the newest %d)", n), Lines: scrub(OpsLines(a, FeedbackOps))})
+		}
+	}
+	out.Parts = []FeedbackPart{mods, paths, logPart, ops}
 	return out
 }
+
+// FeedbackOps is how many operation-log rows the feedback attachment holds (16 §2.14).
+const FeedbackOps = 30
 
 // feedbackMods is the current list in load order: name, packageId, Workshop ID.
 func feedbackMods(st *app.LoadoutState) []string {

@@ -1,6 +1,6 @@
 # Operation log: design draft
 
-> **Status (2026-11-21):** draft, not decided, not implemented. Nothing here is a specification yet; once accepted, the behaviour moves to 02 (file writes), 04 §4 (storage), 13 (command layer), 14/15 (MCP and Archo) and 16 §2.14 (feedback), and this note keeps only the reasoning.
+> **Status (2026-11-21):** accepted; phases 1 and 2 are implemented for the destructive set. The behaviour is specified in 13 §1.3 (the log, its primitives, origin and retention), 02 §1 (the write), 04 §4 (storage), 14 §2 (`list_operations`), 15 §2.4, 16 §2.14 (feedback) and §2.16 (the list), 18 §2 (cost); the rest of the writes are open work in 01 §4. This note keeps only the reasoning; where it and the specifications differ, the specifications win.
 > Basis: [02](../specs/02-file-writes-and-uninstall.md), [04 §4](../specs/04-scanning-and-identity.md), [07 §3](../specs/07-plans.md), [13 §1](../specs/13-commands-and-cli.md), [15](../specs/15-archo.md), `internal/feedback`, `internal/view/feedback.go`.
 
 ## 1. Problem
@@ -137,13 +137,13 @@ Today the feedback form attaches three optional parts: enabled Mods, paths, game
 - Reads: only when the list, `archo ops` or feedback is opened; indexed by time.
 - Start-up: the prune is a single `DELETE` on an indexed column, done after the first page draws. No effect on the load thresholds in 16 §10; add one row to 18 (rows and database size after a launch-heavy session).
 
-## 10. Decisions needed
+## 10. Decisions (2026-11-21)
 
-1. **Scope of §3.** Everything above, or first only the destructive and irreversible ones (`trash`, `workshop.unsubscribe`, `modsconfig.write`, `link.*`, `save.*`, `update.*`, `uninstall`) and add the rest later? Recommendation: the destructive set first; the list is then short enough to read, and reports about lost files are the case that motivated this.
-2. **Retention.** 90 days / 500 rows, or longer? A looping agent is the only reason for a row cap.
-3. **GUI placement.** Under Background tasks (recommended) or inside Settings.
-4. **Archo origin.** An environment variable set by the launcher (proposed), or the MCP `clientInfo` name. The variable is simpler and testable; `clientInfo` is spoofable by any client but nothing depends on it.
-5. **Whether `config.set` is logged.** It helps explain "my settings changed", but it also writes a row per toggle in Settings. Recommendation: log only keys that change files or network behaviour.
+1. Scope: the destructive and irreversible set first (`trash`, `workshop.unsubscribe`, `modsconfig.write`, `link.*`, `save.*`, `update.*`, `uninstall`, `launch`); the rest later.
+2. Retention: the newer of 90 days and 500 rows.
+3. GUI placement: under Background tasks, not a new top-level page or Settings.
+4. Archo origin: the environment variable `ARCHO_ORIGIN=agent`, set only by Archo's launcher.
+5. `config.set`: only keys that change files or network behaviour, in a later phase.
 
 ## 11. Rollout and checks
 

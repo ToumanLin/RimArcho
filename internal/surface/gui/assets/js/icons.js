@@ -18,6 +18,11 @@ export const icon = {
   unloadable: svg('<circle cx="8" cy="8" r="5.6" stroke-dasharray="2.2 2"/>', "dim"),
   rescan: svg('<path d="M13.2 8a5.2 5.2 0 1 1-1.6-3.8"/><path d="M13.4 2.6v2.8h-2.8"/>'),
   ok: svg('<path d="M3.2 8.4l3 3 6.6-6.8"/>', "ok"),
+  // What RimArcho did (16 §2.16): the operation log's icons and its refused mark
+  bin: svg('<path d="M3 4.4h10M6.2 4.4V2.8h3.6v1.6M4.3 4.4l.7 8.8h6l.7-8.8M6.8 6.8v4.4M9.2 6.8v4.4"/>'),
+  link: svg('<path d="M6.8 9.2a2.6 2.6 0 0 0 3.7 0l2-2a2.6 2.6 0 0 0-3.7-3.7l-.9.9"/><path d="M9.2 6.8a2.6 2.6 0 0 0-3.7 0l-2 2a2.6 2.6 0 0 0 3.7 3.7l.9-.9"/>'),
+  unlink: svg('<path d="M9.6 4.4l.6-.6a2.6 2.6 0 0 1 3.7 3.7l-.6.6M6.4 11.6l-.6.6a2.6 2.6 0 0 1-3.7-3.7l.6-.6M2.6 2.6l10.8 10.8"/>'),
+  refused: svg('<circle cx="8" cy="8" r="5.8"/><path d="M3.9 12.1l8.2-8.2"/>', "refused"),
   // the sidebar (16 §2.1)
   sidebar: svg('<rect x="2" y="2.8" width="12" height="10.4" rx="2"/><path d="M6.2 2.8v10.4"/>'),
   home: svg('<path d="M2.6 7.4L8 2.8l5.4 4.6"/><path d="M4.2 6.2v6.8h7.6V6.2"/>'),

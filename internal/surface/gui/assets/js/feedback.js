@@ -13,7 +13,7 @@ import { archoSpot } from "./archo.js";
 // The draft stays for the session: leaving the page does not lose what was typed (16 §3.1).
 // sent: the issue send opened last, shown until the next draft. open: the preview's
 // attachments unfolded by the player (by key), kept while typing.
-const F = { title: "", text: "", contact: "", opts: { mods: false, paths: false, log: false }, at: null, res: null, sent: null, sending: false, failed: false, open: new Set(), mine: null, fresh: new Set(), freshAt: new Set() };
+const F = { title: "", text: "", contact: "", opts: { mods: false, paths: false, log: false, ops: false }, at: null, res: null, sent: null, sending: false, failed: false, open: new Set(), mine: null, fresh: new Set(), freshAt: new Set() };
 let seq = 0, typing = 0, retry = 0;
 
 export async function open() {
