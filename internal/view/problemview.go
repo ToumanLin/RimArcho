@@ -128,82 +128,7 @@ func buildProblemPanel(ctx context.Context, search bool, a *app.App, ps *app.Pro
 		if err != nil {
 			return nil, err
 		}
-		n := parentNeed(st, h.Problems, p)
-		panel.Title = n.Title
-		panel.Meaning = parentSummary(h.Parts)
-		panel.Notes = []string{T(parentRisk)}
-		unresolved := len(h.UnresolvedNames()) > 0
-		switch {
-		case !unresolved: // the enable buttons say what to do
-		case h.SearchIncomplete:
-			panel.Notes = append(panel.Notes, T("not every installed mod could be checked"))
-		case search && !h.CacheIncomplete:
-			panel.Notes = append(panel.Notes, T("no installed mod supplies this base content, enabled or not"))
-		default:
-			panel.Notes = append(panel.Notes, T(parentNext))
-		}
-		panel.Searching = !search && unresolved
-		for _, q := range h.Problems {
-			if part, ok := app.MissingParent(q); ok {
-				panel.Affected = append(panel.Affected, parentPart(part))
-				locations, other := app.ParentLocations(q)
-				panel.Locations = append(panel.Locations, strings.Join(locations, ", "))
-				for _, ev := range other {
-					panel.Evidence = appendUnique(panel.Evidence, Humanize(st, finding.Expand(ev, st.Ix.Ref)))
-				}
-			}
-		}
-		hasCandidates := false
-		enabled := map[string]bool{}
-		for _, fix := range h.Fixes {
-			switch fix.Kind {
-			case "enable":
-				act := Action{Kind: ActEnable, Label: Tf("enable %s", fix.Name), Refs: []string{fix.Ref}, Done: Tf("enabled %s", fix.Name), Undo: true}
-				act.Key = fmt.Sprint(len(panel.Actions) + 1)
-				if !enabled[fix.Ref] {
-					panel.Actions = append(panel.Actions, act)
-					enabled[fix.Ref] = true
-				}
-				panel.Evidence = appendUnique(panel.Evidence, Tf("%s supplies the missing base content %s (file check)", fix.Name, fix.Parent))
-			case "subscribe", "search":
-				hasCandidates = true
-				label := Tf("check candidate %s", fix.Name)
-				var act Action
-				if fix.Kind == "subscribe" {
-					act = subscribeAction([]string{fix.Ref}, Tf("subscribe to candidate %s", fix.Name))
-					act.URL = fix.URL
-				} else {
-					act = Action{Kind: ActOpenURL, Label: label, URL: WorkshopSearch(fix.Name), Done: T("opened the Workshop page")}
-				}
-				act.Key = fmt.Sprint(len(panel.Actions) + 1)
-				panel.Actions = append(panel.Actions, act)
-				panel.Evidence = append(panel.Evidence, Tf("%s is mentioned in %s; it may supply the missing content", fix.Name, parentBasis(fix.Basis)))
-			case "requirements":
-				u := fix.URL
-				if u == "" {
-					u = WorkshopSearch(fix.Name)
-				}
-				panel.Actions = append(panel.Actions, Action{Kind: ActOpenURL, Key: "o", Label: T("check this mod's Workshop requirements"), URL: u, Done: T("opened the Workshop page")})
-			}
-		}
-		if hasCandidates {
-			panel.Notes = append(panel.Notes, T(parentCandidates))
-		}
-		if len(panel.Actions) > 0 && (panel.Actions[0].Kind == ActEnable || panel.Actions[0].Kind == ActSubscribe) {
-			panel.Primary = true
-		}
-		if h.Quiet {
-			panel.Notes = append(panel.Notes, T("the last run of this list had no errors attributed to this mod; this is probably harmless content meant for an optional mod"))
-			var refs []string
-			for _, q := range h.Problems {
-				if !q.Ignored {
-					refs = append(refs, q.Ref)
-				}
-			}
-			if len(refs) > 0 {
-				panel.Actions = append(panel.Actions, Action{Kind: ActIgnore, Key: "I", Label: T("do not warn about this again"), Refs: refs, Done: T("ignored until the mod changes")})
-			}
-		}
+		parentPanel(panel, st, h, p, search)
 		return panel, nil
 	}
 	// Reuse each item's existing explanation and fixes, leaving its wording owned by
@@ -225,21 +150,7 @@ func buildProblemPanel(ctx context.Context, search bool, a *app.App, ps *app.Pro
 			}
 		}
 	}
-	if p.Code == "mod.known-error" {
-		panel.Evidence = append(panel.Evidence, corpusEvidence(p).Source)
-	} else if p.Code == "patch.no-match" {
-		for _, q := range ps.List {
-			if q.Code == p.Code && strings.Join(q.Subjects, "|") == strings.Join(p.Subjects, "|") {
-				location := strings.SplitN(q.Claim, " ", 2)[0]
-				panel.Affected = appendUnique(panel.Affected, Tf("changes in %s do not take effect", location))
-			}
-		}
-		panel.Evidence = append(panel.Evidence, evidenceFor(p).Source)
-	} else {
-		for _, ev := range p.Evidence {
-			panel.Evidence = appendUnique(panel.Evidence, Humanize(st, finding.Expand(ev.Text, st.Ix.Ref)))
-		}
-	}
+	problemEvidence(panel, st, ps, p)
 	if m := st.Ix.ByID[p.SubjectInstance()]; m != nil {
 		ws := m.WorkshopID()
 		if ws == "" {
@@ -255,6 +166,110 @@ func buildProblemPanel(ctx context.Context, search bool, a *app.App, ps *app.Pro
 	}
 	panel.Primary = len(panel.Actions) > 0 && (panel.Actions[0].Kind == ActEnable || panel.Actions[0].Kind == ActSubscribe)
 	return panel, nil
+}
+
+// problemEvidence adds what a problem other than a missing parent rests on.
+func problemEvidence(panel *ProblemPanel, st *app.LoadoutState, ps *app.ProblemSet, p *app.Problem) {
+	if p.Code == "mod.known-error" {
+		panel.Evidence = append(panel.Evidence, corpusEvidence(p).Source)
+	} else if p.Code == "patch.no-match" {
+		for _, q := range ps.List {
+			if q.Code == p.Code && strings.Join(q.Subjects, "|") == strings.Join(p.Subjects, "|") {
+				location := strings.SplitN(q.Claim, " ", 2)[0]
+				panel.Affected = appendUnique(panel.Affected, Tf("changes in %s do not take effect", location))
+			}
+		}
+		panel.Evidence = append(panel.Evidence, evidenceFor(p).Source)
+	} else {
+		for _, ev := range p.Evidence {
+			panel.Evidence = appendUnique(panel.Evidence, Humanize(st, finding.Expand(ev.Text, st.Ix.Ref)))
+		}
+	}
+}
+
+// parentPanel fills the panel of a definition whose parent is missing from its help.
+func parentPanel(panel *ProblemPanel, st *app.LoadoutState, h *app.ParentHelp, p *app.Problem, search bool) {
+	n := parentNeed(st, h.Problems, p)
+	panel.Title = n.Title
+	panel.Meaning = parentSummary(h.Parts)
+	panel.Notes = []string{T(parentRisk)}
+	unresolved := len(h.UnresolvedNames()) > 0
+	switch {
+	case !unresolved: // the enable buttons say what to do
+	case h.SearchIncomplete:
+		panel.Notes = append(panel.Notes, T("not every installed mod could be checked"))
+	case search && !h.CacheIncomplete:
+		panel.Notes = append(panel.Notes, T("no installed mod supplies this base content, enabled or not"))
+	default:
+		panel.Notes = append(panel.Notes, T(parentNext))
+	}
+	panel.Searching = !search && unresolved
+	for _, q := range h.Problems {
+		if part, ok := app.MissingParent(q); ok {
+			panel.Affected = append(panel.Affected, parentPart(part))
+			locations, other := app.ParentLocations(q)
+			panel.Locations = append(panel.Locations, strings.Join(locations, ", "))
+			for _, ev := range other {
+				panel.Evidence = appendUnique(panel.Evidence, Humanize(st, finding.Expand(ev, st.Ix.Ref)))
+			}
+		}
+	}
+	if parentFixes(panel, h) {
+		panel.Notes = append(panel.Notes, T(parentCandidates))
+	}
+	if len(panel.Actions) > 0 && (panel.Actions[0].Kind == ActEnable || panel.Actions[0].Kind == ActSubscribe) {
+		panel.Primary = true
+	}
+	if h.Quiet {
+		panel.Notes = append(panel.Notes, T("the last run of this list had no errors attributed to this mod; this is probably harmless content meant for an optional mod"))
+		var refs []string
+		for _, q := range h.Problems {
+			if !q.Ignored {
+				refs = append(refs, q.Ref)
+			}
+		}
+		if len(refs) > 0 {
+			panel.Actions = append(panel.Actions, Action{Kind: ActIgnore, Key: "I", Label: T("do not warn about this again"), Refs: refs, Done: T("ignored until the mod changes")})
+		}
+	}
+}
+
+// parentFixes adds the help's fixes as numbered actions; it reports whether any is a
+// candidate to check rather than a mod already installed.
+func parentFixes(panel *ProblemPanel, h *app.ParentHelp) (hasCandidates bool) {
+	enabled := map[string]bool{}
+	for _, fix := range h.Fixes {
+		switch fix.Kind {
+		case "enable":
+			act := Action{Kind: ActEnable, Label: Tf("enable %s", fix.Name), Refs: []string{fix.Ref}, Done: Tf("enabled %s", fix.Name), Undo: true}
+			act.Key = fmt.Sprint(len(panel.Actions) + 1)
+			if !enabled[fix.Ref] {
+				panel.Actions = append(panel.Actions, act)
+				enabled[fix.Ref] = true
+			}
+			panel.Evidence = appendUnique(panel.Evidence, Tf("%s supplies the missing base content %s (file check)", fix.Name, fix.Parent))
+		case "subscribe", "search":
+			hasCandidates = true
+			label := Tf("check candidate %s", fix.Name)
+			var act Action
+			if fix.Kind == "subscribe" {
+				act = subscribeAction([]string{fix.Ref}, Tf("subscribe to candidate %s", fix.Name))
+				act.URL = fix.URL
+			} else {
+				act = Action{Kind: ActOpenURL, Label: label, URL: WorkshopSearch(fix.Name), Done: T("opened the Workshop page")}
+			}
+			act.Key = fmt.Sprint(len(panel.Actions) + 1)
+			panel.Actions = append(panel.Actions, act)
+			panel.Evidence = append(panel.Evidence, Tf("%s is mentioned in %s; it may supply the missing content", fix.Name, parentBasis(fix.Basis)))
+		case "requirements":
+			u := fix.URL
+			if u == "" {
+				u = WorkshopSearch(fix.Name)
+			}
+			panel.Actions = append(panel.Actions, Action{Kind: ActOpenURL, Key: "o", Label: T("check this mod's Workshop requirements"), URL: u, Done: T("opened the Workshop page")})
+		}
+	}
+	return hasCandidates
 }
 
 func appendUnique(lines []string, line string) []string {

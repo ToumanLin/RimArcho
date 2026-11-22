@@ -296,6 +296,28 @@ func SaveDetailAgainst(c *app.SaveCheck, running, current bool, own *app.Save, o
 	if own == nil {
 		own = s
 	}
+	d := saveDetailHead(s, own, running)
+	gap := unchecked(c)
+	d.Level, d.Verdict = c.Level, verdictText(c, gap)
+	d.Against = againstText(s, current, ownCheck != nil)
+	var newList *SaveFixView
+	if s.Head != nil && s.Colony != nil {
+		nl := fixView(app.SaveFix{Action: app.FixNewList, Label: "Make a list from this save",
+			Command: "loadout import " + argQuote(s.Path) + " --new " + argQuote(s.Colony.Name), Target: s.Ref}, s)
+		newList, d.NewList = &nl, &nl
+	}
+	d.Quick = saveQuick(d, c, own, ownCheck, gap, newList)
+	if ownCheck != nil && own.Env != nil && ownCheck.Level != "writing" && (d.Quick == nil || d.Quick.Action != app.FixRecycle) {
+		d.Switch = saveSwitch(own, ownCheck)
+	}
+	d.Issues = issueViews(c, s)
+	saveModViews(d, c)
+	return d
+}
+
+// saveDetailHead is the detail's header: the file, its colony and game, its list and
+// what it is checked against, and whether it can be renamed now.
+func saveDetailHead(s, own *app.Save, running bool) *SaveDetail {
 	d := &SaveDetail{Ref: s.Ref, Name: s.Name, File: s.File, Path: s.Path, Folder: filepath.Dir(s.Path), Prefix: s.Prefix,
 		Auto: s.Auto, Size: SizeText(s.Size), Bytes: s.Size, Issues: []SaveIssueView{}, Mods: []SaveModView{}, Changes: []SaveModView{}}
 	if s.Colony != nil {
@@ -329,66 +351,72 @@ func SaveDetailAgainst(c *app.SaveCheck, running, current bool, own *app.Save, o
 	case s.Writing:
 		d.Locked = T("the game is writing this file: rename and recycle wait until it has saved")
 	}
+	return d
+}
 
-	gap := unchecked(c)
-	d.Level, d.Verdict = c.Level, verdictText(c, gap)
+// againstText says what the save is checked against.
+func againstText(s *app.Save, current, applied bool) string {
 	switch {
-	case ownCheck != nil && s.Env != nil:
-		d.Against = Tf("with the current %s and %s", s.Env.Name, listOf(s))
+	case applied && s.Env != nil:
+		return Tf("with the current %s and %s", s.Env.Name, listOf(s))
 	case s.Plan != nil && current:
-		d.Against = Tf("against the current list %s", s.Plan.Name)
+		return Tf("against the current list %s", s.Plan.Name)
 	case s.Plan != nil:
-		d.Against = Tf("against list %s", s.Plan.Name)
+		return Tf("against list %s", s.Plan.Name)
 	case s.Pack != "":
-		d.Against = Tf("against pack %s", s.Pack)
+		return Tf("against pack %s", s.Pack)
 	default:
-		d.Against = T("against the installed Mods")
+		return T("against the installed Mods")
 	}
-	var newList *SaveFixView
-	if s.Head != nil && s.Colony != nil {
-		nl := fixView(app.SaveFix{Action: app.FixNewList, Label: "Make a list from this save",
-			Command: "loadout import " + argQuote(s.Path) + " --new " + argQuote(s.Colony.Name), Target: s.Ref}, s)
-		newList, d.NewList = &nl, &nl
-	}
-	// The bar's one action: Recycle for a file that cannot load; while what the Mods own
-	// could not be checked, a list made from the save and analysed (it indexes the save's
-	// Mods); a save matching no list, Make a list; a save checked against its own list that
-	// loads, Launch, which opens the Launch page (the game starts only there). Fix and
-	// launch is not offered: each row has its fix. Checked against another list, the
-	// Switch line has the action.
+}
+
+// saveQuick is the bar's one action. Recycle for a file that cannot load; while what the
+// Mods own could not be checked, a list made from the save and analysed (it indexes the
+// save's Mods); a save matching no list, Make a list; a save checked against its own list
+// that loads, Launch, which opens the Launch page (the game starts only there). Fix and
+// launch is not offered: each row has its fix. Checked against another list, the Switch
+// line has the action.
+func saveQuick(d *SaveDetail, c *app.SaveCheck, own *app.Save, ownCheck *app.SaveCheck, gap string, newList *SaveFixView) *SaveFixView {
+	s := c.Save
 	switch q := c.Quick; {
 	case q != nil && q.Action == app.FixRecycle:
 		v := fixView(*q, s)
-		d.Quick = &v
+		return &v
 	case gap != "" && newList != nil:
 		v := *newList
 		v.Action, v.Label = SaveFixAnalyse, T("make a list from this save to analyse its assemblies")
 		v.Command += " && archo analyze --open-plan " + argQuote(s.Colony.Name)
-		d.Quick = &v
+		return &v
 	case ownCheck != nil:
 	case own.Plan == nil && own.Pack == "":
-		d.Quick = newList
+		return newList
 	case c.Level == "" && d.AgainstKind != "":
-		d.Quick = &SaveFixView{Action: SaveGoLaunch, Label: T("launch"), Command: T("open the Launch page")}
+		return &SaveFixView{Action: SaveGoLaunch, Label: T("launch"), Command: T("open the Launch page")}
 	}
-	if ownCheck != nil && own.Env != nil && ownCheck.Level != "writing" && (d.Quick == nil || d.Quick.Action != app.FixRecycle) {
-		w := &SaveSwitchView{Level: ownCheck.Level, Label: T("switch and launch"), Env: own.Env.Name, Kind: RowPlan, Pack: own.Pack}
-		if own.Pack != "" {
-			w.Kind = RowPack
-		} else {
-			w.Plan = own.Plan.ID
-		}
-		verdict := T("loads as it is")
-		switch ownCheck.Level {
-		case app.LevelError:
-			verdict = T("will not load cleanly")
-		case app.LevelWarning:
-			verdict = T("content will be lost")
-		}
-		w.Text = Tf("with %s and %s: %s", own.Env.Name, listOf(own), verdict)
-		d.Switch = w
+	return d.Quick
+}
+
+// saveSwitch is the Switch line: how the save loads with its own game and list or pack.
+func saveSwitch(own *app.Save, ownCheck *app.SaveCheck) *SaveSwitchView {
+	w := &SaveSwitchView{Level: ownCheck.Level, Label: T("switch and launch"), Env: own.Env.Name, Kind: RowPlan, Pack: own.Pack}
+	if own.Pack != "" {
+		w.Kind = RowPack
+	} else {
+		w.Plan = own.Plan.ID
 	}
-	d.Issues = issueViews(c, s)
+	verdict := T("loads as it is")
+	switch ownCheck.Level {
+	case app.LevelError:
+		verdict = T("will not load cleanly")
+	case app.LevelWarning:
+		verdict = T("content will be lost")
+	}
+	w.Text = Tf("with %s and %s: %s", own.Env.Name, listOf(own), verdict)
+	return w
+}
+
+// saveModViews lists the save's Mods and, checked against a list or pack, what changes.
+func saveModViews(d *SaveDetail, c *app.SaveCheck) {
 	var removed []SaveModView
 	for _, m := range c.Mods {
 		v := SaveModView{Name: m.Name, PackageID: m.PackageID, Missing: m.Instance == "", Moved: m.Moved, Library: m.Library}
@@ -405,7 +433,6 @@ func SaveDetailAgainst(c *app.SaveCheck, running, current bool, own *app.Save, o
 		}
 		d.Changes = append(d.Changes, removed...)
 	}
-	return d
 }
 
 // SaveModView.Change values.

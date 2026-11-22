@@ -43,16 +43,13 @@ internal/gametest/run.go Run 92 300
 internal/harmony/harmony.go Read 44 96
 internal/harmony/manual.go (*scanner).call 132 239
 internal/harmony/manual.go (*scanner).run 167 269
-internal/identity/reconcile.go Reconcile 44 119
-internal/modchanges/modchanges.go (*changeBuilder).mod 128 321
 internal/modsearch/context.go contexts 58 147
 internal/modsearch/files.go listFiles 49 135
 internal/modsearch/match.go (*matcher).search 43 149
-internal/order/order.go Sort 97 309
 internal/savefile/scan_content.go (*scanner).contentRef 75 176
 internal/savefile/scan_rules.go (*extract).rule 76 132
-internal/scan/observe.go Collect 31 163
 internal/steamworks/publish_windows.go publishWorker 35 159
+<<<<<<< HEAD
 internal/store/maintenance.go (*Store).Maintain 47 171
 internal/subscribe/loverslab.go (*LoversLab).parsePage 49 96
 internal/view/bar.go FilterBoard 42 115
@@ -66,4 +63,18 @@ internal/view/query.go termMatch 48 91
 internal/view/saves.go SaveDetailAgainst 43 116
 internal/view/subscriptions.go BuildSubscriptionsFromLibrary 48 128
 internal/view/tasks.go taskRow 73 166
+=======
+internal/surface/cli/cli.go Run 66 150
+internal/surface/gui/command.go (*API).RunCLI 46 148
+internal/surface/gui/tasks.go (*API).TaskAct 57 151
+internal/surface/tui/changes.go (*model).changesKey 59 153
+internal/surface/tui/library.go (*model).libraryKey 71 185
+internal/surface/tui/needs.go (*model).needLines 46 143
+internal/surface/tui/palette.go (*model).palRunOf 63 179
+internal/surface/tui/update.go (*model).handle 51 122
+internal/surface/tui/update.go (*model).key 74 137
+internal/surface/tui/update.go (*model).listKey 65 164
+internal/surface/tui/update.go (*model).mouse 68 115
+internal/surface/tui/view.go (*model).hintLine 50 119
+>>>>>>> refs/heads/claude/split-view-core-74e00c
 `

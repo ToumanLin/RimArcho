@@ -361,6 +361,7 @@ func sortStable(rows []TaskRow, less func(a, b TaskRow) bool) {
 	}
 }
 
+// taskRow is one task's row in the Tasks page: its state, progress, items and actions.
 func taskRow(t *app.Task, now time.Time) TaskRow {
 	r := TaskRow{ID: t.ID, Kind: t.Kind, Lane: t.Lane, State: t.State, StateText: TaskStateText(t.State),
 		Title: TaskTitle(t.Kind), Obj: t.Obj, Seen: t.Seen}
@@ -378,6 +379,47 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 			r.Dur = DurText(time.Duration(t.End-t.Start) * time.Millisecond)
 		}
 	}
+	taskProgress(t, &r)
+	c := t.Counts()
+	result := taskResult(t, &r, c)
+	taskLine(t, &r, taskPhase(t), result)
+	if t.Kind == TaskPack {
+		r.Steps = packTaskSteps(t)
+	}
+	for _, it := range t.Items {
+		r.Items = append(r.Items, taskItemRow(t, it))
+	}
+	if len(t.Items) > 0 {
+		r.Counts = taskCountsText(c)
+	}
+	if t.Kind == TaskSubscribe && len(t.Items) == 0 && t.WorkshopSubscription() {
+		var names []string
+		for _, arg := range t.Args[2:] {
+			if !strings.HasPrefix(arg, "--") {
+				names = append(names, "Workshop "+arg)
+			}
+		}
+		r.Title, r.Obj = Tf("subscribe %s", TaskObj(names)), ""
+	}
+	if t.Kind == TaskSubscribe && len(t.Items) > 0 {
+		subscriptionTaskText(t, &r, c)
+	}
+	r.Target = taskTarget(t)
+	if len(t.Items) == 0 {
+		r.NoItems = T("this task has no result per item")
+	}
+	r.Acts = taskActs(t, c)
+	var hay []string
+	hay = append(hay, r.Title, r.Obj, result, r.LaneText)
+	for _, it := range t.Items {
+		hay = append(hay, it.Name)
+	}
+	r.Search = strings.ToLower(strings.Join(hay, " "))
+	return r
+}
+
+// taskProgress sets the row's item count and percentage.
+func taskProgress(t *app.Task, r *TaskRow) {
 	if t.Total > 0 {
 		r.Count = fmt.Sprintf("%d / %d", t.Done, t.Total)
 		r.Pct = t.Done * 100 / t.Total
@@ -393,7 +435,10 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 	if t.Kind == TaskSubscribe && t.State == app.TaskRunning {
 		r.Pct = min(r.Pct, 99)
 	}
-	c := t.Counts()
+}
+
+// taskResult is how the task ended in words; a detached task's row also says it went on.
+func taskResult(t *app.Task, r *TaskRow, c map[string]int) string {
 	result := Text(t.Result)
 	if t.Lane != app.LaneSelf && len(t.Items) > 0 && result == "" {
 		switch {
@@ -421,6 +466,11 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 	if n := handedOver(t); n > 0 {
 		result = joinFacts(result, Tf("%d handed to a new task", n))
 	}
+	return result
+}
+
+// taskPhase is the running step in words, by lane.
+func taskPhase(t *app.Task) string {
 	phase := t.Phase
 	if phase != "" && t.Lane == app.LaneFiles {
 		phase = Tf("on %s", phase)
@@ -431,6 +481,11 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 			phase = Tf("waiting for Steam: %s", phase)
 		}
 	}
+	return phase
+}
+
+// taskLine sets the row's line, what a screen reader says and whether it shows a bar.
+func taskLine(t *app.Task, r *TaskRow, phase, result string) {
 	switch t.State {
 	case app.TaskRunning:
 		r.Line = phase
@@ -449,83 +504,67 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 		}
 		r.Bar = t.State == app.TaskStopped || t.State == app.TaskPartial || (t.State == app.TaskFailed && t.Total > 1)
 	}
-	if t.Kind == TaskPack {
-		for i, l := range packSteps {
-			st := app.ItemWait
-			at := packStep[t.Step]
-			switch {
-			case t.State == app.TaskDone || i < at:
-				st = app.ItemOK
-			case i == at && t.State == app.TaskRunning:
-				st = app.ItemRun
-			case t.Closed && t.Detached:
-				st = app.ItemWait
-			case i == at:
-				st = app.ItemFail
-			}
-			r.Steps = append(r.Steps, TaskStep{Label: T(l), State: st})
+}
+
+// packTaskSteps are a pack task's steps with their states.
+func packTaskSteps(t *app.Task) []TaskStep {
+	var steps []TaskStep
+	for i, l := range packSteps {
+		st := app.ItemWait
+		at := packStep[t.Step]
+		switch {
+		case t.State == app.TaskDone || i < at:
+			st = app.ItemOK
+		case i == at && t.State == app.TaskRunning:
+			st = app.ItemRun
+		case t.Closed && t.Detached:
+			st = app.ItemWait
+		case i == at:
+			st = app.ItemFail
+		}
+		steps = append(steps, TaskStep{Label: T(l), State: st})
+	}
+	return steps
+}
+
+// taskItemRow is one item's row under its task.
+func taskItemRow(t *app.Task, it app.TaskItem) TaskItemRow {
+	row := TaskItemRow{Ref: it.Ref, Name: it.Name, State: it.State, StateText: itemStateText(it.State), Rank: itemRank[it.State], Why: Humanize(nil, it.Why), Bytes: it.Bytes, Got: it.Got, DownloadSize: it.Size}
+	row.Permanent = it.Permanent
+	if it.Again != "" {
+		row.Why = joinFacts(row.Why, T("handed to a new task"))
+	}
+	if t.Kind == TaskSubscribe && strings.HasPrefix(it.Ref, "ws:") {
+		row.WorkshopURL = "https://steamcommunity.com/sharedfiles/filedetails/?id=" + strings.TrimPrefix(it.Ref, "ws:")
+		row.Why = ""
+		if it.State == app.ItemFail {
+			row.Why = subscriptionReason(it, false)
+		}
+		if it.State == app.ItemSkip {
+			row.StateText = T("cancelled")
 		}
 	}
-	for _, it := range t.Items {
-		row := TaskItemRow{Ref: it.Ref, Name: it.Name, State: it.State, StateText: itemStateText(it.State), Rank: itemRank[it.State], Why: Humanize(nil, it.Why), Bytes: it.Bytes, Got: it.Got, DownloadSize: it.Size}
-		row.Permanent = it.Permanent
-		if it.Again != "" {
-			row.Why = joinFacts(row.Why, T("handed to a new task"))
+	if it.State == app.ItemRun && t.Lane == app.LaneSteam && t.Kind == LibResub {
+		row.StateText = T("waiting for Steam")
+		if it.Size > 0 && it.Got > 0 {
+			row.StateText = Tf("downloading %d%%", min(int(float64(it.Got)*100/float64(it.Size)), 100))
 		}
-		if t.Kind == TaskSubscribe && strings.HasPrefix(it.Ref, "ws:") {
-			row.WorkshopURL = "https://steamcommunity.com/sharedfiles/filedetails/?id=" + strings.TrimPrefix(it.Ref, "ws:")
-			row.Why = ""
-			if it.State == app.ItemFail {
-				row.Why = subscriptionReason(it, false)
-			}
-			if it.State == app.ItemSkip {
-				row.StateText = T("cancelled")
-			}
+	}
+	if it.Bytes > 0 {
+		row.Size = SizeText(it.Bytes)
+	}
+	return row
+}
+
+// taskCountsText is the items' count by state, "done 3  failed 1".
+func taskCountsText(c map[string]int) string {
+	var parts []string
+	for _, s := range []string{app.ItemOK, app.ItemFail, app.ItemRun, app.ItemWait, app.ItemSkip} {
+		if c[s] > 0 {
+			parts = append(parts, itemStateText(s)+" "+fmt.Sprint(c[s]))
 		}
-		if it.State == app.ItemRun && t.Lane == app.LaneSteam && t.Kind == LibResub {
-			row.StateText = T("waiting for Steam")
-			if it.Size > 0 && it.Got > 0 {
-				row.StateText = Tf("downloading %d%%", min(int(float64(it.Got)*100/float64(it.Size)), 100))
-			}
-		}
-		if it.Bytes > 0 {
-			row.Size = SizeText(it.Bytes)
-		}
-		r.Items = append(r.Items, row)
 	}
-	if len(t.Items) > 0 {
-		var parts []string
-		for _, s := range []string{app.ItemOK, app.ItemFail, app.ItemRun, app.ItemWait, app.ItemSkip} {
-			if c[s] > 0 {
-				parts = append(parts, itemStateText(s)+" "+fmt.Sprint(c[s]))
-			}
-		}
-		r.Counts = strings.Join(parts, "  ")
-	}
-	if t.Kind == TaskSubscribe && len(t.Items) == 0 && t.WorkshopSubscription() {
-		var names []string
-		for _, arg := range t.Args[2:] {
-			if !strings.HasPrefix(arg, "--") {
-				names = append(names, "Workshop "+arg)
-			}
-		}
-		r.Title, r.Obj = Tf("subscribe %s", TaskObj(names)), ""
-	}
-	if t.Kind == TaskSubscribe && len(t.Items) > 0 {
-		subscriptionTaskText(t, &r, c)
-	}
-	r.Target = taskTarget(t)
-	if len(t.Items) == 0 {
-		r.NoItems = T("this task has no result per item")
-	}
-	r.Acts = taskActs(t, c)
-	var hay []string
-	hay = append(hay, r.Title, r.Obj, result, r.LaneText)
-	for _, it := range t.Items {
-		hay = append(hay, it.Name)
-	}
-	r.Search = strings.ToLower(strings.Join(hay, " "))
-	return r
+	return strings.Join(parts, "  ")
 }
 
 func joinFacts(parts ...string) string {
