@@ -903,7 +903,8 @@ func run(parsedPath, resultsPath, patternsPath, steamPath, outPath, mm string, r
 				continue
 			}
 			role := tothers[t][b] > 0
-			if bestB == "" || role && !bestRole || role == bestRole && r1-r0 > bestD {
+			// Ties go to the first packageId: map order would pick a different B each run.
+			if bestB == "" || role && !bestRole || role == bestRole && (r1-r0 > bestD || r1-r0 == bestD && b < bestB) {
 				bestB, bestD, bestRole = b, r1-r0, role
 			}
 		}
