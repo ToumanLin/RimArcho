@@ -395,16 +395,7 @@ func (b *changeBuilder) build(evs []*store.Event) ([]Row, *Group) {
 // "" for a change.
 func (b *changeBuilder) mod(id string, evs []*store.Event, info map[int64]*store.SnapInfo) (Row, string) {
 	tx := b.tx
-	ix, st := b.st.Ix, b.st
-	m := ix.ByID[id]
-	r := Row{ID: id, Ref: ix.Ref(id), Mod: tx.T("a removed mod"), InPlan: st.List.Index(id) >= 0}
-	if m != nil {
-		r.Mod = m.DisplayName()
-		r.Present = m.Status == identity.Live
-		if isNumber(m.WorkshopID()) {
-			r.WorkshopID = m.WorkshopID()
-		}
-	}
+	r, m := b.rowHead(id)
 	kinds := map[string]bool{}
 	var detail = map[string]string{}
 	for _, e := range evs {
@@ -419,35 +410,14 @@ func (b *changeBuilder) mod(id string, evs []*store.Event, info map[int64]*store
 	}
 	last := evs[len(evs)-1].Kind
 	if last == identity.EvDisappeared || kinds[identity.EvDisappeared] && !kinds[identity.EvReappeared] {
-		r.Tier, r.Text = TierWatch, tx.T("removed from the mod folder")
-		if m != nil && m.Kind == source.Local {
-			r.Text = tx.T("removed from the Mods folder")
-		}
-		if r.InPlan {
-			r.Tier = TierLaunch
-			r.Text = tx.Tf("%s; the current list uses it", r.Text)
-		}
-		r.TierText = TierText(tx, r.Tier)
-		return r, identity.EvDisappeared
+		return b.goneRow(r, m), identity.EvDisappeared
 	}
 	if kinds[identity.EvDiscovered] || kinds[identity.EvCopied] {
-		r.Tier, r.TierText = TierContent, TierText(tx, TierContent)
-		r.Text = tx.T("found in a mod folder")
-		if m != nil && m.Kind == source.Local {
-			r.Text = tx.T("found in the Mods folder")
-		}
-		if m != nil && m.Kind.WorkshopLike() {
-			r.Text = tx.T("new subscription from Workshop")
-		}
-		if kinds[identity.EvCopied] {
-			r.Text = tx.T("a new copy")
-		}
-		return r, identity.EvDiscovered
+		return b.arrivedRow(r, m, kinds), identity.EvDiscovered
 	}
-	var facts []fact
-	add := func(tier int, text string) { facts = append(facts, fact{tier, text, false}) }
+	f := &modFacts{}
 	if kinds[identity.EvReappeared] {
-		add(TierWatch, tx.T("came back"))
+		f.add(TierWatch, tx.T("came back"))
 	}
 	var od, nd *scan.Decl
 	if x := info[r.Before]; x != nil && r.Before != r.After {
@@ -461,139 +431,275 @@ func (b *changeBuilder) mod(id string, evs []*store.Event, info map[int64]*store
 		nd = &scan.Decl{}
 		json.Unmarshal([]byte(x.DeclBlob), nd)
 	}
-	launch := func() int {
-		if r.InPlan {
-			return TierLaunch
-		}
-		return TierWatch
-	}
-	deps, rules := false, false
-	modVersion := ""
+	var c declChange
 	if od != nil && nd != nil {
-		if od.PackageID != nd.PackageID {
-			add(launch(), tx.Tf("package id changed: %s → %s", od.PackageID, nd.PackageID))
-		}
-		if od.Name != nd.Name && od.Name != "" {
-			add(TierContent, tx.Tf("renamed from %s", od.Name))
-		}
-		added, dropped := setDiff(od.SupportedVersions, nd.SupportedVersions)
-		for _, v := range dropped {
-			if v == b.mm {
-				add(launch(), tx.Tf("no longer supports %s (your game)", v))
-			} else {
-				add(TierWatch, tx.Tf("no longer supports %s", v))
-			}
-		}
-		for _, v := range added {
-			if v == b.mm {
-				add(TierWatch, tx.Tf("now supports %s (your game)", v))
-			} else {
-				add(TierWatch, tx.Tf("now supports %s", v))
-			}
-		}
-		if od.ModVersion != nd.ModVersion && nd.ModVersion != "" {
-			if od.ModVersion != "" {
-				modVersion = tx.Tf("version %s → %s", od.ModVersion, nd.ModVersion)
-			} else {
-				modVersion = tx.Tf("version %s", nd.ModVersion)
-			}
-		}
-		da, dr := setDiff(b.deps(od), b.deps(nd))
-		for _, p := range da {
-			deps = true
-			name, state := b.pkgState(p)
-			switch {
-			case state == DepMissing:
-				add(launch(), tx.Tf("needs %s now (not installed)", name))
-			case state == DepDisabled && r.InPlan:
-				add(TierLaunch, tx.Tf("needs %s now (not enabled)", name))
-			default:
-				add(TierWatch, tx.Tf("needs %s now", name))
-			}
-		}
-		for _, p := range dr {
-			deps = true
-			name, _ := b.pkgState(p)
-			add(TierWatch, tx.Tf("no longer needs %s", name))
-		}
-		ia, ir := setDiff(b.byMM(od.IncompatibleWith, od.IncompatibleByVersion), b.byMM(nd.IncompatibleWith, nd.IncompatibleByVersion))
-		for _, p := range ia {
-			name, state := b.pkgState(p)
-			if state == DepEnabled && r.InPlan {
-				add(TierLaunch, tx.Tf("now incompatible with %s (enabled)", name))
-			} else {
-				add(TierWatch, tx.Tf("now incompatible with %s", name))
-			}
-		}
-		for _, p := range ir {
-			name, _ := b.pkgState(p)
-			add(TierContent, tx.Tf("no longer incompatible with %s", name))
-		}
-		for _, x := range []struct {
-			on, off  string
-			old, cur []string
-		}{
-			{"now loads after %s", "no longer loads after %s", b.byMM(append(od.LoadAfter, od.ForceLoadAfter...), od.LoadAfterByVersion),
-				b.byMM(append(nd.LoadAfter, nd.ForceLoadAfter...), nd.LoadAfterByVersion)},
-			{"now loads before %s", "no longer loads before %s", b.byMM(append(od.LoadBefore, od.ForceLoadBefore...), od.LoadBeforeByVersion),
-				b.byMM(append(nd.LoadBefore, nd.ForceLoadBefore...), nd.LoadBeforeByVersion)},
-		} {
-			on, off := setDiff(x.old, x.cur)
-			if len(on) > 0 {
-				rules = true
-				add(TierWatch, tx.Tf(x.on, b.names(on)))
-			}
-			if len(off) > 0 {
-				rules = true
-				add(TierWatch, tx.Tf(x.off, b.names(off)))
-			}
-		}
-		if !rules && od.LoadRulesKey() != nd.LoadRulesKey() && len(ia)+len(ir) == 0 {
-			rules = true
-			add(TierWatch, tx.T("load rules changed"))
-		}
+		c = b.declFacts(f, r.InPlan, od, nd)
 	} else {
-		// No declaration to compare: what the events say.
-		if d := detail[identity.EvPackageIDChanged]; d != "" {
-			add(launch(), tx.Tf("package id changed: %s", strings.ReplaceAll(d, "pkg:", "")))
-		}
-		if d := detail[identity.EvVersionSupport]; d != "" {
-			add(TierWatch, tx.Tf("supported versions: %s", d))
-		}
-		if kinds[identity.EvDependencies] {
-			deps = true
-			add(TierWatch, tx.T("dependencies changed"))
-		}
-		if kinds[identity.EvLoadRules] {
-			rules = true
-			add(TierWatch, tx.T("load rules changed"))
-		}
-		if d := detail[identity.EvRenamed]; d != "" {
-			add(TierContent, tx.Tf("renamed: %s", d))
-		}
+		c = b.eventFacts(f, r.InPlan, kinds, detail)
 	}
 	if kinds[identity.EvAuthorChanged] {
-		add(TierContent, tx.Tf("author: %s", detail[identity.EvAuthorChanged]))
+		f.add(TierContent, tx.Tf("author: %s", detail[identity.EvAuthorChanged]))
 	}
 	if kinds[identity.EvMoved] {
-		add(TierContent, tx.T("its folder moved"))
+		f.add(TierContent, tx.T("its folder moved"))
 	}
-	// Files: grouped by kind.
-	var groups []fileGroup
-	var delta int64
-	var filesMissing bool
+	fs := b.fileFacts(f, r, info, c.modVersion)
+	// A locked version keeps the old one: say how far behind it is.
+	if l := b.locks[id]; l != nil && kinds[identity.EvUpdated] {
+		n := b.a.Store.UpdatesSince(id, copiedAt(l))
+		if n > 0 {
+			f.add(TierWatch, tx.Tf("your locked version stays behind (%d updates)", n))
+		} else {
+			f.add(TierWatch, tx.T("your locked version stays behind"))
+		}
+	}
+	if len(f.facts) == 0 {
+		if kinds[identity.EvUpdated] {
+			f.add(TierContent, tx.T("updated"))
+		} else {
+			f.add(TierContent, eventText(tx, evs[0].Kind))
+		}
+	}
+	sorted := b.sayFacts(&r, f.facts)
+	b.rowDetails(&r, fs, sorted, info)
+	b.rowActions(&r, m, kinds, c)
+	return r, ""
+}
+
+// rowHead is a mod's row before its events are read: its name, refs and whether the
+// current list uses it.
+func (b *changeBuilder) rowHead(id string) (Row, *store.Mod) {
+	ix, st := b.st.Ix, b.st
+	m := ix.ByID[id]
+	r := Row{ID: id, Ref: ix.Ref(id), Mod: b.tx.T("a removed mod"), InPlan: st.List.Index(id) >= 0}
+	if m != nil {
+		r.Mod = m.DisplayName()
+		r.Present = m.Status == identity.Live
+		if isNumber(m.WorkshopID()) {
+			r.WorkshopID = m.WorkshopID()
+		}
+	}
+	return r, m
+}
+
+// goneRow is the row of a mod no longer in its folder.
+func (b *changeBuilder) goneRow(r Row, m *store.Mod) Row {
+	tx := b.tx
+	r.Tier, r.Text = TierWatch, tx.T("removed from the mod folder")
+	if m != nil && m.Kind == source.Local {
+		r.Text = tx.T("removed from the Mods folder")
+	}
+	if r.InPlan {
+		r.Tier = TierLaunch
+		r.Text = tx.Tf("%s; the current list uses it", r.Text)
+	}
+	r.TierText = TierText(tx, r.Tier)
+	return r
+}
+
+// arrivedRow is the row of a mod found for the first time, or of a new copy.
+func (b *changeBuilder) arrivedRow(r Row, m *store.Mod, kinds map[string]bool) Row {
+	tx := b.tx
+	r.Tier, r.TierText = TierContent, TierText(tx, TierContent)
+	r.Text = tx.T("found in a mod folder")
+	if m != nil && m.Kind == source.Local {
+		r.Text = tx.T("found in the Mods folder")
+	}
+	if m != nil && m.Kind.WorkshopLike() {
+		r.Text = tx.T("new subscription from Workshop")
+	}
+	if kinds[identity.EvCopied] {
+		r.Text = tx.T("a new copy")
+	}
+	return r
+}
+
+// modFacts collects what a mod's changes mean.
+type modFacts struct{ facts []fact }
+
+// add is a fact the row's details also list.
+func (f *modFacts) add(tier int, text string) { f.facts = append(f.facts, fact{tier, text, false}) }
+
+// addFile is a fact the grouped file summary already says.
+func (f *modFacts) addFile(tier int, text string) { f.facts = append(f.facts, fact{tier, text, true}) }
+
+// declChange is what changed beyond the facts' sentences.
+type declChange struct {
+	deps, rules bool   // the dependencies, the load rules
+	modVersion  string // "version 1.0 → 1.1", placed by the file facts
+}
+
+// launchTier is the tier of a change that can stop the game: TierLaunch for a mod the
+// current list uses.
+func launchTier(inPlan bool) int {
+	if inPlan {
+		return TierLaunch
+	}
+	return TierWatch
+}
+
+// declFacts compares the two declarations: package id, name, versions, dependencies,
+// incompatibilities and load rules.
+func (b *changeBuilder) declFacts(f *modFacts, inPlan bool, od, nd *scan.Decl) declChange {
+	tx := b.tx
+	var c declChange
+	if od.PackageID != nd.PackageID {
+		f.add(launchTier(inPlan), tx.Tf("package id changed: %s → %s", od.PackageID, nd.PackageID))
+	}
+	if od.Name != nd.Name && od.Name != "" {
+		f.add(TierContent, tx.Tf("renamed from %s", od.Name))
+	}
+	b.versionFacts(f, inPlan, od, nd)
+	if od.ModVersion != nd.ModVersion && nd.ModVersion != "" {
+		if od.ModVersion != "" {
+			c.modVersion = tx.Tf("version %s → %s", od.ModVersion, nd.ModVersion)
+		} else {
+			c.modVersion = tx.Tf("version %s", nd.ModVersion)
+		}
+	}
+	c.deps = b.depFacts(f, inPlan, od, nd)
+	ia, ir := setDiff(b.byMM(od.IncompatibleWith, od.IncompatibleByVersion), b.byMM(nd.IncompatibleWith, nd.IncompatibleByVersion))
+	for _, p := range ia {
+		name, state := b.pkgState(p)
+		if state == DepEnabled && inPlan {
+			f.add(TierLaunch, tx.Tf("now incompatible with %s (enabled)", name))
+		} else {
+			f.add(TierWatch, tx.Tf("now incompatible with %s", name))
+		}
+	}
+	for _, p := range ir {
+		name, _ := b.pkgState(p)
+		f.add(TierContent, tx.Tf("no longer incompatible with %s", name))
+	}
+	c.rules = b.ruleFacts(f, od, nd)
+	if !c.rules && od.LoadRulesKey() != nd.LoadRulesKey() && len(ia)+len(ir) == 0 {
+		c.rules = true
+		f.add(TierWatch, tx.T("load rules changed"))
+	}
+	return c
+}
+
+// versionFacts are the game versions the mod no longer supports, then the new ones.
+func (b *changeBuilder) versionFacts(f *modFacts, inPlan bool, od, nd *scan.Decl) {
+	tx := b.tx
+	added, dropped := setDiff(od.SupportedVersions, nd.SupportedVersions)
+	for _, v := range dropped {
+		if v == b.mm {
+			f.add(launchTier(inPlan), tx.Tf("no longer supports %s (your game)", v))
+		} else {
+			f.add(TierWatch, tx.Tf("no longer supports %s", v))
+		}
+	}
+	for _, v := range added {
+		if v == b.mm {
+			f.add(TierWatch, tx.Tf("now supports %s (your game)", v))
+		} else {
+			f.add(TierWatch, tx.Tf("now supports %s", v))
+		}
+	}
+}
+
+// depFacts are the dependencies added and dropped; it reports whether there were any.
+func (b *changeBuilder) depFacts(f *modFacts, inPlan bool, od, nd *scan.Decl) bool {
+	tx := b.tx
+	changed := false
+	da, dr := setDiff(b.deps(od), b.deps(nd))
+	for _, p := range da {
+		changed = true
+		name, state := b.pkgState(p)
+		switch {
+		case state == DepMissing:
+			f.add(launchTier(inPlan), tx.Tf("needs %s now (not installed)", name))
+		case state == DepDisabled && inPlan:
+			f.add(TierLaunch, tx.Tf("needs %s now (not enabled)", name))
+		default:
+			f.add(TierWatch, tx.Tf("needs %s now", name))
+		}
+	}
+	for _, p := range dr {
+		changed = true
+		name, _ := b.pkgState(p)
+		f.add(TierWatch, tx.Tf("no longer needs %s", name))
+	}
+	return changed
+}
+
+// ruleFacts are the load-after and load-before rules added and dropped; it reports
+// whether there were any.
+func (b *changeBuilder) ruleFacts(f *modFacts, od, nd *scan.Decl) bool {
+	tx := b.tx
+	rules := false
+	for _, x := range []struct {
+		on, off  string
+		old, cur []string
+	}{
+		{"now loads after %s", "no longer loads after %s", b.byMM(append(od.LoadAfter, od.ForceLoadAfter...), od.LoadAfterByVersion),
+			b.byMM(append(nd.LoadAfter, nd.ForceLoadAfter...), nd.LoadAfterByVersion)},
+		{"now loads before %s", "no longer loads before %s", b.byMM(append(od.LoadBefore, od.ForceLoadBefore...), od.LoadBeforeByVersion),
+			b.byMM(append(nd.LoadBefore, nd.ForceLoadBefore...), nd.LoadBeforeByVersion)},
+	} {
+		on, off := setDiff(x.old, x.cur)
+		if len(on) > 0 {
+			rules = true
+			f.add(TierWatch, tx.Tf(x.on, b.names(on)))
+		}
+		if len(off) > 0 {
+			rules = true
+			f.add(TierWatch, tx.Tf(x.off, b.names(off)))
+		}
+	}
+	return rules
+}
+
+// eventFacts: no declaration to compare, what the events say.
+func (b *changeBuilder) eventFacts(f *modFacts, inPlan bool, kinds map[string]bool, detail map[string]string) declChange {
+	tx := b.tx
+	var c declChange
+	if d := detail[identity.EvPackageIDChanged]; d != "" {
+		f.add(launchTier(inPlan), tx.Tf("package id changed: %s", strings.ReplaceAll(d, "pkg:", "")))
+	}
+	if d := detail[identity.EvVersionSupport]; d != "" {
+		f.add(TierWatch, tx.Tf("supported versions: %s", d))
+	}
+	if kinds[identity.EvDependencies] {
+		c.deps = true
+		f.add(TierWatch, tx.T("dependencies changed"))
+	}
+	if kinds[identity.EvLoadRules] {
+		c.rules = true
+		f.add(TierWatch, tx.T("load rules changed"))
+	}
+	if d := detail[identity.EvRenamed]; d != "" {
+		f.add(TierContent, tx.Tf("renamed: %s", d))
+	}
+	return c
+}
+
+// rowFiles is a row's files grouped by kind, their size change, and whether the file
+// lists are no longer stored.
+type rowFiles struct {
+	groups  []fileGroup
+	delta   int64
+	missing bool
+}
+
+// fileFacts groups the changed files by kind and adds what they mean, the mod's new
+// version among them.
+func (b *changeBuilder) fileFacts(f *modFacts, r Row, info map[int64]*store.SnapInfo, modVersion string) rowFiles {
+	tx := b.tx
+	var fs rowFiles
 	if r.HasFiles() && !b.noFiles {
-		groups, delta, filesMissing = b.files(r.Before, r.After)
+		fs.groups, fs.delta, fs.missing = b.files(r.Before, r.After)
 	}
-	if (b.noFiles || filesMissing) && r.HasFiles() {
+	if (b.noFiles || fs.missing) && r.HasFiles() {
 		// The snapshot rows keep their total size after maintenance cleans the file lists.
 		if x, y := info[r.Before], info[r.After]; x != nil && y != nil {
-			delta = y.TotalSize - x.TotalSize
+			fs.delta = y.TotalSize - x.TotalSize
 		}
 	}
 	code, defs := false, false
 	var media []string
-	for _, g := range groups {
+	for _, g := range fs.groups {
 		switch g.kind {
 		case fkCode:
 			code = true
@@ -602,54 +708,43 @@ func (b *changeBuilder) mod(id string, evs []*store.Event, info map[int64]*store
 		case fkAbout:
 			// About.xml is what the facts above read; LoadFolders.xml decides which folders load.
 			if g.loadFolders {
-				add(TierWatch, tx.T("LoadFolders.xml changed"))
+				f.add(TierWatch, tx.T("LoadFolders.xml changed"))
 			}
 		default:
 			media = append(media, kindName(tx, g.kind))
 		}
 	}
-	addFile := func(tier int, text string) { facts = append(facts, fact{tier, text, true}) }
 	if code {
-		addFile(TierWatch, tx.T("code changed"))
+		f.addFile(TierWatch, tx.T("code changed"))
 	}
 	if modVersion != "" {
 		if defs || code {
-			add(TierWatch, modVersion)
+			f.add(TierWatch, modVersion)
 		} else {
-			add(TierContent, modVersion)
+			f.add(TierContent, modVersion)
 		}
 	}
 	if defs {
 		var names []string
-		for _, g := range groups {
+		for _, g := range fs.groups {
 			if g.kind == fkDefs || g.kind == fkPatches {
 				names = append(names, kindName(tx, g.kind))
 			}
 		}
-		addFile(TierWatch, tx.Tf("%s changed", strings.Join(names, tx.T(", "))))
+		f.addFile(TierWatch, tx.Tf("%s changed", strings.Join(names, tx.T(", "))))
 	}
 	if !code && !defs && len(media) > 0 {
-		addFile(TierContent, tx.Tf("only %s changed", strings.Join(media, tx.T(", "))))
+		f.addFile(TierContent, tx.Tf("only %s changed", strings.Join(media, tx.T(", "))))
 	} else if len(media) > 0 {
-		addFile(TierContent, tx.Tf("%s changed", strings.Join(media, tx.T(", "))))
+		f.addFile(TierContent, tx.Tf("%s changed", strings.Join(media, tx.T(", "))))
 	}
-	// A locked version keeps the old one: say how far behind it is.
-	if l := b.locks[id]; l != nil && kinds[identity.EvUpdated] {
-		n := b.a.Store.UpdatesSince(id, copiedAt(l))
-		if n > 0 {
-			add(TierWatch, tx.Tf("your locked version stays behind (%d updates)", n))
-		} else {
-			add(TierWatch, tx.T("your locked version stays behind"))
-		}
-	}
-	if len(facts) == 0 {
-		if kinds[identity.EvUpdated] {
-			add(TierContent, tx.T("updated"))
-		} else {
-			add(TierContent, eventText(tx, evs[0].Kind))
-		}
-	}
-	// The tier is the most serious fact; the sentence its first facts in tier order.
+	return fs
+}
+
+// sayFacts sets the row's tier, its most serious fact's, and its sentence, the first
+// facts in tier order; it returns the facts in that order.
+func (b *changeBuilder) sayFacts(r *Row, facts []fact) []fact {
+	tx := b.tx
 	r.Tier = TierContent
 	for _, f := range facts {
 		r.Tier = min(r.Tier, f.tier)
@@ -672,7 +767,14 @@ func (b *changeBuilder) mod(id string, evs []*store.Event, info map[int64]*store
 		}
 	}
 	r.Others = strings.Join(others, tx.T("; "))
-	for _, g := range groups {
+	return sorted
+}
+
+// rowDetails sets the row's file counts and details: the file summary, what the sentence
+// had no room for, and when the Workshop updated it.
+func (b *changeBuilder) rowDetails(r *Row, fs rowFiles, sorted []fact, info map[int64]*store.SnapInfo) {
+	tx := b.tx
+	for _, g := range fs.groups {
 		if g.kind == fkAbout && !g.loadFolders {
 			continue // About.xml's own changes are the facts above
 		}
@@ -682,13 +784,13 @@ func (b *changeBuilder) mod(id string, evs []*store.Event, info map[int64]*store
 		}
 		r.Files = append(r.Files, fc)
 	}
-	if filesMissing {
+	if fs.missing {
 		r.Details = append(r.Details, tx.T("(file lists no longer stored)"))
 	}
-	if s := groupText(tx, groups, delta); s != "" {
+	if s := groupText(tx, fs.groups, fs.delta); s != "" {
 		r.Details = append(r.Details, s)
-	} else if delta != 0 && r.HasFiles() {
-		r.Details = append(r.Details, tx.Tf("size %s", signedSize(delta)))
+	} else if fs.delta != 0 && r.HasFiles() {
+		r.Details = append(r.Details, tx.Tf("size %s", signedSize(fs.delta)))
 	}
 	// then what the sentence had no room for
 	for i, f := range sorted {
@@ -699,20 +801,23 @@ func (b *changeBuilder) mod(id string, evs []*store.Event, info map[int64]*store
 	if x, y := info[r.Before], info[r.After]; y != nil && y.ACFTimeUpdated != 0 && (x == nil || x.ACFTimeUpdated != y.ACFTimeUpdated) {
 		r.Details = append(r.Details, tx.Tf("updated on the Workshop %s", tx.Date(time.Unix(y.ACFTimeUpdated, 0))))
 	}
-	// Actions, where they apply.
+}
+
+// rowActions adds the actions that apply: the change notes, dependencies, sort, lock.
+func (b *changeBuilder) rowActions(r *Row, m *store.Mod, kinds map[string]bool, c declChange) {
+	tx := b.tx
 	if r.WorkshopID != "" {
 		r.Actions = append(r.Actions, Action{ActWorkshop, tx.T("open the change notes"), "ctrl+w"})
 	}
-	if deps && r.Tier == TierLaunch && r.InPlan {
+	if c.deps && r.Tier == TierLaunch && r.InPlan {
 		r.Actions = append(r.Actions, Action{ActDeps, tx.T("see dependencies"), "D"})
 	}
-	if (deps || rules) && r.InPlan {
+	if (c.deps || c.rules) && r.InPlan {
 		r.Actions = append(r.Actions, Action{ActSort, tx.T("sort"), "S"})
 	}
-	if kinds[identity.EvUpdated] && m != nil && m.Status == identity.Live && m.Kind.WorkshopLike() && b.locks[id] == nil && r.InPlan {
+	if kinds[identity.EvUpdated] && m != nil && m.Status == identity.Live && m.Kind.WorkshopLike() && b.locks[r.ID] == nil && r.InPlan {
 		r.Actions = append(r.Actions, Action{ActLock, tx.T("keep this one"), "p"})
 	}
-	return r, ""
 }
 
 // copiedAt is when a lock was made (origin.json), else when its copy was first seen.
