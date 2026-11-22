@@ -47,6 +47,10 @@ func (m *model) toNeeds(items []view.Need) []need {
 		for _, a := range it.Actions {
 			n.keys = append(n.keys, m.actionKey(a, it.Text))
 		}
+		// W: this is wrong (or its data is outdated): the feedback panel filled in (16 §2.4)
+		if id, mod := it.ID, it.DataMod; id != "" {
+			n.keys = append(n.keys, needKey{key: "W", label: T("report it"), run: func(m *model) tea.Cmd { return m.reportNeed(id, mod) }})
+		}
 		out = append(out, n)
 	}
 	// by section, stable: within a section the view's order (this run before the last run)

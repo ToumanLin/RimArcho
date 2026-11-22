@@ -49,6 +49,11 @@ type Template struct {
 	Auto      []string   `json:"auto,omitempty"`   // what goes with it beyond the basic lines
 }
 
+// DataFinding is the answer key an outdated-data report carries when it starts from a Can it
+// run item or a Mod's details: the item's ID, attached as the diagnosis section. It is not a
+// question; the item is what showed the data.
+const DataFinding = "finding"
+
 // FilesQuestion is the bug kind's "files were changed or lost" box: ticked, the report
 // carries the recent operations and the relay labels it priority.
 const FilesQuestion = "files"

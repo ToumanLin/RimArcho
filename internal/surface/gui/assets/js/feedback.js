@@ -50,18 +50,44 @@ export async function open() {
     F.mine = mine;
   } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
+  // came from a Can it run item's or a Mod's flag: that report, filled in (16 §2.4, §2.9)
+  const pre = S.feedbackPrefill;
+  S.feedbackPrefill = null;
+  const filled = pre && prefill(pre);
+  if (filled) await attach().catch(() => {});
+  if (!read.current()) return;
   // came for an unseen reply (the sidebar's dot): land on My reports, not on the form
-  const hit = F.mine?.reports.find(r => r.unseen);
-  if (hit) for (const r of F.mine.reports) if (r.unseen) F.fresh.add(r.number);
+  const hit = filled ? null : F.mine?.reports.find(r => r.unseen);
+  if (F.mine) for (const r of F.mine.reports) if (r.unseen) F.fresh.add(r.number);
   F.landed = hit ? hit.number : 0;
   F.side = hit ? "mine" : prob().kind;
   draw();
   read.finish();
   if (hit) $(`#screen .fb-rep[data-report="${hit.number}"]`)?.scrollIntoView({ block: "center" });
-  else firstField()?.focus({ preventScroll: true });
+  else (filled ? openField() : firstField())?.focus({ preventScroll: true });
   checkReplies();
   loadChoices();
 }
+
+// prefill starts the problem a flag asked for: kind with its answers, in place of an empty
+// problem or as another one; a problem already about the same item is shown instead. False:
+// no room (three problems), said in the status line.
+function prefill({ kind, answers }) {
+  if (!tpl(kind) || tpl(kind).kind !== kind) return false;
+  const same = F.probs.findIndex(p => p.kind === kind && Object.entries(answers).every(([k, v]) => p.answers[k] === v));
+  if (same >= 0) { F.cur = same; }
+  else {
+    const p = { ...fresh(kind), answers: { ...answers } };
+    if (isEmpty(prob())) F.probs[F.cur] = p;
+    else if (F.probs.length < MAX_SPLIT) { F.probs.push(p); F.cur = F.probs.length - 1; }
+    else { say("warn", T("send or remove a problem first")); return false; }
+  }
+  F.sent = null; F.failed = false; F.view = "form"; F.change = false;
+  return true;
+}
+
+// openField is the first question the flag left for the player (why, what it should be).
+const openField = () => [...document.querySelectorAll("#screen .fb-main .fb-q .field")].find(f => !f.value.trim()) || firstField();
 
 const firstField = () => $("#screen .fb-main .fb-q .field, #screen .fb-main .fb-title");
 

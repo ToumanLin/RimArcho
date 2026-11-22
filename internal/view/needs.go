@@ -139,6 +139,10 @@ type Need struct {
 	Mods     []string  `json:"mods,omitempty"`
 	Status   int       `json:"status"` // StatusErr, StatusWarn, StatusLog or StatusHint for the row icon
 	Dim      bool      `json:"dim,omitempty"`
+	// DataMod: the item rests on shared-log data or the replacement library (EvCorpus,
+	// EvCommunity), and this is its Mod's packageId: the item offers "the data is outdated"
+	// besides "this is wrong" (16 §2.4, §2.14).
+	DataMod string `json:"dataMod,omitempty"`
 
 	Content *NeedContent `json:"content,omitempty"`
 
@@ -399,6 +403,7 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 		}
 		names.fill(&n.Items[i])
 		identifyNeed(&n.Items[i])
+		n.Items[i].DataMod = dataMod(st, &n.Items[i])
 	}
 	mergeIntoSort(n.Items)
 	currentLinksFirst(n.Items, st.Ix.Env.GameRoot)
@@ -1730,4 +1735,55 @@ func foldPatchItems(items []Need) Need {
 		}
 	}
 	return f
+}
+
+// dataMod is the packageId of the Mod a data-backed item is about (Need.DataMod): its
+// subject, when the claim comes from shared logs or the replacement library.
+func dataMod(st *app.LoadoutState, it *Need) string {
+	if it.Evidence == nil || (it.Evidence.Kind != EvCorpus && it.Evidence.Kind != EvCommunity) || len(it.Mods) == 0 {
+		return ""
+	}
+	if m := st.Ix.ByID[it.Mods[0]]; m != nil {
+		if m.PackageID != "" {
+			return m.PackageID
+		}
+		return m.WorkshopID()
+	}
+	return ""
+}
+
+// DataNote is a Can it run item about one Mod that rests on shared-log data or the
+// replacement library, as the Mod's details show it with "the data is outdated" (16 §2.9).
+type DataNote struct {
+	Text     string    `json:"text"`
+	Evidence *Evidence `json:"evidence,omitempty"`
+	Finding  string    `json:"finding"` // the item's ID, attached to the report
+	Mod      string    `json:"mod"`     // the Mod's packageId (or Workshop ID)
+}
+
+// DataNotes are the data-backed items that name the instance, in Can it run's order.
+func DataNotes(n *Needs, st *app.LoadoutState, inst string) []DataNote {
+	if n == nil || st == nil || st.Ix == nil {
+		return nil
+	}
+	m := st.Ix.ByID[inst]
+	if m == nil {
+		return nil
+	}
+	ref := m.PackageID
+	if ref == "" {
+		ref = m.WorkshopID()
+	}
+	var out []DataNote
+	for _, it := range n.Items {
+		if it.DataMod == "" || it.Into != "" || !slices.Contains(it.Mods, inst) {
+			continue
+		}
+		text := it.Title
+		if text == "" {
+			text = it.Text
+		}
+		out = append(out, DataNote{Text: text, Evidence: it.Evidence, Finding: it.ID, Mod: ref})
+	}
+	return out
 }

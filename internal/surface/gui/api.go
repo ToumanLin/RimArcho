@@ -832,6 +832,9 @@ type Detail struct {
 	URL         string         `json:"url,omitempty"` // the Workshop page
 	Pos         int            `json:"pos,omitempty"`
 	Version     *view.Reason   `json:"version,omitempty"`
+	// Data: Can it run's items about this Mod that rest on shared-log data or the
+	// replacement library, each with "the data is outdated" (16 §2.9)
+	Data []view.DataNote `json:"data,omitempty"`
 }
 
 // Detail returns the detail of an instance; fetch allows the network for the Workshop
@@ -885,6 +888,7 @@ func (s *API) Detail(id string, staged, fetch, refresh bool) (*Detail, error) {
 		Show: data.Desc.Show, Note: view.DescNote(data), State: data.Desc.WorkshopState,
 		About: data.About, Workshop: data.Workshop, History: view.HistoryLine(data.Events), CanSeparate: st.Ix.CanSeparate(mod)}
 	d.Version = data.Version
+	d.Data = view.DataNotes(n, st, id)
 	d.Status = view.RowStatus(&item, n.Status)
 	switch d.Status {
 	case view.StatusNone:

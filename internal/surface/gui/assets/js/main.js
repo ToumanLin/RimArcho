@@ -1524,6 +1524,8 @@ async function start() {
   document.addEventListener("keydown", onKey);
   wireKeyboardMode();
   wireZoom(); // ctrl+wheel, ctrl+'+' / '-' / '0': interface size on every page (16 §2.14)
+  // a Can it run item's or a Mod's flag (js/reportmark.js): Feedback with the report filled in
+  document.addEventListener("feedback-report", (e) => { S.feedbackPrefill = e.detail; go("feedback"); });
   document.addEventListener("verb", (e) => { const v = e.detail; v === "needs" ? go("needs") : verb(v); });
   // a detail's settings row: Mod library › Mod settings at that Mod's files (16 §2.9)
   document.addEventListener("open-mod-settings", (e) => { modSettings.focusMod(e.detail); go("mod-settings"); });

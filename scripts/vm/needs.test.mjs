@@ -26,7 +26,7 @@ const freshN = () => ({ data: null, cols: [[], []], cur: [0, 0], at: ['', ''], c
 function cardContext(calls) {
   const context = createContext({ el, N: freshN(), T: (s) => s, Tf: (s, ...a) => s.replace(/%[ds]/g, () => a.shift()),
     archo: {}, statusIcon: () => '', needText: (tag, cls, text) => el(tag, cls, text), needParts: () => el('ul'),
-    evidenceMark: () => el('div', 'ev-line'), linkBlock: () => el('div'), jumpTo: (id) => calls.push(['jump', id]),
+    evidenceMark: () => el('div', 'ev-line'), reportMark: (o) => { const b = el('button', 'icon report-mark'); b.report = o; return b; }, linkBlock: () => el('div'), jumpTo: (id) => calls.push(['jump', id]),
     setCur() {}, snapshot: () => calls.push(['snapshot']), doAction: (a, o) => calls.push(['do', a.kind, o]),
     runAction: (it, a, here) => calls.push(['run', a.kind, here]), actionWrite: (a) => a.kind,
     confirmYes: () => calls.push(['yes']), drawNeeds: () => calls.push(['draw']),
@@ -49,7 +49,11 @@ test('every action is a button at the foot, one per option of a choice, none beh
   const foot = row.children.find((n) => n.className === 'need-foot');
   assert.ok(foot, 'the buttons sit in the foot');
   assert.ok(foot.children.some((n) => n.className === 'ev-line'), 'the evidence shares the foot');
-  const bs = buttons(foot);
+  // the flag (16 §2.4): last on the foot, about this item; no data behind it, so no Mod
+  const flag = foot.children.at(-1);
+  assert.equal(flag.className, 'icon report-mark');
+  assert.deepEqual(plain(flag.report), { finding: 'n1', mod: '' });
+  const bs = buttons(foot).filter((b) => b !== flag);
   assert.deepEqual(bs.map((b) => b.textContent), ['disable A', 'disable B', 'details']);
   assert.ok(!bs.some((b) => /more/.test(b.className)));
   assert.ok(bs.slice(0, 2).every((b) => b.className.includes('option') && !b.className.includes('primary')), 'no option is the default');
@@ -79,6 +83,9 @@ test('a confirmation is asked in the item, in place of its buttons', () => {
   assert.equal(no.key, 'esc');
   yes.onclick(); assert.deepEqual(calls.at(-1), ['yes']);
   no.onclick(); assert.equal(context.N.ask, null);
+  // an item from the replacement library: the flag also knows its Mod
+  const data = context.needCard({ id: 'n4', kind: 'mod.replaced', text: 'A has a maintained replacement', dataMod: 'a.pkg', section: 0, actions: [] }, 0, 2);
+  assert.deepEqual(plain(data.children.find((n) => n.className === 'need-foot').children.at(-1).report), { finding: 'n4', mod: 'a.pkg' });
   // another item's card keeps its buttons
   assert.ok(context.needCard({ ...it, id: 'n3' }, 0, 1).children.some((n) => n.className === 'need-foot'));
 });

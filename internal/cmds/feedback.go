@@ -23,7 +23,10 @@ var FeedbackDraft func(c *Ctx, kind, title string, answers map[string]string, at
 var FeedbackAttachments = []string{"mods", "paths", "log", "ops", "problems"}
 
 func init() {
-	flags := []Flag{{Name: "title", Value: "<text>", Help: "the title (default: the first answer's first line)"}}
+	flags := []Flag{
+		{Name: "template", Value: "<" + strings.Join(feedback.Kinds(), "|") + ">", Help: "the report's kind (the same as <kind>)"},
+		{Name: "title", Value: "<text>", Help: "the title (default: the first answer's first line)"},
+	}
 	seen := map[string]bool{}
 	for _, t := range feedback.Templates {
 		for _, q := range t.Questions {
@@ -32,6 +35,9 @@ func init() {
 			}
 			seen[q.Key] = true
 			f := Flag{Name: q.Key, Value: "<text>", Help: t.Kind + ": " + q.Label}
+			if q.Key == feedback.DataFinding {
+				f.Help += "; data: the Can it run item that showed the data"
+			}
 			switch q.Form {
 			case feedback.FormCheck:
 				f.Value = ""
@@ -53,10 +59,17 @@ func init() {
 }
 
 func feedbackCmd(c *Ctx, a *Args) (*render.Doc, error) {
-	if len(a.Pos) == 0 {
+	kind := strings.ToLower(strings.TrimSpace(a.Str("template")))
+	if len(a.Pos) > 0 {
+		pos := strings.ToLower(strings.TrimSpace(a.Pos[0]))
+		if kind != "" && kind != pos {
+			return nil, &UsageError{Msg: fmt.Sprintf("two report kinds: %s and --template %s", pos, kind)}
+		}
+		kind = pos
+	}
+	if kind == "" {
 		return feedbackTemplatesDoc(), nil
 	}
-	kind := strings.ToLower(strings.TrimSpace(a.Pos[0]))
 	if !slices.Contains(feedback.Kinds(), kind) {
 		return nil, &UsageError{Msg: fmt.Sprintf("unknown report kind %q: use %s", kind, strings.Join(feedback.Kinds(), ", "))}
 	}
@@ -78,8 +91,14 @@ func feedbackCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		answers[q.Key] = v
 	}
+	// an outdated-data report may name the Can it run item that showed the data
+	if kind == feedback.KindData {
+		if v := strings.TrimSpace(a.Str(feedback.DataFinding)); v != "" {
+			answers[feedback.DataFinding] = v
+		}
+	}
 	for k := range a.flags {
-		if k == "title" || k == "attach" || slices.ContainsFunc(t.Questions, func(q feedback.Question) bool { return q.Key == k }) {
+		if k == "title" || k == "attach" || k == "template" || (kind == feedback.KindData && k == feedback.DataFinding) || slices.ContainsFunc(t.Questions, func(q feedback.Question) bool { return q.Key == k }) {
 			continue
 		}
 		return nil, &UsageError{Msg: fmt.Sprintf("a %s report has no --%s: see archo feedback", kind, k)}

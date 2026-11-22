@@ -20,6 +20,7 @@ import { wireSeparator } from "./separator.js";
 import { changes, changesKey, initSubscriptions } from "./subscriptions.js";
 import { setNeedRunner } from "./badgepop.js";
 import { initNeedText, needText, needParts, evidenceMark } from "./needtext.js";
+import { reportMark } from "./reportmark.js";
 import { getChoices } from "./credit.js";
 import { memBars, countBar, countMark, stepMeter, visTip, diskMeter } from "./membar.js";
 import { setVersionRunner } from "./versionwarnings.js";
@@ -947,7 +948,9 @@ function needCard(it, ci, i) {
   else {
     foot.append(btns);
     if (it.evidence) foot.append(evidenceMark(it.evidence));
-    if (btns.children.length || it.evidence) row.append(foot);
+    // the flag: this diagnosis is wrong, or the data behind it is outdated (16 §2.4)
+    if (it.id) foot.append(reportMark({ finding: it.id, mod: it.dataMod || "" }));
+    row.append(foot);
   }
   row.onclick = () => setCur(ci, i);
   return row;
