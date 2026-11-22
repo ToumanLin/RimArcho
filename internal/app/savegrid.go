@@ -109,18 +109,6 @@ func (a *App) gridRefs(f *savefile.Facts, insts []string, active func(string) bo
 	if len(f.GridDefs) == 0 {
 		return g, nil
 	}
-	may := func(typ, inst string) {
-		if g.may[typ] == nil {
-			g.may[typ] = map[string]bool{}
-		}
-		g.may[typ][inst] = true
-	}
-	add := func(typ, name string, cells int) {
-		if g.refs[typ] == nil {
-			g.refs[typ] = map[string]int{}
-		}
-		g.refs[typ][name] += cells
-	}
 	facts, err := a.Store.DefsOfTypes(insts, []string{"TerrainDef", "BiomeDef", "TerrainTemplateDef", "ColorDef"})
 	if err != nil {
 		return nil, err
@@ -134,9 +122,9 @@ func (a *App) gridRefs(f *savefile.Facts, insts []string, active func(string) bo
 		names[d.Type] = append(names[d.Type], d.DefName)
 		switch d.Type {
 		case "TerrainDef", "BiomeDef":
-			may(d.Type, d.Instance)
+			g.addMay(d.Type, d.Instance)
 		case "TerrainTemplateDef":
-			may("TerrainDef", d.Instance)
+			g.addMay("TerrainDef", d.Instance)
 		}
 	}
 	var t gridThings
@@ -156,87 +144,112 @@ func (a *App) gridRefs(f *savefile.Facts, insts []string, active func(string) bo
 		byHash := shortHashes(names["BiomeDef"])
 		for h, k := range cells {
 			if n := byHash[h]; n != "" {
-				add("BiomeDef", n, k)
+				g.add("BiomeDef", n, k)
 			} else {
 				g.left["BiomeDef"]++
 			}
 		}
 	}
-	// Terrain: the Def files' own and what the game generates at load, in one hash space.
 	if cells := f.GridDefs["TerrainDef"]; len(cells) > 0 {
-		list := names["TerrainDef"]
-		own := map[string]bool{}
-		for _, n := range list {
-			own[n] = true
-		}
-		implied := map[string][2]string{} // generated defName → the reference it stands for
-		for n, to := range impliedTerrain(&t, active, names["TerrainTemplateDef"], names["ColorDef"]) {
-			if !own[n] { // a Def file has it: that one is loaded
-				implied[n] = to
-				list = append(list, n)
-			}
-		}
-		byHash := shortHashes(list)
-		for h, k := range cells {
-			n := byHash[h]
-			switch to, gen := implied[n]; {
-			case n == "":
-				g.left["TerrainDef"]++
-			case gen:
-				add(to[0], to[1], k)
-			default:
-				add("TerrainDef", n, k)
-			}
-		}
+		g.terrainRefs(cells, &t, active, names)
 	}
-	// Compressed things: rock, ore and chunks, by ThingDef hash. The game hashes every
-	// ThingDef, those it generates included (blueprints, frames, corpses, meat…), which are
-	// not all known here: a hash the Def files' own ThingDefs do not explain is tried as a
-	// compressible Def pushed up to three places on by ones not seen.
 	if cells := f.GridDefs["ThingDef"]; len(cells) > 0 {
-		var list []string
-		comp := map[string]bool{}
-		base := map[uint16][]string{}
-		owners := map[uint16][]string{} // a compressible Def's own hash → the copies defining it
-		for i := range t.all {
-			d := &t.all[i]
-			if d.Abstract || d.DefName == "" || !d.Loaded(active) {
-				continue
-			}
-			list = append(list, d.DefName)
-			if t.inherits(d, building("isNaturalRock")) || t.inherits(d, chunk) {
-				h := defShortHash(d.DefName)
-				owners[h] = append(owners[h], d.Instance)
-				if !comp[d.DefName] {
-					comp[d.DefName] = true
-					base[defShortHash(d.DefName)] = append(base[defShortHash(d.DefName)], d.DefName)
-				}
-			}
-		}
-		byHash := shortHashes(list)
-		for h, k := range cells {
-			n := byHash[h]
-			if !comp[n] {
-				n = ""
-				for back := uint16(0); back <= 3 && n == ""; back++ {
-					if c := base[h-back]; len(c) == 1 {
-						n = c[0]
-					}
-				}
-			}
-			if n == "" {
-				g.left["ThingDef"]++
-				for back := uint16(0); back <= gridReach; back++ {
-					for _, inst := range owners[h-back] {
-						may("ThingDef", inst)
-					}
-				}
-				continue
-			}
-			add("ThingDef", n, k)
-		}
+		g.thingRefs(cells, &t, active)
 	}
 	return g, nil
+}
+
+// addMay records that a hash left of grid Def type typ may belong to the copy inst.
+func (g *gridResult) addMay(typ, inst string) {
+	if g.may[typ] == nil {
+		g.may[typ] = map[string]bool{}
+	}
+	g.may[typ][inst] = true
+}
+
+// add counts cells of a typed reference to name.
+func (g *gridResult) add(typ, name string, cells int) {
+	if g.refs[typ] == nil {
+		g.refs[typ] = map[string]int{}
+	}
+	g.refs[typ][name] += cells
+}
+
+// terrainRefs names the terrain grid's hashes: the Def files' own and what the game
+// generates at load, in one hash space.
+func (g *gridResult) terrainRefs(cells map[uint16]int, t *gridThings, active func(string) bool, names map[string][]string) {
+	list := names["TerrainDef"]
+	own := map[string]bool{}
+	for _, n := range list {
+		own[n] = true
+	}
+	implied := map[string][2]string{} // generated defName → the reference it stands for
+	for n, to := range impliedTerrain(t, active, names["TerrainTemplateDef"], names["ColorDef"]) {
+		if !own[n] { // a Def file has it: that one is loaded
+			implied[n] = to
+			list = append(list, n)
+		}
+	}
+	byHash := shortHashes(list)
+	for h, k := range cells {
+		n := byHash[h]
+		switch to, gen := implied[n]; {
+		case n == "":
+			g.left["TerrainDef"]++
+		case gen:
+			g.add(to[0], to[1], k)
+		default:
+			g.add("TerrainDef", n, k)
+		}
+	}
+}
+
+// thingRefs names the compressed things: rock, ore and chunks, by ThingDef hash. The game
+// hashes every ThingDef, those it generates included (blueprints, frames, corpses, meat…),
+// which are not all known here: a hash the Def files' own ThingDefs do not explain is tried
+// as a compressible Def pushed up to three places on by ones not seen.
+func (g *gridResult) thingRefs(cells map[uint16]int, t *gridThings, active func(string) bool) {
+	var list []string
+	comp := map[string]bool{}
+	base := map[uint16][]string{}
+	owners := map[uint16][]string{} // a compressible Def's own hash → the copies defining it
+	for i := range t.all {
+		d := &t.all[i]
+		if d.Abstract || d.DefName == "" || !d.Loaded(active) {
+			continue
+		}
+		list = append(list, d.DefName)
+		if t.inherits(d, building("isNaturalRock")) || t.inherits(d, chunk) {
+			h := defShortHash(d.DefName)
+			owners[h] = append(owners[h], d.Instance)
+			if !comp[d.DefName] {
+				comp[d.DefName] = true
+				base[defShortHash(d.DefName)] = append(base[defShortHash(d.DefName)], d.DefName)
+			}
+		}
+	}
+	byHash := shortHashes(list)
+	for h, k := range cells {
+		n := byHash[h]
+		if !comp[n] {
+			n = ""
+			for back := uint16(0); back <= 3 && n == ""; back++ {
+				if c := base[h-back]; len(c) == 1 {
+					n = c[0]
+				}
+			}
+		}
+		if n == "" {
+			g.left["ThingDef"]++
+			for back := uint16(0); back <= gridReach; back++ {
+				for _, inst := range owners[h-back] {
+					g.addMay("ThingDef", inst)
+				}
+			}
+			continue
+		}
+		g.add("ThingDef", n, k)
+	}
 }
 
 // impliedTerrain names the TerrainDefs the game generates at load, each with the reference

@@ -458,10 +458,66 @@ func (a *App) ownerMemo() *saveOwnerMemo {
 func (a *App) attributeSave(q ownerQuery) (*saveOwnership, error) {
 	m := a.ownerMemo()
 	defer m.mu.Unlock()
-	f := q.facts
-	out := &saveOwnership{owned: map[int]*SaveOwned{}, alone: map[int]*SaveOwned{}}
+	s := &saveAttr{a: a, m: m, q: q, out: &saveOwnership{owned: map[int]*SaveOwned{}, alone: map[int]*SaveOwned{}}}
+	if err := s.coverage(); err != nil {
+		return nil, err
+	}
+	if err := s.loadIssues(); err != nil {
+		return nil, err
+	}
+	// Defs, pawns and factions.
+	s.pool = ownerPool{races: map[string]*OwnedRace{}}
+	if len(q.issues) > 0 && s.defsOK {
+		if err := s.attributeDefs(); err != nil {
+			return nil, err
+		}
+	}
+	if err := s.attributeClasses(); err != nil {
+		return nil, err
+	}
+	s.sharePool()
+	out := s.out
+	for _, i := range q.issues {
+		o := s.own(i)
+		sort.Strings(o.Classes)
+		o.Classes = dedupe(o.Classes)
+		o.DefsUnchecked = !s.defsOK
+		o.ClassesUnchecked = !s.gameOK || !s.dllOK
+	}
+	sort.SliceStable(out.missing, func(i, j int) bool {
+		if a, b := out.missing[i].Mod.PackageID, out.missing[j].Mod.PackageID; a != b {
+			return a < b
+		}
+		return out.missing[i].Class < out.missing[j].Class
+	})
+	return out, nil
+}
 
-	// Are the save's Mods in the list (and the game) indexed for this game version?
+// saveAttr is one attribution of a save's content, with the owner memo locked.
+type saveAttr struct {
+	a   *App
+	m   *saveOwnerMemo
+	q   ownerQuery
+	out *saveOwnership
+	// whether the save's Mods in the list (and the game) are indexed for this game version
+	defsOK, dllOK, gameOK bool
+	issueAt               map[string]int // the Mods with a row, by packageId
+	pool                  ownerPool
+}
+
+// ownerPool is what nothing installed provides: the Mods with a row and no facts of a kind
+// get it, inferred.
+type ownerPool struct {
+	races    map[string]*OwnedRace
+	factions []string
+	defs     OwnedDefs
+	classes  []string
+}
+
+// coverage tells whether the save's Mods in the list (and the game) are indexed for this
+// game version: their Defs, their assemblies and the game's types.
+func (s *saveAttr) coverage() error {
+	a, m, q := s.a, s.m, s.q
 	cover := q.cover
 	if cover == nil {
 		cover = q.loaded
@@ -471,217 +527,241 @@ func (a *App) attributeSave(q ownerQuery) (*saveOwnership, error) {
 		covered = append(covered, inst)
 	}
 	if err := m.loadViews(a.Store, covered); err != nil {
-		return nil, err
+		return err
 	}
-	defsOK, dllOK := len(covered) > 0, len(covered) > 0
+	s.defsOK, s.dllOK = len(covered) > 0, len(covered) > 0
 	for _, inst := range covered {
 		v := m.views[inst]
-		defsOK = defsOK && v.Defs
-		dllOK = dllOK && v.DLLs
+		s.defsOK = s.defsOK && v.Defs
+		s.dllOK = s.dllOK && v.DLLs
 	}
 	if m.game == 0 {
 		ok, err := a.Store.GameTypesIndexed()
 		if err != nil {
-			return nil, err
+			return err
 		}
 		m.game = map[bool]int8{true: 1, false: -1}[ok]
 	}
-	gameOK := m.game > 0
+	s.gameOK = m.game > 0
+	return nil
+}
 
-	// The Mods with a row, by packageId, and which of them have no facts of a kind: the
-	// pool of what nothing installed provides is theirs, inferred.
-	issueAt := map[string]int{}
+// loadIssues indexes the Mods with a row by packageId and loads what is known of each.
+func (s *saveAttr) loadIssues() error {
+	q := s.q
+	s.issueAt = map[string]int{}
 	var issueInst, issuePkg []string
 	for _, i := range q.issues {
-		issueAt[normPkg(q.mods[i].PackageID)] = i
+		s.issueAt[normPkg(q.mods[i].PackageID)] = i
 		if q.mods[i].Instance != "" {
 			issueInst = append(issueInst, q.mods[i].Instance)
 		} else {
 			issuePkg = append(issuePkg, normPkg(q.mods[i].PackageID))
 		}
 	}
-	if err := m.loadViews(a.Store, issueInst); err != nil {
-		return nil, err
+	if err := s.m.loadViews(s.a.Store, issueInst); err != nil {
+		return err
 	}
-	if err := m.loadPkgViews(a.Store, issuePkg); err != nil {
-		return nil, err
-	}
-	// facts is what is known of a Mod with a row: its own instance's views, or for one not
-	// installed here, those of any copy (another game's, or a tombstone's).
-	facts := func(i int) store.FactView {
-		if inst := q.mods[i].Instance; inst != "" {
-			return m.views[inst]
-		}
-		return m.pkgView[normPkg(q.mods[i].PackageID)]
-	}
-	// owner picks, among the definers of something lost, the Mod with a row latest in the
-	// save's order (12 §1.5); -1 when none has one.
-	pkgOf := func(inst string) string {
-		if q.names != nil {
-			if p, _ := q.names(inst); p != "" {
-				return normPkg(p)
-			}
-		}
-		return normPkg(m.pkgs[inst][0])
-	}
-	owner := func(insts []string) int {
-		best := -1
-		for _, inst := range insts {
-			if i, ok := issueAt[pkgOf(inst)]; ok && i > best {
-				best = i
-			}
-		}
-		return best
-	}
-	own := func(i int) *SaveOwned {
-		o := out.owned[i]
-		if o == nil {
-			o = &SaveOwned{}
-			out.owned[i] = o
-		}
-		return o
-	}
+	return s.m.loadPkgViews(s.a.Store, issuePkg)
+}
 
-	// Defs, pawns and factions.
-	type pooled struct {
-		races    map[string]*OwnedRace
-		factions []string
-		defs     OwnedDefs
-		classes  []string
+// facts is what is known of the Mod with a row i: its own instance's views, or for one not
+// installed here, those of any copy (another game's, or a tombstone's).
+func (s *saveAttr) facts(i int) store.FactView {
+	if inst := s.q.mods[i].Instance; inst != "" {
+		return s.m.views[inst]
 	}
-	pool := pooled{races: map[string]*OwnedRace{}}
-	if len(q.issues) > 0 && defsOK {
-		names := make([]string, 0, len(f.Defs)+len(f.Colonists)+len(f.Factions))
-		for n := range f.Defs {
-			names = append(names, n)
-		}
-		for _, p := range f.Colonists {
-			names = append(names, p.Race)
-		}
-		for _, fa := range f.Factions {
-			names = append(names, fa.Def)
-		}
-		if err := m.loadDefs(a.Store, names); err != nil {
-			return nil, err
-		}
-		var unknownPkgs []string
-		for _, n := range names {
-			for _, d := range m.defs[n] {
-				if _, ok := m.pkgs[d.Instance]; !ok && pkgOf(d.Instance) == "" {
-					unknownPkgs = append(unknownPkgs, d.Instance)
-				}
-			}
-		}
-		if err := m.loadPkgs(a.Store, unknownPkgs); err != nil {
-			return nil, err
-		}
-		// lost: nothing the list loads defines it. Returns the Mod with a row owning it, -1
-		// for nobody installed (the pool), -2 for an installed Mod without a row (not
-		// counted: 12 §1.5).
-		lost := func(name string) (int, []string, bool) {
-			ds := m.defs[name]
-			var insts, types []string
-			for _, d := range ds {
-				if q.loaded[d.Instance] {
-					return 0, nil, false
-				}
-				insts = append(insts, d.Instance)
-			}
-			if len(ds) == 0 {
-				return -1, nil, true
-			}
-			i := owner(insts)
-			if i < 0 {
-				return -2, nil, true
-			}
-			for _, d := range ds {
-				if pkgOf(d.Instance) == normPkg(q.mods[i].PackageID) {
-					types = append(types, d.Type)
-				}
-			}
-			return i, types, true
-		}
-		special := map[string]bool{}
-		races := map[int]map[string]*OwnedRace{}
-		for _, p := range f.Colonists {
-			special[p.Race] = true
-			i, _, ok := lost(p.Race)
-			if !ok || i == -2 || p.Race == "" {
-				continue
-			}
-			byRace := pool.races
-			if i >= 0 {
-				if races[i] == nil {
-					races[i] = map[string]*OwnedRace{}
-				}
-				byRace = races[i]
-			}
-			r := byRace[p.Race]
-			if r == nil {
-				r = &OwnedRace{Race: p.Race}
-				byRace[p.Race] = r
-			}
-			if p.Dead {
-				r.Dead++
-			} else {
-				r.Alive++
-			}
-		}
-		for i, rs := range races {
-			own(i).Colonists = sortedRaces(rs)
-		}
-		for _, fa := range f.Factions {
-			special[fa.Def] = true
-			i, _, ok := lost(fa.Def)
-			if !ok || i == -2 || fa.Def == "" {
-				continue
-			}
-			name := fa.Name
-			if name == "" {
-				name = fa.Def
-			}
-			if i >= 0 {
-				own(i).Factions = append(own(i).Factions, name)
-			} else {
-				pool.factions = append(pool.factions, name)
-			}
-		}
-		defs := map[int]map[string]*OwnedDefs{}
-		for n, uses := range f.Defs {
-			if special[n] {
-				continue
-			}
-			i, types, ok := lost(n)
-			if !ok || i == -2 {
-				continue
-			}
-			if i < 0 {
-				pool.defs.Defs++
-				pool.defs.Uses += uses
-				pool.defs.note(n, uses)
-				continue
-			}
-			if defs[i] == nil {
-				defs[i] = map[string]*OwnedDefs{}
-			}
-			for _, t := range dedupe(types) {
-				d := defs[i][t]
-				if d == nil {
-					d = &OwnedDefs{Type: t}
-					defs[i][t] = d
-				}
-				d.Defs++
-				d.Uses += uses
-				d.note(n, uses)
-			}
-		}
-		pool.defs.finish()
-		for i, ds := range defs {
-			own(i).Defs = sortedDefs(ds)
-		}
-	}
+	return s.m.pkgView[normPkg(s.q.mods[i].PackageID)]
+}
 
-	// Classes: every save, since a class can be missing without any Mod row.
+// pkgOf is the normalised packageId of copy inst.
+func (s *saveAttr) pkgOf(inst string) string {
+	if s.q.names != nil {
+		if p, _ := s.q.names(inst); p != "" {
+			return normPkg(p)
+		}
+	}
+	return normPkg(s.m.pkgs[inst][0])
+}
+
+// owner picks, among the definers of something lost, the Mod with a row latest in the
+// save's order (12 §1.5); -1 when none has one.
+func (s *saveAttr) owner(insts []string) int {
+	best := -1
+	for _, inst := range insts {
+		if i, ok := s.issueAt[s.pkgOf(inst)]; ok && i > best {
+			best = i
+		}
+	}
+	return best
+}
+
+// own is what the Mod with a row i owns, made on first use.
+func (s *saveAttr) own(i int) *SaveOwned {
+	o := s.out.owned[i]
+	if o == nil {
+		o = &SaveOwned{}
+		s.out.owned[i] = o
+	}
+	return o
+}
+
+// lost: nothing the list loads defines name. Returns the Mod with a row owning it, -1 for
+// nobody installed (the pool), -2 for an installed Mod without a row (not counted: 12 §1.5),
+// and the types of its Defs in the owner.
+func (s *saveAttr) lost(name string) (int, []string, bool) {
+	ds := s.m.defs[name]
+	var insts, types []string
+	for _, d := range ds {
+		if s.q.loaded[d.Instance] {
+			return 0, nil, false
+		}
+		insts = append(insts, d.Instance)
+	}
+	if len(ds) == 0 {
+		return -1, nil, true
+	}
+	i := s.owner(insts)
+	if i < 0 {
+		return -2, nil, true
+	}
+	for _, d := range ds {
+		if s.pkgOf(d.Instance) == normPkg(s.q.mods[i].PackageID) {
+			types = append(types, d.Type)
+		}
+	}
+	return i, types, true
+}
+
+// attributeDefs gives the Mods with a row the pawns' races, the factions and the Defs the
+// save names that nothing the list loads defines.
+func (s *saveAttr) attributeDefs() error {
+	f, m, a := s.q.facts, s.m, s.a
+	names := make([]string, 0, len(f.Defs)+len(f.Colonists)+len(f.Factions))
+	for n := range f.Defs {
+		names = append(names, n)
+	}
+	for _, p := range f.Colonists {
+		names = append(names, p.Race)
+	}
+	for _, fa := range f.Factions {
+		names = append(names, fa.Def)
+	}
+	if err := m.loadDefs(a.Store, names); err != nil {
+		return err
+	}
+	var unknownPkgs []string
+	for _, n := range names {
+		for _, d := range m.defs[n] {
+			if _, ok := m.pkgs[d.Instance]; !ok && s.pkgOf(d.Instance) == "" {
+				unknownPkgs = append(unknownPkgs, d.Instance)
+			}
+		}
+	}
+	if err := m.loadPkgs(a.Store, unknownPkgs); err != nil {
+		return err
+	}
+	special := map[string]bool{}
+	s.attributeColonists(special)
+	s.attributeFactions(special)
+	s.attributePlainDefs(special)
+	return nil
+}
+
+// attributeColonists counts the save's pawns, alive and dead, by lost race; it marks the
+// races in special.
+func (s *saveAttr) attributeColonists(special map[string]bool) {
+	races := map[int]map[string]*OwnedRace{}
+	for _, p := range s.q.facts.Colonists {
+		special[p.Race] = true
+		i, _, ok := s.lost(p.Race)
+		if !ok || i == -2 || p.Race == "" {
+			continue
+		}
+		byRace := s.pool.races
+		if i >= 0 {
+			if races[i] == nil {
+				races[i] = map[string]*OwnedRace{}
+			}
+			byRace = races[i]
+		}
+		r := byRace[p.Race]
+		if r == nil {
+			r = &OwnedRace{Race: p.Race}
+			byRace[p.Race] = r
+		}
+		if p.Dead {
+			r.Dead++
+		} else {
+			r.Alive++
+		}
+	}
+	for i, rs := range races {
+		s.own(i).Colonists = sortedRaces(rs)
+	}
+}
+
+// attributeFactions gives out the factions of lost Defs; it marks their Defs in special.
+func (s *saveAttr) attributeFactions(special map[string]bool) {
+	for _, fa := range s.q.facts.Factions {
+		special[fa.Def] = true
+		i, _, ok := s.lost(fa.Def)
+		if !ok || i == -2 || fa.Def == "" {
+			continue
+		}
+		name := fa.Name
+		if name == "" {
+			name = fa.Def
+		}
+		if i >= 0 {
+			s.own(i).Factions = append(s.own(i).Factions, name)
+		} else {
+			s.pool.factions = append(s.pool.factions, name)
+		}
+	}
+}
+
+// attributePlainDefs counts the other lost Defs, not in special, by type.
+func (s *saveAttr) attributePlainDefs(special map[string]bool) {
+	defs := map[int]map[string]*OwnedDefs{}
+	for n, uses := range s.q.facts.Defs {
+		if special[n] {
+			continue
+		}
+		i, types, ok := s.lost(n)
+		if !ok || i == -2 {
+			continue
+		}
+		if i < 0 {
+			s.pool.defs.Defs++
+			s.pool.defs.Uses += uses
+			s.pool.defs.note(n, uses)
+			continue
+		}
+		if defs[i] == nil {
+			defs[i] = map[string]*OwnedDefs{}
+		}
+		for _, t := range dedupe(types) {
+			d := defs[i][t]
+			if d == nil {
+				d = &OwnedDefs{Type: t}
+				defs[i][t] = d
+			}
+			d.Defs++
+			d.Uses += uses
+			d.note(n, uses)
+		}
+	}
+	s.pool.defs.finish()
+	for i, ds := range defs {
+		s.own(i).Defs = sortedDefs(ds)
+	}
+}
+
+// attributeClasses gives out the classes the save names that nothing loaded defines, for
+// every save, since a class can be missing without any Mod row.
+func (s *saveAttr) attributeClasses() error {
+	f, m, q, out := s.q.facts, s.m, s.q, s.out
 	classes := make([]string, 0, len(f.Classes))
 	for c := range f.Classes {
 		if c != "" {
@@ -689,30 +769,30 @@ func (a *App) attributeSave(q ownerQuery) (*saveOwnership, error) {
 		}
 	}
 	sort.Strings(classes)
-	if err := m.loadClasses(a.Store, classes, gameOK); err != nil {
-		return nil, err
+	if err := m.loadClasses(s.a.Store, classes, s.gameOK); err != nil {
+		return err
 	}
 	var ownerInst []string
 	for _, c := range classes {
 		ownerInst = append(ownerInst, m.classOwners(c)...)
 	}
-	if err := m.loadPkgs(a.Store, ownerInst); err != nil {
-		return nil, err
+	if err := m.loadPkgs(s.a.Store, ownerInst); err != nil {
+		return err
 	}
 	for _, c := range classes {
 		ok, insts := m.classOK(c, q.loaded)
 		if ok {
 			continue
 		}
-		if i := owner(insts); i >= 0 {
-			own(i).Classes = append(own(i).Classes, c)
+		if i := s.owner(insts); i >= 0 {
+			s.own(i).Classes = append(s.own(i).Classes, c)
 			continue
 		}
-		if !gameOK || !dllOK {
+		if !s.gameOK || !s.dllOK {
 			continue // a class only an unindexed Mod or the game defines would look missing
 		}
 		if len(insts) == 0 {
-			pool.classes = append(pool.classes, c)
+			s.pool.classes = append(s.pool.classes, c)
 			continue
 		}
 		pkg, name := "", ""
@@ -724,20 +804,24 @@ func (a *App) attributeSave(q ownerQuery) (*saveOwnership, error) {
 		}
 		out.missing = append(out.missing, missingClass{Class: c, Mod: SaveMod{PackageID: pkg, Name: name, Instance: insts[0]}})
 	}
+	return nil
+}
 
-	// The pool goes to the Mods with a row and no facts of that kind; with none, its
-	// classes are missing with no Mod known and its Defs are only "source not found".
+// sharePool gives the pool to the Mods with a row and no facts of that kind; with none, its
+// classes are missing with no Mod known and its Defs are only "source not found".
+func (s *saveAttr) sharePool() {
+	out, pool := s.out, s.pool
 	var defPool, classPool []int
-	for _, i := range q.issues {
-		v := facts(i)
+	for _, i := range s.q.issues {
+		v := s.facts(i)
 		if !v.Defs {
 			defPool = append(defPool, i)
 		}
 		if !v.DLLs {
 			classPool = append(classPool, i)
 		}
-		own(i).NoFacts = !v.Defs && !v.DLLs
-		out.alone[i] = own(i).clone()
+		s.own(i).NoFacts = !v.Defs && !v.DLLs
+		out.alone[i] = s.own(i).clone()
 	}
 	out.defPool, out.classPool = defPool, classPool
 	out.pool = SaveOwned{Colonists: sortedRaces(pool.races), Factions: pool.factions, Classes: pool.classes}
@@ -747,7 +831,7 @@ func (a *App) attributeSave(q ownerQuery) (*saveOwnership, error) {
 	hasDefPool := len(pool.races) > 0 || len(pool.factions) > 0 || pool.defs.Uses > 0
 	if hasDefPool {
 		for _, i := range defPool {
-			o := own(i)
+			o := s.own(i)
 			o.Colonists = mergeRaces(o.Colonists, pool.races)
 			o.Factions = append(o.Factions, pool.factions...)
 			if pool.defs.Uses > 0 {
@@ -764,27 +848,12 @@ func (a *App) attributeSave(q ownerQuery) (*saveOwnership, error) {
 			}
 		}
 		for _, i := range classPool {
-			o := own(i)
+			o := s.own(i)
 			o.Classes = append(o.Classes, pool.classes...)
 			o.Inferred = true
 			o.Among = max(o.Among, len(classPool)-1)
 		}
 	}
-
-	for _, i := range q.issues {
-		o := own(i)
-		sort.Strings(o.Classes)
-		o.Classes = dedupe(o.Classes)
-		o.DefsUnchecked = !defsOK
-		o.ClassesUnchecked = !gameOK || !dllOK
-	}
-	sort.SliceStable(out.missing, func(i, j int) bool {
-		if a, b := out.missing[i].Mod.PackageID, out.missing[j].Mod.PackageID; a != b {
-			return a < b
-		}
-		return out.missing[i].Class < out.missing[j].Class
-	})
-	return out, nil
 }
 
 func (m *saveOwnerMemo) loadViews(s *store.Store, insts []string) error {

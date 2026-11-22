@@ -123,6 +123,58 @@ func (a *App) PlanLoadCost(ctx context.Context, planID int64, progress func(done
 	if mm == "" {
 		return nil, fmt.Errorf("cannot estimate memory: game version is unknown for %s; rescan the selected game (archo scan) and retry", st.Ix.Env.Name)
 	}
+	targets, err := a.loadCostTargets(st, ps, mm)
+	if err != nil {
+		return nil, err
+	}
+	g := loadcost.Game16
+	if !env.VersionLess(mm, "1.7") {
+		g = loadcost.Game17
+	}
+	r := &LoadCost{Game: g, Mods: len(targets), PerMod: make([]ModCost, len(targets))}
+	r.Baseline.RAM, r.Baseline.VRAM = loadcost.Baseline(g)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	run := &loadCostRun{
+		a: a, g: g, r: r, targets: targets, progress: progress, cancel: cancel,
+		cache:    fsscan.OpenCache(filepath.Join(a.Home, "cache", "loadcost-v1.json")),
+		measured: make([]loadcost.Mod, len(targets)),
+		top:      make([]TopMod, len(targets)),
+	}
+	saveErr := run.measureAll(ctx)
+	if run.firstErr != nil {
+		return nil, run.firstErr
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if saveErr != nil {
+		return nil, fmt.Errorf("save load cost cache: %w", saveErr)
+	}
+	r.Report = loadcost.Estimate(g, run.measured)
+	r.LoadingRAMLow, r.LoadingRAMHigh = loadcost.LoadingBudget(g, r.Report, run.measured)
+	r.Capacity = AssessMemory(a.measuredMemory(), r)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if err := a.saveMemoryEstimate(ps, r); err != nil {
+		return nil, err
+	}
+	r.Top = topLoadCostMods(run.top)
+	return r, nil
+}
+
+// loadCostTarget is one Mod to measure: its folders as the plan loads them.
+type loadCostTarget struct {
+	packageID string
+	dir       string
+	folders   []string
+	top       TopMod
+}
+
+// loadCostTargets lists the plan's enabled, non-official Mods once each, with the folders
+// they load under game version mm.
+func (a *App) loadCostTargets(st *LoadoutState, ps *LoadoutState, mm string) ([]loadCostTarget, error) {
 	var mods []*store.Mod
 	active, seen := map[string]bool{}, map[string]bool{}
 	for _, e := range ps.List {
@@ -137,13 +189,7 @@ func (a *App) PlanLoadCost(ctx context.Context, planID int64, progress func(done
 	if err := a.Store.LoadDecls(mods); err != nil {
 		return nil, err
 	}
-	type target struct {
-		packageID string
-		dir       string
-		folders   []string
-		top       TopMod
-	}
-	targets := make([]target, 0, len(mods))
+	targets := make([]loadCostTarget, 0, len(mods))
 	for _, m := range mods {
 		dir := st.Ix.ModDir(m)
 		if real, err := source.RealPath(dir); err == nil {
@@ -153,80 +199,46 @@ func (a *App) PlanLoadCost(ctx context.Context, planID int64, progress func(done
 			return active[strings.TrimSuffix(strings.ToLower(pkg), "_steam")]
 		})
 		ref := st.Ix.Ref(m.ID)
-		targets = append(targets, target{packageID: m.PackageID, dir: dir, folders: res.Folders, top: TopMod{Name: m.DisplayName(), Ref: ref, Page: m.ID}})
+		targets = append(targets, loadCostTarget{packageID: m.PackageID, dir: dir, folders: res.Folders, top: TopMod{Name: m.DisplayName(), Ref: ref, Page: m.ID}})
 	}
-	g := loadcost.Game16
-	if !env.VersionLess(mm, "1.7") {
-		g = loadcost.Game17
-	}
-	r := &LoadCost{Game: g, Mods: len(targets), PerMod: make([]ModCost, len(targets))}
-	r.Baseline.RAM, r.Baseline.VRAM = loadcost.Baseline(g)
-	cache := fsscan.OpenCache(filepath.Join(a.Home, "cache", "loadcost-v1.json"))
-	measured := make([]loadcost.Mod, len(targets))
-	top := make([]TopMod, len(targets))
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	var mu sync.Mutex
-	var firstErr error
-	done := 0
-	if progress != nil {
-		progress(0, len(targets))
+	return targets, nil
+}
+
+// loadCostRun is one measurement of a plan's targets by parallel workers; mu guards the
+// results, the counters and the progress callback.
+type loadCostRun struct {
+	a        *App
+	g        loadcost.Game
+	r        *LoadCost
+	targets  []loadCostTarget
+	progress func(done, total int)
+	cancel   context.CancelFunc
+	cache    *fsscan.Cache
+	measured []loadcost.Mod
+	top      []TopMod
+
+	mu       sync.Mutex
+	firstErr error
+	done     int
+}
+
+// measureAll measures every target with up to eight workers, stopping at the first error
+// or when ctx ends, and returns the error saving the cache.
+func (run *loadCostRun) measureAll(ctx context.Context) error {
+	if run.progress != nil {
+		run.progress(0, len(run.targets))
 	}
 	workers := 1
-	if len(targets) > 0 {
-		workers = min(8, fsscan.Workers(targets[0].dir))
+	if len(run.targets) > 0 {
+		workers = min(8, fsscan.Workers(run.targets[0].dir))
 	}
 	jobs := make(chan int)
 	var wg sync.WaitGroup
 	for range workers {
-		wg.Go(func() {
-			for i := range jobs {
-				if ctx.Err() != nil {
-					return
-				}
-				t := targets[i]
-				stamp, err := loadCostStamp(ctx, t.folders)
-				var m loadcost.Mod
-				hit := false
-				if err == nil {
-					hit = cache.Get(store.PathKey(t.dir), "mod", stamp, &m)
-					if !hit {
-						pngCache := filepath.Join(a.Home, "cache", "textures", fmt.Sprintf("%x.json", sha256.Sum256([]byte(store.PathKey(t.dir)))))
-						m, err = loadcost.Measure(ctx, t.dir, t.folders, pngCache)
-						if err == nil {
-							cache.Put(store.PathKey(t.dir), "mod", stamp, m)
-						}
-					}
-				}
-				mu.Lock()
-				if err != nil {
-					if firstErr == nil {
-						firstErr = err
-					}
-					cancel()
-					mu.Unlock()
-					return
-				}
-				measured[i] = m
-				report := loadcost.Estimate(g, []loadcost.Mod{m})
-				r.PerMod[i] = ModCost{PackageID: t.packageID, Name: t.top.Name, Ref: t.top.Ref, Measure: m, Est: report}
-				t.top.RAMHigh, t.top.VRAMHigh = report.RAMHigh, report.VRAMHigh
-				top[i] = t.top
-				if hit {
-					r.Cached++
-				} else {
-					r.Measured++
-				}
-				done++
-				if progress != nil {
-					progress(done, len(targets))
-				}
-				mu.Unlock()
-			}
-		})
+		wg.Go(func() { run.work(ctx, jobs) })
 	}
 send:
-	for i := range targets {
+	for i := range run.targets {
 		select {
 		case jobs <- i:
 		case <-ctx.Done():
@@ -235,25 +247,67 @@ send:
 	}
 	close(jobs)
 	wg.Wait()
-	saveErr := cache.Save()
-	if firstErr != nil {
-		return nil, firstErr
+	return run.cache.Save()
+}
+
+// work measures the targets whose indexes arrive on jobs until jobs closes, ctx ends or a
+// measurement fails.
+func (run *loadCostRun) work(ctx context.Context, jobs <-chan int) {
+	for i := range jobs {
+		if ctx.Err() != nil {
+			return
+		}
+		t := run.targets[i]
+		m, hit, err := run.measure(ctx, t)
+		run.mu.Lock()
+		if err != nil {
+			if run.firstErr == nil {
+				run.firstErr = err
+			}
+			run.cancel()
+			run.mu.Unlock()
+			return
+		}
+		run.measured[i] = m
+		report := loadcost.Estimate(run.g, []loadcost.Mod{m})
+		run.r.PerMod[i] = ModCost{PackageID: t.packageID, Name: t.top.Name, Ref: t.top.Ref, Measure: m, Est: report}
+		t.top.RAMHigh, t.top.VRAMHigh = report.RAMHigh, report.VRAMHigh
+		run.top[i] = t.top
+		if hit {
+			run.r.Cached++
+		} else {
+			run.r.Measured++
+		}
+		run.done++
+		if run.progress != nil {
+			run.progress(run.done, len(run.targets))
+		}
+		run.mu.Unlock()
 	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
+}
+
+// measure returns a target's measurement from the cache (hit) or by measuring its files.
+func (run *loadCostRun) measure(ctx context.Context, t loadCostTarget) (loadcost.Mod, bool, error) {
+	stamp, err := loadCostStamp(ctx, t.folders)
+	var m loadcost.Mod
+	hit := false
+	if err == nil {
+		hit = run.cache.Get(store.PathKey(t.dir), "mod", stamp, &m)
+		if !hit {
+			pngCache := filepath.Join(run.a.Home, "cache", "textures", fmt.Sprintf("%x.json", sha256.Sum256([]byte(store.PathKey(t.dir)))))
+			m, err = loadcost.Measure(ctx, t.dir, t.folders, pngCache)
+			if err == nil {
+				run.cache.Put(store.PathKey(t.dir), "mod", stamp, m)
+			}
+		}
 	}
-	if saveErr != nil {
-		return nil, fmt.Errorf("save load cost cache: %w", saveErr)
-	}
-	r.Report = loadcost.Estimate(g, measured)
-	r.LoadingRAMLow, r.LoadingRAMHigh = loadcost.LoadingBudget(g, r.Report, measured)
-	r.Capacity = AssessMemory(a.measuredMemory(), r)
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	if err := a.saveMemoryEstimate(ps, r); err != nil {
-		return nil, err
-	}
+	return m, hit, err
+}
+
+// topLoadCostMods picks the five Mods with the most VRAM, then the five with the most RAM,
+// each once. It sorts top in place.
+func topLoadCostMods(top []TopMod) []TopMod {
+	var out []TopMod
 	seenTop := map[string]bool{}
 	for _, ram := range []bool{false, true} {
 		slices.SortStableFunc(top, func(a, b TopMod) int {
@@ -271,12 +325,12 @@ send:
 		})
 		for _, m := range top[:min(5, len(top))] {
 			if !seenTop[m.Ref] {
-				r.Top = append(r.Top, m)
+				out = append(out, m)
 				seenTop[m.Ref] = true
 			}
 		}
 	}
-	return r, nil
+	return out
 }
 
 func loadCostStamp(ctx context.Context, folders []string) ([16]byte, error) {

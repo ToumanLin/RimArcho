@@ -176,7 +176,6 @@ type traceStep struct {
 // attribution (06 §2).
 func (cx *attrCtx) nullTrace(lc *LogCluster) {
 	e := lc.First
-	text := e.Message + "\n" + strings.Join(e.Extra, "\n")
 	ms := excTypeRe.FindAllStringSubmatch(e.Message, -1)
 	if len(ms) == 0 {
 		return
@@ -186,184 +185,223 @@ func (cx *attrCtx) nullTrace(lc *LogCluster) {
 		return
 	}
 	// Exception frames with their 1-based numbers in the stack.
-	var frames []logs.Frame
-	var num []int
+	t := &nullTraceRun{cx: cx, lc: lc, contractParam: -1}
 	for i, fr := range e.Frames {
 		if !fr.Caller {
-			frames, num = append(frames, fr), append(num, i+1)
+			t.frames, t.num = append(t.frames, fr), append(t.num, i+1)
 		}
 	}
-	if len(frames) == 0 {
+	if len(t.frames) == 0 {
 		return
 	}
-	var lines []string
-	var at traceStep
-	throwMod := ""
-	thrower := frames[0]
 	if exc == "NullReferenceException" {
-		if logs.GameNamespace(thrower.Type) || !thrower.HasIL {
+		if !t.startDeref() {
 			return
 		}
-		c, ok := cx.code(thrower)
-		if !ok {
-			return
-		}
-		ds, ok := c.asm.DerefsAt(c.row, thrower.IL)
-		if !ok || len(ds) == 0 {
-			return
-		}
-		d := ds[0]
-		how := c.asm.InstrText(d.At)
-		if push := c.asm.PushText(c.row, d.Value); push != "" {
-			how = push + ", " + how
-		}
-		l := fmt.Sprintf("frame %d %s +0x%x dereferences %s (%s)", num[0], frameName(thrower), thrower.IL, dotnet.ValueText(d.Value, c.names), how)
-		if len(ds) > 1 {
-			l += fmt.Sprintf("; %d more dereferences follow in the statement", len(ds)-1)
-		}
-		lines = append(lines, l)
-		throwMod = c.inst
-		if d.Value.Kind != dotnet.ShParam {
-			lc.Trace = lines
-			return
-		}
-		at = traceStep{k: 0, p: d.Value.N, name: c.names[d.Value.N]}
-	} else {
-		// ArgumentNullException: the parameter the message names, in the innermost frame whose
-		// printed signature has it (the thrower, or the library method a Mod called).
-		pm := paramNameRe.FindStringSubmatch(text)
-		if pm == nil {
-			return
-		}
-		name := pm[1] + pm[2]
-		found := false
-		for k := 0; k < len(frames) && k < 4 && !found; k++ {
-			_, params, ok := frameSig(frames[k].Text)
-			if !ok {
-				continue
-			}
-			for i, p := range params {
-				if p.name == name {
-					at, found = traceStep{k: k, p: i, name: name}, true
-					break
-				}
-			}
-		}
-		if !found {
-			return
-		}
-		fr := frames[at.k]
-		if !logs.GameNamespace(fr.Type) {
-			if c, ok := cx.code(fr); ok {
-				throwMod = c.inst
-			}
-		}
-		lines = append(lines, fmt.Sprintf("frame %d %s throws ArgumentNullException for its parameter %s", num[at.k], frameName(fr), name))
+	} else if !t.startArgNull(e.Message + "\n" + strings.Join(e.Extra, "\n")) {
+		return
 	}
-	supplier := ""
-	var supplierFrame int
-	var contract *CallersResult
-	contractParam := -1
-	patchKind := ""
 	for hop := 0; hop < 8; hop++ {
-		cur := frames[at.k]
-		j := at.k + 1
-		if j >= len(frames) {
+		if !t.step() {
 			break
 		}
-		next := frames[j]
-		// A Harmony patch: its parameter is the patched original's parameter of the same name.
-		if p := patchOf(cur, next); p != nil {
-			_, oparams, ok := frameSig(next.Text)
-			if !ok {
-				break
-			}
-			oname, oi, why := harmonyParam(at.name, oparams)
-			if why != "" {
-				lines = append(lines, fmt.Sprintf("frame %d is a Harmony %s of frame %d %s; %s %s", num[at.k], p.Kind, num[j], frameName(next), at.name, why))
-				break
-			}
-			lines = append(lines, fmt.Sprintf("frame %d is a Harmony %s of frame %d %s: %s is the original's parameter %s", num[at.k], p.Kind, num[j], frameName(next), at.name, oname))
-			if at.k == 0 {
-				patchKind = p.Kind
-			}
-			at = traceStep{k: j, p: oi, name: oname}
-			continue
-		}
-		c, ok := cx.code(next)
-		if !ok {
-			break
-		}
-		_, cparams, _ := frameSig(cur.Text)
-		calleeType, calleeName, n := cur.Type, cur.Method, len(cparams)
-		match := func(m dotnet.Member) bool {
-			return m.Params == n && strings.ReplaceAll(m.Owner, "+", ".") == strings.ReplaceAll(calleeType, "+", ".")
-		}
-		sites := c.asm.CallSitesOf(c.row, calleeName, match)
-		if len(sites) == 0 {
-			// A virtual call names the base method: the same name and arity.
-			sites = c.asm.CallSitesOf(c.row, calleeName, func(m dotnet.Member) bool { return m.Params == n })
-		}
-		site, ok := pickSite(sites, next, at.p)
-		if !ok {
-			break
-		}
-		v := site.Args[at.p]
-		kind := "call"
-		switch {
-		case site.Base:
-			kind = "base constructor call"
-		case site.Op == 0x73:
-			kind = "newobj"
-		}
-		if gameFrame(cur.Type) && contract == nil {
-			if r, err := cx.a.Callers(cx.st, dotnet.Target{Owner: cur.Type, Name: cur.Method, Params: n}, cx.a.enabledCodeMods(cx.st), true); err == nil && len(r.Sites) > 0 {
-				contract, contractParam = r, at.p
-			}
-		}
-		switch v.Kind {
-		case dotnet.ShNull:
-			how := c.asm.PushText(c.row, v)
-			if v.Text == "local" {
-				how = fmt.Sprintf("local %d, only ever set to null", v.N)
-			} else if how != "" {
-				how += fmt.Sprintf(" at IL_%04x", v.Off)
-			}
-			lines = append(lines, fmt.Sprintf("frame %d %s passes null for %s (%s, %s)", num[j], frameName(next), at.name, how, kind))
-			supplier, supplierFrame = c.inst, num[j]
-		case dotnet.ShParam:
-			pn := v.Describe(c.names)
-			pn = strings.TrimPrefix(pn, "param ")
-			lines = append(lines, fmt.Sprintf("frame %d %s passes its parameter %s for %s (%s)", num[j], frameName(next), pn, at.name, kind))
-			at = traceStep{k: j, p: v.N, name: pn}
-			continue
-		default:
-			lines = append(lines, fmt.Sprintf("frame %d %s passes %s for %s (%s)", num[j], frameName(next), dotnet.ValueText(v, c.names), at.name, kind))
-		}
-		break
 	}
+	t.attribute()
+}
+
+// nullTraceRun is one trace of a null value back through the exception frames.
+type nullTraceRun struct {
+	cx            *attrCtx
+	lc            *LogCluster
+	frames        []logs.Frame // the exception frames
+	num           []int        // their 1-based numbers in the stack
+	at            traceStep
+	lines         []string
+	throwMod      string
+	supplier      string
+	supplierFrame int
+	contract      *CallersResult
+	contractParam int
+	patchKind     string
+}
+
+// startDeref starts at the value the throwing frame of a NullReferenceException
+// dereferences. False when there is nothing to trace further (the trace lines may be set).
+func (t *nullTraceRun) startDeref() bool {
+	thrower := t.frames[0]
+	if logs.GameNamespace(thrower.Type) || !thrower.HasIL {
+		return false
+	}
+	c, ok := t.cx.code(thrower)
+	if !ok {
+		return false
+	}
+	ds, ok := c.asm.DerefsAt(c.row, thrower.IL)
+	if !ok || len(ds) == 0 {
+		return false
+	}
+	d := ds[0]
+	how := c.asm.InstrText(d.At)
+	if push := c.asm.PushText(c.row, d.Value); push != "" {
+		how = push + ", " + how
+	}
+	l := fmt.Sprintf("frame %d %s +0x%x dereferences %s (%s)", t.num[0], frameName(thrower), thrower.IL, dotnet.ValueText(d.Value, c.names), how)
+	if len(ds) > 1 {
+		l += fmt.Sprintf("; %d more dereferences follow in the statement", len(ds)-1)
+	}
+	t.lines = append(t.lines, l)
+	t.throwMod = c.inst
+	if d.Value.Kind != dotnet.ShParam {
+		t.lc.Trace = t.lines
+		return false
+	}
+	t.at = traceStep{k: 0, p: d.Value.N, name: c.names[d.Value.N]}
+	return true
+}
+
+// startArgNull starts an ArgumentNullException at the parameter the message names, in the
+// innermost frame whose printed signature has it (the thrower, or the library method a Mod
+// called).
+func (t *nullTraceRun) startArgNull(text string) bool {
+	pm := paramNameRe.FindStringSubmatch(text)
+	if pm == nil {
+		return false
+	}
+	name := pm[1] + pm[2]
+	found := false
+	for k := 0; k < len(t.frames) && k < 4 && !found; k++ {
+		_, params, ok := frameSig(t.frames[k].Text)
+		if !ok {
+			continue
+		}
+		for i, p := range params {
+			if p.name == name {
+				t.at, found = traceStep{k: k, p: i, name: name}, true
+				break
+			}
+		}
+	}
+	if !found {
+		return false
+	}
+	fr := t.frames[t.at.k]
+	if !logs.GameNamespace(fr.Type) {
+		if c, ok := t.cx.code(fr); ok {
+			t.throwMod = c.inst
+		}
+	}
+	t.lines = append(t.lines, fmt.Sprintf("frame %d %s throws ArgumentNullException for its parameter %s", t.num[t.at.k], frameName(fr), name))
+	return true
+}
+
+// step follows the value one frame out: through a Harmony patch to the original, or to
+// what the calling frame passes. True when the value is the caller's parameter, to follow
+// further.
+func (t *nullTraceRun) step() bool {
+	cx, at := t.cx, t.at
+	cur := t.frames[at.k]
+	j := at.k + 1
+	if j >= len(t.frames) {
+		return false
+	}
+	next := t.frames[j]
+	// A Harmony patch: its parameter is the patched original's parameter of the same name.
+	if p := patchOf(cur, next); p != nil {
+		_, oparams, ok := frameSig(next.Text)
+		if !ok {
+			return false
+		}
+		oname, oi, why := harmonyParam(at.name, oparams)
+		if why != "" {
+			t.lines = append(t.lines, fmt.Sprintf("frame %d is a Harmony %s of frame %d %s; %s %s", t.num[at.k], p.Kind, t.num[j], frameName(next), at.name, why))
+			return false
+		}
+		t.lines = append(t.lines, fmt.Sprintf("frame %d is a Harmony %s of frame %d %s: %s is the original's parameter %s", t.num[at.k], p.Kind, t.num[j], frameName(next), at.name, oname))
+		if at.k == 0 {
+			t.patchKind = p.Kind
+		}
+		t.at = traceStep{k: j, p: oi, name: oname}
+		return true
+	}
+	c, ok := cx.code(next)
+	if !ok {
+		return false
+	}
+	_, cparams, _ := frameSig(cur.Text)
+	calleeType, calleeName, n := cur.Type, cur.Method, len(cparams)
+	match := func(m dotnet.Member) bool {
+		return m.Params == n && strings.ReplaceAll(m.Owner, "+", ".") == strings.ReplaceAll(calleeType, "+", ".")
+	}
+	sites := c.asm.CallSitesOf(c.row, calleeName, match)
+	if len(sites) == 0 {
+		// A virtual call names the base method: the same name and arity.
+		sites = c.asm.CallSitesOf(c.row, calleeName, func(m dotnet.Member) bool { return m.Params == n })
+	}
+	site, ok := pickSite(sites, next, at.p)
+	if !ok {
+		return false
+	}
+	v := site.Args[at.p]
+	kind := "call"
+	switch {
+	case site.Base:
+		kind = "base constructor call"
+	case site.Op == 0x73:
+		kind = "newobj"
+	}
+	if gameFrame(cur.Type) && t.contract == nil {
+		if r, err := cx.a.Callers(cx.st, dotnet.Target{Owner: cur.Type, Name: cur.Method, Params: n}, cx.a.enabledCodeMods(cx.st), true); err == nil && len(r.Sites) > 0 {
+			t.contract, t.contractParam = r, at.p
+		}
+	}
+	switch v.Kind {
+	case dotnet.ShNull:
+		how := c.asm.PushText(c.row, v)
+		if v.Text == "local" {
+			how = fmt.Sprintf("local %d, only ever set to null", v.N)
+		} else if how != "" {
+			how += fmt.Sprintf(" at IL_%04x", v.Off)
+		}
+		t.lines = append(t.lines, fmt.Sprintf("frame %d %s passes null for %s (%s, %s)", t.num[j], frameName(next), at.name, how, kind))
+		t.supplier, t.supplierFrame = c.inst, t.num[j]
+	case dotnet.ShParam:
+		pn := v.Describe(c.names)
+		pn = strings.TrimPrefix(pn, "param ")
+		t.lines = append(t.lines, fmt.Sprintf("frame %d %s passes its parameter %s for %s (%s)", t.num[j], frameName(next), pn, at.name, kind))
+		t.at = traceStep{k: j, p: v.N, name: pn}
+		return true
+	default:
+		t.lines = append(t.lines, fmt.Sprintf("frame %d %s passes %s for %s (%s)", t.num[j], frameName(next), dotnet.ValueText(v, c.names), at.name, kind))
+	}
+	return false
+}
+
+// attribute sets the trace lines and next steps and yields the Mod that supplies the null,
+// then the one that dereferences it.
+func (t *nullTraceRun) attribute() {
+	cx, lc := t.cx, t.lc
 	var next []string
-	if contract != nil && contractParam >= 0 {
-		lines = append(lines, "game contract: "+contract.Summary(contractParam))
-		next = append(next, fmt.Sprintf("archo source callers %s", callersArg(contract.Target)))
+	if t.contract != nil && t.contractParam >= 0 {
+		t.lines = append(t.lines, "game contract: "+t.contract.Summary(t.contractParam))
+		next = append(next, fmt.Sprintf("archo source callers %s", callersArg(t.contract.Target)))
 	}
-	lc.Trace = lines
+	lc.Trace = t.lines
 	defer func() { lc.Next = uniqStr(append(next, lc.Next...)) }()
-	if supplier == "" || cx.official(supplier) {
+	if t.supplier == "" || cx.official(t.supplier) {
 		return
 	}
 	ix := cx.st.Ix
-	cx.yieldFirst(lc, supplier, RoleSource, fmt.Sprintf("log frame %d passes null for the argument the throwing frame dereferences (trace)", supplierFrame))
-	next = append([]string{fmt.Sprintf("archo source %s --type %s", ix.Ref(supplier), outerType(frames[indexOfNum(num, supplierFrame)].Type))}, next...)
-	if throwMod == "" || throwMod == supplier {
+	cx.yieldFirst(lc, t.supplier, RoleSource, fmt.Sprintf("log frame %d passes null for the argument the throwing frame dereferences (trace)", t.supplierFrame))
+	next = append([]string{fmt.Sprintf("archo source %s --type %s", ix.Ref(t.supplier), outerType(t.frames[indexOfNum(t.num, t.supplierFrame)].Type))}, next...)
+	if t.throwMod == "" || t.throwMod == t.supplier {
 		return
 	}
-	role, ev := RoleMentioned, fmt.Sprintf("log frame %d dereferences the null that log frame %d passes (trace)", num[0], supplierFrame)
-	if patchKind != "" {
+	role, ev := RoleMentioned, fmt.Sprintf("log frame %d dereferences the null that log frame %d passes (trace)", t.num[0], t.supplierFrame)
+	if t.patchKind != "" {
 		role = RolePatcher
-		ev = fmt.Sprintf("log frame %d, its Harmony %s, dereferences the null that log frame %d passes (trace)", num[0], patchKind, supplierFrame)
+		ev = fmt.Sprintf("log frame %d, its Harmony %s, dereferences the null that log frame %d passes (trace)", t.num[0], t.patchKind, t.supplierFrame)
 	}
-	cx.yieldFirst(lc, throwMod, role, ev)
+	cx.yieldFirst(lc, t.throwMod, role, ev)
 }
 
 func indexOfNum(num []int, n int) int {

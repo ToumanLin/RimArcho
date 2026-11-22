@@ -123,72 +123,11 @@ func (a *App) saveContent(sv *Save, o contentOpts) (*SaveContentResult, error) {
 		out.Note = "The save's Mod list could not be read."
 		return out, nil
 	}
-	var mods []SaveMod
-	active := map[string]bool{}
-	// A pack's save loads the pack's own copies; the library's copy of the same packageId
-	// stands in while the pack's has no content facts.
-	packCopy := map[string]string{}
-	deps := map[string][]scanDep{} // by instance: what its About.xml requires (12 §4.7)
-	if sv.Pack != "" {
-		if p, err := a.ReadPack(sv.Pack); err == nil {
-			for _, e := range p.Entries {
-				if e.Instance != "" {
-					packCopy[normPkg(e.PackageID)] = e.Instance
-				}
-			}
-		}
-	}
-	if sv.Env != nil {
-		a.Store.MM = env.MajorMinor(sv.Env.GameVersion)
-	}
-	var packInsts []string
-	for _, inst := range packCopy {
-		packInsts = append(packInsts, inst)
-	}
-	packReady, err := a.Store.ContentReady(packInsts)
+	cm, err := a.saveContentMods(sv)
 	if err != nil {
 		return nil, err
 	}
-	err = a.inSaveList(sv, func() error {
-		st, err := a.Loadout()
-		if err != nil {
-			return err
-		}
-		seen := map[string]bool{}
-		for i, pkg := range sv.Head.ModIDs {
-			active[normPkg(pkg)] = true
-			inst := st.Reg.Resolve(pkg).Instance
-			if pc := packCopy[normPkg(pkg)]; pc != "" && (packReady[pc] || inst == "") {
-				inst = pc
-			}
-			if inst != "" && seen[inst] {
-				continue
-			}
-			seen[inst] = true
-			name := sv.Head.Name(i)
-			if m := st.Ix.ByID[inst]; m != nil {
-				name = m.DisplayName()
-				active[normPkg(m.PackageID)] = true
-			}
-			mods = append(mods, SaveMod{Name: name, PackageID: pkg, Instance: inst, Library: inst})
-		}
-		var installed []*store.Mod
-		for _, m := range mods {
-			if im := st.Ix.ByID[m.Instance]; im != nil {
-				installed = append(installed, im)
-			}
-		}
-		if err := a.Store.LoadDecls(installed); err != nil {
-			return err
-		}
-		for _, im := range installed {
-			deps[im.ID] = requiredDeps(im, st.GameMM())
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
+	mods, active := cm.mods, cm.active
 	// Loadout restores the caller's environment, so select the saved game's version
 	// explicitly, just as the ownership query does.
 	if sv.Env != nil {
@@ -219,9 +158,132 @@ func (a *App) saveContent(sv *Save, o contentOpts) (*SaveContentResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	grid := grids.refs
-	// So do the references that only set something up (bills, quest parts, research not
-	// begun): the save names those Defs too, and loading without them drops what named them.
+	defRefs := mergeDefRefs(f, grids.refs, o, out)
+	out.GridUnnamed = grids.left
+	names := map[string]bool{}
+	for _, refs := range defRefs {
+		for name := range refs {
+			names[name] = true
+		}
+	}
+	out.Defs = len(names)
+	// Base closure is bounded by shrinking generated names. Extra flesh facts supply
+	// race predicates; they are not themselves counted as save references.
+	lookup := map[string]bool{"Normal": true, "Mechanoid": true}
+	for n := range names {
+		for depth := 0; n != "" && depth < 32; depth++ {
+			lookup[n] = true
+			n = impliedBase(n)
+		}
+	}
+	resolver, err := a.contentResolver(o.src, insts, pos, active, lookup)
+	if err != nil {
+		return nil, err
+	}
+	entries, unmatched := resolveContentEntries(resolver, defRefs, ready, grids.refs)
+	byMod := contentByMod(entries)
+	own := contentOwners(entries)
+	out.mods, out.names = mods, byMod
+	catsOf := out.addCategories(mods, byMod)
+	if len(unmatched) > 0 {
+		var ns []SaveContentName
+		for name, uses := range unmatched {
+			ns = append(ns, SaveContentName{Name: name, Uses: uses})
+		}
+		cat := finishContentCat("unknown", ns)
+		out.Unknown = &cat
+	}
+	if out.Needs, err = a.saveNeeds(f, mods, ready, catsOf, own, cm.deps, grids); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// contentMods are the Mods a save's content is attributed to.
+type contentMods struct {
+	mods   []SaveMod
+	active map[string]bool      // the packageIds that load
+	deps   map[string][]scanDep // by instance: what its About.xml requires (12 §4.7)
+}
+
+// saveContentMods lists the copies the save's Mods load as, once each, in the save's list.
+// It leaves a.Store.MM at the saved game's version.
+func (a *App) saveContentMods(sv *Save) (*contentMods, error) {
+	cm := &contentMods{active: map[string]bool{}, deps: map[string][]scanDep{}}
+	// A pack's save loads the pack's own copies; the library's copy of the same packageId
+	// stands in while the pack's has no content facts.
+	packCopy := map[string]string{}
+	if sv.Pack != "" {
+		if p, err := a.ReadPack(sv.Pack); err == nil {
+			for _, e := range p.Entries {
+				if e.Instance != "" {
+					packCopy[normPkg(e.PackageID)] = e.Instance
+				}
+			}
+		}
+	}
+	if sv.Env != nil {
+		a.Store.MM = env.MajorMinor(sv.Env.GameVersion)
+	}
+	var packInsts []string
+	for _, inst := range packCopy {
+		packInsts = append(packInsts, inst)
+	}
+	packReady, err := a.Store.ContentReady(packInsts)
+	if err != nil {
+		return nil, err
+	}
+	if err := a.inSaveList(sv, func() error { return a.listContentMods(sv, cm, packCopy, packReady) }); err != nil {
+		return nil, err
+	}
+	return cm, nil
+}
+
+// listContentMods fills cm from the save's Mod list as the current loadout resolves it, a
+// pack's copy preferred while it has content facts.
+func (a *App) listContentMods(sv *Save, cm *contentMods, packCopy map[string]string, packReady map[string]bool) error {
+	st, err := a.Loadout()
+	if err != nil {
+		return err
+	}
+	seen := map[string]bool{}
+	for i, pkg := range sv.Head.ModIDs {
+		cm.active[normPkg(pkg)] = true
+		inst := st.Reg.Resolve(pkg).Instance
+		if pc := packCopy[normPkg(pkg)]; pc != "" && (packReady[pc] || inst == "") {
+			inst = pc
+		}
+		if inst != "" && seen[inst] {
+			continue
+		}
+		seen[inst] = true
+		name := sv.Head.Name(i)
+		if m := st.Ix.ByID[inst]; m != nil {
+			name = m.DisplayName()
+			cm.active[normPkg(m.PackageID)] = true
+		}
+		cm.mods = append(cm.mods, SaveMod{Name: name, PackageID: pkg, Instance: inst, Library: inst})
+	}
+	var installed []*store.Mod
+	for _, m := range cm.mods {
+		if im := st.Ix.ByID[m.Instance]; im != nil {
+			installed = append(installed, im)
+		}
+	}
+	if err := a.Store.LoadDecls(installed); err != nil {
+		return err
+	}
+	for _, im := range installed {
+		cm.deps[im.ID] = requiredDeps(im, st.GameMM())
+	}
+	return nil
+}
+
+// mergeDefRefs adds to the save's typed references the grids' (grid) and those that only
+// set something up (bills, quest parts, research not begun): the save names those Defs too,
+// and loading without them drops what named them. With o.seen the set-up references are
+// kept apart in out.configNames instead.
+func mergeDefRefs(f *savefile.Facts, grid map[string]map[string]int, o contentOpts, out *SaveContentResult) map[string]map[string]int {
 	defRefs := f.DefRefs
 	config := f.ConfigRefs
 	if o.seen {
@@ -246,36 +308,23 @@ func (a *App) saveContent(sv *Save, o contentOpts) (*SaveContentResult, error) {
 			}
 		}
 	}
-	out.GridUnnamed = grids.left
-	names := map[string]bool{}
-	for _, refs := range defRefs {
-		for name := range refs {
-			names[name] = true
-		}
-	}
-	out.Defs = len(names)
-	// Base closure is bounded by shrinking generated names. Extra flesh facts supply
-	// race predicates; they are not themselves counted as save references.
-	lookup := map[string]bool{"Normal": true, "Mechanoid": true}
-	for n := range names {
-		for depth := 0; n != "" && depth < 32; depth++ {
-			lookup[n] = true
-			n = impliedBase(n)
-		}
-	}
-	resolver, err := a.contentResolver(o.src, insts, pos, active, lookup)
-	if err != nil {
-		return nil, err
-	}
-	type entry struct {
-		node                      *contentNode
-		name, key                 string
-		uses                      int
-		hidden, inferred, unknown bool
-		weather                   bool
-		grid                      bool // in a map's or the world's grid
-	}
-	entries := map[string]*entry{}
+	return defRefs
+}
+
+// contentEntry is one Def the save references, as the Def a loaded copy defines.
+type contentEntry struct {
+	node                      *contentNode
+	name, key                 string
+	uses                      int
+	hidden, inferred, unknown bool
+	weather                   bool
+	grid                      bool // in a map's or the world's grid
+}
+
+// resolveContentEntries resolves the save's references to the Defs of analysed copies (ready),
+// by type and name; unmatched are the names no Def explains, with their uses.
+func resolveContentEntries(resolver *contentResolver, defRefs map[string]map[string]int, ready map[string]bool, grid map[string]map[string]int) (map[string]*contentEntry, map[string]int) {
+	entries := map[string]*contentEntry{}
 	unmatched := map[string]int{}
 	for typ, refs := range defRefs {
 		for name, uses := range refs {
@@ -307,7 +356,7 @@ func (a *App) saveContent(sv *Save, o contentOpts) (*SaveContentResult, error) {
 				id := t + "/" + name
 				e := entries[id]
 				if e == nil || node.pos > e.node.pos {
-					e = &entry{node: node, name: name, key: key, hidden: key == "factions" && truth(fields, "hidden"), inferred: inferred, unknown: !classified}
+					e = &contentEntry{node: node, name: name, key: key, hidden: key == "factions" && truth(fields, "hidden"), inferred: inferred, unknown: !classified}
 					entries[id] = e
 				}
 				e.uses += uses
@@ -316,8 +365,13 @@ func (a *App) saveContent(sv *Save, o contentOpts) (*SaveContentResult, error) {
 			}
 		}
 	}
-	// One name per category of a Mod: Defs of several types sharing a name (a skill and a
-	// work type both called Mining) are listed once, with the most uses.
+	return entries, unmatched
+}
+
+// contentByMod groups the entries by copy and category: one name per category of a Mod.
+// Defs of several types sharing a name (a skill and a work type both called Mining) are
+// listed once, with the most uses.
+func contentByMod(entries map[string]*contentEntry) map[string]map[string][]SaveContentName {
 	byMod := map[string]map[string][]SaveContentName{}
 	at := map[string]int{}
 	for _, e := range entries {
@@ -337,6 +391,11 @@ func (a *App) saveContent(sv *Save, o contentOpts) (*SaveContentResult, error) {
 		at[id] = len(byMod[inst][e.key])
 		byMod[inst][e.key] = append(byMod[inst][e.key], SaveContentName{Name: e.name, Uses: e.uses, Hidden: e.hidden, Inferred: e.inferred, Unclassified: e.unknown})
 	}
+	return byMod
+}
+
+// contentOwners names the copies that own the save's things, factions, weather and grids.
+func contentOwners(entries map[string]*contentEntry) needOwners {
 	own := needOwners{things: map[string]string{}, factions: map[string]string{}, weather: map[string][]string{}, grid: map[string]bool{}}
 	for _, e := range entries {
 		inst := e.node.fact.Instance
@@ -353,7 +412,12 @@ func (a *App) saveContent(sv *Save, o contentOpts) (*SaveContentResult, error) {
 			own.weather[inst] = append(own.weather[inst], e.name)
 		}
 	}
-	out.mods, out.names = mods, byMod
+	return own
+}
+
+// addCategories adds each Mod's categories and the totals in category order, and returns
+// the categories by copy.
+func (out *SaveContentResult) addCategories(mods []SaveMod, byMod map[string]map[string][]SaveContentName) map[string][]SaveContentCategory {
 	catsOf := map[string][]SaveContentCategory{}
 	totals := map[string]*SaveContentCategory{}
 	for _, m := range mods {
@@ -387,18 +451,7 @@ func (a *App) saveContent(sv *Save, o contentOpts) (*SaveContentResult, error) {
 			out.Totals = append(out.Totals, *t)
 		}
 	}
-	if len(unmatched) > 0 {
-		var ns []SaveContentName
-		for name, uses := range unmatched {
-			ns = append(ns, SaveContentName{Name: name, Uses: uses})
-		}
-		cat := finishContentCat("unknown", ns)
-		out.Unknown = &cat
-	}
-	if out.Needs, err = a.saveNeeds(f, mods, ready, catsOf, own, deps, grids); err != nil {
-		return nil, err
-	}
-	return out, nil
+	return catsOf
 }
 
 func finishContentCat(key string, ns []SaveContentName) SaveContentCategory {

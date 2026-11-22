@@ -158,85 +158,148 @@ func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 	}
 
 	// The list as it is now, and what this game would load for each packageId.
-	var list []SaveMod
-	hasList := false
-	var resolve func(string) string
-	var st *LoadoutState
-	mm := ""              // the game version whose facts the list's analysis reads
-	var packInst []string // the installed copies a pack's Mods come from
-	err = a.inSaveList(s, func() error {
-		var err error
-		if st, err = a.Loadout(); err == nil {
-			mm = a.Store.MM
-			resolve = func(pkg string) string { return st.Reg.Resolve(pkg).Instance }
-		} else {
-			st = nil
-		}
-		switch {
-		case s.Pack != "":
-			p, perr := a.ReadPack(s.Pack)
-			if perr != nil {
-				return perr
-			}
-			hasList = true
-			inPack := map[string]bool{}
-			for _, e := range p.Entries {
-				list = append(list, SaveMod{PackageID: strings.ToLower(e.PackageID), Name: e.Name, SteamID: e.WorkshopID, InList: true})
-				inPack[normPkg(e.PackageID)] = true
-				inst := e.Instance
-				if inst == "" && st != nil {
-					inst = st.Reg.Resolve(e.PackageID).Instance
-				}
-				packInst = append(packInst, inst)
-			}
-			// A pack carries its Mods: what it has is what loads.
-			resolve = func(pkg string) string {
-				if inPack[normPkg(pkg)] {
-					return pkg
-				}
-				return ""
-			}
-		case s.Plan != nil:
-			if err != nil {
-				return err
-			}
-			hasList = true
-			for _, e := range st.List {
-				m := SaveMod{PackageID: e.Missing, Name: e.Name, Instance: e.Instance, InList: true, SteamID: e.WorkshopID}
-				if mod := st.Ix.ByID[e.Instance]; mod != nil {
-					m.PackageID, m.Name, m.SteamID = strings.ToLower(mod.PackageID), mod.Name, mod.WorkshopID()
-				}
-				if m.Name == "" {
-					m.Name = m.PackageID
-				}
-				list = append(list, m)
-			}
-		}
-		return nil
-	})
-	if err != nil {
+	sl := &saveList{}
+	if err := a.inSaveList(s, func() error { return a.readSaveList(s, sl) }); err != nil {
 		return nil, err
 	}
+	c.compareMods(s, sl)
+	a.loadIssues(c, s, sl.st)
+	newList := SaveFix{Action: FixNewList, Label: "Make a list from this save",
+		Command: "loadout import " + cmdQuote(s.Path) + " --new " + cmdQuote(s.Colony.Name), Target: s.Ref}
+	if !sl.hasList {
+		c.add(SaveIssue{Kind: IssueNoList, Level: LevelInfo, Fixes: []SaveFix{newList}})
+	}
+	ck := saveFixing{editable: s.Plan != nil, fixRef: s.Ref, newList: newList}
+	if s.Current { // what saves fix names: the save, and the current list when checked against it
+		ck.fixRef += " --current"
+	}
+	// The Mods with a row of their own. A Mod the list has only as a missing entry (a fix
+	// added it, its download is not scanned yet) is as absent from the game as one the list
+	// lacks.
+	var rows []int
+	for i, m := range c.Mods {
+		if m.Instance != "" && (m.InList || !sl.hasList) {
+			continue
+		}
+		rows = append(rows, i)
+	}
+	var owns *saveOwnership
+	if facts != nil && sl.st != nil {
+		if owns, err = a.saveOwnership(s, sl.st, sl.mm, facts, c.Mods, rows, sl.packInst); err != nil {
+			return nil, err
+		}
+	}
+	fixable := c.modIssues(rows, owns, ck)
+	c.listIssues(ck)
+	for _, is := range c.Issues {
+		if levelRank(is.Level) > levelRank(c.Level) && is.Level != LevelInfo {
+			c.Level = is.Level
+		}
+	}
+	if c.Quick == nil {
+		switch {
+		case !sl.hasList:
+			c.Quick = &newList
+		case ck.editable && fixable > 0:
+			c.Quick = &SaveFix{Action: FixAll, Label: "Fix and launch", Command: "saves fix " + ck.fixRef + " --launch", Target: s.Ref}
+		case ck.editable && c.Level == "":
+			c.Quick = &SaveFix{Action: FixLaunch, Label: "Launch", Command: "saves fix " + ck.fixRef + " --launch", Target: s.Ref}
+		}
+	}
+	return c, nil
+}
 
+// saveList is the list a save is checked against, as it is now.
+type saveList struct {
+	list     []SaveMod
+	hasList  bool
+	resolve  func(string) string // what this game would load for a packageId
+	st       *LoadoutState
+	mm       string   // the game version whose facts the list's analysis reads
+	packInst []string // the installed copies a pack's Mods come from
+}
+
+// readSaveList reads the save's list, its pack or its plan, into sl; run in the save's list.
+func (a *App) readSaveList(s *Save, sl *saveList) error {
+	var err error
+	if sl.st, err = a.Loadout(); err == nil {
+		st := sl.st
+		sl.mm = a.Store.MM
+		sl.resolve = func(pkg string) string { return st.Reg.Resolve(pkg).Instance }
+	} else {
+		sl.st = nil
+	}
+	switch {
+	case s.Pack != "":
+		return a.readSavePack(s, sl)
+	case s.Plan != nil:
+		if err != nil {
+			return err
+		}
+		sl.hasList = true
+		for _, e := range sl.st.List {
+			m := SaveMod{PackageID: e.Missing, Name: e.Name, Instance: e.Instance, InList: true, SteamID: e.WorkshopID}
+			if mod := sl.st.Ix.ByID[e.Instance]; mod != nil {
+				m.PackageID, m.Name, m.SteamID = strings.ToLower(mod.PackageID), mod.Name, mod.WorkshopID()
+			}
+			if m.Name == "" {
+				m.Name = m.PackageID
+			}
+			sl.list = append(sl.list, m)
+		}
+	}
+	return nil
+}
+
+// readSavePack reads the save's pack into sl: a pack carries its Mods, so what it has is
+// what loads.
+func (a *App) readSavePack(s *Save, sl *saveList) error {
+	p, perr := a.ReadPack(s.Pack)
+	if perr != nil {
+		return perr
+	}
+	sl.hasList = true
+	inPack := map[string]bool{}
+	for _, e := range p.Entries {
+		sl.list = append(sl.list, SaveMod{PackageID: strings.ToLower(e.PackageID), Name: e.Name, SteamID: e.WorkshopID, InList: true})
+		inPack[normPkg(e.PackageID)] = true
+		inst := e.Instance
+		if inst == "" && sl.st != nil {
+			inst = sl.st.Reg.Resolve(e.PackageID).Instance
+		}
+		sl.packInst = append(sl.packInst, inst)
+	}
+	sl.resolve = func(pkg string) string {
+		if inPack[normPkg(pkg)] {
+			return pkg
+		}
+		return ""
+	}
+	return nil
+}
+
+// compareMods sets the save's Mods, those only the list has, and the library copy of each.
+func (c *SaveCheck) compareMods(s *Save, sl *saveList) {
 	inList := map[string]bool{}
-	for _, m := range list {
+	for _, m := range sl.list {
 		inList[normPkg(m.PackageID)] = true
 	}
 	inSave := map[string]bool{}
 	for i, id := range s.Head.ModIDs {
 		m := SaveMod{PackageID: id, Name: s.Head.Name(i), SteamID: s.Head.SteamID(i), InSave: true, InList: inList[normPkg(id)]}
-		if resolve != nil {
-			m.Instance = resolve(id)
+		if sl.resolve != nil {
+			m.Instance = sl.resolve(id)
 		}
 		inSave[normPkg(id)] = true
 		c.Mods = append(c.Mods, m)
 	}
-	for _, m := range list {
+	for _, m := range sl.list {
 		if !inSave[normPkg(m.PackageID)] {
 			c.ListOnly = append(c.ListOnly, m)
 		}
 	}
-	markMoved(c.Mods, list)
+	markMoved(c.Mods, sl.list)
+	st := sl.st
 	library := func(pkg string) string {
 		if st == nil || st.Reg == nil {
 			return ""
@@ -249,7 +312,10 @@ func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 	for i := range c.ListOnly {
 		c.ListOnly[i].Library = library(c.ListOnly[i].PackageID)
 	}
+}
 
+// loadIssues adds the rows of the save's last load and of a game version change.
+func (a *App) loadIssues(c *SaveCheck, s *Save, st *LoadoutState) {
 	// The last load of this save had errors or warnings (12 §4.3): from the stored report of the
 	// environment's logs, never parsing one here.
 	if l := a.lastLoadOf(s, st); l != nil && (l.Errors > 0 || l.Warnings > 0) {
@@ -263,33 +329,18 @@ func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 	if mm, gm := env.MajorMinor(s.Head.GameVersion), env.MajorMinor(c.Game); mm != "" && gm != "" && mm != gm {
 		c.add(SaveIssue{Kind: IssueGameVersion, Level: LevelWarning, Text: s.Head.GameVersion + " → " + c.Game})
 	}
-	newList := SaveFix{Action: FixNewList, Label: "Make a list from this save",
-		Command: "loadout import " + cmdQuote(s.Path) + " --new " + cmdQuote(s.Colony.Name), Target: s.Ref}
-	if !hasList {
-		c.add(SaveIssue{Kind: IssueNoList, Level: LevelInfo, Fixes: []SaveFix{newList}})
-	}
-	editable := s.Plan != nil
-	fixRef := s.Ref // what saves fix names: the save, and the current list when checked against it
-	if s.Current {
-		fixRef += " --current"
-	}
-	// The Mods with a row of their own. A Mod the list has only as a missing entry (a fix
-	// added it, its download is not scanned yet) is as absent from the game as one the list
-	// lacks.
-	var rows []int
-	for i, m := range c.Mods {
-		if m.Instance != "" && (m.InList || !hasList) {
-			continue
-		}
-		rows = append(rows, i)
-	}
-	var owns *saveOwnership
-	if facts != nil && st != nil {
-		if owns, err = a.saveOwnership(s, st, mm, facts, c.Mods, rows, packInst); err != nil {
-			return nil, err
-		}
-	}
-	fixable := 0
+}
+
+// saveFixing is how a check's rows offer fixes: only for a plan (editable), naming fixRef.
+type saveFixing struct {
+	editable bool
+	fixRef   string
+	newList  SaveFix
+}
+
+// modIssues adds a row for each of the Mods at rows, disabled or not installed, with what
+// it owns, and the rows of what missing Mods own. It returns how many rows have a fix.
+func (c *SaveCheck) modIssues(rows []int, owns *saveOwnership, ck saveFixing) (fixable int) {
 	var gone []int
 	for _, i := range rows {
 		m := c.Mods[i]
@@ -307,20 +358,20 @@ func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 		if !installed {
 			is.Kind = IssueNotInstalled
 		}
-		if editable {
+		if ck.editable {
 			switch {
 			case installed:
-				is.Fixes = []SaveFix{{Action: FixEnable, Label: "Enable in the list", Command: "saves fix " + fixRef + " --mod " + m.PackageID, Target: m.PackageID}}
+				is.Fixes = []SaveFix{{Action: FixEnable, Label: "Enable in the list", Command: "saves fix " + ck.fixRef + " --mod " + m.PackageID, Target: m.PackageID}}
 				fixable++
 			case m.SteamID != "":
 				label := "Subscribe and enable"
 				if m.InList {
 					label = "Subscribe"
 				}
-				is.Fixes = []SaveFix{{Action: FixSubscribe, Label: label, Command: "saves fix " + fixRef + " --mod " + m.PackageID, Target: m.PackageID}}
+				is.Fixes = []SaveFix{{Action: FixSubscribe, Label: label, Command: "saves fix " + ck.fixRef + " --mod " + m.PackageID, Target: m.PackageID}}
 				fixable++
 			case !m.InList:
-				is.Fixes = []SaveFix{newList}
+				is.Fixes = []SaveFix{ck.newList}
 			}
 		}
 		c.add(is)
@@ -329,9 +380,14 @@ func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 	for _, is := range owns.missingRows() {
 		c.add(is)
 	}
-	if editable && len(c.ListOnly) > 0 {
+	return fixable
+}
+
+// listIssues adds the rows of a plan that has Mods the save lacks or a different order.
+func (c *SaveCheck) listIssues(ck saveFixing) {
+	if ck.editable && len(c.ListOnly) > 0 {
 		c.add(SaveIssue{Kind: IssueAdded, Level: LevelInfo, Mods: c.ListOnly,
-			Fixes: []SaveFix{{Action: FixDisableAdded, Label: "Disable to match", Command: "saves fix " + fixRef + " --disable-added"}}})
+			Fixes: []SaveFix{{Action: FixDisableAdded, Label: "Disable to match", Command: "saves fix " + ck.fixRef + " --disable-added"}}})
 	}
 	var moved []SaveMod
 	for _, m := range c.Mods {
@@ -339,27 +395,10 @@ func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 			moved = append(moved, m)
 		}
 	}
-	if editable && len(moved) > 0 {
+	if ck.editable && len(moved) > 0 {
 		c.add(SaveIssue{Kind: IssueReordered, Level: LevelInfo, Mods: moved,
-			Fixes: []SaveFix{{Action: FixOrder, Label: "Use the save's order", Command: "saves fix " + fixRef + " --order"}}})
+			Fixes: []SaveFix{{Action: FixOrder, Label: "Use the save's order", Command: "saves fix " + ck.fixRef + " --order"}}})
 	}
-
-	for _, is := range c.Issues {
-		if levelRank(is.Level) > levelRank(c.Level) && is.Level != LevelInfo {
-			c.Level = is.Level
-		}
-	}
-	if c.Quick == nil {
-		switch {
-		case !hasList:
-			c.Quick = &newList
-		case editable && fixable > 0:
-			c.Quick = &SaveFix{Action: FixAll, Label: "Fix and launch", Command: "saves fix " + fixRef + " --launch", Target: s.Ref}
-		case editable && c.Level == "":
-			c.Quick = &SaveFix{Action: FixLaunch, Label: "Launch", Command: "saves fix " + fixRef + " --launch", Target: s.Ref}
-		}
-	}
-	return c, nil
 }
 
 func (c *SaveCheck) add(is SaveIssue) {
