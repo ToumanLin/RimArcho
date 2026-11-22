@@ -67,8 +67,6 @@ internal/dotnet/compscan.go (*Assembly).scanBody 136 172
 internal/dotnet/shapes.go (*Assembly).eval 141 201
 internal/gametest/run.go Run 92 300
 internal/harmony/harmony.go Read 44 96
-internal/harmony/manual.go (*scanner).call 132 239
-internal/harmony/manual.go (*scanner).run 167 269
 internal/identity/reconcile.go Reconcile 44 119
 internal/modchanges/modchanges.go (*changeBuilder).mod 128 321
 internal/modsearch/context.go contexts 58 147

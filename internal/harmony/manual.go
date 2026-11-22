@@ -275,12 +275,99 @@ func (s *scanner) setField(k string, v *val) {
 	s.fnext[k] = append(s.fnext[k], v)
 }
 
-func (s *scanner) run(row uint32) {
-	code := s.a.Body(row)
-	if len(code) == 0 {
-		return
+// frame is the evaluation state of one method body in run.
+type frame struct {
+	s      *scanner
+	row    uint32
+	st     []*val
+	snap   map[int][]*val // stacks recorded at branch targets
+	dead   bool           // after an unconditional branch, ret or throw
+	stores map[int64]int  // stores per local
+	locals map[int64]*val
+	args   map[int64]*val
+	localF map[string]*val // fields stored in this method
+}
+
+// record saves the stack for branch target t, merged with what was recorded there before.
+func (f *frame) record(t int) {
+	cp := append([]*val(nil), f.st...)
+	if old, ok := f.snap[t]; ok {
+		cp = mergeStacks(old, cp)
 	}
-	ins := dotnet.DecodeIL(code)
+	f.snap[t] = cp
+}
+
+// pop takes the top of the stack; an empty stack gives an unknown value.
+func (f *frame) pop() *val {
+	if len(f.st) == 0 {
+		return unk("stack")
+	}
+	v := f.st[len(f.st)-1]
+	f.st = f.st[:len(f.st)-1]
+	return v
+}
+
+// push puts v on the stack.
+func (f *frame) push(v *val) { f.st = append(f.st, v) }
+
+// popN takes the top n values, deepest first.
+func (f *frame) popN(n int) []*val {
+	r := make([]*val, n)
+	for i := n - 1; i >= 0; i-- {
+		r[i] = f.pop()
+	}
+	return r
+}
+
+// ldarg is argument i: its last store, else the parameter itself.
+func (f *frame) ldarg(i int64) *val {
+	if v := f.args[i]; v != nil {
+		return v
+	}
+	return &val{k: vParam, n: i}
+}
+
+// ldloc is local i's last store; an int in a local stored more than once is no fixed index.
+func (f *frame) ldloc(i int64) *val {
+	v := f.locals[i]
+	switch {
+	case v == nil:
+		return unk("local")
+	case v.k == vInt && f.stores[i] > 1:
+		return unk("index")
+	}
+	return v
+}
+
+// field is a field token's key and value: stored in this method, else the previous round's.
+func (f *frame) field(tok uint32) (string, *val) {
+	m, ok := f.s.a.Member(tok)
+	if !ok {
+		return "", unk("field")
+	}
+	k := m.Owner + "::" + m.Name
+	if m.Owner == "System.Type" && m.Name == "EmptyTypes" {
+		return k, &val{k: vArr}
+	}
+	if v := f.localF[k]; v != nil {
+		return k, v
+	}
+	if v := f.s.fields[k]; v != nil {
+		return k, v
+	}
+	return k, unk("field")
+}
+
+// storeField records v as the value of the field token's field.
+func (f *frame) storeField(tok uint32, v *val) {
+	if k, _ := f.field(tok); k != "" {
+		f.localF[k] = v
+		f.s.setField(k, v)
+	}
+}
+
+// branchTargets is the set of offsets some branch or switch jumps to.
+func branchTargets(ins []dotnet.Instr) map[int]bool {
 	targets := map[int]bool{}
 	for _, in := range ins {
 		if dotnet.IsBranch(in.Op) {
@@ -290,7 +377,12 @@ func (s *scanner) run(row uint32) {
 			targets[t] = true
 		}
 	}
-	// Locals stored more than once (loop counters): their int value is not a fixed index.
+	return targets
+}
+
+// localStores counts the stores to each local. Locals stored more than once (loop counters):
+// their int value is not a fixed index.
+func localStores(ins []dotnet.Instr) map[int64]int {
 	stores := map[int64]int{}
 	for _, in := range ins {
 		switch op := in.Op; {
@@ -300,249 +392,266 @@ func (s *scanner) run(row uint32) {
 			stores[in.Arg]++
 		}
 	}
-	var st []*val
-	snap := map[int][]*val{}
-	dead := false // after an unconditional branch, ret or throw
-	record := func(t int) {
-		cp := append([]*val(nil), st...)
-		if old, ok := snap[t]; ok {
-			cp = mergeStacks(old, cp)
-		}
-		snap[t] = cp
+	return stores
+}
+
+// run evaluates MethodDef row's IL once, filling its summary and the field stores.
+func (s *scanner) run(row uint32) {
+	code := s.a.Body(row)
+	if len(code) == 0 {
+		return
 	}
-	locals := map[int64]*val{}
-	args := map[int64]*val{}
-	localF := map[string]*val{}
-	pop := func() *val {
-		if len(st) == 0 {
-			return unk("stack")
-		}
-		v := st[len(st)-1]
-		st = st[:len(st)-1]
-		return v
-	}
-	push := func(v *val) { st = append(st, v) }
-	popN := func(n int) []*val {
-		r := make([]*val, n)
-		for i := n - 1; i >= 0; i-- {
-			r[i] = pop()
-		}
-		return r
-	}
-	ldarg := func(i int64) *val {
-		if v := args[i]; v != nil {
-			return v
-		}
-		return &val{k: vParam, n: i}
-	}
-	ldloc := func(i int64) *val {
-		v := locals[i]
-		switch {
-		case v == nil:
-			return unk("local")
-		case v.k == vInt && stores[i] > 1:
-			return unk("index")
-		}
-		return v
-	}
-	field := func(tok uint32) (string, *val) {
-		m, ok := s.a.Member(tok)
-		if !ok {
-			return "", unk("field")
-		}
-		k := m.Owner + "::" + m.Name
-		if m.Owner == "System.Type" && m.Name == "EmptyTypes" {
-			return k, &val{k: vArr}
-		}
-		if v := localF[k]; v != nil {
-			return k, v
-		}
-		if v := s.fields[k]; v != nil {
-			return k, v
-		}
-		return k, unk("field")
-	}
+	ins := dotnet.DecodeIL(code)
+	targets := branchTargets(ins)
+	f := &frame{s: s, row: row, snap: map[int][]*val{}, stores: localStores(ins),
+		locals: map[int64]*val{}, args: map[int64]*val{}, localF: map[string]*val{}}
 	for _, in := range ins {
-		// Stack at a join: the fall-through stack merged with the stacks branched here.
-		if targets[in.Off] {
-			sn, ok := snap[in.Off]
-			switch {
-			case dead && ok:
-				st = append(st[:0], sn...)
-			case dead:
-				st = st[:0]
-			case ok:
-				st = mergeStacks(st, sn)
-			}
-		} else if dead {
-			st = st[:0]
-		}
-		dead = false
-		op := in.Op
-		switch {
-		case op == 0x00: // nop
-		case op >= 0x02 && op <= 0x05: // ldarg.0-3
-			push(ldarg(int64(op - 0x02)))
-		case op >= 0x06 && op <= 0x09: // ldloc.0-3
-			push(ldloc(int64(op - 0x06)))
-		case op >= 0x0a && op <= 0x0d: // stloc.0-3
-			locals[int64(op-0x0a)] = pop()
-		case op == 0x0e || op == 0x0f || op == 0xfe09 || op == 0xfe0a: // ldarg(a)
-			push(ldarg(in.Arg))
-		case op == 0x10 || op == 0xfe0b: // starg
-			args[in.Arg] = pop()
-		case op == 0x11 || op == 0x12 || op == 0xfe0c || op == 0xfe0d: // ldloc(a)
-			push(ldloc(in.Arg))
-		case op == 0x13 || op == 0xfe0e: // stloc
-			locals[in.Arg] = pop()
-		case op == 0x14:
-			push(null)
-		case op >= 0x15 && op <= 0x1e: // ldc.i4.m1 … ldc.i4.8
-			push(&val{k: vInt, n: int64(op) - 0x16})
-		case op == 0x1f || op == 0x20 || op == 0x21:
-			push(&val{k: vInt, n: in.Arg})
-		case op == 0x22 || op == 0x23:
-			push(unk("float"))
-		case op == 0x25:
-			v := pop()
-			push(v)
-			push(v)
-		case op == 0x26:
-			pop()
-		case op == 0x27 || op == 0x29 || op == 0x2a || op == 0xdc || op == 0xdd || op == 0xde || op == 0x7a || op == 0xfe1a || op == 0xfe11:
-			// jmp, calli, ret, endfinally, leave, throw, rethrow, endfilter
-			if op == 0x2a && len(st) > 0 {
-				v := st[len(st)-1]
-				sm := s.sum(row)
-				if sm.ret == nil {
-					sm.ret = v
-				} else if sm.ret.key() != v.key() {
-					sm.ret = alt(sm.ret, v)
-				}
-			}
-			st = st[:0]
-			if op == 0xdd || op == 0xde {
-				record(int(in.Arg))
-			}
-			dead = true
-		case op == 0x2b || op == 0x38: // br
-			record(int(in.Arg))
-			dead = true
-		case op == 0x2c || op == 0x2d || op == 0x39 || op == 0x3a: // brfalse / brtrue
-			pop()
-			record(int(in.Arg))
-		case op >= 0x2e && op <= 0x37 || op >= 0x3b && op <= 0x44:
-			popN(2)
-			record(int(in.Arg))
-		case op == 0x45:
-			pop()
-			for _, t := range in.Targets {
-				record(t)
-			}
-		case op >= 0x46 && op <= 0x50: // ldind.*
-			pop()
-			push(unk("pointer"))
-		case op == 0x51 || op >= 0x52 && op <= 0x57 || op == 0xdf: // stind.*
-			popN(2)
-		case op >= 0x58 && op <= 0x64 || op >= 0xd6 && op <= 0xdb || op >= 0xfe01 && op <= 0xfe05: // binary
-			popN(2)
-			push(unk("arithmetic"))
-		case op == 0x65 || op == 0x66 || op >= 0x67 && op <= 0x6e || op == 0x76 || op >= 0x82 && op <= 0x8b ||
-			op >= 0xb3 && op <= 0xba || op == 0xc3 || op >= 0xd1 && op <= 0xd5 || op == 0xe0 || op == 0x8e || op == 0xfe0f:
-			pop()
-			push(unk("arithmetic"))
-		case op == 0x74 || op == 0x75 || op == 0x8c || op == 0x79 || op == 0xa5 || op == 0x71:
-			// castclass, isinst, box, unbox, unbox.any, ldobj: same value
-		case op == 0x70 || op == 0x81: // cpobj, stobj
-			popN(2)
-		case op == 0x72:
-			push(vstr(s.a.UserString(uint32(in.Arg))))
-		case op == 0x7b || op == 0x7c: // ldfld(a)
-			pop()
-			_, v := field(uint32(in.Arg))
-			push(v)
-		case op == 0x7d: // stfld
-			v := pop()
-			pop()
-			if k, _ := field(uint32(in.Arg)); k != "" {
-				localF[k] = v
-				s.setField(k, v)
-			}
-		case op == 0x7e || op == 0x7f:
-			_, v := field(uint32(in.Arg))
-			push(v)
-		case op == 0x80:
-			v := pop()
-			if k, _ := field(uint32(in.Arg)); k != "" {
-				localF[k] = v
-				s.setField(k, v)
-			}
-		case op == 0x8d: // newarr
-			n := pop()
-			arr := &val{k: vArr}
-			if n.k == vInt && n.n > 0 && n.n < 1000 {
-				arr.el = make([]*val, n.n)
-				for i := range arr.el {
-					arr.el[i] = null
-				}
-			} else if n.k != vInt {
-				arr = unk("collection")
-			}
-			push(arr)
-		case op == 0x8f || op >= 0x90 && op <= 0x9a || op == 0xa3: // ldelem*
-			idx := pop()
-			arr := pop()
-			push(elem(arr, idx))
-		case op >= 0x9b && op <= 0xa2 || op == 0xa4: // stelem*
-			v := pop()
-			idx := pop()
-			arr := pop()
-			if arr.k == vArr && idx.k == vInt && idx.n >= 0 && int(idx.n) < len(arr.el) {
-				arr.el[idx.n] = v
-			}
-		case op == 0xc2 || op == 0xc6 || op == 0xfe1d:
-			pop()
-			push(unk("typedref"))
-		case op == 0xd0: // ldtoken
-			push(s.token(uint32(in.Arg)))
-		case op == 0xfe06: // ldftn
-			push(s.methodToken(uint32(in.Arg)))
-		case op == 0xfe07: // ldvirtftn
-			pop()
-			push(s.methodToken(uint32(in.Arg)))
-		case op == 0xfe15: // initobj
-			pop()
-		case op == 0xfe17 || op == 0xfe18: // cpblk, initblk
-			popN(3)
-		case op == 0xfe1c:
-			push(unk("sizeof"))
-		case op == 0xfe00:
-			push(unk("arglist"))
-		case op == 0x28 || op == 0x6f || op == 0x73: // call, callvirt, newobj
-			m, ok := s.a.Member(uint32(in.Arg))
-			if !ok {
-				st = st[:0]
-				continue
-			}
-			n := m.Params
-			if m.HasThis && op != 0x73 {
-				n++
-			}
-			cargs := popN(n)
-			if op == 0x73 {
-				cargs = append([]*val{unk("this")}, cargs...)
-			}
-			r := s.call(row, m, op, cargs)
-			if op == 0x73 || !m.RetVoid {
-				if r == nil {
-					r = unk("call " + shortOwner(m.Owner) + "." + m.Name)
-				}
-				push(r)
-			}
-		default:
-			// prefixes (unaligned, volatile, tail, constrained, readonly, no.) and anything else: no stack effect
-		}
+		f.join(in.Off, targets[in.Off])
+		f.dead = false
+		f.step(in)
 	}
+}
+
+// join sets the stack at off: the fall-through stack merged with the stacks branched here.
+func (f *frame) join(off int, target bool) {
+	if target {
+		sn, ok := f.snap[off]
+		switch {
+		case f.dead && ok:
+			f.st = append(f.st[:0], sn...)
+		case f.dead:
+			f.st = f.st[:0]
+		case ok:
+			f.st = mergeStacks(f.st, sn)
+		}
+	} else if f.dead {
+		f.st = f.st[:0]
+	}
+}
+
+// step applies one instruction. The handlers keep the opcode cases in their original order;
+// prefixes (unaligned, volatile, tail, constrained, readonly, no.) and anything else have no
+// stack effect.
+func (f *frame) step(in dotnet.Instr) {
+	_ = f.stepLoad(in) || f.stepControl(in) || f.stepArith(in) || f.stepObject(in) || f.stepMisc(in) || f.stepCall(in)
+}
+
+// stepLoad handles nop, arguments, locals, constants, dup and pop.
+func (f *frame) stepLoad(in dotnet.Instr) bool {
+	op := in.Op
+	switch {
+	case op == 0x00: // nop
+	case op >= 0x02 && op <= 0x05: // ldarg.0-3
+		f.push(f.ldarg(int64(op - 0x02)))
+	case op >= 0x06 && op <= 0x09: // ldloc.0-3
+		f.push(f.ldloc(int64(op - 0x06)))
+	case op >= 0x0a && op <= 0x0d: // stloc.0-3
+		f.locals[int64(op-0x0a)] = f.pop()
+	case op == 0x0e || op == 0x0f || op == 0xfe09 || op == 0xfe0a: // ldarg(a)
+		f.push(f.ldarg(in.Arg))
+	case op == 0x10 || op == 0xfe0b: // starg
+		f.args[in.Arg] = f.pop()
+	case op == 0x11 || op == 0x12 || op == 0xfe0c || op == 0xfe0d: // ldloc(a)
+		f.push(f.ldloc(in.Arg))
+	case op == 0x13 || op == 0xfe0e: // stloc
+		f.locals[in.Arg] = f.pop()
+	case op == 0x14:
+		f.push(null)
+	case op >= 0x15 && op <= 0x1e: // ldc.i4.m1 … ldc.i4.8
+		f.push(&val{k: vInt, n: int64(op) - 0x16})
+	case op == 0x1f || op == 0x20 || op == 0x21:
+		f.push(&val{k: vInt, n: in.Arg})
+	case op == 0x22 || op == 0x23:
+		f.push(unk("float"))
+	case op == 0x25:
+		v := f.pop()
+		f.push(v)
+		f.push(v)
+	case op == 0x26:
+		f.pop()
+	default:
+		return false
+	}
+	return true
+}
+
+// stepControl handles returns, throws, leaves, branches and switch.
+func (f *frame) stepControl(in dotnet.Instr) bool {
+	op := in.Op
+	switch {
+	case op == 0x27 || op == 0x29 || op == 0x2a || op == 0xdc || op == 0xdd || op == 0xde || op == 0x7a || op == 0xfe1a || op == 0xfe11:
+		// jmp, calli, ret, endfinally, leave, throw, rethrow, endfilter
+		if op == 0x2a && len(f.st) > 0 {
+			f.recordReturn(f.st[len(f.st)-1])
+		}
+		f.st = f.st[:0]
+		if op == 0xdd || op == 0xde {
+			f.record(int(in.Arg))
+		}
+		f.dead = true
+	case op == 0x2b || op == 0x38: // br
+		f.record(int(in.Arg))
+		f.dead = true
+	case op == 0x2c || op == 0x2d || op == 0x39 || op == 0x3a: // brfalse / brtrue
+		f.pop()
+		f.record(int(in.Arg))
+	case op >= 0x2e && op <= 0x37 || op >= 0x3b && op <= 0x44:
+		f.popN(2)
+		f.record(int(in.Arg))
+	case op == 0x45:
+		f.pop()
+		for _, t := range in.Targets {
+			f.record(t)
+		}
+	default:
+		return false
+	}
+	return true
+}
+
+// recordReturn adds a returned value to the method's summary.
+func (f *frame) recordReturn(v *val) {
+	sm := f.s.sum(f.row)
+	if sm.ret == nil {
+		sm.ret = v
+	} else if sm.ret.key() != v.key() {
+		sm.ret = alt(sm.ret, v)
+	}
+}
+
+// stepArith handles indirect loads and stores, arithmetic, conversions and same-value casts.
+func (f *frame) stepArith(in dotnet.Instr) bool {
+	op := in.Op
+	switch {
+	case op >= 0x46 && op <= 0x50: // ldind.*
+		f.pop()
+		f.push(unk("pointer"))
+	case op == 0x51 || op >= 0x52 && op <= 0x57 || op == 0xdf: // stind.*
+		f.popN(2)
+	case op >= 0x58 && op <= 0x64 || op >= 0xd6 && op <= 0xdb || op >= 0xfe01 && op <= 0xfe05: // binary
+		f.popN(2)
+		f.push(unk("arithmetic"))
+	case op == 0x65 || op == 0x66 || op >= 0x67 && op <= 0x6e || op == 0x76 || op >= 0x82 && op <= 0x8b ||
+		op >= 0xb3 && op <= 0xba || op == 0xc3 || op >= 0xd1 && op <= 0xd5 || op == 0xe0 || op == 0x8e || op == 0xfe0f:
+		f.pop()
+		f.push(unk("arithmetic"))
+	case op == 0x74 || op == 0x75 || op == 0x8c || op == 0x79 || op == 0xa5 || op == 0x71:
+		// castclass, isinst, box, unbox, unbox.any, ldobj: same value
+	default:
+		return false
+	}
+	return true
+}
+
+// stepObject handles cpobj, stobj, ldstr and the field loads and stores.
+func (f *frame) stepObject(in dotnet.Instr) bool {
+	op := in.Op
+	switch {
+	case op == 0x70 || op == 0x81: // cpobj, stobj
+		f.popN(2)
+	case op == 0x72:
+		f.push(vstr(f.s.a.UserString(uint32(in.Arg))))
+	case op == 0x7b || op == 0x7c: // ldfld(a)
+		f.pop()
+		_, v := f.field(uint32(in.Arg))
+		f.push(v)
+	case op == 0x7d: // stfld
+		v := f.pop()
+		f.pop()
+		f.storeField(uint32(in.Arg), v)
+	case op == 0x7e || op == 0x7f:
+		_, v := f.field(uint32(in.Arg))
+		f.push(v)
+	case op == 0x80:
+		f.storeField(uint32(in.Arg), f.pop())
+	default:
+		return false
+	}
+	return true
+}
+
+// stepMisc handles arrays, typed references, tokens, method pointers and the block opcodes.
+func (f *frame) stepMisc(in dotnet.Instr) bool {
+	op := in.Op
+	switch {
+	case op == 0x8d: // newarr
+		f.push(newArr(f.pop()))
+	case op == 0x8f || op >= 0x90 && op <= 0x9a || op == 0xa3: // ldelem*
+		idx := f.pop()
+		arr := f.pop()
+		f.push(elem(arr, idx))
+	case op >= 0x9b && op <= 0xa2 || op == 0xa4: // stelem*
+		v := f.pop()
+		idx := f.pop()
+		arr := f.pop()
+		if arr.k == vArr && idx.k == vInt && idx.n >= 0 && int(idx.n) < len(arr.el) {
+			arr.el[idx.n] = v
+		}
+	case op == 0xc2 || op == 0xc6 || op == 0xfe1d:
+		f.pop()
+		f.push(unk("typedref"))
+	case op == 0xd0: // ldtoken
+		f.push(f.s.token(uint32(in.Arg)))
+	case op == 0xfe06: // ldftn
+		f.push(f.s.methodToken(uint32(in.Arg)))
+	case op == 0xfe07: // ldvirtftn
+		f.pop()
+		f.push(f.s.methodToken(uint32(in.Arg)))
+	case op == 0xfe15: // initobj
+		f.pop()
+	case op == 0xfe17 || op == 0xfe18: // cpblk, initblk
+		f.popN(3)
+	case op == 0xfe1c:
+		f.push(unk("sizeof"))
+	case op == 0xfe00:
+		f.push(unk("arglist"))
+	default:
+		return false
+	}
+	return true
+}
+
+// newArr is the array newarr makes for length n: known null elements for a small constant.
+func newArr(n *val) *val {
+	arr := &val{k: vArr}
+	if n.k == vInt && n.n > 0 && n.n < 1000 {
+		arr.el = make([]*val, n.n)
+		for i := range arr.el {
+			arr.el[i] = null
+		}
+	} else if n.k != vInt {
+		arr = unk("collection")
+	}
+	return arr
+}
+
+// stepCall handles call, callvirt and newobj through the API models in call.
+func (f *frame) stepCall(in dotnet.Instr) bool {
+	op := in.Op
+	if op != 0x28 && op != 0x6f && op != 0x73 {
+		return false
+	}
+	m, ok := f.s.a.Member(uint32(in.Arg))
+	if !ok {
+		f.st = f.st[:0]
+		return true
+	}
+	n := m.Params
+	if m.HasThis && op != 0x73 {
+		n++
+	}
+	cargs := f.popN(n)
+	if op == 0x73 {
+		cargs = append([]*val{unk("this")}, cargs...)
+	}
+	r := f.s.call(f.row, m, op, cargs)
+	if op == 0x73 || !m.RetVoid {
+		if r == nil {
+			r = unk("call " + shortOwner(m.Owner) + "." + m.Name)
+		}
+		f.push(r)
+	}
+	return true
 }
 
 func mergeStacks(a, b []*val) []*val {
@@ -659,217 +768,316 @@ func harmonyOwner(o, name string) bool {
 	return o == "HarmonyLib."+name || o == "Harmony."+name
 }
 
-// call models the reflection and Harmony APIs used to name patch targets; nil = unknown result.
-func (s *scanner) call(row uint32, m dotnet.Member, op uint16, args []*val) *val {
-	o, n := m.Owner, m.Name
-	arg := func(i int) *val {
-		if i < len(args) {
+// callOutcome says how a group of modelled APIs handled a call.
+type callOutcome uint8
+
+const (
+	callNext   callOutcome = iota // no API of the group matched: try the next group
+	callFall                      // an API matched without a result: try wrappers and summaries
+	callReturn                    // the result is final (nil = unknown)
+)
+
+// argAt is args[i], or null when the call has fewer arguments.
+func argAt(args []*val, i int) *val {
+	if i < len(args) {
+		return args[i]
+	}
+	return null
+}
+
+// firstArr is the first array or null argument from index from on, nil if none.
+func firstArr(args []*val, from int) *val {
+	for i := from; i < len(args); i++ {
+		if args[i].k == vArr || args[i].k == vNull {
 			return args[i]
 		}
-		return null
 	}
-	firstArr := func(from int) *val {
-		for i := from; i < len(args); i++ {
-			if args[i].k == vArr || args[i].k == vNull {
-				return args[i]
-			}
-		}
-		return nil
+	return nil
+}
+
+// call models the reflection and Harmony APIs used to name patch targets; nil = unknown result.
+// The API groups are tried in order; the first that matches decides.
+func (s *scanner) call(row uint32, m dotnet.Member, op uint16, args []*val) *val {
+	r, how := s.callHarmony(row, m, args)
+	if how == callNext {
+		r, how = callReflection(m, args)
 	}
+	if how == callNext {
+		r, how = callCollection(m, op, args)
+	}
+	if how == callReturn {
+		return r
+	}
+	return s.callAssembly(row, m, args)
+}
+
+// callHarmony models Harmony.Patch, HarmonyMethod, GenTypes, LINQ method searches and AccessTools.
+func (s *scanner) callHarmony(row uint32, m dotnet.Member, args []*val) (*val, callOutcome) {
+	o, n := m.Owner, m.Name
 	switch {
 	case (harmonyOwner(o, "Harmony") || harmonyOwner(o, "HarmonyInstance")) && n == "Patch" && m.HasThis:
-		pc := pcall{orig: arg(1)}
+		pc := pcall{orig: argAt(args, 1)}
 		for i := 2; i < len(args) && i-2 < len(patchKinds5); i++ {
 			pc.hms = append(pc.hms, args[i])
 			pc.kind = append(pc.kind, patchKinds5[i-2])
 		}
 		s.patchCall(row, pc)
-		return nil
+		return nil, callReturn
 	case harmonyOwner(o, "HarmonyMethod") && (n == ".ctor" || n == "op_Implicit"):
-		a := args
-		if n == ".ctor" {
-			a = args[1:]
-		}
-		if len(a) == 0 {
-			return unk("empty HarmonyMethod")
-		}
-		if a[0].k == vType && len(a) > 1 {
-			return &val{k: vHM, a: &val{k: vMethod, a: a[0], b: a[1], c: argOr(a, 2)}}
-		}
-		return &val{k: vHM, a: a[0]}
+		return harmonyMethod(n, args), callReturn
 	case o == "Verse.GenTypes" && n == "GetTypeInAnyAssembly":
-		if arg(0).k == vStr {
-			return vtyp(arg(0).s)
+		if argAt(args, 0).k == vStr {
+			return vtyp(argAt(args, 0).s), callReturn
 		}
-		return reason(arg(0), "computed name")
-	case o == "System.Linq.Enumerable" && arg(0).k == vSearch:
-		src := arg(0)
-		if len(args) > 1 {
-			nm := s.lambdaName(arg(1))
-			if nm == "" {
-				return unk("method search")
-			}
-			src = &val{k: vSearch, a: src.a, b: vstr(nm)}
-		}
-		switch n {
-		case "Where":
-			return src
-		case "First", "FirstOrDefault", "Single", "SingleOrDefault", "Last", "LastOrDefault":
-			if src.b != nil {
-				return &val{k: vMethod, a: src.a, b: src.b}
-			}
-		}
-		return unk("method search")
+		return reason(argAt(args, 0), "computed name"), callReturn
+	case o == "System.Linq.Enumerable" && argAt(args, 0).k == vSearch:
+		return s.linqSearch(n, args), callReturn
 	case harmonyOwner(o, "AccessTools") || strings.HasSuffix(o, ".AccessToolsExtensions"):
-		switch n {
-		case "Method", "DeclaredMethod":
-			return atMethod(args, "")
-		case "PropertyGetter", "DeclaredPropertyGetter":
-			return atMethod(args, "get")
-		case "PropertySetter", "DeclaredPropertySetter":
-			return atMethod(args, "set")
-		case "Constructor", "DeclaredConstructor":
-			return &val{k: vMethod, s: "ctor", a: arg(0), b: vstr(".ctor"), c: argOr(args, 1)}
-		case "Property", "DeclaredProperty":
-			if arg(0).k == vStr {
-				t, nm := splitColon(arg(0).s)
-				return &val{k: vProp, a: t, b: nm}
-			}
-			return &val{k: vProp, a: arg(0), b: arg(1)}
-		case "TypeByName":
-			if arg(0).k == vStr {
-				return vtyp(arg(0).s)
-			}
-			return reason(arg(0), "computed name")
-		case "Inner":
-			if arg(0).k == vType && arg(1).k == vStr {
-				return vtyp(arg(0).s + "+" + arg(1).s)
-			}
-			return reason(arg(0), "computed name")
-		case "EnumeratorMoveNext", "AsyncMoveNext":
-			return unk("enumerator")
-		case "GetDeclaredMethods":
-			return &val{k: vSearch, a: arg(0)}
-		case "FirstMethod":
-			if nm := s.lambdaName(arg(1)); nm != "" {
-				return &val{k: vMethod, a: arg(0), b: vstr(nm)}
-			}
-			return unk("method search")
-		case "FirstConstructor", "GetDeclaredConstructors", "FirstInner", "GetMethodNames", "AllTypes", "GetTypesFromAssembly":
+		if r, ok := s.accessTools(n, args); ok {
+			return r, callReturn
+		}
+		return nil, callFall
+	}
+	return nil, callNext
+}
+
+// harmonyMethod is new HarmonyMethod(…) or an implicit conversion to one.
+func harmonyMethod(n string, args []*val) *val {
+	a := args
+	if n == ".ctor" {
+		a = args[1:]
+	}
+	if len(a) == 0 {
+		return unk("empty HarmonyMethod")
+	}
+	if a[0].k == vType && len(a) > 1 {
+		return &val{k: vHM, a: &val{k: vMethod, a: a[0], b: a[1], c: argOr(a, 2)}}
+	}
+	return &val{k: vHM, a: a[0]}
+}
+
+// linqSearch is a LINQ call (Where, First …) on a method search, narrowed by a lambda's name.
+func (s *scanner) linqSearch(n string, args []*val) *val {
+	src := argAt(args, 0)
+	if len(args) > 1 {
+		nm := s.lambdaName(argAt(args, 1))
+		if nm == "" {
 			return unk("method search")
 		}
+		src = &val{k: vSearch, a: src.a, b: vstr(nm)}
+	}
+	switch n {
+	case "Where":
+		return src
+	case "First", "FirstOrDefault", "Single", "SingleOrDefault", "Last", "LastOrDefault":
+		if src.b != nil {
+			return &val{k: vMethod, a: src.a, b: src.b}
+		}
+	}
+	return unk("method search")
+}
+
+// accessTools models the AccessTools method n; false when it is not one of those modelled.
+func (s *scanner) accessTools(n string, args []*val) (*val, bool) {
+	arg0, arg1 := argAt(args, 0), argAt(args, 1)
+	switch n {
+	case "Method", "DeclaredMethod":
+		return atMethod(args, ""), true
+	case "PropertyGetter", "DeclaredPropertyGetter":
+		return atMethod(args, "get"), true
+	case "PropertySetter", "DeclaredPropertySetter":
+		return atMethod(args, "set"), true
+	case "Constructor", "DeclaredConstructor":
+		return &val{k: vMethod, s: "ctor", a: arg0, b: vstr(".ctor"), c: argOr(args, 1)}, true
+	case "Property", "DeclaredProperty":
+		if arg0.k == vStr {
+			t, nm := splitColon(arg0.s)
+			return &val{k: vProp, a: t, b: nm}, true
+		}
+		return &val{k: vProp, a: arg0, b: arg1}, true
+	case "TypeByName":
+		if arg0.k == vStr {
+			return vtyp(arg0.s), true
+		}
+		return reason(arg0, "computed name"), true
+	case "Inner":
+		if arg0.k == vType && arg1.k == vStr {
+			return vtyp(arg0.s + "+" + arg1.s), true
+		}
+		return reason(arg0, "computed name"), true
+	case "EnumeratorMoveNext", "AsyncMoveNext":
+		return unk("enumerator"), true
+	case "GetDeclaredMethods":
+		return &val{k: vSearch, a: arg0}, true
+	case "FirstMethod":
+		if nm := s.lambdaName(arg1); nm != "" {
+			return &val{k: vMethod, a: arg0, b: vstr(nm)}, true
+		}
+		return unk("method search"), true
+	case "FirstConstructor", "GetDeclaredConstructors", "FirstInner", "GetMethodNames", "AllTypes", "GetTypesFromAssembly":
+		return unk("method search"), true
+	}
+	return nil, false
+}
+
+// callReflection models System.Type, GetType(), MethodBase, PropertyInfo, MethodInfo, delegates,
+// SymbolExtensions and LINQ expressions.
+func callReflection(m dotnet.Member, args []*val) (*val, callOutcome) {
+	o, n := m.Owner, m.Name
+	switch {
 	case o == "System.Type" || o == "System.Reflection.TypeInfo" || o == "System.Reflection.IReflect":
-		switch n {
-		case "GetTypeFromHandle":
-			return arg(0)
-		case "GetMethod":
-			return &val{k: vMethod, a: arg(0), b: arg(1), c: firstArr(2)}
-		case "GetProperty":
-			return &val{k: vProp, a: arg(0), b: arg(1)}
-		case "GetConstructor":
-			return &val{k: vMethod, s: "ctor", a: arg(0), b: vstr(".ctor"), c: firstArr(1)}
-		case "GetNestedType":
-			if arg(0).k == vType && arg(1).k == vStr {
-				return vtyp(arg(0).s + "+" + arg(1).s)
-			}
-		case "GetType":
-			if !m.HasThis && arg(0).k == vStr {
-				t := arg(0).s
-				if i := strings.IndexByte(t, ','); i >= 0 {
-					t = strings.TrimSpace(t[:i])
-				}
-				return vtyp(t)
-			}
-		case "MakeGenericType", "get_UnderlyingSystemType":
-			return arg(0)
-		case "GetMethods":
-			return &val{k: vSearch, a: arg(0)}
-		case "GetConstructors", "GetNestedTypes", "GetProperties":
-			return unk("method search")
+		if r, ok := typeAPI(m, args); ok {
+			return r, callReturn
 		}
+		return nil, callFall
 	case o == "System.Object" && n == "GetType":
-		if a := arg(0); a.k == vParam || a.k == vThis {
-			return &val{k: vTypeOf, a: a}
+		if a := argAt(args, 0); a.k == vParam || a.k == vThis {
+			return &val{k: vTypeOf, a: a}, callReturn
 		}
-		return unk("GetType()")
+		return unk("GetType()"), callReturn
 	case o == "System.Reflection.MethodBase" && n == "GetMethodFromHandle":
-		return arg(0)
+		return argAt(args, 0), callReturn
 	case o == "System.Reflection.PropertyInfo":
-		p := arg(0)
+		p := argAt(args, 0)
 		if p.k != vProp {
-			return nil
+			return nil, callReturn
 		}
 		switch n {
 		case "GetGetMethod", "get_GetMethod":
-			return &val{k: vMethod, s: "get", a: p.a, b: p.b}
+			return &val{k: vMethod, s: "get", a: p.a, b: p.b}, callReturn
 		case "GetSetMethod", "get_SetMethod":
-			return &val{k: vMethod, s: "set", a: p.a, b: p.b}
+			return &val{k: vMethod, s: "set", a: p.a, b: p.b}, callReturn
 		}
+		return nil, callFall
 	case o == "System.Reflection.MethodInfo" && (n == "MakeGenericMethod" || n == "GetBaseDefinition"):
-		return arg(0)
+		return argAt(args, 0), callReturn
 	case o == "System.Delegate" && n == "get_Method", o == "System.Reflection.RuntimeReflectionExtensions" && n == "GetMethodInfo":
-		return arg(0)
+		return argAt(args, 0), callReturn
 	case strings.HasSuffix(o, "SymbolExtensions") && n == "GetMethodInfo":
-		return firstMethod(args)
+		return firstMethod(args), callReturn
 	case o == "System.Linq.Expressions.Expression":
 		switch {
 		case n == "Call" || n == "Property":
 			if v := firstMethod(args); v != nil {
-				return v
+				return v, callReturn
 			}
 		case strings.HasPrefix(n, "Lambda"):
-			return arg(0)
+			return argAt(args, 0), callReturn
 		}
-		return unk("expression")
-	case o == "System.String" && n == "Concat":
-		var sb strings.Builder
-		for _, x := range args {
-			if x.k != vStr {
-				return unk("computed name")
+		return unk("expression"), callReturn
+	}
+	return nil, callNext
+}
+
+// typeAPI models the System.Type method m; false when it is not one of those modelled.
+func typeAPI(m dotnet.Member, args []*val) (*val, bool) {
+	arg0, arg1 := argAt(args, 0), argAt(args, 1)
+	switch m.Name {
+	case "GetTypeFromHandle":
+		return arg0, true
+	case "GetMethod":
+		return &val{k: vMethod, a: arg0, b: arg1, c: firstArr(args, 2)}, true
+	case "GetProperty":
+		return &val{k: vProp, a: arg0, b: arg1}, true
+	case "GetConstructor":
+		return &val{k: vMethod, s: "ctor", a: arg0, b: vstr(".ctor"), c: firstArr(args, 1)}, true
+	case "GetNestedType":
+		if arg0.k == vType && arg1.k == vStr {
+			return vtyp(arg0.s + "+" + arg1.s), true
+		}
+	case "GetType":
+		if !m.HasThis && arg0.k == vStr {
+			t := arg0.s
+			if i := strings.IndexByte(t, ','); i >= 0 {
+				t = strings.TrimSpace(t[:i])
 			}
-			sb.WriteString(x.s)
+			return vtyp(t), true
 		}
-		return vstr(sb.String())
+	case "MakeGenericType", "get_UnderlyingSystemType":
+		return arg0, true
+	case "GetMethods":
+		return &val{k: vSearch, a: arg0}, true
+	case "GetConstructors", "GetNestedTypes", "GetProperties":
+		return unk("method search"), true
+	}
+	return nil, false
+}
+
+// callCollection models String.Concat, enumerators, List/HashSet/ICollection, LINQ copies and
+// delegates made from ldftn.
+func callCollection(m dotnet.Member, op uint16, args []*val) (*val, callOutcome) {
+	o, n := m.Owner, m.Name
+	switch {
+	case o == "System.String" && n == "Concat":
+		return concat(args), callReturn
 	case n == "get_Current":
-		if e := arg(0); e.k == vEnum {
-			return elem(e.a, unk("index"))
+		if e := argAt(args, 0); e.k == vEnum {
+			return elem(e.a, unk("index")), callReturn
 		}
-		return unk("collection")
+		return unk("collection"), callReturn
 	case strings.HasPrefix(o, "System.Collections.Generic.List`1") || strings.HasPrefix(o, "System.Collections.Generic.HashSet`1") ||
 		strings.HasPrefix(o, "System.Collections.Generic.ICollection`1"):
-		switch n {
-		case ".ctor":
-			if len(args) == 1 || arg(1).k == vInt {
-				return &val{k: vArr}
-			}
-			if arg(1).k == vArr {
-				return &val{k: vArr, el: append([]*val(nil), arg(1).el...)}
-			}
-			return unk("collection")
-		case "Add":
-			if c := arg(0); c.k == vArr && len(c.el) < 256 {
-				c.el = append(c.el, arg(1))
-			}
-			return nil
-		case "AddRange":
-			if c := arg(0); c.k == vArr && arg(1).k == vArr {
-				c.el = append(c.el, arg(1).el...)
-			}
-			return nil
-		case "get_Item":
-			return elem(arg(0), arg(1))
-		case "GetEnumerator":
-			return &val{k: vEnum, a: arg(0)}
-		case "ToArray":
-			return arg(0)
+		if r, ok := listAPI(n, args); ok {
+			return r, callReturn
 		}
+		return nil, callFall
 	case n == "GetEnumerator" && (strings.HasPrefix(o, "System.Collections.Generic.IEnumerable`1") || o == "System.Collections.IEnumerable"):
-		return &val{k: vEnum, a: arg(0)}
+		return &val{k: vEnum, a: argAt(args, 0)}, callReturn
 	case o == "System.Linq.Enumerable" && (n == "ToList" || n == "ToArray" || n == "AsEnumerable" || n == "Distinct"):
-		return arg(0)
-	case op == 0x73 && n == ".ctor" && len(args) == 3 && arg(2).k == vMethod:
-		return arg(2) // a delegate made from ldftn
+		return argAt(args, 0), callReturn
+	case op == 0x73 && n == ".ctor" && len(args) == 3 && argAt(args, 2).k == vMethod:
+		return argAt(args, 2), callReturn // a delegate made from ldftn
 	}
+	return nil, callNext
+}
+
+// concat is String.Concat of constant strings; anything else is a computed name.
+func concat(args []*val) *val {
+	var sb strings.Builder
+	for _, x := range args {
+		if x.k != vStr {
+			return unk("computed name")
+		}
+		sb.WriteString(x.s)
+	}
+	return vstr(sb.String())
+}
+
+// listAPI models the List/HashSet/ICollection method n; false when it is not one of those modelled.
+func listAPI(n string, args []*val) (*val, bool) {
+	arg0, arg1 := argAt(args, 0), argAt(args, 1)
+	switch n {
+	case ".ctor":
+		if len(args) == 1 || arg1.k == vInt {
+			return &val{k: vArr}, true
+		}
+		if arg1.k == vArr {
+			return &val{k: vArr, el: append([]*val(nil), arg1.el...)}, true
+		}
+		return unk("collection"), true
+	case "Add":
+		if c := arg0; c.k == vArr && len(c.el) < 256 {
+			c.el = append(c.el, arg1)
+		}
+		return nil, true
+	case "AddRange":
+		if c := arg0; c.k == vArr && arg1.k == vArr {
+			c.el = append(c.el, arg1.el...)
+		}
+		return nil, true
+	case "get_Item":
+		return elem(arg0, arg1), true
+	case "GetEnumerator":
+		return &val{k: vEnum, a: arg0}, true
+	case "ToArray":
+		return arg0, true
+	}
+	return nil, false
+}
+
+// callAssembly handles a call no API model decided: a wrapper of Harmony.Patch, or a method of
+// this assembly through its summary.
+func (s *scanner) callAssembly(row uint32, m dotnet.Member, args []*val) *val {
 	// A wrapper of Harmony.Patch in another assembly (or one without a summary):
 	// Patch(MethodBase original, HarmonyMethod prefix, HarmonyMethod postfix, …).
 	if (m.Def == 0 || s.sums[m.Def] == nil) && isWrapper(m.Types) {
@@ -877,9 +1085,9 @@ func (s *scanner) call(row uint32, m dotnet.Member, op uint16, args []*val) *val
 		if m.HasThis {
 			off = 1
 		}
-		pc := pcall{orig: arg(off)}
+		pc := pcall{orig: argAt(args, off)}
 		for j := 1; j < len(m.Types) && j-1 < len(patchKinds5) && isHM(m.Types[j]); j++ {
-			pc.hms = append(pc.hms, arg(off+j))
+			pc.hms = append(pc.hms, argAt(args, off+j))
 			pc.kind = append(pc.kind, patchKinds5[j-1])
 		}
 		s.patchCall(row, pc)
