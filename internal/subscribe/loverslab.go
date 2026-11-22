@@ -179,65 +179,9 @@ func (l *LoversLab) parsePage(resp *http.Response, a siteAction) (*FilePage, err
 		return nil, authError("browser verification required", "site access denied (permission or browser verification)")
 	}
 	root, _ := html.Parse(strings.NewReader(string(b)))
-	p := &FilePage{}
-	base := resp.Request.URL
-	var walk func(*html.Node)
-	walk = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "a" {
-			href := attr(n, "href")
-			u, e := base.Parse(href)
-			if e == nil && fileURL(u) && u.Query().Get("do") == "download" && (u.Path == base.Path || strings.HasPrefix(u.Path, "/files/")) {
-				name := strings.TrimSpace(nodeText(n))
-				if name == "" {
-					name = "download file"
-				}
-				file := l.add(siteAction{page: a.page, target: u.String(), referer: base.String()}, name)
-				file.Name, file.Size, file.Date = fileMetadata(n, name)
-				p.Files = append(p.Files, file)
-			}
-		}
-		if n.Type == html.ElementNode && n.Data == "form" {
-			u, e := base.Parse(attr(n, "action"))
-			method := strings.ToUpper(attr(n, "method"))
-			if method == "" {
-				method = "GET"
-			}
-			if e == nil && fileURL(u) && (method == "GET" || method == "POST") && (u.Query().Get("do") == "download" || strings.Contains(attr(n, "data-controller"), "download")) {
-				values := url.Values{}
-				var inputs func(*html.Node)
-				inputs = func(x *html.Node) {
-					if x.Type == html.ElementNode && (x.Data == "input" && (attr(x, "type") == "hidden" || attr(x, "type") == "submit" || attr(x, "type") == "checkbox") || x.Data == "button" && attr(x, "type") == "submit") && attr(x, "name") != "" {
-						value := attr(x, "value")
-						if value == "" {
-							value = "1"
-						}
-						values.Set(attr(x, "name"), value)
-					}
-					for c := x.FirstChild; c != nil; c = c.NextSibling {
-						inputs(c)
-					}
-				}
-				inputs(n)
-				agreement := strings.TrimSpace(nodeText(n))
-				if len(agreement) > 12000 {
-					return
-				}
-				p.Agreement = agreement
-				if method == "GET" {
-					q := u.Query()
-					for k, v := range values {
-						q[k] = v
-					}
-					u.RawQuery = q.Encode()
-				}
-				p.Files = append(p.Files, l.add(siteAction{page: a.page, target: u.String(), method: method, values: values, agreement: agreement, referer: base.String()}, "confirm download"))
-			}
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walk(c)
-		}
-	}
-	walk(root)
+	w := pageWalker{l: l, page: &FilePage{}, base: resp.Request.URL, a: a}
+	w.walk(root)
+	p := w.page
 	hasNamed := false
 	for _, file := range p.Files {
 		hasNamed = hasNamed || archiveName.MatchString(file.Name) || file.Size != "" || file.Date != ""
@@ -255,6 +199,88 @@ func (l *LoversLab) parsePage(resp *http.Response, a siteAction) (*FilePage, err
 		return nil, authError("browser verification required", "no downloadable files recognized; use your browser")
 	}
 	return p, nil
+}
+
+// pageWalker collects a download page's files from its links and forms.
+type pageWalker struct {
+	l    *LoversLab
+	page *FilePage
+	base *url.URL
+	a    siteAction
+}
+
+// walk visits n and its children; a form whose agreement is too long to show is left out
+// with everything inside it.
+func (w pageWalker) walk(n *html.Node) {
+	if n.Type == html.ElementNode && n.Data == "a" {
+		w.link(n)
+	}
+	if n.Type == html.ElementNode && n.Data == "form" && !w.form(n) {
+		return
+	}
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		w.walk(c)
+	}
+}
+
+// link adds a download link on this page or another file page.
+func (w pageWalker) link(n *html.Node) {
+	base := w.base
+	u, e := base.Parse(attr(n, "href"))
+	if e == nil && fileURL(u) && u.Query().Get("do") == "download" && (u.Path == base.Path || strings.HasPrefix(u.Path, "/files/")) {
+		name := strings.TrimSpace(nodeText(n))
+		if name == "" {
+			name = "download file"
+		}
+		file := w.l.add(siteAction{page: w.a.page, target: u.String(), referer: base.String()}, name)
+		file.Name, file.Size, file.Date = fileMetadata(n, name)
+		w.page.Files = append(w.page.Files, file)
+	}
+}
+
+// form adds a download form with its fields and agreement; false when the agreement is
+// too long to show.
+func (w pageWalker) form(n *html.Node) bool {
+	base := w.base
+	u, e := base.Parse(attr(n, "action"))
+	method := strings.ToUpper(attr(n, "method"))
+	if method == "" {
+		method = "GET"
+	}
+	if e != nil || !fileURL(u) || (method != "GET" && method != "POST") || (u.Query().Get("do") != "download" && !strings.Contains(attr(n, "data-controller"), "download")) {
+		return true
+	}
+	values := url.Values{}
+	formValues(n, values)
+	agreement := strings.TrimSpace(nodeText(n))
+	if len(agreement) > 12000 {
+		return false
+	}
+	w.page.Agreement = agreement
+	if method == "GET" {
+		q := u.Query()
+		for k, v := range values {
+			q[k] = v
+		}
+		u.RawQuery = q.Encode()
+	}
+	w.page.Files = append(w.page.Files, w.l.add(siteAction{page: w.a.page, target: u.String(), method: method, values: values, agreement: agreement, referer: base.String()}, "confirm download"))
+	return true
+}
+
+// formValues sets in values the named hidden, submit and checkbox inputs and submit
+// buttons under x, "1" for one without a value.
+func formValues(x *html.Node, values url.Values) {
+	if x.Type == html.ElementNode && (x.Data == "input" && (attr(x, "type") == "hidden" || attr(x, "type") == "submit" || attr(x, "type") == "checkbox") || x.Data == "button" && attr(x, "type") == "submit") && attr(x, "name") != "" {
+		value := attr(x, "value")
+		if value == "" {
+			value = "1"
+		}
+		values.Set(attr(x, "name"), value)
+	}
+	for c := x.FirstChild; c != nil; c = c.NextSibling {
+		formValues(c, values)
+	}
 }
 
 func (l *LoversLab) add(a siteAction, name string) SiteFile {
