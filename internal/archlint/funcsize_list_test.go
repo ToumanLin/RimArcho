@@ -6,7 +6,6 @@ package archlint
 // line: written before the rule; to be split. Never add a line. A plain table, not a Go
 // map, so that deleting a line never realigns the others.
 const oversizedTable = `
-internal/accounts/browser_windows.go (*Session).login 75 338
 internal/analyze/analyze.go Run 41 229
 internal/analyze/harmony.go harmonyFindings 35 153
 internal/analyze/sim.go (*sim).worker 76 223
