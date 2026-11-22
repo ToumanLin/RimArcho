@@ -20,6 +20,7 @@ var frontendNodeSuites = []string{
 	"testdata/envnotice.mjs",
 	"testdata/envswitch.mjs",
 	"testdata/exchange.mjs",
+	"testdata/feedback.mjs",
 	"testdata/guide.mjs",
 	"testdata/hints.mjs",
 	"testdata/home-memory.mjs",

@@ -319,6 +319,8 @@ export const archoFigure = (slot, expr) => show(slot, { expr, rotate: false, res
 // the slot is hidden (visibility) until it fits again.
 const CYCLE = 45000, PEEK_RIGHT = 24, PEEK_OVER = 12;
 export const ARCHO_CYCLE = true; // idle cycling in calm states (16 §7.1)
+// ARCHO_PAGE: her size on the pages that place her (Can it run, Import, Feedback, Tasks; 16 §7.1)
+export const ARCHO_PAGE = 176;
 const spots = new Map();
 
 export function archoSpot(name, { size = 140, calm = ["neutral"], cycle = ARCHO_CYCLE } = {}) {

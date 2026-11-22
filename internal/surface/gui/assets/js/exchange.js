@@ -8,7 +8,7 @@ import * as pop from "./popups.js";
 import { getChoices } from "./credit.js";
 import { still } from "./motion.js";
 import { splitBar } from "./membar.js";
-import { archoSpot } from "./archo.js";
+import { archoSpot, ARCHO_PAGE } from "./archo.js";
 import { wireSeparator } from "./separator.js";
 import { orderDiff, orderView, legend } from "./listdiff.js";
 import { on } from "./api.js";
@@ -73,11 +73,14 @@ export async function exchange(first = false) {
   side.append(card);
   // the right: the comparison (or the tree, a task, a refusal) and, before any, the drop pane
   const main = el("div", "xc-main");
-  const result = el("section", "card settings xc-preview xc-res"); result.hidden = true;
-  // over a result: its counts and buttons at the left, Archo at the right (the user's pick, 2026-11-20)
-  main.append(dock());
+  // a result is one card: its head (the bar: its counts and buttons at the left, Archo at the
+  // right; the user's pick, 2026-11-20) over what it shows. The head is inside the card, so the
+  // two columns' cards start on one line (16 §7.3 item 12).
+  const rcard = el("section", "card xc-rcard");
+  const result = el("div", "settings xc-preview xc-res"); result.hidden = true;
+  rcard.append(dock(), result);
   // no label above the right card: it is as tall as the left one and says what it is itself
-  main.append(result, emptyState());
+  main.append(rcard, emptyState());
   // the gap between the two cards is the card gap, and drags (16 §7.3 "Card spacing")
   const gap = el("div", "split xc-split");
   grid.append(side, gap, main);
@@ -90,7 +93,7 @@ export async function exchange(first = false) {
   });
   w.append(grid);
   sc.append(w);
-  area(card, null); area(result, null);
+  area(card, null); area(rcard, null);
   M = freshM();
   drawDo();
   placeArcho();
@@ -100,7 +103,7 @@ export async function exchange(first = false) {
 
 const live = (active) => session === active && S.screen === "plan-import";
 
-// dock: the bar over a result: its head and buttons at the left, Archo at the right
+// dock: the head of the result's card: the result's head and buttons at the left, Archo at the right
 function dock() {
   const d = el("div", "xc-bar");
   d.append(el("div", "fig"), el("div", "rh"), el("div", "rf"));
@@ -111,7 +114,7 @@ function dock() {
 // a file can be dropped; with a result she stands at the right over it. She thinks while
 // something is read or moved in, is pleased with a comparison, a thumbs-up when it is in, a
 // shake at an error or a refusal.
-const spot = () => archoSpot("import", { size: 176, calm: ["neutral", "ponder", "think", "smirk", "yum"] });
+const spot = () => archoSpot("import", { size: ARCHO_PAGE, calm: ["neutral", "ponder", "think", "smirk", "yum"] });
 // nothing read or running is the calm state: her idle faces follow only there
 const face = (e) => spot().set(e, e === "neutral");
 function placeArcho(expr = "neutral") {
