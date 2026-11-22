@@ -135,6 +135,7 @@ func (q Query) Filter(items []Item, f MatchFacts) []int {
 	return out
 }
 
+// termMatch reports whether the item matches one term of a query.
 func termMatch(t term, it *Item, f MatchFacts) bool {
 	v := t.value
 	switch t.field {
@@ -162,67 +163,82 @@ func termMatch(t term, it *Item, f MatchFacts) bool {
 	case "id":
 		return v != "" && (strings.Contains(it.Package, v) || it.Workshop == v || strings.EqualFold(it.Ref, v) || strings.EqualFold(strings.TrimPrefix(it.Ref, "#"), v))
 	case "source":
-		switch v {
-		case "steamworkshop":
-			v = "workshop"
-		case "localmods":
-			v = "local"
-		case "archolocked", "copy":
-			v = "locked"
-		case "extra":
-			v = "other"
-		}
-		if len(it.Sources) > 0 {
-			return slices.ContainsFunc(it.Sources, func(s string) bool { return app.LocalMatches(v, s) })
-		}
-		return it.Kind == v || v == "steamcmd" && it.SteamCMD
+		return sourceMatch(v, it)
 	case "content":
 		return termMatch(term{field: "type", value: v}, it, f)
 	case "type":
-		switch v { // the long forms are the names in the request (xml-only, language-pack)
-		case "xml-only":
-			v = "xml"
-		case "language-pack", "lang":
-			v = "language"
-		}
-		switch v {
-		case "official", "workshop", "local", "copy", "git":
-			return it.Kind == v
-		case "steamcmd":
-			return it.SteamCMD
-		case "assembly", "xml", "language":
-			c, ok := f.Content[it.ID]
-			if !ok {
-				return false
-			}
-			switch v {
-			case "assembly":
-				return c&store.HasDLL != 0
-			case "xml":
-				return c&store.HasDLL == 0
-			default:
-				return c&store.HasDLL == 0 && c&store.HasDefsPatch == 0 && c&store.HasLanguages != 0
-			}
-		}
-		return false
+		return typeMatch(v, it, f)
 	case "added":
 		return slices.Contains(it.added, v)
 	case "has":
-		switch v {
-		case "problem", "problems":
-			s := RowStatus(it, f.Status)
-			return s != StatusNone && s != StatusUnloadable && s != StatusHint && s != StatusVersion
-		case "error", "errors":
-			s := RowStatus(it, f.Status)
-			return s == StatusErr || s == StatusLog
-		case "tag", "tags":
-			return len(it.Tags) > 0
-		case "note":
-			return it.Note != ""
-		case "alias":
-			return it.Alias
+		return hasMatch(v, it, f)
+	}
+	return false
+}
+
+// sourceMatch is the term source:v, the request's long names read as the short ones.
+func sourceMatch(v string, it *Item) bool {
+	switch v {
+	case "steamworkshop":
+		v = "workshop"
+	case "localmods":
+		v = "local"
+	case "archolocked", "copy":
+		v = "locked"
+	case "extra":
+		v = "other"
+	}
+	if len(it.Sources) > 0 {
+		return slices.ContainsFunc(it.Sources, func(s string) bool { return app.LocalMatches(v, s) })
+	}
+	return it.Kind == v || v == "steamcmd" && it.SteamCMD
+}
+
+// typeMatch is the term type:v (or content:v): a kind of copy or what the mod contains.
+func typeMatch(v string, it *Item, f MatchFacts) bool {
+	switch v { // the long forms are the names in the request (xml-only, language-pack)
+	case "xml-only":
+		v = "xml"
+	case "language-pack", "lang":
+		v = "language"
+	}
+	switch v {
+	case "official", "workshop", "local", "copy", "git":
+		return it.Kind == v
+	case "steamcmd":
+		return it.SteamCMD
+	case "assembly", "xml", "language":
+		c, ok := f.Content[it.ID]
+		if !ok {
+			return false
 		}
-		return false
+		switch v {
+		case "assembly":
+			return c&store.HasDLL != 0
+		case "xml":
+			return c&store.HasDLL == 0
+		default:
+			return c&store.HasDLL == 0 && c&store.HasDefsPatch == 0 && c&store.HasLanguages != 0
+		}
+	}
+	return false
+}
+
+// hasMatch is the term has:v: a problem, an error, tags, a note or an alias.
+func hasMatch(v string, it *Item, f MatchFacts) bool {
+	switch v {
+	case "problem", "problems":
+		s := RowStatus(it, f.Status)
+		return s != StatusNone && s != StatusUnloadable && s != StatusHint && s != StatusVersion
+	case "error", "errors":
+		s := RowStatus(it, f.Status)
+		return s == StatusErr || s == StatusLog
+	case "tag", "tags":
+		return len(it.Tags) > 0
+	case "note":
+		return it.Note != ""
+	case "alias":
+		return it.Alias
 	}
 	return false
 }
