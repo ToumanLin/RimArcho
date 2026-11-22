@@ -93,7 +93,4 @@ internal/surface/tui/update.go (*model).key 74 137
 internal/surface/tui/update.go (*model).listKey 65 164
 internal/surface/tui/update.go (*model).mouse 68 115
 internal/surface/tui/view.go (*model).hintLine 50 119
-internal/view/bar.go FilterBoard 42 115
-internal/view/filesearch_stream.go (*FileSearchRun).search 52 169
-internal/view/subscriptions.go BuildSubscriptionsFromLibrary 48 128
 `
