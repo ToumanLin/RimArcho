@@ -48,6 +48,11 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 		b, err := json.MarshalIndent(&out, "", "  ")
 		return &render.Doc{Raw: string(b) + "\n"}, err
 	}
+	return testRunDoc(r), nil
+}
+
+// testRunDoc is the text report of a test run.
+func testRunDoc(r *app.TestRunReport) *render.Doc {
 	d, root := render.New("test run: " + r.Plan + "  env:" + r.Env)
 	testRunSummary(root, r)
 	if p := r.Probe; p != nil {
@@ -64,7 +69,7 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 	testRunCompared(root, r)
 	root.KV("attribution", r.Attribution)
 	root.KV("run dir", r.RunDir)
-	return d, nil
+	return d
 }
 
 // testRunOptions reads and checks the flags of test run.
