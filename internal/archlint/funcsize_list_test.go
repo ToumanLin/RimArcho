@@ -95,11 +95,8 @@ internal/surface/tui/update.go (*model).mouse 68 115
 internal/surface/tui/view.go (*model).hintLine 50 119
 internal/view/bar.go FilterBoard 42 115
 internal/view/filesearch_stream.go (*FileSearchRun).search 52 169
-internal/view/keys.go KeyHelp 43 267
-internal/view/ops.go CopyOps 92 125
 internal/view/problemview.go buildProblemPanel 50 152
 internal/view/query.go termMatch 48 91
 internal/view/saves.go SaveDetailAgainst 43 116
 internal/view/subscriptions.go BuildSubscriptionsFromLibrary 48 128
-internal/view/tasks.go taskRow 73 166
 `
