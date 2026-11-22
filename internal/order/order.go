@@ -110,6 +110,9 @@ type Input struct {
 	// Replacements: for a required package no node has, the packageIds of nodes that replace
 	// it (Use This Instead, 08 §1.1). The dependency then orders after those.
 	Replacements map[string][]string
+	// Observed: the log corpus's measured constraints for this game version (05 §4.6), from
+	// the caller's corpus choice; nil uses the embedded 1.6 file.
+	Observed ObservedSet
 }
 
 // Constraint kinds.

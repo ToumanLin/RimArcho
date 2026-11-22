@@ -67,47 +67,57 @@ func emptyPatterns() *patterns.Data {
 	return d
 }
 
+// There is no process-wide "data in use": each App reads its own environment's choice
+// (app.Index), since two Apps of different game versions can share a process (parallel tests,
+// MCP switching Game Config per call). Only the parsing is shared: one Active per section.
 var (
-	mu      sync.Mutex
-	current *Active
+	mu     sync.Mutex
+	parsed = map[string]*Active{}
 )
 
-// Use makes ch the data in use (patterns.Load, known.Get, the order strength rules). The same
-// section stays parsed; another one is parsed on its first use.
-func Use(ch Choice) *Active {
+// Activate is ch's data, parsed on first use and shared by every App that chooses the same
+// section. It never changes what another App reads.
+func Activate(ch Choice) *Active {
+	k := ch.Game + "|" + ch.Data + "|" + ch.Origin + "|" + ch.Label
 	mu.Lock()
 	defer mu.Unlock()
-	if current != nil && sameChoice(current.Choice, ch) {
-		current.Choice = ch
-		return current
+	if a := parsed[k]; a != nil && a.Choice.Section == ch.Section {
+		return a
 	}
 	a := &Active{Choice: ch}
-	current = a
-	patterns.SetProvider(func() *patterns.Data { a.load(); return a.patterns })
-	known.SetProvider(func() *known.Data { a.load(); return a.known })
-	order.SetObservedProvider(func() order.ObservedSet { a.load(); return a.observed })
+	parsed[k] = a
 	return a
 }
 
-func sameChoice(a, b Choice) bool {
-	return a.Game == b.Game && a.Data == b.Data && a.Origin == b.Origin && a.Label == b.Label && a.Section == b.Section
+// Patterns is the pattern library of the choice; nil Active is the embedded one.
+func (a *Active) Patterns() *patterns.Data {
+	if a == nil {
+		return patterns.Embedded()
+	}
+	a.load()
+	return a.patterns
 }
 
-// Current is the data in use, nil before the first Use.
-func Current() *Active {
-	mu.Lock()
-	defer mu.Unlock()
-	return current
+// Known is the undeclared prerequisites and known-bad combinations of the choice; nil Active
+// is the embedded file. A test's dataset (known.SetForTesting) wins.
+func (a *Active) Known() *known.Data {
+	if o := known.Override(); o != nil {
+		return o
+	}
+	if a == nil {
+		return known.Get()
+	}
+	a.load()
+	return a.known
 }
 
-// Reset removes the data in use (tests): the packages fall back to their embedded files.
-func Reset() {
-	mu.Lock()
-	defer mu.Unlock()
-	current = nil
-	patterns.SetProvider(nil)
-	known.SetProvider(nil)
-	order.SetObservedProvider(nil)
+// Observed is the measured load-order constraints of the choice; nil Active is the embedded file.
+func (a *Active) Observed() order.ObservedSet {
+	if a == nil {
+		return order.EmbeddedObserved()
+	}
+	a.load()
+	return a.observed
 }
 
 // Summary is the corpus source as interfaces show it (16 §2.4 Can it run, `archo status`,

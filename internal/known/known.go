@@ -14,7 +14,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"sync/atomic"
 )
 
 // Prereq: when Mod is enabled and Needs is not, an error names Needs as the provider of
@@ -149,33 +148,21 @@ var embedded = sync.OnceValue(func() *Data {
 
 var override *Data
 
-var provider atomic.Pointer[func() *Data]
-
-// SetProvider makes Get return what f returns (internal/corpus picks the dataset of the
-// current game version); f returning nil falls back to the embedded dataset. nil removes it.
-func SetProvider(f func() *Data) {
-	if f == nil {
-		provider.Store(nil)
-		return
-	}
-	provider.Store(&f)
-}
 
 // EmbeddedJSON is the embedded dataset file (the 1.6 section of the embedded bundle).
 func EmbeddedJSON() []byte { return knownJSON }
 
-// Get returns the dataset in use.
+// Get returns the embedded dataset, or a test's (SetForTesting). Code with an App reads its
+// environment's choice instead (app.Index.Known, 05 §4.6).
 func Get() *Data {
 	if override != nil {
 		return override
 	}
-	if p := provider.Load(); p != nil {
-		if d := (*p)(); d != nil {
-			return d
-		}
-	}
 	return embedded()
 }
+
+// Override is the test's dataset (SetForTesting), nil otherwise; it wins over any choice.
+func Override() *Data { return override }
 
 // SetForTesting replaces the dataset until the returned function is called.
 func SetForTesting(d *Data) (restore func()) {

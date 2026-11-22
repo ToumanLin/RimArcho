@@ -7,6 +7,9 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/corpus"
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/known"
+	"github.com/ToumanLin/RimArcho/internal/order"
+	"github.com/ToumanLin/RimArcho/internal/patterns"
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
@@ -53,9 +56,21 @@ func (a *App) workshopMonitorPaths(e *env.Environment) []string {
 	return out
 }
 
-// CorpusFor chooses the corpus data of an environment's game version and makes it the data in
-// use. Without an environment it uses 1.6.
+// CorpusFor chooses the corpus data of an environment's game version. Without an environment
+// it uses 1.6. Nothing process-wide changes: the data reaches findings, patterns and sorting
+// through the Index of that environment (CorpusData).
 func (a *App) CorpusFor(e *env.Environment) corpus.Choice {
+	ch, _ := a.corpusFor(e)
+	return ch
+}
+
+// CorpusData is the parsed corpus data of an environment's choice (05 §4.6).
+func (a *App) CorpusData(e *env.Environment) *corpus.Active {
+	_, d := a.corpusFor(e)
+	return d
+}
+
+func (a *App) corpusFor(e *env.Environment) (corpus.Choice, *corpus.Active) {
 	game := "1.6"
 	if e != nil {
 		if mm := env.MajorMinor(e.GameVersion); mm != "" {
@@ -66,13 +81,14 @@ func (a *App) CorpusFor(e *env.Environment) corpus.Choice {
 	if e != nil {
 		key += "|" + e.ID
 	}
+	a.corpusMu.Lock()
+	defer a.corpusMu.Unlock()
 	if a.corpusKey == key && a.corpusSet {
-		return a.corpusChoice
+		return a.corpusChoice, a.corpusData
 	}
 	ch := corpus.Choose(a.CorpusCandidates(e), game)
-	corpus.Use(ch)
-	a.corpusKey, a.corpusChoice, a.corpusSet = key, ch, true
-	return ch
+	a.corpusKey, a.corpusChoice, a.corpusData, a.corpusSet = key, ch, corpus.Activate(ch), true
+	return ch, a.corpusData
 }
 
 // Corpus is the corpus data of the current environment.
@@ -82,14 +98,43 @@ func (a *App) Corpus() corpus.Choice {
 }
 
 // forgetCorpus makes the next Env choose again (a Monitor folder changed).
-func (a *App) forgetCorpus() { a.corpusSet = false }
+func (a *App) forgetCorpus() {
+	a.corpusMu.Lock()
+	a.corpusSet = false
+	a.corpusMu.Unlock()
+}
 
 // corpusStamp is part of cache keys of results that use corpus data.
 func (a *App) corpusStamp() string {
+	a.corpusMu.Lock()
+	defer a.corpusMu.Unlock()
 	if !a.corpusSet {
 		return ""
 	}
 	return a.corpusChoice.Game + ":" + a.corpusChoice.Data + ":" + a.corpusChoice.Origin + ":" + a.corpusChoice.Label
+}
+
+// Patterns is the pattern library of the current environment (`archo pattern`).
+func (a *App) Patterns() *patterns.Data {
+	e, _ := a.Env()
+	return a.CorpusData(e).Patterns()
+}
+
+// Patterns is the pattern library of the environment the Index belongs to (05 §4.6); an
+// Index built without an App (tests) reads the embedded one.
+func (ix *Index) Patterns() *patterns.Data { return ix.corpusData().Patterns() }
+
+// Known is the undeclared prerequisites and known-bad combinations of the Index's environment.
+func (ix *Index) Known() *known.Data { return ix.corpusData().Known() }
+
+// Observed is the measured load-order constraints of the Index's environment.
+func (ix *Index) Observed() order.ObservedSet { return ix.corpusData().Observed() }
+
+func (ix *Index) corpusData() *corpus.Active {
+	if ix == nil || ix.corpus == nil {
+		return nil
+	}
+	return ix.corpus()
 }
 
 // readCorpusData reads a Monitor folder's bundle week; "" when it has none or cannot be read.

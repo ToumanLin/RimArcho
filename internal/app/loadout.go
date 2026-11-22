@@ -870,7 +870,7 @@ func (a *App) Community() order.Community {
 
 // SortInput builds the constraint input for a list.
 func (a *App) SortInput(st *LoadoutState, l loadout.List) (order.Input, error) {
-	in := order.Input{GameMM: st.GameMM(), Community: a.Community()}
+	in := order.Input{GameMM: st.GameMM(), Community: a.Community(), Observed: st.Ix.Observed()}
 	var enabled []*store.Mod
 	for _, e := range l {
 		if m := st.Ix.ByID[e.Instance]; m != nil {

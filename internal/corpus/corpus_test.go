@@ -62,22 +62,29 @@ func TestChoosePerGameVersion(t *testing.T) {
 	}
 }
 
-// The chosen section is what patterns.Load and known.Get return; a game version without a
-// section gets empty data, never another version's.
-func TestUseInstallsSection(t *testing.T) {
-	defer corpus.Reset()
+// An activated choice carries its own section's data; a game version without a section gets
+// empty data, never another version's, and activating one choice never changes another's
+// (two environments of different versions in one process, 05 §4.6).
+func TestActivateSection(t *testing.T) {
+	t.Parallel()
 	cs := []corpus.Candidate{corpus.EmbeddedCandidate(), cand(t, corpus.Monitor, "m", bundle(t, 1, "2026-W47", map[string]string{"1.6": "2026-W47"}))}
-	corpus.Use(corpus.Choose(cs, "1.6"))
-	if d := patterns.Load(); d.Get("g:t.2026-W47") == nil || known.Get().Cutoff != "2026-W47" {
-		t.Fatalf("1.6 section not in use: %d rules, cutoff %q", len(d.Rules), known.Get().Cutoff)
+	a16 := corpus.Activate(corpus.Choose(cs, "1.6"))
+	a17 := corpus.Activate(corpus.Choose(cs, "1.7"))
+	if d := a16.Patterns(); d.Get("g:t.2026-W47") == nil || a16.Known().Cutoff != "2026-W47" {
+		t.Fatalf("1.6 section not carried: %d rules, cutoff %q", len(d.Rules), a16.Known().Cutoff)
 	}
-	corpus.Use(corpus.Choose(cs, "1.7"))
-	if d := patterns.Load(); len(d.Rules) != 0 || len(d.Mod) != 0 || len(known.Get().Prereqs) != 0 {
+	if d := a17.Patterns(); len(d.Rules) != 0 || len(d.Mod) != 0 || len(a17.Known().Prereqs) != 0 {
 		t.Fatalf("1.7 borrowed 1.6 data: %d rules", len(d.Rules))
 	}
-	corpus.Reset()
-	if patterns.Load() != patterns.Embedded() {
-		t.Fatal("Reset should restore the embedded library")
+	if a16.Patterns().Get("g:t.2026-W47") == nil {
+		t.Fatal("activating 1.7 changed the 1.6 data")
+	}
+	if corpus.Activate(corpus.Choose(cs, "1.6")) != a16 {
+		t.Fatal("the same choice should reuse its parsed data")
+	}
+	var none *corpus.Active
+	if none.Patterns() != patterns.Embedded() || none.Known() != known.Get() {
+		t.Fatal("no data should read the embedded files")
 	}
 }
 

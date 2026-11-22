@@ -14,7 +14,6 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/corpus"
 	"github.com/ToumanLin/RimArcho/internal/deps"
-	"github.com/ToumanLin/RimArcho/internal/patterns"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"github.com/ToumanLin/RimArcho/internal/updatechannel"
 )
@@ -37,7 +36,6 @@ func writeCorpus(t *testing.T, e *testkit.Env, modDir, week string) {
 // Monitor version refreshes its folder in place instead of being "same version, different
 // content".
 func TestMonitorCorpusData(t *testing.T) {
-	defer corpus.Reset()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	if ch := e.App.Corpus(); ch.Origin != corpus.Embedded || ch.Data != corpus.EmbeddedData {
@@ -55,8 +53,8 @@ func TestMonitorCorpusData(t *testing.T) {
 	if ch.Origin != corpus.Monitor || ch.Data != "2026-W47" || ch.Label != "ArchoMonitor-0.12.0" {
 		t.Fatalf("B not chosen: %+v", ch.Summarize())
 	}
-	if patterns.Load().Get("g:week.2026-W47") == nil {
-		t.Fatal("patterns.Load does not use the chosen section")
+	if e.App.Patterns().Get("g:week.2026-W47") == nil {
+		t.Fatal("the environment does not use the chosen section")
 	}
 	// A data-only update: same modVersion and DLL, newer bundle.
 	writeCorpus(t, e, bundled, "2026-W48")
@@ -91,7 +89,6 @@ func TestMonitorCorpusData(t *testing.T) {
 // with +login anonymous into a scratch folder and installs it as a Monitor folder; it never
 // runs with automatic checks off, and not again until the item changes.
 func TestMonitorAnonymousFetch(t *testing.T) {
-	defer corpus.Reset()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	t.Setenv(updatechannel.MonitorItemEnv, "12345")
@@ -147,5 +144,50 @@ func TestMonitorAnonymousFetch(t *testing.T) {
 	scanNow(t, e)
 	if f, _ := e.App.FetchMonitorAnonymous(context.Background()); !strings.Contains(f.Skipped, "Workshop") || len(runs) != 1 {
 		t.Fatalf("with a Workshop Monitor: %+v", f)
+	}
+}
+
+// 05 §4.6: corpus data belongs to an environment, not the process. Two Apps of different game
+// versions working at once each read their own version's patterns and prerequisites.
+func TestCorpusPerEnvironment(t *testing.T) {
+	t.Parallel()
+	home := func(ver string) *testkit.Env {
+		e := testkit.New(t)
+		e.WriteFile(filepath.Join(e.Game, "Version.txt"), ver)
+		e.WriteModsConfig(ver, "ludeon.rimworld")
+		e.AddEnv(false)
+		e.MustRun("scan")
+		return e
+	}
+	e16, e17 := home("1.6.4633 rev1261"), home("1.7.5000 rev1")
+	want := func(e *testkit.Env) *corpus.Active {
+		env, _ := e.App.Env()
+		return e.App.CorpusData(env)
+	}
+	w16, w17 := want(e16), want(e17)
+	if e16.App.Corpus().Game != "1.6" || e17.App.Corpus().Game != "1.7" {
+		t.Fatalf("choices: %+v / %+v", e16.App.Corpus().Summarize(), e17.App.Corpus().Summarize())
+	}
+	errs := make(chan string, 2)
+	check := func(e *testkit.Env, w *corpus.Active) {
+		for range 30 {
+			ix, err := e.App.Index()
+			if err != nil {
+				errs <- err.Error()
+				return
+			}
+			if ix.Patterns() != w.Patterns() || ix.Known() != w.Known() {
+				errs <- "an environment read another's corpus data"
+				return
+			}
+		}
+		errs <- ""
+	}
+	go check(e16, w16)
+	go check(e17, w17)
+	for range 2 {
+		if m := <-errs; m != "" {
+			t.Fatal(m)
+		}
 	}
 }

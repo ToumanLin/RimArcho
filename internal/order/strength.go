@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"sync/atomic"
 )
 
 // Strength says how much breaking a constraint matters (08 §1.3). It comes from the log
@@ -98,23 +97,14 @@ var embeddedObserved = sync.OnceValue(func() ObservedSet {
 	return out
 })
 
-var observedProvider atomic.Pointer[func() ObservedSet]
+// EmbeddedObserved is the embedded 1.6 file, parsed once.
+func EmbeddedObserved() ObservedSet { return embeddedObserved() }
 
-// SetObservedProvider makes the strength rules use what f returns (internal/corpus: the
-// section of the current game version); f returning nil falls back to the embedded file.
-func SetObservedProvider(f func() ObservedSet) {
-	if f == nil {
-		observedProvider.Store(nil)
-		return
-	}
-	observedProvider.Store(&f)
-}
-
-func observed() ObservedSet {
-	if p := observedProvider.Load(); p != nil {
-		if o := (*p)(); o != nil {
-			return o
-		}
+// observed is in's corpus set (its caller's game version, 05 §4.6), else the embedded file.
+// Never process-wide: two Apps of different game versions share a process (tests, MCP).
+func (in Input) observed() ObservedSet {
+	if in.Observed != nil {
+		return in.Observed
 	}
 	return embeddedObserved()
 }
@@ -123,14 +113,14 @@ func obsKey(kind, from, to string) string {
 	return kind + " " + strings.ToLower(from) + " " + strings.ToLower(to)
 }
 
-// LookupObserved returns the corpus record of a constraint and whether it was harmful
+// LookupObserved returns the corpus record of a constraint in set and whether it was harmful
 // (nil when the corpus has none).
-func LookupObserved(kind, from, to string) (o *Observed, harmful bool) {
+func LookupObserved(set ObservedSet, kind, from, to string) (o *Observed, harmful bool) {
 	k := obsKey(kind, from, to)
-	if o := observed()["harmful"][k]; o != nil {
+	if o := set["harmful"][k]; o != nil {
 		return o, true
 	}
-	return observed()["harmless"][k], false
+	return set["harmless"][k], false
 }
 
 func (o *Observed) text() string {
@@ -154,7 +144,7 @@ func Assess(in Input, e Edge) Assessment {
 	case KindOfficial:
 		return Assessment{Strong, ""}
 	}
-	if o, harmful := LookupObserved(e.C.Kind, from, to); o != nil {
+	if o, harmful := LookupObserved(in.observed(), e.C.Kind, from, to); o != nil {
 		if harmful {
 			return Assessment{Strong, o.text()}
 		}

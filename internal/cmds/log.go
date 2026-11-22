@@ -258,7 +258,7 @@ func clusterLine(ix *app.Index, lc *app.LogCluster) string {
 			who += fmt.Sprintf(", +%d", len(lc.Attr)-1)
 		}
 		who += ")"
-	} else if commonUnattributed(lc) != "" {
+	} else if commonUnattributed(ix, lc) != "" {
 		who = "  (" + patterns.CommonLabel + ")"
 	}
 	if lc.Consequences > 0 {
@@ -348,7 +348,7 @@ func clusterDoc(c *Ctx, ix *app.Index, r *app.LogReport, lc *app.LogCluster) *re
 		conf += " (" + lc.Why + ")"
 	}
 	root.KV("confidence", conf)
-	if note := commonUnattributed(lc); note != "" {
+	if note := commonUnattributed(ix, lc); note != "" {
 		root.KV("note", note)
 	}
 	if fx := twoSourcesFix(ix, lc); fx != "" {

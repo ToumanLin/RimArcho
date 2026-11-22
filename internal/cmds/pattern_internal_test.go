@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
-	"github.com/ToumanLin/RimArcho/internal/corpus"
 	"github.com/ToumanLin/RimArcho/internal/logs"
 	"github.com/ToumanLin/RimArcho/internal/patterns"
 	"github.com/ToumanLin/RimArcho/internal/render"
@@ -15,9 +14,7 @@ import (
 // A mod-specific pattern is shown only when the cluster's own attribution names that mod as
 // source; the generic kind is shown either way (01-pattern-library-integration-draft.md §3).
 func TestClusterPatterns(t *testing.T) {
-	// Not parallel: the corpus in use is process-wide (19 §6), and a parallel test that opens a
-	// 1.7 home swaps it for one without these fixture patterns.
-	corpus.Reset()
+	t.Parallel()
 	p := patterns.Load().Get("m:krkr.rocketman:e84d5a3b")
 	if p == nil {
 		t.Fatal("fixture pattern missing")

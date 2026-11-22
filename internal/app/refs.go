@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/corpus"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/ids"
@@ -26,6 +27,7 @@ type Index struct {
 	Sources   []*source.Source
 	inst, lin *ids.Shortener
 	own       map[string]*store.Mod // packageId → this game's own Mods/ copy (OwnCopy)
+	corpus    func() *corpus.Active // this environment's corpus data (Patterns, Known, Observed)
 }
 
 // OwnCopy is this game's own Mods/ copy of a packageId (not a RimArcho link), or nil. A list
@@ -112,7 +114,8 @@ func (a *App) readIndex(e *env.Environment, repair bool) (*Index, error) {
 	if mods, srcs, err = a.withElsewhere(e, mods, srcs); err != nil {
 		return nil, err
 	}
-	ix := &Index{store: a.Store, Env: e, Mods: mods, ByID: map[string]*store.Mod{}, ByLineage: map[string][]*store.Mod{}, Lineages: lins, Sources: srcs}
+	ix := &Index{store: a.Store, Env: e, Mods: mods, ByID: map[string]*store.Mod{}, ByLineage: map[string][]*store.Mod{}, Lineages: lins, Sources: srcs,
+		corpus: func() *corpus.Active { return a.CorpusData(e) }}
 	var iids, lids []string
 	ix.own = map[string]*store.Mod{}
 	for _, m := range mods {

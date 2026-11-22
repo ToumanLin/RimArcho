@@ -19,7 +19,6 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/logs"
-	"github.com/ToumanLin/RimArcho/internal/patterns"
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
@@ -536,7 +535,7 @@ func (a *App) testRunLog(st *LoadoutState, r *TestRunReport) error {
 		}
 		note := ""
 		if !settings {
-			note = patterns.Load().CommonUnattributed(class, lc.Template, len(lc.Attr) > 0)
+			note = st.Ix.Patterns().CommonUnattributed(class, lc.Template, len(lc.Attr) > 0)
 		}
 		if slices.Contains(lc.Details, ownArtNote) {
 			note = ownArtNote

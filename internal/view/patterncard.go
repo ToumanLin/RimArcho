@@ -73,7 +73,7 @@ func patternCard(st *app.LoadoutState, lc *app.LogCluster) *PatternCard {
 			src = append(src, strings.TrimSuffix(strings.ToLower(m.PackageID), "_steam"))
 		}
 	}
-	d := patterns.Load()
+	d := st.Ix.Patterns()
 	m := d.MatchCluster(lc.Class, lc.Template, src)
 	if m.Generic == nil && m.Mod == nil {
 		return nil

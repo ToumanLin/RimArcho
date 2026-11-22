@@ -31,10 +31,19 @@ import (
 // construction, come with their error in at least 25–30% of the matching logs.
 
 // knownFindings adds the corpus findings for the enabled mods.
-func (a *App) knownFindings(active []*store.Mod, activeByPkg, installed map[string][]*store.Mod, add func(*finding.Finding)) {
-	data := known.Get()
+func (a *App) knownFindings(data *known.Data, active []*store.Mod, activeByPkg, installed map[string][]*store.Mod, add func(*finding.Finding)) {
 	if len(data.Prereqs) == 0 && len(data.Combos) == 0 {
 		return
+	}
+	// each corpus evidence says the month of the data it came from (corpusRef)
+	ref, add0 := corpusRef(data), add
+	add = func(f *finding.Finding) {
+		for i := range f.Evidence {
+			if f.Evidence[i].Ref == "log corpus" {
+				f.Evidence[i].Ref = ref
+			}
+		}
+		add0(f)
 	}
 	inst := finding.Inst
 	pkgOf := func(m *store.Mod) string { return strings.TrimSuffix(strings.ToLower(m.PackageID), "_steam") }
@@ -250,4 +259,14 @@ func short(s string) string {
 		return string(r[:160]) + "…"
 	}
 	return s
+}
+
+// corpusRef is the evidence Ref of a corpus finding: "log corpus", and the month its data
+// covers up to ("log corpus to 2026-10"), so the interfaces label the chip with the data the
+// finding came from rather than any process-wide choice (16 §2.4).
+func corpusRef(d *known.Data) string {
+	if d == nil || d.Cutoff == "" {
+		return "log corpus"
+	}
+	return "log corpus to " + d.Cutoff
 }

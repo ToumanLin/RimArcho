@@ -953,7 +953,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 		f := Need{rank: 8, Group: GroupList, Status: StatusWarn, Dim: true, Fold: true, code: "order.violated",
 			Text:     Tf("%d weaker order preferences are not met", len(weak)),
 			Why:      T("loadAfter and community rules: breaking them showed no more errors in shared logs; sorting puts them right"),
-			Evidence: evidence(EvCorpus, T("load-order constraint strength"))}
+			Evidence: cutoffChip(evidence(EvCorpus, T("load-order constraint strength")), st.Ix.Known().Cutoff)}
 		for _, w := range weak {
 			f.linkProblems = append(f.linkProblems, w.linkProblems...)
 			f.Mods = append(f.Mods, w.Mods...)

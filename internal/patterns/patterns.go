@@ -26,7 +26,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"sync/atomic"
 )
 
 // Pattern is one entry of the library.
@@ -107,28 +106,10 @@ var Embedded = sync.OnceValue(func() *Data {
 // EmbeddedJSON is the embedded library file.
 func EmbeddedJSON() []byte { return dataJSON }
 
-var provider atomic.Pointer[func() *Data]
-
-// SetProvider makes Load return what f returns (internal/corpus picks the library of the
-// current game version); f returning nil falls back to the embedded library. nil removes it.
-func SetProvider(f func() *Data) {
-	if f == nil {
-		provider.Store(nil)
-		return
-	}
-	provider.Store(&f)
-}
-
-// Load returns the library in use: the corpus section of the current game version, else the
-// embedded one.
-func Load() *Data {
-	if p := provider.Load(); p != nil {
-		if d := (*p)(); d != nil {
-			return d
-		}
-	}
-	return Embedded()
-}
+// Load returns the embedded library. Code with an App reads its environment's choice instead
+// (app.Index.Patterns, 05 §4.6): there is no process-wide "library in use", since two Apps of
+// different game versions can share a process (tests, MCP).
+func Load() *Data { return Embedded() }
 
 // Parse reads a library file and compiles its rules.
 func Parse(b []byte) (*Data, error) {

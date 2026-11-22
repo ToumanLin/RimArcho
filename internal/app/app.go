@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/corpus"
@@ -219,9 +220,12 @@ type App struct {
 	logCache          *logCacheEntry
 	subscriptionCache map[string]subscriptionCacheEntry
 
-	// Corpus data in use (corpus.go), chosen for the environment Env returned.
+	// Corpus data (corpus.go), chosen for the environment last asked about. This App's own:
+	// never process-wide, so Apps of different game versions in one process do not mix.
+	corpusMu     sync.Mutex
 	corpusKey    string
 	corpusChoice corpus.Choice
+	corpusData   *corpus.Active
 	corpusSet    bool
 }
 
