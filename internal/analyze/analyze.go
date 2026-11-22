@@ -406,6 +406,7 @@ func (r *run) patchFindings(sim *sim, tops []*topOp) {
 	}
 	out.Findings = append(out.Findings, defFindings(r.active, r.allDefs, r.isActive)...)
 	out.Findings = append(out.Findings, sim.parentFindings(r.origin, tops, r.isActive)...)
+	r.origin = nil // not needed by the Harmony layer; free it as the unsplit Run did
 	out.Findings = append(out.Findings, sim.findings(tops, out.Patches)...)
 }
 
