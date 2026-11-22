@@ -69,11 +69,6 @@ internal/scan/observe.go Collect 31 163
 internal/steamworks/publish_windows.go publishWorker 35 159
 internal/store/maintenance.go (*Store).Maintain 47 171
 internal/subscribe/loverslab.go (*LoversLab).parsePage 49 96
-internal/surface/tui/update.go (*model).handle 51 122
-internal/surface/tui/update.go (*model).key 74 137
-internal/surface/tui/update.go (*model).listKey 65 164
-internal/surface/tui/update.go (*model).mouse 68 115
-internal/surface/tui/view.go (*model).hintLine 50 119
 internal/view/bar.go FilterBoard 42 115
 internal/view/filesearch_stream.go (*FileSearchRun).search 52 169
 internal/view/keys.go KeyHelp 43 267
