@@ -188,55 +188,20 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	} else if a.Bool("include-muted") {
 		list = append(list, ps.Muted...)
 	}
-	var subj string
+	f := problemsFilter{code: a.Str("code"), sev: a.Str("severity"), minSev: a.Str("min-severity")}
 	if r := a.Str("subject"); r != "" {
 		m, err := ix.ResolveOne(r)
 		if err != nil {
 			return nil, err
 		}
-		subj = finding.Inst(m.ID)
+		f.subj = finding.Inst(m.ID)
 	}
-	code, sev, minSev := a.Str("code"), a.Str("severity"), a.Str("min-severity")
-	full := a.Bool("all") || a.Bool("include-muted") || code != "" || subj != "" || sev == finding.Info
-	var sel []*app.Problem
-	hidden := map[string]int{}
-	var versions, skips []*app.Problem
-	byLog := map[*app.LogRun][]*app.Problem{} // log problems are grouped under their log (06 §3)
-	for _, p := range list {
-		if subj != "" && !contains(p.Subjects, subj) {
-			continue
-		}
-		if code != "" && p.Code != code && !strings.HasPrefix(p.Code, code+".") {
-			continue
-		}
-		if sev != "" && p.Severity != sev {
-			continue
-		}
-		if minSev != "" && sevRank(p.Severity) > sevRank(minSev) {
-			continue
-		}
-		if !full && app.NoisyCodes[p.Code] {
-			hidden[p.Code]++
-			continue
-		}
-		if !full && p.Code == "version.unsupported" {
-			versions = append(versions, p) // folded into one row below
-			continue
-		}
-		if !full && p.Code == "harmony.skip-prefix" && p.Severity == finding.Info {
-			skips = append(skips, p) // folded too (05 §4.5)
-			continue
-		}
-		if p.Log != nil {
-			byLog[p.Log] = append(byLog[p.Log], p)
-			continue
-		}
-		sel = append(sel, p)
-	}
-	counted := append(append(append([]*app.Problem{}, sel...), versions...), skips...)
+	f.full = a.Bool("all") || a.Bool("include-muted") || f.code != "" || f.subj != "" || f.sev == finding.Info
+	pk := f.pick(list)
+	counted := append(append(append([]*app.Problem{}, pk.sel...), pk.versions...), pk.skips...)
 	for _, r := range ps.Logs {
 		if !r.Stale() {
-			counted = append(counted, byLog[r]...)
+			counted = append(counted, pk.byLog[r]...)
 		}
 	}
 	head := "problems: " + severityCounts(counted)
@@ -248,10 +213,10 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		root.KV("ignored-version-warnings", fmt.Sprintf("%d version warnings (archo problems --include-muted --code version.unsupported)", len(ps.Muted)))
 	}
 	root.KV("analysis", analysisText(c, ps.Analysis, ps.AnalysisErr))
-	shown := len(sel)
+	shown := len(pk.sel)
 	for _, r := range ps.Logs {
-		if !r.Stale() || full {
-			shown += len(byLog[r])
+		if !r.Stale() || f.full {
+			shown += len(pk.byLog[r])
 		}
 	}
 	detail := a.Bool("detail") || shown <= 3
@@ -263,53 +228,162 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		limit = 0
 	}
 	lst := root.Section("list")
-	if len(sel) == 0 && len(versions)+len(skips) == 0 {
+	if len(pk.sel) == 0 && len(pk.versions)+len(pk.skips) == 0 {
 		lst.Add("(none)")
 	}
+	folds := problemsFolds(a, ps, &pk, f)
+	problemsListRows(ix, lst, pk.sel, folds, detail)
+	lst.Truncate(limit, problemsExpandCmd(f.code, a.Str("subject"), f.sev))
+	if len(pk.hidden) > 0 {
+		var hs []string
+		for _, k := range []string{"def.override", "patch.contested"} {
+			if pk.hidden[k] > 0 {
+				hs = append(hs, fmt.Sprintf("%d %s", pk.hidden[k], k))
+			}
+		}
+		root.KV("hidden", strings.Join(hs, ", ")+" (archo problems --all)")
+	}
+	if !a.Bool("ignored") && len(ps.Ignored) > 0 {
+		root.KV("ignored", fmt.Sprintf("%d (archo problems --ignored)", len(ps.Ignored)))
+	}
+	logFirst := problemsLogs(c, a, root, ps, pk.byLog, f.full, detail, limit)
+	sel := pk.sel
+	if len(sel) == 0 && logFirst != nil {
+		sel = append(sel, logFirst)
+	}
+	if len(sel) > 0 {
+		if !detail {
+			d.AddNext("archo problems show " + sel[0].Ref)
+		} else if len(sel[0].Suggestions) > 0 {
+			d.AddNext(expand(ix, sel[0].Suggestions[0], ""))
+		}
+	}
+	return d, nil
+}
+
+// problemsFilter is the problems list's filters; full lifts the default folding and hiding.
+type problemsFilter struct {
+	subj, code, sev, minSev string
+	full                    bool
+}
+
+// problemsPicked is the filtered problems: the plain rows, the rows folded into one
+// version or skip-prefix row, the counts of hidden noisy codes, and the log rows by log.
+type problemsPicked struct {
+	sel, versions, skips []*app.Problem
+	hidden               map[string]int
+	byLog                map[*app.LogRun][]*app.Problem
+}
+
+// pick sorts list into the rows the filters keep.
+func (f problemsFilter) pick(list []*app.Problem) problemsPicked {
+	pk := problemsPicked{hidden: map[string]int{}, byLog: map[*app.LogRun][]*app.Problem{}} // log problems are grouped under their log (06 §3)
+	for _, p := range list {
+		if !f.keeps(p) {
+			continue
+		}
+		if !f.full && app.NoisyCodes[p.Code] {
+			pk.hidden[p.Code]++
+			continue
+		}
+		if !f.full && p.Code == "version.unsupported" {
+			pk.versions = append(pk.versions, p) // folded into one row below
+			continue
+		}
+		if !f.full && p.Code == "harmony.skip-prefix" && p.Severity == finding.Info {
+			pk.skips = append(pk.skips, p) // folded too (05 §4.5)
+			continue
+		}
+		if p.Log != nil {
+			pk.byLog[p.Log] = append(pk.byLog[p.Log], p)
+			continue
+		}
+		pk.sel = append(pk.sel, p)
+	}
+	return pk
+}
+
+// keeps reports whether p passes the subject, code and severity filters.
+func (f problemsFilter) keeps(p *app.Problem) bool {
+	if f.subj != "" && !contains(p.Subjects, f.subj) {
+		return false
+	}
+	if f.code != "" && p.Code != f.code && !strings.HasPrefix(p.Code, f.code+".") {
+		return false
+	}
+	if f.sev != "" && p.Severity != f.sev {
+		return false
+	}
+	if f.minSev != "" && sevRank(p.Severity) > sevRank(f.minSev) {
+		return false
+	}
+	return true
+}
+
+// problemFold is a folded row of the problems list, placed first in its severity.
+type problemFold struct {
+	rank int
+	line string
+}
+
+// problemsFolds builds the folded rows, sorted by severity. With --all and many info
+// rows it also folds those, one row per code, out of pk.sel.
+func problemsFolds(a *Args, ps *app.ProblemSet, pk *problemsPicked, f problemsFilter) []problemFold {
 	// Folded rows go first in their severity, so a truncated list still shows them.
-	type fold struct {
-		rank int
-		line string
+	var folds []problemFold
+	if len(pk.versions) > 0 {
+		line := versionSummary(pk.versions, ps.State.GameMM())
+		folds = append(folds, problemFold{sevRank(strings.Fields(line)[0]), line})
 	}
-	var folds []fold
-	if len(versions) > 0 {
-		line := versionSummary(versions, ps.State.GameMM())
-		folds = append(folds, fold{sevRank(strings.Fields(line)[0]), line})
-	}
-	if len(skips) > 0 {
-		folds = append(folds, fold{sevRank(skips[0].Severity), skipSummary(skips)})
+	if len(pk.skips) > 0 {
+		folds = append(folds, problemFold{sevRank(pk.skips[0].Severity), skipSummary(pk.skips)})
 	}
 	// --all with many info rows: one row per code (MCP review round 2 P12: 20–25 KB results
 	// of 137 info rows that no agent used). --code or --severity info lists them.
-	if a.Bool("all") && code == "" && sev == "" {
-		var info []*app.Problem
-		for _, p := range sel {
-			if p.Severity == finding.Info {
-				info = append(info, p)
-			}
-		}
-		if len(info) > infoFoldLimit {
-			byCode := map[string]int{}
-			var codes []string
-			keep := sel[:0:0]
-			for _, p := range sel {
-				if p.Severity != finding.Info {
-					keep = append(keep, p)
-					continue
-				}
-				if byCode[p.Code] == 0 {
-					codes = append(codes, p.Code)
-				}
-				byCode[p.Code]++
-			}
-			sel = keep
-			sort.Strings(codes)
-			for _, k := range codes {
-				folds = append(folds, fold{sevRank(finding.Info), fmt.Sprintf("info %s  %d problems  (archo problems --code %s --all; MCP: list_problems code=%s all=true)", k, byCode[k], k, k)})
-			}
-		}
+	if a.Bool("all") && f.code == "" && f.sev == "" {
+		folds = append(folds, foldInfoRows(pk)...)
 	}
 	sort.SliceStable(folds, func(i, j int) bool { return folds[i].rank < folds[j].rank })
+	return folds
+}
+
+// foldInfoRows takes the info rows out of pk.sel when there are more than infoFoldLimit,
+// and returns one folded row per code.
+func foldInfoRows(pk *problemsPicked) []problemFold {
+	var info []*app.Problem
+	for _, p := range pk.sel {
+		if p.Severity == finding.Info {
+			info = append(info, p)
+		}
+	}
+	if len(info) <= infoFoldLimit {
+		return nil
+	}
+	byCode := map[string]int{}
+	var codes []string
+	keep := pk.sel[:0:0]
+	for _, p := range pk.sel {
+		if p.Severity != finding.Info {
+			keep = append(keep, p)
+			continue
+		}
+		if byCode[p.Code] == 0 {
+			codes = append(codes, p.Code)
+		}
+		byCode[p.Code]++
+	}
+	pk.sel = keep
+	sort.Strings(codes)
+	var folds []problemFold
+	for _, k := range codes {
+		folds = append(folds, problemFold{sevRank(finding.Info), fmt.Sprintf("info %s  %d problems  (archo problems --code %s --all; MCP: list_problems code=%s all=true)", k, byCode[k], k, k)})
+	}
+	return folds
+}
+
+// problemsListRows adds the rows to lst, each fold before the first row of a lower
+// severity.
+func problemsListRows(ix *app.Index, lst *render.Node, sel []*app.Problem, folds []problemFold, detail bool) {
 	flush := func(rank int) {
 		for len(folds) > 0 && folds[0].rank <= rank {
 			lst.Add(folds[0].line)
@@ -324,63 +398,46 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	flush(99)
-	lst.Truncate(limit, problemsExpandCmd(code, a.Str("subject"), sev))
-	if len(hidden) > 0 {
-		var hs []string
-		for _, k := range []string{"def.override", "patch.contested"} {
-			if hidden[k] > 0 {
-				hs = append(hs, fmt.Sprintf("%d %s", hidden[k], k))
-			}
-		}
-		root.KV("hidden", strings.Join(hs, ", ")+" (archo problems --all)")
-	}
-	if !a.Bool("ignored") && len(ps.Ignored) > 0 {
-		root.KV("ignored", fmt.Sprintf("%d (archo problems --ignored)", len(ps.Ignored)))
-	}
-	// Logs: one row per log with its clusters under it. A current log lists them (the
-	// first few unless --all); a stale log is folded unless the filters ask for its rows.
+}
+
+// problemsLogs adds the logs section: one row per log with its clusters under it. A
+// current log lists them (the first few unless --all); a stale log is folded unless the
+// filters ask for its rows. It returns the first row of a current log.
+func problemsLogs(c *Ctx, a *Args, root *render.Node, ps *app.ProblemSet, byLog map[*app.LogRun][]*app.Problem, full, detail bool, limit int) *app.Problem {
+	ix := ps.State.Ix
 	var logFirst *app.Problem
-	if len(byLog) > 0 {
-		lg := root.Section("logs")
-		for _, r := range ps.Logs {
-			lp := byLog[r]
-			if len(lp) == 0 {
-				continue
-			}
-			folded := r.Stale() && !full
-			n := lg.Add(logRunLine(c, r, lp, folded))
-			if folded {
-				continue
-			}
-			if !r.Stale() && logFirst == nil {
-				logFirst = lp[0]
-			}
-			for _, p := range lp {
-				pn := n.Add(problemLine(ix, p))
-				if detail {
-					addProblemDetail(ix, pn, p)
-				}
-			}
-			lim := 5
-			if a.Bool("all") {
-				lim = 0
-			} else if full {
-				lim = limit
-			}
-			n.Truncate(lim, logExpandCmd(r))
+	if len(byLog) == 0 {
+		return nil
+	}
+	lg := root.Section("logs")
+	for _, r := range ps.Logs {
+		lp := byLog[r]
+		if len(lp) == 0 {
+			continue
 		}
-	}
-	if len(sel) == 0 && logFirst != nil {
-		sel = append(sel, logFirst)
-	}
-	if len(sel) > 0 {
-		if !detail {
-			d.AddNext("archo problems show " + sel[0].Ref)
-		} else if len(sel[0].Suggestions) > 0 {
-			d.AddNext(expand(ix, sel[0].Suggestions[0], ""))
+		folded := r.Stale() && !full
+		n := lg.Add(logRunLine(c, r, lp, folded))
+		if folded {
+			continue
 		}
+		if !r.Stale() && logFirst == nil {
+			logFirst = lp[0]
+		}
+		for _, p := range lp {
+			pn := n.Add(problemLine(ix, p))
+			if detail {
+				addProblemDetail(ix, pn, p)
+			}
+		}
+		lim := 5
+		if a.Bool("all") {
+			lim = 0
+		} else if full {
+			lim = limit
+		}
+		n.Truncate(lim, logExpandCmd(r))
 	}
-	return d, nil
+	return logFirst
 }
 
 func findProblem(c *Ctx, ref string) (*app.ProblemSet, *app.Problem, error) {
