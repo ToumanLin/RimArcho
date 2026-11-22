@@ -96,8 +96,6 @@ internal/surface/tui/view.go (*model).hintLine 50 119
 internal/view/bar.go FilterBoard 42 115
 internal/view/filesearch_stream.go (*FileSearchRun).search 52 169
 internal/view/keys.go KeyHelp 43 267
-internal/view/needs.go Do 41 99
-internal/view/needs.go buildItems 138 610
 internal/view/ops.go CopyOps 92 125
 internal/view/problemview.go buildProblemPanel 50 152
 internal/view/query.go termMatch 48 91
