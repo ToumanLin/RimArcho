@@ -91,63 +91,29 @@ func complexity(fd *ast.FuncDecl) int {
 	return n
 }
 
-// oversizedFuncs reads oversizedTable: "file function complexity lines" per line.
-func oversizedFuncs(t *testing.T) map[string]funcSize {
-	out := map[string]funcSize{}
-	for i, line := range strings.Split(strings.TrimSpace(oversizedTable), "\n") {
-		f := strings.Fields(line)
-		var s funcSize
-		if len(f) != 4 {
-			t.Fatalf("oversizedTable line %d %q: want file, function, complexity, lines", i+1, line)
-		}
-		if _, err := fmt.Sscan(f[2]+" "+f[3], &s.complexity, &s.lines); err != nil {
-			t.Fatalf("oversizedTable line %d %q: %v", i+1, line, err)
-		}
-		out[f[0]+" "+f[1]] = s
-	}
-	return out
-}
-
 func (s funcSize) over() bool { return s.complexity > maxComplexity || s.lines > maxFuncLines }
 
-// TestArchFunctionSize: no function is over the limits, except the ones in oversizedTable,
-// which may shrink but never grow; an entry whose function is gone or now within the limits
-// fails as stale, so the list only gets shorter. RIMARCHO_FUNCSIZE_PRINT=1 prints the table
-// as it is now.
+// TestArchFunctionSize: no production function is over the limits. RIMARCHO_FUNCSIZE_PRINT=1
+// prints the largest functions, to see how close they are.
 func TestArchFunctionSize(t *testing.T) {
 	t.Parallel()
 	sizes := funcSizes(repoSource(t))
-	listed := oversizedFuncs(t)
 	if os.Getenv("RIMARCHO_FUNCSIZE_PRINT") != "" {
-		var keys []string
-		for k, s := range sizes {
-			if s.over() {
-				keys = append(keys, k)
-			}
+		keys := make([]string, 0, len(sizes))
+		for k := range sizes {
+			keys = append(keys, k)
 		}
-		sort.Strings(keys)
+		sort.Slice(keys, func(i, j int) bool { return sizes[keys[i]].complexity > sizes[keys[j]].complexity })
 		var b strings.Builder
-		for _, k := range keys {
+		for _, k := range keys[:min(30, len(keys))] {
 			fmt.Fprintf(&b, "%s %d %d\n", k, sizes[k].complexity, sizes[k].lines)
 		}
-		t.Logf("%d over the limits:\n%s", len(keys), b.String())
+		t.Logf("largest by complexity:\n%s", b.String())
 	}
 	var problems []string
 	for k, s := range sizes {
-		if !s.over() {
-			continue
-		}
-		cap, ok := listed[k]
-		switch {
-		case !ok:
+		if s.over() {
 			problems = append(problems, fmt.Sprintf("%s: complexity %d, %d lines; the limits are %d and %d. Split it into functions that each do one step (17 §4 \"Function size\")", k, s.complexity, s.lines, maxComplexity, maxFuncLines))
-		case s.complexity > cap.complexity || s.lines > cap.lines:
-			problems = append(problems, fmt.Sprintf("%s grew: complexity %d (was %d), %d lines (was %d). An oversized function may only shrink; put the new work in a function of its own (17 §4 \"Function size\")", k, s.complexity, cap.complexity, s.lines, cap.lines))
-		}
-	}
-	for k := range listed {
-		if s, ok := sizes[k]; !ok || !s.over() {
-			problems = append(problems, fmt.Sprintf("oversizedTable line %q is stale: the function is gone or within the limits now; delete the line (17 §4 \"Function size\")", k))
 		}
 	}
 	sort.Strings(problems)
