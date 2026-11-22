@@ -7,7 +7,6 @@ package archlint
 // map, so that deleting a line never realigns the others.
 const oversizedTable = `
 internal/accounts/browser_windows.go (*Session).login 75 338
-internal/analyze/analyze.go Run 41 229
 internal/app/credit.go (*App).CreditStep 53 159
 internal/app/creditreplace.go (*App).replaceCreditLocked 74 252
 internal/app/data.go (*App).UpdateDataProgress 41 128

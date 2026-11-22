@@ -1,0 +1,96 @@
+{
+ "Progress": [
+  "defs: 500/501 files",
+  "defs: 501 files, 500 defs from 1 active mods",
+  "defs: 1 inactive mods indexed (1 cached)",
+  "patches: 3 files, 1000 operations",
+  "patches: 1000/1000 operations",
+  "done: 0 failed operations, 0 findings, \u003ctime\u003e"
+ ],
+ "After": 1,
+ "Stats": {
+  "ActiveMods": 1,
+  "InstalledMods": 3,
+  "DefFiles": 501,
+  "PatchFiles": 3,
+  "Defs": 500,
+  "TopOps": 1000,
+  "UnknownOps": 0,
+  "Failed": 0,
+  "ParseErrors": 2,
+  "Nodes": 2502,
+  "TextMB": 0,
+  "IndexHits": 1000,
+  "IndexRebuilds": 1,
+  "Evaluations": 1000,
+  "DefsMs": 0,
+  "PatchMs": 0,
+  "TotalMs": 0,
+  "CachedMods": 1,
+  "PeakHeapMB": 0,
+  "LiveHeapMB": 0,
+  "Assemblies": 2,
+  "AssemblyErrors": 2,
+  "HarmonyPatches": 0,
+  "Types": 0,
+  "HarmonyMs": 0,
+  "Guards": true
+ },
+ "Content": {
+  "p": {
+   "Key": "(varies with file times)",
+   "AssemblyKey": "70|dll497bd37880cf5cd58b02a7157535104a616149803388cef4436c65e11b50f277|a12",
+   "Folders": [
+    "<root>/p"
+   ],
+   "DefFiles": 501,
+   "PatchFiles": 3,
+   "ParseErrors": [
+    "Defs/Bad.xml: XML syntax error on line 1: unexpected EOF",
+    "Patches/Bad.xml: XML syntax error on line 1: unexpected EOF"
+   ]
+  },
+  "q": {
+   "Key": "(varies with file times)",
+   "AssemblyKey": "",
+   "Folders": [
+    "<root>/q"
+   ],
+   "DefFiles": 0,
+   "PatchFiles": 0,
+   "ParseErrors": null
+  },
+  "r": {
+   "Key": "(varies with file times)",
+   "AssemblyKey": "",
+   "Folders": [
+    "<root>/r"
+   ],
+   "DefFiles": 2,
+   "PatchFiles": 0,
+   "ParseErrors": [
+    "Defs/Bad.xml: XML syntax error on line 1: unexpected EOF"
+   ]
+  }
+ },
+ "NewDefs": {
+  "p": 500,
+  "r": 1
+ },
+ "Asms": [
+  {
+   "Instance": "p",
+   "File": "Assemblies/0Harmony.dll",
+   "Skipped": true,
+   "Err": true
+  },
+  {
+   "Instance": "p",
+   "File": "Assemblies/Broken.dll",
+   "Skipped": false,
+   "Err": true
+  }
+ ],
+ "Findings": null,
+ "Patches": 1000
+}
