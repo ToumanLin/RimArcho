@@ -50,11 +50,6 @@ internal/app/subscribe.go (*App).UpdateSubscriptionsWith 61 240
 internal/app/subscribeworkshop.go (*App).downloadWorkshopGroup 57 197
 internal/app/uninstall.go (*App).planUninstall 150 467
 internal/app/workshopsub.go (*App).Workshop 48 134
-internal/cmds/saves.go savesFix 82 225
-internal/cmds/saves.go savesList 60 185
-internal/cmds/saves.go savesShow 69 203
-internal/cmds/saves_review.go savesReview 42 136
-internal/cmds/test.go testRunCmd 58 177
 internal/csharp/outline.go tokenize 82 158
 internal/dotnet/compscan.go (*Assembly).scanBody 136 172
 internal/dotnet/shapes.go (*Assembly).eval 141 201

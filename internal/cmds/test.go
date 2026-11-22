@@ -30,41 +30,9 @@ func init() {
 }
 
 func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
-	o := app.TestRunOptions{Env: args.Str("env"), Map: args.Bool("map"), Progress: c.progressCtx(), Save: args.Str("save"),
-		Probe: args.Str("probe"), ProbeAfter: args.Str("probe-after"), ProbeBefore: args.Str("probe-before")}
-	if args.Bool("ticks") {
-		n, err := strconv.Atoi(args.Str("ticks"))
-		if err != nil || n <= 0 {
-			return nil, &UsageError{Msg: "--ticks needs a positive number of ticks, such as 4000"}
-		}
-		o.Ticks = n
-	}
-	switch {
-	case o.Save != "" && (o.Map || o.Probe != ""):
-		return nil, &UsageError{Msg: "--save loads a save; give --save or --map/--probe, not both"}
-	case o.Ticks > 0 && (o.Probe != "" || !o.Map && o.Save == ""):
-		return nil, &UsageError{Msg: "--ticks needs --map or --save (a probe run ends at its RESULT line)"}
-	}
-	if o.Probe == "" && (o.ProbeAfter != "" || o.ProbeBefore != "") {
-		return nil, &UsageError{Msg: "--probe-after and --probe-before need --probe <folder>"}
-	}
-	if o.ProbeAfter != "" && o.ProbeBefore != "" {
-		return nil, &UsageError{Msg: "give --probe-after or --probe-before, not both"}
-	}
-	if len(args.Pos) > 0 {
-		o.Plan = args.Pos[0]
-	}
-	for _, flag := range []struct {
-		name string
-		dst  *time.Duration
-	}{{"timeout", &o.Timeout}, {"settle", &o.Settle}} {
-		if args.Bool(flag.name) {
-			d, err := time.ParseDuration(args.Str(flag.name))
-			if err != nil || d <= 0 {
-				return nil, &UsageError{Msg: fmt.Sprintf("--%s needs a positive duration, such as 30s or 10m", flag.name)}
-			}
-			*flag.dst = d
-		}
+	o, err := testRunOptions(c, args)
+	if err != nil {
+		return nil, err
 	}
 	r, err := c.App.TestRun(c.Context, o)
 	if err != nil {
@@ -81,6 +49,68 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 		return &render.Doc{Raw: string(b) + "\n"}, err
 	}
 	d, root := render.New("test run: " + r.Plan + "  env:" + r.Env)
+	testRunSummary(root, r)
+	if p := r.Probe; p != nil {
+		testProbe(root, p)
+	}
+	missing := root.Section(fmt.Sprintf("missing: %d", len(r.Missing)))
+	for _, m := range r.Missing {
+		n := missing.Add(m.PackageID + "  " + m.Name)
+		if m.Reason != "" {
+			n.KV("not loaded", m.Reason)
+		}
+	}
+	testRunClusters(root, r)
+	testRunCompared(root, r)
+	root.KV("attribution", r.Attribution)
+	root.KV("run dir", r.RunDir)
+	return d, nil
+}
+
+// testRunOptions reads and checks the flags of test run.
+func testRunOptions(c *Ctx, args *Args) (app.TestRunOptions, error) {
+	o := app.TestRunOptions{Env: args.Str("env"), Map: args.Bool("map"), Progress: c.progressCtx(), Save: args.Str("save"),
+		Probe: args.Str("probe"), ProbeAfter: args.Str("probe-after"), ProbeBefore: args.Str("probe-before")}
+	if args.Bool("ticks") {
+		n, err := strconv.Atoi(args.Str("ticks"))
+		if err != nil || n <= 0 {
+			return o, &UsageError{Msg: "--ticks needs a positive number of ticks, such as 4000"}
+		}
+		o.Ticks = n
+	}
+	switch {
+	case o.Save != "" && (o.Map || o.Probe != ""):
+		return o, &UsageError{Msg: "--save loads a save; give --save or --map/--probe, not both"}
+	case o.Ticks > 0 && (o.Probe != "" || !o.Map && o.Save == ""):
+		return o, &UsageError{Msg: "--ticks needs --map or --save (a probe run ends at its RESULT line)"}
+	}
+	if o.Probe == "" && (o.ProbeAfter != "" || o.ProbeBefore != "") {
+		return o, &UsageError{Msg: "--probe-after and --probe-before need --probe <folder>"}
+	}
+	if o.ProbeAfter != "" && o.ProbeBefore != "" {
+		return o, &UsageError{Msg: "give --probe-after or --probe-before, not both"}
+	}
+	if len(args.Pos) > 0 {
+		o.Plan = args.Pos[0]
+	}
+	for _, flag := range []struct {
+		name string
+		dst  *time.Duration
+	}{{"timeout", &o.Timeout}, {"settle", &o.Settle}} {
+		if args.Bool(flag.name) {
+			d, err := time.ParseDuration(args.Str(flag.name))
+			if err != nil || d <= 0 {
+				return o, &UsageError{Msg: fmt.Sprintf("--%s needs a positive duration, such as 30s or 10m", flag.name)}
+			}
+			*flag.dst = d
+		}
+	}
+	return o, nil
+}
+
+// testRunSummary adds the run's status, timing, save, map, memory and the Mod folders it
+// linked, moved aside and loaded.
+func testRunSummary(root *render.Node, r *app.TestRunReport) {
 	if r.NotTested != "" {
 		root.Add("NOT TESTED: " + r.NotTested)
 	}
@@ -122,16 +152,10 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 			loaded.Addf("%s  %s  (%s)", l.PackageID, l.Folder, l.From)
 		}
 	}
-	if p := r.Probe; p != nil {
-		testProbe(root, p)
-	}
-	missing := root.Section(fmt.Sprintf("missing: %d", len(r.Missing)))
-	for _, m := range r.Missing {
-		n := missing.Add(m.PackageID + "  " + m.Name)
-		if m.Reason != "" {
-			n.KV("not loaded", m.Reason)
-		}
-	}
+}
+
+// testRunClusters adds the run's error clusters and its informational ones.
+func testRunClusters(root *render.Node, r *app.TestRunReport) {
 	clusters := root.Section(fmt.Sprintf("error clusters: %d", r.ClustersTotal))
 	for _, cluster := range r.Clusters {
 		prefix := ""
@@ -170,6 +194,10 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 			info.Add(line)
 		}
 	}
+}
+
+// testRunCompared adds the comparison with the player's log and with the plan's earlier run.
+func testRunCompared(root *render.Node, r *app.TestRunReport) {
 	if p := r.PlayerLog; p == nil {
 		root.Add("compared with the player's log: none found")
 	} else if p.Error != "" {
@@ -202,9 +230,6 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 	} else {
 		root.Add("compared with: no earlier run of this plan")
 	}
-	root.KV("attribution", r.Attribution)
-	root.KV("run dir", r.RunDir)
-	return d, nil
 }
 
 // testMapLine says how long the map ran and how many ticks that was (MCP eval h7: agents
