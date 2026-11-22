@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 )
@@ -98,17 +99,6 @@ func (a *App) UpdateDataProgress(keys []string, dryRun bool, progress func(key s
 	if err := a.subscriptionContext().Err(); err != nil {
 		return nil, err
 	}
-	want := func(k string) bool {
-		if len(keys) == 0 {
-			return true
-		}
-		for _, x := range keys {
-			if x == k {
-				return true
-			}
-		}
-		return false
-	}
 	if err := os.MkdirAll(filepath.Join(a.Home, "cache"), 0o755); err != nil {
 		return nil, err
 	}
@@ -123,7 +113,7 @@ func (a *App) UpdateDataProgress(keys []string, dryRun bool, progress func(key s
 	defer cleanup()
 	failed := false
 	for _, d := range Datasets {
-		if !want(d.Key) {
+		if len(keys) > 0 && !slices.Contains(keys, d.Key) {
 			continue
 		}
 		if progress != nil {
@@ -134,38 +124,14 @@ func (a *App) UpdateDataProgress(keys []string, dryRun bool, progress func(key s
 		if dryRun {
 			continue
 		}
-		prev := status[d.Key]
-		etag := ""
-		if prev != nil && prev.Source == u.Info.Source {
-			if _, err := os.Stat(a.dataPath(d)); err == nil {
-				etag = prev.ETag
-			}
-		}
-		modified := ""
-		if prev != nil && prev.Source == u.Info.Source && etag != "" {
-			modified = prev.Modified
-		}
-		if prev != nil && prev.Source == u.Info.Source && etag == "" {
-			if _, err := os.Stat(a.dataPath(d)); err == nil {
-				modified = prev.Modified
-			}
-		}
-		tmp, err := a.fetchData(d, u, etag, modified)
+		staged, err := a.fetchDataUpdate(d, u, status[d.Key])
 		if err != nil {
 			u.Err, failed = err, true
 			continue
 		}
-		if u.Same {
-			if prev == nil || (etag == "" && modified == "") {
-				u.Err, failed = errors.New("unexpected not-modified response"), true
-				continue
-			}
-			copy := *prev
-			copy.Checked = a.Now().UTC()
-			u.Info = &copy
-			continue
+		if staged != nil {
+			ready = append(ready, *staged)
 		}
-		ready = append(ready, stagedDataFile{tmp, a.dataPath(d)})
 	}
 	if failed {
 		return res, errors.New("community data not updated: a download failed or was invalid; the stored files are unchanged")
@@ -176,36 +142,8 @@ func (a *App) UpdateDataProgress(keys []string, dryRun bool, progress func(key s
 	if dryRun {
 		return res, nil
 	}
-	stage := func(dst string, b []byte) error {
-		file, err := stageDataFile(dst, b)
-		if err == nil {
-			ready = append(ready, file)
-		}
-		return err
-	}
-	for _, u := range res {
-		b, err := json.MarshalIndent(u.Info, "", "  ")
-		if err != nil {
-			return res, err
-		}
-		if err := stage(a.dataPath(u.Dataset)+".source.json", b); err != nil {
-			return res, err
-		}
-		if u.Dataset.Key == "steamdb" && !u.Same {
-			for _, file := range ready {
-				if file.dst != a.dataPath(u.Dataset) {
-					continue
-				}
-				index, err := steamIndexData(file.tmp)
-				if err != nil {
-					return res, fmt.Errorf("steamDB index: %v", err)
-				}
-				if err := stage(a.steamIndexPath(), index); err != nil {
-					return res, err
-				}
-				break
-			}
-		}
+	if err := a.stageDataInfo(res, &ready); err != nil {
+		return res, err
 	}
 	if err := a.subscriptionContext().Err(); err != nil {
 		return res, err
@@ -219,6 +157,78 @@ func (a *App) UpdateDataProgress(keys []string, dryRun bool, progress func(key s
 	}
 	a.dataIdx = nil
 	return res, nil
+}
+
+// fetchDataUpdate downloads one dataset, conditionally when the stored file came from the
+// same source (prev). It returns the staged download, or nil when the stored file is
+// current (u.Same, its info then rechecked now).
+func (a *App) fetchDataUpdate(d Dataset, u *DataUpdate, prev *DataInfo) (*stagedDataFile, error) {
+	etag := ""
+	if prev != nil && prev.Source == u.Info.Source {
+		if _, err := os.Stat(a.dataPath(d)); err == nil {
+			etag = prev.ETag
+		}
+	}
+	modified := ""
+	if prev != nil && prev.Source == u.Info.Source && etag != "" {
+		modified = prev.Modified
+	}
+	if prev != nil && prev.Source == u.Info.Source && etag == "" {
+		if _, err := os.Stat(a.dataPath(d)); err == nil {
+			modified = prev.Modified
+		}
+	}
+	tmp, err := a.fetchData(d, u, etag, modified)
+	if err != nil {
+		return nil, err
+	}
+	if u.Same {
+		if prev == nil || (etag == "" && modified == "") {
+			return nil, errors.New("unexpected not-modified response")
+		}
+		copy := *prev
+		copy.Checked = a.Now().UTC()
+		u.Info = &copy
+		return nil, nil
+	}
+	return &stagedDataFile{tmp, a.dataPath(d)}, nil
+}
+
+// stageDataInfo stages each dataset's .source.json and, for a new SteamDB file, its index,
+// adding them to ready.
+func (a *App) stageDataInfo(res []*DataUpdate, ready *[]stagedDataFile) error {
+	stage := func(dst string, b []byte) error {
+		file, err := stageDataFile(dst, b)
+		if err == nil {
+			*ready = append(*ready, file)
+		}
+		return err
+	}
+	for _, u := range res {
+		b, err := json.MarshalIndent(u.Info, "", "  ")
+		if err != nil {
+			return err
+		}
+		if err := stage(a.dataPath(u.Dataset)+".source.json", b); err != nil {
+			return err
+		}
+		if u.Dataset.Key == "steamdb" && !u.Same {
+			for _, file := range *ready {
+				if file.dst != a.dataPath(u.Dataset) {
+					continue
+				}
+				index, err := steamIndexData(file.tmp)
+				if err != nil {
+					return fmt.Errorf("steamDB index: %v", err)
+				}
+				if err := stage(a.steamIndexPath(), index); err != nil {
+					return err
+				}
+				break
+			}
+		}
+	}
+	return nil
 }
 
 // DropCommunityData forgets data cached before another connection updated it.
