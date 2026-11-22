@@ -56,8 +56,9 @@ func (a *Assembly) CompEdits() []CompEdit {
 		return nil
 	}
 	var out []CompEdit
+	var stack []slot
 	for row := uint32(1); int(row) <= len(a.methods); row++ {
-		r := a.scanBody(row)
+		r := a.scanBody(row, &stack)
 		if len(r.ops) == 0 {
 			continue
 		}
@@ -112,8 +113,9 @@ func (a *Assembly) Enumerated(typ, method string) []string {
 	}
 	seen := map[string]bool{}
 	var out []string
+	var stack []slot
 	for _, r := range rows {
-		for _, s := range a.scanBody(r).enums {
+		for _, s := range a.scanBody(r, &stack).enums {
 			if !seen[s] {
 				seen[s] = true
 				out = append(out, s)
@@ -186,7 +188,24 @@ func memberSrc(m Member) string {
 	return strings.ReplaceAll(m.Owner, "+", ".") + "." + name
 }
 
-func (a *Assembly) scanBody(row uint32) bodyScan {
+// compScan is the per-method state of scanBody except the stack. The stack and the result
+// are a separate slotStack so that these maps can stay off the heap.
+type compScan struct {
+	a      *Assembly
+	snap   map[int][]slot // the first stack recorded at each branch target
+	locals map[int64]slot
+	dead   bool // after an unconditional branch, ret or throw
+}
+
+// slotStack is scanBody's stack and its result.
+type slotStack struct {
+	v []slot
+	r bodyScan
+}
+
+// scanBody scans MethodDef row's body for comp-list changes and enumerated members. stack is
+// a buffer for the evaluation stack, reused from call to call.
+func (a *Assembly) scanBody(row uint32, stack *[]slot) bodyScan {
 	r := bodyScan{ops: map[string]int{}}
 	code := a.Body(row)
 	if len(code) == 0 {
@@ -194,169 +213,239 @@ func (a *Assembly) scanBody(row uint32) bodyScan {
 	}
 	ins := DecodeIL(code)
 	targets := map[int]bool{}
+	addBranchTargets(targets, ins)
+	c := compScan{a: a, snap: map[int][]slot{}, locals: map[int64]slot{}}
+	s := slotStack{v: (*stack)[:0], r: r}
 	for _, in := range ins {
-		if IsBranch(in.Op) {
-			targets[int(in.Arg)] = true
+		if targets[in.Off] && c.dead {
+			s.v = append(s.v[:0], c.snap[in.Off]...)
+		} else if c.dead {
+			s.v = s.v[:0]
 		}
+		c.dead = false
+		c.step(in, &s)
+	}
+	clear(s.v[:cap(s.v)])
+	*stack = s.v[:0]
+	return s.r
+}
+
+// pop takes the top of the stack; an empty stack gives an unknown slot.
+func (s *slotStack) pop() slot {
+	if len(s.v) == 0 {
+		return slot{}
+	}
+	v := s.v[len(s.v)-1]
+	s.v = s.v[:len(s.v)-1]
+	return v
+}
+
+// popInto fills out with the top len(out) slots, deepest first.
+func (s *slotStack) popInto(out []slot) {
+	for i := len(out) - 1; i >= 0; i-- {
+		out[i] = s.pop()
+	}
+}
+
+// drop discards the top n slots.
+func (s *slotStack) drop(n int) {
+	for i := 0; i < n; i++ {
+		s.pop()
+	}
+}
+
+// push puts v on the stack.
+func (s *slotStack) push(v slot) { s.v = append(s.v, v) }
+
+// op1 counts one comp-list operation.
+func (s *slotStack) op1(label string) {
+	if s.r.ops[label] == 0 {
+		s.r.order = append(s.r.order, label)
+	}
+	s.r.ops[label]++
+}
+
+// record saves the stack for branch target t unless one is recorded there already.
+func (c *compScan) record(t int, s *slotStack) {
+	if _, ok := c.snap[t]; !ok {
+		c.snap[t] = append([]slot(nil), s.v...)
+	}
+}
+
+// step applies one instruction. The handlers keep the opcode cases in their original order;
+// anything else has no stack effect.
+func (c *compScan) step(in Instr, s *slotStack) {
+	_ = c.stepLoad(in, s) || c.stepControl(in, s) || c.stepArith(in, s) || c.stepObject(in, s) || c.stepCall(in, s)
+}
+
+// stepLoad handles arguments, locals, constants, dup and pop.
+func (c *compScan) stepLoad(in Instr, s *slotStack) bool {
+	op := in.Op
+	switch {
+	case op >= 0x02 && op <= 0x05, op == 0x0e, op == 0x0f, op == 0xfe09, op == 0xfe0a: // ldarg(a)
+		s.push(slot{})
+	case op >= 0x06 && op <= 0x09:
+		s.push(c.locals[int64(op-0x06)])
+	case op == 0x11 || op == 0x12 || op == 0xfe0c || op == 0xfe0d:
+		s.push(c.locals[in.Arg])
+	case op >= 0x0a && op <= 0x0d:
+		c.locals[int64(op-0x0a)] = s.pop()
+	case op == 0x13 || op == 0xfe0e:
+		c.locals[in.Arg] = s.pop()
+	case op == 0x10 || op == 0xfe0b, op == 0x26: // starg, pop
+		s.pop()
+	case op == 0x14, op >= 0x15 && op <= 0x23, op == 0x72, op == 0xd0, op == 0xfe06, op == 0xfe1c, op == 0xfe00:
+		s.push(slot{}) // constants, ldstr, ldtoken, ldftn, sizeof, arglist
+	case op == 0x25: // dup
+		v := s.pop()
+		s.push(v)
+		s.push(v)
+	default:
+		return false
+	}
+	return true
+}
+
+// stepControl handles returns, throws, leaves, branches and switch.
+func (c *compScan) stepControl(in Instr, s *slotStack) bool {
+	op := in.Op
+	switch {
+	case op == 0x27 || op == 0x29 || op == 0x2a || op == 0xdc || op == 0xdd || op == 0xde || op == 0x7a || op == 0xfe1a || op == 0xfe11:
+		s.v = s.v[:0]
+		if op == 0xdd || op == 0xde {
+			c.record(int(in.Arg), s)
+		}
+		c.dead = true
+	case op == 0x2b || op == 0x38:
+		c.record(int(in.Arg), s)
+		c.dead = true
+	case op == 0x2c || op == 0x2d || op == 0x39 || op == 0x3a:
+		s.pop()
+		c.record(int(in.Arg), s)
+	case op >= 0x2e && op <= 0x37 || op >= 0x3b && op <= 0x44:
+		s.drop(2)
+		c.record(int(in.Arg), s)
+	case op == 0x45:
+		s.pop()
 		for _, t := range in.Targets {
-			targets[t] = true
+			c.record(t, s)
 		}
+	default:
+		return false
 	}
-	var st []slot
-	snap := map[int][]slot{}
-	locals := map[int64]slot{}
-	dead := false
-	pop := func() slot {
-		if len(st) == 0 {
-			return slot{}
-		}
-		v := st[len(st)-1]
-		st = st[:len(st)-1]
-		return v
+	return true
+}
+
+// stepArith handles indirect loads and stores, arithmetic, conversions and same-value casts.
+func (c *compScan) stepArith(in Instr, s *slotStack) bool {
+	op := in.Op
+	switch {
+	case op >= 0x46 && op <= 0x50: // ldind
+		s.pop()
+		s.push(slot{})
+	case op >= 0x51 && op <= 0x57 || op == 0xdf: // stind
+		s.drop(2)
+	case op >= 0x58 && op <= 0x64 || op >= 0xd6 && op <= 0xdb || op >= 0xfe01 && op <= 0xfe05:
+		s.drop(2)
+		s.push(slot{})
+	case op == 0x65 || op == 0x66 || op >= 0x67 && op <= 0x6e || op == 0x76 || op >= 0x82 && op <= 0x8b ||
+		op >= 0xb3 && op <= 0xba || op == 0xc3 || op >= 0xd1 && op <= 0xd5 || op == 0xe0 || op == 0x8e || op == 0xfe0f ||
+		op == 0x8d || op == 0xc2 || op == 0xc6 || op == 0xfe1d || op == 0xfe07:
+		s.pop()
+		s.push(slot{})
+	case op == 0x74 || op == 0x75 || op == 0x8c || op == 0x79 || op == 0xa5 || op == 0x71:
+		// castclass, isinst, box, unbox(.any), ldobj: the same value
+	default:
+		return false
 	}
-	popN := func(n int) []slot {
-		out := make([]slot, n)
-		for i := n - 1; i >= 0; i-- {
-			out[i] = pop()
-		}
-		return out
+	return true
+}
+
+// stepObject handles cpobj, stobj, fields, arrays and the block opcodes.
+func (c *compScan) stepObject(in Instr, s *slotStack) bool {
+	op := in.Op
+	switch {
+	case op == 0x70 || op == 0x81:
+		s.drop(2)
+	case op == 0x7b || op == 0x7c: // ldfld(a)
+		s.pop()
+		m, _ := c.a.Member(uint32(in.Arg))
+		s.push(slot{memberSrc(m)})
+	case op == 0x7e || op == 0x7f: // ldsfld(a)
+		m, _ := c.a.Member(uint32(in.Arg))
+		s.push(slot{memberSrc(m)})
+	case op == 0x7d:
+		s.drop(2)
+	case op == 0x80:
+		s.pop()
+	case op == 0x8f || op >= 0x90 && op <= 0x9a || op == 0xa3:
+		s.drop(2)
+		s.push(slot{})
+	case op >= 0x9b && op <= 0xa2 || op == 0xa4:
+		s.drop(3)
+	case op == 0xfe15:
+		s.pop()
+	case op == 0xfe17 || op == 0xfe18:
+		s.drop(3)
+	default:
+		return false
 	}
-	push := func(v slot) { st = append(st, v) }
-	record := func(t int) {
-		if _, ok := snap[t]; !ok {
-			snap[t] = append([]slot(nil), st...)
-		}
+	return true
+}
+
+// stepCall handles call, callvirt and newobj: enumerated members, comp-list changes, and the
+// member a getter's result comes from.
+func (c *compScan) stepCall(in Instr, s *slotStack) bool {
+	op := in.Op
+	if op != 0x28 && op != 0x6f && op != 0x73 {
+		return false
 	}
-	op1 := func(label string) {
-		if r.ops[label] == 0 {
-			r.order = append(r.order, label)
-		}
-		r.ops[label]++
+	m, ok := c.a.Member(uint32(in.Arg))
+	if !ok {
+		s.v = s.v[:0]
+		return true
 	}
-	for _, in := range ins {
-		if targets[in.Off] && dead {
-			st = append(st[:0], snap[in.Off]...)
-		} else if dead {
-			st = st[:0]
+	n := m.Params
+	if m.HasThis && op != 0x73 {
+		n++
+	}
+	args := make([]slot, n)
+	s.popInto(args)
+	var res slot
+	if op != 0x73 {
+		res = c.callEffect(m, args, s)
+	}
+	if op == 0x73 || !m.RetVoid {
+		s.push(res)
+	}
+	return true
+}
+
+// callEffect records what a call (not newobj) does to comp lists and enumerations, and returns
+// the slot of its result.
+func (c *compScan) callEffect(m Member, args []slot, s *slotStack) slot {
+	switch {
+	case m.HasThis && len(args) > 0 && m.Name == "GetEnumerator":
+		if args[0].src != "" {
+			s.r.enums = append(s.r.enums, args[0].src)
 		}
-		dead = false
-		op := in.Op
-		switch {
-		case op >= 0x02 && op <= 0x05, op == 0x0e, op == 0x0f, op == 0xfe09, op == 0xfe0a: // ldarg(a)
-			push(slot{})
-		case op >= 0x06 && op <= 0x09:
-			push(locals[int64(op-0x06)])
-		case op == 0x11 || op == 0x12 || op == 0xfe0c || op == 0xfe0d:
-			push(locals[in.Arg])
-		case op >= 0x0a && op <= 0x0d:
-			locals[int64(op-0x0a)] = pop()
-		case op == 0x13 || op == 0xfe0e:
-			locals[in.Arg] = pop()
-		case op == 0x10 || op == 0xfe0b, op == 0x26: // starg, pop
-			pop()
-		case op == 0x14, op >= 0x15 && op <= 0x23, op == 0x72, op == 0xd0, op == 0xfe06, op == 0xfe1c, op == 0xfe00:
-			push(slot{}) // constants, ldstr, ldtoken, ldftn, sizeof, arglist
-		case op == 0x25: // dup
-			v := pop()
-			push(v)
-			push(v)
-		case op == 0x27 || op == 0x29 || op == 0x2a || op == 0xdc || op == 0xdd || op == 0xde || op == 0x7a || op == 0xfe1a || op == 0xfe11:
-			st = st[:0]
-			if op == 0xdd || op == 0xde {
-				record(int(in.Arg))
-			}
-			dead = true
-		case op == 0x2b || op == 0x38:
-			record(int(in.Arg))
-			dead = true
-		case op == 0x2c || op == 0x2d || op == 0x39 || op == 0x3a:
-			pop()
-			record(int(in.Arg))
-		case op >= 0x2e && op <= 0x37 || op >= 0x3b && op <= 0x44:
-			popN(2)
-			record(int(in.Arg))
-		case op == 0x45:
-			pop()
-			for _, t := range in.Targets {
-				record(t)
-			}
-		case op >= 0x46 && op <= 0x50: // ldind
-			pop()
-			push(slot{})
-		case op >= 0x51 && op <= 0x57 || op == 0xdf: // stind
-			popN(2)
-		case op >= 0x58 && op <= 0x64 || op >= 0xd6 && op <= 0xdb || op >= 0xfe01 && op <= 0xfe05:
-			popN(2)
-			push(slot{})
-		case op == 0x65 || op == 0x66 || op >= 0x67 && op <= 0x6e || op == 0x76 || op >= 0x82 && op <= 0x8b ||
-			op >= 0xb3 && op <= 0xba || op == 0xc3 || op >= 0xd1 && op <= 0xd5 || op == 0xe0 || op == 0x8e || op == 0xfe0f ||
-			op == 0x8d || op == 0xc2 || op == 0xc6 || op == 0xfe1d || op == 0xfe07:
-			pop()
-			push(slot{})
-		case op == 0x74 || op == 0x75 || op == 0x8c || op == 0x79 || op == 0xa5 || op == 0x71:
-			// castclass, isinst, box, unbox(.any), ldobj: the same value
-		case op == 0x70 || op == 0x81:
-			popN(2)
-		case op == 0x7b || op == 0x7c: // ldfld(a)
-			pop()
-			m, _ := a.Member(uint32(in.Arg))
-			push(slot{memberSrc(m)})
-		case op == 0x7e || op == 0x7f: // ldsfld(a)
-			m, _ := a.Member(uint32(in.Arg))
-			push(slot{memberSrc(m)})
-		case op == 0x7d:
-			popN(2)
-		case op == 0x80:
-			pop()
-		case op == 0x8f || op >= 0x90 && op <= 0x9a || op == 0xa3:
-			popN(2)
-			push(slot{})
-		case op >= 0x9b && op <= 0xa2 || op == 0xa4:
-			popN(3)
-		case op == 0xfe15:
-			pop()
-		case op == 0xfe17 || op == 0xfe18:
-			popN(3)
-		case op == 0x28 || op == 0x6f || op == 0x73: // call, callvirt, newobj
-			m, ok := a.Member(uint32(in.Arg))
-			if !ok {
-				st = st[:0]
-				continue
-			}
-			n := m.Params
-			if m.HasThis && op != 0x73 {
-				n++
-			}
-			args := popN(n)
-			var res slot
-			switch {
-			case op == 0x73:
-			case m.HasThis && len(args) > 0 && m.Name == "GetEnumerator":
-				if args[0].src != "" {
-					r.enums = append(r.enums, args[0].src)
-				}
-			case m.HasThis && len(args) > 0 && listMutators[m.Name] && strings.HasPrefix(m.Owner, "System.Collections.Generic.List`1"):
-				if IsCompList(args[0].src) {
-					label := args[0].src[strings.LastIndexByte(args[0].src, '.')+1:]
-					if m.Name == "set_Item" {
-						op1(label + "[i] =")
-					} else {
-						op1(label + "." + m.Name)
-					}
-				}
-			case !m.HasThis && len(args) > 0 && m.Owner == "Verse.GenList" && genListMutators[m.Name]:
-				if IsCompList(args[0].src) {
-					op1("GenList." + m.Name)
-				}
-			case !m.Field && (strings.HasPrefix(m.Name, "get_") && m.Params == 0 || compSource(m) != ""):
-				res = slot{memberSrc(m)}
-			}
-			if op == 0x73 || !m.RetVoid {
-				push(res)
+	case m.HasThis && len(args) > 0 && listMutators[m.Name] && strings.HasPrefix(m.Owner, "System.Collections.Generic.List`1"):
+		if IsCompList(args[0].src) {
+			label := args[0].src[strings.LastIndexByte(args[0].src, '.')+1:]
+			if m.Name == "set_Item" {
+				s.op1(label + "[i] =")
+			} else {
+				s.op1(label + "." + m.Name)
 			}
 		}
+	case !m.HasThis && len(args) > 0 && m.Owner == "Verse.GenList" && genListMutators[m.Name]:
+		if IsCompList(args[0].src) {
+			s.op1("GenList." + m.Name)
+		}
+	case !m.Field && (strings.HasPrefix(m.Name, "get_") && m.Params == 0 || compSource(m) != ""):
+		return slot{memberSrc(m)}
 	}
-	return r
+	return slot{}
 }
 
 // CompClassesSet maps CompProperties subclasses of the assembly to the comp class their
