@@ -21,7 +21,7 @@ func VersionOf(ctx context.Context, exe string) (result string, err error) {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, exe, "version")
-	cmd.Env = append(os.Environ(), "RIMARCHO_HOME="+home)
+	cmd.Env = append(os.Environ(), "RIMARCHO_HOME="+home, "RIMARCHO_CHILD=1") // a probe never opens a window (17 §3)
 	hideWindow(cmd)
 	var out firstLineWriter
 	cmd.Stdout = &out

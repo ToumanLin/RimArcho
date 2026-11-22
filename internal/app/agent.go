@@ -397,7 +397,7 @@ func (a *App) RunAgent(console bool, stdin io.Reader, stdout, stderr io.Writer) 
 		"PI_CODING_AGENT_DIR="+filepath.Join(a.AgentConfigDir(), "pi"),
 		agentKeyEnv+"="+key,
 		"PI_SKIP_VERSION_CHECK=1", "PI_TELEMETRY=0", "PI_OFFLINE=1",
-		"RIMARCHO_HOME="+a.Home)
+		"RIMARCHO_HOME="+a.Home, ChildEnvVar+"=1") // its archo mcp never opens a window (17 §3)
 	if console {
 		return startAgentConsole(cmd.Path, cmd.Args[1:], cmd.Dir, cmd.Env)
 	}

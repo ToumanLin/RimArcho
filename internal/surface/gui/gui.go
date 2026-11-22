@@ -36,6 +36,10 @@ type Options struct {
 
 // Run opens the window and returns when it is closed.
 func Run(o Options) error {
+	if app.IsChild() {
+		// a helper RimArcho started never opens a window: that would start helpers again (17 §3)
+		return fmt.Errorf("refusing to open a window from a RimArcho helper process (%s is set)", app.ChildEnvVar)
+	}
 	perftrace.Mark("gui-enter")
 	a := o.App
 	view.SetLang(cmds.Setting(a, "ui.lang"))
