@@ -44,52 +44,9 @@ func searchNumber(a *Args, name string, fallback int) (int, error) {
 }
 
 func filesSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
-	page, err := searchNumber(a, "page", 1)
+	f, err := parseFilesSearch(a)
 	if err != nil {
 		return nil, err
-	}
-	limit, err := searchNumber(a, "limit", 40)
-	if err != nil {
-		return nil, err
-	}
-	perFile, err := searchNumber(a, "per-file", 5)
-	if err != nil {
-		return nil, err
-	}
-	mode := a.Str("mode")
-	if mode == "" {
-		mode = "matches"
-	}
-	if mode != "matches" && mode != "files" && mode != "count" {
-		return nil, &UsageError{Msg: "--mode must be matches, files, or count"}
-	}
-	game := a.Str("game")
-	if game == "" {
-		game = "with"
-	}
-	if game != "with" && game != "without" && game != "only" {
-		return nil, &UsageError{Msg: "--game must be with, without, or only"}
-	}
-	unpaged := a.Bool("all") || limit == 0
-	if unpaged {
-		page, limit = 1, 100000
-	}
-	if page-1 > int(^uint(0)>>1)/limit {
-		return nil, &UsageError{Msg: "--page is too large for --limit"}
-	}
-	offset := (page - 1) * limit
-	kinds := modsearch.DefaultKinds
-	if a.Bool("def") {
-		kinds = modsearch.Defs | modsearch.Patches
-	}
-	if a.Bool("kind") {
-		kinds, err = modsearch.ParseKinds(a.Str("kind"))
-		if err != nil {
-			return nil, &UsageError{Msg: err.Error()}
-		}
-	}
-	if a.Bool("languages") || len(a.List("lang")) > 0 {
-		kinds |= modsearch.Languages
 	}
 	st, err := c.App.Loadout()
 	if err != nil {
@@ -99,6 +56,105 @@ func filesSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
+	mods = searchGameFilter(mods, f.game)
+	if err := c.App.Store.LoadDecls(mods); err != nil {
+		return nil, err
+	}
+	inputs := searchInputs(st, mods)
+	active := searchActive(st)
+	o := modsearch.Options{Pattern: a.Pos[0], Regex: a.Bool("regex"), CaseSensitive: a.Bool("case"), Word: a.Bool("word"), Def: a.Bool("def"), MM: st.GameMM(), Active: func(pkg string) bool { return active[pkg] }, AllVersions: a.Bool("all-versions"), Kinds: f.kinds, Langs: a.List("lang"), Offset: f.offset, Limit: f.limit, PerFile: f.perFile}
+	if f.mode != "matches" {
+		o.Offset, o.Limit = 0, 1
+	}
+	result, err := modsearch.Search(context.Background(), inputs, o)
+	if err != nil {
+		return nil, &UsageError{Msg: err.Error()}
+	}
+	scope := searchScope(a, st, o, f, len(inputs))
+	d, root := render.New(fmt.Sprintf("files search %q (%s): %d matches in %d files of %d mods (searched %d files in %d mods, %d ms)", o.Pattern, scope, result.Matches, result.FilesMatched, result.ModsMatched, result.FilesSearched, result.ModsSearched, result.Elapsed.Milliseconds()))
+	if o.Def {
+		searchSummary(root, result)
+	}
+	rows := searchRows(root, result, f)
+	if f.mode == "matches" {
+		rows = result.Kept
+	}
+	if !f.unpaged && rows > f.offset && rows-f.offset > f.limit {
+		d.AddNext(searchNext(c, a, f.page+1))
+	}
+	if result.Unreadable > 0 {
+		root.Addf("unreadable: %d files or folders could not be read; first: %s", result.Unreadable, result.FirstError)
+	}
+	if result.Matches == 0 {
+		root.Add("(none)")
+		if len(a.List("mod")) == 0 && !a.Bool("kind") && f.game == "with" && !o.AllVersions && f.kinds&modsearch.Languages == 0 {
+			root.Add("hint: translations, other versions, and inactive mods are excluded; widen with --languages, --all-versions, or --mod <ref>")
+		}
+	}
+	return d, nil
+}
+
+// filesSearchFlagValues are the parsed paging, mode, game and kind flags of files search.
+type filesSearchFlagValues struct {
+	page, limit, perFile, offset int
+	mode, game                   string
+	unpaged                      bool
+	kinds                        modsearch.Kind
+}
+
+// parseFilesSearch reads and checks the flags of files search.
+func parseFilesSearch(a *Args) (filesSearchFlagValues, error) {
+	var f filesSearchFlagValues
+	var err error
+	if f.page, err = searchNumber(a, "page", 1); err != nil {
+		return f, err
+	}
+	if f.limit, err = searchNumber(a, "limit", 40); err != nil {
+		return f, err
+	}
+	if f.perFile, err = searchNumber(a, "per-file", 5); err != nil {
+		return f, err
+	}
+	f.mode = a.Str("mode")
+	if f.mode == "" {
+		f.mode = "matches"
+	}
+	if f.mode != "matches" && f.mode != "files" && f.mode != "count" {
+		return f, &UsageError{Msg: "--mode must be matches, files, or count"}
+	}
+	f.game = a.Str("game")
+	if f.game == "" {
+		f.game = "with"
+	}
+	if f.game != "with" && f.game != "without" && f.game != "only" {
+		return f, &UsageError{Msg: "--game must be with, without, or only"}
+	}
+	f.unpaged = a.Bool("all") || f.limit == 0
+	if f.unpaged {
+		f.page, f.limit = 1, 100000
+	}
+	if f.page-1 > int(^uint(0)>>1)/f.limit {
+		return f, &UsageError{Msg: "--page is too large for --limit"}
+	}
+	f.offset = (f.page - 1) * f.limit
+	f.kinds = modsearch.DefaultKinds
+	if a.Bool("def") {
+		f.kinds = modsearch.Defs | modsearch.Patches
+	}
+	if a.Bool("kind") {
+		f.kinds, err = modsearch.ParseKinds(a.Str("kind"))
+		if err != nil {
+			return f, &UsageError{Msg: err.Error()}
+		}
+	}
+	if a.Bool("languages") || len(a.List("lang")) > 0 {
+		f.kinds |= modsearch.Languages
+	}
+	return f, nil
+}
+
+// searchGameFilter keeps the mods that --game allows, in place.
+func searchGameFilter(mods []*store.Mod, game string) []*store.Mod {
 	filtered := mods[:0]
 	for _, m := range mods {
 		official := m.Kind == source.Official
@@ -107,82 +163,65 @@ func filesSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		filtered = append(filtered, m)
 	}
-	mods = filtered
-	if err := c.App.Store.LoadDecls(mods); err != nil {
-		return nil, err
-	}
+	return filtered
+}
+
+// searchActive is the set of package ids in the active list.
+func searchActive(st *app.LoadoutState) map[string]bool {
 	active := map[string]bool{}
 	for _, entry := range st.List {
 		if m := st.Ix.ByID[entry.Instance]; m != nil {
 			active[strings.TrimSuffix(strings.ToLower(m.PackageID), "_steam")] = true
 		}
 	}
+	return active
+}
+
+// searchInputs describes the mods to search for modsearch.
+func searchInputs(st *app.LoadoutState, mods []*store.Mod) []modsearch.Mod {
 	inputs := make([]modsearch.Mod, 0, len(mods))
 	for _, m := range mods {
 		inputs = append(inputs, modsearch.Mod{Pos: st.Position(m.ID), Ref: st.Ix.Ref(m.ID), PackageID: m.PackageID, Name: m.DisplayName(), Copy: location(m), Root: st.Ix.ModDir(m), LoadFoldersXML: m.Decl().LoadFolders})
 	}
-	o := modsearch.Options{Pattern: a.Pos[0], Regex: a.Bool("regex"), CaseSensitive: a.Bool("case"), Word: a.Bool("word"), Def: a.Bool("def"), MM: st.GameMM(), Active: func(pkg string) bool { return active[pkg] }, AllVersions: a.Bool("all-versions"), Kinds: kinds, Langs: a.List("lang"), Offset: offset, Limit: limit, PerFile: perFile}
-	if mode != "matches" {
-		o.Offset, o.Limit = 0, 1
-	}
-	result, err := modsearch.Search(context.Background(), inputs, o)
-	if err != nil {
-		return nil, &UsageError{Msg: err.Error()}
-	}
+	return inputs
+}
+
+// searchScope describes what files search covered, for its title.
+func searchScope(a *Args, st *app.LoadoutState, o modsearch.Options, f filesSearchFlagValues, nInputs int) string {
 	scope := "active list"
 	if len(a.List("mod")) > 0 {
-		scope = fmt.Sprintf("%d mods", len(inputs))
+		scope = fmt.Sprintf("%d mods", nInputs)
 	}
 	version := st.GameMM()
 	if o.AllVersions {
 		version = "all versions"
 	}
-	scope += ", " + version + ", " + searchKinds(kinds)
+	scope += ", " + version + ", " + searchKinds(f.kinds)
 	if len(o.Langs) > 0 {
 		scope += ", languages " + strings.Join(o.Langs, ",")
 	}
-	if game != "with" {
-		scope += ", game " + game
+	if f.game != "with" {
+		scope += ", game " + f.game
 	}
-	d, root := render.New(fmt.Sprintf("files search %q (%s): %d matches in %d files of %d mods (searched %d files in %d mods, %d ms)", o.Pattern, scope, result.Matches, result.FilesMatched, result.ModsMatched, result.FilesSearched, result.ModsSearched, result.Elapsed.Milliseconds()))
-	if o.Def {
-		searchSummary(root, result)
-	}
+	return scope
+}
+
+// searchRows adds each mod's results in the chosen mode and returns the rows counted
+// for paging (files and count modes).
+func searchRows(root *render.Node, result *modsearch.Result, f filesSearchFlagValues) int {
 	rows := 0
 	for _, m := range result.Mods {
 		pos := searchPosition(m.Pos)
-		switch mode {
+		switch f.mode {
 		case "matches":
 			if len(m.Files) == 0 {
 				continue
 			}
-			node := root.Addf("%s %s %s  pkg:%s  %s  load: %s", pos, m.Ref, m.Name, m.PackageID, m.Copy, strings.Join(m.Folders, ", "))
-			for _, f := range m.Files {
-				line := f.Rel
-				if more := f.Count - len(f.Matches); more > 0 {
-					line += fmt.Sprintf("  (+%d more in this file)", more)
-				}
-				file := node.Add(line)
-				for _, hit := range f.Matches {
-					if hit.Line == 0 {
-						file.Add(hit.Text)
-						continue
-					}
-					parts := []string{strconv.Itoa(hit.Line)}
-					if hit.Role != "" {
-						parts = append(parts, hit.Role)
-					}
-					if hit.Within != "" && !strings.Contains(hit.Text, hit.Within) { // an xpath line already shows it
-						parts = append(parts, "in "+hit.Within)
-					}
-					parts = append(parts, hit.Text)
-					file.Add(strings.Join(parts, "  "))
-				}
-			}
+			searchMatches(root, pos, m)
 		case "files":
-			for _, f := range m.FileCounts {
-				if rows >= offset && rows-offset < limit {
-					root.Addf("%s %s  %s  %d", pos, m.Ref, f.Rel, f.Count)
+			for _, fc := range m.FileCounts {
+				if rows >= f.offset && rows-f.offset < f.limit {
+					root.Addf("%s %s  %s  %d", pos, m.Ref, fc.Rel, fc.Count)
 				}
 				rows++
 			}
@@ -190,28 +229,40 @@ func filesSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			if m.Matches == 0 {
 				continue
 			}
-			if rows >= offset && rows-offset < limit {
+			if rows >= f.offset && rows-f.offset < f.limit {
 				root.Addf("%s %s %s  %d matches in %d files", pos, m.Ref, m.Name, m.Matches, m.FilesMatched)
 			}
 			rows++
 		}
 	}
-	if mode == "matches" {
-		rows = result.Kept
-	}
-	if !unpaged && rows > offset && rows-offset > limit {
-		d.AddNext(searchNext(c, a, page+1))
-	}
-	if result.Unreadable > 0 {
-		root.Addf("unreadable: %d files or folders could not be read; first: %s", result.Unreadable, result.FirstError)
-	}
-	if result.Matches == 0 {
-		root.Add("(none)")
-		if len(a.List("mod")) == 0 && !a.Bool("kind") && game == "with" && !o.AllVersions && kinds&modsearch.Languages == 0 {
-			root.Add("hint: translations, other versions, and inactive mods are excluded; widen with --languages, --all-versions, or --mod <ref>")
+	return rows
+}
+
+// searchMatches adds one mod's matching files and lines.
+func searchMatches(root *render.Node, pos string, m modsearch.ModResult) {
+	node := root.Addf("%s %s %s  pkg:%s  %s  load: %s", pos, m.Ref, m.Name, m.PackageID, m.Copy, strings.Join(m.Folders, ", "))
+	for _, f := range m.Files {
+		line := f.Rel
+		if more := f.Count - len(f.Matches); more > 0 {
+			line += fmt.Sprintf("  (+%d more in this file)", more)
+		}
+		file := node.Add(line)
+		for _, hit := range f.Matches {
+			if hit.Line == 0 {
+				file.Add(hit.Text)
+				continue
+			}
+			parts := []string{strconv.Itoa(hit.Line)}
+			if hit.Role != "" {
+				parts = append(parts, hit.Role)
+			}
+			if hit.Within != "" && !strings.Contains(hit.Text, hit.Within) { // an xpath line already shows it
+				parts = append(parts, "in "+hit.Within)
+			}
+			parts = append(parts, hit.Text)
+			file.Add(strings.Join(parts, "  "))
 		}
 	}
-	return d, nil
 }
 
 // Package references prefer exactly one active copy; explicit instance references stay exact.
