@@ -187,7 +187,7 @@ func (in info) targetMethod() string {
 var kindByName = map[string]string{"Prefix": Prefix, "Postfix": Postfix, "Transpiler": Transpiler, "Finalizer": Finalizer}
 var kindAttr = map[string]string{"HarmonyPrefix": Prefix, "HarmonyPostfix": Postfix, "HarmonyTranspiler": Transpiler, "HarmonyFinalizer": Finalizer}
 
-/// Read analyses one DLL.
+// Read analyses one DLL.
 func Read(path string, skipHarmony bool) (*Assembly, error) {
 	a, err := dotnet.Open(path)
 	if err != nil {
