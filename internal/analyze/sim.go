@@ -237,227 +237,295 @@ func (s *sim) valueChildren(o *Op) []int32 {
 
 func (s *sim) clone(o *Op, k int32) int32 { return s.doc.Clone(o.valDoc, k) }
 
+// worker applies one operation to the document and reports whether it succeeded, as the
+// game's ApplyWorker does; nested operations run under g.
 func (s *sim) worker(o *Op, g guard) (bool, error) {
-	d := s.doc
 	switch o.Class {
 	case "PatchOperationAdd":
-		if o.value == xdoc.None {
-			return false, errRuntime
-		}
-		nodes, err := s.selectNodes(o, false)
-		if err != nil {
-			return false, err
-		}
-		kids := s.valueChildren(o)
-		for _, n := range nodes {
-			if n.IsAttr() {
-				return false, errRuntime
-			}
-			if o.order == "Prepend" {
-				for i := len(kids) - 1; i >= 0; i-- {
-					d.PrependChild(n.N, s.clone(o, kids[i]))
-				}
-			} else {
-				for _, k := range kids {
-					d.AppendChild(n.N, s.clone(o, k))
-				}
-			}
-		}
-		return len(nodes) > 0, nil
+		return s.opAdd(o)
 	case "PatchOperationInsert":
-		if o.value == xdoc.None {
-			return false, errRuntime
-		}
-		nodes, err := s.selectNodes(o, false)
-		if err != nil {
-			return false, err
-		}
-		kids := s.valueChildren(o)
-		for _, n := range nodes {
-			if n.IsAttr() || d.Parent(n.N) == xdoc.None {
-				return false, errRuntime
-			}
-			if o.order == "Append" {
-				// InsertAfter(child, xmlNode) per child in order: later children end up first.
-				for _, k := range kids {
-					d.InsertAfter(n.N, s.clone(o, k))
-				}
-			} else {
-				for i := len(kids) - 1; i >= 0; i-- {
-					d.InsertBefore(n.N, s.clone(o, kids[i]))
-				}
-			}
-			if d.Kind(n.N) == xdoc.KindText {
-				d.Normalize(d.Parent(n.N))
-			}
-		}
-		return len(nodes) > 0, nil
+		return s.opInsert(o)
 	case "PatchOperationReplace":
-		if o.value == xdoc.None {
-			return false, errRuntime
-		}
-		nodes, err := s.selectNodes(o, false)
-		if err != nil {
-			return false, err
-		}
-		s.contest(nodes)
-		kids := s.valueChildren(o)
-		for _, n := range nodes {
-			if n.IsAttr() || d.Parent(n.N) == xdoc.None {
-				return false, errRuntime
-			}
-			for _, k := range kids {
-				d.InsertBefore(n.N, s.clone(o, k))
-			}
-			d.Detach(n.N)
-		}
-		return len(nodes) > 0, nil
+		return s.opReplace(o)
 	case "PatchOperationRemove":
-		nodes, err := s.selectNodes(o, false)
-		if err != nil {
-			return false, err
-		}
-		s.contest(nodes)
-		for _, n := range nodes {
-			if n.IsAttr() || d.Parent(n.N) == xdoc.None {
-				return false, errRuntime
-			}
-			d.Detach(n.N)
-		}
-		return len(nodes) > 0, nil
+		return s.opRemove(o)
 	case "PatchOperationAttributeAdd", "PatchOperationAttributeSet", "PatchOperationAttributeRemove":
-		nodes, err := s.selectNodes(o, false)
-		if err != nil {
-			return false, err
-		}
-		res := false
-		for _, n := range nodes {
-			if n.IsAttr() || d.Kind(n.N) != xdoc.KindElement {
-				if o.Class == "PatchOperationAttributeSet" {
-					return false, errRuntime // Attributes is null on non-elements
-				}
-				continue
-			}
-			_, has := d.Attr(n.N, o.attribute)
-			switch o.Class {
-			case "PatchOperationAttributeAdd":
-				if !has {
-					d.SetAttr(n.N, o.attribute, o.attrValue)
-					res = true
-				}
-			case "PatchOperationAttributeSet":
-				d.SetAttr(n.N, o.attribute, o.attrValue)
-				res = true
-			case "PatchOperationAttributeRemove":
-				if has {
-					d.RemoveAttr(n.N, o.attribute)
-					res = true
-				}
-			}
-		}
-		return res, nil
+		return s.opAttribute(o)
 	case "PatchOperationSetName":
-		nodes, err := s.selectNodes(o, false)
-		if err != nil {
-			return false, err
-		}
-		for _, n := range nodes {
-			if n.IsAttr() || d.Parent(n.N) == xdoc.None {
-				return false, errRuntime
-			}
-			nn := d.NewElement(o.name)
-			for _, c := range d.ChildNodes(n.N) {
-				d.AppendChild(nn, d.Clone(d, c))
-			}
-			d.InsertBefore(n.N, nn)
-			d.Detach(n.N)
-		}
-		return len(nodes) > 0, nil
+		return s.opSetName(o)
 	case "PatchOperationAddModExtension":
-		if o.value == xdoc.None {
-			return false, errRuntime
-		}
-		nodes, err := s.selectNodes(o, false)
-		if err != nil {
-			return false, err
-		}
-		kids := s.valueChildren(o)
-		for _, n := range nodes {
-			if n.IsAttr() {
-				return false, errRuntime
-			}
-			ext := d.Child(n.N, "modExtensions")
-			if ext == xdoc.None {
-				ext = d.NewElement("modExtensions")
-				d.AppendChild(n.N, ext)
-			}
-			for _, k := range kids {
-				d.AppendChild(ext, s.clone(o, k))
-			}
-		}
-		return len(nodes) > 0, nil
+		return s.opAddModExtension(o)
 	case "PatchOperationTest":
 		n, err := s.selectNodes(o, true)
 		return len(n) > 0, err
 	case "PatchOperationConditional":
-		n, err := s.selectNodes(o, true)
-		if err != nil {
-			return false, err
-		}
-		cg := g
-		cg.cond = true
-		if len(n) > 0 {
-			if o.match != nil {
-				return s.apply(o.match, cg)
-			}
-		} else if o.nomatch != nil {
-			return s.apply(o.nomatch, cg)
-		}
-		if o.match == nil {
-			return o.nomatch != nil, nil
-		}
-		return true, nil
+		return s.opConditional(o, g)
 	case "PatchOperationFindMod":
-		found := false
-		for _, m := range o.mods {
-			if s.activeNm[m] {
-				found = true
-				break
-			}
-		}
-		if found {
-			if o.match != nil {
-				mg := g
-				mg.findMods = append(append([]string(nil), g.findMods...), o.mods...)
-				return s.apply(o.match, mg)
-			}
-		} else if o.nomatch != nil {
-			return s.apply(o.nomatch, g)
-		}
-		return true, nil
+		return s.opFindMod(o, g)
 	case "PatchOperationSequence":
-		for _, c := range o.ops {
-			if !s.listItemActive(c) {
-				continue
-			}
-			cg := g
-			if c.mayReq != "" || c.mayReqAny != "" {
-				cg.mayReq = append(append([]string(nil), g.mayReq...), splitPkgs(c.mayReq+","+c.mayReqAny)...)
-			}
-			ok, err := s.apply(c, cg)
-			if err != nil {
-				return false, err
-			}
-			if !ok {
-				o.lastFailed = c
-				return false, nil
-			}
-		}
-		return true, nil
+		return s.opSequence(o, g)
 	case "PatchOperation":
 		return false, nil
 	}
 	// A mod-defined operation class cannot be simulated; assume it succeeds.
+	return true, nil
+}
+
+// opAdd appends (or prepends) the value's children to every selected node.
+func (s *sim) opAdd(o *Op) (bool, error) {
+	d := s.doc
+	if o.value == xdoc.None {
+		return false, errRuntime
+	}
+	nodes, err := s.selectNodes(o, false)
+	if err != nil {
+		return false, err
+	}
+	kids := s.valueChildren(o)
+	for _, n := range nodes {
+		if n.IsAttr() {
+			return false, errRuntime
+		}
+		if o.order == "Prepend" {
+			for i := len(kids) - 1; i >= 0; i-- {
+				d.PrependChild(n.N, s.clone(o, kids[i]))
+			}
+		} else {
+			for _, k := range kids {
+				d.AppendChild(n.N, s.clone(o, k))
+			}
+		}
+	}
+	return len(nodes) > 0, nil
+}
+
+// opInsert inserts the value's children before (or after) every selected node.
+func (s *sim) opInsert(o *Op) (bool, error) {
+	d := s.doc
+	if o.value == xdoc.None {
+		return false, errRuntime
+	}
+	nodes, err := s.selectNodes(o, false)
+	if err != nil {
+		return false, err
+	}
+	kids := s.valueChildren(o)
+	for _, n := range nodes {
+		if n.IsAttr() || d.Parent(n.N) == xdoc.None {
+			return false, errRuntime
+		}
+		if o.order == "Append" {
+			// InsertAfter(child, xmlNode) per child in order: later children end up first.
+			for _, k := range kids {
+				d.InsertAfter(n.N, s.clone(o, k))
+			}
+		} else {
+			for i := len(kids) - 1; i >= 0; i-- {
+				d.InsertBefore(n.N, s.clone(o, kids[i]))
+			}
+		}
+		if d.Kind(n.N) == xdoc.KindText {
+			d.Normalize(d.Parent(n.N))
+		}
+	}
+	return len(nodes) > 0, nil
+}
+
+// opReplace puts the value's children in place of every selected node.
+func (s *sim) opReplace(o *Op) (bool, error) {
+	d := s.doc
+	if o.value == xdoc.None {
+		return false, errRuntime
+	}
+	nodes, err := s.selectNodes(o, false)
+	if err != nil {
+		return false, err
+	}
+	s.contest(nodes)
+	kids := s.valueChildren(o)
+	for _, n := range nodes {
+		if n.IsAttr() || d.Parent(n.N) == xdoc.None {
+			return false, errRuntime
+		}
+		for _, k := range kids {
+			d.InsertBefore(n.N, s.clone(o, k))
+		}
+		d.Detach(n.N)
+	}
+	return len(nodes) > 0, nil
+}
+
+// opRemove detaches every selected node.
+func (s *sim) opRemove(o *Op) (bool, error) {
+	d := s.doc
+	nodes, err := s.selectNodes(o, false)
+	if err != nil {
+		return false, err
+	}
+	s.contest(nodes)
+	for _, n := range nodes {
+		if n.IsAttr() || d.Parent(n.N) == xdoc.None {
+			return false, errRuntime
+		}
+		d.Detach(n.N)
+	}
+	return len(nodes) > 0, nil
+}
+
+// opAttribute adds, sets or removes an attribute on every selected element.
+func (s *sim) opAttribute(o *Op) (bool, error) {
+	d := s.doc
+	nodes, err := s.selectNodes(o, false)
+	if err != nil {
+		return false, err
+	}
+	res := false
+	for _, n := range nodes {
+		if n.IsAttr() || d.Kind(n.N) != xdoc.KindElement {
+			if o.Class == "PatchOperationAttributeSet" {
+				return false, errRuntime // Attributes is null on non-elements
+			}
+			continue
+		}
+		if s.changeAttribute(o, n.N) {
+			res = true
+		}
+	}
+	return res, nil
+}
+
+// changeAttribute applies an attribute operation to element n and reports whether it changed.
+func (s *sim) changeAttribute(o *Op, n int32) bool {
+	d := s.doc
+	_, has := d.Attr(n, o.attribute)
+	switch o.Class {
+	case "PatchOperationAttributeAdd":
+		if !has {
+			d.SetAttr(n, o.attribute, o.attrValue)
+			return true
+		}
+	case "PatchOperationAttributeSet":
+		d.SetAttr(n, o.attribute, o.attrValue)
+		return true
+	case "PatchOperationAttributeRemove":
+		if has {
+			d.RemoveAttr(n, o.attribute)
+			return true
+		}
+	}
+	return false
+}
+
+// opSetName replaces every selected node by an element of the new name with its children.
+func (s *sim) opSetName(o *Op) (bool, error) {
+	d := s.doc
+	nodes, err := s.selectNodes(o, false)
+	if err != nil {
+		return false, err
+	}
+	for _, n := range nodes {
+		if n.IsAttr() || d.Parent(n.N) == xdoc.None {
+			return false, errRuntime
+		}
+		nn := d.NewElement(o.name)
+		for _, c := range d.ChildNodes(n.N) {
+			d.AppendChild(nn, d.Clone(d, c))
+		}
+		d.InsertBefore(n.N, nn)
+		d.Detach(n.N)
+	}
+	return len(nodes) > 0, nil
+}
+
+// opAddModExtension appends the value's children to each selected node's modExtensions,
+// creating it when missing.
+func (s *sim) opAddModExtension(o *Op) (bool, error) {
+	d := s.doc
+	if o.value == xdoc.None {
+		return false, errRuntime
+	}
+	nodes, err := s.selectNodes(o, false)
+	if err != nil {
+		return false, err
+	}
+	kids := s.valueChildren(o)
+	for _, n := range nodes {
+		if n.IsAttr() {
+			return false, errRuntime
+		}
+		ext := d.Child(n.N, "modExtensions")
+		if ext == xdoc.None {
+			ext = d.NewElement("modExtensions")
+			d.AppendChild(n.N, ext)
+		}
+		for _, k := range kids {
+			d.AppendChild(ext, s.clone(o, k))
+		}
+	}
+	return len(nodes) > 0, nil
+}
+
+// opConditional runs match or nomatch, by whether the xpath selects anything, as guarded.
+func (s *sim) opConditional(o *Op, g guard) (bool, error) {
+	n, err := s.selectNodes(o, true)
+	if err != nil {
+		return false, err
+	}
+	cg := g
+	cg.cond = true
+	if len(n) > 0 {
+		if o.match != nil {
+			return s.apply(o.match, cg)
+		}
+	} else if o.nomatch != nil {
+		return s.apply(o.nomatch, cg)
+	}
+	if o.match == nil {
+		return o.nomatch != nil, nil
+	}
+	return true, nil
+}
+
+// opFindMod runs match when one of the named mods is active (guarded by them), else nomatch.
+func (s *sim) opFindMod(o *Op, g guard) (bool, error) {
+	found := false
+	for _, m := range o.mods {
+		if s.activeNm[m] {
+			found = true
+			break
+		}
+	}
+	if found {
+		if o.match != nil {
+			mg := g
+			mg.findMods = append(append([]string(nil), g.findMods...), o.mods...)
+			return s.apply(o.match, mg)
+		}
+	} else if o.nomatch != nil {
+		return s.apply(o.nomatch, g)
+	}
+	return true, nil
+}
+
+// opSequence runs the active list items in order and stops at the first that fails.
+func (s *sim) opSequence(o *Op, g guard) (bool, error) {
+	for _, c := range o.ops {
+		if !s.listItemActive(c) {
+			continue
+		}
+		cg := g
+		if c.mayReq != "" || c.mayReqAny != "" {
+			cg.mayReq = append(append([]string(nil), g.mayReq...), splitPkgs(c.mayReq+","+c.mayReqAny)...)
+		}
+		ok, err := s.apply(c, cg)
+		if err != nil {
+			return false, err
+		}
+		if !ok {
+			o.lastFailed = c
+			return false, nil
+		}
+	}
 	return true, nil
 }
 
