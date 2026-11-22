@@ -254,15 +254,17 @@ The frontend is plain HTML, CSS and ES modules (16 §8.2). A grep of `style.css`
 
 About three weeks of work. Not in this milestone: packages (L7), Steam-client subscriptions (L6), Archo Agent and secrets (L4), native memory targets (M08), GTK 4, Wayland-specific checks beyond what GNOME's default session shows.
 
-## 6. Decisions to take, and discrepancies
+## 6. Decisions, and discrepancies
 
-| # | Question | Recommendation |
+D4, D7, D8 and D9 were decided by the maintainer on 2026-11-22, as recommended. D10 is still open. 17 §1, §5 and 16 §8.1 change when the code that follows these decisions lands, not before.
+
+| # | Question | Decision |
 | --- | --- | --- |
-| D4 (revisit) | Oldest distributions | Keep Ubuntu 22.04, Debian 12, Fedora 40; WebKitGTK floor 2.44; glibc floor set by building on 22.04 |
-| D7 (new) | cgo for the Linux GUI | Allow `CGO_ENABLED=1` only for the Linux GUI binary; no `import "C"` in RimArcho's packages; `TestArchNoCgo` stays |
-| D8 (new) | GTK 3 or GTK 4 | GTK 3 (`-tags gtk3`) for 1.2; retest GTK 4 with the next pinned Wails |
-| D9 (new) | One Linux binary or two | Two: static `archo`, dynamic `rimarcho` |
-| D10 (new) | Linux memory measure | Summed Pss of the process tree, recorded, not gating, while experimental |
+| D4 (revisited, decided) | Oldest distributions | Ubuntu 22.04, Debian 12, Fedora 40; WebKitGTK at least 2.44, checked at startup; the glibc floor is set by building on 22.04 |
+| D7 (decided) | cgo for the Linux GUI | `CGO_ENABLED=1` only for the Linux GUI binary (WebKitGTK is a C library, and Wails' Linux code calls it through cgo); no `import "C"` in RimArcho's packages; `TestArchNoCgo` stays; `archo` stays pure Go and static |
+| D8 (decided) | GTK 3 or GTK 4 | GTK 3 (`-tags gtk3`, WebKitGTK 4.1) for 1.2, because it is measured and on all D4 distributions; build once with GTK 4 (WebKitGTK 6.0) at the next pinned Wails, and switch when the D4 distributions carry it |
+| D9 (decided) | One Linux binary or two | Two: the static `archo` (CLI, TUI, MCP; no GTK needed: SteamOS game mode, servers) and the dynamic `rimarcho` GUI, as `archo.exe` and `RimArcho.exe` on Windows |
+| D10 (open) | Linux memory measure | Recommended: summed Pss of the process tree, recorded, not gating, while experimental |
 
 Discrepancies between docs and code found while checking:
 
