@@ -21,11 +21,9 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"regexp"
 	"sort"
@@ -33,6 +31,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/logs"
+	"github.com/ToumanLin/RimArcho/spikes/internal/jsonl"
 )
 
 // ---- input ----
@@ -354,6 +353,7 @@ type Pattern struct {
 	Versions []string    `json:"mod_versions,omitempty"`
 	First    string      `json:"first_seen,omitempty"` // month
 	Last     string      `json:"last_seen,omitempty"`
+	LastLog  string      `json:"last_log,omitempty"` // newest log, YYYY-MM-DD
 	Logs     int         `json:"logs"`
 	Sessions int         `json:"sessions"`
 	Clusters int         `json:"clusters"`
@@ -415,28 +415,7 @@ func main() {
 	}
 }
 
-func eachLine(path string, f func([]byte) error) error {
-	fh, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer fh.Close()
-	r := bufio.NewReaderSize(fh, 1<<20)
-	for {
-		b, err := r.ReadBytes('\n')
-		if len(b) > 0 {
-			if e := f(b); e != nil {
-				return e
-			}
-		}
-		if err == io.EOF {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-	}
-}
+func eachLine(path string, f func([]byte) error) error { return jsonl.Each(path, f) }
 
 var dump string
 
@@ -572,6 +551,7 @@ func run(parsedPath, resultsPath, outPath, mm string, minLogs, minSess, maxChang
 		sess                           map[int]bool
 		srcLogs                        map[string]int
 		first, last                    string
+		lastDay                        string // newest log, YYYY-MM-DD (weekly data, 05 §4.6)
 		versions                       map[string]bool
 		res                            *Res
 	}
@@ -659,6 +639,9 @@ func run(parsedPath, resultsPath, outPath, mm string, minLogs, minSess, maxChang
 					}
 					if month > m.last {
 						m.last = month
+					}
+					if day := l.created.Format("2006-01-02"); day > m.lastDay {
+						m.lastDay = day
 					}
 					if v := l.mv[c.src[0]]; v != "" {
 						m.versions[v] = true
@@ -923,7 +906,7 @@ func run(parsedPath, resultsPath, outPath, mm string, minLogs, minSess, maxChang
 			gid = g.ID
 		}
 		pats = append(pats, &Pattern{ID: fmt.Sprintf("m:%s:%s", m.k.mod, shortHash(m.k.tpl)), Layer: "mod", Template: m.k.tpl, Class: modClass[m.k],
-			Mod: m.k.mod, Versions: vs, First: m.a.first, Last: m.a.last, Logs: m.a.logs, Sessions: len(m.a.sess), Clusters: m.a.clusters,
+			Mod: m.k.mod, Versions: vs, First: m.a.first, Last: m.a.last, LastLog: m.a.lastDay, Logs: m.a.logs, Sessions: len(m.a.sess), Clusters: m.a.clusters,
 			Count: m.a.count, WithSrc: m.a.withSrc, Res: m.a.res, Rule: &Rule{ID: gid}})
 	}
 	p("\n== Mod-specific patterns (one source mod; >= %d logs from >= %d sessions; %d candidates below the threshold dropped)", minLogs, minSess, dropped)

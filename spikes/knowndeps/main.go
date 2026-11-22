@@ -29,12 +29,10 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"math/bits"
 	"os"
 	"path/filepath"
@@ -46,6 +44,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/known"
 	"github.com/ToumanLin/RimArcho/internal/scan"
+	"github.com/ToumanLin/RimArcho/spikes/internal/jsonl"
 )
 
 type multi []string
@@ -121,28 +120,7 @@ type logRec struct {
 
 // ---- input ----
 
-func eachLine(path string, f func([]byte) error) error {
-	fh, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer fh.Close()
-	r := bufio.NewReaderSize(fh, 1<<20)
-	for {
-		b, err := r.ReadBytes('\n')
-		if len(b) > 0 {
-			if e := f(b); e != nil {
-				return e
-			}
-		}
-		if err == io.EOF {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-	}
-}
+func eachLine(path string, f func([]byte) error) error { return jsonl.Each(path, f) }
 
 type pmod struct {
 	Pkg string `json:"pkg"`
@@ -431,6 +409,21 @@ func uses(f *files, it item) bool {
 // ---- helpers ----
 
 type set map[int]bool
+
+// lastLog is the newest of the logs, YYYY-MM-DD (weekly data drops entries without a log in
+// the last 12 weeks, 05 §4.6).
+func lastLog(ls []*logRec, idx set) string {
+	var t time.Time
+	for i := range idx {
+		if ls[i].created.After(t) {
+			t = ls[i].created
+		}
+	}
+	if t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format("2006-01-02")
+}
 
 func players(ls []*logRec, idx set) int {
 	var ids []int
@@ -757,7 +750,7 @@ func run(parsedPath, resultsPath, patternsPath, steamPath, outPath, mm string, r
 			}
 		}
 		pr := &known.Prereq{Mod: k.a, Needs: k.b, Logs: len(errs), Players: pl, Without: without, Items: items,
-			Class: top(class, 1)[0], Example: ex, Cosmetic: cosmetic}
+			Class: top(class, 1)[0], Example: ex, Cosmetic: cosmetic, Seen: known.Seen{LastLog: lastLog(ls, errs)}}
 		mi := lib[k.a]
 		row := &prow{pr: pr, rate: r, errs: errs}
 		if mi != nil {
@@ -978,7 +971,7 @@ func run(parsedPath, resultsPath, patternsPath, steamPath, outPath, mm string, r
 			continue
 		}
 		x := &known.Combo{Mods: mods, Version: k.v, Class: top(c.class, 1)[0], Templates: tpls, Logs: len(errs), Players: pl,
-			With: with, Without: without, WithoutErr: withoutErr}
+			With: with, Without: without, WithoutErr: withoutErr, Seen: known.Seen{LastLog: lastLog(ls, errs)}}
 		chg := []string{k.a}
 		if k.b != "" {
 			chg = append(chg, k.b)

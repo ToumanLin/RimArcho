@@ -68,7 +68,7 @@ func export(datasetPath, outPath string) error {
 			kind = "g:" + p.Rule.ID
 		}
 		out.Mod = append(out.Mod, &patterns.Pattern{ID: p.ID, Class: p.Class, Template: p.Template, Mod: p.Mod, Kind: kind,
-			Versions: p.Versions, First: p.First, Last: p.Last, Logs: p.Logs, Sessions: p.Sessions, NClusters: p.Clusters, Res: res(p.Res)})
+			Versions: p.Versions, First: p.First, Last: p.Last, LastLog: p.LastLog, Logs: p.Logs, Sessions: p.Sessions, NClusters: p.Clusters, Res: res(p.Res)})
 	}
 	// One pattern per line, as patterns-v0.json: readable diffs between dataset versions.
 	var sb strings.Builder
