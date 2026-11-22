@@ -116,42 +116,7 @@ func tagCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	switch a.Pos[0] {
 	case "list":
-		all, err := TagList(c.App)
-		if err != nil {
-			return nil, err
-		}
-		var ts []TagInfo
-		for _, t := range all {
-			if t.N > 0 {
-				ts = append(ts, t)
-			}
-		}
-		slices.SortStableFunc(ts, func(x, y TagInfo) int { return strings.Compare(strings.ToLower(x.Tag), strings.ToLower(y.Tag)) })
-		d, root := render.New(fmt.Sprintf("tags: %d", len(ts)))
-		var rows [][]string
-		for _, t := range ts {
-			r := []string{t.Tag, render.Plural(t.N, "mod")}
-			var more []string
-			if t.Pinned {
-				more = append(more, "pinned")
-			}
-			if t.Color != "" {
-				more = append(more, "colour: "+t.Color)
-			}
-			if t.Note != "" {
-				more = append(more, "note: "+strings.ReplaceAll(t.Note, "\n", " / "))
-			}
-			rows = append(rows, append(r, strings.Join(more, "  ")))
-		}
-		root.AddColumns(rows)
-		if len(ts) == 0 {
-			root.Add("(none)")
-		}
-		root.Truncate(boolLimit(a, render.DefaultLimit), "")
-		if len(ts) > 0 {
-			d.AddNext("archo list --filter tag:" + quoteArg(ts[0].Tag))
-		}
-		return d, nil
+		return tagListCmd(c, a)
 	case "rename":
 		if len(a.Pos) != 3 {
 			return nil, &UsageError{Msg: "tag rename <tag> <new name> [--dry-run]"}
@@ -180,46 +145,9 @@ func tagCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		return tagEditDoc(e, a.Bool("dry-run"), "deleted", strings.Join(e.From, ", ")), nil
 	case "note":
-		v := ""
-		switch {
-		case len(a.Pos) == 2 && a.Bool("clear"):
-		case len(a.Pos) == 3:
-			v = a.Pos[2]
-		default:
-			return nil, &UsageError{Msg: "tag note <tag> <text> | tag note <tag> --clear"}
-		}
-		t, err := SetTagNote(c.App, a.Pos[1], v)
-		if err != nil {
-			return nil, err
-		}
-		if strings.TrimSpace(v) == "" {
-			d, _ := render.New("note cleared for tag " + t)
-			return d, nil
-		}
-		d, root := render.New("note set for tag " + t)
-		root.KV("note", strings.TrimSpace(v))
-		return d, nil
+		return tagNoteCmd(c, a)
 	case "color":
-		v := ""
-		switch {
-		case len(a.Pos) == 2 && a.Bool("clear"):
-		case len(a.Pos) == 3:
-			v = a.Pos[2]
-		default:
-			return nil, &UsageError{Msg: "tag color <tag> <colour> | tag color <tag> --clear (colours: " + strings.Join(TagColorNames, ", ") + ", #rrggbb, none)"}
-		}
-		t, col, err := SetTagColor(c.App, a.Pos[1], v)
-		if err != nil {
-			return nil, err
-		}
-		if col == "" {
-			d, _ := render.New("colour cleared for tag " + t)
-			return d, nil
-		}
-		d, root := render.New("colour set for tag " + t)
-		root.KV("colour", col)
-		root.KV("shows", "a band at the left of its mods' rows, where it is the mod's first tag")
-		return d, nil
+		return tagColorCmd(c, a)
 	case "order":
 		if len(a.Pos) < 3 {
 			return nil, &UsageError{Msg: "tag order <ref> <tag…> (the tags first, in this order)"}
@@ -236,64 +164,166 @@ func tagCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		root.KV("tags", strings.Join(tags, ", "))
 		return d, nil
 	case "add", "remove":
-		if len(a.Pos) < 3 {
-			return nil, &UsageError{Msg: "tag " + a.Pos[0] + " <ref> <tag…> [--mod <ref>]…"}
-		}
-		var mods []*store.Mod
-		for _, r := range append([]string{a.Pos[1]}, a.List("mod")...) {
-			m, err := ix.ResolveOne(r)
-			if err != nil {
-				return nil, err
-			}
-			mods = append(mods, m)
-		}
-		var tags []string
-		for _, t := range a.Pos[2:] {
-			if t = strings.TrimSpace(t); t != "" {
-				tags = append(tags, t)
-			}
-		}
-		verb := map[string]string{"add": "tagged", "remove": "untagged"}[a.Pos[0]]
-		var d *render.Doc
-		var root *render.Node
-		if len(mods) == 1 {
-			d, root = render.New(fmt.Sprintf("%s %s: %s", verb, modLabel(ix, mods[0].ID), strings.Join(tags, ", ")))
-		} else {
-			d, root = render.New(fmt.Sprintf("%s %s: %s", verb, render.Plural(len(mods), "mod"), strings.Join(tags, ", ")))
-		}
-		seen := map[string]bool{} // copies of one lineage share tags
-		for _, m := range mods {
-			if seen[m.LineageID] {
-				continue
-			}
-			seen[m.LineageID] = true
-			var same []string
-			for _, t := range tags {
-				var ok bool
-				var err error
-				if a.Pos[0] == "add" {
-					ok, err = c.App.Store.AddTag(ix.Env.ID, m.LineageID, t)
-				} else {
-					ok, err = c.App.Store.RemoveTag(ix.Env.ID, m.LineageID, t)
-				}
-				if err != nil {
-					return nil, err
-				}
-				if !ok {
-					same = append(same, t)
-				}
-			}
-			if len(same) > 0 {
-				k := "unchanged"
-				if len(mods) > 1 {
-					k = "unchanged for " + modLabel(ix, m.ID)
-				}
-				root.KV(k, strings.Join(same, ", "))
-			}
-		}
-		return d, nil
+		return tagAddRemoveCmd(c, a, ix)
 	}
 	return nil, &UsageError{Msg: "tag add|remove <ref> <tag…> | list | rename <tag> <new> | merge <tag…> --into <tag> | delete <tag…> | note <tag> [<text>]"}
+}
+
+// tagListCmd is tag list: the tags in use, with their pins, colours and notes.
+func tagListCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	all, err := TagList(c.App)
+	if err != nil {
+		return nil, err
+	}
+	var ts []TagInfo
+	for _, t := range all {
+		if t.N > 0 {
+			ts = append(ts, t)
+		}
+	}
+	slices.SortStableFunc(ts, func(x, y TagInfo) int { return strings.Compare(strings.ToLower(x.Tag), strings.ToLower(y.Tag)) })
+	d, root := render.New(fmt.Sprintf("tags: %d", len(ts)))
+	var rows [][]string
+	for _, t := range ts {
+		r := []string{t.Tag, render.Plural(t.N, "mod")}
+		var more []string
+		if t.Pinned {
+			more = append(more, "pinned")
+		}
+		if t.Color != "" {
+			more = append(more, "colour: "+t.Color)
+		}
+		if t.Note != "" {
+			more = append(more, "note: "+strings.ReplaceAll(t.Note, "\n", " / "))
+		}
+		rows = append(rows, append(r, strings.Join(more, "  ")))
+	}
+	root.AddColumns(rows)
+	if len(ts) == 0 {
+		root.Add("(none)")
+	}
+	root.Truncate(boolLimit(a, render.DefaultLimit), "")
+	if len(ts) > 0 {
+		d.AddNext("archo list --filter tag:" + quoteArg(ts[0].Tag))
+	}
+	return d, nil
+}
+
+// tagNoteCmd is tag note: set or clear a tag's note.
+func tagNoteCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	v := ""
+	switch {
+	case len(a.Pos) == 2 && a.Bool("clear"):
+	case len(a.Pos) == 3:
+		v = a.Pos[2]
+	default:
+		return nil, &UsageError{Msg: "tag note <tag> <text> | tag note <tag> --clear"}
+	}
+	t, err := SetTagNote(c.App, a.Pos[1], v)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(v) == "" {
+		d, _ := render.New("note cleared for tag " + t)
+		return d, nil
+	}
+	d, root := render.New("note set for tag " + t)
+	root.KV("note", strings.TrimSpace(v))
+	return d, nil
+}
+
+// tagColorCmd is tag color: set or clear a tag's colour.
+func tagColorCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	v := ""
+	switch {
+	case len(a.Pos) == 2 && a.Bool("clear"):
+	case len(a.Pos) == 3:
+		v = a.Pos[2]
+	default:
+		return nil, &UsageError{Msg: "tag color <tag> <colour> | tag color <tag> --clear (colours: " + strings.Join(TagColorNames, ", ") + ", #rrggbb, none)"}
+	}
+	t, col, err := SetTagColor(c.App, a.Pos[1], v)
+	if err != nil {
+		return nil, err
+	}
+	if col == "" {
+		d, _ := render.New("colour cleared for tag " + t)
+		return d, nil
+	}
+	d, root := render.New("colour set for tag " + t)
+	root.KV("colour", col)
+	root.KV("shows", "a band at the left of its mods' rows, where it is the mod's first tag")
+	return d, nil
+}
+
+// tagAddRemoveCmd is tag add and tag remove: tag or untag one or more mods.
+func tagAddRemoveCmd(c *Ctx, a *Args, ix *app.Index) (*render.Doc, error) {
+	if len(a.Pos) < 3 {
+		return nil, &UsageError{Msg: "tag " + a.Pos[0] + " <ref> <tag…> [--mod <ref>]…"}
+	}
+	var mods []*store.Mod
+	for _, r := range append([]string{a.Pos[1]}, a.List("mod")...) {
+		m, err := ix.ResolveOne(r)
+		if err != nil {
+			return nil, err
+		}
+		mods = append(mods, m)
+	}
+	var tags []string
+	for _, t := range a.Pos[2:] {
+		if t = strings.TrimSpace(t); t != "" {
+			tags = append(tags, t)
+		}
+	}
+	verb := map[string]string{"add": "tagged", "remove": "untagged"}[a.Pos[0]]
+	var d *render.Doc
+	var root *render.Node
+	if len(mods) == 1 {
+		d, root = render.New(fmt.Sprintf("%s %s: %s", verb, modLabel(ix, mods[0].ID), strings.Join(tags, ", ")))
+	} else {
+		d, root = render.New(fmt.Sprintf("%s %s: %s", verb, render.Plural(len(mods), "mod"), strings.Join(tags, ", ")))
+	}
+	seen := map[string]bool{} // copies of one lineage share tags
+	for _, m := range mods {
+		if seen[m.LineageID] {
+			continue
+		}
+		seen[m.LineageID] = true
+		same, err := tagApply(c, ix, a.Pos[0] == "add", m, tags)
+		if err != nil {
+			return nil, err
+		}
+		if len(same) > 0 {
+			k := "unchanged"
+			if len(mods) > 1 {
+				k = "unchanged for " + modLabel(ix, m.ID)
+			}
+			root.KV(k, strings.Join(same, ", "))
+		}
+	}
+	return d, nil
+}
+
+// tagApply adds (or removes) tags on m's lineage and returns the tags that were already
+// so.
+func tagApply(c *Ctx, ix *app.Index, add bool, m *store.Mod, tags []string) ([]string, error) {
+	var same []string
+	for _, t := range tags {
+		var ok bool
+		var err error
+		if add {
+			ok, err = c.App.Store.AddTag(ix.Env.ID, m.LineageID, t)
+		} else {
+			ok, err = c.App.Store.RemoveTag(ix.Env.ID, m.LineageID, t)
+		}
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			same = append(same, t)
+		}
+	}
+	return same, nil
 }
 
 // tagEditDoc reports a rename, merge or delete (or with dryRun what it would do).

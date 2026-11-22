@@ -50,11 +50,6 @@ internal/app/subscribe.go (*App).UpdateSubscriptionsWith 61 240
 internal/app/subscribeworkshop.go (*App).downloadWorkshopGroup 57 197
 internal/app/uninstall.go (*App).planUninstall 150 467
 internal/app/workshopsub.go (*App).Workshop 48 134
-internal/cmds/content.go whyCmd 56 189
-internal/cmds/files.go filesSearchCmd 67 170
-internal/cmds/harmony.go harmonyCmd 44 160
-internal/cmds/mcphints.go MCPCall 42 103
-internal/cmds/playerdata.go tagCmd 53 186
 internal/cmds/problems.go problemsCmd 81 219
 internal/cmds/query.go modDoc 60 188
 internal/cmds/saves.go savesFix 82 225
