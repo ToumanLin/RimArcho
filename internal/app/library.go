@@ -280,241 +280,305 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 }
 
 func (a *App) buildLibrary(st *LoadoutState, only string, search, snapshot bool) (*Library, error) {
-	ix := st.Ix
-	selected := func(m *store.Mod) bool { return only == "" || m.LineageID == only }
-	lib := &Library{Env: ix.Env, GameMM: st.GameMM(), St: st}
-	var used map[string][]LibUse
+	b := &libBuild{a: a, st: st, ix: st.Ix, only: only, search: search, snapshot: snapshot}
+	b.lib = &Library{Env: b.ix.Env, GameMM: st.GameMM(), St: st}
+	if err := b.gatherUses(); err != nil {
+		return nil, err
+	}
+	if err := b.gatherCopies(); err != nil {
+		return nil, err
+	}
+	for _, m := range b.ix.Mods {
+		if !b.selected(m) || m.Status != identity.Live || (!search && m.Kind == source.Official) || b.srcKind[m.SourceID] == "" {
+			continue
+		}
+		b.add(m, b.instance(m))
+	}
+	// Subscribed Workshop items with no folder (16 §2.9: "missing Workshop items"). A tombstone of the item
+	// keeps its name and lineage.
+	for _, s := range b.ix.Sources {
+		if search || s.Kind != source.Workshop || s.Status == source.StatusRetired {
+			continue
+		}
+		b.missingWorkshop(s)
+	}
+	b.finishLineages()
+	sortLineages(b.lib.Lineages, "name")
+	return b.lib, nil
+}
+
+// libBuild is one build of the library: what buildLibrary read once and the lineages it
+// fills.
+type libBuild struct {
+	a                *App
+	st               *LoadoutState
+	ix               *Index
+	lib              *Library
+	only             string
+	search, snapshot bool
+	used             map[string][]LibUse
+	played, changed  map[string]time.Time
+	notes            map[string]*store.CopyNote
+	texs             map[string]TextureSummary
+	locks            map[string]*Locked
+	pinUpdated       map[string]bool // RimCrow-style copies whose hidden upstream changed
+	snaps            map[string]int64
+	contents         map[string]int
+	srcKind          map[string]string
+	byLin            map[string]*LibLineage
+	live             map[string]int // live instances per lineage
+	dups             map[string]map[string]bool
+	onDisk, staged   map[string]bool
+	png              map[int64]bool
+}
+
+// selected tells whether m is in the library being built: all, or the lineage only.
+func (b *libBuild) selected(m *store.Mod) bool { return b.only == "" || m.LineageID == b.only }
+
+// gatherUses reads where each copy is used (lists and plans) and when it was last played.
+func (b *libBuild) gatherUses() error {
+	a, st := b.a, b.st
 	var lists *ListMembership
 	var err error
-	if snapshot {
+	if b.snapshot {
 		var envs []libEnv
 		envs, err = a.libEnvs(st)
 		if err == nil {
-			used, lists, err = a.listUses(st, envs)
+			b.used, lists, err = a.listUses(st, envs)
 		}
 	} else {
-		used, lists, err = a.libUses(st)
+		b.used, lists, err = a.libUses(st)
 	}
 	if err != nil {
-		return nil, err
+		return err
 	}
-	lib.Lists = lists
-	played := map[string]time.Time{}
-	if !snapshot {
-		played, err = a.libPlayed(st)
+	b.lib.Lists = lists
+	b.played = map[string]time.Time{}
+	if !b.snapshot {
+		b.played, err = a.libPlayed(st)
 	}
-	if err != nil {
-		return nil, err
-	}
+	return err
+}
+
+// gatherCopies reads the copies' history, notes, textures, locks, content kinds, sources,
+// staged state and PNG snapshots.
+func (b *libBuild) gatherCopies() error {
+	a, st, ix := b.a, b.st, b.ix
 	var instances []string
-	if only != "" {
-		for _, m := range ix.ByLineage[only] {
+	if b.only != "" {
+		for _, m := range ix.ByLineage[b.only] {
 			instances = append(instances, m.ID)
 		}
 		if len(instances) == 0 { // an unseen ghost has no history or note
 			instances = []string{""}
 		}
 	}
-	changed, err := a.Store.LastChanged(ix.Env.GameID, instances...)
+	var err error
+	b.changed, err = a.Store.LastChanged(ix.Env.GameID, instances...)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	notes, err := a.Store.CopyNotes(ix.Env.GameID, instances...)
-	texs := a.textureSummariesAtIndex(ix) // Texture optimisation: the DDS RimArcho wrote into each copy
+	b.notes, err = a.Store.CopyNotes(ix.Env.GameID, instances...)
+	b.texs = a.textureSummariesAtIndex(ix) // Texture optimisation: the DDS RimArcho wrote into each copy
 	if err != nil {
-		return nil, err
+		return err
 	}
-	lib.Now = a.Now()
-	locks := map[string]*Locked{}
+	b.lib.Now = a.Now()
+	b.locks = map[string]*Locked{}
 	for _, l := range st.Locked() {
-		locks[l.Copy.ID] = l
+		b.locks[l.Copy.ID] = l
 	}
-	pinUpdated := map[string]bool{} // RimCrow-style copies whose hidden upstream changed
+	b.pinUpdated = map[string]bool{}
 	for _, h := range st.Hidden() {
 		if h.Kind == HiddenPinned && h.Upstream {
-			pinUpdated[h.Copy.ID] = true
+			b.pinUpdated[h.Copy.ID] = true
 		}
 	}
-	snaps := map[string]int64{}
+	b.snaps = map[string]int64{}
 	for _, m := range ix.Mods {
-		if selected(m) {
-			snaps[m.ID] = m.SnapID
+		if b.selected(m) {
+			b.snaps[m.ID] = m.SnapID
 		}
 	}
-	contents, err := a.Store.ContentKinds(snaps)
-	if err != nil {
-		return nil, err
+	if b.contents, err = a.Store.ContentKinds(b.snaps); err != nil {
+		return err
 	}
-	srcKind := a.libSourceKinds(ix)
-	if search {
+	b.srcKind = a.libSourceKinds(ix)
+	if b.search {
 		for _, s := range ix.Sources {
 			if s.Kind == source.Official {
-				srcKind[s.ID] = "official"
+				b.srcKind[s.ID] = "official"
 			}
 		}
 	}
-	byLin := map[string]*LibLineage{}
-	lineage := func(id string) *LibLineage {
-		l := byLin[id]
-		if l == nil {
-			l = &LibLineage{ID: id, Ref: ix.LRef(id)}
-			byLin[id] = l
-		}
-		return l
-	}
-	live := map[string]int{} // live instances per lineage
+	b.byLin = map[string]*LibLineage{}
+	b.live = map[string]int{}
 	// the packageId duplicates of each game's Mods/, read once per folder (inModsDuplicate)
-	dups := map[string]map[string]bool{}
-	dupIn := func(id string) bool {
-		root := modsRootOf(ix, id)
-		if dups[root] == nil {
-			dups[root] = a.modsDuplicateIDs(ix, root)
-		}
-		return dups[root][id]
-	}
-	onDisk := map[string]bool{}
+	b.dups = map[string]map[string]bool{}
+	b.onDisk = map[string]bool{}
 	for _, m := range ix.Mods {
 		if m.Status == identity.Live && m.Kind != source.Official {
-			live[m.LineageID]++
+			b.live[m.LineageID]++
 			if m.Kind == source.Workshop {
-				onDisk[m.Rel] = true
+				b.onDisk[m.Rel] = true
 			}
 		}
 	}
-	add := func(m *store.Mod, i *LibInstance) {
-		i.Lists = lib.Lists.ByInstance[m.ID]
-		l := lineage(m.LineageID)
-		l.Instances = append(l.Instances, i)
-		l.Alias, l.Note, l.Tags = m.Alias, m.Note, m.Tags
-		l.search += " " + strings.ToLower(strings.Join([]string{m.Name, m.Alias, m.PackageID, m.Authors, m.WorkshopID(), m.Rel, m.Note, strings.Join(m.Tags, " ")}, " "))
-		if i.Note != nil {
-			l.search += " " + strings.ToLower(i.Note.Text)
-		}
-	}
-	staged := map[string]bool{}
-	if !snapshot {
+	b.staged = map[string]bool{}
+	if !b.snapshot {
 		if items, _, err := a.Staged(); err == nil {
 			for _, it := range items {
-				staged[it.Instance] = true
+				b.staged[it.Instance] = true
 			}
 		}
 	}
-	var png map[int64]bool
-	if only == "" {
-		png = a.pngSnapshots()
-	} else {
-		png, err = a.Store.SnapshotsWithPNGFor(snaps)
-		if err != nil {
-			return nil, err
+	if b.only == "" {
+		b.png = a.pngSnapshots()
+	} else if b.png, err = a.Store.SnapshotsWithPNGFor(b.snaps); err != nil {
+		return err
+	}
+	return nil
+}
+
+// lineage returns the lineage id, made on first use.
+func (b *libBuild) lineage(id string) *LibLineage {
+	l := b.byLin[id]
+	if l == nil {
+		l = &LibLineage{ID: id, Ref: b.ix.LRef(id)}
+		b.byLin[id] = l
+	}
+	return l
+}
+
+// dupIn tells whether copy id is a packageId duplicate in its game's Mods/.
+func (b *libBuild) dupIn(id string) bool {
+	root := modsRootOf(b.ix, id)
+	if b.dups[root] == nil {
+		b.dups[root] = b.a.modsDuplicateIDs(b.ix, root)
+	}
+	return b.dups[root][id]
+}
+
+// add puts copy i of m into its lineage.
+func (b *libBuild) add(m *store.Mod, i *LibInstance) {
+	i.Lists = b.lib.Lists.ByInstance[m.ID]
+	l := b.lineage(m.LineageID)
+	l.Instances = append(l.Instances, i)
+	l.Alias, l.Note, l.Tags = m.Alias, m.Note, m.Tags
+	l.search += " " + strings.ToLower(strings.Join([]string{m.Name, m.Alias, m.PackageID, m.Authors, m.WorkshopID(), m.Rel, m.Note, strings.Join(m.Tags, " ")}, " "))
+	if i.Note != nil {
+		l.search += " " + strings.ToLower(i.Note.Text)
+	}
+}
+
+// instance describes the live copy m.
+func (b *libBuild) instance(m *store.Mod) *LibInstance {
+	a, st, ix, snapshot := b.a, b.st, b.ix, b.snapshot
+	i := &LibInstance{Mod: m, Ref: ix.Ref(m.ID), Source: b.srcKind[m.SourceID], WorkshopID: m.WorkshopID(), Path: ix.ModDir(m),
+		Bytes: m.TotalSize, Sized: m.SnapID != 0 && (m.FileCount > 0 || m.TotalSize > 0),
+		UsedIn: b.used[m.ID], InPlan: st.List.Index(m.ID) >= 0, Staged: b.staged[m.ID], Played: b.played[m.ID], Changed: b.changed[m.ID], Locked: b.locks[m.ID],
+		Authors: strings.TrimSpace(m.Authors), Note: b.notes[m.ID]}
+	if !snapshot {
+		i.Subscription = a.SubscriptionOf(m)
+	}
+	if r := i.Subscription; r != nil {
+		if r.Kind == "git" || r.Kind == "page" {
+			i.Source = r.Kind
+		}
+		if r.WorkshopID != "" {
+			i.WorkshopID = r.WorkshopID
 		}
 	}
-	for _, m := range ix.Mods {
-		if !selected(m) || m.Status != identity.Live || (!search && m.Kind == source.Official) || srcKind[m.SourceID] == "" {
-			continue
-		}
-		i := &LibInstance{Mod: m, Ref: ix.Ref(m.ID), Source: srcKind[m.SourceID], WorkshopID: m.WorkshopID(), Path: ix.ModDir(m),
-			Bytes: m.TotalSize, Sized: m.SnapID != 0 && (m.FileCount > 0 || m.TotalSize > 0),
-			UsedIn: used[m.ID], InPlan: st.List.Index(m.ID) >= 0, Staged: staged[m.ID], Played: played[m.ID], Changed: changed[m.ID], Locked: locks[m.ID],
-			Authors: strings.TrimSpace(m.Authors), Note: notes[m.ID]}
-		if !snapshot {
-			i.Subscription = a.SubscriptionOf(m)
-		}
-		if r := i.Subscription; r != nil {
-			if r.Kind == "git" || r.Kind == "page" {
-				i.Source = r.Kind
-			}
-			if r.WorkshopID != "" {
-				i.WorkshopID = r.WorkshopID
-			}
-		}
-		if s := ix.Source(m.SourceID); s != nil {
-			i.Location = s.Root
-			i.DirectoryValues, i.DirectoryName = a.DirectoryValues(s), DirectoryName(s)
-			i.Content = contents[m.ID]
-		}
-		i.PNG = m.SnapID != 0 && png[m.SnapID]
-		if t, ok := texs[m.ID]; ok {
-			i.Textures = &t
-		}
-		if m.ACFTimeUpdated > 0 {
-			i.Updated = time.Unix(m.ACFTimeUpdated, 0).UTC()
-		} else if !snapshot {
-			if fi, err := os.Stat(i.Path); err == nil {
-				i.Updated = fi.ModTime().UTC()
-			}
-		}
-		for _, v := range strings.Fields(strings.ReplaceAll(m.SupportedVersions, ",", " ")) {
-			if !slices.Contains(i.Versions, v) {
-				i.Versions = append(i.Versions, v)
-			}
-		}
-		i.Created = libCreated(m)
-		if !snapshot {
-			link := ""
-			if m.Kind.GameMods() {
-				link = ix.LinkEntry(m)
-			}
-			i.Spare = m.Kind.GameMods() && (live[m.LineageID] > 1 || m.Origin != "" || dupIn(m.ID)) && link == ""
-			if who := LinkMaker(link); link != "" && who != "RimArcho" {
-				i.Link, i.LinkedBy = link, who
-			}
-		}
-		if i.Locked != nil {
-			since := i.Created
-			if i.Note != nil && i.Note.Made != nil {
-				since = i.Note.Made.At
-			}
-			if !since.IsZero() {
-				i.UpstreamUpdates = a.Store.UpdatesSince(i.Locked.Upstream.ID, since)
-			}
-		}
-		i.States = libStates(st, m, i.Locked != nil && i.Locked.Updated || pinUpdated[m.ID])
-		if i.Subscription != nil && i.Subscription.HasUpdate() {
-			i.States = append(i.States, LibSourceUpdate)
-		}
-		add(m, i)
+	if s := ix.Source(m.SourceID); s != nil {
+		i.Location = s.Root
+		i.DirectoryValues, i.DirectoryName = a.DirectoryValues(s), DirectoryName(s)
+		i.Content = b.contents[m.ID]
 	}
-	// Subscribed Workshop items with no folder (16 §2.9: "missing Workshop items"). A tombstone of the item
-	// keeps its name and lineage.
-	for _, s := range ix.Sources {
-		if search || s.Kind != source.Workshop || s.Status == source.StatusRetired {
-			continue
+	i.PNG = m.SnapID != 0 && b.png[m.SnapID]
+	if t, ok := b.texs[m.ID]; ok {
+		i.Textures = &t
+	}
+	if m.ACFTimeUpdated > 0 {
+		i.Updated = time.Unix(m.ACFTimeUpdated, 0).UTC()
+	} else if !snapshot {
+		if fi, err := os.Stat(i.Path); err == nil {
+			i.Updated = fi.ModTime().UTC()
 		}
-		acf := scan.ReadACF(s.Root)
-		if acf == nil {
-			continue
+	}
+	for _, v := range strings.Fields(strings.ReplaceAll(m.SupportedVersions, ",", " ")) {
+		if !slices.Contains(i.Versions, v) {
+			i.Versions = append(i.Versions, v)
 		}
-		ids := make([]string, 0, len(acf.Items))
-		for id, it := range acf.Items {
-			if it.Subscribed && !onDisk[id] {
-				ids = append(ids, id)
+	}
+	i.Created = libCreated(m)
+	if !snapshot {
+		link := ""
+		if m.Kind.GameMods() {
+			link = ix.LinkEntry(m)
+		}
+		i.Spare = m.Kind.GameMods() && (b.live[m.LineageID] > 1 || m.Origin != "" || b.dupIn(m.ID)) && link == ""
+		if who := LinkMaker(link); link != "" && who != "RimArcho" {
+			i.Link, i.LinkedBy = link, who
+		}
+	}
+	if i.Locked != nil {
+		since := i.Created
+		if i.Note != nil && i.Note.Made != nil {
+			since = i.Note.Made.At
+		}
+		if !since.IsZero() {
+			i.UpstreamUpdates = a.Store.UpdatesSince(i.Locked.Upstream.ID, since)
+		}
+	}
+	i.States = libStates(st, m, i.Locked != nil && i.Locked.Updated || b.pinUpdated[m.ID])
+	if i.Subscription != nil && i.Subscription.HasUpdate() {
+		i.States = append(i.States, LibSourceUpdate)
+	}
+	return i
+}
+
+// missingWorkshop adds the items Workshop folder s subscribes to that have no folder.
+func (b *libBuild) missingWorkshop(s *source.Source) {
+	ix := b.ix
+	acf := scan.ReadACF(s.Root)
+	if acf == nil {
+		return
+	}
+	ids := make([]string, 0, len(acf.Items))
+	for id, it := range acf.Items {
+		if it.Subscribed && !b.onDisk[id] {
+			ids = append(ids, id)
+		}
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		var ghost *store.Mod
+		for _, m := range ix.Mods {
+			if m.SourceID == s.ID && m.Rel == id && (ghost == nil || m.LastSeen.After(ghost.LastSeen)) {
+				ghost = m
 			}
 		}
-		sort.Strings(ids)
-		for _, id := range ids {
-			var ghost *store.Mod
-			for _, m := range ix.Mods {
-				if m.SourceID == s.ID && m.Rel == id && (ghost == nil || m.LastSeen.After(ghost.LastSeen)) {
-					ghost = m
-				}
-			}
-			i := &LibInstance{Source: LibWorkshop, Location: s.Root, WorkshopID: id, Ref: "ws:" + id, States: []string{LibMissing}}
-			if ghost == nil {
-				if only != "" && only != "ws:"+id {
-					continue
-				}
-				byLin["ws:"+id] = &LibLineage{ID: "ws:" + id, Ref: "ws:" + id, Name: "Workshop item " + id, Instances: []*LibInstance{i}, search: " " + id}
+		i := &LibInstance{Source: LibWorkshop, Location: s.Root, WorkshopID: id, Ref: "ws:" + id, States: []string{LibMissing}}
+		if ghost == nil {
+			if b.only != "" && b.only != "ws:"+id {
 				continue
 			}
-			if !selected(ghost) {
-				continue
-			}
-			i.Mod, i.Ref, i.UsedIn, i.InPlan, i.Note = ghost, ix.Ref(ghost.ID), used[ghost.ID], st.List.Index(ghost.ID) >= 0, notes[ghost.ID]
-			add(ghost, i)
+			b.byLin["ws:"+id] = &LibLineage{ID: "ws:" + id, Ref: "ws:" + id, Name: "Workshop item " + id, Instances: []*LibInstance{i}, search: " " + id}
+			continue
 		}
+		if !b.selected(ghost) {
+			continue
+		}
+		i.Mod, i.Ref, i.UsedIn, i.InPlan, i.Note = ghost, ix.Ref(ghost.ID), b.used[ghost.ID], b.st.List.Index(ghost.ID) >= 0, b.notes[ghost.ID]
+		b.add(ghost, i)
 	}
-	added, newSince := Added(st), a.NewSince(ix.Env.GameID)
-	for id, l := range byLin {
+}
+
+// finishLineages names, dates and sorts each lineage and adds it to the library.
+func (b *libBuild) finishLineages() {
+	a, ix := b.a, b.ix
+	added, newSince := Added(b.st), a.NewSince(ix.Env.GameID)
+	for id, l := range b.byLin {
 		if l.Name == "" {
 			l.Name = libName(ix, id, l)
 		}
@@ -534,14 +598,12 @@ func (a *App) buildLibrary(st *LoadoutState, only string, search, snapshot bool)
 			}
 			i.UpstreamUpdates, i.UpstreamWorkshop = a.Store.UpdatesSince(ws.Mod.ID, i.Created), true
 		}
-		if !search {
+		if !b.search {
 			foldLinked(l)
 		}
 		sortLibInstances(l.Instances)
-		lib.Lineages = append(lib.Lineages, l)
+		b.lib.Lineages = append(b.lib.Lineages, l)
 	}
-	sortLineages(lib.Lineages, "name")
-	return lib, nil
 }
 
 // foldLinked moves other managers' links out of the copies when the Mod has a copy of its

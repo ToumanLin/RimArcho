@@ -19,7 +19,6 @@ internal/app/envlinks.go (*App).prepareEnvLinks 69 198
 internal/app/envs.go (*App).EnvAdd 48 139
 internal/app/envs.go (*App).EnvSet 57 160
 internal/app/gamedl.go errorKind 42 22
-internal/app/library.go (*App).buildLibrary 102 264
 internal/app/linkhealth.go (*App).InspectGameLinks 61 172
 internal/app/linkhealth.go (*App).applyLinkRepair 51 111
 internal/app/linkrecovery.go (*App).applyLinkRecoveries 41 116
