@@ -90,6 +90,15 @@ func (m *model) feedbackPanel(p view.FeedbackProblem) tea.Cmd {
 	} else {
 		b.WriteString(T("enter: copy the text and open GitHub; paste it into the issue") + "\n")
 	}
+	// where players talk, in full (moved from Settings › about, 16 §2.14)
+	b.WriteString("\n" + T("community") + "\n")
+	for _, l := range view.CommunityLinks() {
+		if l.URL != "" {
+			fmt.Fprintf(&b, "  %s  %s\n", l.Label, l.URL)
+		} else {
+			fmt.Fprintf(&b, "  %s\n", l.Label) // the QQ group: its number is in the label
+		}
+	}
 	m.openPanel(T("feedback"), b.String())
 	again := func(f func()) func(*model) tea.Cmd {
 		return func(m *model) tea.Cmd { f(); return m.feedbackPanel(p) }

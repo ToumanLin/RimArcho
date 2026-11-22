@@ -1752,7 +1752,14 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .page.fill.fb-page { display: flex; flex-direction: column; }
 .fb-lay { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(220px, var(--fb-side, 38fr)) var(--card-gap) minmax(0, 62fr); grid-template-rows: minmax(0, 1fr); }
 .fb-split { align-self: stretch; margin: 0; }
-.fb-side { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.fb-side { display: flex; flex-direction: column; gap: var(--card-gap); min-width: 0; min-height: 0; }
+.fb-side > .fb-kinds { flex: 1 1 auto; min-height: 0; }
+/* the community card under the templates: Discord, GitHub, and the QQ group in Chinese (16 §2.14) */
+.fb-community { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 10px 14px 12px; }
+.fb-com-l { color: var(--muted); font-size: 12px; }
+.fb-com-links { display: flex; flex-wrap: wrap; gap: 6px; }
+.fb-community .community-link { border-radius: 999px; }
+.fb-community[hidden] { display: none; }
 .fb-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .fb-card { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .fb-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
@@ -1763,21 +1770,21 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
   .fb-body { overflow: visible; }
 }
 .fb-kinds { overflow-y: auto; }
-.fb-kind { position: relative; width: 100%; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.fb-kind:first-child { border-top-left-radius: var(--r-lg); border-top-right-radius: var(--r-lg); }
-.fb-kind:last-child { border-bottom-left-radius: var(--r-lg); border-bottom-right-radius: var(--r-lg); }
-.fb-kind:hover:not(.on) { background: var(--card-2); }
-.fb-kind .fb-rep-dot { left: 5px; top: 18px; }
+.fb-kind { position: relative; width: calc(100% - 12px); border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.fb-kind:hover:not(.on) { background: var(--pill); }
+.fb-kind.on .nt { color: var(--accent-11, var(--accent)); }
+.fb-kind .fb-rep-dot { left: 2px; top: 16px; }
 .fb-kind.prio .nt::after { content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 8px; border-radius: 50%; background: var(--red); vertical-align: middle; }
 .fb-mine-row { margin-top: 0; }
-.fb-kinds > .fb-mine-row { border-top: var(--hairline) solid var(--line); }
+.fb-kinds > .fb-mine-row { margin-top: 8px; }
 /* the right card's head: the problems and the buttons at the left, Archo standing at the right
    on its bottom line (176 px, 16 §7.1); she has her own column, so she covers no control */
-.fb-bar { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 8px 14px; align-items: end; align-content: end; padding: 12px 4px 0 14px; border-bottom: var(--hairline) solid var(--line-2); }
-.fb-bar .fig { grid-column: 2; grid-row: 1 / span 2; display: flex; align-self: end; min-height: 24px; }
+.fb-bar { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto auto; gap: 8px 14px; align-items: end; align-content: end; padding: 12px 4px 0 14px; border-bottom: var(--hairline) solid var(--line-2); }
+.fb-bar .fig { grid-column: 2; grid-row: 1 / span 3; display: flex; align-self: end; min-height: 24px; }
 .fb-bar .fig > .archo-spot.archo-stand { margin: 0; }
 .fb-probs { grid-column: 1; grid-row: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
-.fb-acts { grid-column: 1; grid-row: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; padding-bottom: 12px; }
+.fb-head-title { grid-column: 1; grid-row: 2; }
+.fb-acts { grid-column: 1; grid-row: 3; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; padding-bottom: 12px; }
 .fb-status { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 4px 10px; min-width: 0; color: var(--muted); font-size: 12px; }
 .fb-status:empty { display: none; }
 .fb-status.warn, .fb-prio-note { color: var(--amber); }
@@ -2214,15 +2221,15 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
   .xc-lay > .xc-side { position: static; }
 }
 /* the left column: a row per way in, an icon tile, a name with its count, what it takes, a button */
-.xc-do { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
-.xc-dorow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 16px; align-items: center; padding: 12px 14px; }
-.xc-do > * + * { border-top: var(--hairline) solid var(--line-2); }
+.xc-do { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 2px; overflow: auto; padding: 6px 0; }
+/* rows sit inside their card as All lists' do (.pm-row): inset, rounded, no rules between (2026-11-22) */
+.xc-dorow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 16px; align-items: center; padding: 10px 12px; margin: 0 6px; border-radius: var(--r-sm); }
 .xc-dorow .l { min-width: 0; }
 .xc-dorow .name { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: 13px; font-weight: 600; color: var(--fg); }
 .xc-dorow .nt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .xc-dorow .meta { flex: none; font-size: 12px; font-weight: 400; color: var(--muted); }
 .xc-dorow .sub { margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--muted); }
-.xc-dorow.on { background: var(--accent-soft); }
+.xc-dorow.on { background: var(--sel); }
 .xc-db { display: flex; flex-direction: column; padding-bottom: 12px; }
 .xc-db > .xc-dorow { padding-bottom: 10px; }
 .xc-db .xc-mrows { display: flex; flex-direction: column; gap: var(--card-gap); margin: 0 14px; }

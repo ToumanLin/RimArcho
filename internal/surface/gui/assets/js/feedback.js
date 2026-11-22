@@ -49,8 +49,10 @@ export async function open() {
   try {
     if (!F.tpls) F.tpls = await api.FeedbackTemplates();
     if (!F.probs.length) { F.probs = [fresh(F.tpls[0].kind)]; F.cur = 0; }
-    const [, mine] = await Promise.all([attach(), api.FeedbackReports()]);
+    // the community links follow the interface language (the QQ group in Chinese): read each visit
+    const [, mine, com] = await Promise.all([attach(), api.FeedbackReports(), api.Community().catch(() => [])]);
     F.mine = mine;
+    S.community = com;
   } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
   // came from a Can it run item's or a Mod's flag: that report, filled in (16 §2.4, §2.9)
@@ -163,11 +165,12 @@ function crumb() {
 function draw() {
   const sc = $("#screen");
   sc.innerHTML = "";
-  const w = page("feedback fill fb-page", "");
+  // the page's one line, as Import's (16 §2.14): what is sent here is public
+  const w = page("feedback fill fb-page", T("reports sent from here become public issues on GitHub"));
   const grid = el("div", "fb-lay");
   const side = el("div", "fb-side");
   const card = el("section", "card settings xc-do fb-kinds");
-  side.append(card);
+  side.append(card, community());
   const main = el("div", "fb-main");
   // the gap between the two cards drags; the left starts at All lists' 38% (16 §7.3 item 12)
   const gap = el("div", "split fb-split");
@@ -185,6 +188,24 @@ function draw() {
   area(card, null);
   drawSide();
   drawMain();
+}
+
+// community is the left's second card, under the templates: where players talk (Discord,
+// GitHub; in Chinese the QQ group, whose number is copied). Moved from Settings › about.
+function community() {
+  const card = el("section", "card fb-community");
+  card.append(el("div", "fb-com-l", T("community")));
+  const row = el("div", "fb-com-links");
+  for (const l of S.community || []) {
+    const b = l.url
+      ? button(l.label, "", () => api.OpenURL(l.url).catch(e => say("fail", errText(e))), "community-link")
+      : button(l.label, "", () => copy(l.copy, b), "community-link");
+    b.title = l.url ? l.url : T("copy the number");
+    row.append(b);
+  }
+  card.append(row);
+  card.hidden = !(S.community || []).length;
+  return card;
 }
 
 // drawSide is the left: the templates (the one shown marked, with how many problems use each)
@@ -257,8 +278,10 @@ function drawMain() {
     face();
     return;
   }
+  // the head: the problems, the title, the buttons, with Archo at the right (her height is
+  // the head's, so the title fills it rather than empty space)
   const bar = el("div", "fb-bar");
-  bar.append(el("div", "fb-probs"), el("div", "fb-acts"), el("div", "fig"));
+  bar.append(el("div", "fb-probs"), titleField(), el("div", "fb-acts"), el("div", "fig"));
   const body = el("div", "settings fb-body fb-form");
   card.append(bar, body);
   area(card, null, () => firstField()?.focus());
@@ -267,16 +290,21 @@ function drawMain() {
   refresh();
 }
 
-// drawForm: the template's hint, the title, its questions, the contact, what goes with it
-function drawForm(card) {
-  const p = prob(), t = tpl(p.kind);
-  if (t.note) card.append(el("div", "fb-note", t.note));
+// titleField is the problem's title, in the card's head
+function titleField() {
+  const p = prob();
   const title = el("input", "field fb-title");
   title.value = p.title; title.spellcheck = false;
   title.setAttribute("aria-label", T("title"));
   title.placeholder = T("optional; the first answer's first line otherwise");
-  title.oninput = () => { p.title = title.value; typed(); };
-  card.append(field(T("title"), title));
+  title.oninput = () => { p.title = title.value; typed(); if (F.view === "preview") fillPreview(); };
+  return field(T("title"), title, "fb-head-title");
+}
+
+// drawForm: the template's hint, its questions, the contact, what goes with it
+function drawForm(card) {
+  const p = prob(), t = tpl(p.kind);
+  if (t.note) card.append(el("div", "fb-note", t.note));
   for (const q of t.questions) card.append(question(p, q));
   // the contact goes to the relay only, never into the issue; GitHub has the account instead
   if (F.at?.send) {
@@ -569,18 +597,18 @@ function refresh() {
   acts.innerHTML = "";
   const p = prob();
   const pv = button(F.view === "preview" ? T("edit") : T("preview"), "", () => { F.view = F.view === "preview" ? "form" : "preview"; drawMain(); }, "fb-tab-preview");
-  const copyBtn = button(T("copy the text"), "", () => copy(F.res.body, copyBtn));
-  const gh = button(F.res.full ? T("open GitHub") : T("copy and open GitHub"), "", openIssue, F.at?.send ? "" : "primary");
-  if (F.probs.length > 1) gh.title = T("opens the problem shown; GitHub takes one at a time");
   const m = el("div", "fb-status");
   if (!F.at?.send) {
+    // a build without a relay has no send: GitHub is then the only way, so it stays (16 §2.14)
+    const gh = button(F.res.full ? T("open GitHub") : T("copy and open GitHub"), "", openIssue, "primary");
+    if (F.probs.length > 1) gh.title = T("opens the problem shown; GitHub takes one at a time");
     m.className = "fb-status" + (F.res.full ? "" : " warn");
     m.textContent = F.res.full ? T("opens GitHub in the browser; nothing is sent until you submit it there")
       : T("too long for a link: the link carries the title and the basics, and the full text is copied for you to paste");
-    acts.append(pv, copyBtn, gh, m);
+    acts.append(pv, gh, m);
     return;
   }
-  // send first; GitHub stays as the other way for players with an account
+  // with a relay: preview and send only (copy the text and open GitHub went 2026-11-22)
   if (F.sent?.length) {
     for (const s of F.sent) m.append(button(Tf("sent as #%d", s.number) + " ↗", "", () => api.OpenURL(s.url).catch(e => say("fail", errText(e))), "link"));
   } else if (priority(p)) m.append(el("span", "fb-prio-note", T("files changed or lost: sent as a priority report, with the recent operations")));
@@ -588,7 +616,7 @@ function refresh() {
   const send = button(F.sending ? T("sending…") : n > 1 ? Tf("send %d reports", n) : T("send"), "", sendReport, "primary fb-send");
   send.disabled = F.sending || F.probs.some(isEmpty);
   if (n > 1 && F.probs.some(isEmpty)) send.title = T("every problem needs a title or an answer");
-  acts.append(pv, copyBtn, gh, send, m);
+  acts.append(pv, send, m);
 }
 
 async function sendReport() {

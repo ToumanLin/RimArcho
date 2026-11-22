@@ -88,7 +88,6 @@ var bridgeUncalled = map[string]string{
 	"Board":                      "unused; open question (the page gets the board from Workspace and edit results)",
 	"History":                    "unused; open question",
 	"Logs":                       "unused; open question",
-	"Community":                  "unused; open question",
 	"ModCandidates":              "unused; open question",
 	"NewPlan":                    "unused; open question (All lists creates with CreatePlan)",
 	"PlanFroms":                  "unused; open question",

@@ -170,7 +170,7 @@ func TestAboutSettingsOrderAndUniqueControls(t *testing.T) {
 	for _, lang := range []string{"en", "zh"} {
 		view.SetLang(lang)
 		groups := view.SettingsPage(e.App, nil)
-		if groups[0].Title != view.T("about") || len(groups[0].Items) != 3 { // feedback moved to the sidebar (16 §2.1)
+		if groups[0].Title != view.T("about") || len(groups[0].Items) != 2 { // feedback moved to the sidebar (16 §2.1), community to Feedback (§2.14)
 			t.Fatal(groups[0])
 		}
 		counts := map[string]int{}
@@ -198,9 +198,13 @@ func TestAboutSettingsOrderAndUniqueControls(t *testing.T) {
 		if counts["version"] != 1 || counts["auto"] != 1 || counts["check"] > 1 {
 			t.Fatal(counts)
 		}
-		links := groups[0].Items[2].Links
-		if len(links) != 2 || links[0].Label != "Discord" || links[0].URL != "https://discord.gg/HF2GVyurQs" || links[1].Label != "GitHub" {
+		// the community links are the Feedback page's; Chinese adds the QQ group to copy
+		links := view.CommunityLinks()
+		if len(links) < 2 || links[0].Label != "Discord" || links[0].URL != "https://discord.gg/HF2GVyurQs" || links[1].Label != "GitHub" {
 			t.Fatal(links)
+		}
+		if qq := len(links) == 3 && links[2].Copy == "1042873484" && links[2].URL == ""; qq != (lang == "zh") {
+			t.Fatal(lang, links)
 		}
 	}
 }

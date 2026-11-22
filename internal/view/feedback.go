@@ -533,13 +533,19 @@ func SendFeedbackProblems(ctx context.Context, ps []FeedbackProblem, ats []*Feed
 	return sent, nil
 }
 
-// CommunityLink is one of RimArcho's public pages (the settings page's head, 16 §2.14).
+// CommunityLink is one of RimArcho's public places, shown on the Feedback page (16 §2.14): a
+// web page (URL) or, for a QQ group, a number the player copies (Copy).
 type CommunityLink struct {
 	Label string `json:"label"`
-	URL   string `json:"url"`
+	URL   string `json:"url,omitempty"`
+	Copy  string `json:"copy,omitempty"`
 }
 
-// CommunityLinks: the GitHub repository and the Discord server.
+// CommunityLinks: the Discord server and the GitHub repository; in Chinese also the QQ group.
 func CommunityLinks() []CommunityLink {
-	return []CommunityLink{{Label: "Discord", URL: feedback.Discord}, {Label: "GitHub", URL: feedback.Repo}}
+	ls := []CommunityLink{{Label: "Discord", URL: feedback.Discord}, {Label: "GitHub", URL: feedback.Repo}}
+	if strings.HasPrefix(Lang(), "zh") {
+		ls = append(ls, CommunityLink{Label: T("QQ group") + " " + feedback.QQGroup, Copy: feedback.QQGroup})
+	}
+	return ls
 }

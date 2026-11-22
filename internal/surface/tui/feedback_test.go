@@ -144,10 +144,24 @@ func TestSettingsAboutFirst(t *testing.T) {
 		if !strings.HasPrefix(text, view.T("about")+"\n") || strings.Index(text, view.T("Game Config")) < strings.Index(text, view.T("about")) {
 			t.Fatal(text)
 		}
-		for _, value := range []string{"config set updates.auto {}", "config set updates.interval {}", `config set steamcmd.path ""`, "https://discord.gg/HF2GVyurQs", "https://github.com/ToumanLin/RimArcho"} {
+		for _, value := range []string{"config set updates.auto {}", "config set updates.interval {}", `config set steamcmd.path ""`} {
 			if strings.Count(text, value) != 1 {
 				t.Fatalf("want one %q in settings: %s", value, text)
 			}
+		}
+		// the community links moved to the feedback panel (16 §2.14); the QQ group only in Chinese
+		if strings.Contains(text, "https://discord.gg/HF2GVyurQs") {
+			t.Fatal("community still in settings", text)
+		}
+		m.palRun("feedback")(m)
+		fb := strings.Join(m.panel.lines, "\n")
+		for _, value := range []string{"https://discord.gg/HF2GVyurQs", "https://github.com/ToumanLin/RimArcho"} {
+			if strings.Count(fb, value) != 1 {
+				t.Fatalf("want one %q in feedback: %s", value, fb)
+			}
+		}
+		if strings.Contains(fb, "1042873484") != (lang == "zh") {
+			t.Fatalf("QQ group in %s: %s", lang, fb)
 		}
 		if !strings.Contains(text, "env set") {
 			t.Fatal("lost text path commands", text)
