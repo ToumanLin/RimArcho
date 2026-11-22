@@ -13,8 +13,6 @@ internal/analyze/sim.go (*sim).worker 76 223
 internal/app/credit.go (*App).CreditStep 53 159
 internal/app/creditreplace.go (*App).replaceCreditLocked 74 252
 internal/app/data.go (*App).UpdateDataProgress 41 128
-internal/app/directories.go (*App).ManagedDirectories 47 80
-internal/app/directories.go (*App).setDirectoryRecords 41 88
 internal/app/envlinks.go (*App).prepareEnvLinks 69 198
 internal/app/envs.go (*App).EnvAdd 48 139
 internal/app/envs.go (*App).EnvSet 57 160
