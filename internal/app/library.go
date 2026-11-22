@@ -131,6 +131,10 @@ type LibInstance struct {
 	UpstreamWorkshop bool
 	// Textures: the DDS RimArcho wrote next to this copy's PNGs (Texture optimisation; nil: none).
 	Textures *TextureSummary
+	// Link is the entry another tool linked into a game's Mods/ (RimCrow `_Link_<id>`) whose
+	// target no source holds ("" for a real folder or RimArcho's own link); LinkedBy names
+	// that tool ("" when its name does not say). 04 §1.3 "Other managers' links".
+	Link, LinkedBy string
 	// PNG: the copy has PNGs under a Textures/ folder (its last scan), so optimise textures applies.
 	PNG bool
 }
@@ -152,12 +156,20 @@ type LibLineage struct {
 	Alias, Note   string
 	Tags          []string
 	Instances     []*LibInstance
+	// Linked are other managers' links into the game (LibInstance.Link) folded out of the
+	// copies because the Mod has a real copy: the game loads them, but they are not copies
+	// (no copy row, count or copy action; 04 §5, 16 §2.9). Their usage still counts.
+	Linked []*LibInstance
 	// Added: when a scan first found the Mod (its earliest copy, app.Added); New: within
 	// NewFor and after the environment's first scan (16 §2.9).
 	Added  time.Time
 	New    bool
 	search string // lower-cased names, package ids, authors, ids, folders, player data
 }
+
+// All is its copies and the other managers' links folded out of them (Linked): the plan
+// editor and lookups by instance still find a linked copy the lists use.
+func (l *LibLineage) All() []*LibInstance { return slices.Concat(l.Instances, l.Linked) }
 
 // InPlan reports whether the current plan uses one of its copies.
 func (l *LibLineage) InPlan() bool {
@@ -191,7 +203,7 @@ func (l *LibLineage) State() string {
 // UsedIn is every plan and pack that uses an instance, without repeats.
 func (l *LibLineage) UsedIn() []LibUse {
 	var out []LibUse
-	for _, i := range l.Instances {
+	for _, i := range l.All() {
 		for _, u := range i.UsedIn {
 			if !slices.ContainsFunc(out, func(x LibUse) bool { return x.Value() == u.Value() }) {
 				out = append(out, u)
@@ -438,7 +450,14 @@ func (a *App) buildLibrary(st *LoadoutState, only string, search, snapshot bool)
 		}
 		i.Created = libCreated(m)
 		if !snapshot {
-			i.Spare = m.Kind.GameMods() && (live[m.LineageID] > 1 || m.Origin != "" || dupIn(m.ID)) && !ix.ModIsLink(m)
+			link := ""
+			if m.Kind.GameMods() {
+				link = ix.LinkEntry(m)
+			}
+			i.Spare = m.Kind.GameMods() && (live[m.LineageID] > 1 || m.Origin != "" || dupIn(m.ID)) && link == ""
+			if who := LinkMaker(link); link != "" && who != "RimArcho" {
+				i.Link, i.LinkedBy = link, who
+			}
 		}
 		if i.Locked != nil {
 			since := i.Created
@@ -515,11 +534,32 @@ func (a *App) buildLibrary(st *LoadoutState, only string, search, snapshot bool)
 			}
 			i.UpstreamUpdates, i.UpstreamWorkshop = a.Store.UpdatesSince(ws.Mod.ID, i.Created), true
 		}
+		if !search {
+			foldLinked(l)
+		}
 		sortLibInstances(l.Instances)
 		lib.Lineages = append(lib.Lineages, l)
 	}
 	sortLineages(lib.Lineages, "name")
 	return lib, nil
+}
+
+// foldLinked moves other managers' links out of the copies when the Mod has a copy of its
+// own (04 §1.3 "Other managers' links"): RimCrow linking its folder into the game is how the
+// game reaches the Mod, not a second copy to keep or remove. A link that is the Mod's only
+// live copy stays its row: the game loads it and the lists use it.
+func foldLinked(l *LibLineage) {
+	own := slices.ContainsFunc(l.Instances, func(i *LibInstance) bool { return i.Link == "" && i.Mod != nil && !i.Missing() })
+	if !own {
+		return
+	}
+	l.Instances = slices.DeleteFunc(l.Instances, func(i *LibInstance) bool {
+		if i.Link != "" && i.Mod != nil && !i.Missing() {
+			l.Linked = append(l.Linked, i)
+			return true
+		}
+		return false
+	})
 }
 
 // libName is the lineage's name: its primary instance's, else its first instance's.
@@ -1399,7 +1439,7 @@ func (lib *Library) Lineage(ref string) (*LibLineage, error) {
 // Instance finds an instance of the library by its reference.
 func (lib *Library) Instance(ref string) *LibInstance {
 	for _, l := range lib.Lineages {
-		for _, i := range l.Instances {
+		for _, i := range l.All() {
 			if i.Ref == ref || i.Mod != nil && i.Mod.ID == ref {
 				return i
 			}

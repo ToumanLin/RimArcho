@@ -157,6 +157,8 @@ export function fieldList(fields, acts = {}) {
         if (a.act === "steam") return api.OpenSteamWorkshop("ws:" + f.value).then((t) => say("ok", t), (e) => say("fail", errText(e)));
         // Mod library › Mod settings at this Mod's files (main.js opens it)
         if (a.act === "settings") return document.dispatchEvent(new CustomEvent("open-mod-settings", { detail: f.target }));
+        // another manager's link into the game: open where it is and say whose (16 §2.9)
+        if (a.act === "linked") return api.ShowLink(f.target).then((t) => say("", t), (e) => say("fail", errText(e)));
         if (acts[a.act]) return acts[a.act](f);
       };
       bar.append(b);

@@ -1158,7 +1158,7 @@ func LibDoes(kind string) bool {
 // the library does not have it.
 func LibCopy(lib *app.Library, ref string) *LibInstRow {
 	for _, l := range lib.Lineages {
-		for _, i := range l.Instances {
+		for _, i := range l.All() {
 			if i.Ref == ref || i.Mod != nil && i.Mod.ID == ref {
 				r := libInst(lib, l, i)
 				return &r

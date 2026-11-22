@@ -292,7 +292,7 @@ func OpKeyed(code string) bool {
 // LibOpsOf is CopyOps of the copy ref in the library (nil: not there).
 func LibOpsOf(lib *app.Library, ref string, page string) []string {
 	for _, l := range lib.Lineages {
-		for _, i := range l.Instances {
+		for _, i := range l.All() {
 			if i.Ref == ref {
 				return CopyOps(lib, l, i, page)
 			}

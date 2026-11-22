@@ -240,7 +240,7 @@ func reviewTags(r *app.App) map[string][]string {
 		if len(l.Tags) == 0 {
 			continue
 		}
-		for _, i := range l.Instances {
+		for _, i := range l.All() {
 			if i.Mod != nil {
 				out[i.Mod.ID] = l.Tags
 			}
