@@ -13,7 +13,6 @@ internal/analyze/sim.go (*sim).worker 76 223
 internal/app/credit.go (*App).CreditStep 53 159
 internal/app/creditreplace.go (*App).replaceCreditLocked 74 252
 internal/app/data.go (*App).UpdateDataProgress 41 128
-internal/app/gamedl.go errorKind 42 22
 internal/app/gametest.go (*App).TestRun 63 202
 internal/app/library.go (*App).buildLibrary 102 264
 internal/app/linkhealth.go (*App).InspectGameLinks 61 172
