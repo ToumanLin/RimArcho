@@ -15,8 +15,6 @@ internal/app/creditreplace.go (*App).replaceCreditLocked 74 252
 internal/app/data.go (*App).UpdateDataProgress 41 128
 internal/app/gametest.go (*App).TestRun 63 202
 internal/app/library.go (*App).buildLibrary 102 264
-internal/app/linkhealth.go (*App).InspectGameLinks 61 172
-internal/app/linkhealth.go (*App).applyLinkRepair 51 111
 internal/app/linkrecovery.go (*App).applyLinkRecoveries 41 116
 internal/app/livelog.go (*LiveLog).finish 43 101
 internal/app/loadcost.go (*App).PlanLoadCost 44 181
