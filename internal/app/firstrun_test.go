@@ -13,6 +13,9 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
+// syntheticList is a ModsConfig-style list with two Mods.
+const syntheticList = `<?xml version="1.0" encoding="utf-8"?><ModsConfigData><version>1.6.4633 rev1261</version><activeMods><li>ludeon.rimworld</li><li>tester.alpha</li></activeMods></ModsConfigData>`
+
 func TestDiscoverManagerImports(t *testing.T) {
 	e := testkit.New(t)
 	sort := filepath.Join(e.Root, "local", "RimSort")
@@ -21,14 +24,16 @@ func TestDiscoverManagerImports(t *testing.T) {
 	settings, _ := json.Marshal(map[string]any{"instances": map[string]any{"Default": map[string]string{"config_folder": config}}})
 	e.WriteFile(filepath.Join(sort, "settings.json"), string(settings))
 	e.WriteFile(filepath.Join(sort, "dbs", "userRules.json"), `{"rules":{}}`)
-	e.WriteFile(filepath.Join(sort, "modlists", "colony.xml"), "synthetic list")
-	e.WriteFile(filepath.Join(config, "ModsConfig.xml"), "synthetic current list")
+	e.WriteFile(filepath.Join(sort, "modlists", "colony.xml"), syntheticList)
+	e.WriteFile(filepath.Join(sort, "modlists", "notes.txt"), "not a list: an unrelated file beside the lists")
+	e.WriteFile(filepath.Join(config, "ModsConfig.xml"), syntheticList)
 	e.WriteFile(filepath.Join(crow, "data", "mod_manager.db"), "synthetic database")
-	e.WriteFile(filepath.Join(crow, "backups", "Latest_ModList.rml"), "synthetic saved list")
+	e.WriteFile(filepath.Join(crow, "backups", "Latest_ModList.rml"), syntheticList)
+	e.WriteFile(filepath.Join(crow, "backups", "settings.json"), `{"theme":"dark"}`)
 	// RimPy's saved lists: a synthetic ModsConfig-style XML in LocalLow\RimPy Mod Manager\ModLists
 	rimpy := filepath.Join(e.Root, "LocalLow", "RimPy Mod Manager")
 	rimpyList := filepath.Join(rimpy, "ModLists", "colony.xml")
-	e.WriteFile(rimpyList, `<?xml version="1.0" encoding="utf-8"?><ModsConfigData><version>1.6.4633 rev1261</version><activeMods><li>ludeon.rimworld</li><li>tester.alpha</li></activeMods></ModsConfigData>`)
+	e.WriteFile(rimpyList, syntheticList)
 	e.WriteFile(filepath.Join(rimpy, "config.ini"), "synthetic settings")
 	before, _ := os.ReadFile(filepath.Join(sort, "settings.json"))
 	found := app.DiscoverManagerImports(app.ManagerLocations{RimSort: []string{sort, sort}, Installs: []string{crow, filepath.Join(e.Root, "absent")}, RimPy: []string{rimpy}})
@@ -87,5 +92,40 @@ func TestManagedRootAndWorkshopRefusal(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(e.App.SelfProgram, app.UpdateDirName)); !os.IsNotExist(err) {
 		t.Fatal("refused update wrote files")
+	}
+}
+
+// 07 §6.2: a portable RimCrow anywhere is found through its `_Link_` links in a game's Mods
+// folder (they point into <install>\mods), and a chosen .exe or folder reads like a found
+// install; a link into another folder, or an .exe with no data beside it, finds nothing.
+func TestDiscoverPortableManagers(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	crow := filepath.Join(e.Root, "D", "Game", "RimModManager")
+	e.WriteFile(filepath.Join(crow, "RimModManager.exe"), "MZ")
+	e.WriteFile(filepath.Join(crow, "data", "mod_manager.db"), "synthetic database")
+	e.WriteFile(filepath.Join(crow, "mods", "123", "About", "About.xml"), "<ModMetaData/>")
+	other := filepath.Join(e.Root, "elsewhere", "456")
+	e.WriteFile(filepath.Join(other, "About", "About.xml"), "<ModMetaData/>")
+	mods := filepath.Join(e.Root, "game", "Mods")
+	e.Junction(filepath.Join(mods, "_Link_123"), filepath.Join(crow, "mods", "123"))
+	e.Junction(filepath.Join(mods, "_Link_456"), other)
+	db := filepath.Join(crow, "data", "mod_manager.db")
+	found := app.DiscoverManagerImports(app.ManagerLocations{GameMods: []string{mods}})
+	if len(found) != 1 || found[0].Kind != "rimcrow" || !strings.EqualFold(found[0].Path, db) {
+		t.Fatalf("through the link: %+v", found)
+	}
+	for _, pick := range []string{filepath.Join(crow, "RimModManager.exe"), crow} {
+		if got := app.ManagerSourcesIn(pick); len(got) != 1 || got[0].Kind != "rimcrow" || !strings.EqualFold(got[0].Path, db) {
+			t.Fatalf("%s: %+v", pick, got)
+		}
+	}
+	lone := filepath.Join(e.Root, "Tools", "RimSort.exe")
+	e.WriteFile(lone, "MZ")
+	if got := app.ManagerSourcesIn(lone); len(got) != 0 {
+		t.Fatalf("an .exe with no data: %+v", got)
+	}
+	if got := app.ManagerSourcesIn(db); got != nil {
+		t.Fatalf("a data file is classified by ManagerFileKind, not read as a folder: %+v", got)
 	}
 }

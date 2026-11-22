@@ -337,31 +337,41 @@ function refuse(name, why = "", cls = "") {
 let M = null;
 function freshM() { return { managers: null, error: "", shown: new Set(), on: new Set(), mode: new Map(), open: new Set(), extra: M?.extra || [], run: null }; }
 
-// managerRows: one card per manager found (drawRows fills them in), then "Not found? Add it
-// yourself" with its button.
+// managerRows: one card per manager found (drawRows fills them in), then "Not found? Choose
+// its .exe" with its button.
 function managerRows(card) {
-  const more = button(T("add…"), "", async () => {
+  const more = button(T("choose…"), "", async () => {
     let f = "";
     try { f = await api.PickManagerImport(); } catch (e) { return say("fail", errText(e)); }
     if (!f || S.screen !== "plan-import") return;
     addManagerSource(f);
   });
-  more.title = T("a data folder or file kept elsewhere; it is only read");
+  more.title = T("RimCrow's or RimSort's .exe or folder, or one of its data files (mod_manager.db, userRules.json, a saved list); it is only read");
   const elsewhere = el("div", "xc-else");
-  elsewhere.append(el("span", "", T("Not found? Add it yourself")), more);
+  elsewhere.append(el("span", "", T("Not found? Choose its .exe")), more);
   card.append(el("div", "xc-mrows"), elsewhere);
 }
 
-// addManagerSource adds a manager's folder or file kept elsewhere (the dialog, or a dropped one)
-// and shows what it holds; a folder or file with no manager's data in it is refused on the right.
+const isExe = f => /\.exe$/i.test(f);
+
+// addManagerSource adds a manager kept elsewhere (the dialog, or a dropped one): its .exe or
+// folder, read like a found install, or one data file; it shows what that holds, and refuses
+// on the right a choice with no manager's data in it.
 async function addManagerSource(f) {
   const active = session;
-  const k = await api.ManagerFileKind(f).catch(() => "list");
-  M.extra.push({ manager: k === "list" ? T("a file") : "", kind: k, path: f });
+  const found = await api.ManagerSourcesIn(f).catch(() => null);
+  if (!live(active)) return;
+  if (found?.length) M.extra.push(...found);
+  else if (isExe(f)) return refuse(f.replace(/^.*[\\/]/, ""), T("no RimSort, RimCrow or RimPy data beside it"));
+  else {
+    const k = await api.ManagerFileKind(f).catch(() => "list");
+    M.extra.push({ manager: k === "list" ? T("a file") : "", kind: k, path: f });
+  }
   await survey();
   if (!live(active)) return;
   const norm = x => String(x || "").replace(/\\/g, "/").toLowerCase();
-  const m = M.managers?.find(m => m.groups.some(g => norm(g.path).startsWith(norm(f))));
+  const base = norm(isExe(f) ? f.replace(/[\\/][^\\/]*$/, "") : f);
+  const m = M.managers?.find(m => m.groups.some(g => norm(g.path).startsWith(base)));
   if (!m) return refuse(f.replace(/^.*[\\/]/, ""), T("no RimSort, RimCrow or RimPy data in it"));
   if (!M.shown.has(mKey(m))) showManager(m);
 }

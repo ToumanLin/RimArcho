@@ -100,13 +100,25 @@ func (s *API) ChooseManagedFolder(path string) error {
 	return s.a.Store.SetMeta("guide.managed-folders", "done")
 }
 
-func (s *API) DiscoverManagerImports() []app.ManagerImport { return app.FindManagerImports() }
+func (s *API) DiscoverManagerImports() []app.ManagerImport { return app.FindManagerImports(s.gameModsDirs()) }
+
+// gameModsDirs are the environments' game Mods folders, where RimCrow's links lead to its
+// install folder (07 §6.2).
+func (s *API) gameModsDirs() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.a.GameModsDirs()
+}
+
+// ManagerSourcesIn is what a chosen or dropped manager .exe or folder holds (07 §6.2): its
+// data read like a found install's. nil for anything else, which ManagerFileKind classifies.
+func (s *API) ManagerSourcesIn(path string) []app.ManagerImport { return app.ManagerSourcesIn(path) }
 
 func (s *API) PickManagerImport() (string, error) {
 	if s.x.native == nil {
 		return "", nil
 	}
-	return s.x.native.openFile(view.T("import from RimSort, RimCrow or RimPy"), [][2]string{{"Manager data and Mod lists", "*.db;*.json;*.xml;*.rml;*.txt"}, {"All files", "*.*"}})
+	return s.x.native.openFile(view.T("import from RimSort, RimCrow or RimPy"), [][2]string{{"Manager program or data", "*.exe;*.db;*.json;*.xml;*.rml;*.txt"}, {"All files", "*.*"}})
 }
 
 type managerPreview struct {

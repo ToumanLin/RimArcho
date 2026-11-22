@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
 // ManagerImport is one read-only source offered by the migration flow.
@@ -17,8 +19,58 @@ type ManagerImport struct {
 
 // ManagerLocations separates discovery from machine locations for synthetic tests.
 // RimPy is RimPy's data folders (AppData\LocalLow\RimPy Mod Manager): its saved lists
-// are in ModLists.
-type ManagerLocations struct{ RimSort, Installs, RimPy []string }
+// are in ModLists. GameMods are the games' Mods folders: a portable RimCrow, which keeps
+// everything beside its exe, links its Mods in as `_Link_<name>` → <install>\mods\<name>,
+// so each such link names an install folder wherever it is (07 §6.2).
+type ManagerLocations struct{ RimSort, Installs, RimPy, GameMods []string }
+
+// maxListBytes bounds a file read to check that it is a Mod list.
+const maxListBytes = 4 << 20
+
+// isModList reports whether a found file reads as a Mod list with at least one Mod, so that
+// unrelated .xml, .json or .txt files beside a manager are not offered as its lists.
+func isModList(path string) bool {
+	if st, err := os.Stat(path); err != nil || st.Size() > maxListBytes {
+		return false
+	}
+	_, err := readListFile(path)
+	return err == nil
+}
+
+// linkedInstalls are the install folders RimCrow's links in the games' Mods folders point
+// into: the folder holding the `mods` folder a `_Link_` entry targets (at most 2,000 entries
+// per Mods folder).
+func linkedInstalls(modsDirs []string) []string {
+	var out []string
+	seen := map[string]bool{}
+	var links source.LinkReader
+	for _, dir := range modsDirs {
+		ents, _ := os.ReadDir(dir)
+		for i, e := range ents {
+			if i >= 2000 {
+				break
+			}
+			if !strings.HasPrefix(strings.ToLower(e.Name()), "_link_") {
+				continue
+			}
+			// RimCrow makes junctions on Windows, which Go does not follow as symlinks
+			li, err := links.Read(filepath.Join(dir, e.Name()))
+			if err != nil || li.Target == "" {
+				continue
+			}
+			target := li.Target
+			if !strings.EqualFold(filepath.Base(filepath.Dir(target)), "mods") {
+				continue
+			}
+			root := filepath.Dir(filepath.Dir(target))
+			if k := strings.ToLower(root); !seen[k] {
+				seen[k] = true
+				out = append(out, root)
+			}
+		}
+	}
+	return out
+}
 
 // DiscoverManagerImports checks bounded, explicit locations, never whole drives.
 func DiscoverManagerImports(loc ManagerLocations) []ManagerImport {
@@ -42,7 +94,9 @@ func DiscoverManagerImports(loc ManagerLocations) []ManagerImport {
 			if !f.IsDir() {
 				switch strings.ToLower(filepath.Ext(f.Name())) {
 				case ".xml", ".rml", ".json", ".txt":
-					add(manager, "list", filepath.Join(dir, f.Name()))
+					if p := filepath.Join(dir, f.Name()); isModList(p) {
+						add(manager, "list", p)
+					}
 				}
 			}
 		}
@@ -50,7 +104,7 @@ func DiscoverManagerImports(loc ManagerLocations) []ManagerImport {
 
 	rootsSeen := map[string]bool{}
 	sortRoots := append([]string(nil), loc.RimSort...)
-	for _, root := range loc.Installs {
+	for _, root := range append(append([]string(nil), loc.Installs...), linkedInstalls(loc.GameMods)...) {
 		add("RimCrow", "rimcrow", filepath.Join(root, "data", "mod_manager.db"))
 
 		add("RimCrow", "rimcrow", filepath.Join(root, "mod_manager.db"))
@@ -120,8 +174,11 @@ func DiscoverManagerImports(loc ManagerLocations) []ManagerImport {
 			if !filepath.IsAbs(config) {
 				config = filepath.Join(root, config)
 			}
-			add("RimSort", "list", filepath.Join(config, "ModsConfig.xml"))
-			add("RimSort", "list", filepath.Join(config, "Config", "ModsConfig.xml"))
+			for _, p := range []string{filepath.Join(config, "ModsConfig.xml"), filepath.Join(config, "Config", "ModsConfig.xml")} {
+				if isModList(p) {
+					add("RimSort", "list", p)
+				}
+			}
 		}
 	}
 	for _, root := range loc.RimPy {
@@ -136,9 +193,11 @@ func DiscoverManagerImports(loc ManagerLocations) []ManagerImport {
 	return out
 }
 
-func FindManagerImports() []ManagerImport {
+// FindManagerImports looks in this machine's locations (07 §6.2); gameMods are the games'
+// Mods folders, whose RimCrow links lead to portable installs.
+func FindManagerImports(gameMods []string) []ManagerImport {
 	local, roaming := os.Getenv("LOCALAPPDATA"), os.Getenv("APPDATA")
-	loc := ManagerLocations{}
+	loc := ManagerLocations{GameMods: gameMods}
 	if local != "" {
 		loc.RimSort = append(loc.RimSort, filepath.Join(local, "RimSort"))
 	}
@@ -162,6 +221,45 @@ func FindManagerImports() []ManagerImport {
 		}
 	}
 	loc.Installs = append(loc.Installs, managerProcessFolders()...)
+	loc.Installs = append(loc.Installs, managerRanFolders()...)
 	loc.Installs = append(loc.Installs, managerShortcutFolders()...)
 	return DiscoverManagerImports(loc)
+}
+
+// ManagerSourcesIn is what a folder the player chose holds: a manager's install folder (the
+// folder of its .exe when path is one) read like a found install, or a single data file.
+func ManagerSourcesIn(path string) []ManagerImport {
+	st, err := os.Stat(path)
+	if err != nil {
+		return nil
+	}
+	dir := path
+	if !st.IsDir() {
+		if !strings.EqualFold(filepath.Ext(path), ".exe") {
+			return nil
+		}
+		dir = filepath.Dir(path)
+	}
+	return DiscoverManagerImports(ManagerLocations{Installs: []string{dir}})
+}
+
+// managerExe reports whether an executable's name is RimCrow's, RimModManager's or RimSort's.
+func managerExe(name string) bool {
+	n := strings.ToLower(name)
+	return strings.HasPrefix(n, "rimcrow") || strings.HasPrefix(n, "rimmodmanager") || strings.HasPrefix(n, "rimsort")
+}
+
+// GameModsDirs are the Mods folders of every environment's game.
+func (a *App) GameModsDirs() []string {
+	envs, err := a.Store.Envs()
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, e := range envs {
+		if e.GameRoot != "" {
+			out = append(out, filepath.Join(e.GameRoot, "Mods"))
+		}
+	}
+	return out
 }

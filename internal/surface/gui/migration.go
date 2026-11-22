@@ -15,7 +15,7 @@ import (
 // came in before. extra are files the player chose with "another folder or file…". It
 // reads in its own session (dry runs only), so the window stays free.
 func (s *API) ImportSurvey(extra []app.ManagerImport) ([]app.MigrationManager, error) {
-	found := app.FindManagerImports()
+	found := app.FindManagerImports(s.gameModsDirs())
 	seen := map[string]bool{}
 	for _, f := range found {
 		seen[f.Kind+"|"+strings.ToLower(filepath.Clean(f.Path))] = true
