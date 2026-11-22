@@ -73,44 +73,9 @@ func (a *App) Workshop(action string, refs []string, dryRun bool, callbacks ...B
 	}
 	op := &WorkshopOp{Action: action, DryRun: dryRun}
 	for _, ref := range refs {
-		m, err := st.Ix.ResolveOne(ref)
+		it, err := a.workshopItem(st, action, ref)
 		if err != nil {
 			return nil, err
-		}
-		ws := m.WorkshopID()
-		if m.Kind != source.Workshop || !isDigits(ws) {
-			return nil, fmt.Errorf("%s is not a Workshop item (src:%s)", st.Ix.Ref(m.ID), m.SourceLabel)
-		}
-		it := WorkshopItem{ID: m.ID, Name: m.DisplayName(), WorkshopID: ws}
-		if action == steamworks.Resubscribe && !st.Ix.CanResubscribe(m) {
-			return nil, fmt.Errorf("%s is a link or locked copy: resubscribe to the original Workshop copy", st.Ix.Ref(m.ID))
-		}
-		if action == steamworks.Resubscribe && !m.Residue {
-			it.Folder = st.Ix.ModDir(m)
-			if src := st.Ix.Source(m.SourceID); src != nil {
-				// Keep the source path so a replacement junction cannot redirect cleanup.
-				it.Folder = filepath.Join(src.Root, m.Rel)
-			}
-		}
-		switch action {
-		case steamworks.Subscribe:
-			if !m.Residue {
-				return nil, fmt.Errorf("%s is subscribed already", st.Ix.Ref(m.ID))
-			}
-		case steamworks.Unsubscribe:
-			if m.Residue {
-				return nil, fmt.Errorf("%s is not subscribed (an unsubscribed leftover: archo trash %s moves the folder to the recycle bin)", st.Ix.Ref(m.ID), st.Ix.Ref(m.ID))
-			}
-			if it.UsedBy, err = a.usedBy(st, m.ID); err != nil {
-				return nil, err
-			}
-			if m.Status == identity.Live {
-				it.Folder = st.Ix.ModDir(m)
-				it.Links, err = a.PlanIncomingLinks(it.Folder, "")
-				if err != nil {
-					return nil, err
-				}
-			}
 		}
 		op.Items = append(op.Items, it)
 	}
@@ -161,23 +126,7 @@ func (a *App) Workshop(action string, refs []string, dryRun bool, callbacks ...B
 		}
 		return nil, err
 	}
-	by := map[string]steamworks.Item{}
-	for _, x := range rep.Items {
-		by[strconv.FormatUint(x.ID, 10)] = x
-	}
-	var failed []string
-	for k := range op.Items {
-		it := &op.Items[k]
-		x, ok := by[it.WorkshopID]
-		if !ok {
-			it.Result = "timeout"
-		} else {
-			it.Result, it.State = x.Result, x.State
-		}
-		if it.Result != "ok" {
-			failed = append(failed, fmt.Sprintf("%s (%s)", it.Name, it.Result))
-		}
-	}
+	failed := op.takeSteamResults(rep)
 	if action == steamworks.Unsubscribe {
 		a.logUnsubscribe(op.Items, rep, nil, false, "")
 	}
@@ -196,6 +145,74 @@ func (a *App) Workshop(action string, refs []string, dryRun bool, callbacks ...B
 		}
 	}
 	return op, nil
+}
+
+// workshopItem resolves one reference of a Workshop action and checks the action can
+// apply to it.
+func (a *App) workshopItem(st *LoadoutState, action, ref string) (WorkshopItem, error) {
+	m, err := st.Ix.ResolveOne(ref)
+	if err != nil {
+		return WorkshopItem{}, err
+	}
+	ws := m.WorkshopID()
+	if m.Kind != source.Workshop || !isDigits(ws) {
+		return WorkshopItem{}, fmt.Errorf("%s is not a Workshop item (src:%s)", st.Ix.Ref(m.ID), m.SourceLabel)
+	}
+	it := WorkshopItem{ID: m.ID, Name: m.DisplayName(), WorkshopID: ws}
+	if action == steamworks.Resubscribe && !st.Ix.CanResubscribe(m) {
+		return WorkshopItem{}, fmt.Errorf("%s is a link or locked copy: resubscribe to the original Workshop copy", st.Ix.Ref(m.ID))
+	}
+	if action == steamworks.Resubscribe && !m.Residue {
+		it.Folder = st.Ix.ModDir(m)
+		if src := st.Ix.Source(m.SourceID); src != nil {
+			// Keep the source path so a replacement junction cannot redirect cleanup.
+			it.Folder = filepath.Join(src.Root, m.Rel)
+		}
+	}
+	switch action {
+	case steamworks.Subscribe:
+		if !m.Residue {
+			return WorkshopItem{}, fmt.Errorf("%s is subscribed already", st.Ix.Ref(m.ID))
+		}
+	case steamworks.Unsubscribe:
+		if m.Residue {
+			return WorkshopItem{}, fmt.Errorf("%s is not subscribed (an unsubscribed leftover: archo trash %s moves the folder to the recycle bin)", st.Ix.Ref(m.ID), st.Ix.Ref(m.ID))
+		}
+		if it.UsedBy, err = a.usedBy(st, m.ID); err != nil {
+			return WorkshopItem{}, err
+		}
+		if m.Status == identity.Live {
+			it.Folder = st.Ix.ModDir(m)
+			it.Links, err = a.PlanIncomingLinks(it.Folder, "")
+			if err != nil {
+				return WorkshopItem{}, err
+			}
+		}
+	}
+	return it, nil
+}
+
+// takeSteamResults records Steam's result for each item and lists the items it did not
+// confirm.
+func (op *WorkshopOp) takeSteamResults(rep *steamworks.Report) []string {
+	by := map[string]steamworks.Item{}
+	for _, x := range rep.Items {
+		by[strconv.FormatUint(x.ID, 10)] = x
+	}
+	var failed []string
+	for k := range op.Items {
+		it := &op.Items[k]
+		x, ok := by[it.WorkshopID]
+		if !ok {
+			it.Result = "timeout"
+		} else {
+			it.Result, it.State = x.Result, x.State
+		}
+		if it.Result != "ok" {
+			failed = append(failed, fmt.Sprintf("%s (%s)", it.Name, it.Result))
+		}
+	}
+	return failed
 }
 
 // resubscribe preserves the recorded copy and incoming links while replacing its folder.
