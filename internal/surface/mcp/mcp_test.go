@@ -65,7 +65,7 @@ func TestToolsAndAnnotations(t *testing.T) {
 	want := map[string]string{ // name → expected annotation: ro, write, destructive
 		"guide":  "ro", // 14 §3: the detail behind the short descriptions
 		"status": "ro", "find_mods": "ro", "get_mod": "ro", "get_mod_settings": "ro", "get_def": "ro", "get_patches": "ro", "get_harmony": "ro",
-		"explain_relation": "ro", "list_problems": "ro", "list_changes": "ro", "analyze_log": "ro", "search_files": "ro",
+		"explain_relation": "ro", "list_problems": "ro", "list_changes": "ro", "list_operations": "ro", "analyze_log": "ro", "search_files": "ro",
 		"read_source": "ro", "edit_loadout": "write", "save_loadout": "destructive",
 		"get_description": "ro", "set_player_data": "write", "set_mod_settings": "write",
 		"test_run":        "write",
@@ -180,6 +180,8 @@ func TestCLIParity(t *testing.T) {
 		{"list_problems", nil, []string{"problems", "--min-severity", "warning"}},
 		{"list_problems", map[string]any{"code": "harmony", "min_severity": "info"}, []string{"problems", "--code", "harmony", "--min-severity", "info"}},
 		{"list_changes", nil, []string{"changes"}},
+		{"list_operations", nil, []string{"ops"}},
+		{"list_operations", map[string]any{"failed": true, "op": "save", "since": "2d", "all": true}, []string{"ops", "--since", "2d", "--op", "save", "--failed", "--all"}},
 		{"analyze_log", nil, []string{"log"}},
 		{"analyze_log", map[string]any{"cluster": "E3"}, []string{"log", "--cluster", "E3"}},
 		{"analyze_log", map[string]any{"text": testkit.FixtureLog(`C:\x\Compat.xml`)}, []string{"log", "--text", testkit.FixtureLog(`C:\x\Compat.xml`)}},

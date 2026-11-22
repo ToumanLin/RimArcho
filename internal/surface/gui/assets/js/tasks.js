@@ -16,6 +16,7 @@ import { createTable, mergeColumns } from "./datatable.js";
 import { wireSeparator } from "./separator.js";
 import { pickClick } from "./select.js";
 import { archoSpot } from "./archo.js";
+import * as ops from "./oplog.js";
 
 const COLS_KEY = "ui.gui.tasks.items.columns";
 const SIDE_KEY = "ui.gui.tasks.side";
@@ -43,6 +44,7 @@ const X = {
   sort: "state", dir: 1,
   bar: null,
   from: null,         // the page ctrl+j came from (again goes back)
+  view: "tasks",      // "tasks", or "ops": What RimArcho did (oplog.js)
 };
 let ui = null;
 let els = null;
@@ -87,6 +89,7 @@ export async function relang() {
   if (b) b.dataset.sig = "";
   if (S.screen !== "tasks") return refreshFoot();
   els = null;
+  opsBox = null;
   await load();
 }
 
@@ -136,7 +139,8 @@ export function toggle() {
 }
 
 export async function open() {
-  if (S.screen !== "tasks") { X.focus = "list"; if (!byKey) X.from = null; }
+  // coming from another page shows the tasks again, not What RimArcho did
+  if (S.screen !== "tasks") { X.focus = "list"; X.view = "tasks"; opsBox = null; if (!byKey) X.from = null; }
   const read = beginPageRead("tasks", { retry: open });
   await load(read);
   api.TasksSeen().then(refreshFoot).catch(() => {});
@@ -144,6 +148,7 @@ export async function open() {
 
 async function load(read = null) {
   if (!read && S.screen !== "tasks") return;
+  if (X.view === "ops") return loadOps(read);
   read ||= beginPageRead("tasks", { retry: () => load() });
   let p, saved;
   try {
@@ -234,6 +239,7 @@ function build() {
   const sc = $("#screen");
   sc.innerHTML = "";
   const w = page("fill tasks", "",
+    pageAct(T("What RimArcho did"), "log", () => showOps(), "W"),
     pageAct(T("clear finished"), "ok", () => run("clear", []), "C"));
   const root = el("div", "tk");
   const side = el("div", "fcol tk-side");
@@ -662,9 +668,43 @@ async function run(act, rows, ref = "") {
   load();
 }
 
+// ---- What RimArcho did (16 §2.16): the operation log in place of the tasks ----
+let opsBox = null;
+function showOps() {
+  X.view = "ops";
+  els = null;
+  ops.reset();
+  opsBox = null;
+  return loadOps();
+}
+function backToTasks() {
+  X.view = "tasks";
+  ops.reset();
+  opsBox = null;
+  load();
+}
+async function loadOps(read = null) {
+  if (!opsBox || !document.body.contains(opsBox)) {
+    const sc = $("#screen");
+    sc.innerHTML = "";
+    opsBox = page("fill tasks ops-view", "");
+    sc.append(opsBox);
+    ops.reset();
+  }
+  await ops.load(opsBox, backToTasks, read);
+  ui.renderHints();
+  ui.renderWhere();
+}
+
 // ---- keys (16 §2.16): the page's own; the rest are the shell's ----
 export function key(e) {
   const k = e.key, ctrl = e.ctrlKey || e.metaKey;
+  if (X.view === "ops") {
+    if (k === "W") { e.preventDefault(); return backToTasks(); }
+    if (ops.key(e)) { ui.renderWhere(); return; }
+    return;
+  }
+  if (k === "W" && !ctrl) { e.preventDefault(); return showOps(); }
   if (!X.page || !els) return;
   const done = () => e.preventDefault();
   if (k === "/" || (ctrl && k === "f")) { done(); return X.bar.focus(); }
@@ -738,6 +778,7 @@ function itemsKey(e, done, menuKey) {
 
 // ---- the shell's lines ----
 export function where() {
+  if (X.view === "ops") return ops.where();
   if (!X.page) return "";
   const list = shown(), i = list.findIndex((r) => r.id === X.cur);
   if (X.focus === "items") {
@@ -750,6 +791,7 @@ export function where() {
   return s;
 }
 export function hintList() {
+  if (X.view === "ops") return ops.hintList();
   if (X.bar && X.bar.open) return [{ key: "←→↑↓", label: T("pick a value") }, { key: "enter", label: T("only these") }, { key: "x", label: T("leave out") }, { key: "esc", label: T("close") }];
   if (X.focus === "items") return [{ key: "↑↓", label: T("move") }, { key: "←", label: T("back to the tasks") }, { key: "o", label: T("see it in the mod library") }, { key: "s", label: T("sort and columns") }, { key: "?", label: T("all keys") }];
   const r = current();

@@ -519,10 +519,11 @@ func (a *App) ApplyLinkRepair(plan *LinkRepairPlan) error {
 	return nil
 }
 
-func (a *App) applyLinkRepair(plan *LinkRepairPlan) error {
+func (a *App) applyLinkRepair(plan *LinkRepairPlan) (err error) {
 	if plan == nil {
 		return fmt.Errorf("missing link repair preview")
 	}
+	defer func() { a.logLinkRepair(plan, err) }()
 	locked := map[string]bool{}
 	var unlocks []func()
 	defer func() {

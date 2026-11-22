@@ -175,6 +175,7 @@ func (s *API) Ready() {
 	defer perftrace.Span("Ready")()
 	s.startAutomatic()
 	s.startMaintenance()
+	go s.a.PruneOps()           // the operation log's retention (13 §1.3), after the first draw
 	s.prepareBackgrounds(false) // menu extraction starts after the first draw (16 §3.1)
 	s.monitorOnce.Do(s.checkMonitor)
 	s.watchOnce.Do(func() { go s.watchDownloads() })

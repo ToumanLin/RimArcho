@@ -13,6 +13,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
+	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/order"
 	"github.com/ToumanLin/RimArcho/internal/rules"
 	"github.com/ToumanLin/RimArcho/internal/source"
@@ -43,6 +44,9 @@ type LoadoutState struct {
 	// keepWorkshopLinks: a save while the game runs keeps the Workshop links it may have
 	// started with, adding none (09 §3).
 	keepWorkshopLinks bool
+	// op: this write's operation-log state (13 §1.3): the parent row (a launch) and whether
+	// anything was changed yet. Never carried by the cached copy.
+	op *opWrite
 	// localize reads another game's own entries by packageId (nil: as stored).
 	localize func(loadout.List) loadout.List
 }
@@ -219,6 +223,7 @@ func (a *App) Loadout() (*LoadoutState, error) {
 	}
 	if a.stCache != nil && a.stKey == key && a.stCache.Ix == ix {
 		c := *a.stCache
+		c.op = nil
 		c.MM = a.GameVersion
 		c.Notices = nil
 		c.List = c.List.Clone()
@@ -1106,6 +1111,23 @@ func (a *App) SaveWith(dryRun, move bool) (*SaveResult, error) {
 // version), else "user" or "undo". dryRun computes the same result and writes nothing.
 // move: plain Mods/ folders in the way move into the lock library first (09 §3).
 func (a *App) writeGame(st *LoadoutState, dryRun, launch, move bool, creditFrom ...*store.Mod) (*SaveResult, error) {
+	if st.op == nil {
+		st.op = &opWrite{}
+	}
+	r, err := a.writeGameOnce(st, dryRun, launch, move, creditFrom...)
+	if !dryRun {
+		a.logModsConfig(st, r, err, len(creditFrom) > 0)
+	}
+	return r, err
+}
+
+// opWrite is a ModsConfig.xml write's operation-log state (LoadoutState.op).
+type opWrite struct {
+	h     *oplog.Handle // the launch it is part of; nil for a save
+	wrote bool          // a file changed: a later error is a failure, not a refusal
+}
+
+func (a *App) writeGameOnce(st *LoadoutState, dryRun, launch, move bool, creditFrom ...*store.Mod) (*SaveResult, error) {
 	e := st.Ix.Env
 	if err := a.recoverInstallationTestLinks(modsDir(st.Ix), dryRun); err != nil {
 		return nil, err
@@ -1141,6 +1163,7 @@ func (a *App) writeGame(st *LoadoutState, dryRun, launch, move bool, creditFrom 
 		}
 		if !dryRun {
 			// Move them, then write from the state after the move (the instances moved).
+			st.op.wrote = true
 			if _, err := a.doMoves(de.Moves); err != nil {
 				return nil, err
 			}
@@ -1148,8 +1171,8 @@ func (a *App) writeGame(st *LoadoutState, dryRun, launch, move bool, creditFrom 
 			if err != nil {
 				return nil, err
 			}
-			st2.workshopLinks, st2.keepWorkshopLinks = st.workshopLinks, st.keepWorkshopLinks
-			r, err := a.writeGame(st2, false, launch, false)
+			st2.workshopLinks, st2.keepWorkshopLinks, st2.op = st.workshopLinks, st.keepWorkshopLinks, st.op
+			r, err := a.writeGameOnce(st2, false, launch, false)
 			if r != nil {
 				r.Moved = de.Moves
 			}
@@ -1248,10 +1271,12 @@ func (a *App) writeGame(st *LoadoutState, dryRun, launch, move bool, creditFrom 
 		if err := a.checkRoots(mods); err != nil {
 			return nil, err
 		}
-		if err := a.applyLinks(mods, links); err != nil {
+		st.op.wrote = true
+		if err := a.applyLinksIn(st.op.h, mods, links); err != nil {
 			return nil, err
 		}
 	}
+	st.op.wrote = true
 	if r.Backup, err = loadout.WriteFile(st.FilePath, data); err != nil {
 		return nil, err
 	}

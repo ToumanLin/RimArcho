@@ -23,6 +23,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/machine"
+	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
 	"github.com/ToumanLin/RimArcho/internal/surface/mcp"
@@ -105,6 +106,17 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	}
 	defer ap.Close()
 	ap.EnvName, ap.PlanName = envName, openPlan
+	// The operation log's origin (13 §1.3): one per process; a parent's wins.
+	switch {
+	case (len(rest) == 0 && buildinfo.GUI == "1") || (len(rest) == 1 && rest[0] == "gui"):
+		ap.SetOrigin(oplog.GUI)
+	case tuiMode:
+		ap.SetOrigin(oplog.TUI)
+	case serveMCP:
+		ap.SetOrigin(oplog.MCP)
+	default:
+		ap.SetOrigin(oplog.CLI)
+	}
 	interactive := len(rest) == 0 || len(rest) == 1 && (rest[0] == "gui" || rest[0] == "tui")
 	if interactive {
 		// What an update left in the program folder (17 §5.1); never delays the first paint.

@@ -406,6 +406,13 @@ type ProblemsIn struct {
 	IncludeMuted bool `json:"include_muted,omitempty" jsonschema:"also show ignored version warnings, marked ignored"`
 }
 
+type OpsIn struct {
+	Since  string `json:"since,omitempty" jsonschema:"<n>h, <n>d or YYYY-MM-DD"`
+	Op     string `json:"op,omitempty" jsonschema:"an op code or family (save, link, update)"`
+	Failed bool   `json:"failed,omitempty" jsonschema:"only failed, refused, partial"`
+	All    bool   `json:"all,omitempty"`
+}
+
 type ChangesIn struct {
 	Env     string `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Ref     string `json:"ref,omitempty" jsonschema:"one mod's history"`
@@ -616,6 +623,9 @@ func toolList() []tool {
 		reg("list_problems", true, false, descProblems, func(in ProblemsIn) []string { return ProblemsArgv(in) }),
 		reg("list_changes", true, false, descChanges, func(in ChangesIn) []string {
 			return argv("changes").pos(in.Ref).flag("library", in.Library).str("since", in.Since).flag("all", in.All).a
+		}),
+		reg("list_operations", true, false, descOps, func(in OpsIn) []string {
+			return argv("ops").str("since", in.Since).str("op", in.Op).flag("failed", in.Failed).flag("all", in.All).a
 		}),
 		reg("analyze_log", true, false, descLog, func(in LogIn) []string {
 			if in.Pattern != "" {

@@ -50,7 +50,7 @@ Only the player can change environments and settings; there are no tools for the
 ### 2.4 Records
 
 - Every Archo tool call can be expanded in the panel to show the tool name, the parameters and the first few lines of the returned text, so players can see what its conclusions rest on (00 §4 item 2).
-- No separate AI action log. Undo history is the record of changes (07 §3).
+- Archo's actions on the player's files are in the operation log with origin `agent` (13 §1.3); list edits stay in the undo history (07 §3). The player sees them in "What RimArcho did" (16 §2.16), and Archo reads them with `list_operations`.
 
 ## 3. Model sources and consent
 
@@ -171,9 +171,9 @@ Archo Agent is Archo as a separate program: Node, the Pi coding agent and Archo'
 - **Start** (Settings "open Archo Agent", `archo agent run [--window]`) needs an installed bundle, a base URL, a model and a key; otherwise it says which is missing. `--window` (the GUI) opens a console window of its own, created by Windows with its own input and screen buffers (`startAgentConsole`; os/exec would hand Pi `NUL` and it would exit at once). Each start rewrites Pi's configuration in `<data-directory>/agent/pi/` (`PI_CODING_AGENT_DIR`):
   - `models.json`: one provider `archo-model` with the settings above, `apiKey` `$ARCHO_AGENT_API_KEY` (the key is never written), a 128,000-token context and a 16,384-token reply limit (the agent continues a reply that reaches it);
   - `settings.json`: that model as the default, the thinking level, Pi's install telemetry off;
-  - `mcp.json`: the server `archo`, this program folder's `archo.exe mcp`, exposure `direct`;
+  - `mcp.json`: the server `archo`, this program folder's `archo.exe mcp`, exposure `direct`, with `ARCHO_ORIGIN=agent` in its environment (13 §1.3);
   - `archo-redact.json`: the private values RimArcho knows (§7.3).
-- The bundle's Node runs Pi with the bundle's extensions, in `<data-directory>/agent/work/`, with `ARCHO_AGENT_API_KEY`, `RIMARCHO_HOME` and Pi's version check, telemetry and catalog refreshes turned off. From the GUI it opens in a new console window and RimArcho does not wait for it; `archo agent run` runs it in the current terminal.
+- The bundle's Node runs Pi with the bundle's extensions, in `<data-directory>/agent/work/`, with `ARCHO_AGENT_API_KEY`, `RIMARCHO_HOME`, `ARCHO_ORIGIN=agent` (so the archo commands it runs log as Archo's, 13 §1.3) and Pi's version check, telemetry and catalog refreshes turned off. From the GUI it opens in a new console window and RimArcho does not wait for it; `archo agent run` runs it in the current terminal.
 - Pi keeps its own sessions under `pi/sessions/`; they are local only. Conversations in the planned panel stay undecided (§1).
 
 ### 7.3 What the extensions guarantee

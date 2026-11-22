@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 )
@@ -16,28 +17,42 @@ var ErrNotInTrashList = errors.New("not something RimArcho moves to the recycle 
 
 // ToTrash is the one way into the recycle bin (02 §3). Whoever calls it, the path must be
 // on the allow-list; the caller's own rules (enabled, used by a plan, subscribed) come first.
-func (a *App) ToTrash(path string) error {
-	check := a.trashAllow
-	if check == nil {
-		check = a.trashAllowed
-	}
-	if err := check(path); err != nil {
+// Every call is a row in the operation log (13 §1.3): ok, refused (not on the allow-list,
+// gone) or failed.
+func (a *App) ToTrash(path string) error { return a.toTrash(nil, path) }
+
+// toTrash is ToTrash whose row belongs to the parent row h (a batch of saves, uninstall).
+func (a *App) toTrash(h *oplog.Handle, path string) error {
+	if err := a.trashCheck(path); err != nil {
+		a.logTrash(h, path, err, true)
 		return err
 	}
-	return a.withIncomingLinks(path, "", func() error { return a.recycleTarget(path) })
+	err := a.withIncomingLinks(path, "", func() error { return a.recycleChecked(path) })
+	a.logTrash(h, path, err, false)
+	return err
 }
 
 // recycleTarget is used inside an already journalled lifecycle. It retains the
 // existing trash allow-list; detaching a link never goes through this function.
 func (a *App) recycleTarget(path string) error {
+	err := a.recycleChecked(path)
+	a.logTrash(nil, path, err, errors.Is(err, ErrNotInTrashList) || errors.Is(err, os.ErrNotExist))
+	return err
+}
+
+func (a *App) recycleChecked(path string) error {
+	if err := a.trashCheck(path); err != nil {
+		return err
+	}
+	return a.trash(path)
+}
+
+func (a *App) trashCheck(path string) error {
 	check := a.trashAllow
 	if check == nil {
 		check = a.trashAllowed
 	}
-	if err := check(path); err != nil {
-		return err
-	}
-	return a.trash(path)
+	return check(path)
 }
 
 // trash moves path to the recycle bin without the allow-list. Only a caller that has its

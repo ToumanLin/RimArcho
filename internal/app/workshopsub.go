@@ -116,7 +116,11 @@ func (a *App) Workshop(action string, refs []string, dryRun bool, callbacks ...B
 	}
 	if action == steamworks.Unsubscribe || action == steamworks.Resubscribe {
 		if run, err := a.GameRunning(); err == nil && run != nil {
-			return nil, fmt.Errorf("the game is running (pid %d): Steam would delete folders it has loaded; close it first", run.PID)
+			err := fmt.Errorf("the game is running (pid %d): Steam would delete folders it has loaded; close it first", run.PID)
+			if !dryRun {
+				a.logUnsubscribe(op.Items, nil, err, true, "")
+			}
+			return nil, err
 		}
 	}
 	if dryRun || len(op.Items) == 0 {
@@ -151,7 +155,11 @@ func (a *App) Workshop(action string, refs []string, dryRun bool, callbacks ...B
 	}()
 	rep, err := a.runSteam(action, ids)
 	if err != nil {
-		return nil, a.unavailable(err, op.Items)
+		err = a.unavailable(err, op.Items)
+		if action == steamworks.Unsubscribe {
+			a.logUnsubscribe(op.Items, nil, err, false, "")
+		}
+		return nil, err
 	}
 	by := map[string]steamworks.Item{}
 	for _, x := range rep.Items {
@@ -169,6 +177,9 @@ func (a *App) Workshop(action string, refs []string, dryRun bool, callbacks ...B
 		if it.Result != "ok" {
 			failed = append(failed, fmt.Sprintf("%s (%s)", it.Name, it.Result))
 		}
+	}
+	if action == steamworks.Unsubscribe {
+		a.logUnsubscribe(op.Items, rep, nil, false, "")
 	}
 	if len(failed) > 0 {
 		return op, fmt.Errorf("Steam did not confirm: %s", strings.Join(failed, ", "))
@@ -213,10 +224,19 @@ func (a *App) resubscribe(op *WorkshopOp, b BatchCalls) (*WorkshopOp, error) {
 			return nil, err
 		}
 		rep, err := a.runSteam(steamworks.Unsubscribe, remove)
+		var gone []WorkshopItem
+		for _, it := range op.Items {
+			if it.Folder != "" {
+				gone = append(gone, it)
+			}
+		}
 		if err != nil {
 			// The call may have reached Steam: the record stays until Steam confirms a subscription.
-			return nil, a.unavailable(err, op.Items)
+			err = a.unavailable(err, op.Items)
+			a.logUnsubscribe(gone, nil, err, false, "resubscribe")
+			return nil, err
 		}
+		a.logUnsubscribe(gone, rep, nil, false, "resubscribe")
 		var kept []string
 		for _, it := range rep.Items {
 			id := strconv.FormatUint(it.ID, 10)

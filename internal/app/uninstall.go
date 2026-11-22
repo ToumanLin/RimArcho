@@ -22,6 +22,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
+	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/scan"
 	"github.com/ToumanLin/RimArcho/internal/secret"
 	"github.com/ToumanLin/RimArcho/internal/selfupdate"
@@ -845,14 +846,28 @@ type UninstallProgress struct {
 // others go on; then the data folders and the program are left in place (run it again),
 // because they hold what is needed to finish. Otherwise the script that deletes them once
 // RimArcho has closed is started.
-func (a *App) Uninstall(o UninstallOptions, progress func(UninstallProgress)) (*UninstallPlan, error) {
-	p, err := a.CheckUninstall(o)
+//
+// The operation log (13 §1.3) gets one parent row, with the recycle-bin moves, unlinked links
+// and failed items under it. It goes with the data folder when that is deleted.
+func (a *App) Uninstall(o UninstallOptions, progress func(UninstallProgress)) (p *UninstallPlan, err error) {
+	run := a.opStart(false, func() oplog.Row { return oplog.Row{Op: oplog.Uninstall, Subject: "RimArcho", Target: a.Home} })
+	failed := false
+	defer func() {
+		outcome := err
+		if outcome == nil && failed {
+			outcome = errPartial
+		}
+		run.end(outcome, "")
+	}()
+	p, err = a.CheckUninstall(o)
 	if err != nil {
 		return nil, err
 	}
 	if err := p.Blocked(); err != nil {
 		return p, err
 	}
+	run.begin()
+	h := run.parent()
 	if progress == nil {
 		progress = func(UninstallProgress) {}
 	}
@@ -862,7 +877,6 @@ func (a *App) Uninstall(o UninstallOptions, progress func(UninstallProgress)) (*
 			n += len(s.Items)
 		}
 	}
-	failed := false
 	for _, s := range p.Steps {
 		if s.Key == UnData || s.Key == UnProgram {
 			continue
@@ -870,9 +884,12 @@ func (a *App) Uninstall(o UninstallOptions, progress func(UninstallProgress)) (*
 		for _, it := range s.Items {
 			i++
 			progress(UninstallProgress{Step: s.Key, Item: it.Path, I: i, N: n})
-			if err := a.uninstallItem(s.Key, it); err != nil {
+			if err := a.uninstallItem(h, s.Key, it); err != nil {
 				it.Err = err.Error()
 				failed = true
+				if it.Do != DoTrash && it.Do != DoUnlink { // those write their own rows
+					a.opAdd(h, oplog.Row{Op: oplog.Uninstall, Subject: s.Key + ": " + it.Do, Target: it.Path, Result: oplog.Failed, Detail: err.Error()})
+				}
 				if it.Do == "forget-agent-key" {
 					return p, errors.New("could not remove the Archo Agent API key from Windows Credential Manager; tools and data were kept; retry")
 				}
@@ -910,11 +927,11 @@ func (a *App) Uninstall(o UninstallOptions, progress func(UninstallProgress)) (*
 	}
 	progress(UninstallProgress{Step: UnData, I: n, N: n})
 	a.Uninstalled = true
-	run := a.AfterExitFunc
-	if run == nil {
-		run = func(x AfterExit) error { return startAfterExit(x, p.Log) }
+	after := a.AfterExitFunc
+	if after == nil {
+		after = func(x AfterExit) error { return startAfterExit(x, p.Log) }
 	}
-	if err := run(p.AfterExit); err != nil {
+	if err := after(p.AfterExit); err != nil {
 		for _, s := range last {
 			if s == nil {
 				continue
@@ -930,7 +947,7 @@ func (a *App) Uninstall(o UninstallOptions, progress func(UninstallProgress)) (*
 }
 
 // uninstallItem carries out one item.
-func (a *App) uninstallItem(step string, it *UninstallItem) error {
+func (a *App) uninstallItem(h *oplog.Handle, step string, it *UninstallItem) error {
 	switch it.Do {
 	case "forget-accounts":
 		return a.ForgetAccounts()
@@ -944,13 +961,13 @@ func (a *App) uninstallItem(step string, it *UninstallItem) error {
 		}
 		return nil
 	case DoUnlink:
-		return a.applyLinks(filepath.Dir(it.Path), []LinkChange{{Op: "remove", Name: filepath.Base(it.Path)}})
+		return a.applyLinksIn(h, filepath.Dir(it.Path), []LinkChange{{Op: "remove", Name: filepath.Base(it.Path)}})
 	case DoClean:
 		return cleanModsConfig(it.Path, it.Drop)
 	case DoRestore:
 		return restoreModsConfig(it.Path)
 	case DoTrash:
-		return a.ToTrash(it.Path)
+		return a.toTrash(h, it.Path)
 	case DoDelete:
 		if step == UnSource {
 			return a.uninstallSource(it.Path)

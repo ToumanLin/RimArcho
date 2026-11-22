@@ -54,6 +54,7 @@ var hintSpecs = []hintSpec{
 	{cmd: "problems", tool: "list_problems", minInfo: true,
 		value: map[string]string{"subject": "subject", "code": "code", "severity": "severity", "min-severity": "min_severity", "ref": "ref", "game-version": "game_version"},
 		flag:  map[string]string{"all": "all", "detail": "detail", "ignored": "ignored", "include-muted": "include_muted"}},
+	{cmd: "ops", tool: "list_operations", value: map[string]string{"since": "since", "op": "op"}, flag: map[string]string{"failed": "failed", "all": "all"}},
 	{cmd: "changes", tool: "list_changes", pos: []string{"ref"}, value: map[string]string{"since": "since"}, flag: map[string]string{"library": "library", "all": "all"}},
 	{cmd: "enable", tool: "edit_loadout", fixed: [][2]string{{"action", "enable"}}, posList: true, pos: []string{"refs"},
 		value: map[string]string{"at": "at", "before": "before", "after": "after"}},

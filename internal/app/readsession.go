@@ -2,7 +2,9 @@ package app
 
 import (
 	"strings"
+	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
@@ -17,6 +19,18 @@ func (a *App) ReadSession() (*App, error) {
 		return nil, err
 	}
 	b := &App{Store: s, decl: a.decl}
+	// Actions a page runs on its session are logged like any other (13 §1.3), on the
+	// session's own connection and with the process origin.
+	if a.Ops != nil {
+		b.Ops = oplog.New(s, a.Ops.Origin())
+		b.Ops.Fail = a.Ops.Fail
+		b.Ops.Now = func() time.Time {
+			if b.Now != nil {
+				return b.Now()
+			}
+			return time.Now()
+		}
+	}
 	b.ReadOptions(a)
 	s.DB.Exec("PRAGMA cache_size=-256")
 	return b, nil
