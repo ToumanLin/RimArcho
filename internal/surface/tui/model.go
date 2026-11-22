@@ -430,10 +430,29 @@ func (m *model) loadDetail() tea.Cmd {
 		return nil
 	}
 	ref := it.ref
-	return func() tea.Msg {
-		out, _ := cmds.Execute(m.app, []string{"mod", ref})
-		return detailMsg{ref: ref, lines: strings.Split(strings.TrimRight(out, "\n"), "\n")}
+	// On its own session (16 §3.1 rule 9), not m.app, which the screen goroutine changes
+	// meanwhile (removing a Game Config clears EnvName).
+	return m.bg(func(a *app.App) func(*model) tea.Cmd {
+		out, _ := cmds.Execute(a, []string{"mod", ref})
+		msg := detailMsg{ref: ref, lines: strings.Split(strings.TrimRight(out, "\n"), "\n")}
+		return func(m *model) tea.Cmd { m.onDetailLines(msg); return nil }
+	})
+}
+
+// onDetailLines shows a Mod's technical details if the cursor is still on it.
+func (m *model) onDetailLines(msg detailMsg) {
+	if it := m.current(); it != nil && it.ref == msg.ref {
+		m.detailRef, m.detail = msg.ref, msg.lines
 	}
+}
+
+// onDetailData stores a Mod's loaded details (clearing the fetching note) and schedules the
+// Workshop fetch.
+func (m *model) onDetailData(d *detailData) tea.Cmd {
+	if m.status == T("fetching the Workshop page…") {
+		m.status, m.sayKind = "", sayNone
+	}
+	return m.onData(d)
 }
 
 func (m *model) startScan() tea.Cmd {

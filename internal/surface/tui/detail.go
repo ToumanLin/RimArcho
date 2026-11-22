@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/bbcode"
 	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -39,8 +40,13 @@ func (m *model) loadData(id string, fetch, refresh bool) tea.Cmd {
 	if mod == nil {
 		return nil
 	}
-	ix, a := m.st.Ix, m.app
-	return func() tea.Msg { return detailDataMsg{view.LoadDetail(a, ix, mod, fetch, refresh)} }
+	// On its own session (16 §3.1 rule 9): the screen goroutine changes m.app meanwhile
+	// (removing a Game Config clears EnvName).
+	ix := m.st.Ix
+	return m.bg(func(a *app.App) func(*model) tea.Cmd {
+		d := view.LoadDetail(a, ix, mod, fetch, refresh)
+		return func(m *model) tea.Cmd { return m.onDetailData(d) }
+	})
 }
 
 // onData stores loaded data and schedules the Workshop fetch when it is missing.

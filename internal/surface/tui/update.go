@@ -72,10 +72,7 @@ func (m *model) handle(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case detailDataMsg:
-		if m.status == T("fetching the Workshop page…") {
-			m.status, m.sayKind = "", sayNone
-		}
-		return m, m.onData(msg.d)
+		return m, m.onDetailData(msg.d)
 	case fetchTick:
 		return m, m.onFetchTick(msg.id)
 	case fullSecsMsg:
@@ -84,9 +81,7 @@ func (m *model) handle(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case detailMsg:
-		if it := m.current(); it != nil && it.ref == msg.ref {
-			m.detailRef, m.detail = msg.ref, msg.lines
-		}
+		m.onDetailLines(msg)
 		return m, nil
 	case tea.KeyMsg:
 		return m, m.key(msg)
