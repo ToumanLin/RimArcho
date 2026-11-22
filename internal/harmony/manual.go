@@ -204,6 +204,7 @@ type scanner struct {
 	final  bool
 	out    *Assembly
 	seen   map[string]bool
+	stack  []*val // run's stack buffer, reused from method to method
 }
 
 var patchKinds5 = []string{Prefix, Postfix, Transpiler, Finalizer, ILManipulator}
@@ -275,11 +276,11 @@ func (s *scanner) setField(k string, v *val) {
 	s.fnext[k] = append(s.fnext[k], v)
 }
 
-// frame is the evaluation state of one method body in run.
+// frame is the evaluation state of one method body in run, except the stack. The stack is a
+// separate valStack so that these maps can stay off the heap.
 type frame struct {
 	s      *scanner
 	row    uint32
-	st     []*val
 	snap   map[int][]*val // stacks recorded at branch targets
 	dead   bool           // after an unconditional branch, ret or throw
 	stores map[int64]int  // stores per local
@@ -288,9 +289,12 @@ type frame struct {
 	localF map[string]*val // fields stored in this method
 }
 
+// valStack is run's evaluation stack.
+type valStack struct{ v []*val }
+
 // record saves the stack for branch target t, merged with what was recorded there before.
-func (f *frame) record(t int) {
-	cp := append([]*val(nil), f.st...)
+func (f *frame) record(t int, s *valStack) {
+	cp := append([]*val(nil), s.v...)
 	if old, ok := f.snap[t]; ok {
 		cp = mergeStacks(old, cp)
 	}
@@ -298,25 +302,32 @@ func (f *frame) record(t int) {
 }
 
 // pop takes the top of the stack; an empty stack gives an unknown value.
-func (f *frame) pop() *val {
-	if len(f.st) == 0 {
+func (s *valStack) pop() *val {
+	if len(s.v) == 0 {
 		return unk("stack")
 	}
-	v := f.st[len(f.st)-1]
-	f.st = f.st[:len(f.st)-1]
+	v := s.v[len(s.v)-1]
+	s.v = s.v[:len(s.v)-1]
 	return v
 }
 
 // push puts v on the stack.
-func (f *frame) push(v *val) { f.st = append(f.st, v) }
+func (s *valStack) push(v *val) { s.v = append(s.v, v) }
 
 // popN takes the top n values, deepest first.
-func (f *frame) popN(n int) []*val {
+func (s *valStack) popN(n int) []*val {
 	r := make([]*val, n)
 	for i := n - 1; i >= 0; i-- {
-		r[i] = f.pop()
+		r[i] = s.pop()
 	}
 	return r
+}
+
+// drop discards the top n values.
+func (s *valStack) drop(n int) {
+	for i := 0; i < n; i++ {
+		s.pop()
+	}
 }
 
 // ldarg is argument i: its last store, else the parameter itself.
@@ -339,36 +350,37 @@ func (f *frame) ldloc(i int64) *val {
 	return v
 }
 
-// field is a field token's key and value: stored in this method, else the previous round's.
-func (f *frame) field(tok uint32) (string, *val) {
+// field is a field token's value: stored in this method, else the previous round's.
+func (f *frame) field(tok uint32) *val {
 	m, ok := f.s.a.Member(tok)
 	if !ok {
-		return "", unk("field")
+		return unk("field")
 	}
 	k := m.Owner + "::" + m.Name
 	if m.Owner == "System.Type" && m.Name == "EmptyTypes" {
-		return k, &val{k: vArr}
+		return &val{k: vArr}
 	}
 	if v := f.localF[k]; v != nil {
-		return k, v
+		return v
 	}
 	if v := f.s.fields[k]; v != nil {
-		return k, v
+		return v
 	}
-	return k, unk("field")
+	return unk("field")
 }
 
 // storeField records v as the value of the field token's field.
 func (f *frame) storeField(tok uint32, v *val) {
-	if k, _ := f.field(tok); k != "" {
+	if m, ok := f.s.a.Member(tok); ok {
+		k := m.Owner + "::" + m.Name
 		f.localF[k] = v
 		f.s.setField(k, v)
 	}
 }
 
-// branchTargets is the set of offsets some branch or switch jumps to.
-func branchTargets(ins []dotnet.Instr) map[int]bool {
-	targets := map[int]bool{}
+// addBranchTargets adds the offsets some branch or switch jumps to. The caller makes the map,
+// so that a small one can stay off the heap.
+func addBranchTargets(targets map[int]bool, ins []dotnet.Instr) {
 	for _, in := range ins {
 		if dotnet.IsBranch(in.Op) {
 			targets[int(in.Arg)] = true
@@ -377,13 +389,11 @@ func branchTargets(ins []dotnet.Instr) map[int]bool {
 			targets[t] = true
 		}
 	}
-	return targets
 }
 
-// localStores counts the stores to each local. Locals stored more than once (loop counters):
+// addLocalStores counts the stores to each local. Locals stored more than once (loop counters):
 // their int value is not a fixed index.
-func localStores(ins []dotnet.Instr) map[int64]int {
-	stores := map[int64]int{}
+func addLocalStores(stores map[int64]int, ins []dotnet.Instr) {
 	for _, in := range ins {
 		switch op := in.Op; {
 		case op >= 0x0a && op <= 0x0d:
@@ -392,7 +402,6 @@ func localStores(ins []dotnet.Instr) map[int64]int {
 			stores[in.Arg]++
 		}
 	}
-	return stores
 }
 
 // run evaluates MethodDef row's IL once, filling its summary and the field stores.
@@ -402,73 +411,78 @@ func (s *scanner) run(row uint32) {
 		return
 	}
 	ins := dotnet.DecodeIL(code)
-	targets := branchTargets(ins)
-	f := &frame{s: s, row: row, snap: map[int][]*val{}, stores: localStores(ins),
+	targets, stores := map[int]bool{}, map[int64]int{}
+	addBranchTargets(targets, ins)
+	addLocalStores(stores, ins)
+	f := frame{s: s, row: row, snap: map[int][]*val{}, stores: stores,
 		locals: map[int64]*val{}, args: map[int64]*val{}, localF: map[string]*val{}}
+	st := valStack{v: s.stack[:0]}
 	for _, in := range ins {
-		f.join(in.Off, targets[in.Off])
+		f.join(in.Off, targets[in.Off], &st)
 		f.dead = false
-		f.step(in)
+		f.step(in, &st)
 	}
+	clear(st.v[:cap(st.v)])
+	s.stack = st.v[:0]
 }
 
 // join sets the stack at off: the fall-through stack merged with the stacks branched here.
-func (f *frame) join(off int, target bool) {
+func (f *frame) join(off int, target bool, s *valStack) {
 	if target {
 		sn, ok := f.snap[off]
 		switch {
 		case f.dead && ok:
-			f.st = append(f.st[:0], sn...)
+			s.v = append(s.v[:0], sn...)
 		case f.dead:
-			f.st = f.st[:0]
+			s.v = s.v[:0]
 		case ok:
-			f.st = mergeStacks(f.st, sn)
+			s.v = mergeStacks(s.v, sn)
 		}
 	} else if f.dead {
-		f.st = f.st[:0]
+		s.v = s.v[:0]
 	}
 }
 
 // step applies one instruction. The handlers keep the opcode cases in their original order;
 // prefixes (unaligned, volatile, tail, constrained, readonly, no.) and anything else have no
 // stack effect.
-func (f *frame) step(in dotnet.Instr) {
-	_ = f.stepLoad(in) || f.stepControl(in) || f.stepArith(in) || f.stepObject(in) || f.stepMisc(in) || f.stepCall(in)
+func (f *frame) step(in dotnet.Instr, s *valStack) {
+	_ = f.stepLoad(in, s) || f.stepControl(in, s) || f.stepArith(in, s) || f.stepObject(in, s) || f.stepMisc(in, s) || f.stepCall(in, s)
 }
 
 // stepLoad handles nop, arguments, locals, constants, dup and pop.
-func (f *frame) stepLoad(in dotnet.Instr) bool {
+func (f *frame) stepLoad(in dotnet.Instr, s *valStack) bool {
 	op := in.Op
 	switch {
 	case op == 0x00: // nop
 	case op >= 0x02 && op <= 0x05: // ldarg.0-3
-		f.push(f.ldarg(int64(op - 0x02)))
+		s.push(f.ldarg(int64(op - 0x02)))
 	case op >= 0x06 && op <= 0x09: // ldloc.0-3
-		f.push(f.ldloc(int64(op - 0x06)))
+		s.push(f.ldloc(int64(op - 0x06)))
 	case op >= 0x0a && op <= 0x0d: // stloc.0-3
-		f.locals[int64(op-0x0a)] = f.pop()
+		f.locals[int64(op-0x0a)] = s.pop()
 	case op == 0x0e || op == 0x0f || op == 0xfe09 || op == 0xfe0a: // ldarg(a)
-		f.push(f.ldarg(in.Arg))
+		s.push(f.ldarg(in.Arg))
 	case op == 0x10 || op == 0xfe0b: // starg
-		f.args[in.Arg] = f.pop()
+		f.args[in.Arg] = s.pop()
 	case op == 0x11 || op == 0x12 || op == 0xfe0c || op == 0xfe0d: // ldloc(a)
-		f.push(f.ldloc(in.Arg))
+		s.push(f.ldloc(in.Arg))
 	case op == 0x13 || op == 0xfe0e: // stloc
-		f.locals[in.Arg] = f.pop()
+		f.locals[in.Arg] = s.pop()
 	case op == 0x14:
-		f.push(null)
+		s.push(null)
 	case op >= 0x15 && op <= 0x1e: // ldc.i4.m1 … ldc.i4.8
-		f.push(&val{k: vInt, n: int64(op) - 0x16})
+		s.push(&val{k: vInt, n: int64(op) - 0x16})
 	case op == 0x1f || op == 0x20 || op == 0x21:
-		f.push(&val{k: vInt, n: in.Arg})
+		s.push(&val{k: vInt, n: in.Arg})
 	case op == 0x22 || op == 0x23:
-		f.push(unk("float"))
+		s.push(unk("float"))
 	case op == 0x25:
-		v := f.pop()
-		f.push(v)
-		f.push(v)
+		v := s.pop()
+		s.push(v)
+		s.push(v)
 	case op == 0x26:
-		f.pop()
+		s.pop()
 	default:
 		return false
 	}
@@ -476,32 +490,32 @@ func (f *frame) stepLoad(in dotnet.Instr) bool {
 }
 
 // stepControl handles returns, throws, leaves, branches and switch.
-func (f *frame) stepControl(in dotnet.Instr) bool {
+func (f *frame) stepControl(in dotnet.Instr, s *valStack) bool {
 	op := in.Op
 	switch {
 	case op == 0x27 || op == 0x29 || op == 0x2a || op == 0xdc || op == 0xdd || op == 0xde || op == 0x7a || op == 0xfe1a || op == 0xfe11:
 		// jmp, calli, ret, endfinally, leave, throw, rethrow, endfilter
-		if op == 0x2a && len(f.st) > 0 {
-			f.recordReturn(f.st[len(f.st)-1])
+		if op == 0x2a && len(s.v) > 0 {
+			f.recordReturn(s.v[len(s.v)-1])
 		}
-		f.st = f.st[:0]
+		s.v = s.v[:0]
 		if op == 0xdd || op == 0xde {
-			f.record(int(in.Arg))
+			f.record(int(in.Arg), s)
 		}
 		f.dead = true
 	case op == 0x2b || op == 0x38: // br
-		f.record(int(in.Arg))
+		f.record(int(in.Arg), s)
 		f.dead = true
 	case op == 0x2c || op == 0x2d || op == 0x39 || op == 0x3a: // brfalse / brtrue
-		f.pop()
-		f.record(int(in.Arg))
+		s.pop()
+		f.record(int(in.Arg), s)
 	case op >= 0x2e && op <= 0x37 || op >= 0x3b && op <= 0x44:
-		f.popN(2)
-		f.record(int(in.Arg))
+		s.drop(2)
+		f.record(int(in.Arg), s)
 	case op == 0x45:
-		f.pop()
+		s.pop()
 		for _, t := range in.Targets {
-			f.record(t)
+			f.record(t, s)
 		}
 	default:
 		return false
@@ -520,21 +534,21 @@ func (f *frame) recordReturn(v *val) {
 }
 
 // stepArith handles indirect loads and stores, arithmetic, conversions and same-value casts.
-func (f *frame) stepArith(in dotnet.Instr) bool {
+func (f *frame) stepArith(in dotnet.Instr, s *valStack) bool {
 	op := in.Op
 	switch {
 	case op >= 0x46 && op <= 0x50: // ldind.*
-		f.pop()
-		f.push(unk("pointer"))
+		s.pop()
+		s.push(unk("pointer"))
 	case op == 0x51 || op >= 0x52 && op <= 0x57 || op == 0xdf: // stind.*
-		f.popN(2)
+		s.drop(2)
 	case op >= 0x58 && op <= 0x64 || op >= 0xd6 && op <= 0xdb || op >= 0xfe01 && op <= 0xfe05: // binary
-		f.popN(2)
-		f.push(unk("arithmetic"))
+		s.drop(2)
+		s.push(unk("arithmetic"))
 	case op == 0x65 || op == 0x66 || op >= 0x67 && op <= 0x6e || op == 0x76 || op >= 0x82 && op <= 0x8b ||
 		op >= 0xb3 && op <= 0xba || op == 0xc3 || op >= 0xd1 && op <= 0xd5 || op == 0xe0 || op == 0x8e || op == 0xfe0f:
-		f.pop()
-		f.push(unk("arithmetic"))
+		s.pop()
+		s.push(unk("arithmetic"))
 	case op == 0x74 || op == 0x75 || op == 0x8c || op == 0x79 || op == 0xa5 || op == 0x71:
 		// castclass, isinst, box, unbox, unbox.any, ldobj: same value
 	default:
@@ -544,26 +558,24 @@ func (f *frame) stepArith(in dotnet.Instr) bool {
 }
 
 // stepObject handles cpobj, stobj, ldstr and the field loads and stores.
-func (f *frame) stepObject(in dotnet.Instr) bool {
+func (f *frame) stepObject(in dotnet.Instr, s *valStack) bool {
 	op := in.Op
 	switch {
 	case op == 0x70 || op == 0x81: // cpobj, stobj
-		f.popN(2)
+		s.drop(2)
 	case op == 0x72:
-		f.push(vstr(f.s.a.UserString(uint32(in.Arg))))
+		s.push(vstr(f.s.a.UserString(uint32(in.Arg))))
 	case op == 0x7b || op == 0x7c: // ldfld(a)
-		f.pop()
-		_, v := f.field(uint32(in.Arg))
-		f.push(v)
+		s.pop()
+		s.push(f.field(uint32(in.Arg)))
 	case op == 0x7d: // stfld
-		v := f.pop()
-		f.pop()
+		v := s.pop()
+		s.pop()
 		f.storeField(uint32(in.Arg), v)
 	case op == 0x7e || op == 0x7f:
-		_, v := f.field(uint32(in.Arg))
-		f.push(v)
+		s.push(f.field(uint32(in.Arg)))
 	case op == 0x80:
-		f.storeField(uint32(in.Arg), f.pop())
+		f.storeField(uint32(in.Arg), s.pop())
 	default:
 		return false
 	}
@@ -571,40 +583,40 @@ func (f *frame) stepObject(in dotnet.Instr) bool {
 }
 
 // stepMisc handles arrays, typed references, tokens, method pointers and the block opcodes.
-func (f *frame) stepMisc(in dotnet.Instr) bool {
+func (f *frame) stepMisc(in dotnet.Instr, s *valStack) bool {
 	op := in.Op
 	switch {
 	case op == 0x8d: // newarr
-		f.push(newArr(f.pop()))
+		s.push(newArr(s.pop()))
 	case op == 0x8f || op >= 0x90 && op <= 0x9a || op == 0xa3: // ldelem*
-		idx := f.pop()
-		arr := f.pop()
-		f.push(elem(arr, idx))
+		idx := s.pop()
+		arr := s.pop()
+		s.push(elem(arr, idx))
 	case op >= 0x9b && op <= 0xa2 || op == 0xa4: // stelem*
-		v := f.pop()
-		idx := f.pop()
-		arr := f.pop()
+		v := s.pop()
+		idx := s.pop()
+		arr := s.pop()
 		if arr.k == vArr && idx.k == vInt && idx.n >= 0 && int(idx.n) < len(arr.el) {
 			arr.el[idx.n] = v
 		}
 	case op == 0xc2 || op == 0xc6 || op == 0xfe1d:
-		f.pop()
-		f.push(unk("typedref"))
+		s.pop()
+		s.push(unk("typedref"))
 	case op == 0xd0: // ldtoken
-		f.push(f.s.token(uint32(in.Arg)))
+		s.push(f.s.token(uint32(in.Arg)))
 	case op == 0xfe06: // ldftn
-		f.push(f.s.methodToken(uint32(in.Arg)))
+		s.push(f.s.methodToken(uint32(in.Arg)))
 	case op == 0xfe07: // ldvirtftn
-		f.pop()
-		f.push(f.s.methodToken(uint32(in.Arg)))
+		s.pop()
+		s.push(f.s.methodToken(uint32(in.Arg)))
 	case op == 0xfe15: // initobj
-		f.pop()
+		s.pop()
 	case op == 0xfe17 || op == 0xfe18: // cpblk, initblk
-		f.popN(3)
+		s.drop(3)
 	case op == 0xfe1c:
-		f.push(unk("sizeof"))
+		s.push(unk("sizeof"))
 	case op == 0xfe00:
-		f.push(unk("arglist"))
+		s.push(unk("arglist"))
 	default:
 		return false
 	}
@@ -626,21 +638,21 @@ func newArr(n *val) *val {
 }
 
 // stepCall handles call, callvirt and newobj through the API models in call.
-func (f *frame) stepCall(in dotnet.Instr) bool {
+func (f *frame) stepCall(in dotnet.Instr, s *valStack) bool {
 	op := in.Op
 	if op != 0x28 && op != 0x6f && op != 0x73 {
 		return false
 	}
 	m, ok := f.s.a.Member(uint32(in.Arg))
 	if !ok {
-		f.st = f.st[:0]
+		s.v = s.v[:0]
 		return true
 	}
 	n := m.Params
 	if m.HasThis && op != 0x73 {
 		n++
 	}
-	cargs := f.popN(n)
+	cargs := s.popN(n)
 	if op == 0x73 {
 		cargs = append([]*val{unk("this")}, cargs...)
 	}
@@ -649,7 +661,7 @@ func (f *frame) stepCall(in dotnet.Instr) bool {
 		if r == nil {
 			r = unk("call " + shortOwner(m.Owner) + "." + m.Name)
 		}
-		f.push(r)
+		s.push(r)
 	}
 	return true
 }
