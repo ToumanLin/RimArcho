@@ -1128,21 +1128,8 @@ type opWrite struct {
 }
 
 func (a *App) writeGameOnce(st *LoadoutState, dryRun, launch, move bool, creditFrom ...*store.Mod) (*SaveResult, error) {
-	e := st.Ix.Env
-	if err := a.recoverInstallationTestLinks(modsDir(st.Ix), dryRun); err != nil {
+	if err := a.checkGameWritable(st, dryRun); err != nil {
 		return nil, err
-	}
-	if st.FilePath == "" {
-		return nil, errors.New("the Game Config has no user data directory; set one with archo env set --user-data <dir>")
-	}
-	if st.FileErr != nil {
-		return nil, fmt.Errorf("cannot read %s: %v (fix or remove the file first)", st.FilePath, st.FileErr)
-	}
-	// Never over an external change the player has not seen (05 I8, 07 §4.3).
-	if c, err := a.writeBlocker(st); err != nil {
-		return nil, err
-	} else if c != nil {
-		return nil, conflictError(st, c)
 	}
 	copies := a.ModsCopies(st.Ix)
 	mods, links, dups, err := planLinks(st, copies)
@@ -1151,74 +1138,158 @@ func (a *App) writeGameOnce(st *LoadoutState, dryRun, launch, move bool, creditF
 	}
 	var moved []DuplicateMove
 	if len(dups) > 0 {
-		de := &DuplicatesError{Moves: a.planMoves(st, copies, dups), Fix: "archo save --move-duplicates"}
-		if launch {
-			de.Fix = "archo launch --move-duplicates"
+		d, err := a.writeDuplicates(st, copies, dups, dryRun, launch, move)
+		if d.done || err != nil {
+			return d.r, err
 		}
-		if !move || !de.Movable() {
-			if !de.Movable() {
-				de.Fix = ""
-			}
-			return nil, de
-		}
-		if !dryRun {
-			// Move them, then write from the state after the move (the instances moved).
-			st.op.wrote = true
-			if _, err := a.doMoves(de.Moves); err != nil {
-				return nil, err
-			}
-			st2, err := a.Loadout()
-			if err != nil {
-				return nil, err
-			}
-			st2.workshopLinks, st2.keepWorkshopLinks, st2.op = st.workshopLinks, st.keepWorkshopLinks, st.op
-			r, err := a.writeGameOnce(st2, false, launch, false)
-			if r != nil {
-				r.Moved = de.Moves
-			}
-			return r, err
-		}
-		// The dry run: what would be linked once they have moved.
-		moved = de.Moves
-		var rest []ModsCopy
-		for _, c := range copies {
-			gone := false
-			for _, m := range de.Moves {
-				gone = gone || m.Copy.Name == c.Name
-			}
-			if !gone {
-				rest = append(rest, c)
-			}
-		}
-		if mods, links, _, err = planLinks(st, rest); err != nil {
-			return nil, err
-		}
+		moved, mods, links = d.moved, d.mods, d.links
 	}
 	// A credit handoff projects the file already in the game, keeping unrelated
 	// pending edits, links and the selected plan intact. Only the old copy's managed
 	// deployment is detached. Registry tokens must describe the links that will remain.
 	if len(creditFrom) > 0 {
-		old := creditFrom[0]
-		filtered := []LinkChange{}
-		for _, c := range links {
-			if c.Op == "remove" && c.Target != "" && samePath(c.Target, old.RealPath) {
-				filtered = append(filtered, c)
-			}
+		links = creditHandoff(st, links, creditFrom[0])
+	}
+	r, data, err := newSaveResult(st, dryRun, launch, moved, links)
+	if err != nil {
+		return nil, err
+	}
+	settings := a.listSettings(st, nil, filepath.Dir(st.FilePath))
+	if dryRun {
+		r.Settings = planModSettings(settings)
+		return r, nil
+	}
+	if err := a.checkUserData(filepath.Dir(st.FilePath)); err != nil { // own saves live in the data directory (03 §2)
+		return nil, err
+	}
+	if len(links) > 0 {
+		if err := a.checkRoots(mods); err != nil {
+			return nil, err
 		}
-		links = filtered
-		base := Candidates(st.Ix, st.Aliases)
-		seen := map[string]bool{}
-		for _, c := range base {
+		st.op.wrote = true
+		if err := a.applyLinksIn(st.op.h, mods, links); err != nil {
+			return nil, err
+		}
+	}
+	st.op.wrote = true
+	if r.Backup, err = loadout.WriteFile(st.FilePath, data); err != nil {
+		return nil, err
+	}
+	// Settings follow the Mod (09 §3): a Mod seen under a new folder gets its settings.
+	r.Settings = carryModSettings(settings, nil)
+	if err := a.recordGameWrite(st, r, data, len(creditFrom) > 0); err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+// checkGameWritable refuses to write ModsConfig.xml without a readable file in a user data
+// directory, or over an external change the player has not seen.
+func (a *App) checkGameWritable(st *LoadoutState, dryRun bool) error {
+	if err := a.recoverInstallationTestLinks(modsDir(st.Ix), dryRun); err != nil {
+		return err
+	}
+	if st.FilePath == "" {
+		return errors.New("the Game Config has no user data directory; set one with archo env set --user-data <dir>")
+	}
+	if st.FileErr != nil {
+		return fmt.Errorf("cannot read %s: %v (fix or remove the file first)", st.FilePath, st.FileErr)
+	}
+	// Never over an external change the player has not seen (05 I8, 07 §4.3).
+	if c, err := a.writeBlocker(st); err != nil {
+		return err
+	} else if c != nil {
+		return conflictError(st, c)
+	}
+	return nil
+}
+
+// dupWrite is what writeDuplicates decided: done with the result r of the write after the
+// move, or, for a dry run, the moves and the links once they are made.
+type dupWrite struct {
+	done  bool
+	r     *SaveResult
+	moved []DuplicateMove
+	mods  string
+	links []LinkChange
+}
+
+// writeDuplicates handles packageId duplicates in Mods/: refused unless move is set and
+// they are movable; moved, then the game written from the state after the move; or, in
+// a dry run, the links planned without the copies that would move.
+func (a *App) writeDuplicates(st *LoadoutState, copies []ModsCopy, dups []DuplicateMove, dryRun, launch, move bool) (dupWrite, error) {
+	de := &DuplicatesError{Moves: a.planMoves(st, copies, dups), Fix: "archo save --move-duplicates"}
+	if launch {
+		de.Fix = "archo launch --move-duplicates"
+	}
+	if !move || !de.Movable() {
+		if !de.Movable() {
+			de.Fix = ""
+		}
+		return dupWrite{done: true}, de
+	}
+	if !dryRun {
+		// Move them, then write from the state after the move (the instances moved).
+		st.op.wrote = true
+		if _, err := a.doMoves(de.Moves); err != nil {
+			return dupWrite{done: true}, err
+		}
+		st2, err := a.Loadout()
+		if err != nil {
+			return dupWrite{done: true}, err
+		}
+		st2.workshopLinks, st2.keepWorkshopLinks, st2.op = st.workshopLinks, st.keepWorkshopLinks, st.op
+		r, err := a.writeGameOnce(st2, false, launch, false)
+		if r != nil {
+			r.Moved = de.Moves
+		}
+		return dupWrite{done: true, r: r}, err
+	}
+	// The dry run: what would be linked once they have moved.
+	var rest []ModsCopy
+	for _, c := range copies {
+		gone := false
+		for _, m := range de.Moves {
+			gone = gone || m.Copy.Name == c.Name
+		}
+		if !gone {
+			rest = append(rest, c)
+		}
+	}
+	mods, links, _, err := planLinks(st, rest)
+	if err != nil {
+		return dupWrite{done: true}, err
+	}
+	return dupWrite{moved: de.Moves, mods: mods, links: links}, nil
+}
+
+// creditHandoff keeps only the removal of old's managed link and makes the registry
+// describe the links that remain.
+func creditHandoff(st *LoadoutState, links []LinkChange, old *store.Mod) []LinkChange {
+	filtered := []LinkChange{}
+	for _, c := range links {
+		if c.Op == "remove" && c.Target != "" && samePath(c.Target, old.RealPath) {
+			filtered = append(filtered, c)
+		}
+	}
+	base := Candidates(st.Ix, st.Aliases)
+	seen := map[string]bool{}
+	for _, c := range base {
+		seen[c.ID] = true
+	}
+	for _, c := range st.cands {
+		if c.ID != old.ID && !seen[c.ID] {
+			base = append(base, c)
 			seen[c.ID] = true
 		}
-		for _, c := range st.cands {
-			if c.ID != old.ID && !seen[c.ID] {
-				base = append(base, c)
-				seen[c.ID] = true
-			}
-		}
-		st.Reg = loadout.NewRegistry(base)
 	}
+	st.Reg = loadout.NewRegistry(base)
+	return filtered
+}
+
+// newSaveResult describes the write and renders the ModsConfig.xml it writes.
+func newSaveResult(st *LoadoutState, dryRun, launch bool, moved []DuplicateMove, links []LinkChange) (*SaveResult, []byte, error) {
+	e := st.Ix.Env
 	r := &SaveResult{State: st, Path: st.FilePath, DryRun: dryRun, Changes: st.Changes(), Moved: moved}
 	r.Links = links
 	r.Tokens = st.Reg.Tokens(st.List, func(id string) string {
@@ -1248,7 +1319,7 @@ func (a *App) writeGameOnce(st *LoadoutState, dryRun, launch, move bool, creditF
 	}
 	data, err := loadout.Render(orig, r.NewVersion, r.Tokens, known)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	switch {
 	case launch:
@@ -1259,29 +1330,13 @@ func (a *App) writeGameOnce(st *LoadoutState, dryRun, launch, move bool, creditF
 	default:
 		r.Source = "user"
 	}
-	settings := a.listSettings(st, nil, filepath.Dir(st.FilePath))
-	if dryRun {
-		r.Settings = planModSettings(settings)
-		return r, nil
-	}
-	if err := a.checkUserData(filepath.Dir(st.FilePath)); err != nil { // own saves live in the data directory (03 §2)
-		return nil, err
-	}
-	if len(links) > 0 {
-		if err := a.checkRoots(mods); err != nil {
-			return nil, err
-		}
-		st.op.wrote = true
-		if err := a.applyLinksIn(st.op.h, mods, links); err != nil {
-			return nil, err
-		}
-	}
-	st.op.wrote = true
-	if r.Backup, err = loadout.WriteFile(st.FilePath, data); err != nil {
-		return nil, err
-	}
-	// Settings follow the Mod (09 §3): a Mod seen under a new folder gets its settings.
-	r.Settings = carryModSettings(settings, nil)
+	return r, data, nil
+}
+
+// recordGameWrite records a written ModsConfig.xml: the plan's new version, the write
+// record and, unless it is a credit handoff, the workspace and the current plan.
+func (a *App) recordGameWrite(st *LoadoutState, r *SaveResult, data []byte, credit bool) error {
+	e := st.Ix.Env
 	now := a.Now().UTC()
 	n := 0
 	if r.Unchanged {
@@ -1291,8 +1346,9 @@ func (a *App) writeGameOnce(st *LoadoutState, dryRun, launch, move bool, creditF
 		if r.Source == "undo" {
 			note = fmt.Sprintf("restored v%d", st.WS.OriginVersion)
 		}
+		var err error
 		if n, err = a.Store.AddVersion(st.Plan.ID, &store.Version{Created: now, Source: r.Source, Entries: st.List.Encode(), GameVersion: r.NewVersion, Note: note}); err != nil {
-			return nil, err
+			return err
 		}
 		r.Version = n
 	}
@@ -1300,23 +1356,23 @@ func (a *App) writeGameOnce(st *LoadoutState, dryRun, launch, move bool, creditF
 	h := loadout.Hash(data)
 	if err := a.Store.SetModsConfigStateAt(e.UserDataRoot, &store.ModsConfigState{Written: h, Seen: h, WrittenAt: now,
 		WriterPlan: st.Plan.ID, WriterVersion: n, WriterEnv: e.ID}); err != nil {
-		return nil, err
+		return err
 	}
-	if len(creditFrom) > 0 {
-		return r, nil
+	if credit {
+		return nil
 	}
 	st.WS.OriginVersion, st.WS.OriginKind, st.WS.Conflict, st.WS.Updated = n, "save", 0, now
 	if err := a.Store.SetWorkspace(st.WS); err != nil {
-		return nil, err
+		return err
 	}
 	// Writing an opened list to the game chooses it: it becomes the current one (07 §1.3).
 	if a.Store.CurrentPlanID(e.ID) != st.Plan.ID {
 		if err := a.Store.SetCurrentPlan(e.ID, st.Plan.ID); err != nil {
-			return nil, err
+			return err
 		}
 	}
 	a.OpenPlan, a.PlanName = 0, ""
-	return r, nil
+	return nil
 }
 
 // ParseVersionRef resolves "v3", "3" or "workspace" (0) in the environment's current plan.

@@ -163,48 +163,81 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 	if err := cx.a.Store.LoadDecls(mods); err != nil {
 		return
 	}
+	ix := newRefIndexes(qs)
+	hits := scanRefJobs(cx.refJobs(qs, mods, len(ix.lit) > 0), ix)
+	sort.Slice(hits, func(i, j int) bool {
+		a, b := hits[i], hits[j]
+		if a.q != b.q {
+			return a.q < b.q
+		}
+		if pa, pb := cx.st.Position(a.inst), cx.st.Position(b.inst); pa != pb {
+			return pa < pb
+		}
+		if a.file != b.file {
+			return a.file < b.file
+		}
+		return a.line < b.line
+	})
+	cx.yieldReferrers(qs, hits)
+}
+
+// refIndexes are the names of a set of queries, by how a file can mention them.
+type refIndexes struct {
+	qs    []*refQuery
+	text  map[string][]int // element text → queries
+	elem  map[string][]int // element name → queries (defs only)
+	lit   map[string][]int // assembly string literal → queries
+	paths []int            // texture queries: a literal can also be the start of the path
+	class map[string][]int // Class="…" attribute value → queries
+	field map[string][]int // element name + "\x00" + text → queries
+}
+
+// newRefIndexes indexes the names of qs.
+func newRefIndexes(qs []*refQuery) *refIndexes {
+	ix := &refIndexes{qs: qs, text: map[string][]int{}, elem: map[string][]int{}, lit: map[string][]int{}, class: map[string][]int{}, field: map[string][]int{}}
+	for i, q := range qs {
+		for _, n := range q.names {
+			if q.field != "" {
+				ix.field[q.field+"\x00"+n] = append(ix.field[q.field+"\x00"+n], i)
+				continue
+			}
+			ix.text[n] = append(ix.text[n], i)
+			if q.class {
+				ix.class[n] = append(ix.class[n], i)
+			}
+			if q.def != "" {
+				ix.elem[n] = append(ix.elem[n], i)
+			}
+			if q.dll {
+				ix.lit[n] = append(ix.lit[n], i)
+			}
+		}
+		if q.dll && !q.code && q.def == "" && q.field == "" && !q.class {
+			ix.paths = append(ix.paths, i)
+		}
+	}
+	return ix
+}
+
+// refJob is one file to search: a Defs or Patches XML file, or an assembly (dll).
+type refJob struct {
+	m    *store.Mod
+	path string
+	rel  string
+	dll  bool
+}
+
+// refJobs lists the files of mods to search. The reference index names the XML files that
+// can mention each name; only those are read (06 §5). Without it every effective
+// Defs/Patches file is read. Assemblies are read when a query is for a literal (dlls).
+func (cx *attrCtx) refJobs(qs []*refQuery, mods []*store.Mod, dlls bool) []refJob {
 	active := map[string]bool{}
 	for _, e := range cx.st.List {
 		if m := cx.st.Ix.ByID[e.Instance]; m != nil {
 			active[strings.TrimSuffix(strings.ToLower(m.PackageID), "_steam")] = true
 		}
 	}
-	text := map[string][]int{}  // element text → queries
-	elem := map[string][]int{}  // element name → queries (defs only)
-	lit := map[string][]int{}   // assembly string literal → queries
-	var paths []int             // texture queries: a literal can also be the start of the path
-	class := map[string][]int{} // Class="…" attribute value → queries
-	field := map[string][]int{} // element name + "\x00" + text → queries
-	for i, q := range qs {
-		for _, n := range q.names {
-			if q.field != "" {
-				field[q.field+"\x00"+n] = append(field[q.field+"\x00"+n], i)
-				continue
-			}
-			text[n] = append(text[n], i)
-			if q.class {
-				class[n] = append(class[n], i)
-			}
-			if q.def != "" {
-				elem[n] = append(elem[n], i)
-			}
-			if q.dll {
-				lit[n] = append(lit[n], i)
-			}
-		}
-		if q.dll && !q.code && q.def == "" && q.field == "" && !q.class {
-			paths = append(paths, i)
-		}
-	}
-	type job struct {
-		m    *store.Mod
-		path string
-		rel  string
-		dll  bool
-	}
-	var jobs []job
-	// The reference index names the XML files that can mention each name; only those are
-	// read (06 §5). Without it every effective Defs/Patches file is read.
+	var jobs []refJob
 	x, _ := cx.a.RefIndex(cx.st)
 	if x != nil {
 		read := map[int]bool{}
@@ -226,7 +259,7 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 		sort.Ints(idx)
 		for _, f := range idx {
 			if m := byID[x.files[f].Inst]; m != nil {
-				jobs = append(jobs, job{m, x.files[f].Path, x.files[f].Rel, false})
+				jobs = append(jobs, refJob{m, x.files[f].Path, x.files[f].Rel, false})
 			}
 		}
 	}
@@ -236,90 +269,45 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 			r := content.Resolve(dir, m.Decl().LoadFolders, cx.st.GameMM(), func(p string) bool { return active[strings.TrimSuffix(strings.ToLower(p), "_steam")] })
 			for _, sub := range []string{"Defs", "Patches"} {
 				for _, as := range content.Assets(dir, r.Folders, sub) {
-					jobs = append(jobs, job{m, as.Path, as.Rel, false})
+					jobs = append(jobs, refJob{m, as.Path, as.Rel, false})
 				}
 			}
 		}
-		if len(lit) > 0 {
+		if dlls {
 			for _, p := range cx.assemblyPaths(m) {
 				rel, _ := filepath.Rel(dir, p)
-				jobs = append(jobs, job{m, p, filepath.ToSlash(rel), true})
+				jobs = append(jobs, refJob{m, p, filepath.ToSlash(rel), true})
 			}
 		}
 	}
-	type hit struct {
-		q    int
-		inst string
-		file string
-		line int    // 0: an assembly's string literal
-		name string // the name or alternative that matched
-	}
+	return jobs
+}
+
+// refHit is the first place a file mentions a query's name.
+type refHit struct {
+	q    int
+	inst string
+	file string
+	line int    // 0: an assembly's string literal
+	name string // the name or alternative that matched
+}
+
+// scanRefJobs searches the files of jobs with eight workers and returns their hits.
+func scanRefJobs(jobs []refJob, ix *refIndexes) []refHit {
 	var mu sync.Mutex
-	var hits []hit
+	var hits []refHit
 	var wg sync.WaitGroup
-	next := make(chan job)
+	next := make(chan refJob)
 	for w := 0; w < 8; w++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for j := range next {
-				first := map[int]hit{}
+				first := map[int]refHit{}
 				if j.dll {
-					a, err := dotnet.Open(j.path)
-					if err != nil {
-						continue
-					}
-					for _, s := range a.UserStrings() {
-						for _, q := range lit[s] {
-							first[q] = hit{q, j.m.ID, j.rel, 0, s}
-						}
-						// Code that builds the path: "OdysseyPatch/OutfitStands/OutfitStand_" + defName
-						// (MCP eval h2). Only a literal shaped like a path prefix counts.
-						if len(paths) > 0 && pathPrefix(s) {
-							for _, q := range paths {
-								if _, ok := first[q]; ok {
-									continue
-								}
-								for _, n := range qs[q].names {
-									if strings.HasPrefix(n, s) && n != s {
-										first[q] = hit{q, j.m.ID, j.rel, 0, s}
-										break
-									}
-								}
-							}
-						}
-					}
+					ix.scanAssembly(j, first)
 				} else {
-					b, err := os.ReadFile(j.path)
-					if err != nil {
-						continue
-					}
-					xmlRefs(b, func(tag, s []byte, isElem bool, off int) {
-						idx := text[string(s)]
-						if isElem {
-							idx = elem[string(s)]
-						} else if len(field) > 0 {
-							for _, q := range field[string(tag)+"\x00"+string(s)] {
-								if c := qs[q].ctx; c == "" || bytes.Contains(b, []byte("<"+c)) || bytes.Contains(b, []byte(c+"[")) || bytes.Contains(b, []byte("/"+c)) {
-									idx = append(idx[:len(idx):len(idx)], q)
-								}
-							}
-						}
-						for _, q := range idx {
-							if _, ok := first[q]; !ok {
-								first[q] = hit{q, j.m.ID, j.rel, bytes.Count(b[:off], []byte{'\n'}) + 1, string(s)}
-							}
-						}
-					})
-					if len(class) > 0 {
-						classAttrs(b, func(v []byte, off int) {
-							for _, q := range class[string(v)] {
-								if _, ok := first[q]; !ok {
-									first[q] = hit{q, j.m.ID, j.rel, bytes.Count(b[:off], []byte{'\n'}) + 1, string(v)}
-								}
-							}
-						})
-					}
+					ix.scanXML(j, first)
 				}
 				if len(first) > 0 {
 					mu.Lock()
@@ -336,22 +324,77 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 	}
 	close(next)
 	wg.Wait()
-	sort.Slice(hits, func(i, j int) bool {
-		a, b := hits[i], hits[j]
-		if a.q != b.q {
-			return a.q < b.q
+	return hits
+}
+
+// scanAssembly records in first the queries an assembly's string literals name.
+func (ix *refIndexes) scanAssembly(j refJob, first map[int]refHit) {
+	a, err := dotnet.Open(j.path)
+	if err != nil {
+		return
+	}
+	for _, s := range a.UserStrings() {
+		for _, q := range ix.lit[s] {
+			first[q] = refHit{q, j.m.ID, j.rel, 0, s}
 		}
-		if pa, pb := cx.st.Position(a.inst), cx.st.Position(b.inst); pa != pb {
-			return pa < pb
+		// Code that builds the path: "OdysseyPatch/OutfitStands/OutfitStand_" + defName
+		// (MCP eval h2). Only a literal shaped like a path prefix counts.
+		if len(ix.paths) > 0 && pathPrefix(s) {
+			for _, q := range ix.paths {
+				if _, ok := first[q]; ok {
+					continue
+				}
+				for _, n := range ix.qs[q].names {
+					if strings.HasPrefix(n, s) && n != s {
+						first[q] = refHit{q, j.m.ID, j.rel, 0, s}
+						break
+					}
+				}
+			}
 		}
-		if a.file != b.file {
-			return a.file < b.file
+	}
+}
+
+// scanXML records in first the queries an XML file's element texts, element names, fields
+// and Class attributes name.
+func (ix *refIndexes) scanXML(j refJob, first map[int]refHit) {
+	b, err := os.ReadFile(j.path)
+	if err != nil {
+		return
+	}
+	xmlRefs(b, func(tag, s []byte, isElem bool, off int) {
+		idx := ix.text[string(s)]
+		if isElem {
+			idx = ix.elem[string(s)]
+		} else if len(ix.field) > 0 {
+			for _, q := range ix.field[string(tag)+"\x00"+string(s)] {
+				if c := ix.qs[q].ctx; c == "" || bytes.Contains(b, []byte("<"+c)) || bytes.Contains(b, []byte(c+"[")) || bytes.Contains(b, []byte("/"+c)) {
+					idx = append(idx[:len(idx):len(idx)], q)
+				}
+			}
 		}
-		return a.line < b.line
+		for _, q := range idx {
+			if _, ok := first[q]; !ok {
+				first[q] = refHit{q, j.m.ID, j.rel, bytes.Count(b[:off], []byte{'\n'}) + 1, string(s)}
+			}
+		}
 	})
-	// A mod that defines the missing def itself and refers to it is not an ordinary referrer:
-	// the game did not have its definition (log corpus: the current version of the mod often
-	// defines what the player's version lacked).
+	if len(ix.class) > 0 {
+		classAttrs(b, func(v []byte, off int) {
+			for _, q := range ix.class[string(v)] {
+				if _, ok := first[q]; !ok {
+					first[q] = refHit{q, j.m.ID, j.rel, bytes.Count(b[:off], []byte{'\n'}) + 1, string(v)}
+				}
+			}
+		})
+	}
+}
+
+// selfDefiners finds, per def query, the mods that define the missing def themselves, with
+// where. A mod that defines the missing def itself and refers to it is not an ordinary
+// referrer: the game did not have its definition (log corpus: the current version of the
+// mod often defines what the player's version lacked).
+func (cx *attrCtx) selfDefiners(qs []*refQuery) []map[string]string {
 	defines := make([]map[string]string, len(qs))
 	for i, q := range qs {
 		if q.def == "" {
@@ -365,6 +408,12 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 			}
 		}
 	}
+	return defines
+}
+
+// yieldReferrers adds the mods of the sorted hits to their queries' clusters and ranks them.
+func (cx *attrCtx) yieldReferrers(qs []*refQuery, hits []refHit) {
+	defines := cx.selfDefiners(qs)
 	refs := make([]map[string]bool, len(qs))
 	selfs := make([]map[string]bool, len(qs))
 	for _, h := range hits {
