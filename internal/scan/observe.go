@@ -92,7 +92,7 @@ type Options struct {
 	// stored one is still valid, which keeps no-change rescans small.
 	PrevHash func(loc Location) (Hash, bool)
 	// Known reports whether a location already belongs to an Instance; alias groups keep
-	// a known location as primary so R1 keeps matching.
+	// a known location as primary so R1 keeps matching (a real folder still beats a link).
 	Known func(loc Location) bool
 	// Generated lists the files RimArcho wrote into a mod folder (by its real path; lower-
 	// cased paths relative to it), left out of the fingerprint.
@@ -175,13 +175,16 @@ func Collect(sources []*source.Source, o Options) ([]*Observation, map[string]*S
 		g := groups[k]
 		sort.SliceStable(g, func(i, j int) bool {
 			a, b := g[i], g[j]
+			// a real folder is the copy and a link only its alias, even when the link was
+			// seen first (its target outside every source until the player added that
+			// folder): 04 §1.3 "Other managers' links"
+			if a.loc.IsLink != b.loc.IsLink {
+				return !a.loc.IsLink
+			}
 			if o.Known != nil {
 				if ka, kb := o.Known(a.loc), o.Known(b.loc); ka != kb {
 					return ka
 				}
-			}
-			if a.loc.IsLink != b.loc.IsLink {
-				return !a.loc.IsLink
 			}
 			if ra, rb := a.loc.Kind.ReconcileRank(), b.loc.Kind.ReconcileRank(); ra != rb {
 				return ra < rb

@@ -233,6 +233,9 @@ func libraryLineageDoc(c *Ctx, lib *app.Library, l *app.LibLineage) *render.Doc 
 		if i.Path != "" {
 			x.KV("path", i.Path)
 		}
+		if i.Link != "" {
+			x.KV("linked in", linkedLine(i))
+		}
 		if i.WorkshopID != "" && isDigits(i.WorkshopID) {
 			x.KV("workshop", "https://steamcommunity.com/sharedfiles/filedetails/?id="+i.WorkshopID)
 		}
@@ -269,7 +272,20 @@ func libraryLineageDoc(c *Ctx, lib *app.Library, l *app.LibLineage) *render.Doc 
 			d.AddNext(cmd)
 		}
 	}
+	// other managers' links into the game: how the game reaches the Mod, not copies (04 §1.3)
+	for _, i := range l.Linked {
+		root.KV("linked in", i.Ref+" "+linkedLine(i)+" (not a copy; RimArcho never removes it)")
+	}
 	return d
+}
+
+// linkedLine says whose link brings a Mod into the game and where it points.
+func linkedLine(i *app.LibInstance) string {
+	who := i.LinkedBy
+	if who == "" {
+		who = "another tool"
+	}
+	return fmt.Sprintf("by %s: %s → %s", who, i.Link, i.Path)
 }
 
 // copyNoteText is a copy's note: the player's words, else what RimArcho knows about how it

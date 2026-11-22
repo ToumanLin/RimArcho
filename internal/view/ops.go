@@ -101,7 +101,7 @@ var opTable = []Op{
 	{Code: OpResub, Group: 5, Confirm: true, Detail: true},
 	{Code: OpSubCheck, Group: 5, Detail: true},
 	{Code: OpSubUpdate, Group: 5, Confirm: true, Detail: true},
-	{Code: OpLinked, Group: 5, Detail: true, One: true},
+	{Code: OpLinked, Group: 5, One: true}, // the details say it on the linked field (FieldLinked)
 	{Code: OpSubRemove, Key: "Del", Group: 5, Confirm: true, Danger: true, Detail: true},
 	{Code: OpUnsub, Key: "Del", Group: 5, Confirm: true, Danger: true, Detail: true},
 	{Code: OpDelete, Key: "Del", Group: 5, Confirm: true, Danger: true, Detail: true},
@@ -207,9 +207,16 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 		linked = lib.St.Ix.ModIsLink(m)
 	}
 	loadable := live && !has(app.LibUnloadable) && !has(app.LibHidden) && !has(app.LibResidue)
+	// another manager's link into the game (RimCrow `_Link_`) is not a copy: no copy
+	// actions (separate, keep this version, textures), whatever the page (04 §1.3)
+	foreign := i.Link != ""
 	others := 0
 	if l != nil {
-		for _, o := range l.Instances {
+		copies := l.Instances
+		if page != LibraryPage {
+			copies = l.All() // the editor swaps between whatever the game can load
+		}
+		for _, o := range copies {
 			if o != i && o.Mod != nil && !o.Missing() {
 				others++
 			}
@@ -247,7 +254,7 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 	if m != nil {
 		ks = append(ks, OpTags, OpNote) // the editor: the mod's note; Mod library: this copy's
 	}
-	if live && others > 0 {
+	if live && others > 0 && !foreign {
 		ks = append(ks, OpSeparate)
 	}
 	url := IsNumber(i.WorkshopID)
@@ -257,7 +264,7 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 	if url {
 		ks = append(ks, OpWorkshop, OpSteam)
 	}
-	if loadable && (workshop || own) {
+	if loadable && (workshop || own) && !foreign {
 		ks = append(ks, OpPin)
 	}
 	if live && own && !workshop && !linked && lib != nil && lib.St != nil && lib.St.Ix != nil && lib.St.Ix.WorkshopUpdateSource(m) != nil {
@@ -273,7 +280,7 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 		ks = append(ks, OpUnhide)
 	}
 	// Texture optimisation: a copy with PNG textures (not RimArcho's own mod)
-	if page != LibraryPage && live && i.PNG && i.Path != "" && !app.IsMonitor(m) && !has(app.LibHidden) && !has(app.LibResidue) {
+	if page != LibraryPage && live && !foreign && i.PNG && i.Path != "" && !app.IsMonitor(m) && !has(app.LibHidden) && !has(app.LibResidue) {
 		ks = append(ks, OpTextures)
 	}
 	if i.Textures != nil && i.Textures.Files > 0 {
@@ -334,7 +341,7 @@ func LinkedText(ix *app.Index, m *store.Mod) string {
 func RowOps(lib *app.Library, id string, col Column) []string {
 	if lib != nil {
 		for _, l := range lib.Lineages {
-			for _, i := range l.Instances {
+			for _, i := range l.All() {
 				if i.Mod != nil && i.Mod.ID == id {
 					ops := CopyOps(lib, l, i, EditorPage)
 					// the column the player sees decides space (the library reads the plan

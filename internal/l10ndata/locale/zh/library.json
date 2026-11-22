@@ -410,5 +410,8 @@
   "a link, not a folder: show where it is": "这是链接，不是文件夹：显示所在位置",
   "%s is a link another tool made: delete the link there or in this folder; its target stays": "%s 是其他工具建的链接：在那个工具里删，或在这个文件夹里删掉链接；它指向的文件夹不受影响",
   "%s is a link %s made: remove it in %s, or delete the link in this folder; its target stays": "%s 是 %s 建的链接：在 %s 里移除，或在这个文件夹里删掉链接；它指向的文件夹不受影响",
-  "⚠ pack %s uses this copy: it still goes, and the pack launches with its own copy": "⚠ 整合包%s用到这份副本：照样执行，整合包启动时改用自带的副本"
+  "⚠ pack %s uses this copy: it still goes, and the pack launches with its own copy": "⚠ 整合包%s用到这份副本：照样执行，整合包启动时改用自带的副本",
+  "linked into the game": "链入游戏",
+  "another tool": "其他工具",
+  "show where it is": "显示位置"
 }

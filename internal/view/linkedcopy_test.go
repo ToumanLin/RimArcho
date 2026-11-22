@@ -11,11 +11,11 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The player's case ("cannot delete a Mod"): a Workshop Mod also sits in the game's Mods/
-// as RimCrow's `_Link_<id>` junction into RimCrow's own folder, outside every source. The
-// scan reads it as a local copy that links out (04 §5 A11); RimArcho never deletes another
-// tool's link (09 §3), so the menu says so and opens where the link is instead of offering
-// no way out (16 §2.9). A real folder the player put in Mods/ still goes to the recycle bin,
+// The player's case ("cannot delete a Mod"): RimCrow's `_Link_<id>` junction into its own
+// folder, outside every source. Its files differ too much from the Workshop copy for R4, so
+// it is a Mod of its own and the link its only copy (04 §1.3 "Other managers' links"; the
+// folded case is foreignlink_test.go). RimArcho never deletes another tool's link (09 §3),
+// so the menu says so and opens where the link is instead of offering no way out (16 §2.9). A real folder the player put in Mods/ still goes to the recycle bin,
 // and the operation log records it (13 §1.3).
 func TestLinkedLocalCopyOps(t *testing.T) {
 	e := testkit.New(t)
