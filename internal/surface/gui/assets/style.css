@@ -1815,58 +1815,46 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .page.fill.tasks { height: 100%; padding-left: 12px; padding-right: 12px; }
 
 /* What RimArcho did (16 §2.16): the operation log as a view of this page. A row is its time,
-   the operation's icon, the subject and a result mark; failed and refused rows carry a red
-   tint and the red mark. Chips filter by result and origin; an opened row shows the path,
-   the reason and where the item can be got back. */
+   the operation's icon and the subject, then one fixed 16px column that holds a mark only
+   when something went wrong (failed and refused rows also carry a red tint). One toggle in
+   the heading shows only the problems; an opened row shows who did it, the steps, the path,
+   the reason and where the item can be got back. The steps' marks share the rows' column. */
 .ops-view .op-log { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .op-log > .head { gap: 8px; }
-.op-log > .head .badge-n.red { color: var(--red); background: var(--red-soft); font-size: 12px; padding: 0 6px; border-radius: 999px; }
-.op-log > .head .q { margin-left: auto; color: var(--faint); font-size: 12px; }
-.op-log > .head .op-back { height: 22px; }
-.op-chips { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 8px 12px 4px; }
-.op-chipset { display: flex; flex-wrap: wrap; gap: 6px; }
-.op-chip { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; border-radius: 999px; border: var(--hairline) solid var(--line-2); background: var(--card); color: var(--fg-2); font-size: 12px; cursor: pointer; }
-.op-chip:hover { background: var(--pill); }
-.op-chip.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--fg); }
-.op-chip .mk { display: inline-flex; }
-.op-chip .mk .i { width: 13px; height: 13px; }
-.op-chip.bad { color: var(--red); background: var(--red-soft); border-color: transparent; }
-.op-chip.bad.on { border-color: var(--red); }
-.op-chip.r-failed { color: var(--red); }
-.op-chip.r-refused { color: var(--amber); }
-.op-chip.r-ok { color: var(--green); }
-.op-chip .num { color: var(--fg-2); }
-.op-chip.o-agent, .op-chip.o-mcp { color: var(--accent-11, var(--accent)); }
+.op-log > .head .op-back { height: 22px; margin-left: auto; }
+.op-problems { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 999px; border: var(--hairline) solid transparent; background: var(--red-soft); color: var(--red); font-size: 12px; cursor: pointer; }
+.op-problems:hover { border-color: color-mix(in srgb, var(--red) 40%, transparent); }
+.op-problems.on { border-color: var(--red); }
+.op-problems .mk { display: inline-flex; }
+.op-problems .mk .i { width: 13px; height: 13px; }
 .op-rows { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 6px 12px; outline: 0; }
 .op-day { padding: 10px 8px 4px; }
 .op-item { border-radius: var(--r-sm); }
 .op-item.bad { background: color-mix(in srgb, var(--red) 7%, transparent); }
 .op-item + .op-item { margin-top: 2px; }
-.op-row { display: grid; grid-template-columns: 44px 18px minmax(0, 1fr) auto auto auto; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--r-sm); cursor: pointer; transition: background var(--t-press); }
+.op-row { display: grid; grid-template-columns: 44px 16px minmax(0, 1fr) 16px; align-items: center; gap: 10px; padding: 6px 10px 6px 8px; border-radius: var(--r-sm); cursor: pointer; transition: background var(--t-press); }
 .op-row:hover { background: var(--pill); }
 .op-row.cur { background: color-mix(in srgb, var(--fg) 6%, transparent); }
 .op-row .tm { color: var(--faint); font-size: 12px; }
 .op-row .op-ic, .op-step .op-ic { display: inline-flex; color: var(--muted); }
 .op-ic .i, .op-mk .i { width: 15px; height: 15px; }
 .op-row .op-sub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.op-row .op-n { font-size: 12px; color: var(--faint); border: var(--hairline) solid var(--line-2); border-radius: 999px; padding: 0 6px; }
-.op-row .op-org { font-size: 12px; color: var(--accent-11, var(--accent)); background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 999px; padding: 0 7px; }
-.op-mk { display: inline-flex; }
-.op-mk.r-ok { color: var(--green); }
+.op-mk { display: inline-flex; justify-content: center; width: 16px; }
 .op-mk.r-failed { color: var(--red); }
 .op-mk.r-refused, .op-mk.r-partial { color: var(--amber); }
 .op-mk.r-started { color: var(--muted); }
 .op-item.bad .op-row .op-sub { color: var(--fg); font-weight: 500; }
-.op-more { padding: 2px 10px 10px 60px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.op-more { padding: 2px 10px 10px 62px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
 .op-kv { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; color: var(--fg-2); }
 .op-kv .k { color: var(--faint); }
 .op-kv .v { overflow-wrap: anywhere; user-select: text; }
 .op-kv.path .v { font-family: var(--mono, ui-monospace, monospace); }
 .op-kv.bad .v { color: var(--red); }
+.op-kv.agent .v { color: var(--accent-11, var(--accent)); }
 .op-back-to { display: flex; align-items: center; gap: 6px; color: var(--green); }
 .op-back-to .i { width: 13px; height: 13px; }
 .op-steps { margin-top: 4px; display: flex; flex-direction: column; gap: 2px; border-left: var(--hairline) solid var(--line-2); padding-left: 10px; }
-.op-step { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 8px; align-items: center; color: var(--fg-2); }
+.op-step { display: grid; grid-template-columns: 16px minmax(0, 1fr) 16px; gap: 10px; align-items: center; color: var(--fg-2); }
 .op-step .op-sub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .op-step-why { color: var(--red); padding-left: 26px; overflow-wrap: anywhere; }
 .i.refused { color: var(--amber); }

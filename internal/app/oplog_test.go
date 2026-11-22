@@ -166,3 +166,74 @@ func TestOpLogOrigin(t *testing.T) {
 		t.Fatal("origin not passed on to children")
 	}
 }
+
+// The player's case: a SteamCMD subscription removed with quick delete. Each removal is a
+// subscription.remove row with its delete (or recycle) as a step; a dry run writes nothing;
+// a refusal is a refused row; the parallel batch the window uses logs the same (13 §1.3).
+func TestOpLogSubscriptionQuickDelete(t *testing.T) {
+	t.Parallel()
+	e := setup(t, true)
+	quick := filepath.Join(e.SteamCMD, "3771446780")
+	slow := filepath.Join(e.SteamCMD, "3771446781")
+	par := filepath.Join(e.SteamCMD, "3771446782")
+	e.WriteMod(quick, testkit.Sample("fvc.fat", "Female Variant Clothing"))
+	e.WriteMod(slow, testkit.Sample("fvc.slow", "Slow One"))
+	e.WriteMod(par, testkit.Sample("fvc.par", "Parallel One"))
+	scanNow(t, e)
+	e.App.TrashFunc = os.RemoveAll
+
+	if _, err := e.App.RemoveSubscriptionsWith([]string{"pkg:fvc.fat"}, app.RemoveSubscriptionOptions{DryRun: true, Permanent: true}, app.BatchCalls{}); err != nil {
+		t.Fatal(err)
+	}
+	if rows := opRows(t, e); len(rows) != 0 {
+		t.Fatalf("a dry run wrote %+v", rows)
+	}
+
+	if _, err := e.App.RemoveSubscriptionsWith([]string{"pkg:fvc.fat"}, app.RemoveSubscriptionOptions{Permanent: true}, app.BatchCalls{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(quick); !os.IsNotExist(err) {
+		t.Fatalf("quick delete left the folder: %v", err)
+	}
+	rows := opRows(t, e)
+	p, d := findOp(rows, oplog.SubscriptionRemove, oplog.OK), findOp(rows, oplog.Delete, oplog.OK)
+	if p == nil || d == nil || d.Batch != p.ID || p.Subject != "Female Variant Clothing" || !samePath(p.Target, quick) || p.Detail != oplog.Permanent || !samePath(d.Target, quick) {
+		t.Fatalf("rows %+v", rows)
+	}
+	if oplog.Where(*p) != "" || oplog.Where(*d) != "" {
+		t.Fatalf("a permanent delete says it can be got back: %q %q", oplog.Where(*p), oplog.Where(*d))
+	}
+
+	// Recycled: the step is a trash row, and the row points to the recycle bin.
+	if _, err := e.App.RemoveSubscriptionsWith([]string{"pkg:fvc.slow"}, app.RemoveSubscriptionOptions{}, app.BatchCalls{}); err != nil {
+		t.Fatal(err)
+	}
+	rows = opRows(t, e)
+	if rows[1].Op != oplog.SubscriptionRemove || rows[0].Op != oplog.Trash || rows[0].Batch != rows[1].ID || oplog.Where(rows[1]) != "the recycle bin" {
+		t.Fatalf("recycled rows %+v", rows[:2])
+	}
+
+	// The window's batch: workers on their own sessions, and a reference that is not a
+	// subscription is refused.
+	if _, err := e.App.RemoveSubscriptionsWith([]string{"pkg:fvc.par", "pkg:nothing.here"}, app.RemoveSubscriptionOptions{Permanent: true, Workers: 4}, app.BatchCalls{}); err == nil {
+		t.Fatal("an unknown reference was accepted")
+	}
+	rows = opRows(t, e)
+	var gone, refused bool
+	for _, r := range rows {
+		gone = gone || r.Op == oplog.Delete && r.Result == oplog.OK && samePath(r.Target, par)
+		refused = refused || r.Op == oplog.SubscriptionRemove && r.Result == oplog.Refused && r.Subject == "pkg:nothing.here"
+	}
+	if !gone || !refused {
+		t.Fatalf("batch rows %+v", rows)
+	}
+	if out := e.MustRun("ops", "--op", "delete"); !strings.Contains(out, "3771446780") || strings.Contains(out, "back:") {
+		t.Fatal(out)
+	}
+}
+
+func samePath(a, b string) bool {
+	ra, _ := filepath.EvalSymlinks(filepath.Dir(a))
+	rb, _ := filepath.EvalSymlinks(filepath.Dir(b))
+	return strings.EqualFold(filepath.Join(ra, filepath.Base(a)), filepath.Join(rb, filepath.Base(b)))
+}

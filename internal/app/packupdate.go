@@ -141,7 +141,7 @@ func (a *App) replacePackContent(name, tmp string) error {
 	os.RemoveAll(tmp)
 	// the previous revision is RimArcho's own copy: the recycle bin when it can, else gone
 	if err := a.ToTrash(aside); err != nil {
-		os.RemoveAll(aside)
+		a.deleteTree(nil, aside)
 	}
 	return nil
 }
