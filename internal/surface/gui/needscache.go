@@ -204,8 +204,10 @@ func (s *API) refreshNeedsLocked(c *needsSnapshot) {
 	}
 	s.needsRefreshing = true
 	s.needsJobs.Add(1)
+	s.needsActive.Add(1)
 	go func() {
 		defer s.needsJobs.Done()
+		defer s.needsActive.Add(-1)
 		defer r.Close()
 		r.LazyLog, r.LogCacheOnly = false, false
 		ps, err := r.Problems(false, nil)

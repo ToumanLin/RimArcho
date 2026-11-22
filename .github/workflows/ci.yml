@@ -50,6 +50,28 @@ jobs:
       - name: go test
         run: go test -timeout 20m ./...
 
+  race:
+    # The race detector over the packages with concurrency (17 §4): the Windows runner's
+    # MinGW gcc builds cgo. Shared state that two Apps or a background task and a request
+    # touch at once fails here, not as a flaky test later.
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      CGO_ENABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: go test -race
+        run: go test -race -count=1 -timeout 40m ./internal/...
+
   linux:
     runs-on: ubuntu-latest
     timeout-minutes: 30

@@ -36,10 +36,10 @@ type API struct {
 	mu              sync.Mutex
 	filesMu         sync.RWMutex // scans and file jobs; never acquired by page reads/edits
 	a               *app.App
-	emit            func(name string, data any) // Wails events; nil in tests
-	open            func(url string) error      // the system browser
-	openDir         func(dir string) error      // the file manager (nil: the system's)
-	lib             *app.Library                // Mod library, as of libAt
+	emitFn          atomic.Pointer[func(name string, data any)] // Wails events; unset in tests (setEmit)
+	open            func(url string) error                      // the system browser
+	openDir         func(dir string) error                      // the file manager (nil: the system's)
+	lib             *app.Library                                // Mod library, as of libAt
 	libAt           string
 	libGate         sync.Mutex // coalesces full inventory builds, never acquired by edits
 	problemLookup   problemLookup
@@ -66,6 +66,7 @@ type API struct {
 	workspace       *workspaceSnapshot
 	needsCache      map[string]*needsSnapshot
 	needsJobs       sync.WaitGroup
+	needsActive     atomic.Int32 // needsJobs still running, for waits that may overlap an Add (tests)
 	needsRefreshing bool
 	needsClosed     bool
 	// autoAnalyzed: the inputs (scope and analysis key) an automatic check already ran for
@@ -158,9 +159,12 @@ func newAPI(a *app.App) *API {
 	return s
 }
 
+// setEmit sets where events go; nil drops them. Safe while background tasks send.
+func (s *API) setEmit(f func(name string, data any)) { s.emitFn.Store(&f) }
+
 func (s *API) send(name string, data any) {
-	if s.emit != nil {
-		s.emit(name, data)
+	if f := s.emitFn.Load(); f != nil && *f != nil {
+		(*f)(name, data)
 	}
 }
 
@@ -1863,8 +1867,10 @@ func (s *API) startAnalyzeOf(list string) bool {
 		go s.send("list-problems", ev)
 	}
 	s.needsJobs.Add(1)
+	s.needsActive.Add(1)
 	go func() {
 		defer s.needsJobs.Done()
+		defer s.needsActive.Add(-1)
 		progress := func(l string) {
 			l = view.AnalyzeProgress(strings.TrimPrefix(l, "progress: "))
 			s.tasks.Update(task, func(t *app.Task) { t.Phase = l })

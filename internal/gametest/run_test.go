@@ -291,6 +291,9 @@ func TestRunTimeoutLastLine(t *testing.T) {
 }
 
 func TestRunProbe(t *testing.T) {
+	if raceBuild {
+		t.Skip("the helper child exits 1 instead of its own code in a race build (open, 17 §4 \"Concurrency\")")
+	}
 	for _, tc := range []struct {
 		mode    string
 		waylith bool

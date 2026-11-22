@@ -10,10 +10,10 @@ import (
 
 // settle waits until no automatic check is pending and no needs refresh or analysis runs.
 func settle(s *API) {
+	// Not needsJobs.Wait: a settle timer may Add a job while it waits, which WaitGroup forbids.
 	for {
-		s.needsJobs.Wait()
 		s.mu.Lock()
-		idle := !s.busy["analyze"] && !s.needsRefreshing && s.analyzeTimer == nil
+		idle := !s.busy["analyze"] && !s.needsRefreshing && s.analyzeTimer == nil && s.needsActive.Load() == 0
 		s.mu.Unlock()
 		if idle {
 			return

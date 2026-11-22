@@ -283,11 +283,11 @@ func TestMenuCachedArtPublishedBeforeMissingExtraction(t *testing.T) {
 	shown, resume := make(chan struct{}), make(chan struct{})
 	var first, release sync.Once
 	t.Cleanup(func() { release.Do(func() { close(resume) }) })
-	api.emit = func(name string, _ any) {
+	api.setEmit(func(name string, _ any) {
 		if name == "backgrounds" {
 			first.Do(func() { close(shown); <-resume })
 		}
-	}
+	})
 	api.HomeBackground()
 	select {
 	case <-shown:

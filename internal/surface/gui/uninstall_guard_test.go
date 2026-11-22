@@ -46,14 +46,14 @@ func testUninstallCloseGuard(t *testing.T, commandLine bool) {
 		return nil // never start the real cleanup script
 	}
 	blocked := 0
-	s.emit = func(name string, data any) {
+	s.setEmit(func(name string, data any) {
 		if name == "uninstall-close-blocked" {
 			blocked++
 		}
 		if name == "uninstall" && data.(UninstallStatus).Done {
 			close(done)
 		}
-	}
+	})
 	quit := make(chan struct{}, 1)
 	s.quit = func() { quit <- struct{}{} }
 	if commandLine {
@@ -122,11 +122,11 @@ func TestUninstallFailureReleasesCloseGuard(t *testing.T) {
 	e, s, _ := fixture(t)
 	done := make(chan struct{})
 	e.App.AfterExitFunc = func(app.AfterExit) error { return errors.New("synthetic cleanup failure") }
-	s.emit = func(name string, data any) {
+	s.setEmit(func(name string, data any) {
 		if name == "uninstall" && data.(UninstallStatus).Done {
 			close(done)
 		}
-	}
+	})
 	if err := s.UninstallRun(view.UninstallChoice{}); err != nil {
 		t.Fatal(err)
 	}

@@ -70,7 +70,7 @@ func Run(o Options) error {
 			WndProcInterceptor:    api.uninstallSessionEnd,
 		},
 	})
-	api.emit = func(name string, data any) { w.Event.Emit(name, data) }
+	api.setEmit(func(name string, data any) { w.Event.Emit(name, data) })
 	api.x.native = wailsNative{w}
 	api.quit = w.Quit
 	frame := newWindowTheme(cmds.Setting(a, "ui.theme"))
@@ -121,7 +121,7 @@ func BrowserArgs(gpu bool) []string {
 // window uses it, and so does the development harness (spikes/guidev).
 func NewAPI(a *app.App, emit func(name string, data any)) *API {
 	api := newAPI(a)
-	api.emit = emit
+	api.setEmit(emit)
 	return api
 }
 

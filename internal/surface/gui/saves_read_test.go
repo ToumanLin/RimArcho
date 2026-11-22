@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -216,9 +217,12 @@ func TestSavesFullReadPage(t *testing.T) {
 
 	// A new save while a run is busy elsewhere: selecting it does not wait for that run.
 	release := make(chan struct{})
+	var runMu sync.Mutex
 	var runFirst []string
 	api.saves.runner = func(ctx context.Context, first []string, progress func(string)) error {
+		runMu.Lock()
 		runFirst = first
+		runMu.Unlock()
 		select {
 		case <-release:
 			return nil
@@ -234,8 +238,11 @@ func TestSavesFullReadPage(t *testing.T) {
 	for tk := savesTask(api); tk == nil || tk.State != app.TaskRunning; tk = savesTask(api) {
 		time.Sleep(10 * time.Millisecond)
 	}
-	if !slices.Equal(runFirst, []string{sel}) {
-		t.Fatalf("the run reads %q first, want the selected %s", runFirst, sel)
+	runMu.Lock()
+	gotFirst := runFirst
+	runMu.Unlock()
+	if !slices.Equal(gotFirst, []string{sel}) {
+		t.Fatalf("the run reads %q first, want the selected %s", gotFirst, sel)
 	}
 	start := time.Now()
 	d, err = api.SaveDetail(sel)

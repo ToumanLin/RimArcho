@@ -32,7 +32,7 @@ func TestSaveReviewSelectionAndShell(t *testing.T) {
 	e.WriteSave("Old.rws", testkit.SaveSpec{Faction: "Old", Seed: "old", PRV: 1, ModTime: e.Now().Add(-2 * time.Hour)})
 	e.WriteSave("New.rws", testkit.SaveSpec{Faction: "New", Seed: "new", PRV: 2, ModTime: e.Now().Add(-time.Hour)})
 	var news []*ReviewEvent
-	api.emit = func(name string, data any) {
+	api.setEmit(func(name string, data any) {
 		if name != "review" {
 			return
 		}
@@ -44,7 +44,7 @@ func TestSaveReviewSelectionAndShell(t *testing.T) {
 				t.Errorf("shell followed a full read: %d %v", n, err)
 			}
 		}
-	}
+	})
 	run := func(request uint64, colony string) *ReviewEvent {
 		t.Helper()
 		api.review.seq = request
@@ -82,11 +82,11 @@ func TestSaveReviewEmptyAndLeaveBeforeRead(t *testing.T) {
 		t.Fatalf("empty: %+v", empty)
 	}
 	e.WriteSave("Fort.rws", testkit.SaveSpec{})
-	api.emit = func(name string, data any) {
+	api.setEmit(func(name string, data any) {
 		if name == "review" {
 			api.leaveReview()
 		}
-	}
+	})
 	api.review.seq = 2
 	if ev := api.runReview(2, ""); ev != nil {
 		t.Fatalf("answered after leaving: %+v", ev)

@@ -80,6 +80,9 @@ func TestTaskDownloadProgressAndRetry(t *testing.T) {
 
 func TestSteamWatchEOFShutsDownCleanly(t *testing.T) {
 	t.Parallel()
+	if raceBuild {
+		t.Skip("the helper child exits 1 instead of its own code in a race build (open, 17 §4 \"Concurrency\")")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestSteamStreamHelper$")

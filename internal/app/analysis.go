@@ -254,10 +254,17 @@ func ChildAnalyzeExe(exe, home, envName, plan, mm string, progress func(string))
 	return nil
 }
 
-// InProcessAnalyze runs the analysis in this process (tests, and `archo analyze` itself).
+// InProcessAnalyze runs the analysis in this process (tests), on a session of its own like
+// the `archo analyze` child: never on a itself, which the caller's page or request uses at
+// the same time.
 func InProcessAnalyze(a *App) func(string, func(string)) error {
 	return func(_ string, progress func(string)) error {
-		_, err := a.Analyze(progress)
+		r, err := a.ReadSession()
+		if err != nil {
+			return err
+		}
+		defer r.Close()
+		_, err = r.Analyze(progress)
 		return err
 	}
 }

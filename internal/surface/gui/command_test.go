@@ -24,7 +24,7 @@ func waitCommand(t *testing.T, s *API) CommandResult {
 func TestCommandRawOutputHistoryAndGuard(t *testing.T) {
 	t.Parallel()
 	e, s, _ := fixture(t)
-	s.emit = nil
+	s.setEmit(nil)
 	for _, line := range []string{"log --follow", "plan new", "no-such-command", "list --env"} {
 		if _, err := s.RunCLI(line); err == nil {
 			t.Errorf("accepted %q", line)
@@ -64,7 +64,7 @@ func TestCommandRawOutputHistoryAndGuard(t *testing.T) {
 func TestCommandDoesNotHoldPageLock(t *testing.T) {
 	t.Parallel()
 	_, s, _ := fixture(t)
-	s.emit = nil
+	s.setEmit(nil)
 	entered, release := make(chan struct{}), make(chan struct{})
 	s.ScanRunner = func(string) (string, error) { close(entered); <-release; return "raw child output\n", nil }
 	if _, err := s.RunCLI("scan"); err != nil {
@@ -98,7 +98,7 @@ func TestCommandDoesNotHoldPageLock(t *testing.T) {
 func TestCommandSharedCompletions(t *testing.T) {
 	t.Parallel()
 	_, s, _ := fixture(t)
-	s.emit = nil
+	s.setEmit(nil)
 	for _, tc := range []struct{ line, want string }{{"sort --dr", "--dry-run"}, {"config set ui.icons ", "compat"}, {"why harm", "Harmony"}} {
 		r, err := s.CommandComplete(tc.line, len([]rune(tc.line)), "", nil)
 		if err != nil {
