@@ -124,48 +124,14 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 	if err := a.checkRoots(roots...); err != nil {
 		return nil, err
 	}
-	skip := map[string]bool{}
-	present := map[string]bool{} // left out of this scan, not lost (identity.Input.Present)
-	var active []*source.Source
-	var listed []*source.Source // the sources this scan reports on
-	partial := false            // some sources are left out
-	for _, s := range srcs {
-		if !o.reads(s, e.GameID) {
-			partial = true
-			if s.Status != source.StatusRetired {
-				skip[s.ID] = true
-				present[s.ID] = s.Status == source.StatusOK
-			}
-			continue
-		}
-		listed = append(listed, s)
-		switch s.Status {
-		case source.StatusRetired:
-			continue
-		case source.StatusRebindPending:
-			skip[s.ID] = true
-			continue
-		}
-		status := source.StatusOK
-		if st, err := os.Stat(s.Root); err != nil || !st.IsDir() {
-			status = source.StatusMissing
-		}
-		if status != s.Status {
-			s.Status = status
-			if err := a.Store.UpdateSource(s); err != nil {
-				return nil, err
-			}
-		}
-		if status == source.StatusMissing {
-			skip[s.ID] = true
-			continue
-		}
-		active = append(active, s)
+	set, err := a.scanSources(srcs, o, e.GameID)
+	if err != nil {
+		return nil, err
 	}
 
 	// What the folders look like as this scan starts (04 §1.6): recorded once it succeeds.
 	prints := map[string]string{}
-	for _, s := range listed {
+	for _, s := range set.listed {
 		if s.Status != source.StatusRetired && s.Status != source.StatusRebindPending {
 			prints[s.ID] = folderPrint(s)
 		}
@@ -174,22 +140,7 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 	if err != nil {
 		return nil, err
 	}
-	knownLoc := map[string]bool{}
-	for _, k := range known {
-		knownLoc[scan.LocKey(k.SourceID, k.Rel)] = true
-	}
-	var prev map[string]map[string]scan.File
-	var prevHash map[string]scan.Hash
-	if !full {
-		if prev, err = a.Store.CurrentFiles(e.GameID); err != nil {
-			return nil, err
-		}
-		if prevHash, err = a.Store.CurrentHashes(e.GameID); err != nil {
-			return nil, err
-		}
-	}
-	// The DDS RimArcho wrote next to mods' PNGs are not part of the mods (Texture optimisation).
-	generated, err := a.Store.GeneratedFiles()
+	collect, err := a.scanCollectOptions(e.GameID, full, known, o)
 	if err != nil {
 		return nil, err
 	}
@@ -197,55 +148,23 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 	if err != nil {
 		return nil, err
 	}
-	obs, sstats := scan.Collect(active, scan.Options{
-		Generated: func(dir string) map[string]bool {
-			if len(generated) == 0 {
-				return nil
-			}
-			if g := generated[store.PathKey(dir)]; g != nil {
-				return g
-			}
-			if real, err := source.RealPath(dir); err == nil {
-				return generated[store.PathKey(real)]
-			}
-			return nil
-		},
-		PrevFiles: func(l scan.Location) map[string]scan.File { return prev[l.Key()] },
-		PrevHash: func(l scan.Location) (scan.Hash, bool) {
-			h, ok := prevHash[l.Key()]
-			return h, ok
-		},
-		Known:    func(l scan.Location) bool { return knownLoc[l.Key()] },
-		Progress: o.readProgress(),
-	})
+	obs, sstats := scan.Collect(set.active, collect)
 	if o.Progress != nil {
 		o.Progress(ScanProgress{Saving: true, Done: len(obs), Total: len(obs)})
 	}
-	if partial {
-		sharedLinkObservations(obs, known, srcs, present, sstats)
+	if set.partial {
+		sharedLinkObservations(obs, known, srcs, set.present, sstats)
 	}
-	prev, prevHash = nil, nil // release the caches before reconciliation
+	collect = scan.Options{} // release the caches before reconciliation
 	lineages, err := a.Store.LineageIDs(e.GameID)
 	if err != nil {
 		return nil, err
 	}
-	// Origin markers written before migration v14 name IDs merged away (03 §2.1).
-	if aliases, err := a.Store.IDAliases(); err != nil {
+	if err := a.renameOriginAliases(obs); err != nil {
 		return nil, err
-	} else if len(aliases) > 0 {
-		for _, ob := range obs {
-			if og := ob.Origin; og != nil {
-				if n := aliases[og.InstanceID]; n != "" {
-					og.InstanceID = n
-				}
-				if n := aliases[og.LineageID]; n != "" {
-					og.LineageID = n
-				}
-			}
-		}
 	}
 	res := identity.Reconcile(identity.Input{
-		Obs: obs, Known: known, Skip: skip, Present: present, Lineages: lineages, NewID: a.NewID,
+		Obs: obs, Known: known, Skip: set.skip, Present: set.present, Lineages: lineages, NewID: a.NewID,
 		Semantic: func(k *identity.Known) scan.SemanticSet {
 			if k.Snap == nil {
 				return nil
@@ -256,7 +175,7 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 	})
 	now := a.Now()
 	var scanned []string
-	for _, s := range active {
+	for _, s := range set.active {
 		scanned = append(scanned, s.ID)
 	}
 	if err := a.Store.ApplyScan(e.GameID, scanID, now, res, scanned); err != nil {
@@ -270,29 +189,7 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 		return nil, err
 	}
 
-	st := ScanStats{Events: map[string]int{}, Questions: len(res.Questions), Partial: partial}
-	for _, s := range listed {
-		ss := SourceStat{Label: s.Label, Kind: string(s.Kind), Status: s.Status}
-		if x := sstats[s.ID]; x != nil {
-			ss.Folders, ss.Mods, ss.Residue, ss.Disabled, ss.NoAbout, ss.ResidueNoAbout, ss.Aliases, ss.HasACF, ss.Err =
-				x.Folders, x.Mods, x.Residue, x.Disabled, x.NoAbout, x.ResidueNoAbout, x.Aliases, x.HasACF, x.Err
-		}
-		st.Sources = append(st.Sources, ss)
-	}
-	for _, ev := range res.Events {
-		st.Events[ev.Kind]++
-	}
-	for _, ob := range obs {
-		st.Files += ob.FP.Count
-		st.Bytes += ob.FP.TotalSize
-		st.Hashed += ob.FP.Hashed
-		st.Reused += ob.FP.Reused
-	}
-	for _, as := range res.Assignments {
-		if as.NeedSnapshot {
-			st.Snapshots++
-		}
-	}
+	st := newScanStats(set, sstats, res, obs)
 	mods, err := a.Store.Mods(e.GameID)
 	if err != nil {
 		return nil, err
@@ -326,6 +223,152 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 	}
 	rep.GameLinks, err = a.InspectGameLinks()
 	return rep, err
+}
+
+// scanSourceSet is how a scan treats the installation's sources.
+type scanSourceSet struct {
+	skip    map[string]bool
+	present map[string]bool  // left out of this scan, not lost (identity.Input.Present)
+	active  []*source.Source // the sources read
+	listed  []*source.Source // the sources this scan reports on
+	partial bool             // some sources are left out
+}
+
+// scanSources sorts the sources into read, skipped and left out, recording a source whose
+// folder went missing or came back.
+func (a *App) scanSources(srcs []*source.Source, o ScanOptions, gameID string) (*scanSourceSet, error) {
+	set := &scanSourceSet{skip: map[string]bool{}, present: map[string]bool{}}
+	for _, s := range srcs {
+		if !o.reads(s, gameID) {
+			set.partial = true
+			if s.Status != source.StatusRetired {
+				set.skip[s.ID] = true
+				set.present[s.ID] = s.Status == source.StatusOK
+			}
+			continue
+		}
+		set.listed = append(set.listed, s)
+		switch s.Status {
+		case source.StatusRetired:
+			continue
+		case source.StatusRebindPending:
+			set.skip[s.ID] = true
+			continue
+		}
+		status := source.StatusOK
+		if st, err := os.Stat(s.Root); err != nil || !st.IsDir() {
+			status = source.StatusMissing
+		}
+		if status != s.Status {
+			s.Status = status
+			if err := a.Store.UpdateSource(s); err != nil {
+				return nil, err
+			}
+		}
+		if status == source.StatusMissing {
+			set.skip[s.ID] = true
+			continue
+		}
+		set.active = append(set.active, s)
+	}
+	return set, nil
+}
+
+// scanCollectOptions reads what scan.Collect reuses: the known locations, the previous
+// file lists and hashes (unless full), and the DDS RimArcho wrote.
+func (a *App) scanCollectOptions(gameID string, full bool, known []*identity.Known, o ScanOptions) (scan.Options, error) {
+	knownLoc := map[string]bool{}
+	for _, k := range known {
+		knownLoc[scan.LocKey(k.SourceID, k.Rel)] = true
+	}
+	var prev map[string]map[string]scan.File
+	var prevHash map[string]scan.Hash
+	var err error
+	if !full {
+		if prev, err = a.Store.CurrentFiles(gameID); err != nil {
+			return scan.Options{}, err
+		}
+		if prevHash, err = a.Store.CurrentHashes(gameID); err != nil {
+			return scan.Options{}, err
+		}
+	}
+	// The DDS RimArcho wrote next to mods' PNGs are not part of the mods (Texture optimisation).
+	generated, err := a.Store.GeneratedFiles()
+	if err != nil {
+		return scan.Options{}, err
+	}
+	return scan.Options{
+		Generated: func(dir string) map[string]bool {
+			if len(generated) == 0 {
+				return nil
+			}
+			if g := generated[store.PathKey(dir)]; g != nil {
+				return g
+			}
+			if real, err := source.RealPath(dir); err == nil {
+				return generated[store.PathKey(real)]
+			}
+			return nil
+		},
+		PrevFiles: func(l scan.Location) map[string]scan.File { return prev[l.Key()] },
+		PrevHash: func(l scan.Location) (scan.Hash, bool) {
+			h, ok := prevHash[l.Key()]
+			return h, ok
+		},
+		Known:    func(l scan.Location) bool { return knownLoc[l.Key()] },
+		Progress: o.readProgress(),
+	}, nil
+}
+
+// renameOriginAliases renames the IDs merged away in origin markers written before
+// migration v14 (03 §2.1).
+func (a *App) renameOriginAliases(obs []*scan.Observation) error {
+	aliases, err := a.Store.IDAliases()
+	if err != nil {
+		return err
+	}
+	if len(aliases) == 0 {
+		return nil
+	}
+	for _, ob := range obs {
+		if og := ob.Origin; og != nil {
+			if n := aliases[og.InstanceID]; n != "" {
+				og.InstanceID = n
+			}
+			if n := aliases[og.LineageID]; n != "" {
+				og.LineageID = n
+			}
+		}
+	}
+	return nil
+}
+
+// newScanStats sums up a scan: per source, the events, the files read and the snapshots.
+func newScanStats(set *scanSourceSet, sstats map[string]*scan.SourceStats, res *identity.Result, obs []*scan.Observation) ScanStats {
+	st := ScanStats{Events: map[string]int{}, Questions: len(res.Questions), Partial: set.partial}
+	for _, s := range set.listed {
+		ss := SourceStat{Label: s.Label, Kind: string(s.Kind), Status: s.Status}
+		if x := sstats[s.ID]; x != nil {
+			ss.Folders, ss.Mods, ss.Residue, ss.Disabled, ss.NoAbout, ss.ResidueNoAbout, ss.Aliases, ss.HasACF, ss.Err =
+				x.Folders, x.Mods, x.Residue, x.Disabled, x.NoAbout, x.ResidueNoAbout, x.Aliases, x.HasACF, x.Err
+		}
+		st.Sources = append(st.Sources, ss)
+	}
+	for _, ev := range res.Events {
+		st.Events[ev.Kind]++
+	}
+	for _, ob := range obs {
+		st.Files += ob.FP.Count
+		st.Bytes += ob.FP.TotalSize
+		st.Hashed += ob.FP.Hashed
+		st.Reused += ob.FP.Reused
+	}
+	for _, as := range res.Assignments {
+		if as.NeedSnapshot {
+			st.Snapshots++
+		}
+	}
+	return st
 }
 
 func (o ScanOptions) readProgress() func(done, total int) {

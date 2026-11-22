@@ -399,82 +399,15 @@ func (a *App) ApplyListSettings(s *PackSettings, mods []string, replace, dryRun 
 			want[packageBase(strings.ToLower(m))] = true
 		}
 	}
-	type here struct{ id, name, folder string }
-	inList := map[string]here{}
-	// the current list's copy of a package, else an installed one the game can load (the
-	// list may have been imported as a new list, not the one in the game yet)
-	add := func(m *store.Mod) {
-		if m == nil || m.Kind == source.Official || m.PackageID == "" || m.Status != identity.Live || !st.Reg.Loadable(m.ID) {
-			return
-		}
-		pkg := packageBase(strings.ToLower(m.PackageID))
-		if _, ok := inList[pkg]; !ok {
-			inList[pkg] = here{m.ID, m.DisplayName(), st.Reg.Folder(m.ID)}
-		}
-	}
-	for _, en := range st.List {
-		add(st.Ix.ByID[en.Instance])
-	}
-	for _, m := range st.Ix.Mods {
-		add(m)
-	}
-	plan := &ListSettingsPlan{Config: cfg, DryRun: dryRun, Replace: replace}
-	byPkg := map[string]int{}
-	row := func(pkg, name string) *ListSettingsMod {
-		k := packageBase(strings.ToLower(pkg))
-		if i, ok := byPkg[k]; ok {
-			return &plan.Mods[i]
-		}
-		r := ListSettingsMod{Mod: name, PackageID: strings.ToLower(pkg)}
-		if h, ok := inList[k]; ok && h.folder != "" {
-			r.Mod, r.Instance = h.name, h.id
-		} else {
-			r.Missing = true
-		}
-		if r.Mod == "" {
-			r.Mod = r.PackageID
-		}
-		byPkg[k] = len(plan.Mods)
-		plan.Mods = append(plan.Mods, r)
-		return &plan.Mods[len(plan.Mods)-1]
-	}
-	pick := func(pkg string) bool { return len(want) == 0 || want[packageBase(strings.ToLower(pkg))] }
-	for _, f := range s.Files {
-		if !pick(f.PackageID) {
-			continue
-		}
-		r := row(f.PackageID, f.Name)
-		if r.Missing {
-			r.Files = append(r.Files, ListSettingsFile{Class: f.Class})
-			continue
-		}
-		to := SettingsFile(inList[packageBase(r.PackageID)].folder, f.Class)
-		lf := ListSettingsFile{Class: f.Class, To: to}
-		if b, err := os.ReadFile(filepath.Join(cfg, to)); err == nil {
-			lf.Exists, lf.Same = true, string(b) == f.XML
-		} else if _, lerr := os.Lstat(filepath.Join(cfg, to)); lerr == nil {
-			lf.Exists = true
-		}
-		lf.Write = !lf.Exists || replace && !lf.Same
-		r.Files = append(r.Files, lf)
-	}
+	lp := &listSettingsPlanner{plan: &ListSettingsPlan{Config: cfg, DryRun: dryRun, Replace: replace}, inList: listSettingsTargets(st), byPkg: map[string]int{}, want: want}
+	plan := lp.plan
+	lp.planFiles(s, cfg, replace)
 	hugsPath := filepath.Join(root, HugsLibSettingsFile)
 	hugs, herr := os.ReadFile(hugsPath)
 	if herr != nil {
 		hugs = nil
 	}
-	for _, h := range s.HugsLib {
-		if !pick(h.PackageID) {
-			continue
-		}
-		r := row(h.PackageID, h.Name)
-		lf := ListSettingsFile{Class: h.ID, To: filepath.ToSlash(HugsLibSettingsFile), HugsLib: true}
-		if !r.Missing {
-			lf.Exists, lf.Same = hugsLibHas(hugs, h.ID, h.XML)
-			lf.Write = !lf.Exists || replace && !lf.Same
-		}
-		r.Files = append(r.Files, lf)
-	}
+	lp.planHugsLib(s, hugs, replace)
 	sort.SliceStable(plan.Mods, func(i, j int) bool { return strings.ToLower(plan.Mods[i].Mod) < strings.ToLower(plan.Mods[j].Mod) })
 	if dryRun || plan.Writes() == 0 {
 		return plan, nil
@@ -482,49 +415,8 @@ func (a *App) ApplyListSettings(s *PackSettings, mods []string, replace, dryRun 
 	if err := a.settingsGameClosed(); err != nil {
 		return nil, err
 	}
-	xmlOf := map[string]PackSettingsFile{}
-	for _, f := range s.Files {
-		xmlOf[packageBase(strings.ToLower(f.PackageID))+"\x00"+strings.ToLower(f.Class)] = f
-	}
-	hugsOf := map[string]PackHugsLib{}
-	for _, h := range s.HugsLib {
-		hugsOf[strings.ToLower(h.ID)] = h
-	}
-	cur, hugsChanged := hugs, false
-	var hugsFiles []*ListSettingsFile
-	for i := range plan.Mods {
-		r := &plan.Mods[i]
-		for j := range r.Files {
-			lf := &r.Files[j]
-			if !lf.Write {
-				continue
-			}
-			if lf.HugsLib {
-				next, changed, err := putHugsLibPack(cur, lf.Class, hugsOf[strings.ToLower(lf.Class)].XML, true)
-				if err != nil {
-					lf.Err = err.Error()
-					continue
-				}
-				if changed {
-					cur, hugsChanged = next, true
-					hugsFiles = append(hugsFiles, lf)
-				}
-				continue
-			}
-			f := xmlOf[packageBase(r.PackageID)+"\x00"+strings.ToLower(lf.Class)]
-			dst := filepath.Join(cfg, lf.To)
-			if lf.Exists {
-				if err := a.ToTrash(dst); err != nil {
-					lf.Err = err.Error()
-					continue
-				}
-			}
-			if err := writeNewFile(dst, []byte(f.XML), f.Modified); err != nil {
-				lf.Err = err.Error()
-			}
-		}
-	}
-	if hugsChanged {
+	cur, hugsFiles := a.writeListSettings(plan, s, cfg, hugs)
+	if len(hugsFiles) > 0 {
 		fail := func(err error) {
 			for _, lf := range hugsFiles {
 				lf.Err = err.Error()
@@ -542,6 +434,154 @@ func (a *App) ApplyListSettings(s *PackSettings, mods []string, replace, dryRun 
 		}
 	}
 	return plan, nil
+}
+
+// listSettingsTarget is the copy of a package whose settings a list's settings go to.
+type listSettingsTarget struct{ id, name, folder string }
+
+// listSettingsTargets is, per package, the current list's copy, else an installed one the
+// game can load (the list may have been imported as a new list, not the one in the game yet).
+func listSettingsTargets(st *LoadoutState) map[string]listSettingsTarget {
+	inList := map[string]listSettingsTarget{}
+	add := func(m *store.Mod) {
+		if m == nil || m.Kind == source.Official || m.PackageID == "" || m.Status != identity.Live || !st.Reg.Loadable(m.ID) {
+			return
+		}
+		pkg := packageBase(strings.ToLower(m.PackageID))
+		if _, ok := inList[pkg]; !ok {
+			inList[pkg] = listSettingsTarget{m.ID, m.DisplayName(), st.Reg.Folder(m.ID)}
+		}
+	}
+	for _, en := range st.List {
+		add(st.Ix.ByID[en.Instance])
+	}
+	for _, m := range st.Ix.Mods {
+		add(m)
+	}
+	return inList
+}
+
+// listSettingsPlanner builds a ListSettingsPlan: a row per Mod, in the order first seen.
+type listSettingsPlanner struct {
+	plan   *ListSettingsPlan
+	inList map[string]listSettingsTarget
+	byPkg  map[string]int
+	want   map[string]bool // the packages chosen (none: all)
+}
+
+// pick reports whether a package's settings are chosen.
+func (lp *listSettingsPlanner) pick(pkg string) bool {
+	return len(lp.want) == 0 || lp.want[packageBase(strings.ToLower(pkg))]
+}
+
+// row is the plan's row for a package, added the first time.
+func (lp *listSettingsPlanner) row(pkg, name string) *ListSettingsMod {
+	plan := lp.plan
+	k := packageBase(strings.ToLower(pkg))
+	if i, ok := lp.byPkg[k]; ok {
+		return &plan.Mods[i]
+	}
+	r := ListSettingsMod{Mod: name, PackageID: strings.ToLower(pkg)}
+	if h, ok := lp.inList[k]; ok && h.folder != "" {
+		r.Mod, r.Instance = h.name, h.id
+	} else {
+		r.Missing = true
+	}
+	if r.Mod == "" {
+		r.Mod = r.PackageID
+	}
+	lp.byPkg[k] = len(plan.Mods)
+	plan.Mods = append(plan.Mods, r)
+	return &plan.Mods[len(plan.Mods)-1]
+}
+
+// planFiles plans the Mod settings files in cfg: written when missing, or when replace is
+// set and they differ.
+func (lp *listSettingsPlanner) planFiles(s *PackSettings, cfg string, replace bool) {
+	for _, f := range s.Files {
+		if !lp.pick(f.PackageID) {
+			continue
+		}
+		r := lp.row(f.PackageID, f.Name)
+		if r.Missing {
+			r.Files = append(r.Files, ListSettingsFile{Class: f.Class})
+			continue
+		}
+		to := SettingsFile(lp.inList[packageBase(r.PackageID)].folder, f.Class)
+		lf := ListSettingsFile{Class: f.Class, To: to}
+		if b, err := os.ReadFile(filepath.Join(cfg, to)); err == nil {
+			lf.Exists, lf.Same = true, string(b) == f.XML
+		} else if _, lerr := os.Lstat(filepath.Join(cfg, to)); lerr == nil {
+			lf.Exists = true
+		}
+		lf.Write = !lf.Exists || replace && !lf.Same
+		r.Files = append(r.Files, lf)
+	}
+}
+
+// planHugsLib plans the HugsLib settings entries against the current file hugs.
+func (lp *listSettingsPlanner) planHugsLib(s *PackSettings, hugs []byte, replace bool) {
+	for _, h := range s.HugsLib {
+		if !lp.pick(h.PackageID) {
+			continue
+		}
+		r := lp.row(h.PackageID, h.Name)
+		lf := ListSettingsFile{Class: h.ID, To: filepath.ToSlash(HugsLibSettingsFile), HugsLib: true}
+		if !r.Missing {
+			lf.Exists, lf.Same = hugsLibHas(hugs, h.ID, h.XML)
+			lf.Write = !lf.Exists || replace && !lf.Same
+		}
+		r.Files = append(r.Files, lf)
+	}
+}
+
+// writeListSettings writes the planned settings files (an existing one goes to the recycle
+// bin first) and puts the HugsLib entries into a copy of hugs. It returns that copy and the
+// HugsLib entries that changed it, for the caller to write.
+func (a *App) writeListSettings(plan *ListSettingsPlan, s *PackSettings, cfg string, hugs []byte) ([]byte, []*ListSettingsFile) {
+	xmlOf := map[string]PackSettingsFile{}
+	for _, f := range s.Files {
+		xmlOf[packageBase(strings.ToLower(f.PackageID))+"\x00"+strings.ToLower(f.Class)] = f
+	}
+	hugsOf := map[string]PackHugsLib{}
+	for _, h := range s.HugsLib {
+		hugsOf[strings.ToLower(h.ID)] = h
+	}
+	cur := hugs
+	var hugsFiles []*ListSettingsFile
+	for i := range plan.Mods {
+		r := &plan.Mods[i]
+		for j := range r.Files {
+			lf := &r.Files[j]
+			if !lf.Write {
+				continue
+			}
+			if lf.HugsLib {
+				next, changed, err := putHugsLibPack(cur, lf.Class, hugsOf[strings.ToLower(lf.Class)].XML, true)
+				if err != nil {
+					lf.Err = err.Error()
+					continue
+				}
+				if changed {
+					cur = next
+					hugsFiles = append(hugsFiles, lf)
+				}
+				continue
+			}
+			f := xmlOf[packageBase(r.PackageID)+"\x00"+strings.ToLower(lf.Class)]
+			dst := filepath.Join(cfg, lf.To)
+			if lf.Exists {
+				if err := a.ToTrash(dst); err != nil {
+					lf.Err = err.Error()
+					continue
+				}
+			}
+			if err := writeNewFile(dst, []byte(f.XML), f.Modified); err != nil {
+				lf.Err = err.Error()
+			}
+		}
+	}
+	return cur, hugsFiles
 }
 
 // packSettingsFrom is a SettingsCarry's From for a file the pack itself carries.

@@ -465,30 +465,9 @@ func (a *App) BuildPackWith(name string, o BuildOptions) (*PackBuild, error) {
 	}
 	bs := &buildState{report: o.Progress}
 	if !o.DryRun {
-		if err := a.managedRootReady("packs", a.PacksDir()); err != nil {
+		if err := a.startPackBuild(name, tmp, o.Update, bs); err != nil {
 			return nil, err
 		}
-		if o.Update {
-			if _, err := a.ReadPack(name); err != nil {
-				return nil, err
-			}
-			if err := a.checkNoGame(); err != nil {
-				return nil, err
-			}
-		} else if _, err := os.Stat(a.packPath(name)); err == nil {
-			return nil, fmt.Errorf("pack %q exists (%s); remove it first, pick another name, or make a new revision of it (--update)", name, a.packPath(name))
-		}
-		// What is left of an earlier, unfinished build of this name is replaced.
-		if err := os.RemoveAll(tmp); err != nil {
-			return nil, err
-		}
-		if err := os.MkdirAll(tmp, 0o755); err != nil {
-			return nil, err
-		}
-		if err := a.Store.SetMeta(directoryKey("packs"), a.PacksDir()); err != nil {
-			return nil, err
-		}
-		bs.start(tmp, BuildProgress{Name: name, Step: StepCheck})
 	}
 	cleanup := func() {
 		bs.stop()
@@ -560,16 +539,9 @@ func (a *App) BuildPackWith(name string, o BuildOptions) (*PackBuild, error) {
 		}
 	}
 	bs.update(func(p *BuildProgress) { p.Step, p.Mod = StepWrite, "" })
-	for i := range r.Pack.Entries {
-		pe := &r.Pack.Entries[i]
-		if pe.Official || pe.Folder == "" {
-			continue
-		}
-		pe.Files, pe.SHA256, err = copyDigest(filepath.Join(tmp, "mods", pe.Folder))
-		if err != nil {
-			cleanup()
-			return nil, fmt.Errorf("%s: %w", pe.Name, err)
-		}
+	if err := digestPackEntries(r.Pack, tmp); err != nil {
+		cleanup()
+		return nil, err
 	}
 	b, _ := json.MarshalIndent(r.Pack, "", "  ")
 	if err := os.WriteFile(filepath.Join(tmp, "pack.json"), append(b, '\n'), 0o644); err != nil {
@@ -589,6 +561,52 @@ func (a *App) BuildPackWith(name string, o BuildOptions) (*PackBuild, error) {
 	}
 	bs.update(func(p *BuildProgress) { p.Step = StepDone })
 	return r, nil
+}
+
+// startPackBuild checks a pack of this name can be built (or updated) and starts its build
+// folder tmp, replacing what an earlier, unfinished build left there.
+func (a *App) startPackBuild(name, tmp string, update bool, bs *buildState) error {
+	if err := a.managedRootReady("packs", a.PacksDir()); err != nil {
+		return err
+	}
+	if update {
+		if _, err := a.ReadPack(name); err != nil {
+			return err
+		}
+		if err := a.checkNoGame(); err != nil {
+			return err
+		}
+	} else if _, err := os.Stat(a.packPath(name)); err == nil {
+		return fmt.Errorf("pack %q exists (%s); remove it first, pick another name, or make a new revision of it (--update)", name, a.packPath(name))
+	}
+	// What is left of an earlier, unfinished build of this name is replaced.
+	if err := os.RemoveAll(tmp); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(tmp, 0o755); err != nil {
+		return err
+	}
+	if err := a.Store.SetMeta(directoryKey("packs"), a.PacksDir()); err != nil {
+		return err
+	}
+	bs.start(tmp, BuildProgress{Name: name, Step: StepCheck})
+	return nil
+}
+
+// digestPackEntries records the files and digest of each copied Mod in the build folder.
+func digestPackEntries(p *Pack, tmp string) error {
+	var err error
+	for i := range p.Entries {
+		pe := &p.Entries[i]
+		if pe.Official || pe.Folder == "" {
+			continue
+		}
+		pe.Files, pe.SHA256, err = copyDigest(filepath.Join(tmp, "mods", pe.Folder))
+		if err != nil {
+			return fmt.Errorf("%s: %w", pe.Name, err)
+		}
+	}
+	return nil
 }
 
 func carriedCount(p *Pack) int {
@@ -917,55 +935,10 @@ func (a *App) launchPackWith(o *opRun, name string, dryRun, move bool) (*PackLau
 	dir := a.packPath(name)
 	r := &PackLaunch{Pack: p, Check: check, UserData: filepath.Join(dir, "userdata"), DryRun: dryRun}
 	r.ModsConfig = env.ModsConfigPath(r.UserData)
-	// What Mods/ holds besides this pack (10 §3 step 2): a second folder with a pack copy's
-	// packageId makes the game report an error and ignore one of them, so a pack copy is
-	// never linked next to one. A copy of the player's (a folder, or another tool's link)
-	// with the same content stands in for the pack's; with other content the launch is
-	// refused. A plan's _Archo_ link of the same packageId is removed for the run (writing
-	// the plan to the game makes it again).
-	byPkg := map[string][]ModsCopy{}
 	copies := a.ModsCopies(st.Ix)
-	for _, c := range copies {
-		byPkg[c.PackageID] = append(byPkg[c.PackageID], c)
-	}
-	cands := Candidates(st.Ix, st.Aliases)
-	want := map[string]string{}         // link name (lower) → target
-	useLocal := map[string]*store.Mod{} // pack folder → the player's copy that stands in
-	dropDeploy := map[string]bool{}     // _Archo_ link names (lower) that would duplicate
-	var dups []DuplicateMove
-	for _, pe := range p.Entries {
-		if pe.Official {
-			continue
-		}
-		var player []ModsCopy
-		for _, c := range byPkg[strings.ToLower(pe.PackageID)] {
-			switch c.By {
-			case CopyDeploy:
-				dropDeploy[strings.ToLower(c.Name)] = true
-			case CopyPlayer:
-				player = append(player, c)
-			}
-		}
-		switch {
-		case len(player) == 0:
-			link := packLinkName(name, pe.Folder)
-			want[strings.ToLower(link)] = filepath.Join(dir, "mods", pe.Folder)
-			cands = append(cands, loadout.Candidate{ID: "pack:" + pe.Folder, PackageID: pe.PackageID, Kind: source.Local, Folder: link})
-		case len(player) == 1 && packSameContent(pe, player[0].Mod):
-			useLocal[pe.Folder] = player[0].Mod
-		default:
-			// Another version in the way: it may move into the lock library, after which
-			// the pack's copy is linked as usual (the dry run shows it so).
-			link := packLinkName(name, pe.Folder)
-			for _, c := range player {
-				dups = append(dups, DuplicateMove{Copy: c, For: fmt.Sprintf("pack %s's copy of %s", name, pe.Name), Pack: name, Mod: pe.Name, Link: link})
-			}
-			want[strings.ToLower(link)] = filepath.Join(dir, "mods", pe.Folder)
-			cands = append(cands, loadout.Candidate{ID: "pack:" + pe.Folder, PackageID: pe.PackageID, Kind: source.Local, Folder: link})
-		}
-	}
-	if len(dups) > 0 {
-		de := &DuplicatesError{Moves: a.planMoves(st, copies, dups), Fix: "archo pack launch " + quoteRef(name) + " --move-duplicates"}
+	pp := planPackEntries(st, p, name, dir, copies)
+	if len(pp.dups) > 0 {
+		de := &DuplicatesError{Moves: a.planMoves(st, copies, pp.dups), Fix: "archo pack launch " + quoteRef(name) + " --move-duplicates"}
 		if !move || !de.Movable() {
 			if !de.Movable() {
 				de.Fix = ""
@@ -986,72 +959,19 @@ func (a *App) launchPackWith(o *opRun, name string, dryRun, move bool) (*PackLau
 		}
 		r.Moved = de.Moves
 	}
-	reg := loadout.NewRegistry(cands)
-	for _, pe := range p.Entries {
-		if pe.Official {
-			r.Tokens = append(r.Tokens, pe.PackageID)
-			continue
-		}
-		if m := useLocal[pe.Folder]; m != nil {
-			r.Tokens = append(r.Tokens, reg.Token(m.ID))
-			r.InMods = append(r.InMods, pe.Name)
-			continue
-		}
-		id := "pack:" + pe.Folder
-		if !reg.Loadable(id) {
-			return nil, fmt.Errorf("%w: the game would not load the pack's copy of %s", ErrLaunchBlocked, pe.Name)
-		}
-		r.Tokens = append(r.Tokens, reg.Token(id))
+	reg := loadout.NewRegistry(pp.cands)
+	if err := pp.tokens(p, reg, r); err != nil {
+		return nil, err
 	}
-	// Links: other packs' and the duplicating _Archo_ ones go, this pack's are made (or fixed).
-	ents, _ := os.ReadDir(mods)
-	have := map[string]bool{}
-	for _, de := range ents {
-		n := de.Name()
-		lp := filepath.Join(mods, n)
-		if dropDeploy[strings.ToLower(n)] && source.IsLink(lp) {
-			tgt, _ := source.RealPath(lp)
-			r.Links = append(r.Links, LinkChange{Op: "remove", Name: n, Target: tgt})
-			continue
-		}
-		if !packLink(n) || !source.IsLink(lp) {
-			continue
-		}
-		if t, ok := want[strings.ToLower(n)]; ok && sameDir(lp, t) {
-			have[strings.ToLower(n)] = true
-			continue
-		}
-		tgt, _ := source.RealPath(lp)
-		r.Links = append(r.Links, LinkChange{Op: "remove", Name: n, Target: tgt})
-	}
-	for _, pe := range p.Entries {
-		if pe.Official || useLocal[pe.Folder] != nil {
-			continue
-		}
-		link := packLinkName(name, pe.Folder)
-		if !have[strings.ToLower(link)] {
-			if _, err := os.Lstat(filepath.Join(mods, link)); err == nil && !source.IsLink(filepath.Join(mods, link)) {
-				return nil, fmt.Errorf("%s already exists and is not a link; RimArcho does not touch it", filepath.Join(mods, link))
-			}
-			r.Links = append(r.Links, LinkChange{Op: "add", Name: link, Target: filepath.Join(dir, "mods", pe.Folder)})
-		}
+	if err := pp.linkChanges(p, name, dir, mods, r); err != nil {
+		return nil, err
 	}
 	if r.Plan, err = a.gamePlan(e, r.UserData); err != nil {
 		return nil, err
 	}
-	settings := a.packSettings(st, p, reg, useLocal, r.UserData)
+	settings := a.packSettings(st, p, reg, pp.useLocal, r.UserData)
 	// The pack's own settings (10 §3 step 4): written once per revision, missing files only.
-	folderOf := map[string]string{}
-	for _, pe := range p.Entries {
-		if pe.Official || pe.PackageID == "" {
-			continue
-		}
-		id := "pack:" + pe.Folder
-		if m := useLocal[pe.Folder]; m != nil {
-			id = m.ID
-		}
-		folderOf[packageBase(strings.ToLower(pe.PackageID))] = reg.Folder(id)
-	}
+	folderOf := pp.folderOf(p, reg)
 	ps := readPackState(dir)
 	seed := !p.Settings.Empty() && ps.SettingsRevision < p.Rev()
 	if dryRun {
@@ -1080,28 +1000,7 @@ func (a *App) launchPackWith(o *opRun, name string, dryRun, move bool) (*PackLau
 		ps.SettingsRevision = p.Rev()
 	}
 	r.Settings = append(r.Settings, carryModSettings(settings, nil)...)
-	var known []string
-	for _, m := range installedOfficial(st.Ix.Mods) {
-		if m.PackageID != "ludeon.rimworld" {
-			known = append(known, m.PackageID)
-		}
-	}
-	version := e.GameVersion
-	if version == "" {
-		version = p.Game
-	}
-	var orig []byte
-	if b, err := os.ReadFile(r.ModsConfig); err == nil {
-		orig = b
-	}
-	data, err := loadout.Render(orig, version, r.Tokens, known)
-	if err != nil {
-		return nil, err
-	}
-	if err := os.MkdirAll(filepath.Dir(r.ModsConfig), 0o755); err != nil {
-		return nil, err
-	}
-	if err := os.WriteFile(r.ModsConfig, data, 0o644); err != nil {
+	if err := writePackModsConfig(st, p, r); err != nil {
 		return nil, err
 	}
 	if err := a.startGame(r.Plan); err != nil {
@@ -1113,6 +1012,168 @@ func (a *App) launchPackWith(o *opRun, name string, dryRun, move bool) (*PackLau
 	// A pack's launch has no plan; its fingerprint is the pack's list (09 §1).
 	return r, a.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: e.ID, GameID: e.GameID, UserDataRoot: r.UserData, EnvName: e.Name, Started: a.Now().UTC(), Method: "pack:" + name,
 		Command: r.Plan.Command(), Fingerprint: TokenFingerprint(r.Tokens)})
+}
+
+// packLaunchPlan is how a pack's Mods meet what Mods/ already holds.
+type packLaunchPlan struct {
+	cands      []loadout.Candidate
+	want       map[string]string     // link name (lower) → target
+	useLocal   map[string]*store.Mod // pack folder → the player's copy that stands in
+	dropDeploy map[string]bool       // _Archo_ link names (lower) that would duplicate
+	dups       []DuplicateMove
+}
+
+// planPackEntries works out, for each of the pack's Mods, what Mods/ holds besides this
+// pack (10 §3 step 2): a second folder with a pack copy's packageId makes the game report
+// an error and ignore one of them, so a pack copy is never linked next to one. A copy of the
+// player's (a folder, or another tool's link) with the same content stands in for the
+// pack's; with other content the launch is refused. A plan's _Archo_ link of the same
+// packageId is removed for the run (writing the plan to the game makes it again).
+func planPackEntries(st *LoadoutState, p *Pack, name, dir string, copies []ModsCopy) *packLaunchPlan {
+	byPkg := map[string][]ModsCopy{}
+	for _, c := range copies {
+		byPkg[c.PackageID] = append(byPkg[c.PackageID], c)
+	}
+	pp := &packLaunchPlan{cands: Candidates(st.Ix, st.Aliases), want: map[string]string{}, useLocal: map[string]*store.Mod{}, dropDeploy: map[string]bool{}}
+	for _, pe := range p.Entries {
+		if pe.Official {
+			continue
+		}
+		var player []ModsCopy
+		for _, c := range byPkg[strings.ToLower(pe.PackageID)] {
+			switch c.By {
+			case CopyDeploy:
+				pp.dropDeploy[strings.ToLower(c.Name)] = true
+			case CopyPlayer:
+				player = append(player, c)
+			}
+		}
+		switch {
+		case len(player) == 0:
+			pp.linkPackCopy(name, dir, pe)
+		case len(player) == 1 && packSameContent(pe, player[0].Mod):
+			pp.useLocal[pe.Folder] = player[0].Mod
+		default:
+			// Another version in the way: it may move into the lock library, after which
+			// the pack's copy is linked as usual (the dry run shows it so).
+			link := packLinkName(name, pe.Folder)
+			for _, c := range player {
+				pp.dups = append(pp.dups, DuplicateMove{Copy: c, For: fmt.Sprintf("pack %s's copy of %s", name, pe.Name), Pack: name, Mod: pe.Name, Link: link})
+			}
+			pp.linkPackCopy(name, dir, pe)
+		}
+	}
+	return pp
+}
+
+// linkPackCopy plans the link to the pack's copy of pe and its candidate.
+func (pp *packLaunchPlan) linkPackCopy(name, dir string, pe PackEntry) {
+	link := packLinkName(name, pe.Folder)
+	pp.want[strings.ToLower(link)] = filepath.Join(dir, "mods", pe.Folder)
+	pp.cands = append(pp.cands, loadout.Candidate{ID: "pack:" + pe.Folder, PackageID: pe.PackageID, Kind: source.Local, Folder: link})
+}
+
+// tokens lists the pack's ModsConfig.xml entries in r; a pack copy the game would not load
+// blocks the launch.
+func (pp *packLaunchPlan) tokens(p *Pack, reg *loadout.Registry, r *PackLaunch) error {
+	for _, pe := range p.Entries {
+		if pe.Official {
+			r.Tokens = append(r.Tokens, pe.PackageID)
+			continue
+		}
+		if m := pp.useLocal[pe.Folder]; m != nil {
+			r.Tokens = append(r.Tokens, reg.Token(m.ID))
+			r.InMods = append(r.InMods, pe.Name)
+			continue
+		}
+		id := "pack:" + pe.Folder
+		if !reg.Loadable(id) {
+			return fmt.Errorf("%w: the game would not load the pack's copy of %s", ErrLaunchBlocked, pe.Name)
+		}
+		r.Tokens = append(r.Tokens, reg.Token(id))
+	}
+	return nil
+}
+
+// linkChanges lists in r the link changes in mods: other packs' and the duplicating
+// _Archo_ ones go, this pack's are made (or fixed).
+func (pp *packLaunchPlan) linkChanges(p *Pack, name, dir, mods string, r *PackLaunch) error {
+	ents, _ := os.ReadDir(mods)
+	have := map[string]bool{}
+	for _, de := range ents {
+		n := de.Name()
+		lp := filepath.Join(mods, n)
+		if pp.dropDeploy[strings.ToLower(n)] && source.IsLink(lp) {
+			tgt, _ := source.RealPath(lp)
+			r.Links = append(r.Links, LinkChange{Op: "remove", Name: n, Target: tgt})
+			continue
+		}
+		if !packLink(n) || !source.IsLink(lp) {
+			continue
+		}
+		if t, ok := pp.want[strings.ToLower(n)]; ok && sameDir(lp, t) {
+			have[strings.ToLower(n)] = true
+			continue
+		}
+		tgt, _ := source.RealPath(lp)
+		r.Links = append(r.Links, LinkChange{Op: "remove", Name: n, Target: tgt})
+	}
+	for _, pe := range p.Entries {
+		if pe.Official || pp.useLocal[pe.Folder] != nil {
+			continue
+		}
+		link := packLinkName(name, pe.Folder)
+		if !have[strings.ToLower(link)] {
+			if _, err := os.Lstat(filepath.Join(mods, link)); err == nil && !source.IsLink(filepath.Join(mods, link)) {
+				return fmt.Errorf("%s already exists and is not a link; RimArcho does not touch it", filepath.Join(mods, link))
+			}
+			r.Links = append(r.Links, LinkChange{Op: "add", Name: link, Target: filepath.Join(dir, "mods", pe.Folder)})
+		}
+	}
+	return nil
+}
+
+// folderOf maps each of the pack's packageIds to the folder the game reads it from.
+func (pp *packLaunchPlan) folderOf(p *Pack, reg *loadout.Registry) map[string]string {
+	folderOf := map[string]string{}
+	for _, pe := range p.Entries {
+		if pe.Official || pe.PackageID == "" {
+			continue
+		}
+		id := "pack:" + pe.Folder
+		if m := pp.useLocal[pe.Folder]; m != nil {
+			id = m.ID
+		}
+		folderOf[packageBase(strings.ToLower(pe.PackageID))] = reg.Folder(id)
+	}
+	return folderOf
+}
+
+// writePackModsConfig writes the pack's ModsConfig.xml with its tokens, keeping what else
+// the file holds.
+func writePackModsConfig(st *LoadoutState, p *Pack, r *PackLaunch) error {
+	var known []string
+	for _, m := range installedOfficial(st.Ix.Mods) {
+		if m.PackageID != "ludeon.rimworld" {
+			known = append(known, m.PackageID)
+		}
+	}
+	version := st.Ix.Env.GameVersion
+	if version == "" {
+		version = p.Game
+	}
+	var orig []byte
+	if b, err := os.ReadFile(r.ModsConfig); err == nil {
+		orig = b
+	}
+	data, err := loadout.Render(orig, version, r.Tokens, known)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(r.ModsConfig), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(r.ModsConfig, data, 0o644)
 }
 
 // ---- export, import, remove ----

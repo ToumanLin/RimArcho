@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
@@ -196,6 +197,50 @@ func TestImportRimCrow(t *testing.T) {
 	}
 	if ents, _ := filepath.Glob(filepath.Join(e.Home, "rimcrow-*")); len(ents) > 0 {
 		t.Fatalf("temp copies left behind: %v", ents)
+	}
+}
+
+// 07 §6.2: user rules switched off in RimCrow are skipped and counted, top / bottom and
+// pairs alike, unless they are asked for; then they come over as their own part.
+func TestImportRimCrowRulesSwitchedOff(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	e.AddWorkshop("3000000003", testkit.Sample("tester.beta", "Beta"))
+	e.WriteMod(filepath.Join(e.Game, "Mods", "Gamma"), testkit.Sample("tester.gamma", "Gamma"))
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.beta")
+	e.AddEnv(false)
+	e.MustRun("scan")
+	crow := filepath.Join(e.Root, "RimCrow", "data")
+	os.MkdirAll(filepath.Join(crow, "rules"), 0o755)
+	dbPath := filepath.Join(crow, "mod_manager.db")
+	rimcrowDB(t, dbPath)
+	os.WriteFile(filepath.Join(crow, "rules", "user_rules.json"), []byte(`{"settings": {"user_mod_rules_enabled": false},
+		"mod_rules": {"tester.beta": {"loadAfter": {"tester.gamma": {}}, "loadTop": {"value": "True"}, "loadSoon": {}}}}`), 0o644)
+	rep, err := e.App.ImportRimCrow(app.RimCrowOptions{DB: dbPath, DryRun: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !rep.RulesDisabled || rep.RulesTotal != 2 || rep.RuleNew != 0 || len(rep.RulesSkipped) != 2 || rep.NotMapped["rule loadSoon"] != 1 {
+		t.Fatalf("switched off: %+v", rep)
+	}
+	for _, s := range rep.RulesSkipped {
+		if !strings.Contains(s.Reason, "switched off in RimCrow") {
+			t.Fatalf("skip reason: %+v", s)
+		}
+	}
+	rep, err = e.App.ImportRimCrow(app.RimCrowOptions{DB: dbPath, DryRun: true, IncludeDisabledRules: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.RulesTotal != 2 || rep.RuleNew != 2 || rep.Parts[app.PartRulesOff] == nil || rep.Parts[app.PartRulesOff].New != 2 {
+		t.Fatalf("included: %+v", rep)
+	}
+	rep, err = e.App.ImportRimCrow(app.RimCrowOptions{DB: dbPath, DryRun: true, Parts: map[string]bool{app.PartRules: true}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.RulesTotal != 0 || rep.NotMapped["rule loadSoon"] != 0 {
+		t.Fatalf("part not chosen: %+v", rep)
 	}
 }
 

@@ -148,3 +148,21 @@ func TestJSONLaunchArgumentsReachLauncher(t *testing.T) {
 		t.Fatalf("launch argv: %#v expected suffix %#v", args, expected)
 	}
 }
+
+// 03 §6.4: a profile of a game that already has a Game Config previews the entries that
+// game cannot resolve.
+func TestRimCrowProfilePreviewKnownGame(t *testing.T) {
+	e := loadoutEnv(t)
+	scanNow(t, e)
+	root := filepath.Join(e.Root, "Crow data", "known")
+	e.WriteFile(filepath.Join(root, "Config", "ModsConfig.xml"), `<?xml version="1.0"?><ModsConfigData><version>1.6.4633 rev1261</version><activeMods><li>ludeon.rimworld</li><li>missing.example</li></activeMods></ModsConfigData>`)
+	path := filepath.Join(e.Root, "profiles.db")
+	testkit.RimCrowProfiles(t, path, testkit.CrowProfile{ID: "k", Name: "Known", Game: e.Game, UserData: root})
+	dry, err := e.App.ImportRimCrow(app.RimCrowOptions{DB: path, DryRun: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dry.Profiles) != 1 || dry.Profiles[0].Status != "ready" || !reflect.DeepEqual(dry.Profiles[0].Unresolved, []string{"missing.example"}) {
+		t.Fatalf("preview: %+v", dry.Profiles)
+	}
+}
