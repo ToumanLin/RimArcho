@@ -45,29 +45,24 @@ type listing struct {
 	err        error
 }
 
-// dirLister reads and caches sorted directory listings, counting failures in result.
-type dirLister struct {
-	ctx    context.Context
-	fs     FS
-	cache  map[string][]fs.DirEntry
-	result *listing
-}
-
-// fileWalk carries the state listFiles keeps while it walks one mod's folders.
-type fileWalk struct {
-	l    *dirLister
-	mod  *Mod
-	o    *Options
-	seen map[string]bool
-	out  []fileJob
+// walkScope names one scope folder that walkBase lists, and the options that filter its files.
+type walkScope struct {
+	root, folder, base string
+	langs              []string
+	allVersions        bool
+	kind               Kind
 }
 
 func listFiles(ctx context.Context, mod Mod, o Options) listing {
 	var result listing
 	// A listing may be shared by several kinds and the resolver; never sort an FS-owned slice.
-	l := dirLister{ctx: ctx, fs: o.FS, cache: map[string][]fs.DirEntry{}, result: &result}
-	folders, labels := uniqueFolders(modFolders(&l, &mod, &o), &mod, &o)
-	w := fileWalk{l: &l, mod: &mod, o: &o, seen: map[string]bool{}}
+	cache := map[string][]fs.DirEntry{}
+	readDir := func(dir string) ([]fs.DirEntry, error) {
+		return readSortedDir(ctx, o.FS, cache, &result, dir)
+	}
+	folders, labels := uniqueFolders(modFolders(readDir, &mod, &o), &mod, &o)
+	seen := map[string]bool{}
+	var out []fileJob
 	for fi, folder := range folders {
 		for _, s := range scopes {
 			if fi >= len(labels) && s.kind != About {
@@ -76,37 +71,39 @@ func listFiles(ctx context.Context, mod Mod, o Options) listing {
 			if o.Kinds&s.kind == 0 || s.kind == About && filepath.Clean(folder) != filepath.Clean(mod.Root) {
 				continue
 			}
-			for _, base := range w.scopeDirs(folder, s.dir) {
-				if !w.walkBase(folder, base, s.kind) {
+			for _, base := range scopeDirs(readDir, []string{folder}, s.dir) {
+				ws := walkScope{root: mod.Root, folder: folder, base: base, langs: o.Langs, allVersions: o.AllVersions, kind: s.kind}
+				var ok bool
+				if out, ok = walkBase(readDir, &result, seen, out, &ws); !ok {
 					return result
 				}
 			}
 		}
 	}
-	result.folders, result.files = labels, w.out
+	result.folders, result.files = labels, out
 	return result
 }
 
-// readDir returns dir's entries sorted case-insensitively, cached, and records errors in the listing.
-func (l *dirLister) readDir(dir string) ([]fs.DirEntry, error) {
-	if err := l.ctx.Err(); err != nil {
-		l.result.err = err
+// readSortedDir returns dir's entries sorted case-insensitively, cached, and records errors in result.
+func readSortedDir(ctx context.Context, fsys FS, cache map[string][]fs.DirEntry, result *listing, dir string) ([]fs.DirEntry, error) {
+	if err := ctx.Err(); err != nil {
+		result.err = err
 		return nil, err
 	}
-	if entries, ok := l.cache[dir]; ok {
+	if entries, ok := cache[dir]; ok {
 		return entries, nil
 	}
-	entries, err := l.fs.ReadDir(dir)
+	entries, err := fsys.ReadDir(dir)
 	if err != nil {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			l.result.err = err
+			result.err = err
 		} else if !errors.Is(err, fs.ErrNotExist) { // LoadFolders may name folders that do not exist
-			l.result.unreadable++
-			if l.result.firstError == "" {
-				l.result.firstError = errText(dir, err)
+			result.unreadable++
+			if result.firstError == "" {
+				result.firstError = errText(dir, err)
 			}
 		}
-		l.cache[dir] = nil
+		cache[dir] = nil
 		return nil, err
 	}
 	entries = append([]fs.DirEntry(nil), entries...)
@@ -117,17 +114,17 @@ func (l *dirLister) readDir(dir string) ([]fs.DirEntry, error) {
 		}
 		return strings.ToLower(a) < strings.ToLower(b)
 	})
-	l.cache[dir] = entries
+	cache[dir] = entries
 	return entries, nil
 }
 
 // modFolders lists the mod's load folders: every candidate with AllVersions, else the resolved ones.
-func modFolders(l *dirLister, mod *Mod, o *Options) []string {
+func modFolders(readDir func(string) ([]fs.DirEntry, error), mod *Mod, o *Options) []string {
 	if !o.AllVersions {
-		return content.ResolveFS(mod.Root, mod.LoadFoldersXML, o.MM, o.Active, l.readDir).Folders
+		return content.ResolveFS(mod.Root, mod.LoadFoldersXML, o.MM, o.Active, readDir).Folders
 	}
 	var folders []string
-	entries, _ := l.readDir(mod.Root)
+	entries, _ := readDir(mod.Root)
 	for _, e := range entries {
 		if e.IsDir() && content.IsVersionFolder(e.Name()) {
 			folders = append(folders, filepath.Join(mod.Root, e.Name()))
@@ -164,13 +161,12 @@ func uniqueFolders(folders []string, mod *Mod, o *Options) (unique, labels []str
 	return unique, labels
 }
 
-// scopeDirs resolves each segment of a scope path case-insensitively under folder, including Lunar/Components.
-func (w *fileWalk) scopeDirs(folder, scopeDir string) []string {
-	dirs := []string{folder}
+// scopeDirs resolves each segment of a scope path case-insensitively under dirs, including Lunar/Components.
+func scopeDirs(readDir func(string) ([]fs.DirEntry, error), dirs []string, scopeDir string) []string {
 	for _, segment := range strings.Split(scopeDir, "/") {
 		var found []string
 		for _, parent := range dirs {
-			entries, _ := w.l.readDir(parent)
+			entries, _ := readDir(parent)
 			for _, e := range entries {
 				if e.IsDir() && strings.EqualFold(e.Name(), segment) {
 					found = append(found, filepath.Join(parent, e.Name()))
@@ -182,21 +178,21 @@ func (w *fileWalk) scopeDirs(folder, scopeDir string) []string {
 	return dirs
 }
 
-// walkBase adds the accepted files under base breadth-first; it reports false once the listing has an error.
-func (w *fileWalk) walkBase(folder, base string, kind Kind) bool {
-	o := w.o
+// walkBase appends the accepted files under s.base breadth-first; it reports false once the listing has an error.
+func walkBase(readDir func(string) ([]fs.DirEntry, error), result *listing, seen map[string]bool, out []fileJob, s *walkScope) ([]fileJob, bool) {
+	base, kind := s.base, s.kind
 	queue := []string{base}
 	for len(queue) > 0 {
 		dir := queue[0]
 		queue = queue[1:]
-		entries, _ := w.l.readDir(dir)
-		if w.l.result.err != nil {
-			return false
+		entries, _ := readDir(dir)
+		if result.err != nil {
+			return out, false
 		}
 		for _, e := range entries {
 			path := filepath.Join(dir, e.Name())
 			if e.IsDir() {
-				if kind != Languages || len(o.Langs) == 0 || dir != base || hasLang(o.Langs, e.Name()) {
+				if kind != Languages || len(s.langs) == 0 || dir != base || hasLang(s.langs, e.Name()) {
 					queue = append(queue, path)
 				}
 				continue
@@ -205,18 +201,18 @@ func (w *fileWalk) walkBase(folder, base string, kind Kind) bool {
 				continue
 			}
 			asset := relative(base, path)
-			if kind == Languages && len(o.Langs) > 0 && !strings.Contains(asset, "/") {
+			if kind == Languages && len(s.langs) > 0 && !strings.Contains(asset, "/") {
 				continue
 			}
-			key := strings.ToLower(relative(folder, path))
-			if !o.AllVersions && w.seen[key] {
+			key := strings.ToLower(relative(s.folder, path))
+			if !s.allVersions && seen[key] {
 				continue
 			}
-			w.seen[key] = true
-			w.out = append(w.out, fileJob{path: path, rel: relative(w.mod.Root, path), folder: relative(w.mod.Root, folder), asset: asset, kind: kind})
+			seen[key] = true
+			out = append(out, fileJob{path: path, rel: relative(s.root, path), folder: relative(s.root, s.folder), asset: asset, kind: kind})
 		}
 	}
-	return true
+	return out, true
 }
 
 func hasLang(langs []string, name string) bool {

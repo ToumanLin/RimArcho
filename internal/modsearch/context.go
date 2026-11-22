@@ -13,14 +13,14 @@ type region struct {
 	within, role string
 }
 
-// regionScan holds the decoder state that contexts carries from token to token.
+// regionScan holds the decoder state that contexts carries from token to token; the element stack stays local to contexts.
 type regionScan struct {
 	b                                   []byte
 	kind                                Kind
-	o                                   *Options
+	def                                 bool
+	pattern                             string
 	spans, roles                        []region
 	depth, current                      int
-	stack                               []string
 	name, defName, xpath                strings.Builder
 	captureDef, captureXPath, haveXPath bool
 }
@@ -31,7 +31,8 @@ func contexts(ctx context.Context, b []byte, kind Kind, o Options, hits []Match,
 	dec := xml.NewDecoder(bytes.NewReader(b))
 	dec.Strict = false
 	dec.CharsetReader = func(_ string, r io.Reader) (io.Reader, error) { return r, nil }
-	s := regionScan{b: b, kind: kind, o: &o, current: -1}
+	s := regionScan{b: b, kind: kind, def: o.Def, pattern: o.Pattern, current: -1}
+	var stack []string
 	for ctx.Err() == nil {
 		start := int(dec.InputOffset())
 		token, err := dec.Token()
@@ -42,11 +43,15 @@ func contexts(ctx context.Context, b []byte, kind Kind, o Options, hits []Match,
 		end := int(dec.InputOffset())
 		switch t := token.(type) {
 		case xml.StartElement:
+			stack = append(stack, t.Name.Local)
 			s.startElement(&t, start, end)
 		case xml.CharData:
-			s.charData(t, start, end)
+			s.charData(t, stack, start, end)
 		case xml.EndElement:
 			s.endElement(&t, end)
+			if len(stack) > 0 {
+				stack = stack[:len(stack)-1]
+			}
 		}
 	}
 	return summarize(s.spans, s.roles, kind, &o, hits, offsets)
@@ -74,7 +79,6 @@ func (s *regionScan) finish(end int) {
 // startElement opens a span at a top-level def or operation and starts capturing its name.
 func (s *regionScan) startElement(t *xml.StartElement, start, end int) {
 	s.depth++
-	s.stack = append(s.stack, t.Name.Local)
 	if s.depth == 2 && (s.kind == Defs || t.Name.Local == "Operation") {
 		s.openSpan(t, start)
 	}
@@ -86,8 +90,8 @@ func (s *regionScan) startElement(t *xml.StartElement, start, end int) {
 			s.captureXPath, s.haveXPath = true, true
 		}
 	}
-	if s.kind == Defs && s.o.Def {
-		s.roles = append(s.roles, attributeRoles(s.b[start:end], start, s.o.Pattern)...)
+	if s.kind == Defs && s.def {
+		s.roles = append(s.roles, attributeRoles(s.b[start:end], start, s.pattern)...)
 	}
 }
 
@@ -107,14 +111,14 @@ func (s *regionScan) openSpan(t *xml.StartElement, start int) {
 }
 
 // charData captures defName and xpath text and marks a defName equal to the pattern as a def.
-func (s *regionScan) charData(t xml.CharData, start, end int) {
+func (s *regionScan) charData(t xml.CharData, stack []string, start, end int) {
 	if s.captureDef {
 		s.defName.Write(t)
 	}
 	if s.captureXPath {
 		s.xpath.Write(t)
 	}
-	if s.kind == Defs && s.o.Def && len(s.stack) > 0 && s.stack[len(s.stack)-1] == "defName" && strings.TrimSpace(string(t)) == s.o.Pattern {
+	if s.kind == Defs && s.def && len(stack) > 0 && stack[len(stack)-1] == "defName" && strings.TrimSpace(string(t)) == s.pattern {
 		s.roles = append(s.roles, region{start: start, end: end, role: "def"})
 	}
 }
@@ -131,9 +135,6 @@ func (s *regionScan) endElement(t *xml.EndElement, end int) {
 		s.finish(end)
 	}
 	s.depth--
-	if len(s.stack) > 0 {
-		s.stack = s.stack[:len(s.stack)-1]
-	}
 }
 
 // defTally remembers which spans already put a patch, def, abstract or child in the summary.
