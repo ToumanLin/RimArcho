@@ -1,0 +1,299 @@
+#0 ok=false err=true
+  PatchOperationAdd ran=true result=false err=true hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#1 ok=false err=true
+  PatchOperationAdd ran=true result=false err=true hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#2 ok=false err=true
+  PatchOperationAdd ran=true result=false err=true hits=1 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#3 ok=true err=false
+  PatchOperationAdd ran=true result=true err=false hits=1 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><n1></n1><n2></n2><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#4 ok=true err=false
+  PatchOperationAdd ran=true result=true err=false hits=1 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li><n1></n1><n2></n2></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#5 ok=false err=false
+  PatchOperationAdd ran=true result=false err=false hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#6 ok=false err=true
+  PatchOperationInsert ran=true result=false err=true hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#7 ok=false err=true
+  PatchOperationInsert ran=true result=false err=true hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#8 ok=false err=true
+  PatchOperationInsert ran=true result=false err=true hits=1 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#9 ok=false err=true
+  PatchOperationInsert ran=true result=false err=true hits=1 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#10 ok=true err=false
+  PatchOperationInsert ran=true result=true err=false hits=1 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><n2></n2><n1></n1><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#11 ok=true err=false
+  PatchOperationInsert ran=true result=true err=false hits=1 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><n2></n2><n1></n1><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#12 ok=true err=false
+  PatchOperationInsert ran=true result=true err=false hits=1 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>ta</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#13 ok=false err=false
+  PatchOperationInsert ran=true result=false err=false hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#14 ok=false err=true
+  PatchOperationReplace ran=true result=false err=true hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#15 ok=false err=true
+  PatchOperationReplace ran=true result=false err=true hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#16 ok=false err=true
+  PatchOperationReplace ran=true result=false err=true hits=1 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=1
+#17 ok=false err=true
+  PatchOperationReplace ran=true result=false err=true hits=1 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#18 ok=true err=false
+  PatchOperationReplace ran=true result=true err=false hits=2 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><n1></n1><n2></n2><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><n1></n1><n2></n2><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=2
+#19 ok=false err=false
+  PatchOperationReplace ran=true result=false err=false hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#20 ok=false err=true
+  PatchOperationRemove ran=true result=false err=true hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#21 ok=false err=true
+  PatchOperationRemove ran=true result=false err=true hits=1 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=1
+#22 ok=false err=true
+  PatchOperationRemove ran=true result=false err=true hits=1 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#23 ok=true err=false
+  PatchOperationRemove ran=true result=true err=false hits=1 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=1
+#24 ok=false err=false
+  PatchOperationRemove ran=true result=false err=false hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#25 ok=false err=true
+  PatchOperationAttributeAdd ran=true result=false err=true hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#26 ok=true err=false
+  PatchOperationAttributeAdd ran=true result=true err=false hits=2 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef Name="v"><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#27 ok=false err=false
+  PatchOperationAttributeAdd ran=true result=false err=false hits=3 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#28 ok=true err=false
+  PatchOperationAttributeSet ran=true result=true err=false hits=2 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="v"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef Name="v"><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#29 ok=false err=true
+  PatchOperationAttributeSet ran=true result=false err=true hits=2 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#30 ok=false err=true
+  PatchOperationAttributeSet ran=true result=false err=true hits=1 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#31 ok=false err=false
+  PatchOperationAttributeSet ran=true result=false err=false hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#32 ok=true err=false
+  PatchOperationAttributeRemove ran=true result=true err=false hits=2 guard=[]/[]/false/[test.f]
+<Defs><ThingDef><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#33 ok=false err=false
+  PatchOperationAttributeRemove ran=true result=false err=false hits=1 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#34 ok=false err=false
+  PatchOperationAttributeRemove ran=true result=false err=false hits=2 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#35 ok=false err=true
+  PatchOperationSetName ran=true result=false err=true hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#36 ok=false err=true
+  PatchOperationSetName ran=true result=false err=true hits=1 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#37 ok=false err=true
+  PatchOperationSetName ran=true result=false err=true hits=1 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#38 ok=true err=false
+  PatchOperationSetName ran=true result=true err=false hits=2 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><title>a</title><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><title>b</title><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#39 ok=false err=false
+  PatchOperationSetName ran=true result=false err=false hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#40 ok=false err=true
+  PatchOperationAddModExtension ran=true result=false err=true hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#41 ok=false err=true
+  PatchOperationAddModExtension ran=true result=false err=true hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#42 ok=false err=true
+  PatchOperationAddModExtension ran=true result=false err=true hits=1 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#43 ok=true err=false
+  PatchOperationAddModExtension ran=true result=true err=false hits=2 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps><modExtensions><n1></n1><n2></n2></modExtensions></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li><n1></n1><n2></n2></modExtensions></ThingDef></Defs>
+contests=0
+#44 ok=false err=false
+  PatchOperationAddModExtension ran=true result=false err=false hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#45 ok=true err=false
+  PatchOperationTest ran=true result=true err=false hits=1 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#46 ok=false err=false
+  PatchOperationTest ran=true result=false err=false hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#47 ok=false err=true
+  PatchOperationTest ran=true result=false err=true hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#48 ok=false err=true
+  PatchOperationConditional ran=true result=false err=true hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#49 ok=true err=false
+  PatchOperationConditional ran=true result=true err=false hits=1 guard=[]/[]/false/[test.f]
+    PatchOperationRemove ran=true result=true err=false hits=2 guard=[]/[]/true/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=2
+#50 ok=true err=false
+  PatchOperationConditional ran=true result=true err=false hits=1 guard=[]/[]/false/[test.f]
+    PatchOperationRemove ran=false result=false err=false hits=0 guard=[]/[]/false/[]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#51 ok=false err=false
+  PatchOperationConditional ran=true result=false err=false hits=1 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#52 ok=false err=false
+  PatchOperationConditional ran=true result=false err=false hits=0 guard=[]/[]/false/[test.f]
+    PatchOperationRemove ran=true result=false err=false hits=0 guard=[]/[]/true/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#53 ok=true err=false
+  PatchOperationConditional ran=true result=true err=false hits=0 guard=[]/[]/false/[test.f]
+    PatchOperationRemove ran=false result=false err=false hits=0 guard=[]/[]/false/[]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#54 ok=false err=false
+  PatchOperationConditional ran=true result=false err=false hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#55 ok=true err=false
+  PatchOperationFindMod ran=true result=true err=false hits=0 guard=[]/[]/false/[test.f]
+    PatchOperationFindMod ran=true result=true err=false hits=0 guard=[Nope Mod B]/[]/false/[test.f]
+      PatchOperationRemove ran=true result=true err=false hits=2 guard=[Nope Mod B Mod A]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=2
+#56 ok=true err=false
+  PatchOperationFindMod ran=true result=true err=false hits=0 guard=[]/[]/false/[test.f]
+    PatchOperationRemove ran=false result=false err=false hits=0 guard=[]/[]/false/[]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#57 ok=false err=false
+  PatchOperationFindMod ran=true result=false err=false hits=0 guard=[]/[]/false/[test.f]
+    PatchOperationRemove ran=true result=false err=false hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#58 ok=true err=false
+  PatchOperationFindMod ran=true result=true err=false hits=0 guard=[]/[]/false/[test.f]
+    PatchOperationRemove ran=false result=false err=false hits=0 guard=[]/[]/false/[]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#59 ok=true err=false
+  PatchOperationSequence ran=true result=true err=false hits=0 guard=[]/[]/false/[test.f]
+    PatchOperationRemove ran=false result=false err=false hits=0 guard=[]/[]/false/[]
+    PatchOperationRemove ran=true result=true err=false hits=1 guard=[]/[test.x test.b]/false/[test.f]
+    PatchOperationSequence ran=true result=true err=false hits=0 guard=[]/[test.b]/false/[test.f]
+      PatchOperationRemove ran=true result=true err=false hits=1 guard=[]/[test.b]/false/[test.f]
+    PatchOperationTest ran=true result=true err=false hits=1 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=2
+#60 ok=false err=false
+  PatchOperationSequence ran=true result=false err=false hits=0 guard=[]/[]/false/[test.f] lastFailed=Verse.PatchOperationTest(Defs/Nothing)
+    PatchOperationTest ran=true result=true err=false hits=1 guard=[]/[]/false/[test.f]
+    PatchOperationTest ran=true result=false err=false hits=0 guard=[]/[]/false/[test.f]
+    PatchOperationRemove ran=false result=false err=false hits=0 guard=[]/[]/false/[]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#61 ok=false err=true
+  PatchOperationSequence ran=true result=false err=true hits=0 guard=[]/[]/false/[test.f]
+    PatchOperationTest ran=true result=false err=true hits=0 guard=[]/[]/false/[test.f]
+    PatchOperationRemove ran=false result=false err=false hits=0 guard=[]/[]/false/[]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#62 ok=true err=false
+  PatchOperationSequence ran=true result=true err=false hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#63 ok=false err=false
+  PatchOperation ran=true result=false err=false hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#64 ok=false err=false
+  PatchOperation ran=true result=false err=false hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#65 ok=true err=false
+  SomeMod.PatchOperationMagic ran=true result=true err=false hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#66 ok=true err=false
+  PatchOperationTest ran=true result=true err=false hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#67 ok=false err=false
+  PatchOperationTest ran=true result=false err=false hits=1 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#68 ok=true err=false
+  PatchOperationTest ran=true result=true err=false hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
+#69 ok=false err=true
+  PatchOperationTest ran=true result=false err=true hits=0 guard=[]/[]/false/[test.f]
+<Defs><ThingDef Name="Base"><defName>A</defName><label>a</label><comps><li>x</li></comps></ThingDef><ThingDef><defName>B</defName><label>b</label><modExtensions><li>m</li></modExtensions></ThingDef></Defs>
+contests=0
