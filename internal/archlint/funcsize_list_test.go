@@ -69,7 +69,6 @@ internal/scan/observe.go Collect 31 163
 internal/steamworks/publish_windows.go publishWorker 35 159
 internal/store/maintenance.go (*Store).Maintain 47 171
 internal/subscribe/loverslab.go (*LoversLab).parsePage 49 96
-internal/surface/cli/cli.go Run 66 150
 internal/surface/gui/command.go (*API).RunCLI 46 148
 internal/surface/gui/tasks.go (*API).TaskAct 57 151
 internal/surface/tui/changes.go (*model).changesKey 59 153
