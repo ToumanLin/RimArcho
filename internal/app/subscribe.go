@@ -606,9 +606,9 @@ func (u *subscriptionUpdate) apply(j int, item SubscribeItem) error {
 	return nil
 }
 
-// watchStop cancels the context once the task is asked to stop, until watched closes. It
-// is not scheduled: it checks the task's stop request while SteamCMD runs a group.
+// watchStop cancels the context once the task is asked to stop, until watched closes.
 func (u *subscriptionUpdate) watchStop(watched <-chan struct{}, cancel context.CancelFunc) {
+	// not scheduled: checks the task's stop request while SteamCMD runs the group
 	tick := time.NewTicker(250 * time.Millisecond)
 	defer tick.Stop()
 	for {
