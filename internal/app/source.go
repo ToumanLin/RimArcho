@@ -369,37 +369,23 @@ func (a *App) SourceSearchContext(ctx context.Context, st *LoadoutState, mods []
 	}
 	defer release()
 	res := &SourceSearchResult{}
-	var all []*SourceDLL
+	var uses []*SourceDLL
 	for _, m := range mods {
 		ds, err := a.SourceDLLs(st, m)
 		if err != nil {
 			return nil, err
 		}
 		res.Searched = append(res.Searched, m.ID)
-		all = append(all, ds...)
+		uses = append(uses, ds...)
 	}
 	if len(game) > 0 && game[0] {
 		d, err := a.GameSourceDLL(st)
 		if err != nil {
 			return nil, err
 		}
-		all = append(all, d)
+		uses = append(uses, d)
 	}
-	// Group before dispatch: identical assemblies share one job and one result.
-	uses := all
-	all = nil
-	byHash := map[string]*SourceDLL{}
-	for _, d := range uses {
-		key := d.Hash + "|" + d.GameBuild
-		if first := byHash[key]; first != nil {
-			if !containsSourceInstance(first.Shared, d.Instance) {
-				first.Shared = append(first.Shared, d.Instance)
-			}
-			continue
-		}
-		d.Shared = []string{d.Instance}
-		byHash[key], all = d, append(all, d)
-	}
+	all, byHash := groupSourceDLLs(uses)
 	res.Assemblies = len(all)
 	var todo []*SourceDLL
 	for _, d := range all {
@@ -408,72 +394,8 @@ func (a *App) SourceSearchContext(ctx context.Context, st *LoadoutState, mods []
 		}
 	}
 	if len(todo) > 0 {
-		began := time.Now()
-		deadline := time.Time{}
-		if budget > 0 {
-			deadline = time.Now().Add(budget)
-		}
-		var mu sync.Mutex
-		var wg sync.WaitGroup
-		next := make(chan *SourceDLL)
-		done := 0
-		for w := 0; w < 6; w++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				for d := range next {
-					err := a.DecompileDLL(ctx, st, d)
-					mu.Lock()
-					done++
-					if err != nil {
-						res.Errors = append(res.Errors, fmt.Sprintf("%s %s: %v", st.Ix.Ref(d.Instance), d.File, err))
-					} else {
-						res.Decompiled++
-						res.Game = res.Game || d.Kind == "game"
-					}
-					if progress != nil {
-						progress(fmt.Sprintf("decompiled %d/%d assemblies", done, len(todo)))
-					}
-					mu.Unlock()
-				}
-			}()
-		}
-		var noILSpy bool
-		var budgetC <-chan time.Time
-		if !deadline.IsZero() {
-			timer := time.NewTimer(time.Until(deadline))
-			defer timer.Stop()
-			budgetC = timer.C
-		}
-		for _, d := range todo {
-			if ctx.Err() != nil || !deadline.IsZero() && time.Now().After(deadline) {
-				res.Pending++
-				continue
-			}
-			mu.Lock()
-			noILSpy = len(res.Errors) > 0 && strings.Contains(res.Errors[0], "ilspycmd not found")
-			mu.Unlock()
-			if noILSpy {
-				break
-			}
-			select {
-			case next <- d:
-			case <-ctx.Done():
-				res.Pending++
-			case <-budgetC:
-				res.Pending++
-			}
-		}
-		close(next)
-		wg.Wait()
-		res.Took = time.Since(began)
-		if err := ctx.Err(); err != nil {
+		if err := a.decompileForSearch(ctx, st, todo, budget, progress, res); err != nil {
 			return nil, err
-		}
-		for _, e := range res.Errors {
-			if strings.Contains(e, "ilspycmd not found") {
-				return nil, ErrNoILSpy
-			}
 		}
 	}
 	for _, d := range uses {
@@ -487,47 +409,8 @@ func (a *App) SourceSearchContext(ctx context.Context, st *LoadoutState, mods []
 	}
 	m := newLineMatcher(pattern, re)
 	for _, d := range all {
-		if !d.Cached {
-			continue
-		}
-		var files []string
-		filepath.WalkDir(d.Dir, func(p string, de os.DirEntry, err error) error {
-			if ctx.Err() != nil {
-				return filepath.SkipAll
-			}
-			if err == nil && !de.IsDir() && strings.EqualFold(filepath.Ext(p), ".cs") {
-				files = append(files, p)
-			}
-			return nil
-		})
-		// Files are read by several workers; the results are merged in file order, so the
-		// output does not depend on the schedule.
-		found := make([]fileMatches, len(files))
-		var next atomic.Int64
-		var wg sync.WaitGroup
-		for w := 0; w < min(searchWorkers, len(files)); w++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				for ctx.Err() == nil {
-					i := int(next.Add(1)) - 1
-					if i >= len(files) {
-						return
-					}
-					found[i] = m.file(files[i], limit)
-				}
-			}()
-		}
-		wg.Wait()
-		for i, f := range found {
-			res.Total += f.total
-			rel, _ := filepath.Rel(d.Dir, files[i])
-			for _, h := range f.hits {
-				if limit != 0 && len(res.Hits) >= limit {
-					break
-				}
-				res.Hits = append(res.Hits, SourceHit{Instance: d.Instance, File: filepath.ToSlash(filepath.Join(filepath.Base(d.File), rel)), Path: files[i], Line: h.line, Text: h.text, Shared: d.Shared})
-			}
+		if d.Cached {
+			searchSourceDLL(ctx, d, m, limit, res)
 		}
 	}
 	if err := ctx.Err(); err != nil {
@@ -535,4 +418,139 @@ func (a *App) SourceSearchContext(ctx context.Context, st *LoadoutState, mods []
 	}
 	sort.SliceStable(res.Hits, func(i, j int) bool { return st.Position(res.Hits[i].Instance) < st.Position(res.Hits[j].Instance) })
 	return res, nil
+}
+
+// groupSourceDLLs groups before dispatch: identical assemblies (same hash and game build)
+// share one job and one result. It returns the first of each, keyed in byHash, with the
+// instances that share it.
+func groupSourceDLLs(uses []*SourceDLL) (all []*SourceDLL, byHash map[string]*SourceDLL) {
+	byHash = map[string]*SourceDLL{}
+	for _, d := range uses {
+		key := d.Hash + "|" + d.GameBuild
+		if first := byHash[key]; first != nil {
+			if !containsSourceInstance(first.Shared, d.Instance) {
+				first.Shared = append(first.Shared, d.Instance)
+			}
+			continue
+		}
+		d.Shared = []string{d.Instance}
+		byHash[key], all = d, append(all, d)
+	}
+	return all, byHash
+}
+
+// decompileForSearch decompiles the assemblies in todo with six workers until the budget
+// runs out (0 = no limit); the rest are counted as pending.
+func (a *App) decompileForSearch(ctx context.Context, st *LoadoutState, todo []*SourceDLL, budget time.Duration, progress func(string), res *SourceSearchResult) error {
+	began := time.Now()
+	deadline := time.Time{}
+	if budget > 0 {
+		deadline = time.Now().Add(budget)
+	}
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	next := make(chan *SourceDLL)
+	done := 0
+	for w := 0; w < 6; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for d := range next {
+				err := a.DecompileDLL(ctx, st, d)
+				mu.Lock()
+				done++
+				if err != nil {
+					res.Errors = append(res.Errors, fmt.Sprintf("%s %s: %v", st.Ix.Ref(d.Instance), d.File, err))
+				} else {
+					res.Decompiled++
+					res.Game = res.Game || d.Kind == "game"
+				}
+				if progress != nil {
+					progress(fmt.Sprintf("decompiled %d/%d assemblies", done, len(todo)))
+				}
+				mu.Unlock()
+			}
+		}()
+	}
+	var noILSpy bool
+	var budgetC <-chan time.Time
+	if !deadline.IsZero() {
+		timer := time.NewTimer(time.Until(deadline))
+		defer timer.Stop()
+		budgetC = timer.C
+	}
+	for _, d := range todo {
+		if ctx.Err() != nil || !deadline.IsZero() && time.Now().After(deadline) {
+			res.Pending++
+			continue
+		}
+		mu.Lock()
+		noILSpy = len(res.Errors) > 0 && strings.Contains(res.Errors[0], "ilspycmd not found")
+		mu.Unlock()
+		if noILSpy {
+			break
+		}
+		select {
+		case next <- d:
+		case <-ctx.Done():
+			res.Pending++
+		case <-budgetC:
+			res.Pending++
+		}
+	}
+	close(next)
+	wg.Wait()
+	res.Took = time.Since(began)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	for _, e := range res.Errors {
+		if strings.Contains(e, "ilspycmd not found") {
+			return ErrNoILSpy
+		}
+	}
+	return nil
+}
+
+// searchSourceDLL searches one decompiled assembly's files and adds the hits, up to limit
+// (0 = no limit). Files are read by several workers; the results are merged in file order,
+// so the output does not depend on the schedule.
+func searchSourceDLL(ctx context.Context, d *SourceDLL, m *lineMatcher, limit int, res *SourceSearchResult) {
+	var files []string
+	filepath.WalkDir(d.Dir, func(p string, de os.DirEntry, err error) error {
+		if ctx.Err() != nil {
+			return filepath.SkipAll
+		}
+		if err == nil && !de.IsDir() && strings.EqualFold(filepath.Ext(p), ".cs") {
+			files = append(files, p)
+		}
+		return nil
+	})
+	found := make([]fileMatches, len(files))
+	var next atomic.Int64
+	var wg sync.WaitGroup
+	for w := 0; w < min(searchWorkers, len(files)); w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for ctx.Err() == nil {
+				i := int(next.Add(1)) - 1
+				if i >= len(files) {
+					return
+				}
+				found[i] = m.file(files[i], limit)
+			}
+		}()
+	}
+	wg.Wait()
+	for i, f := range found {
+		res.Total += f.total
+		rel, _ := filepath.Rel(d.Dir, files[i])
+		for _, h := range f.hits {
+			if limit != 0 && len(res.Hits) >= limit {
+				break
+			}
+			res.Hits = append(res.Hits, SourceHit{Instance: d.Instance, File: filepath.ToSlash(filepath.Join(filepath.Base(d.File), rel)), Path: files[i], Line: h.line, Text: h.text, Shared: d.Shared})
+		}
+	}
 }

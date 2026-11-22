@@ -42,7 +42,6 @@ internal/app/savecontent.go (*App).saveContent 87 309
 internal/app/savegrid.go (*App).gridRefs 42 134
 internal/app/saveowners.go (*App).attributeSave 91 331
 internal/app/scan.go (*App).scanEnvironment 58 224
-internal/app/source.go (*App).SourceSearchContext 49 174
 internal/cmds/content.go whyCmd 56 189
 internal/cmds/files.go filesSearchCmd 67 170
 internal/cmds/harmony.go harmonyCmd 44 160
