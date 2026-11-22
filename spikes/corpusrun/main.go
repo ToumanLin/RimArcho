@@ -16,6 +16,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"hash/fnv"
@@ -31,6 +32,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/order"
+	"github.com/ToumanLin/RimArcho/spikes/internal/jsonl"
 )
 
 type multi []string
@@ -52,6 +54,7 @@ func main() {
 	var extra multi
 	fs.Var(&extra, "extra", "setup: extra mod root (repeatable)")
 	corpus := fs.String("corpus", "", "run: the hugslogs folder of RimArcho-corpus (parsed.jsonl, raw/)")
+	parsed := fs.String("parsed", "", "run: hugslogs parsed records (comma-separated, .gz allowed; default <corpus>/parsed.jsonl)")
 	out := fs.String("out", "", "run: results JSONL (appended; logs already in it are skipped)")
 	mm := fs.String("mm", "1.6", "run: game major.minor of the logs to process")
 	cpuprof := fs.String("cpuprofile", "", "write a CPU profile to this file")
@@ -88,7 +91,10 @@ func main() {
 	case "run":
 		var sel func(string) bool
 		if sel, err = selector(*shard, *idsFile); err == nil {
-			err = run(*home, *corpus, *out, *mm, *maxN, sel)
+			if *parsed == "" {
+				*parsed = filepath.Join(*corpus, "parsed.jsonl")
+			}
+			err = run(*home, *corpus, *parsed, *out, *mm, *maxN, sel)
 		}
 	default:
 		err = fmt.Errorf("unknown command %q", os.Args[1])
@@ -259,7 +265,7 @@ func selector(shard, idsFile string) (func(string) bool, error) {
 	}, nil
 }
 
-func run(home, corpus, out, mm string, maxN int, sel func(string) bool) error {
+func run(home, corpus, parsed, out, mm string, maxN int, sel func(string) bool) error {
 	done := map[string]bool{}
 	if f, err := os.Open(out); err == nil {
 		sc := bufio.NewScanner(f)
@@ -283,27 +289,21 @@ func run(home, corpus, out, mm string, maxN int, sel func(string) bool) error {
 	}
 	userData := st.Ix.Env.UserDataRoot
 
-	pf, err := os.Open(filepath.Join(corpus, "parsed.jsonl"))
-	if err != nil {
-		return err
-	}
-	defer pf.Close()
 	of, err := os.OpenFile(out, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}
 	defer of.Close()
-	sc := bufio.NewScanner(pf)
-	sc.Buffer(make([]byte, 1<<20), 512<<20)
 	n := 0
 	t0 := time.Now()
-	for sc.Scan() {
+	errStop := errors.New("stop")
+	err = jsonl.Each(parsed, func(b []byte) error {
 		var r record
-		if json.Unmarshal(sc.Bytes(), &r) != nil || r.Status != "ok" || r.MM != mm || done[r.ID] || sel != nil && !sel(r.ID) {
-			continue
+		if json.Unmarshal(b, &r) != nil || r.Status != "ok" || r.MM != mm || done[r.ID] || sel != nil && !sel(r.ID) {
+			return nil
 		}
 		if maxN > 0 && n >= maxN {
-			break
+			return errStop
 		}
 		n++
 		res := one(a, userData, corpus, r)
@@ -311,8 +311,12 @@ func run(home, corpus, out, mm string, maxN int, sel func(string) bool) error {
 		of.Write(append(j, '\n'))
 		fmt.Printf("%4d %s mods %d resolved %d clusters %d analysis %dms %s (%s elapsed)\n", n, r.ID[:8], res.Mods, res.Resolved,
 			len(res.Clusters), res.AnalysisMS, res.Err, time.Since(t0).Round(time.Second))
+		return nil
+	})
+	if err == errStop {
+		err = nil
 	}
-	return sc.Err()
+	return err
 }
 
 // rawMods: read the mod list from the raw log header instead of parsed.jsonl, whose parser
