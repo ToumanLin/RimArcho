@@ -66,46 +66,107 @@ func boundary(b []byte, start, end int) bool {
 	return (start == 0 || !ident(b[start-1])) && (end == len(b) || !ident(b[end]))
 }
 
+// hitCollector records one file's hits, advancing line numbers only between hits.
+type hitCollector struct {
+	b                                 []byte
+	def, lineMode                     bool
+	perFile                           int
+	binary                            bool
+	found                             fileHits
+	offsets, keptMeta                 []int
+	allHits                           []Match
+	allOffsets                        []int
+	lastLine, line, lineStart, cursor int
+}
+
 func (m *matcher) search(ctx context.Context, j fileJob, o Options, scratch *[]byte) fileHits {
-	binary := j.kind&(Textures|Sounds|Assemblies) != 0
-	var b []byte
-	if binary {
-		b = []byte(j.asset)
-	} else {
-		var err error
-		b, err = o.FS.ReadFile(j.path)
-		if err != nil {
-			return fileHits{err: err}
-		}
-		b = textenc.UTF8(b)
+	b, binary, err := jobBytes(&j, &o)
+	if err != nil {
+		return fileHits{err: err}
 	}
-	found := fileHits{}
-	var offsets, keptMeta []int
-	var allHits []Match
-	var allOffsets []int
-	lastLine, line, lineStart, cursor := -1, 1, 0, 0
-	add := func(start int) {
-		// Line numbers advance only across the gaps between hits; no per-line scan on misses.
-		gap := b[cursor:start]
-		line += bytes.Count(gap, []byte{'\n'})
-		if n := bytes.LastIndexByte(gap, '\n'); n >= 0 {
-			lineStart = cursor + n + 1
+	c := hitCollector{b: b, def: o.Def, lineMode: o.LineMode, perFile: o.PerFile, binary: binary, lastLine: -1, line: 1}
+	if m.re != nil {
+		if len(m.prefix) > 0 && !bytes.Contains(b, m.prefix) {
+			return c.found
 		}
-		cursor = start
-		if o.Def {
-			allHits = append(allHits, Match{Line: line, Col: start - lineStart + 1})
-			allOffsets = append(allOffsets, start)
+		if o.LineMode {
+			err = m.regexLines(ctx, &c)
+		} else {
+			err = m.regexAll(ctx, &c)
 		}
-		if line == lastLine {
-			return
-		}
-		lastLine = line
-		found.count++
-		if len(found.matches) >= o.PerFile {
-			return
-		}
-		if o.Def {
-			keptMeta = append(keptMeta, len(allHits)-1)
+	} else {
+		err = m.literal(ctx, &c, scratch)
+	}
+	if err != nil {
+		return fileHits{err: err}
+	}
+	if len(c.found.matches) > 0 {
+		c.annotate(ctx, j.kind, &o)
+	}
+	return c.found
+}
+
+// jobBytes returns the text searched for a job: the asset path for binary kinds, else the file as UTF-8.
+func jobBytes(j *fileJob, o *Options) (b []byte, binary bool, err error) {
+	binary = j.kind&(Textures|Sounds|Assemblies) != 0
+	if binary {
+		return []byte(j.asset), true, nil
+	}
+	b, err = o.FS.ReadFile(j.path)
+	if err != nil {
+		return nil, false, err
+	}
+	return textenc.UTF8(b), false, nil
+}
+
+// add records a hit at start, counting one per line and keeping up to PerFile matches.
+func (c *hitCollector) add(start int) {
+	b := c.b
+	// Line numbers advance only across the gaps between hits; no per-line scan on misses.
+	gap := b[c.cursor:start]
+	c.line += bytes.Count(gap, []byte{'\n'})
+	if n := bytes.LastIndexByte(gap, '\n'); n >= 0 {
+		c.lineStart = c.cursor + n + 1
+	}
+	c.cursor = start
+	if c.def {
+		c.allHits = append(c.allHits, Match{Line: c.line, Col: start - c.lineStart + 1})
+		c.allOffsets = append(c.allOffsets, start)
+	}
+	if c.line == c.lastLine {
+		return
+	}
+	c.lastLine = c.line
+	c.found.count++
+	if len(c.found.matches) >= c.perFile {
+		return
+	}
+	if c.def {
+		c.keptMeta = append(c.keptMeta, len(c.allHits)-1)
+	}
+	end := bytes.IndexByte(b[start:], '\n')
+	if end < 0 {
+		end = len(b)
+	} else {
+		end += start
+	}
+	hit := Match{Line: c.line, Col: start - c.lineStart + 1, Text: snippet(string(b[c.lineStart:end]), 160)}
+	if c.lineMode {
+		hit.Text = matchSnippet(string(b[c.lineStart:end]), start-c.lineStart, 160)
+	}
+	if c.binary {
+		hit.Line = 0
+	}
+	c.found.matches = append(c.found.matches, hit)
+	c.offsets = append(c.offsets, start)
+}
+
+// regexLines adds the first regex hit of each line until PerFile matches are kept.
+func (m *matcher) regexLines(ctx context.Context, c *hitCollector) error {
+	b := c.b
+	for start := 0; start < len(b); {
+		if err := ctx.Err(); err != nil {
+			return err
 		}
 		end := bytes.IndexByte(b[start:], '\n')
 		if end < 0 {
@@ -113,107 +174,92 @@ func (m *matcher) search(ctx context.Context, j fileJob, o Options, scratch *[]b
 		} else {
 			end += start
 		}
-		hit := Match{Line: line, Col: start - lineStart + 1, Text: snippet(string(b[lineStart:end]), 160)}
-		if o.LineMode {
-			hit.Text = matchSnippet(string(b[lineStart:end]), start-lineStart, 160)
+		if hit := m.re.FindIndex(b[start:end]); hit != nil {
+			c.add(start + hit[0])
 		}
-		if binary {
-			hit.Line = 0
+		if len(c.found.matches) >= c.perFile {
+			break
 		}
-		found.matches = append(found.matches, hit)
-		offsets = append(offsets, start)
+		start = end + 1
 	}
-	if m.re != nil {
-		if len(m.prefix) > 0 && !bytes.Contains(b, m.prefix) {
-			return found
+	return nil
+}
+
+// regexAll adds every regex hit in the file, honouring whole-word matching.
+func (m *matcher) regexAll(ctx context.Context, c *hitCollector) error {
+	for _, hit := range m.re.FindAllIndex(c.b, -1) {
+		if err := ctx.Err(); err != nil {
+			return err
 		}
-		if o.LineMode {
-			for start := 0; start < len(b); {
-				if ctx.Err() != nil {
-					return fileHits{err: ctx.Err()}
-				}
-				end := bytes.IndexByte(b[start:], '\n')
-				if end < 0 {
-					end = len(b)
-				} else {
-					end += start
-				}
-				if hit := m.re.FindIndex(b[start:end]); hit != nil {
-					add(start + hit[0])
-				}
-				if len(found.matches) >= o.PerFile {
-					break
-				}
-				start = end + 1
+		if !m.word || boundary(c.b, hit[0], hit[1]) {
+			c.add(hit[0])
+		}
+	}
+	return nil
+}
+
+// literal adds the hits of a literal pattern, case-folding into scratch when needed.
+func (m *matcher) literal(ctx context.Context, c *hitCollector, scratch *[]byte) error {
+	b := c.b
+	haystack := b
+	if m.fold {
+		*scratch = foldASCII(*scratch, b)
+		haystack = *scratch
+	}
+	for at := 0; at <= len(haystack); {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		n := bytes.Index(haystack[at:], m.pattern)
+		if n < 0 {
+			break
+		}
+		start := at + n
+		end := start + len(m.pattern)
+		if m.word && !boundary(b, start, end) {
+			at = start + 1
+			continue
+		}
+		c.add(start)
+		if c.lineMode && len(c.found.matches) >= c.perFile {
+			break
+		}
+		if c.def {
+			at = end
+			continue
+		}
+		// Like rg, all later occurrences starting on this line count as the same hit.
+		n = bytes.IndexByte(b[start:], '\n')
+		if n < 0 {
+			break
+		}
+		at = start + n + 1
+	}
+	return nil
+}
+
+// annotate gives the kept matches their roles and contexts, or keeps offsets for later paging.
+func (c *hitCollector) annotate(ctx context.Context, kind Kind, o *Options) {
+	found := &c.found
+	if !c.binary && (kind == Defs || kind == Patches) {
+		if o.Def {
+			found.summary = contexts(ctx, c.b, kind, *o, c.allHits, c.allOffsets)
+			for i, index := range c.keptMeta {
+				found.matches[i].Role, found.matches[i].Within = c.allHits[index].Role, c.allHits[index].Within
 			}
 		} else {
-			for _, hit := range m.re.FindAllIndex(b, -1) {
-				if ctx.Err() != nil {
-					return fileHits{err: ctx.Err()}
-				}
-				if !m.word || boundary(b, hit[0], hit[1]) {
-					add(hit[0])
-				}
-			}
+			found.offsets = c.offsets // contexts only for the shown page, after paging
 		}
-	} else {
-		haystack := b
-		if m.fold {
-			*scratch = foldASCII(*scratch, b)
-			haystack = *scratch
+	} else if o.Def {
+		role := "ref"
+		if kind == Languages {
+			role = "translation"
 		}
-		for at := 0; at <= len(haystack); {
-			if ctx.Err() != nil {
-				return fileHits{err: ctx.Err()}
-			}
-			n := bytes.Index(haystack[at:], m.pattern)
-			if n < 0 {
-				break
-			}
-			start := at + n
-			end := start + len(m.pattern)
-			if m.word && !boundary(b, start, end) {
-				at = start + 1
-				continue
-			}
-			add(start)
-			if o.LineMode && len(found.matches) >= o.PerFile {
-				break
-			}
-			if o.Def {
-				at = end
-				continue
-			}
-			// Like rg, all later occurrences starting on this line count as the same hit.
-			n = bytes.IndexByte(b[start:], '\n')
-			if n < 0 {
-				break
-			}
-			at = start + n + 1
+		found.summary.Roles = map[string]int{role: found.count}
+		for i := range found.matches {
+			found.matches[i].Role = role
 		}
 	}
-	if len(found.matches) > 0 {
-		if !binary && (j.kind == Defs || j.kind == Patches) {
-			if o.Def {
-				found.summary = contexts(ctx, b, j.kind, o, allHits, allOffsets)
-				for i, index := range keptMeta {
-					found.matches[i].Role, found.matches[i].Within = allHits[index].Role, allHits[index].Within
-				}
-			} else {
-				found.offsets = offsets // contexts only for the shown page, after paging
-			}
-		} else if o.Def {
-			role := "ref"
-			if j.kind == Languages {
-				role = "translation"
-			}
-			found.summary.Roles = map[string]int{role: found.count}
-			for i := range found.matches {
-				found.matches[i].Role = role
-			}
-		}
-	}
-	return found
 }
 
 func snippet(s string, limit int) string {

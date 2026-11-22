@@ -1,6 +1,7 @@
 package csharp
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -240,5 +241,62 @@ func TestTruncatedAndOddInput(t *testing.T) {
 	}
 	if Find(nil, "X") != nil {
 		t.Error("Find on nothing")
+	}
+}
+
+// tokenDump renders tokens as "line:text" separated by spaces, for exact comparisons.
+func tokenDump(toks []token) string {
+	var b strings.Builder
+	for i, t := range toks {
+		if i > 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString(strconv.Itoa(t.line))
+		b.WriteByte(':')
+		b.WriteString(t.text)
+	}
+	return b.String()
+}
+
+// Every token family and literal form, each with the line it starts on.
+func TestTokenizeFamilies(t *testing.T) {
+	for _, c := range []struct{ src, want string }{
+		{"a  \t\r\f b\nc", "1:a 1:b 2:c"},
+		{"  #if X\nx\n y # z", "2:x 3:y 3:# 3:z"},
+		{"a // c { \"\nb", "1:a 2:b"},
+		{"a /* x\n y */ b /* open\n\n", "1:a 2:b"},
+		{"s = \"a\\\"{\" ; t", "1:s 1:= 1:\" 1:; 1:t"},
+		{"@\"C:\\x\"\"y\n\" z", "1:\" 2:z"},
+		{"$\"a {f(\"}\")} {{ b\" z", "1:\" 1:z"},
+		{"$@\"a {x[\"\n\"]}\" z", "1:\" 2:z"},
+		{"@$\"a\n{y}\" z", "1:\" 2:z"},
+		{"$\"{ @\"}\" + $\"{1}\" + '}' }\" z", "1:\" 1:z"},
+		{"$\"{ (a) ? b : '\\'' }\" z", "1:\" 1:z"},
+		{"$\"{ @$\"a\\\"}\" }\" z", "1:\" 1:z"}, // inside a hole, @$" is @ then a $" string
+		{"$\"{ $@\"a\\\"}\" }\" z", "1:\" 1:} 1:\""}, // verbatim: the backslash does not escape
+		{"\"\"\"\n{ \"\" }\n\"\"\" z", "1:\" 3:z"},
+		{"\"\"\"\" x \"\"\" y \"\"\"\" z", "1:\" 1:z"},
+		{"a \"\"\"\nopen", "1:a 1:\""},
+		{"\"open\n", "1:\""},
+		{"'a' '\\n' '\\u0041' '\\U00000041' ' x", "1:\" 1:\" 1:\" 1:\" 1:\" 1:x"}, // a stray quote is a one-byte literal
+		{"a=>b==c!=d<=e>=f=g<h", "1:a 1:=> 1:b 1:== 1:c 1:!= 1:d 1:<= 1:e 1:>= 1:f 1:= 1:g 1:< 1:h"},
+		{"@x _y é9 0x1F", "1:@x 1:_y 1:é9 1:0x1F"},
+		{"=", "1:="},
+		{"$x @", "1:$ 1:x 1:@"},
+		{"$\"open {x", "1:\""},
+	} {
+		if got := tokenDump(tokenize(c.src)); got != c.want {
+			t.Errorf("tokenize(%q)\n got %s\nwant %s", c.src, got, c.want)
+		}
+	}
+}
+
+// Synthetic decompiled source: the sample type repeated, about 600 KB.
+func BenchmarkTokenize(b *testing.B) {
+	src := strings.Repeat(sample, 200)
+	b.SetBytes(int64(len(src)))
+	b.ReportAllocs()
+	for b.Loop() {
+		tokenize(src)
 	}
 }

@@ -6,10 +6,6 @@ package archlint
 // line: written before the rule; to be split. Never add a line. A plain table, not a Go
 // map, so that deleting a line never realigns the others.
 const oversizedTable = `
-internal/accounts/browser_windows.go (*Session).login 75 338
-internal/analyze/analyze.go Run 41 229
-internal/analyze/harmony.go harmonyFindings 35 153
-internal/analyze/sim.go (*sim).worker 76 223
 internal/app/credit.go (*App).CreditStep 53 159
 internal/app/creditreplace.go (*App).replaceCreditLocked 74 252
 internal/app/data.go (*App).UpdateDataProgress 41 128
@@ -36,6 +32,7 @@ internal/app/subscribe.go (*App).UpdateSubscriptionsWith 61 240
 internal/app/subscribeworkshop.go (*App).downloadWorkshopGroup 57 197
 internal/app/uninstall.go (*App).planUninstall 150 467
 internal/app/workshopsub.go (*App).Workshop 48 134
+<<<<<<< HEAD
 internal/csharp/outline.go tokenize 82 158
 internal/dotnet/compscan.go (*Assembly).scanBody 136 172
 internal/dotnet/shapes.go (*Assembly).eval 141 201
@@ -50,6 +47,24 @@ internal/savefile/scan_content.go (*scanner).contentRef 75 176
 internal/savefile/scan_rules.go (*extract).rule 76 132
 internal/steamworks/publish_windows.go publishWorker 35 159
 <<<<<<< HEAD
+=======
+internal/cmds/content.go whyCmd 56 189
+internal/cmds/files.go filesSearchCmd 67 170
+internal/cmds/harmony.go harmonyCmd 44 160
+internal/cmds/mcphints.go MCPCall 42 103
+internal/cmds/playerdata.go tagCmd 53 186
+internal/cmds/problems.go problemsCmd 81 219
+internal/cmds/query.go modDoc 60 188
+internal/cmds/saves.go savesFix 82 225
+internal/cmds/saves.go savesList 60 185
+internal/cmds/saves.go savesShow 69 203
+internal/cmds/saves_review.go savesReview 42 136
+internal/cmds/test.go testRunCmd 58 177
+internal/identity/reconcile.go Reconcile 44 119
+internal/modchanges/modchanges.go (*changeBuilder).mod 128 321
+internal/order/order.go Sort 97 309
+internal/scan/observe.go Collect 31 163
+>>>>>>> refs/heads/claude/split-analyzers-fb289b
 internal/store/maintenance.go (*Store).Maintain 47 171
 internal/subscribe/loverslab.go (*LoversLab).parsePage 49 96
 internal/view/bar.go FilterBoard 42 115

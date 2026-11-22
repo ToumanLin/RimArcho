@@ -153,163 +153,195 @@ func isWordByte(c byte) bool {
 	return c == '_' || c == '@' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c >= 0x80
 }
 
+// lexer is the tokeniser's state: the source and the current line.
+type lexer struct {
+	src  string
+	line int
+}
+
+// tokenize splits src into tokens, skipping blanks, comments and preprocessor directives.
 func tokenize(src string) []token {
+	lx := lexer{src: src, line: 1}
 	var toks []token
-	line := 1
 	i := 0
 	n := len(src)
-	// skipString moves past a string or character literal that starts at i (src[i] is the
-	// opening quote after any @ / $ prefix) and returns the new index; interpolation holes
-	// are walked as code so quotes inside them do not end the string early.
-	var skipString func(i int, verbatim, interp bool) int
-	skipCode := func(i int, until byte) int { // code up to the unmatched until, for a hole
-		depth := 0
-		for i < n {
-			c := src[i]
-			switch {
-			case c == '\n':
-				line++
-			case c == '"':
-				i = skipString(i, false, false)
-				continue
-			case c == '@' && i+1 < n && src[i+1] == '"':
-				i = skipString(i+1, true, false)
-				continue
-			case c == '$' && i+1 < n && (src[i+1] == '"' || src[i+1] == '@' && i+2 < n && src[i+2] == '"'):
-				j := i + 1
-				verb := false
-				if src[j] == '@' {
-					verb, j = true, j+1
-				}
-				i = skipString(j, verb, true)
-				continue
-			case c == '\'':
-				i = skipChar(src, i)
-				continue
-			case c == '{' || c == '(' || c == '[':
-				depth++
-			case c == '}' || c == ')' || c == ']':
-				if depth == 0 && c == until {
-					return i
-				}
-				depth--
-			}
-			i++
-		}
-		return i
-	}
-	skipString = func(i int, verbatim, interp bool) int {
-		// raw string literal: three or more quotes
-		if !verbatim && i+2 < n && src[i+1] == '"' && src[i+2] == '"' {
-			q := 0
-			for i+q < n && src[i+q] == '"' {
-				q++
-			}
-			end := strings.Repeat("\"", q)
-			j := strings.Index(src[i+q:], end)
-			if j < 0 {
-				line += strings.Count(src[i:], "\n")
-				return n
-			}
-			line += strings.Count(src[i:i+q+j], "\n")
-			return i + q + j + q
-		}
-		i++ // the opening quote
-		for i < n {
-			c := src[i]
-			switch {
-			case c == '\n':
-				line++
-			case c == '\\' && !verbatim:
-				i += 2
-				continue
-			case c == '"':
-				if verbatim && i+1 < n && src[i+1] == '"' {
-					i += 2
-					continue
-				}
-				return i + 1
-			case c == '{' && interp:
-				if i+1 < n && src[i+1] == '{' {
-					i += 2
-					continue
-				}
-				i = skipCode(i+1, '}')
-			}
-			i++
-		}
-		return i
-	}
 	for i < n {
 		c := src[i]
 		switch {
 		case c == '\n':
-			line++
+			lx.line++
 			i++
 		case c == ' ' || c == '\t' || c == '\r' || c == '\f':
 			i++
 		case c == '#' && onlyBlankBefore(src, i):
-			for i < n && src[i] != '\n' {
-				i++
-			}
+			i = lineEnd(src, i)
 		case c == '/' && i+1 < n && src[i+1] == '/':
-			for i < n && src[i] != '\n' {
-				i++
-			}
+			i = lineEnd(src, i)
 		case c == '/' && i+1 < n && src[i+1] == '*':
-			j := strings.Index(src[i+2:], "*/")
-			if j < 0 {
-				line += strings.Count(src[i:], "\n")
-				i = n
-				break
-			}
-			line += strings.Count(src[i:i+2+j], "\n")
-			i += 2 + j + 2
-		case c == '"':
-			at := line
-			i = skipString(i, false, false)
-			toks = append(toks, token{"\"", at})
-		case c == '@' && i+1 < n && src[i+1] == '"':
-			at := line
-			i = skipString(i+1, true, false)
-			toks = append(toks, token{"\"", at})
-		case c == '$' && i+1 < n && (src[i+1] == '"' || src[i+1] == '@' && i+2 < n && src[i+2] == '"'):
-			at := line
-			j, verb := i+1, false
-			if src[j] == '@' {
-				verb, j = true, j+1
-			}
-			i = skipString(j, verb, true)
-			toks = append(toks, token{"\"", at})
-		case c == '@' && i+2 < n && src[i+1] == '$' && src[i+2] == '"':
-			at := line
-			i = skipString(i+2, true, true)
-			toks = append(toks, token{"\"", at})
-		case c == '\'':
-			at := line
-			i = skipChar(src, i)
-			toks = append(toks, token{"\"", at})
-		case isWordByte(c):
-			j := i + 1
-			for j < n && isWordByte(src[j]) {
-				j++
-			}
-			toks = append(toks, token{src[i:j], line})
+			i = lx.blockComment(i)
+		case c != '@' && isWordByte(c):
+			j := wordEnd(src, i)
+			toks = append(toks, token{src[i:j], lx.line})
 			i = j
 		default:
-			if i+1 < n {
-				switch two := src[i : i+2]; two {
-				case "=>", "==", "!=", "<=", ">=":
-					toks = append(toks, token{two, line})
-					i += 2
-					continue
-				}
-			}
-			toks = append(toks, token{string(c), line})
-			i++
+			at := lx.line
+			var text string
+			text, i = lx.code(i)
+			toks = append(toks, token{text, at})
 		}
 	}
 	return toks
+}
+
+// wordEnd returns the index after the word that starts at i.
+func wordEnd(src string, i int) int {
+	j := i + 1
+	for j < len(src) && isWordByte(src[j]) {
+		j++
+	}
+	return j
+}
+
+// lineEnd returns the index of the newline that ends the line holding i, or the end.
+func lineEnd(src string, i int) int {
+	for i < len(src) && src[i] != '\n' {
+		i++
+	}
+	return i
+}
+
+// blockComment moves past the /* comment at i, counting its lines.
+func (lx *lexer) blockComment(i int) int {
+	src := lx.src
+	j := strings.Index(src[i+2:], "*/")
+	if j < 0 {
+		lx.line += strings.Count(src[i:], "\n")
+		return len(src)
+	}
+	lx.line += strings.Count(src[i:i+2+j], "\n")
+	return i + 2 + j + 2
+}
+
+// code reads the literal, @word or punctuation mark at i and returns its token text ("\""
+// for a literal) and the index after it.
+func (lx *lexer) code(i int) (string, int) {
+	if j := lx.skipLiteral(i, true); j >= 0 {
+		return "\"", j
+	}
+	src := lx.src
+	if isWordByte(src[i]) {
+		j := wordEnd(src, i)
+		return src[i:j], j
+	}
+	if i+1 < len(src) {
+		switch two := src[i : i+2]; two {
+		case "=>", "==", "!=", "<=", ">=":
+			return two, i + 2
+		}
+	}
+	return string(src[i]), i + 1
+}
+
+// skipLiteral moves past a string or character literal that starts at i and returns the
+// new index, or -1 when none starts there. atDollar admits the @$" prefix, which code in
+// an interpolation hole reads as @ followed by a $" string.
+func (lx *lexer) skipLiteral(i int, atDollar bool) int {
+	src, n := lx.src, len(lx.src)
+	switch c := src[i]; {
+	case c == '"':
+		return lx.skipString(i, false, false)
+	case c == '@' && i+1 < n && src[i+1] == '"':
+		return lx.skipString(i+1, true, false)
+	case c == '$' && i+1 < n && (src[i+1] == '"' || src[i+1] == '@' && i+2 < n && src[i+2] == '"'):
+		j, verb := i+1, false
+		if src[j] == '@' {
+			verb, j = true, j+1
+		}
+		return lx.skipString(j, verb, true)
+	case atDollar && c == '@' && i+2 < n && src[i+1] == '$' && src[i+2] == '"':
+		return lx.skipString(i+2, true, true)
+	case c == '\'':
+		return skipChar(src, i)
+	}
+	return -1
+}
+
+// skipCode moves past the code of an interpolation hole up to the unmatched until and
+// returns its index (or the end).
+func (lx *lexer) skipCode(i int, until byte) int {
+	src, n := lx.src, len(lx.src)
+	depth := 0
+	for i < n {
+		if j := lx.skipLiteral(i, false); j >= 0 {
+			i = j
+			continue
+		}
+		switch c := src[i]; {
+		case c == '\n':
+			lx.line++
+		case c == '{' || c == '(' || c == '[':
+			depth++
+		case c == '}' || c == ')' || c == ']':
+			if depth == 0 && c == until {
+				return i
+			}
+			depth--
+		}
+		i++
+	}
+	return i
+}
+
+// skipString moves past a string literal whose opening quote is at i (after any @ / $
+// prefix) and returns the new index; interpolation holes are walked as code so quotes
+// inside them do not end the string early.
+func (lx *lexer) skipString(i int, verbatim, interp bool) int {
+	src, n := lx.src, len(lx.src)
+	if !verbatim && i+2 < n && src[i+1] == '"' && src[i+2] == '"' {
+		return lx.skipRawString(i)
+	}
+	i++ // the opening quote
+	for i < n {
+		c := src[i]
+		switch {
+		case c == '\n':
+			lx.line++
+		case c == '\\' && !verbatim:
+			i += 2
+			continue
+		case c == '"':
+			if verbatim && i+1 < n && src[i+1] == '"' {
+				i += 2
+				continue
+			}
+			return i + 1
+		case c == '{' && interp:
+			if i+1 < n && src[i+1] == '{' {
+				i += 2
+				continue
+			}
+			i = lx.skipCode(i+1, '}')
+		}
+		i++
+	}
+	return i
+}
+
+// skipRawString moves past a raw string literal (three or more quotes) that opens at i.
+func (lx *lexer) skipRawString(i int) int {
+	src, n := lx.src, len(lx.src)
+	q := 0
+	for i+q < n && src[i+q] == '"' {
+		q++
+	}
+	end := strings.Repeat("\"", q)
+	j := strings.Index(src[i+q:], end)
+	if j < 0 {
+		lx.line += strings.Count(src[i:], "\n")
+		return n
+	}
+	lx.line += strings.Count(src[i:i+q+j], "\n")
+	return i + q + j + q
 }
 
 func onlyBlankBefore(src string, i int) bool {

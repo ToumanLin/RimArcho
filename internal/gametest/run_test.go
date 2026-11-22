@@ -357,6 +357,39 @@ func TestProbeLine(t *testing.T) {
 	}
 }
 
+// Invalid options return no result and start nothing.
+func TestRunRejectsInvalidOptions(t *testing.T) {
+	for name, tc := range map[string]struct {
+		edit func(*Options)
+		want string
+	}{
+		"negative timeout":  {func(o *Options) { o.Timeout = -1 }, "must not be negative"},
+		"negative settle":   {func(o *Options) { o.Settle = -1 }, "must not be negative"},
+		"negative quiet":    {func(o *Options) { o.MapQuiet = -1 }, "must not be negative"},
+		"negative ticks":    {func(o *Options) { o.Ticks = -1 }, "must not be negative"},
+		"save with probe":   {func(o *Options) { o.Save, o.Probe = "x.rws", true }, "not a test map"},
+		"ticks with probe":  {func(o *Options) { o.Ticks, o.Probe = 10, true }, "not after ticks"},
+		"managed logfile":   {func(o *Options) { o.ExtraArgs = []string{"/LogFile=x"} }, "managed option"},
+		"managed quicktest": {func(o *Options) { o.ExtraArgs = []string{"--quicktest"} }, "managed option"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			o := testOptions(t, "idle", false)
+			o.Start = func(*exec.Cmd) error { t.Fatal("started"); return nil }
+			tc.edit(&o)
+			r, err := Run(context.Background(), o)
+			if r != nil || err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("result %+v, error %v, want %q", r, err, tc.want)
+			}
+		})
+	}
+	o := testOptions(t, "idle", false)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if r, err := Run(ctx, o); r != nil || !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled before start: %+v, %v", r, err)
+	}
+}
+
 func TestRunCancel(t *testing.T) {
 	t.Parallel()
 	o := testOptions(t, "idle", true)
