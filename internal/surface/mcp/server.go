@@ -413,6 +413,39 @@ type OpsIn struct {
 	All    bool   `json:"all,omitempty"`
 }
 
+// FeedbackIn drafts a report from one of the Feedback page's templates (16 §2.14).
+type FeedbackIn struct {
+	Kind    string            `json:"kind,omitempty" jsonschema:"feature, bug, diagnosis, data or other; empty lists the templates and their questions"`
+	Title   string            `json:"title,omitempty"`
+	Answers map[string]string `json:"answers,omitempty" jsonschema:"the template's questions by key, e.g. {did, expected, actual}; files: yes"`
+	Attach  StrList           `json:"attach,omitempty" jsonschema:"more attachments: mods, paths, log, ops, problems"`
+}
+
+// FeedbackArgv is archo feedback with the answers as flags, in the template's order.
+func FeedbackArgv(in FeedbackIn) []string {
+	b := argv("feedback")
+	if in.Kind == "" {
+		return b.a
+	}
+	b = b.pos(in.Kind).str("title", in.Title)
+	keys := make([]string, 0, len(in.Answers))
+	for k := range in.Answers {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		if k == "files" {
+			b = b.flag("files", in.Answers[k] == "yes" || in.Answers[k] == "true")
+			continue
+		}
+		b = b.str(k, in.Answers[k])
+	}
+	if len(in.Attach) > 0 {
+		b = b.str("attach", strings.Join(in.Attach, ","))
+	}
+	return b.a
+}
+
 type ChangesIn struct {
 	Env     string `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Ref     string `json:"ref,omitempty" jsonschema:"one mod's history"`
@@ -647,6 +680,7 @@ func toolList() []tool {
 			return argv("pin", in.Ref).str("name", in.Name).flag("git", in.Git).flag("update", in.Update).flag("move-to-library", in.MoveToLibrary).str("reason", in.Reason).flag("dry-run", in.DryRun).a
 		}),
 		reg("preview_uninstall", true, false, descUninstall, UninstallArgv).allOnly(),
+		reg("draft_feedback", true, false, descFeedback, FeedbackArgv).allOnly(),
 		reg("unpin_mod", false, false, descUnpin, func(in UnpinIn) []string { return argv("unpin", in.Ref).flag("dry-run", in.DryRun).a }),
 	}
 }

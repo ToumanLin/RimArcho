@@ -233,7 +233,7 @@ func (m *model) palRunOf(id string) func(m *model) tea.Cmd {
 			return nil
 		}
 	case "feedback":
-		return func(m *model) tea.Cmd { return m.feedbackPanel(view.FeedbackOptions{}) }
+		return func(m *model) tea.Cmd { return m.feedbackPanel(view.FeedbackProblem{}) }
 	case "uninstall":
 		return func(m *model) tea.Cmd { return m.uninstallPanel() }
 	case "update":

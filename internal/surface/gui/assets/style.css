@@ -1732,6 +1732,79 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .fb-reply-who { color: var(--muted); font-size: 12px; margin-bottom: 2px; }
 .fb-reply-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.55; user-select: text; }
 .fb-rep .btn.link.fb-rep-follow { align-self: flex-start; margin-top: 2px; padding-left: 0; padding-right: 0; border-left-width: 0; font-size: 12px; height: 20px; }
+/* Feedback's two panes (16 §2.14), Import's arrangement (§2.18): the templates and My reports
+   at the left, the picked one at the right under a bar with the problems, the buttons and Archo */
+.page.fb-page { container: fbp / inline-size; padding-left: max(12px, calc(50% - 760px)); padding-right: max(12px, calc(50% - 760px)); }
+.fb-lay { display: grid; grid-template-columns: minmax(220px, 268px) var(--card-gap) minmax(0, 1fr); align-items: start; margin-bottom: 24px; }
+.fb-side { position: sticky; top: 0; min-width: 0; }
+.fb-main { display: flex; flex-direction: column; min-width: 0; }
+@container fbp (max-width: 700px) {
+  .fb-lay { grid-template-columns: minmax(0, 1fr); row-gap: var(--card-gap); }
+  .fb-gap { display: none; }
+  .fb-side { position: static; }
+}
+.fb-kinds { overflow: visible; }
+.fb-kind { position: relative; width: 100%; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.fb-kind:first-child { border-top-left-radius: var(--r-lg); border-top-right-radius: var(--r-lg); }
+.fb-kind:last-child { border-bottom-left-radius: var(--r-lg); border-bottom-right-radius: var(--r-lg); }
+.fb-kind:hover:not(.on) { background: var(--card-2); }
+.fb-kind .fb-rep-dot { left: 5px; top: 18px; }
+.fb-kind.prio .nt::after { content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 8px; border-radius: 50%; background: var(--red); vertical-align: middle; }
+.fb-mine-row { margin-top: 0; }
+.fb-kinds > .fb-mine-row { border-top: var(--hairline) solid var(--line); }
+/* the bar over the form: the problems and the buttons at the left, Archo standing at the right */
+.fb-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 8px 14px; align-items: end; margin-bottom: var(--card-gap); padding-left: 4px; }
+.fb-bar .fig { grid-column: 2; grid-row: 1 / span 2; display: flex; align-self: end; min-height: 24px; }
+.fb-bar .fig > .archo-spot.archo-stand { margin: 0; }
+.fb-probs { grid-column: 1; grid-row: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.fb-acts { grid-column: 1; grid-row: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; padding-bottom: 6px; }
+.fb-status { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 4px 10px; min-width: 0; color: var(--muted); font-size: 12px; }
+.fb-status:empty { display: none; }
+.fb-status.warn, .fb-prio-note { color: var(--amber); }
+.fb-prob { display: inline-flex; align-items: center; max-width: 260px; height: 26px; border: var(--hairline) solid var(--line-2); border-radius: 999px; background: var(--card); }
+.fb-prob.on { border-color: var(--accent); background: var(--accent-soft); }
+.fb-prob.prio { border-color: var(--red); }
+.page .btn.fb-prob-b { min-width: 0; height: 24px; padding: 0 4px 0 10px; border: 0; background: none; box-shadow: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.page .btn.icon.fb-prob-x { flex: none; width: 22px; height: 22px; padding: 0; border: 0; background: none; box-shadow: none; color: var(--muted); }
+.fb-prob-x svg { width: 12px; height: 12px; }
+.page .btn.link.fb-add { padding-left: 2px; font-size: 12px; }
+.fb-mine-bar { grid-template-rows: auto; }
+.fb-mine-bar .fb-mine-note { grid-column: 1; grid-row: 1; padding-bottom: 6px; color: var(--muted); font-size: 12px; }
+/* the form: a hint, the title, the questions, the contact, what goes with it */
+.fb-opt { margin-left: 6px; font-weight: 400; color: var(--faint); }
+.fb-note { padding: 8px 10px; border-radius: var(--r-sm); background: var(--card-2); color: var(--fg-2); font-size: 12px; }
+.fb-field .fb-text { min-height: 72px; }
+.fb-q .fb-text { min-height: 64px; }
+.fb-field .field.fb-text, .fb-field .field.fb-title { font-weight: 400; }
+.fb-pills { display: flex; flex-wrap: wrap; gap: 6px; font-weight: 400; }
+.page .btn.fb-pill { height: 26px; padding: 0 12px; border-radius: 999px; font-size: 12px; }
+.page .btn.fb-pill.on { border-color: var(--accent); background: var(--accent-soft); color: var(--fg); }
+.fb-files { padding: 6px 0 2px; }
+.fb-files .name { font-weight: 500; }
+.fb-files input:checked + .name { color: var(--red); }
+.fb-att { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; border-top: var(--hairline) solid var(--line-2); }
+.fb-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.fb-att-l { color: var(--muted); font-size: 12px; margin-right: 2px; }
+.fb-chip { display: inline-flex; align-items: center; max-width: 280px; height: 22px; padding: 0 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 999px; background: var(--pill); color: var(--fg-2); font-size: 12px; cursor: default; }
+.fb-chip.hot { background: color-mix(in srgb, var(--red) 16%, transparent); color: var(--red); }
+.fb-chip.wait { background: transparent; color: var(--muted); }
+.page .btn.link.fb-change { font-size: 12px; }
+.fb-parts { display: flex; flex-direction: column; gap: 6px; padding-left: 2px; }
+.fb-part { width: auto; flex-wrap: wrap; row-gap: 0; }
+.fb-part .sub { flex: 1 1 260px; min-width: 0; color: var(--muted); font-size: 12px; }
+/* the preview in place of the form */
+.fb-prev-head { display: flex; align-items: baseline; }
+.fb-prev-card .fb-prev { max-height: none; padding: 0; }
+.fb-p-ans { display: flex; flex-direction: column; gap: 2px; }
+.fb-p-prio { color: var(--red); font-weight: 600; }
+/* similar requests under a feature request: each with its +1 */
+.fb-sim { padding: 4px 0; }
+.fb-sim-row { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 14px; }
+.fb-sim-row + .fb-sim-row { border-top: var(--hairline) solid var(--line-2); }
+.page .btn.link.fb-sim-t { min-width: 0; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); }
+.page .btn.link.fb-sim-t:hover { color: var(--accent-11, var(--accent)); }
+.page .btn.fb-plus { flex: none; margin-left: auto; height: 24px; padding: 0 10px; font-size: 12px; }
+.page .btn.fb-plus.given { color: var(--accent-11, var(--accent)); }
 .nav-item .reply-dot { width: 7px; height: 7px; margin: 0 2px 0 auto; border-radius: 50%; background: var(--accent); flex: none; }
 
 /* Library > Texture optimisation (10 §2): settings rows, the run's foot, the mods table */
