@@ -30,7 +30,6 @@ internal/app/packsettings.go (*App).ApplyListSettings 52 166
 internal/app/rimcrow.go (*App).ImportRimCrow 128 428
 internal/app/rimcrowprofiles.go (*App).importCrowProfiles 80 291
 internal/app/rimsortaux.go (*App).ImportRimSortAux 60 188
-internal/app/saveowners.go (*App).attributeSave 91 331
 internal/app/scan.go (*App).scanEnvironment 58 224
 internal/app/source.go (*App).SourceSearchContext 49 174
 internal/app/subscribe.go (*App).UpdateSubscriptionsWith 61 240
