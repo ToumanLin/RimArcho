@@ -82,3 +82,35 @@ func TestContentReferenceForms(t *testing.T) {
 		t.Fatal("legacy Defs must remain unchanged")
 	}
 }
+
+func TestContentReferenceEdges(t *testing.T) {
+	x := `<savegame><def>TopLevel</def><meta><kindDef>MetaKind</kindDef></meta><game>
+<pawn><story><traits><allTraits><li><def>Brave</def></li></allTraits></traits></story><abilities><abilities><li><def>Skip</def></li></abilities></abilities>
+<kindDef IsNull="True">NullKind</kindDef><kindDef></kindDef><stuff>null</stuff></pawn>
+<gameConditionManager><activeConditions><li><def>Eclipse</def></li></activeConditions></gameConditionManager>
+<storyteller><def>Cassandra</def><incidentQueue><queue><li><firingInc><def>RaidEnemy</def></firingInc></li></queue></incidentQueue></storyteller>
+<researchManager><progress><keys><li>null</li><li></li><li>Real</li></keys><values><li>1</li><li>1</li><li>1</li><li>1</li></values></progress></researchManager>
+</game></savegame>`
+	f, err := Scan(strings.NewReader(x))
+	if err != nil || f.Malformed != nil {
+		t.Fatalf("%v %+v", err, f.Malformed)
+	}
+	for typ, n := range map[string]string{"TraitDef": "Brave", "AbilityDef": "Skip", "GameConditionDef": "Eclipse", "StorytellerDef": "Cassandra", "IncidentDef": "RaidEnemy", "ResearchProjectDef": "Real"} {
+		if f.DefRefs[typ][n] != 1 || len(f.DefRefs[typ]) != 1 {
+			t.Errorf("%s/%s: %v", typ, n, f.DefRefs[typ])
+		}
+	}
+	// outside game, IsNull, empty and null values, and research values with no key count nothing
+	for _, refs := range []map[string]map[string]int{f.DefRefs, f.ConfigRefs} {
+		for typ, ns := range refs {
+			for _, n := range []string{"TopLevel", "MetaKind", "NullKind", "", "null"} {
+				if ns[n] != 0 {
+					t.Errorf("unexpected %s/%q: %v", typ, n, ns)
+				}
+			}
+		}
+	}
+	if len(f.ConfigRefs) != 0 || len(f.DefRefs["PawnKindDef"]) != 0 || len(f.DefRefs["ThingDef"]) != 0 || len(f.DefRefs[""]) != 0 {
+		t.Errorf("refs: %v config: %v", f.DefRefs, f.ConfigRefs)
+	}
+}

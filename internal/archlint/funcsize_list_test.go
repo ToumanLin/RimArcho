@@ -72,7 +72,6 @@ internal/harmony/manual.go (*scanner).run 167 269
 internal/identity/reconcile.go Reconcile 44 119
 internal/modchanges/modchanges.go (*changeBuilder).mod 128 321
 internal/order/order.go Sort 97 309
-internal/savefile/scan_content.go (*scanner).contentRef 75 176
 internal/savefile/scan_rules.go (*extract).rule 76 132
 internal/scan/observe.go Collect 31 163
 internal/steamworks/publish_windows.go publishWorker 35 159
