@@ -392,24 +392,89 @@ func (a *App) UpdateSubscriptionsWith(refs []string, dryRun bool, calls BatchCal
 	if err != nil {
 		return nil, err
 	}
-	start := func(j int) {
-		if calls.Start != nil {
-			for _, i := range slots[j] {
-				calls.Start(i)
+	u := &subscriptionUpdate{a: a, ss: ss, slots: slots, calls: calls, op: &SubscribeOp{Action: "update", DryRun: dryRun}}
+	gitDry, err := u.planItems(refs, dryRun)
+	if err != nil {
+		return nil, err
+	}
+	if dryRun {
+		return u.op, u.previewGit(gitDry)
+	}
+	// Git failures still prevent later work. Skipped download-page subscriptions
+	// do not split SteamCMD groups; only Git updates are ordering barriers.
+	defer func() {
+		if u.changed {
+			updateErr = errors.Join(updateErr, a.refreshWorkshop(u.op))
+		}
+	}()
+	for i := 0; i < len(ss); {
+		if u.stopped() {
+			break
+		}
+		s := ss[i]
+		if s.Record.Kind == "steamcmd" {
+			end := i + 1
+			for end < len(ss) && ss[end].Record.Kind != "git" {
+				end++
 			}
+			if err := u.updateSteamCMD(i, end); err != nil {
+				return u.op, err
+			}
+			i = end
+			continue
+		}
+		if s.Record.Kind != "git" {
+			i++
+			continue
+		}
+		if err := u.updateGit(i); err != nil {
+			return u.op, err
+		}
+		i++
+	}
+	return u.op, errors.Join(u.failures...)
+}
+
+// subscriptionUpdate is one run of UpdateSubscriptionsWith: the selected subscriptions, the
+// task items each reports to, and what has happened so far.
+type subscriptionUpdate struct {
+	a        *App
+	ss       []Subscription
+	slots    [][]int
+	calls    BatchCalls
+	op       *SubscribeOp
+	changed  bool // a copy changed: the Workshop view is refreshed
+	failures []error
+}
+
+// start reports subscription j's task items as started.
+func (u *subscriptionUpdate) start(j int) {
+	if u.calls.Start != nil {
+		for _, i := range u.slots[j] {
+			u.calls.Start(i)
 		}
 	}
-	done := func(j int, err error) {
-		if calls.Done != nil {
-			for _, i := range slots[j] {
-				calls.Done(i, err)
-			}
+}
+
+// done reports subscription j's task items as done.
+func (u *subscriptionUpdate) done(j int, err error) {
+	if u.calls.Done != nil {
+		for _, i := range u.slots[j] {
+			u.calls.Done(i, err)
 		}
 	}
-	stopped := func() bool { return calls.Stopped != nil && calls.Stopped() }
-	op := &SubscribeOp{Action: "update", DryRun: dryRun}
+}
+
+// stopped reports whether the task was asked to stop.
+func (u *subscriptionUpdate) stopped() bool { return u.calls.Stopped != nil && u.calls.Stopped() }
+
+// planItems lists an item per subscription and returns the indices of the Git items a
+// preview asks for their remote commit. A named subscription that cannot be updated in
+// place is refused.
+func (u *subscriptionUpdate) planItems(refs []string, dryRun bool) ([]int, error) {
+	op := u.op
 	var gitDry []int
-	for _, s := range ss {
+	for _, s := range u.ss {
 		it := subscriptionItem(s)
 		if s.Record.Kind != "git" && s.Record.Kind != "steamcmd" {
 			if len(refs) > 0 {
@@ -427,195 +492,209 @@ func (a *App) UpdateSubscriptionsWith(refs []string, dryRun bool, calls BatchCal
 		}
 		op.Items = append(op.Items, it)
 	}
-	if dryRun {
-		// The remote commits are network round trips: asked side by side, so a preview of
-		// many Git subscriptions does not wait for each in turn.
-		errs := make([]error, len(op.Items))
-		var wg sync.WaitGroup
-		sem := make(chan struct{}, 8)
-		for _, j := range gitDry {
-			wg.Add(1)
-			go func(j int) {
-				defer wg.Done()
-				sem <- struct{}{}
-				defer func() { <-sem }()
-				r := op.Items[j].Record
-				op.Items[j].To, errs[j] = subscribe.RemoteCommit(context.Background(), r.GitURL(), r.RefType, r.Ref)
-			}(j)
-		}
-		wg.Wait()
-		return op, errors.Join(errs...)
+	return gitDry, nil
+}
+
+// previewGit asks for the Git items' remote commits. They are network round trips: asked
+// side by side, so a preview of many Git subscriptions does not wait for each in turn.
+func (u *subscriptionUpdate) previewGit(gitDry []int) error {
+	op := u.op
+	errs := make([]error, len(op.Items))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 8)
+	for _, j := range gitDry {
+		wg.Add(1)
+		go func(j int) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			r := op.Items[j].Record
+			op.Items[j].To, errs[j] = subscribe.RemoteCommit(context.Background(), r.GitURL(), r.RefType, r.Ref)
+		}(j)
 	}
-	// Git failures still prevent later work. Skipped download-page subscriptions
-	// do not split SteamCMD groups; only Git updates are ordering barriers.
-	changed := false
-	var failures []error
-	defer func() {
-		if changed {
-			updateErr = errors.Join(updateErr, a.refreshWorkshop(op))
+	wg.Wait()
+	return errors.Join(errs...)
+}
+
+// updateGit updates Git subscription i. An error stops the update; it is returned joined
+// with the failures so far.
+func (u *subscriptionUpdate) updateGit(i int) error {
+	a, s, op := u.a, u.ss[i], u.op
+	u.start(i)
+	commit, err := subscribe.Update(context.Background(), s.Folder, s.Record)
+	if err != nil {
+		u.done(i, err)
+		return errors.Join(append(u.failures, err)...)
+	}
+	u.changed = true
+	r := s.Record
+	r.Installed, r.Latest, r.InstalledAt, r.CheckedAt, r.CheckError = commit, commit, a.Now(), a.Now(), ""
+	op.Items[i].To, op.Items[i].Result = commit, "updated"
+	if err := subscribe.Write(s.Folder, r); err != nil {
+		u.done(i, err)
+		return errors.Join(append(u.failures, err)...)
+	}
+	delete(a.subscriptionCache, s.Folder)
+	u.done(i, nil)
+	return nil
+}
+
+// steamCMDGroupKey is one SteamCMD run: a content root and an account.
+type steamCMDGroupKey struct{ root, account string }
+
+// steamCMDGroup is the Workshop IDs one SteamCMD run downloads, and the subscriptions they
+// are.
+type steamCMDGroup struct {
+	key     steamCMDGroupKey
+	ids     []string
+	indices []int
+}
+
+// updateSteamCMD updates the SteamCMD subscriptions in ss[i:end], one SteamCMD run per
+// content root. Only a missing account stops the update; it is returned joined with the
+// failures so far.
+func (u *subscriptionUpdate) updateSteamCMD(i, end int) error {
+	ss := u.ss
+	account, accountErr := u.a.SteamCMDAccount("")
+	if accountErr != nil {
+		for j := i; j < end; j++ {
+			if ss[j].Record.Kind == "steamcmd" {
+				u.done(j, accountErr)
+			}
 		}
-	}()
-	for i := 0; i < len(ss); {
-		if stopped() {
+		return errors.Join(append(u.failures, accountErr)...)
+	}
+	var groups []*steamCMDGroup
+	byKey := map[steamCMDGroupKey]*steamCMDGroup{}
+	for j := i; j < end; j++ {
+		if ss[j].Record.Kind != "steamcmd" {
+			continue
+		}
+		root := realOrAbs(filepath.Dir(ss[j].Folder))
+		key := steamCMDGroupKey{env.PathKey(root), account}
+		g := byKey[key]
+		if g == nil {
+			g = &steamCMDGroup{key: steamCMDGroupKey{root, account}}
+			groups = append(groups, g)
+			byKey[key] = g
+		}
+		if !slices.Contains(g.ids, ss[j].Record.WorkshopID) {
+			g.ids = append(g.ids, ss[j].Record.WorkshopID)
+		}
+		g.indices = append(g.indices, j)
+	}
+	for _, g := range groups {
+		if u.stopped() {
 			break
 		}
-		s := ss[i]
-		if s.Record.Kind == "steamcmd" {
-			end := i + 1
-			for end < len(ss) && ss[end].Record.Kind != "git" {
-				end++
-			}
-			account, accountErr := a.SteamCMDAccount("")
-			if accountErr != nil {
-				for j := i; j < end; j++ {
-					if ss[j].Record.Kind == "steamcmd" {
-						done(j, accountErr)
-					}
-				}
-				return op, errors.Join(append(failures, accountErr)...)
-			}
-			type groupKey struct{ root, account string }
-			type group struct {
-				key     groupKey
-				ids     []string
-				indices []int
-			}
-			var groups []*group
-			byKey := map[groupKey]*group{}
-			for j := i; j < end; j++ {
-				if ss[j].Record.Kind != "steamcmd" {
-					continue
-				}
-				root := realOrAbs(filepath.Dir(ss[j].Folder))
-				key := groupKey{env.PathKey(root), account}
-				g := byKey[key]
-				if g == nil {
-					g = &group{key: groupKey{root, account}}
-					groups = append(groups, g)
-					byKey[key] = g
-				}
-				if !slices.Contains(g.ids, ss[j].Record.WorkshopID) {
-					g.ids = append(g.ids, ss[j].Record.WorkshopID)
-				}
-				g.indices = append(g.indices, j)
-			}
-			for _, g := range groups {
-				if stopped() {
-					break
-				}
-				// Each Mod is shown as worked on when SteamCMD starts it and done when it is
-				// confirmed, not all of them at the group's start and end; stop ends SteamCMD.
-				ctx, cancel := context.WithCancel(context.Background())
-				watched := make(chan struct{})
-				go func() {
-					// not scheduled: checks the task's stop request while SteamCMD runs the group
-					tick := time.NewTicker(250 * time.Millisecond)
-					defer tick.Stop()
-					for {
-						select {
-						case <-watched:
-							return
-						case <-tick.C:
-							if stopped() {
-								cancel()
-								return
-							}
-						}
-					}
-				}()
-				byID := map[string][]int{}
-				for _, j := range g.indices {
-					byID[ss[j].Record.WorkshopID] = append(byID[ss[j].Record.WorkshopID], j)
-				}
-				apply := func(j int, item SubscribeItem) error {
-					op.Items[j].To, op.Items[j].Result = item.To, item.Result
-					op.Items[j].Record, op.Items[j].Links = item.Record, item.Links
-					delete(a.subscriptionCache, ss[j].Folder)
-					delete(a.subscriptionCache, realOrAbs(ss[j].Folder))
-					changed = changed || item.To != ""
-					if why, failed := strings.CutPrefix(item.Result, "failed: "); failed {
-						return errors.New(why)
-					}
-					return nil
-				}
-				reported := map[int]bool{}
-				transfer := &workshopTransfer{ctx: ctx, items: make([]TaskItem, len(g.ids))}
-				for k, id := range g.ids {
-					transfer.items[k] = TaskItem{Ref: "ws:" + id, State: ItemWait}
-				}
-				startedIDs := map[string]bool{}
-				transfer.changed = func(items []TaskItem) {
-					for _, it := range items {
-						if id := strings.TrimPrefix(it.Ref, "ws:"); it.State == ItemRun && !startedIDs[id] {
-							startedIDs[id] = true
-							for _, j := range byID[id] {
-								start(j)
-							}
-						}
-					}
-				}
-				transfer.settled = func(item SubscribeItem) {
-					for _, j := range byID[item.Record.WorkshopID] {
-						itemErr := apply(j, item)
-						if itemErr != nil && ctx.Err() != nil {
-							continue // stopped before it was confirmed: left as not done
-						}
-						reported[j] = true
-						done(j, itemErr)
-					}
-				}
-				download, err := a.downloadWorkshopGroup(g.ids, g.key.root, g.key.account, false, false, transfer)
-				close(watched)
-				halted := ctx.Err() != nil
-				cancel()
-				if err != nil && !(halted && errors.Is(err, context.Canceled)) {
-					failures = append(failures, err)
-				}
-				for _, j := range g.indices {
-					if reported[j] || halted {
-						continue
-					}
-					if download == nil {
-						op.Items[j].To = ""
-						op.Items[j].Result = "failed: " + err.Error()
-						done(j, err)
-						continue
-					}
-					var itemErr error = fmt.Errorf("SteamCMD did not report Workshop %s", ss[j].Record.WorkshopID)
-					for _, item := range download.Items {
-						if item.Record.WorkshopID == ss[j].Record.WorkshopID {
-							itemErr = apply(j, item)
-						}
-					}
-					done(j, itemErr)
-				}
-			}
-			i = end
-			continue
-		}
-		if s.Record.Kind != "git" {
-			i++
-			continue
-		}
-		start(i)
-		commit, err := subscribe.Update(context.Background(), s.Folder, s.Record)
-		if err != nil {
-			done(i, err)
-			return op, errors.Join(append(failures, err)...)
-		}
-		changed = true
-		r := s.Record
-		r.Installed, r.Latest, r.InstalledAt, r.CheckedAt, r.CheckError = commit, commit, a.Now(), a.Now(), ""
-		op.Items[i].To, op.Items[i].Result = commit, "updated"
-		if err := subscribe.Write(s.Folder, r); err != nil {
-			done(i, err)
-			return op, errors.Join(append(failures, err)...)
-		}
-		delete(a.subscriptionCache, s.Folder)
-		done(i, nil)
-		i++
+		u.downloadGroup(g)
 	}
-	return op, errors.Join(failures...)
+	return nil
+}
+
+// apply takes SteamCMD's outcome for subscription j; a failed item's reason is returned.
+func (u *subscriptionUpdate) apply(j int, item SubscribeItem) error {
+	op, ss := u.op, u.ss
+	op.Items[j].To, op.Items[j].Result = item.To, item.Result
+	op.Items[j].Record, op.Items[j].Links = item.Record, item.Links
+	delete(u.a.subscriptionCache, ss[j].Folder)
+	delete(u.a.subscriptionCache, realOrAbs(ss[j].Folder))
+	u.changed = u.changed || item.To != ""
+	if why, failed := strings.CutPrefix(item.Result, "failed: "); failed {
+		return errors.New(why)
+	}
+	return nil
+}
+
+// watchStop cancels the context once the task is asked to stop, until watched closes. It
+// is not scheduled: it checks the task's stop request while SteamCMD runs a group.
+func (u *subscriptionUpdate) watchStop(watched <-chan struct{}, cancel context.CancelFunc) {
+	tick := time.NewTicker(250 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		select {
+		case <-watched:
+			return
+		case <-tick.C:
+			if u.stopped() {
+				cancel()
+				return
+			}
+		}
+	}
+}
+
+// downloadGroup runs SteamCMD for one group. Each Mod is shown as worked on when SteamCMD
+// starts it and done when it is confirmed, not all of them at the group's start and end;
+// stop ends SteamCMD.
+func (u *subscriptionUpdate) downloadGroup(g *steamCMDGroup) {
+	ss := u.ss
+	ctx, cancel := context.WithCancel(context.Background())
+	watched := make(chan struct{})
+	go u.watchStop(watched, cancel)
+	byID := map[string][]int{}
+	for _, j := range g.indices {
+		byID[ss[j].Record.WorkshopID] = append(byID[ss[j].Record.WorkshopID], j)
+	}
+	reported := map[int]bool{}
+	transfer := u.groupTransfer(ctx, g, byID, reported)
+	download, err := u.a.downloadWorkshopGroup(g.ids, g.key.root, g.key.account, false, false, transfer)
+	close(watched)
+	halted := ctx.Err() != nil
+	cancel()
+	if err != nil && !(halted && errors.Is(err, context.Canceled)) {
+		u.failures = append(u.failures, err)
+	}
+	for _, j := range g.indices {
+		if reported[j] || halted {
+			continue
+		}
+		if download == nil {
+			u.op.Items[j].To = ""
+			u.op.Items[j].Result = "failed: " + err.Error()
+			u.done(j, err)
+			continue
+		}
+		var itemErr error = fmt.Errorf("SteamCMD did not report Workshop %s", ss[j].Record.WorkshopID)
+		for _, item := range download.Items {
+			if item.Record.WorkshopID == ss[j].Record.WorkshopID {
+				itemErr = u.apply(j, item)
+			}
+		}
+		u.done(j, itemErr)
+	}
+}
+
+// groupTransfer is the transfer through which SteamCMD reports a group's Mods as it starts
+// and settles them; byID maps a Workshop ID to its subscriptions, and reported records the
+// ones settled.
+func (u *subscriptionUpdate) groupTransfer(ctx context.Context, g *steamCMDGroup, byID map[string][]int, reported map[int]bool) *workshopTransfer {
+	transfer := &workshopTransfer{ctx: ctx, items: make([]TaskItem, len(g.ids))}
+	for k, id := range g.ids {
+		transfer.items[k] = TaskItem{Ref: "ws:" + id, State: ItemWait}
+	}
+	startedIDs := map[string]bool{}
+	transfer.changed = func(items []TaskItem) {
+		for _, it := range items {
+			if id := strings.TrimPrefix(it.Ref, "ws:"); it.State == ItemRun && !startedIDs[id] {
+				startedIDs[id] = true
+				for _, j := range byID[id] {
+					u.start(j)
+				}
+			}
+		}
+	}
+	transfer.settled = func(item SubscribeItem) {
+		for _, j := range byID[item.Record.WorkshopID] {
+			itemErr := u.apply(j, item)
+			if itemErr != nil && ctx.Err() != nil {
+				continue // stopped before it was confirmed: left as not done
+			}
+			reported[j] = true
+			u.done(j, itemErr)
+		}
+	}
+	return transfer
 }
 
 // subscriptionSlots maps each selected subscription to the indices in refs that name it

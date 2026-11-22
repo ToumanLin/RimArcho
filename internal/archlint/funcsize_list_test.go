@@ -43,7 +43,6 @@ internal/app/savegrid.go (*App).gridRefs 42 134
 internal/app/saveowners.go (*App).attributeSave 91 331
 internal/app/scan.go (*App).scanEnvironment 58 224
 internal/app/source.go (*App).SourceSearchContext 49 174
-internal/app/subscribe.go (*App).UpdateSubscriptionsWith 61 240
 internal/app/subscribeworkshop.go (*App).downloadWorkshopGroup 57 197
 internal/app/workshopsub.go (*App).Workshop 48 134
 internal/cmds/content.go whyCmd 56 189
