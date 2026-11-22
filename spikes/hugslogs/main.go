@@ -21,6 +21,7 @@ package main
 
 import (
 	"bufio"
+	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -40,6 +41,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/logs"
+	"github.com/ToumanLin/RimArcho/spikes/internal/jsonl"
 )
 
 const (
@@ -71,6 +73,9 @@ func main() {
 	listOnly := fs.Bool("list-only", false, "api: index the listing, download nothing")
 	day := fs.Int("day", 15, "sample: day of the month (UTC) to download")
 	fs.Float64Var(&share16, "share-16", 0, "api, sample, even: keep this share of the 1.6 logs, chosen by gist id (0 = all); 1.7 logs are always kept")
+	statsOut := fs.String("out", "", "stats: parsed records to write (a .gz name compresses); default <dir>/parsed.jsonl")
+	statsSince := fs.String("since", "", "stats: only logs created on or after this date (YYYY-MM-DD)")
+	statsSeen := fs.String("seen", "", "stats: parsed records kept earlier (comma-separated, .gz allowed); their logs are skipped and their content counts for duplicates")
 	fs.Parse(os.Args[2:])
 	var err error
 	switch os.Args[1] {
@@ -112,7 +117,7 @@ func main() {
 	case "verdicts":
 		err = verdicts(*dir, *from, *until)
 	case "stats":
-		err = stats(*dir)
+		err = stats(*dir, *statsOut, *statsSince, *statsSeen)
 	default:
 		err = fmt.Errorf("unknown command %q", os.Args[1])
 	}
@@ -850,25 +855,65 @@ func trunc(s string, n int) string {
 
 // ---- stats ----
 
-func stats(dir string) error {
+// stats parses the raw logs into parsed records and prints a summary of them. With -seen it is
+// incremental (the weekly corpus run, 05 §4.6): logs already in those records are skipped and
+// their content hashes still mark later copies as duplicates, so a run parses one week's logs
+// and writes one week's records instead of rewriting the whole corpus.
+func stats(dir, outPath, since, seen string) error {
 	idx, err := readIndex(filepath.Join(dir, "index.jsonl"))
 	if err != nil {
 		return err
 	}
+	seenHash := map[string]bool{}
+	skip := map[string]bool{}
+	if seen != "" {
+		if err := jsonl.Each(seen, func(b []byte) error {
+			var h struct{ ID, Hash string }
+			if json.Unmarshal(b, &h) == nil && h.ID != "" {
+				skip[h.ID] = true
+				if h.Hash != "" {
+					seenHash[h.Hash] = true
+				}
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+	}
+	if since != "" {
+		t, err := time.Parse("2006-01-02", since)
+		if err != nil {
+			return fmt.Errorf("-since %q: use YYYY-MM-DD", since)
+		}
+		since = t.UTC().Format(time.RFC3339)
+	}
 	ids := make([]string, 0, len(idx))
-	for id := range idx {
+	for id, e := range idx {
+		if skip[id] || since != "" && e.Created < since {
+			continue
+		}
 		ids = append(ids, id)
 	}
-	sort.Slice(ids, func(a, b int) bool { return idx[ids[a]].Created < idx[ids[b]].Created })
+	sort.Slice(ids, func(a, b int) bool {
+		if idx[ids[a]].Created != idx[ids[b]].Created {
+			return idx[ids[a]].Created < idx[ids[b]].Created
+		}
+		return ids[a] < ids[b]
+	})
+	if len(skip) > 0 {
+		fmt.Printf("incremental: %d logs already parsed, %d to parse\n", len(skip), len(ids))
+	}
 
-	out, err := os.Create(filepath.Join(dir, "parsed.jsonl"))
+	if outPath == "" {
+		outPath = filepath.Join(dir, "parsed.jsonl")
+	}
+	out, err := createRecords(outPath)
 	if err != nil {
 		return err
 	}
 	defer out.Close()
 	var recs []Record
 	harmonyLen := map[string]int{} // Harmony section size per id, kept after the section is dropped
-	seenHash := map[string]bool{}
 	drops := map[string]int{}
 	missing := 0
 	t0 := time.Now()
@@ -925,6 +970,9 @@ func stats(dir string) error {
 			}
 			recs = append(recs, r)
 		}
+	}
+	if err := out.Close(); err != nil {
+		return err
 	}
 	parseTime := time.Since(t0)
 
@@ -1201,4 +1249,47 @@ func fmtCounts(m map[string]int, limit int) string {
 		parts = append(parts, fmt.Sprintf("%s %d", e.k, e.v))
 	}
 	return strings.Join(parts, ", ")
+}
+
+// records writes parsed records, gzip-compressed when the name ends in .gz. Close flushes and
+// may be called more than once.
+type records struct {
+	f      *os.File
+	zw     *gzip.Writer
+	bw     *bufio.Writer
+	closed bool
+}
+
+func createRecords(path string) (*records, error) {
+	f, err := os.Create(path)
+	if err != nil {
+		return nil, err
+	}
+	r := &records{f: f}
+	if strings.HasSuffix(strings.ToLower(path), ".gz") {
+		r.zw = gzip.NewWriter(f)
+		r.bw = bufio.NewWriterSize(r.zw, 1<<20)
+	} else {
+		r.bw = bufio.NewWriterSize(f, 1<<20)
+	}
+	return r, nil
+}
+
+func (r *records) Write(b []byte) (int, error) { return r.bw.Write(b) }
+
+func (r *records) Close() error {
+	if r.closed {
+		return nil
+	}
+	r.closed = true
+	err := r.bw.Flush()
+	if r.zw != nil {
+		if e := r.zw.Close(); err == nil {
+			err = e
+		}
+	}
+	if e := r.f.Close(); err == nil {
+		err = e
+	}
+	return err
 }

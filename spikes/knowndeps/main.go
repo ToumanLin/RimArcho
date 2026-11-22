@@ -37,6 +37,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime/pprof"
 	"sort"
 	"strings"
 	"time"
@@ -70,7 +71,17 @@ func main() {
 	home := flag.String("verify", "", "verify mode: RIMARCHO_HOME of a corpusrun research environment")
 	userData := flag.String("userdata", "", "verify mode: its user data root")
 	perKind := flag.Int("lists", 20, "verify mode: mod lists per finding code")
+	cpuprof := flag.String("cpuprofile", "", "write a CPU profile to this file")
 	flag.Parse()
+	if *cpuprof != "" {
+		f, err := os.Create(*cpuprof)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(1)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
 	if *home != "" {
 		if err := verify(*home, *userData, *parsed, *mm, *perKind); err != nil {
 			fmt.Fprintln(os.Stderr, "error:", err)
@@ -79,6 +90,7 @@ func main() {
 		return
 	}
 	if err := run(*parsed, *results, *patterns, *steamdb, *out, *mm, roots); err != nil {
+		pprof.StopCPUProfile()
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
@@ -311,15 +323,11 @@ func readLibrary(roots []string, mm string) map[string]*modInfo {
 type files struct{ xml, dll [][]byte }
 
 type fileCache struct {
-	lib   map[string]*modInfo
-	m     map[string]*files
-	order []string
+	lib map[string]*modInfo
 }
 
-func (c *fileCache) get(p string) *files {
-	if f := c.m[p]; f != nil {
-		return f
-	}
+// load reads a mod's files without caching them.
+func (c *fileCache) load(p string) *files {
 	f := &files{}
 	if mi := c.lib[p]; mi != nil {
 		for _, d := range mi.dirs {
@@ -347,12 +355,6 @@ func (c *fileCache) get(p string) *files {
 				return nil
 			})
 		}
-	}
-	c.m[p] = f
-	c.order = append(c.order, p)
-	if len(c.order) > 300 {
-		delete(c.m, c.order[0])
-		c.order = c.order[1:]
 	}
 	return f
 }
@@ -580,7 +582,7 @@ func run(parsedPath, resultsPath, patternsPath, steamPath, outPath, mm string, r
 		return err
 	}
 	lib := readLibrary(roots, mm)
-	fc := &fileCache{lib: lib, m: map[string]*files{}}
+	fc := &fileCache{lib: lib}
 	wsDeps := readSteamDB(steamPath)
 	links := sessions(ls)
 	nA := map[string]int{}
@@ -661,6 +663,18 @@ func run(parsedPath, resultsPath, patternsPath, steamPath, outPath, mm string, r
 	}
 	pairItems := map[pk][]pitem{}
 	nItems, nConf := 0, 0
+	// Candidates per item, then the file checks grouped by mod: each mod's files are read once
+	// (checking them item by item re-read mods evicted from the cache, hours on 40k logs).
+	type cand struct {
+		k ik
+		a []string
+	}
+	var cands []cand
+	type ak struct {
+		a  string
+		it item
+	}
+	need := map[string][]item{}
 	for k, idx := range itemLogs {
 		if len(idx) < 3 {
 			continue
@@ -672,16 +686,34 @@ func run(parsedPath, resultsPath, patternsPath, steamPath, outPath, mm string, r
 				cnt[m]++
 			}
 		}
-		conf := false
-		for a, c := range cnt {
-			if float64(c) < *cover*float64(len(idx)) || a == k.b || official(a) || a == "brrainz.harmony" {
+		c := cand{k: k}
+		for a, n := range cnt {
+			if float64(n) < *cover*float64(len(idx)) || a == k.b || official(a) || a == "brrainz.harmony" {
 				continue
 			}
+			c.a = append(c.a, a)
+			if itemSrc[k][a] == 0 && k.it.kind != "error" && lib[a] != nil {
+				need[a] = append(need[a], k.it)
+			}
+		}
+		cands = append(cands, c)
+	}
+	used := map[ak]bool{}
+	for a, its := range need {
+		f := fc.load(a)
+		for _, it := range its {
+			used[ak{a, it}] = uses(f, it)
+		}
+	}
+	for _, c := range cands {
+		k := c.k
+		conf := false
+		for _, a := range c.a {
 			how := ""
 			switch {
 			case itemSrc[k][a] > 0:
 				how = "source"
-			case k.it.kind != "error" && lib[a] != nil && uses(fc.get(a), k.it):
+			case used[ak{a, k.it}]:
 				how = "files"
 			}
 			if how != "" {
@@ -871,7 +903,8 @@ func run(parsedPath, resultsPath, patternsPath, steamPath, outPath, mm string, r
 				continue
 			}
 			role := tothers[t][b] > 0
-			if bestB == "" || role && !bestRole || role == bestRole && r1-r0 > bestD {
+			// Ties go to the first packageId: map order would pick a different B each run.
+			if bestB == "" || role && !bestRole || role == bestRole && (r1-r0 > bestD || r1-r0 == bestD && b < bestB) {
 				bestB, bestD, bestRole = b, r1-r0, role
 			}
 		}

@@ -6,12 +6,17 @@
 //	corpusweekly features -parsed P -results R -out <features>    keep per-log features by week
 //	corpusweekly newids -parsed P -features F -mm 1.6             logs without features yet
 //	corpusweekly window -features F -mm 1.6 -week 2026-W47        the files of the last 26 weeks
+//	corpusweekly seen -features F                                 records parsed earlier (hugslogs stats -seen)
+//	corpusweekly since -week 2026-W47                             the first day counted (hugslogs stats -since)
 //	corpusweekly prune -corpus <hugslogs> -features F -keep 8     delete raw logs older than 8 weeks
 //	corpusweekly bundle -week W -gen <dir> -prev P -out O -summary S
 //
 // Features are the collector's parsed records and corpusrun's results, one gzip JSON-lines file
 // pair per game version and ISO week of upload: features/<mm>/<week>.{parsed,results}.jsonl.gz.
-// They stay in the private corpus repository like the raw logs. The bundle holds aggregates only
+// Logs the collector dropped (no log section, duplicate content, another game version) are
+// listed in features/dropped.jsonl.gz so the next run does not parse them again. Each weekly run
+// parses only the logs in neither (hugslogs stats -seen) and adds one week's files; nothing
+// rewrites the whole corpus. They stay in the private corpus repository like the raw logs. The bundle holds aggregates only
 // (05 §4.6): no log ids, no mod lists, every entry from at least five players.
 package main
 
@@ -59,8 +64,9 @@ func main() {
 	steamdb := fs.String("steamdb", "", "bundle: RimSort steamDB.json (packageId → Workshop id) for \"may be fixed\"")
 	fresh := fs.Int("fresh", 12, "bundle: drop entries without a supporting log in this many weeks")
 	since := fs.String("since", "", "features: only logs uploaded in this ISO week or later")
+	tracked := fs.String("tracked", "", "prune: file listing the raw logs committed to the corpus repository (git ls-files); only those are deleted")
 	fs.Parse(os.Args[2:])
-	if *since == "" && (os.Args[1] == "features" || os.Args[1] == "newids") {
+	if *since == "" && (os.Args[1] == "features" || os.Args[1] == "newids" || os.Args[1] == "since" || os.Args[1] == "prune") {
 		// Only the weeks the next bundle counts.
 		if t, err := weekStart(*week); err == nil {
 			*since = corpus.Week(t.AddDate(0, 0, -7*(*weeks-1)))
@@ -76,8 +82,15 @@ func main() {
 		var files []string
 		files, err = window(*features, *mm, *week, *weeks, *part)
 		fmt.Println(strings.Join(files, ","))
+	case "seen":
+		fmt.Println(strings.Join(seenFiles(*features), ","))
+	case "since":
+		var t time.Time
+		if t, err = weekStart(*since); err == nil {
+			fmt.Println(t.Format("2006-01-02"))
+		}
 	case "prune":
-		err = prune(*corpusDir, *features, *keep, *dry)
+		err = prune(*corpusDir, *features, *tracked, *since, *keep, *dry)
 	case "bundle":
 		err = bundle(*week, *gen, *prev, *out, *summary, *steamdb, *fresh)
 	default:
@@ -134,7 +147,10 @@ func keepFeatures(parsedList, resultsList, out, since string) error {
 	where := map[string]string{} // id → <mm>/<week>
 	adds := map[string]map[string][]byte{}
 	add := func(key, part, id string, line []byte) {
-		k := key + "." + part
+		k := key
+		if part != "" {
+			k += "." + part
+		}
 		if adds[k] == nil {
 			adds[k] = map[string][]byte{}
 		}
@@ -142,7 +158,7 @@ func keepFeatures(parsedList, resultsList, out, since string) error {
 	}
 	if err := jsonl.Each(parsedList, func(b []byte) error {
 		var h head
-		if json.Unmarshal(b, &h) != nil || h.Status != "ok" || (h.MM != "1.6" && h.MM != "1.7") {
+		if json.Unmarshal(b, &h) != nil || h.ID == "" {
 			return nil
 		}
 		t, err := time.Parse(time.RFC3339, h.Created)
@@ -150,6 +166,13 @@ func keepFeatures(parsedList, resultsList, out, since string) error {
 			return nil
 		}
 		if since != "" && corpus.Week(t.UTC()) < since {
+			return nil
+		}
+		if h.Status != "ok" || (h.MM != "1.6" && h.MM != "1.7") {
+			var d dropped
+			json.Unmarshal(b, &d)
+			j, _ := json.Marshal(d)
+			add("dropped", "", h.ID, j)
 			return nil
 		}
 		key := h.MM + "/" + corpus.Week(t.UTC())
@@ -187,6 +210,32 @@ func keepFeatures(parsedList, resultsList, out, since string) error {
 		fmt.Printf("%s: +%d\n", k, n)
 	}
 	return nil
+}
+
+// dropped is the line kept for a log the collector dropped: enough to skip it next time and
+// to count its content for duplicates.
+type dropped struct {
+	ID      string `json:"id"`
+	Created string `json:"created"`
+	Hash    string `json:"hash,omitempty"`
+	Status  string `json:"status"`
+	Drop    string `json:"drop,omitempty"`
+	MM      string `json:"mm,omitempty"`
+}
+
+// seenFiles lists the records parsed earlier: every parsed feature file and the dropped list.
+func seenFiles(features string) []string {
+	files, _ := filepath.Glob(filepath.Join(features, "*", "*.parsed.jsonl.gz"))
+	sort.Strings(files)
+	if d := filepath.Join(features, "dropped.jsonl.gz"); fileExists(d) {
+		files = append(files, d)
+	}
+	return files
+}
+
+func fileExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
 }
 
 // merge adds lines to a gzip JSON-lines file, keeping one line per id (a later run's line
@@ -297,29 +346,47 @@ func weekStart(week string) (time.Time, error) {
 
 // ---- prune ----
 
-// prune deletes raw logs uploaded more than keep weeks ago whose features are kept. The
-// files stay in the corpus repository's history; the working tree keeps its -MaxRawGB cap.
-func prune(dir, features string, keep int, dry bool) error {
+// prune deletes raw logs uploaded more than keep weeks ago that are done with: their features
+// are kept, they are on the dropped list, or they were uploaded before the counting window
+// (since) and so are never counted again. With -tracked only logs committed to the corpus
+// repository are deleted: its history keeps them, and the working tree keeps its -MaxRawGB cap.
+func prune(dir, features, tracked, since string, keep int, dry bool) error {
 	if dir == "" || features == "" {
 		return fmt.Errorf("-corpus and -features are required")
 	}
-	kept := map[string]bool{}
-	for _, mm := range []string{"1.6", "1.7"} {
-		files, _ := filepath.Glob(filepath.Join(features, mm, "*.parsed.jsonl.gz"))
-		for _, f := range files {
-			if err := jsonl.Each(f, func(b []byte) error {
-				var h head
-				if json.Unmarshal(b, &h) == nil {
-					kept[h.ID] = true
-				}
-				return nil
-			}); err != nil {
-				return err
+	done := map[string]bool{}
+	if err := jsonl.Each(strings.Join(seenFiles(features), ","), func(b []byte) error {
+		var h head
+		if json.Unmarshal(b, &h) == nil {
+			done[h.ID] = true
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	var committed map[string]bool
+	if tracked != "" {
+		committed = map[string]bool{}
+		b, err := os.ReadFile(tracked)
+		if err != nil {
+			return err
+		}
+		for _, l := range strings.Split(string(b), "\n") {
+			if l = strings.TrimSpace(l); l != "" {
+				committed[strings.TrimSuffix(filepath.Base(filepath.FromSlash(l)), ".txt")] = true
 			}
 		}
 	}
+	var windowStart time.Time
+	if since != "" {
+		t, err := weekStart(since)
+		if err != nil {
+			return err
+		}
+		windowStart = t
+	}
 	cut := time.Now().UTC().AddDate(0, 0, -7*keep)
-	n, skipped := 0, 0
+	n, pending, uncommitted := 0, 0, 0
 	var bytes int64
 	err := jsonl.Each(filepath.Join(dir, "index.jsonl"), func(b []byte) error {
 		var e struct{ ID, Created string }
@@ -335,8 +402,12 @@ func prune(dir, features string, keep int, dry bool) error {
 		if err != nil {
 			return nil
 		}
-		if !kept[e.ID] {
-			skipped++ // no features yet: keep the raw log until they are extracted
+		if !done[e.ID] && !(since != "" && t.Before(windowStart)) {
+			pending++ // no features yet: keep the raw log until they are extracted
+			return nil
+		}
+		if committed != nil && !committed[e.ID] {
+			uncommitted++
 			return nil
 		}
 		n++
@@ -350,7 +421,7 @@ func prune(dir, features string, keep int, dry bool) error {
 	if dry {
 		verb = "would delete"
 	}
-	fmt.Printf("raw logs older than %d weeks: %s %d (%.2f GB); kept %d without features\n", keep, verb, n, float64(bytes)/(1<<30), skipped)
+	fmt.Printf("raw logs older than %d weeks: %s %d (%.2f GB); kept %d without features, %d not committed\n", keep, verb, n, float64(bytes)/(1<<30), pending, uncommitted)
 	return err
 }
 

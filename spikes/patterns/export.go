@@ -49,7 +49,9 @@ func export(datasetPath, outPath string) error {
 	for _, r := range rules {
 		p := byID["g:"+r.ID]
 		if p == nil {
-			return fmt.Errorf("dataset has no pattern g:%s", r.ID)
+			// No log of this window matched the rule (a young game version's few weeks): the
+			// matcher still needs every rule in order, with zero counts.
+			p = &Pattern{}
 		}
 		out.Clusters += p.Clusters
 		out.Rules = append(out.Rules, &patterns.Pattern{ID: "g:" + r.ID, Class: r.Class, Match: r.Match, Fallback: r.Fallback,
