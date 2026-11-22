@@ -65,7 +65,6 @@ internal/cmds/test.go testRunCmd 58 177
 internal/csharp/outline.go tokenize 82 158
 internal/dotnet/compscan.go (*Assembly).scanBody 136 172
 internal/dotnet/shapes.go (*Assembly).eval 141 201
-internal/gametest/run.go Run 92 300
 internal/harmony/harmony.go Read 44 96
 internal/harmony/manual.go (*scanner).call 132 239
 internal/harmony/manual.go (*scanner).run 167 269
