@@ -310,6 +310,8 @@ func (m *model) runLibOp(code string) tea.Cmd {
 	switch code {
 	case view.OpFolder:
 		return m.openFolderOf(i0.ID)
+	case view.OpLinked:
+		return m.showLinkOf(i0.ID)
 	case view.OpWorkshop, view.OpSteam:
 		ws := strings.TrimPrefix(i0.Ref, "ws:")
 		if i0.ID != "" {

@@ -262,6 +262,7 @@ async function runOp(code) {
       }
       break;
     case "folder": return api.OpenFolder(c.id).then(() => say("ok", T("opened the folder")), (e) => say("fail", errText(e)));
+    case "linked": return api.ShowLink(c.id).then((t) => say("", t), (e) => say("fail", errText(e)));
     case "steam": return api.OpenSteamWorkshop(c.id || c.ref).then((t) => say("ok", t), (e) => say("fail", errText(e)));
     case "workshop":
       if (c.id) return api.OpenWorkshop(c.id).then((t) => say("ok", t), (e) => say("", errText(e)));

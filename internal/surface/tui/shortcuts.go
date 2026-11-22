@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -15,6 +16,33 @@ import (
 // Workshop page, C the Updates page narrowed to its Lineage.
 
 // openFolderOf shows an instance's folder in the file manager.
+// showLinkOf opens the folder holding a linked copy's link and says whose link it is and
+// how to remove it: RimArcho never deletes another tool's link (09 §3, 16 §2.9 OpLinked).
+func (m *model) showLinkOf(id string) tea.Cmd {
+	if id == "" || m.st == nil {
+		return nil
+	}
+	mod := m.st.Ix.ByID[id]
+	if mod == nil {
+		return nil
+	}
+	link := m.st.Ix.LinkEntry(mod)
+	if link == "" {
+		m.say(sayFail, T("the folder is not there"))
+		return nil
+	}
+	open := m.opts.OpenDir
+	if open == nil {
+		open = openDir
+	}
+	if err := open(filepath.Dir(link)); err != nil {
+		m.say(sayFail, err.Error())
+		return nil
+	}
+	m.say(sayInfo, view.LinkedText(m.st.Ix, mod))
+	return nil
+}
+
 func (m *model) openFolderOf(id string) tea.Cmd {
 	if id == "" || m.st == nil {
 		m.say(sayInfo, T("RimArcho has not seen this copy: no folder"))

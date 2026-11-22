@@ -5,6 +5,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // What the player can do with a row in the plan editor or Mod library > All
@@ -63,6 +64,10 @@ const (
 	OpSubCheck  = "subscription-check"
 	OpSubUpdate = "subscription-update"
 	OpSubPage   = "subscription-page"
+	// OpLinked stands where delete would: the copy is a link another tool made (RimCrow
+	// `_Link_`), which RimArcho never deletes (09 §3); it opens the folder holding the link
+	// and says whose it is (16 §2.9).
+	OpLinked = "linked"
 )
 
 // opTable is every op in menu order (16 §8.5): within a group in this order, and unsubscribe /
@@ -96,6 +101,7 @@ var opTable = []Op{
 	{Code: OpResub, Group: 5, Confirm: true, Detail: true},
 	{Code: OpSubCheck, Group: 5, Detail: true},
 	{Code: OpSubUpdate, Group: 5, Confirm: true, Detail: true},
+	{Code: OpLinked, Group: 5, Detail: true, One: true},
 	{Code: OpSubRemove, Key: "Del", Group: 5, Confirm: true, Danger: true, Detail: true},
 	{Code: OpUnsub, Key: "Del", Group: 5, Confirm: true, Danger: true, Detail: true},
 	{Code: OpDelete, Key: "Del", Group: 5, Confirm: true, Danger: true, Detail: true},
@@ -113,7 +119,7 @@ func opLabel(code string) string {
 		OpSteam: T("steam page"),
 		OpPin:   T("keep this version"), OpPinUpdate: T("update to the Workshop version"), OpUnpin: T("stop keeping this version"),
 		OpMove: T("move into the lock library"), OpUnhide: T("unhide"), OpResub: T("resubscribe"),
-		OpUnsub: T("unsubscribe"), OpDelete: T("move to the recycle bin"),
+		OpUnsub: T("unsubscribe"), OpDelete: T("move to the recycle bin"), OpLinked: T("a link, not a folder: show where it is"),
 		OpTextures: T("convert textures to DDS"), OpTexClean: T("remove the converted textures"),
 	}[code]
 }
@@ -300,7 +306,27 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 	} else if live && (own || workshop && (has(app.LibResidue) || has(app.LibHidden))) && !linked {
 		ks = append(ks, OpDelete)
 	}
+	// a link cannot go to the recycle bin (02 §3), and another tool's is not RimArcho's to
+	// remove: the menu says why and opens where it is, never a menu with no way out
+	if live && linked {
+		ks = append(ks, OpLinked)
+	}
 	return sortOps(ks)
+}
+
+// LinkedText says whose link a linked copy is and how to remove it (OpLinked; the same
+// reason archo trash gives).
+func LinkedText(ix *app.Index, m *store.Mod) string {
+	link := ix.LinkEntry(m)
+	if link == "" {
+		link = ix.ModDir(m)
+	}
+	switch who := app.LinkMaker(link); who {
+	case "":
+		return Tf("%s is a link another tool made: delete the link there or in this folder; its target stays", link)
+	default:
+		return Tf("%s is a link %s made: remove it in %s, or delete the link in this folder; its target stays", link, who, who)
+	}
 }
 
 // RowOps are the ops of the editor's row: its copy's ops when the library knows it (the

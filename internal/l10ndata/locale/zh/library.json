@@ -406,5 +406,9 @@
   "stop keeping this version": "不再保留这个版本",
   "Updating replaces this copy. To keep the old one, keep this version first.": "更新会替换这一份。想留着旧版：先保留这个版本",
   "After unsubscribing, you cannot download it again; keep this version to hold on to it.": "退订后将无法重新下载；保留这个版本即可保留。",
-  "check again": "重新检查"
+  "check again": "重新检查",
+  "a link, not a folder: show where it is": "这是链接，不是文件夹：显示所在位置",
+  "%s is a link another tool made: delete the link there or in this folder; its target stays": "%s 是其他工具建的链接：在那个工具里删，或在这个文件夹里删掉链接；它指向的文件夹不受影响",
+  "%s is a link %s made: remove it in %s, or delete the link in this folder; its target stays": "%s 是 %s 建的链接：在 %s 里移除，或在这个文件夹里删掉链接；它指向的文件夹不受影响",
+  "⚠ pack %s uses this copy: it still goes, and the pack launches with its own copy": "⚠ 整合包%s用到这份副本：照样执行，整合包启动时改用自带的副本"
 }

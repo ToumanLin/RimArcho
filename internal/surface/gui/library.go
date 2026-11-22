@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -194,6 +195,35 @@ func (s *API) OpenFolder(id string) error {
 		return s.openDir(dir)
 	}
 	return openDir(dir)
+}
+
+// ShowLink opens the folder that holds a linked copy's link (Mods/ for RimCrow's
+// `_Link_<id>`) and says whose link it is and how to remove it: RimArcho never deletes
+// another tool's link (09 §3, 16 §2.9 OpLinked).
+func (s *API) ShowLink(id string) (string, error) {
+	s.mu.Lock()
+	ix, err := s.a.Index()
+	s.mu.Unlock()
+	if err != nil {
+		return "", err
+	}
+	m := ix.ByID[id]
+	if m == nil {
+		return "", fmt.Errorf("no mod %s", id)
+	}
+	link := ix.LinkEntry(m)
+	if link == "" {
+		return "", errors.New(view.T("the folder is not there"))
+	}
+	dir := filepath.Dir(link)
+	open := s.openDir
+	if open == nil {
+		open = openDir
+	}
+	if err := open(dir); err != nil {
+		return "", err
+	}
+	return view.LinkedText(ix, m), nil
 }
 
 // OpenWorkshop opens an instance's Workshop page (ctrl+w, 16 §3.5); without a Workshop ID

@@ -816,9 +816,7 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 				p.Lines = append(p.Lines, T("RimArcho moves the folder to the recycle bin before Steam re-downloads it; local edits are lost"))
 			}
 		}
-		if w := usedWarning(a, st, kind, ref); w != "" {
-			p.Lines = append(p.Lines, w)
-		}
+		p.Lines = append(p.Lines, usedWarning(a, st, kind, ref)...)
 	}
 	// One copy that cannot go does not hold back the others (VM run B2: a moved folder
 	// blocked eleven deletions); the confirm says which are left out.
@@ -892,24 +890,34 @@ func previewFailure(st *app.LoadoutState, ref, out string) string {
 }
 
 // usedWarning: deleting or unsubscribing a copy the lists use only warns; the player's word
-// goes, and the lists show it as missing (16 §2.9). "" when no list uses it.
-func usedWarning(a *app.App, st *app.LoadoutState, kind, ref string) string {
+// goes, and the lists show it as missing (16 §2.9); a pack that reuses a Mods/ copy links
+// its own instead (10 §3). None when nothing uses it.
+func usedWarning(a *app.App, st *app.LoadoutState, kind, ref string) []string {
 	if kind != LibDelete && kind != LibUnsub && kind != OpSubRemove {
-		return ""
+		return nil
 	}
 	m, err := st.Ix.ResolveOne(ref)
 	if err != nil {
-		return ""
+		return nil
 	}
-	ps, err := a.PlansUsing(st, m.ID)
-	if err != nil || len(ps) == 0 {
-		return ""
+	var out []string
+	if ps, err := a.PlansUsing(st, m.ID); err == nil && len(ps) > 0 {
+		q := make([]string, len(ps))
+		for j, p := range ps {
+			q[j] = Tf("“%s”", libUseText(p))
+		}
+		out = append(out, Tf("⚠ %s is in list %s: it still goes, and the list shows it as missing", m.DisplayName(), strings.Join(q, T(", "))))
 	}
-	q := make([]string, len(ps))
-	for j, p := range ps {
-		q[j] = Tf("“%s”", libUseText(p))
+	if kind == LibDelete {
+		if ps, err := a.PacksUsing(st, m.ID); err == nil && len(ps) > 0 {
+			q := make([]string, len(ps))
+			for j, p := range ps {
+				q[j] = Tf("“%s”", p)
+			}
+			out = append(out, Tf("⚠ pack %s uses this copy: it still goes, and the pack launches with its own copy", strings.Join(q, T(", "))))
+		}
 	}
-	return Tf("⚠ %s is in list %s: it still goes, and the list shows it as missing", m.DisplayName(), strings.Join(q, T(", ")))
+	return out
 }
 
 // LibDo runs an action on copies and says what it did.

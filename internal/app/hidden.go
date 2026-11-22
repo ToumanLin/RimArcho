@@ -226,7 +226,18 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 	case !own && m.Unloadable != scan.UnloadableAboutDisabled && !m.Residue:
 		return nil, fmt.Errorf("%w: %s is a subscribed, loadable mod; unsubscribe it in Steam instead", ErrNotTrashable, st.Ix.Ref(m.ID))
 	case st.Ix.ModIsLink(m):
-		return nil, fmt.Errorf("%w: %s is a link, not a folder; RimArcho does not move it", ErrNotTrashable, st.Ix.ModDir(m))
+		// another tool's link (RimCrow `_Link_`): never ours to delete (09 §3); say whose it
+		// is and where, so the player can remove it there (16 §2.9 "a link")
+		link := st.Ix.LinkEntry(m)
+		if link == "" {
+			link = st.Ix.ModDir(m)
+		}
+		who := LinkMaker(link)
+		if who == "" {
+			who = "another tool"
+		}
+		return nil, fmt.Errorf("%w: %s is a link %s made to %s, not a folder; RimArcho does not delete other tools' links: remove it in %s, or delete the link itself in its folder (its target stays)",
+			ErrNotTrashable, link, who, st.Ix.ModDir(m), who)
 	}
 	// The plans that use it (the current one when it is enabled, any environment of this
 	// game) only hear about it: they keep the entry and show it missing (16 §2.9).

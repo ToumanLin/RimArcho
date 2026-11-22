@@ -265,3 +265,20 @@ func (a *App) usedBy(st *LoadoutState, id string) ([]string, error) {
 
 // PlansUsing is usedBy for the pages: deleting or unsubscribing such a copy warns, and goes.
 func (a *App) PlansUsing(st *LoadoutState, id string) ([]string, error) { return a.usedBy(st, id) }
+
+// PacksUsing names the packs whose list holds the copy: a pack built while this `Mods/`
+// copy was there reuses it at launch instead of linking its own (10 §3 step 2). Deleting it
+// warns, and goes; the pack then links its bundled copy.
+func (a *App) PacksUsing(st *LoadoutState, id string) ([]string, error) {
+	uses, _, err := a.libUses(st)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, u := range uses[id] {
+		if u.Kind == "pack" {
+			out = append(out, u.Name)
+		}
+	}
+	return out, nil
+}

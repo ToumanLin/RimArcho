@@ -41,6 +41,33 @@ func (ix *Index) ModIsLink(m *store.Mod) bool {
 	return source.IsLink(ix.ModDir(m))
 }
 
+// LinkEntry is the link a linked copy is seen through (the entry in its source, such as
+// Mods/_Link_<id>), "" when the copy is a real folder.
+func (ix *Index) LinkEntry(m *store.Mod) string {
+	if s := ix.Source(m.SourceID); s != nil {
+		if p := filepath.Join(s.Root, m.Rel); source.IsLink(p) {
+			return p
+		}
+	}
+	if p := ix.ModDir(m); source.IsLink(p) {
+		return p
+	}
+	return ""
+}
+
+// LinkMaker names the tool a link's name says made it: RimCrow for `_Link_`, RimArcho for
+// its own prefixes (09 §3), "" when the name says nothing.
+func LinkMaker(link string) string {
+	n := strings.ToLower(filepath.Base(link))
+	switch {
+	case strings.HasPrefix(n, "_link_"):
+		return "RimCrow"
+	case strings.HasPrefix(n, "_archo_"), strings.HasPrefix(n, "!archopack_"):
+		return "RimArcho"
+	}
+	return ""
+}
+
 // analysisMods: the enabled list in order, plus every other live instance the list could
 // load: registered, or deployable through a link on save (SteamCMD and extra folders).
 // Inactive ones are definers for no-match reasons and the missing-parent provider index
