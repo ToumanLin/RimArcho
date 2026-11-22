@@ -83,3 +83,21 @@ func TestClusterKeyHint(t *testing.T) {
 		t.Fatalf("own class kept: %s", cls)
 	}
 }
+
+// 19 §4: a Monitor writing a higher schema than this reader knows is newer than RimArcho; its
+// entries are not read and the reader says so instead of reporting a clean run.
+func TestCompanionNewerSchema(t *testing.T) {
+	c := NewCompanion("ArchoMonitor.log")
+	c.Feed([]byte(`{"timestamp":"2026-11-21 10:00:00.000","level":"INFO","message":"[Archo Monitor] session abc","source":"archo-monitor","schema":2,"kind":"session","context":{"session":"abc","version":"2.0.0"}}
+{"timestamp":"2026-11-21 10:00:01.000","level":"ERROR","message":"boom","source":"archo-monitor","schema":2,"id":"0000abcd","count":1,"total":1}
+`), true)
+	if c.TooNew != 2 || len(c.Entries) != 0 || !c.Monitor || c.Version != "2.0.0" {
+		t.Fatalf("newer schema read: TooNew %d, %d entries, version %q", c.TooNew, len(c.Entries), c.Version)
+	}
+	ok := NewCompanion("ArchoMonitor.log")
+	ok.Feed([]byte(`{"timestamp":"2026-11-21 10:00:01.000","level":"ERROR","message":"boom","source":"archo-monitor","schema":1,"id":"0000abcd","count":1,"total":1}
+`), true)
+	if ok.TooNew != 0 || len(ok.Entries) != 1 {
+		t.Fatalf("schema 1: TooNew %d, %d entries", ok.TooNew, len(ok.Entries))
+	}
+}

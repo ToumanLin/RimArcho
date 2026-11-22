@@ -255,8 +255,13 @@ func (a *App) automaticCheck(ctx context.Context, kind string) (int, string, err
 		return a.CheckSelfUpdate(ctx)
 	case "data":
 		_, err := a.UpdateData(nil, false)
+		// Archo Monitor's corpus data for players without the Workshop item (19 §6).
+		_, ferr := a.FetchMonitorAnonymous(ctx)
 		if err != nil {
-			return 0, "stored data kept", err
+			return 0, "stored data kept", errors.Join(err, ferr)
+		}
+		if ferr != nil {
+			return 0, "community data updated; Archo Monitor data not fetched", ferr
 		}
 		return 0, "community data updated", nil
 	}

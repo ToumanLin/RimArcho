@@ -26,6 +26,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 // Pattern is one entry of the library.
@@ -52,6 +53,10 @@ type Pattern struct {
 	Versions []string `json:"versions,omitempty"`
 	First    string   `json:"first,omitempty"` // month first / last seen
 	Last     string   `json:"last,omitempty"`
+	// LastLog is the newest supporting log (YYYY-MM-DD); MayBeFixed: Mod's Workshop item was
+	// updated after it (weekly corpus data, 05 §4.6), so the known error may be fixed.
+	LastLog    string `json:"lastLog,omitempty"`
+	MayBeFixed bool   `json:"mayBeFixed,omitempty"`
 
 	Logs      int         `json:"logs"`
 	Sessions  int         `json:"sessions"`
@@ -89,14 +94,41 @@ type Data struct {
 //go:embed patterns.json
 var dataJSON []byte
 
-// Load returns the embedded library (parsed once).
-var Load = sync.OnceValue(func() *Data {
+// Embedded returns the library built into the program (parsed once): the 1.6 section of
+// the embedded corpus bundle (internal/corpus).
+var Embedded = sync.OnceValue(func() *Data {
 	d, err := Parse(dataJSON)
 	if err != nil {
 		panic("internal/patterns: " + err.Error())
 	}
 	return d
 })
+
+// EmbeddedJSON is the embedded library file.
+func EmbeddedJSON() []byte { return dataJSON }
+
+var provider atomic.Pointer[func() *Data]
+
+// SetProvider makes Load return what f returns (internal/corpus picks the library of the
+// current game version); f returning nil falls back to the embedded library. nil removes it.
+func SetProvider(f func() *Data) {
+	if f == nil {
+		provider.Store(nil)
+		return
+	}
+	provider.Store(&f)
+}
+
+// Load returns the library in use: the corpus section of the current game version, else the
+// embedded one.
+func Load() *Data {
+	if p := provider.Load(); p != nil {
+		if d := (*p)(); d != nil {
+			return d
+		}
+	}
+	return Embedded()
+}
 
 // Parse reads a library file and compiles its rules.
 func Parse(b []byte) (*Data, error) {

@@ -624,6 +624,7 @@ function drawNeeds() {
   again.classList.add("analyze-again");
   const w = page("needs fill", needsLead(d),
     checkState(d),
+    corpusChip(d),
     autoFix(),
     again,
     act(T("game log"), "log", () => ui.go("log"), "l"));
@@ -1187,6 +1188,17 @@ export function againChanged() {
   if (st && N.data) st.replaceWith(checkState(N.data));
 }
 
+// corpusChip: the shared-log data behind the corpus items as a small week pill (05 §4.6);
+// its source and log count are the tooltip. Amber when a bundle needs a newer RimArcho.
+function corpusChip(d) {
+  const c = d && d.corpus;
+  if (!c) return null;
+  const s = el("span", "corpus-chip" + (c.newer ? " newer" : "") + (c.week ? "" : " none"), c.week ? c.week + " " + c.game : c.game);
+  s.title = c.tip;
+  s.setAttribute("aria-label", c.tip);
+  return s;
+}
+
 // checkCurrent: the shown findings come from a check of the list as it is.
 function checkCurrent(d) { return !!d && !d.never && !d.stale && !d.error && !S.busy.analyze; }
 
@@ -1530,6 +1542,8 @@ function monitorRows(scroll, mon) {
   if (mon.running) head.append(el("span", "live-dot"));
   head.append(el("span", "word-facts", mon.facts));
   scroll.append(head);
+  // A newer Monitor's log is not read (19 §4): say so instead of "nothing reported".
+  if (mon.tooNew) { scroll.append(el("div", "empty-state too-new", mon.tooNew)); return; }
   if (!mon.entries.length) { scroll.append(el("div", "empty-state", "✓ " + T("nothing reported in this run"))); return; }
   L.mcur = Math.min(L.mcur, Math.max(0, mon.entries.length - 1));
   L.list = virtualRows(scroll, mon.entries.length, (i) => {

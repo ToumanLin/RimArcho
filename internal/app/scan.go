@@ -104,6 +104,7 @@ func (a *App) ScanWith(o ScanOptions) (*ScanReport, error) {
 }
 
 func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, error) {
+	defer a.forgetCorpus() // a Workshop Monitor may have come or gone (05 §4.6)
 	if o.Progress == nil {
 		o.Progress = a.ScanProgress
 	}

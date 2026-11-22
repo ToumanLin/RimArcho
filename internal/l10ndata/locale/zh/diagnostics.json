@@ -494,5 +494,13 @@
   "a patch of %s finds nothing": "%s 的一个补丁找不到要改的东西",
   "it failed in the last run": "上次运行时它失败了",
   "patches of %d Mods find nothing": "%d 个 Mod 的补丁找不到要改的东西",
-  "those changes do not take effect; the Mods may not fit this game version or the Mods they change": "这些改动不会生效；这些 Mod 可能不适配当前游戏版本或它们改的 Mod"
+  "those changes do not take effect; the Mods may not fit this game version or the Mods they change": "这些改动不会生效；这些 Mod 可能不适配当前游戏版本或它们改的 Mod",
+  "no shared-log data for %s yet": "%s 暂无共享日志数据",
+  "built in": "内置",
+  "Archo Monitor folder %s": "Archo Monitor 文件夹 %s",
+  "Workshop Archo Monitor": "创意工坊的 Archo Monitor",
+  "shared-log data %s, %s; %s, %d logs": "共享日志数据 %s，%s；%s，%d 份日志",
+  "newer corpus data needs a newer RimArcho": "更新的日志数据需要更新 RimArcho",
+  "Monitor is newer than RimArcho, update RimArcho": "Monitor 比 RimArcho 新，请更新 RimArcho",
+  "%s has this error itself in %s shared logs (%s); may be fixed: it was updated after the last of them": "%s 自身在 %s 份共享日志中有这个错误（%s）；可能已修复：它在最后一份日志之后更新过"
 }

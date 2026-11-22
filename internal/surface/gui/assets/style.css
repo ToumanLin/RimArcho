@@ -527,6 +527,7 @@ body.row-dragging, body.row-dragging * { cursor: grabbing !important; user-selec
 .card-head { display: flex; align-items: baseline; gap: 10px; padding: 10px 14px 8px; border-bottom: var(--hairline) solid var(--line-2); }
 .card-head .n { margin-left: auto; color: var(--amber); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .empty-state { padding: 36px 20px; text-align: center; color: var(--muted); }
+.empty-state.too-new { color: var(--amber); }
 .group { padding: 12px 14px 4px; color: var(--faint); font-size: 12px; font-weight: 600; }
 .page-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--card-gap); padding-bottom: 8px; }
 .cols { flex: 1; min-height: 0; display: grid; gap: var(--card-gap); }
@@ -677,6 +678,10 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .page-head .check-state svg { width: 16px; height: 16px; }
 .page-head .check-state.current { color: var(--green); }
 .page-head .check-state.checking { color: var(--muted); }
+/* the shared-log data behind corpus items, its source in the tooltip (05 §4.6) */
+.page-head .corpus-chip { font-size: 12px; line-height: 16px; padding: 0 6px; border-radius: 999px; background: var(--pill); color: var(--muted); font-variant-numeric: tabular-nums; }
+.page-head .corpus-chip.none { color: var(--faint); text-decoration: line-through; }
+.page-head .corpus-chip.newer { color: var(--amber); }
 .parts { color: var(--muted); margin: 4px 0 0 2px; font-size: 12px; }
 .parts { padding-left: 18px; }
 .parts li + li { margin-top: 3px; }
