@@ -60,12 +60,7 @@ internal/cmds/saves_review.go savesReview 42 136
 internal/cmds/test.go testRunCmd 58 177
 internal/identity/reconcile.go Reconcile 44 119
 internal/modchanges/modchanges.go (*changeBuilder).mod 128 321
-internal/modsearch/context.go contexts 58 147
-internal/modsearch/files.go listFiles 49 135
-internal/modsearch/match.go (*matcher).search 43 149
 internal/order/order.go Sort 97 309
-internal/savefile/scan_content.go (*scanner).contentRef 75 176
-internal/savefile/scan_rules.go (*extract).rule 76 132
 internal/scan/observe.go Collect 31 163
 internal/store/maintenance.go (*Store).Maintain 47 171
 internal/subscribe/loverslab.go (*LoversLab).parsePage 49 96

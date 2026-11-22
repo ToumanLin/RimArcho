@@ -598,8 +598,25 @@ func (x *extract) newPawn(s *scanner, p *frame, kind []byte) {
 }
 
 func (x *extract) rule(s *scanner, f, p *frame, v []byte) {
-	fs := s.f
-	switch ruleNodes[f.node].act {
+	a := ruleNodes[f.node].act
+	switch a {
+	case aRecorderDef, aRecords, aRecordsDeflate, aLetterDef, aLetterLabel, aLetterTick,
+		aFactionDef, aFactionName, aFactionLoadID, aWOID, aWOFaction, aWOName, aMapID:
+		if p != nil && p.obj >= 0 {
+			x.objectRule(s.f, a, p.obj, v)
+		}
+	case aPawnFirst, aPawnNick, aPawnLast, aPawnSingle, aPawnHealth, aPawnGuest, aPawnHost:
+		if pw := x.curPawn(); pw != nil {
+			x.pawnRule(pw, a, v)
+		}
+	default:
+		x.gameRule(s.f, a, v)
+	}
+}
+
+// gameRule stores a value of the game itself: header, statistics, research and story.
+func (x *extract) gameRule(fs *Facts, a act, v []byte) {
+	switch a {
 	case aRealPlayTime:
 		fs.RealPlayTime = parseFloat(v)
 	case aPermadeath:
@@ -636,32 +653,20 @@ func (x *extract) rule(s *scanner, f, p *frame, v []byte) {
 		fs.Difficulty = string(v)
 	case aGroupDef:
 		x.curGroup = x.str(v)
-	case aRecorderDef:
-		if p != nil && p.obj >= 0 {
-			fs.History[p.obj].Def = string(v)
-		}
-	case aRecords, aRecordsDeflate:
-		if p != nil && p.obj >= 0 {
-			setRecords(&fs.History[p.obj], v, ruleNodes[f.node].act == aRecordsDeflate)
-		}
+	default:
+		x.worldRule(fs, a, v)
+	}
+}
+
+// worldRule stores a value of the world or the current map: grids, world info and map info.
+func (x *extract) worldRule(fs *Facts, a act, v []byte) {
+	switch a {
 	case aTerrainGrid, aTerrainGridDeflate:
-		fs.gridDefs("TerrainDef", v, ruleNodes[f.node].act == aTerrainGridDeflate)
+		fs.gridDefs("TerrainDef", v, a == aTerrainGridDeflate)
 	case aThingGrid, aThingGridDeflate:
-		fs.gridDefs("ThingDef", v, ruleNodes[f.node].act == aThingGridDeflate)
+		fs.gridDefs("ThingDef", v, a == aThingGridDeflate)
 	case aBiomeGrid, aBiomeGridDeflate:
-		fs.gridDefs("BiomeDef", v, ruleNodes[f.node].act == aBiomeGridDeflate)
-	case aLetterDef:
-		if p != nil && p.obj >= 0 {
-			fs.Events[p.obj].Def = x.str(v)
-		}
-	case aLetterLabel:
-		if p != nil && p.obj >= 0 {
-			fs.Events[p.obj].Label = string(v)
-		}
-	case aLetterTick:
-		if p != nil && p.obj >= 0 {
-			fs.Events[p.obj].Tick = parseInt(v)
-		}
+		fs.gridDefs("BiomeDef", v, a == aBiomeGridDeflate)
 	case aWorldName:
 		fs.World.Name = string(v)
 	case aWorldSeed:
@@ -670,34 +675,6 @@ func (x *extract) rule(s *scanner, f, p *frame, v []byte) {
 		fs.World.PersistentRandomValue = int(parseInt(v))
 	case aWorldCoverage:
 		fs.World.Coverage = parseFloat(v)
-	case aFactionDef:
-		if p != nil && p.obj >= 0 {
-			fs.Factions[p.obj].Def = string(v)
-		}
-	case aFactionName:
-		if p != nil && p.obj >= 0 {
-			fs.Factions[p.obj].Name = string(v)
-		}
-	case aFactionLoadID:
-		if p != nil && p.obj >= 0 {
-			fs.Factions[p.obj].LoadID = int(parseInt(v))
-		}
-	case aWOID:
-		if p != nil && p.obj >= 0 {
-			x.wos[p.obj].id = int(parseInt(v))
-		}
-	case aWOFaction:
-		if p != nil && p.obj >= 0 {
-			x.wos[p.obj].faction = x.str(v)
-		}
-	case aWOName:
-		if p != nil && p.obj >= 0 {
-			x.wos[p.obj].name = string(v)
-		}
-	case aMapID:
-		if p != nil && p.obj >= 0 {
-			fs.Maps[p.obj].ID = int(parseInt(v))
-		}
 	case aMapParent:
 		if x.curMap >= 0 && string(v) != "null" {
 			fs.Maps[x.curMap].Parent = string(v)
@@ -706,27 +683,56 @@ func (x *extract) rule(s *scanner, f, p *frame, v []byte) {
 		if x.curMap >= 0 {
 			fs.Maps[x.curMap].Pocket = string(v) == "True"
 		}
-	case aPawnFirst, aPawnNick, aPawnLast, aPawnSingle, aPawnHealth, aPawnGuest, aPawnHost:
-		pw := x.curPawn()
-		if pw == nil {
-			return
-		}
-		switch ruleNodes[f.node].act {
-		case aPawnFirst:
-			pw.First = string(v)
-		case aPawnNick:
-			pw.Nick = string(v)
-		case aPawnLast:
-			pw.Last = string(v)
-		case aPawnSingle:
-			pw.Name = string(v)
-		case aPawnHealth:
-			pw.Dead = string(v) == "Dead"
-		case aPawnGuest:
-			pw.guest = x.str(v)
-		case aPawnHost:
-			pw.host = x.str(v)
-		}
+	}
+}
+
+// objectRule stores a value of the record its parent element opened (obj).
+func (x *extract) objectRule(fs *Facts, a act, obj int32, v []byte) {
+	switch a {
+	case aRecorderDef:
+		fs.History[obj].Def = string(v)
+	case aRecords, aRecordsDeflate:
+		setRecords(&fs.History[obj], v, a == aRecordsDeflate)
+	case aLetterDef:
+		fs.Events[obj].Def = x.str(v)
+	case aLetterLabel:
+		fs.Events[obj].Label = string(v)
+	case aLetterTick:
+		fs.Events[obj].Tick = parseInt(v)
+	case aFactionDef:
+		fs.Factions[obj].Def = string(v)
+	case aFactionName:
+		fs.Factions[obj].Name = string(v)
+	case aFactionLoadID:
+		fs.Factions[obj].LoadID = int(parseInt(v))
+	case aWOID:
+		x.wos[obj].id = int(parseInt(v))
+	case aWOFaction:
+		x.wos[obj].faction = x.str(v)
+	case aWOName:
+		x.wos[obj].name = string(v)
+	case aMapID:
+		fs.Maps[obj].ID = int(parseInt(v))
+	}
+}
+
+// pawnRule stores a value of the current pawn.
+func (x *extract) pawnRule(pw *pawnRec, a act, v []byte) {
+	switch a {
+	case aPawnFirst:
+		pw.First = string(v)
+	case aPawnNick:
+		pw.Nick = string(v)
+	case aPawnLast:
+		pw.Last = string(v)
+	case aPawnSingle:
+		pw.Name = string(v)
+	case aPawnHealth:
+		pw.Dead = string(v) == "Dead"
+	case aPawnGuest:
+		pw.guest = x.str(v)
+	case aPawnHost:
+		pw.host = x.str(v)
 	}
 }
 
