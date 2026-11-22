@@ -136,6 +136,19 @@ func TestScanColony(t *testing.T) {
 	}
 }
 
+func TestScanLaunchedAndPocketMap(t *testing.T) {
+	f := scanBytes(t, []byte(`<savegame><game>
+<storyWatcher><statsRecord><colonistsLaunched>2</colonistsLaunched><greatestPopulation>7</greatestPopulation></statsRecord></storyWatcher>
+<maps><li><uniqueID>3</uniqueID><mapInfo><parent>WorldObject_9</parent><isPocketMap>True</isPocketMap></mapInfo></li><li><uniqueID>4</uniqueID><mapInfo><isPocketMap>False</isPocketMap></mapInfo></li></maps>
+</game></savegame>`))
+	if want := (Stats{ColonistsLaunched: 2, GreatestPopulation: 7}); f.Stats != want {
+		t.Errorf("stats = %+v, want %+v", f.Stats, want)
+	}
+	if len(f.Maps) != 2 || f.Maps[0].ID != 3 || f.Maps[0].Parent != "WorldObject_9" || !f.Maps[0].Pocket || f.Maps[1].ID != 4 || f.Maps[1].Pocket {
+		t.Errorf("maps = %+v", f.Maps)
+	}
+}
+
 func TestScanJSONRoundTrip(t *testing.T) {
 	f := scanBytes(t, readFixture(t, "colony.rws"))
 	b, err := json.Marshal(f)
