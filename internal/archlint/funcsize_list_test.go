@@ -24,7 +24,6 @@ internal/app/library.go (*App).buildLibrary 102 264
 internal/app/linkhealth.go (*App).InspectGameLinks 61 172
 internal/app/linkhealth.go (*App).applyLinkRepair 51 111
 internal/app/linkrecovery.go (*App).applyLinkRecoveries 41 116
-internal/app/livelog.go (*LiveLog).finish 43 101
 internal/app/loadcost.go (*App).PlanLoadCost 44 181
 internal/app/loadout.go (*App).writeGameOnce 58 191
 internal/app/logrefs.go (*attrCtx).referrers 89 277
@@ -35,14 +34,12 @@ internal/app/pack.go (*App).launchPackWith 64 233
 internal/app/pack_archive.go (*App).exportPackArchive 50 161
 internal/app/pack_archive.go scanPackArchive 44 118
 internal/app/packsettings.go (*App).ApplyListSettings 52 166
-internal/app/parentproblems.go (*App).ParentHelp 54 153
 internal/app/problems.go (*App).DeclFindings 111 426
 internal/app/rimcrow.go (*App).ImportRimCrow 128 428
 internal/app/rimcrowprofiles.go (*App).importCrowProfiles 80 291
 internal/app/rimsortaux.go (*App).ImportRimSortAux 60 188
 internal/app/savecheck.go (*App).CheckSave 76 242
 internal/app/savecontent.go (*App).saveContent 87 309
-internal/app/savegrid.go (*App).gridRefs 42 134
 internal/app/saveowners.go (*App).attributeSave 91 331
 internal/app/scan.go (*App).scanEnvironment 58 224
 internal/app/source.go (*App).SourceSearchContext 49 174

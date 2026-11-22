@@ -455,90 +455,102 @@ func (lv *LiveLog) finish(a *App, fresh []*LiveCluster) error {
 		c.withComp = len(c.samples) > 0 && lv.comp.Lookup(c.samples[0].Message) != nil
 		c.redo = false
 	}
-	fresh = todo
-	if len(fresh) > 0 {
-		lf := &logs.File{Version: lv.Version, Waylith: lv.p.F.Waylith, HasPhases: lv.p.F.HasPhases}
-		for _, c := range fresh {
-			lf.Entries = append(lf.Entries, c.samples[0])
-		}
-		st, err := a.Loadout()
-		if err != nil {
+	if len(todo) > 0 {
+		if err := lv.attributeFresh(a, todo); err != nil {
 			return err
-		}
-		rep := &LogReport{Path: lv.Path, Label: filepath.Base(lv.Path), Version: lv.Version}
-		st2, restore, err := a.logState(st, rep)
-		if err != nil {
-			return err
-		}
-		err = a.attribute(st2, rep, lf, nil, lv.comp)
-		restore()
-		if err != nil {
-			return err
-		}
-		for i, c := range fresh {
-			if i < len(rep.Clusters) && rep.Clusters[i].First == c.samples[0] {
-				c.Report = rep.Clusters[i]
-				continue
-			}
-			for _, lc := range rep.Clusters {
-				if lc.First == c.samples[0] {
-					c.Report = lc
-				}
-			}
 		}
 	}
 	// Times, levels and counts from the companion log (06 §7).
 	for _, c := range lv.order {
-		if len(c.samples) == 0 {
+		if len(c.samples) > 0 {
+			lv.applyCompanion(c)
+		}
+	}
+	return nil
+}
+
+// attributeFresh attributes the clusters in fresh with the full-log engine and stores each report.
+func (lv *LiveLog) attributeFresh(a *App, fresh []*LiveCluster) error {
+	lf := &logs.File{Version: lv.Version, Waylith: lv.p.F.Waylith, HasPhases: lv.p.F.HasPhases}
+	for _, c := range fresh {
+		lf.Entries = append(lf.Entries, c.samples[0])
+	}
+	st, err := a.Loadout()
+	if err != nil {
+		return err
+	}
+	rep := &LogReport{Path: lv.Path, Label: filepath.Base(lv.Path), Version: lv.Version}
+	st2, restore, err := a.logState(st, rep)
+	if err != nil {
+		return err
+	}
+	err = a.attribute(st2, rep, lf, nil, lv.comp)
+	restore()
+	if err != nil {
+		return err
+	}
+	for i, c := range fresh {
+		if i < len(rep.Clusters) && rep.Clusters[i].First == c.samples[0] {
+			c.Report = rep.Clusters[i]
 			continue
 		}
-		c.Phases = nil
-		if len(c.playerPhases) > 0 || lv.p.F.HasPhases || lv.comp != nil && lv.comp.HasPhases {
-			// Rebuild from the independent sources. Player.log can arrive after its
-			// companion count; incrementing the previously merged total would count
-			// that occurrence twice and invent an unknown-phase remainder.
-			c.Count = 0
-			for _, pc := range c.playerPhases {
-				c.Count += pc.Count
-			}
-		}
-		if lv.p.F.HasPhases {
-			c.Phases = append([]logs.PhaseCount(nil), c.playerPhases...)
-		}
-		if e := lv.comp.Lookup(c.samples[0].Message); e != nil {
-			if c.Level == "" {
-				c.At, c.Level = e.At, e.Level
-			}
-			if e.Count > c.Count {
-				c.Count = e.Count
-			}
-			if lv.comp.HasPhases {
-				c.Phases = logs.MergePhaseCounts(c.Phases, e.Phases)
-			}
-		}
-		if lv.p.F.HasPhases || lv.comp != nil && lv.comp.HasPhases {
-			n := 0
-			for _, pc := range c.Phases {
-				n += pc.Count
-			}
-			c.Count = max(c.Count, n)
-			c.Phases = logs.CompletePhaseCounts(c.Phases, c.Count)
-		}
-		if c.Report != nil && c.Report.Cluster != nil {
-			c.Report.Count = c.Count
-			c.Report.Phases = c.Phases
-			if lv.p.F.HasPhases && !c.OnlyCompanion {
-				c.Report.Phase = c.samples[0].Phase
-				if c.Report.Phase == nil {
-					c.Report.Phase = logs.LoadingPhase
-				}
-			} else if e := lv.comp.Lookup(c.samples[0].Message); e != nil && lv.comp.HasPhases {
-				c.Report.Phase = e.Phase
-				if c.Report.Phase == nil {
-					c.Report.Phase = logs.LoadingPhase
-				}
+		for _, lc := range rep.Clusters {
+			if lc.First == c.samples[0] {
+				c.Report = lc
 			}
 		}
 	}
 	return nil
+}
+
+// applyCompanion sets a cluster's count and phases from Player.log and the companion log and
+// copies them into its report.
+func (lv *LiveLog) applyCompanion(c *LiveCluster) {
+	c.Phases = nil
+	if len(c.playerPhases) > 0 || lv.p.F.HasPhases || lv.comp != nil && lv.comp.HasPhases {
+		// Rebuild from the independent sources. Player.log can arrive after its
+		// companion count; incrementing the previously merged total would count
+		// that occurrence twice and invent an unknown-phase remainder.
+		c.Count = 0
+		for _, pc := range c.playerPhases {
+			c.Count += pc.Count
+		}
+	}
+	if lv.p.F.HasPhases {
+		c.Phases = append([]logs.PhaseCount(nil), c.playerPhases...)
+	}
+	if e := lv.comp.Lookup(c.samples[0].Message); e != nil {
+		if c.Level == "" {
+			c.At, c.Level = e.At, e.Level
+		}
+		if e.Count > c.Count {
+			c.Count = e.Count
+		}
+		if lv.comp.HasPhases {
+			c.Phases = logs.MergePhaseCounts(c.Phases, e.Phases)
+		}
+	}
+	if lv.p.F.HasPhases || lv.comp != nil && lv.comp.HasPhases {
+		n := 0
+		for _, pc := range c.Phases {
+			n += pc.Count
+		}
+		c.Count = max(c.Count, n)
+		c.Phases = logs.CompletePhaseCounts(c.Phases, c.Count)
+	}
+	if c.Report != nil && c.Report.Cluster != nil {
+		c.Report.Count = c.Count
+		c.Report.Phases = c.Phases
+		if lv.p.F.HasPhases && !c.OnlyCompanion {
+			c.Report.Phase = c.samples[0].Phase
+			if c.Report.Phase == nil {
+				c.Report.Phase = logs.LoadingPhase
+			}
+		} else if e := lv.comp.Lookup(c.samples[0].Message); e != nil && lv.comp.HasPhases {
+			c.Report.Phase = e.Phase
+			if c.Report.Phase == nil {
+				c.Report.Phase = logs.LoadingPhase
+			}
+		}
+	}
 }
