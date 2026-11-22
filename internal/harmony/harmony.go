@@ -187,7 +187,7 @@ func (in info) targetMethod() string {
 var kindByName = map[string]string{"Prefix": Prefix, "Postfix": Postfix, "Transpiler": Transpiler, "Finalizer": Finalizer}
 var kindAttr = map[string]string{"HarmonyPrefix": Prefix, "HarmonyPostfix": Postfix, "HarmonyTranspiler": Transpiler, "HarmonyFinalizer": Finalizer}
 
-// Read analyses one DLL.
+/// Read analyses one DLL.
 func Read(path string, skipHarmony bool) (*Assembly, error) {
 	a, err := dotnet.Open(path)
 	if err != nil {
@@ -199,81 +199,9 @@ func Read(path string, skipHarmony bool) (*Assembly, error) {
 	if skipHarmony || !out.UsesHarm {
 		return out, nil
 	}
-	attrs := a.AttributesOf(func(t string) bool {
-		if !strings.HasPrefix(t, "HarmonyLib.") && !strings.HasPrefix(t, "Harmony.") {
-			return false
-		}
-		n := t[strings.IndexByte(t, '.')+1:]
-		return n == "HarmonyPatch" || kindAttr[n] != ""
-	})
-	classInfo := map[uint32]info{}
-	methodInfo := map[uint32]info{}
-	methodKind := map[uint32]string{}
-	for _, x := range attrs {
-		n := x.Type[strings.IndexByte(x.Type, '.')+1:]
-		if x.Errors != "" && n == "HarmonyPatch" {
-			out.AttrError++
-		}
-		switch {
-		case n == "HarmonyPatch" && x.ParentKind == dotnet.ParentType:
-			in := classInfo[x.ParentRow]
-			in.merge(x.Attr)
-			classInfo[x.ParentRow] = in
-		case n == "HarmonyPatch" && x.ParentKind == dotnet.ParentMethod:
-			in := methodInfo[x.ParentRow]
-			in.merge(x.Attr)
-			methodInfo[x.ParentRow] = in
-		case kindAttr[n] != "" && x.ParentKind == dotnet.ParentMethod:
-			methodKind[x.ParentRow] = kindAttr[n]
-		}
-	}
-	// Types holding patch methods: every type with a class-level HarmonyPatch, and the owners
-	// of methods with method-level HarmonyPatch or patch-kind attributes.
-	rows := map[uint32]bool{}
-	for r := range classInfo {
-		rows[r] = true
-	}
-	for m := range methodInfo {
-		rows[a.MethodOwner(m)] = true
-	}
-	for m := range methodKind {
-		rows[a.MethodOwner(m)] = true
-	}
-	var sorted []uint32
-	for r := range rows {
-		sorted = append(sorted, r)
-	}
-	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
-	for _, r := range sorted {
-		ci, hasClass := classInfo[r]
-		ms := a.Methods(r)
-		dynamic := false
-		for _, m := range ms {
-			if m.Name == "TargetMethod" || m.Name == "TargetMethods" {
-				dynamic = true
-			}
-		}
-		for _, m := range ms {
-			kind := methodKind[m.Row]
-			if kind == "" {
-				kind = kindByName[m.Name]
-			}
-			mi, hasMethod := methodInfo[m.Row]
-			if kind == "" || (!hasClass && !hasMethod && methodKind[m.Row] == "") {
-				continue
-			}
-			in := ci.with(mi)
-			p := Patch{PatchType: a.TypeName(r), PatchMethod: m.Name, Kind: kind, TargetType: in.typ,
-				TargetMethod: in.targetMethod(), Args: in.args, Skips: kind == Prefix && m.ReturnBool}
-			if dynamic && (in.typ == "" || in.method == "" && in.mtype == "") {
-				p.Dynamic = true
-				p.TargetType, p.TargetMethod, p.Args = "", "", ""
-			}
-			if !p.Dynamic && p.TargetType == "" && p.TargetMethod == "" {
-				continue // a helper named Prefix outside any patch class
-			}
-			out.Patches = append(out.Patches, p)
-		}
+	pa := readPatchAttrs(a, out)
+	for _, r := range pa.typeRows(a) {
+		out.Patches = append(out.Patches, pa.patchesOf(a, r)...)
 	}
 	resolveTargetMethods(a, out)
 	// Harmony.Patch calls, direct or through a wrapper taking HarmonyMethods (manual.go).
@@ -283,6 +211,101 @@ func Read(path string, skipHarmony bool) (*Assembly, error) {
 	}
 	out.IDs = idCandidates(a.UserStrings())
 	return out, nil
+}
+
+// patchAttrs are an assembly's Harmony attributes by TypeDef or MethodDef row.
+type patchAttrs struct {
+	classInfo  map[uint32]info   // class-level HarmonyPatch
+	methodInfo map[uint32]info   // method-level HarmonyPatch
+	methodKind map[uint32]string // HarmonyPrefix, HarmonyPostfix …
+}
+
+// readPatchAttrs collects the HarmonyPatch and patch-kind attributes, counting those that could
+// not be decoded in out.AttrError.
+func readPatchAttrs(a *dotnet.Assembly, out *Assembly) patchAttrs {
+	attrs := a.AttributesOf(func(t string) bool {
+		if !strings.HasPrefix(t, "HarmonyLib.") && !strings.HasPrefix(t, "Harmony.") {
+			return false
+		}
+		n := t[strings.IndexByte(t, '.')+1:]
+		return n == "HarmonyPatch" || kindAttr[n] != ""
+	})
+	pa := patchAttrs{classInfo: map[uint32]info{}, methodInfo: map[uint32]info{}, methodKind: map[uint32]string{}}
+	for _, x := range attrs {
+		n := x.Type[strings.IndexByte(x.Type, '.')+1:]
+		if x.Errors != "" && n == "HarmonyPatch" {
+			out.AttrError++
+		}
+		switch {
+		case n == "HarmonyPatch" && x.ParentKind == dotnet.ParentType:
+			in := pa.classInfo[x.ParentRow]
+			in.merge(x.Attr)
+			pa.classInfo[x.ParentRow] = in
+		case n == "HarmonyPatch" && x.ParentKind == dotnet.ParentMethod:
+			in := pa.methodInfo[x.ParentRow]
+			in.merge(x.Attr)
+			pa.methodInfo[x.ParentRow] = in
+		case kindAttr[n] != "" && x.ParentKind == dotnet.ParentMethod:
+			pa.methodKind[x.ParentRow] = kindAttr[n]
+		}
+	}
+	return pa
+}
+
+// typeRows are the types holding patch methods, in row order: every type with a class-level
+// HarmonyPatch, and the owners of methods with method-level HarmonyPatch or patch-kind attributes.
+func (pa patchAttrs) typeRows(a *dotnet.Assembly) []uint32 {
+	rows := map[uint32]bool{}
+	for r := range pa.classInfo {
+		rows[r] = true
+	}
+	for m := range pa.methodInfo {
+		rows[a.MethodOwner(m)] = true
+	}
+	for m := range pa.methodKind {
+		rows[a.MethodOwner(m)] = true
+	}
+	var sorted []uint32
+	for r := range rows {
+		sorted = append(sorted, r)
+	}
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
+	return sorted
+}
+
+// patchesOf are the declared patches of TypeDef row r.
+func (pa patchAttrs) patchesOf(a *dotnet.Assembly, r uint32) []Patch {
+	var out []Patch
+	ci, hasClass := pa.classInfo[r]
+	ms := a.Methods(r)
+	dynamic := false
+	for _, m := range ms {
+		if m.Name == "TargetMethod" || m.Name == "TargetMethods" {
+			dynamic = true
+		}
+	}
+	for _, m := range ms {
+		kind := pa.methodKind[m.Row]
+		if kind == "" {
+			kind = kindByName[m.Name]
+		}
+		mi, hasMethod := pa.methodInfo[m.Row]
+		if kind == "" || (!hasClass && !hasMethod && pa.methodKind[m.Row] == "") {
+			continue
+		}
+		in := ci.with(mi)
+		p := Patch{PatchType: a.TypeName(r), PatchMethod: m.Name, Kind: kind, TargetType: in.typ,
+			TargetMethod: in.targetMethod(), Args: in.args, Skips: kind == Prefix && m.ReturnBool}
+		if dynamic && (in.typ == "" || in.method == "" && in.mtype == "") {
+			p.Dynamic = true
+			p.TargetType, p.TargetMethod, p.Args = "", "", ""
+		}
+		if !p.Dynamic && p.TargetType == "" && p.TargetMethod == "" {
+			continue // a helper named Prefix outside any patch class
+		}
+		out = append(out, p)
+	}
+	return out
 }
 
 var idRe = regexp.MustCompile(`^[A-Za-z][\w\-]*(\.[\w\-]+)+$`)
