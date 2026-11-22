@@ -439,6 +439,7 @@ func bundle(week, gen, prevPath, out, summaryPath, steamdb string, freshWeeks in
 	ws := workshopTimes(steamdb)
 	b := &corpus.Bundle{Format: corpus.Format, Data: week, Generated: time.Now().UTC().Format("2006-01-02"), Sections: map[string]*corpus.Section{}}
 	stats := map[string]*sectionStats{}
+	held := map[string]*corpus.Section{}
 	for _, mm := range []string{"1.6", "1.7"} {
 		dir := filepath.Join(gen, mm)
 		pat, err := os.ReadFile(filepath.Join(dir, "patterns.json"))
@@ -461,10 +462,22 @@ func bundle(week, gen, prevPath, out, summaryPath, steamdb string, freshWeeks in
 				return fmt.Errorf("%s observed: %w", mm, err)
 			}
 		}
+		st.vsEmbedded = compareEmbedded(mm, s)
+		if st.vsEmbedded.smaller() {
+			held[mm] = s // smaller than the program's own data: shipping it would replace that
+			continue
+		}
 		b.Sections[mm] = s
 	}
-	if len(b.Sections) == 0 {
+	if len(b.Sections) == 0 && len(held) == 0 {
 		return fmt.Errorf("%s has no generator output", gen)
+	}
+	if len(b.Sections) == 0 {
+		fmt.Printf("no section is at least as large as the built-in data; no bundle written\n")
+		if summaryPath != "" {
+			return os.WriteFile(summaryPath, []byte(summarize(b, nil, held, stats, freshWeeks)), 0o644)
+		}
+		return nil
 	}
 	enc, err := corpus.Encode(b)
 	if err != nil {
@@ -485,7 +498,7 @@ func bundle(week, gen, prevPath, out, summaryPath, steamdb string, freshWeeks in
 		if raw, err := os.ReadFile(prevPath); err == nil {
 			prev, _ = corpus.Parse(raw)
 		}
-		return os.WriteFile(summaryPath, []byte(summarize(b, prev, stats, freshWeeks)), 0o644)
+		return os.WriteFile(summaryPath, []byte(summarize(b, prev, held, stats, freshWeeks)), 0o644)
 	}
 	return nil
 }
@@ -497,6 +510,7 @@ func readText(p string) string {
 
 type sectionStats struct {
 	droppedStale, mayBeFixed int
+	vsEmbedded               vsEmbedded
 }
 
 // filterPatterns drops mod-specific patterns without a supporting log since fresh and marks
@@ -672,6 +686,44 @@ func workshopTimes(steamdb string) map[string]int64 {
 
 // ---- summary ----
 
+// sizes counts a section's entries per dataset, the way the program uses them.
+type sizes struct{ patterns, known, observed int }
+
+func sizesOf(s *corpus.Section) sizes {
+	var z sizes
+	for k := range entries(s) {
+		switch {
+		case k.kind == "pattern":
+			z.patterns++
+		case k.kind == "prereq" || k.kind == "combo":
+			z.known++
+		default:
+			z.observed++
+		}
+	}
+	return z
+}
+
+// vsEmbedded compares a new section with the program's built-in one for the same game version.
+// A section ships only when no dataset is smaller: RimArcho uses the newest data per version,
+// so a smaller section would take entries away (05 §4.6).
+type vsEmbedded struct {
+	has      bool // the program has built-in data for this version
+	new, emb sizes
+}
+
+func (v vsEmbedded) smaller() bool {
+	return v.has && (v.new.patterns < v.emb.patterns || v.new.known < v.emb.known || v.new.observed < v.emb.observed)
+}
+
+func compareEmbedded(mm string, s *corpus.Section) vsEmbedded {
+	v := vsEmbedded{new: sizesOf(s)}
+	if e := corpus.EmbeddedBundle().Sections[mm]; e != nil {
+		v.has, v.emb = true, sizesOf(e)
+	}
+	return v
+}
+
 type entryKey struct{ kind, key string }
 
 type entry struct {
@@ -744,7 +796,7 @@ func short(s string) string {
 
 // summarize is the weekly change summary for the maintainer: per game version the entries
 // added, removed and those whose log count changed by half or more (and at least 10).
-func summarize(b, prev *corpus.Bundle, stats map[string]*sectionStats, fresh int) string {
+func summarize(b, prev *corpus.Bundle, held map[string]*corpus.Section, stats map[string]*sectionStats, fresh int) string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "# Corpus %s\n\nformat %d, generated %s", b.Data, b.Format, b.Generated)
 	if prev != nil {
@@ -755,9 +807,15 @@ func summarize(b, prev *corpus.Bundle, stats map[string]*sectionStats, fresh int
 	for g := range b.Sections {
 		games = append(games, g)
 	}
+	for g := range held {
+		games = append(games, g)
+	}
 	sort.Strings(games)
 	for _, g := range games {
-		s := b.Sections[g]
+		s, shipped := b.Sections[g]
+		if !shipped {
+			s = held[g]
+		}
 		var ps *corpus.Section
 		if prev != nil {
 			ps = prev.Sections[g]
@@ -765,6 +823,16 @@ func summarize(b, prev *corpus.Bundle, stats map[string]*sectionStats, fresh int
 		cur, old := entries(s), entries(ps)
 		fmt.Fprintf(&sb, "\n## %s\n\n%d logs, window %s; dropped without a log in %d weeks: %d; may be fixed: %d\n",
 			g, s.Logs, s.Window, fresh, stats[g].droppedStale, stats[g].mayBeFixed)
+		if v := stats[g].vsEmbedded; v.has {
+			fmt.Fprintf(&sb, "against the built-in %s data (%s): mod patterns %d / %d, known %d / %d, observed %d / %d\n",
+				g, corpus.EmbeddedData, v.new.patterns, v.emb.patterns, v.new.known, v.emb.known, v.new.observed, v.emb.observed)
+		} else {
+			fmt.Fprintf(&sb, "no built-in %s data: shipped as it is\n", g)
+		}
+		if !shipped {
+			fmt.Fprintf(&sb, "\n**Not shipped**: smaller than the built-in data, which RimArcho keeps using for %s.\n", g)
+			continue
+		}
 		if ps != nil {
 			fmt.Fprintf(&sb, "previous: %d logs (%s)\n", ps.Logs, ps.Data)
 		}
