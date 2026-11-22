@@ -710,7 +710,7 @@ func ChildArcho(exe, home, envName string, args []string, progress func(string))
 		args = append(append([]string{}, args...), "--env", envName)
 	}
 	cmd := exec.Command(exe, args...)
-	cmd.Env = append(os.Environ(), "RIMARCHO_HOME="+home)
+	cmd.Env = ChildEnv(home)
 	hideWindow(cmd)
 	out, err := cmd.StdoutPipe()
 	if err != nil {

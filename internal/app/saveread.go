@@ -392,7 +392,7 @@ func ChildSavesIndex(exe, home string, first []string, progress func(string)) er
 // ChildSavesIndexContext is ChildSavesIndex, killing the child when ctx is done.
 func ChildSavesIndexContext(ctx context.Context, exe, home string, first []string, progress func(string)) error {
 	cmd := exec.CommandContext(ctx, exe, append([]string{"saves", "index", "--progress"}, first...)...)
-	cmd.Env = append(os.Environ(), "RIMARCHO_HOME="+home)
+	cmd.Env = ChildEnv(home)
 	hideWindow(cmd)
 	out, err := cmd.StdoutPipe()
 	if err != nil {

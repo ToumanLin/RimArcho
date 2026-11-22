@@ -338,7 +338,7 @@ func ChildPackBuildExe(exe, home, envName, plan, name, logPath string, extra ...
 	defer logf.Close()
 	cmd, err := startDetached(func() *exec.Cmd {
 		c := exec.Command(exe, args...)
-		c.Env = append(os.Environ(), "RIMARCHO_HOME="+home)
+		c.Env = ChildEnv(home)
 		c.Stdout, c.Stderr = logf, logf
 		return c
 	})

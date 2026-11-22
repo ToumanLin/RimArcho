@@ -39,7 +39,7 @@ func ChildMonitorExe(exe, home, envName string) (string, error) {
 		args = append(args, "--env", envName)
 	}
 	cmd := exec.Command(exe, args...)
-	cmd.Env = append(os.Environ(), "RIMARCHO_HOME="+home)
+	cmd.Env = ChildEnv(home)
 	hideWindow(cmd)
 	out, err := cmd.CombinedOutput()
 	return string(out), err
@@ -62,7 +62,7 @@ func ChildScanProgress(exe, home, envName string, progress func(ScanProgress), f
 		args = append(args, "--env", envName)
 	}
 	cmd := exec.Command(exe, args...)
-	cmd.Env = append(os.Environ(), "RIMARCHO_HOME="+home)
+	cmd.Env = ChildEnv(home)
 	hideWindow(cmd)
 	pr, pw := io.Pipe()
 	cmd.Stdout, cmd.Stderr = pw, pw
