@@ -675,8 +675,18 @@ func run(parsedPath, resultsPath, patternsPath, steamPath, outPath, mm string, r
 		it item
 	}
 	need := map[string][]item{}
+	// The game's own content (Core, DLCs) defines a def or abstract parent that a log says is
+	// missing: Core failed to load it, or a mod removed it. A mod that defines the same name too
+	// (One with Death, Buildable Terrain redefining Core's defs) is an alternative, not the
+	// provider; only the DLC itself can be one (05 §4.6, 2026-11-22).
+	offXML := officialXML(fc, lib)
+	nOfficial := 0
 	for k, idx := range itemLogs {
 		if len(idx) < 3 {
+			continue
+		}
+		if !official(k.b) && officialDefines(offXML, k.it) {
+			nOfficial++
 			continue
 		}
 		nItems++
@@ -725,7 +735,7 @@ func run(parsedPath, resultsPath, patternsPath, steamPath, outPath, mm string, r
 			nConf++
 		}
 	}
-	p("\n== Prerequisites\n\nmissing items (provider, what) in >= 3 logs: %d; with a confirmed dependent mod: %d; candidate pairs: %d", nItems, nConf, len(pairItems))
+	p("\n== Prerequisites\n\nmissing items (provider, what) in >= 3 logs: %d (and %d whose item the game's own content defines, dropped); with a confirmed dependent mod: %d; candidate pairs: %d", nItems, nOfficial, nConf, len(pairItems))
 	type prow struct {
 		pr                   *known.Prereq
 		declared, wsDeclared bool
@@ -1170,3 +1180,27 @@ func mergeG5(rs []*g5res) *g5res {
 }
 
 func bitsOn(x uint64) int { return bits.OnesCount64(x) }
+
+// officialXML is the XML of the game's own content (Core and the DLCs) in the library roots.
+func officialXML(fc *fileCache, lib map[string]*modInfo) [][]byte {
+	var out [][]byte
+	for p := range lib {
+		if official(p) {
+			out = append(out, fc.load(p).xml...)
+		}
+	}
+	return out
+}
+
+// officialDefines: the game's own content defines the item (a def by defName, an abstract
+// parent by Name).
+func officialDefines(xml [][]byte, it item) bool {
+	switch it.kind {
+	case "def":
+		n := it.name[strings.IndexByte(it.name, ' ')+1:]
+		return anyContains(xml, []byte("<defName>"+n+"</defName>"))
+	case "abstract":
+		return anyContains(xml, []byte(`Name="`+it.name+`"`))
+	}
+	return false
+}
