@@ -586,13 +586,16 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .need-live .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
 .need-none .need.lv-ok .need-ic { color: var(--green); }
 .need-none .need .body { color: var(--muted); }
-/* Archo on Can it run (16 §7.1 "Placements"): beside the last-save card, which gives up her
-   width; her chest fades at the card's bottom line and the card stretches to her height when it
-   is shorter, so its top stays level with the right column's. Without a last save she stands at
-   the bottom right of the right column's blank space (archo-corner), or after its last card */
-.archo-save-row { display: flex; align-items: stretch; gap: 8px; min-width: 0; }
-.archo-save-row > .need-save { flex: 1 1 auto; min-width: 0; }
-.archo-save-row > .archo-spot.archo-stand { margin: 0 12px 0 0; align-self: flex-end; }
+/* Archo on Can it run (16 §7.1 "Placements"): over the last-save card's bottom right, in front of
+   it (her loop may cross its text; clicks pass through her). The card keeps the whole width;
+   only its item keeps clear of her body at rest (21 px in from her slot's left), and the card is
+   her height plus its heading, so the heading's date stays above her hair. Hidden or off, she
+   takes nothing. Without a last save she stands at the bottom right of the right column's blank
+   space (archo-corner), or after its last card */
+.archo-save-row { position: relative; min-width: 0; }
+.archo-save-row > .archo-spot.archo-stand { position: absolute; right: 4px; bottom: 0; z-index: 3; margin: 0; }
+.archo-save-row:has(> .archo-spot.archo-stand:not(.archo-hide)) > .need-save { min-height: 141px; }
+.archo-save-row:has(> .archo-spot.archo-stand:not(.archo-hide)) .need-save-row { padding-right: 168px; }
 .needcol.archo-corner { position: relative; }
 .needcol.archo-corner > .archo-spot.archo-stand { position: absolute; right: 18px; bottom: 0; margin: 0; }
 .need-away { align-self: flex-start; margin: 6px 2px 0; padding: 2px 4px; border-radius: var(--r-sm); color: var(--muted); font-size: 12px; }

@@ -578,9 +578,9 @@ function needsFace(d) {
   return d.never ? "neutral" : "thumbsup";
 }
 
-// needsArcho places Archo on Can it run (16 §7.1 "Placements"), 176 px: beside the last-save
-// card, which gives up her width at its right (its content is short), her chest fading at the
-// card's bottom line; the card stretches to her height when it is shorter. Without a last save
+// needsArcho places Archo on Can it run (16 §7.1 "Placements"), 176 px: in front of the
+// last-save card's bottom right, which keeps its width; only its item keeps clear of her, her
+// chest fading at the card's bottom line (style.css .archo-save-row). Without a last save
 // she stands at the bottom right of the right column's blank space, or after its last card
 // when the cards reach down to her.
 const NEEDS_ARCHO = 176;
