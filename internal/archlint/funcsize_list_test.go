@@ -78,7 +78,6 @@ internal/order/order.go Sort 97 309
 internal/savefile/scan_content.go (*scanner).contentRef 75 176
 internal/savefile/scan_rules.go (*extract).rule 76 132
 internal/scan/observe.go Collect 31 163
-internal/steamworks/publish_windows.go publishWorker 35 159
 internal/store/maintenance.go (*Store).Maintain 47 171
 internal/subscribe/loverslab.go (*LoversLab).parsePage 49 96
 internal/surface/cli/cli.go Run 66 150
