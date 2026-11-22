@@ -330,20 +330,16 @@ func (m *model) needLines(n int) []string {
 		return out
 	}
 	p.cursor = max(0, min(p.cursor, len(items)-1))
-	type row struct {
-		text string
-		item int
-	}
-	var rows []row
+	var rows []needRow
 	sec := -1
 	phase, group := "", -1
 	for i, it := range items {
 		if it.section != sec {
 			if sec >= 0 {
-				rows = append(rows, row{"", -1})
+				rows = append(rows, needRow{"", -1})
 			}
 			sec = it.section
-			rows = append(rows, row{m.sectionHead(sec, w), -1}) // its number in the cursor's slot (16 §7)
+			rows = append(rows, needRow{m.sectionHead(sec, w), -1}) // its number in the cursor's slot (16 §7)
 		}
 		// while the game runs, the last run's items follow this run's: say which run they are
 		// from, or the same phase headings repeat over the same errors
@@ -352,72 +348,19 @@ func (m *model) needLines(n int) []string {
 			if m.prob.lastRun != "" {
 				label += "  " + m.prob.lastRun
 			}
-			rows = append(rows, row{"    " + sDimS.Render(label), -1})
+			rows = append(rows, needRow{"    " + sDimS.Render(label), -1})
 		}
 		if it.phaseHeading != "" && (phase != it.phaseHeading || group != it.group) {
-			rows = append(rows, row{"    " + sDimS.Render(it.phaseHeading), -1})
+			rows = append(rows, needRow{"    " + sDimS.Render(it.phaseHeading), -1})
 		}
 		phase, group = it.phaseHeading, it.group
-		icon := statusIcon(it.status)
-		if it.dim && it.status != statusHint || it.status == statusNone {
-			icon = " "
-		}
-		st := sText
-		if it.dim {
-			st = sDimS
-		}
-		sel := i == p.cursor
-		var keys []string
-		for _, k := range it.keys {
-			keys = append(keys, k.key+" "+k.label)
-		}
-		hint := strings.Join(keys, "   ")
-		tw := w - 6
-		lines := wrap(it.text, tw)
-		for j, l := range lines {
-			lead := "    "
-			if j == 0 {
-				lead = "  " + icon + " "
-				if sel {
-					lead = "  " + sAccent.Render(markSel) + " "
-				}
-			}
-			s := st
-			if sel {
-				s = sSel
-			}
-			rows = append(rows, row{lead + s.Render(fit(l, tw)), i})
-		}
-		for _, a := range it.also {
-			for _, l := range wrap(a, tw-2) {
-				rows = append(rows, row{"    " + sDimS.Render("+ "+fit(l, tw-2)), i})
-			}
-		}
-		if it.fold && p.open[it.text] {
-			for _, part := range it.parts {
-				for j, l := range wrap(part, tw-2) {
-					lead := "    " + sDimS.Render("–") + " "
-					if j > 0 {
-						lead = "      "
-					}
-					rows = append(rows, row{lead + sSecond.Render(fit(l, tw-2)), i})
-				}
-			}
-		}
-		if c := chipText(it.evidence); c != "" {
-			rows = append(rows, row{"    " + sDimS.Render(fit(c, tw)), i})
-		}
-		if sel && hint != "" {
-			for _, l := range wrap(hint, tw) {
-				rows = append(rows, row{"    " + sSecond.Render(fit(l, tw)), i})
-			}
-		}
+		rows = m.needItemRows(rows, it, i, i == p.cursor)
 	}
 	// what this page leaves to another: faint lines at the end (16 §2.4)
 	if away := m.elsewhereLines(w); len(away) > 0 {
-		rows = append(rows, row{"", -1})
+		rows = append(rows, needRow{"", -1})
 		for _, l := range away {
-			rows = append(rows, row{l, -1})
+			rows = append(rows, needRow{l, -1})
 		}
 	}
 	// keep the selected item in view
@@ -442,6 +385,72 @@ func (m *model) needLines(n int) []string {
 		out = append(out, rows[i].text)
 	}
 	return out
+}
+
+// needRow is a line of the Problems page and the item it belongs to (-1: none).
+type needRow struct {
+	text string
+	item int
+}
+
+// needItemRows appends the lines of item i: its text, the also lines, the open parts,
+// the evidence chip and, when selected, its keys.
+func (m *model) needItemRows(rows []needRow, it need, i int, sel bool) []needRow {
+	p := &m.prob
+	icon := statusIcon(it.status)
+	if it.dim && it.status != statusHint || it.status == statusNone {
+		icon = " "
+	}
+	st := sText
+	if it.dim {
+		st = sDimS
+	}
+	var keys []string
+	for _, k := range it.keys {
+		keys = append(keys, k.key+" "+k.label)
+	}
+	hint := strings.Join(keys, "   ")
+	tw := m.w - 6
+	lines := wrap(it.text, tw)
+	for j, l := range lines {
+		lead := "    "
+		if j == 0 {
+			lead = "  " + icon + " "
+			if sel {
+				lead = "  " + sAccent.Render(markSel) + " "
+			}
+		}
+		s := st
+		if sel {
+			s = sSel
+		}
+		rows = append(rows, needRow{lead + s.Render(fit(l, tw)), i})
+	}
+	for _, a := range it.also {
+		for _, l := range wrap(a, tw-2) {
+			rows = append(rows, needRow{"    " + sDimS.Render("+ "+fit(l, tw-2)), i})
+		}
+	}
+	if it.fold && p.open[it.text] {
+		for _, part := range it.parts {
+			for j, l := range wrap(part, tw-2) {
+				lead := "    " + sDimS.Render("–") + " "
+				if j > 0 {
+					lead = "      "
+				}
+				rows = append(rows, needRow{lead + sSecond.Render(fit(l, tw-2)), i})
+			}
+		}
+	}
+	if c := chipText(it.evidence); c != "" {
+		rows = append(rows, needRow{"    " + sDimS.Render(fit(c, tw)), i})
+	}
+	if sel && hint != "" {
+		for _, l := range wrap(hint, tw) {
+			rows = append(rows, needRow{"    " + sSecond.Render(fit(l, tw)), i})
+		}
+	}
+	return rows
 }
 
 // sectionHead is a section's heading: its title, its count and, for the run errors, which
