@@ -115,7 +115,7 @@ Element.ELEMENT_NODE = 1;
 export async function loadModules(entry, deps, globals = {}) {
   deps["/wails/runtime.js"] ||= {};
   // Archo's figure (images, WebGL, timers) is off in these suites unless a test loads archo.js itself.
-  if (entry !== "./archo.js") deps["./archo.js"] ||= { archoMode: () => "off", setMode() {}, bootLive() {}, bootDone() {}, tipLine: () => () => {},
+  if (entry !== "./archo.js") deps["./archo.js"] ||= { ARCHO_PAGE: 176, archoMode: () => "off", setMode() {}, bootLive() {}, bootDone() {}, tipLine: () => () => {},
     archoWait: () => ({ end() {}, set() {} }), archoFigure: () => ({ end() {}, set() {} }),
     archoSpot: () => ({ slot: { remove() {} }, peek() {}, stand() {}, set() {}, end() {} }) };
   const state = deps["./state.js"];

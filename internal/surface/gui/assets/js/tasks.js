@@ -15,7 +15,7 @@ import { still } from "./motion.js";
 import { createTable, mergeColumns } from "./datatable.js";
 import { wireSeparator } from "./separator.js";
 import { pickClick } from "./select.js";
-import { archoSpot } from "./archo.js";
+import { archoSpot, ARCHO_PAGE } from "./archo.js";
 import * as ops from "./oplog.js";
 
 const COLS_KEY = "ui.gui.tasks.items.columns";
@@ -511,7 +511,7 @@ function drawItems() {
   els.iscroll.hidden = !has;
   els.none.hidden = has;
   // Archo stands in the empty detail (16 §7.1 "Placements"); a list of items fills it
-  const spot = archoSpot("tasks", { size: 176, calm: ["sleepy", "neutral", "ponder", "wink", "yum"] });
+  const spot = archoSpot("tasks", { size: ARCHO_PAGE, calm: ["sleepy", "neutral", "ponder", "wink", "yum"] });
   const face = taskFace(r);
   // calm: nothing selected, a task done or stopped; running, failed or partly done hold
   if (has) spot.slot.remove(); else spot.stand(els.items, face, ["sleepy", "thumbsup", "neutral"].includes(face));

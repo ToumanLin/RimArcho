@@ -98,7 +98,7 @@ test("reading the game's list shows it next to yours, in order, with what is rem
   assert.match(h.screen.querySelector(".xc-miss").textContent, /subscribe all 1/);
 });
 
-test("a result puts its counts and buttons in the bar over it, with Archo; empty, there is no bar", async () => {
+test("a result puts its counts and buttons in its card's head, with Archo; empty, there is no bar", async () => {
   const preview = { summary: "s", format: "ModsConfig.xml", total: 1, missing: [], installed: [], replace: { added: 1 }, merge: {}, current: [row("a")], incoming: [row("b")] };
   const h = await setup({ ImportPreviewFor: async () => preview });
   await h.m.exchange();
@@ -107,6 +107,10 @@ test("a result puts its counts and buttons in the bar over it, with Archo; empty
   await flush(); await flush(); await flush();
   assert.equal(h.screen.querySelector(".xc-lay").dataset.showing, "list");
   assert.ok(h.screen.querySelector(".xc-main .xc-bar .ld-legend"));
+  // the head is inside the result's card, so both columns start with a card (16 §7.3 item 12)
+  assert.ok(h.screen.querySelector(".xc-rcard.card .xc-bar"));
+  for (const col of h.screen.querySelector(".xc-lay").children.filter((c) => !c.classList.contains("split")))
+    assert.ok(col.children[0].classList.contains("card"), col.className + " starts with " + col.children[0].className);
   assert.ok(h.screen.querySelector(".xc-bar .xc-acts"));
   assert.ok(!h.screen.querySelector(".xc-preview .xc-acts"));
   assert.ok(h.screen.querySelector(".xc-preview .ld-grid"));

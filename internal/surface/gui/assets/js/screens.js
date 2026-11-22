@@ -10,7 +10,7 @@ import { factText, S, $, el, api, T, Tf, errText, say, cur, slideThumb, keyCaps 
 import { icon, bowMark } from "./icons.js";
 import { statusIcon } from "./icons.js";
 import { bump, shimmer } from "./motion.js";
-import { archoMode, archoWait, archoSpot, tipLine } from "./archo.js";
+import { archoMode, archoWait, archoSpot, tipLine, ARCHO_PAGE } from "./archo.js";
 import * as pop from "./popups.js";
 import { bgSection } from "./bg.js";
 import { appearanceControl } from "./appearance.js";
@@ -583,7 +583,7 @@ function needsFace(d) {
 // chest fading at the card's bottom line (style.css .archo-save-row). Without a last save
 // she stands at the bottom right of the right column's blank space, or after its last card
 // when the cards reach down to her.
-const NEEDS_ARCHO = 176;
+const NEEDS_ARCHO = ARCHO_PAGE;
 let needsRO = null;
 function needsArcho(face, { grid, right, rbox, lbox }) {
   const s = archoSpot("needs", { size: NEEDS_ARCHO, calm: ["neutral", "smug", "wink", "smirk", "sleepy"] });

@@ -1,5 +1,6 @@
-// Feedback (16 §2.14): Import's two panes. The left lists the report templates and My reports;
-// the right is the picked template's questions, with the buttons and Archo at its top. A
+// Feedback (16 §2.14): two panes, as All lists (16 §7.3 item 12). The left lists the report
+// templates and My reports; the right card is the picked template's questions under a head
+// with the problems, the buttons and Archo. The gap between them drags (16 §3.1 rule 10). A
 // report is sent through the feedback relay (send, no GitHub account needed; offered only when
 // RimArcho has one) or opened in the browser with the title and body filled in
 // (view.FeedbackAttachments, ComposeProblem, SendFeedbackProblems). Each template ticks its
@@ -11,7 +12,9 @@ import { copy } from "./fields.js";
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { icon } from "./icons.js";
 import { page, button, area, beginPageRead } from "./screens.js";
-import { archoSpot } from "./archo.js";
+import { archoSpot, ARCHO_PAGE } from "./archo.js";
+import { wireSeparator } from "./separator.js";
+import { sync } from "./shell.js";
 
 const MAX_SPLIT = 3; // feedback.MaxSplit
 const PARTS = ["mods", "paths", "log", "ops", "problems"];
@@ -109,9 +112,10 @@ async function compose() {
 // reattach after a change that moves the attachments (a template, a box, the diagnosis or Mod)
 const reattach = () => attach().then(ok => { if (ok !== false && S.screen === "feedback") refresh(); }).catch(e => say("fail", errText(e)));
 
-// Archo stands at the top right of the form (16 §7.1 "Placements"): thinking while you write,
-// pondering while it sends, a salute once sent, tears if sending failed, a wink at a new reply.
-const spot = () => archoSpot("feedback", { size: 128, calm: ["neutral", "ponder", "think", "wink", "smirk"] });
+// Archo stands at the right end of the right card's head (16 §7.1 "Placements"), at the pages'
+// size: thinking while you write, pondering while it sends, a salute once sent, tears if
+// sending failed, a wink at a new reply.
+const spot = () => archoSpot("feedback", { size: ARCHO_PAGE, calm: ["neutral", "ponder", "think", "wink", "smirk"] });
 function fbFace() {
   if (F.sending) return "ponder";
   if (F.failed) return "cry";
@@ -122,23 +126,39 @@ function fbFace() {
 // only the empty form is calm: her idle faces follow there, never over a state
 const face = () => { const e = fbFace(); spot().stand($("#screen .fb-bar .fig"), e, e === "neutral"); };
 
+// crumb: the breadcrumb is "feedback / <template>" or "feedback / my reports" (16 §2.2)
+function crumb() {
+  const c = F.side === "mine" ? T("my reports") : tpl(F.side)?.label || "";
+  if (S.feedbackCrumb === c) return;
+  S.feedbackCrumb = c;
+  sync();
+}
+
 function draw() {
   const sc = $("#screen");
-  const top = sc.scrollTop;
   sc.innerHTML = "";
-  const w = page("feedback fb-page", "");
+  const w = page("feedback fill fb-page", "");
   const grid = el("div", "fb-lay");
   const side = el("div", "fb-side");
   const card = el("section", "card settings xc-do fb-kinds");
   side.append(card);
   const main = el("div", "fb-main");
-  grid.append(side, el("div", "fb-gap"), main);
+  // the gap between the two cards drags; the left starts at All lists' 38% (16 §7.3 item 12)
+  const gap = el("div", "split fb-split");
+  grid.append(side, gap, main);
+  const setSide = (v) => { if (v) grid.style.setProperty("--fb-side", v + "px"); else grid.style.removeProperty("--fb-side"); };
+  const range = () => [220, Math.max(220, grid.clientWidth - 420)];
+  wireSeparator(gap, {
+    key: "ui.gui.feedback.side", range,
+    get: () => side.getBoundingClientRect().width,
+    set: setSide, reset: () => setSide(0),
+    restore: (v) => setSide(+v ? Math.max(range()[0], +v) : 0),
+  });
   w.append(grid);
   sc.append(w);
   area(card, null);
   drawSide();
   drawMain();
-  sc.scrollTop = top;
 }
 
 // drawSide is the left: the templates (the one shown marked, with how many problems use each)
@@ -191,18 +211,21 @@ function pick(kind) {
   similarSoon();
 }
 
-// drawMain is the right: My reports, or the bar (problems, buttons, Archo) over the problem
-// shown as a form or as its preview.
+// drawMain is the right: one card whose head (.fb-bar: the problems, the buttons, Archo) stands
+// over its body, the problem shown as a form or as its preview, or My reports. The head is
+// inside the card, so the two cards' tops are one line (16 §7.3 item 12).
 function drawMain() {
   const main = $("#screen .fb-main");
   if (!main) return;
   main.innerHTML = "";
+  crumb();
+  const card = el("section", "card fb-card");
+  main.append(card);
   if (F.side === "mine") {
     const head = el("div", "fb-bar fb-mine-bar");
     const note = el("div", "fb-mine-note");
     head.append(note, el("div", "fig"));
-    const card = el("section", "card settings fb-mine");
-    main.append(head, card);
+    card.append(head, el("div", "settings fb-body fb-mine"));
     area(card, null);
     drawMine();
     face();
@@ -210,10 +233,11 @@ function drawMain() {
   }
   const bar = el("div", "fb-bar");
   bar.append(el("div", "fb-probs"), el("div", "fb-acts"), el("div", "fig"));
-  const card = el("section", "card settings fb-form");
-  main.append(bar, card, el("div", "fb-similar"));
+  const body = el("div", "settings fb-body fb-form");
+  card.append(bar, body);
   area(card, null, () => firstField()?.focus());
-  if (F.view === "preview") drawPreview(card); else drawForm(card);
+  if (F.view === "preview") drawPreview(body); else drawForm(body);
+  body.append(el("div", "fb-similar"));
   refresh();
 }
 
@@ -428,7 +452,7 @@ function similarSoon() {
   }, 400);
 }
 
-// drawSimilar lists them under the form: each title opens GitHub; +1 adds this player's vote
+// drawSimilar lists them under the form, inside its card: each title opens GitHub; +1 adds this player's vote
 // through the relay instead of a new report.
 function drawSimilar() {
   const box = $("#screen .fb-similar");
@@ -437,7 +461,7 @@ function drawSimilar() {
   if (prob()?.kind !== "feature" || !F.similar.length || F.view !== "form") return;
   const head = el("div", "label section", T("similar requests"));
   head.append(el("span", "fb-public", T("a +1 counts more than a new report")));
-  const card = el("section", "card settings fb-sim");
+  const card = el("div", "settings fb-sim");
   for (const r of F.similar) {
     const row = el("div", "fb-sim-row");
     const t = button(r.title, "", () => api.OpenURL(r.url).catch(e => say("fail", errText(e))), "link fb-sim-t");

@@ -365,8 +365,9 @@ export function crumbs() {
   }
   if (S.screen === "full" && S.fullName) out = out.concat([{ label: S.fullName, id: "full" }]);
   if (S.screen === "uninstall" || S.screen === "uninstall-progress") out = out.concat([{ label: T("uninstall RimArcho"), id: "uninstall" }]);
-  // Feedback is its own sidebar row since 2026-11-18 (16 §2.1)
-  if (S.screen === "feedback") out = [{ label: T("feedback"), id: "feedback" }];
+  // Feedback is its own sidebar row since 2026-11-18 (16 §2.1); the template or My reports
+  // shown is its second level, as a list is the editor's (16 §2.2)
+  if (S.screen === "feedback") out = [{ label: T("feedback"), id: "feedback" }].concat(S.feedbackCrumb ? [{ label: S.feedbackCrumb, id: "feedback" }] : []);
   if (S.screen === "build") out = out.concat([{ label: T("create a pack"), id: "build" }]);
   if (S.screen === "plan-export" && S.planExport) out = ((sh && sh.crumbs && sh.crumbs["plan:" + S.planExport.id]) || []).concat([{ label: T("export"), id: "plan-export" }]);
   if (S.screen === "plans" && S.listCreating) out = out.concat([{ label: T("new list"), id: "plan:new" }]);

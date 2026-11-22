@@ -495,8 +495,8 @@ body.row-dragging, body.row-dragging * { cursor: grabbing !important; user-selec
 .page.fill { height: 100%; min-height: 0; padding-bottom: 8px; }
 /* page width by shape (16 §7.3 rule 12): list-and-detail pages fill the window like the
    editor and the library; one-column pages share one reading width */
-.page:is(.logs, .pm-page, .packs, .subs-page, .needs, .modsettings, .saves, .review) { padding-left: 12px; padding-right: 12px; }
-.page:is(.env, .textures, .settings, .feedback) { padding-left: max(20px, calc(50% - 480px)); padding-right: max(20px, calc(50% - 480px)); }
+.page:is(.logs, .pm-page, .packs, .subs-page, .needs, .modsettings, .saves, .review, .fb-page) { padding-left: 12px; padding-right: 12px; }
+.page:is(.env, .textures, .settings) { padding-left: max(20px, calc(50% - 480px)); padding-right: max(20px, calc(50% - 480px)); }
 @keyframes view-in { from { opacity: 0; transform: translateY(4px); } }
 .head-right { display: flex; align-items: center; gap: 8px; }
 .note { padding: 0 4px; font-size: 12px; }
@@ -1688,7 +1688,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .uninstall .set .sub { white-space: normal; }
 
 /* Settings > Feedback (16 §2.14): what the player writes, the attachments, the whole text */
-.fb-form { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; }
+.fb-form { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px 14px; }
 .fb-field { display: flex; flex-direction: column; gap: 6px; font-weight: 500; }
 .fb-field .field { flex: none; width: 100%; font-weight: 400; }
 .fb-field .fb-title { height: 30px; }
@@ -1711,7 +1711,6 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 /* "public on GitHub" beside preview: a note, not part of the heading */
 .fb-public { margin-left: 12px; font-weight: 400; color: var(--faint); }
 /* My reports (16 §2.14): replies as plain text under each report; the sidebar's dot */
-.fb-mine { margin-bottom: 24px; }
 .fb-mine-why { margin-left: 10px; color: var(--muted); }
 .fb-mine-empty { padding: 14px; color: var(--muted); }
 .fb-rep { position: relative; padding: 12px 14px 10px; display: flex; flex-direction: column; gap: 4px; }
@@ -1732,18 +1731,24 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .fb-reply-who { color: var(--muted); font-size: 12px; margin-bottom: 2px; }
 .fb-reply-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.55; user-select: text; }
 .fb-rep .btn.link.fb-rep-follow { align-self: flex-start; margin-top: 2px; padding-left: 0; padding-right: 0; border-left-width: 0; font-size: 12px; height: 20px; }
-/* Feedback's two panes (16 §2.14), Import's arrangement (§2.18): the templates and My reports
-   at the left, the picked one at the right under a bar with the problems, the buttons and Archo */
-.page.fb-page { container: fbp / inline-size; padding-left: max(12px, calc(50% - 760px)); padding-right: max(12px, calc(50% - 760px)); }
-.fb-lay { display: grid; grid-template-columns: minmax(220px, 268px) var(--card-gap) minmax(0, 1fr); align-items: start; margin-bottom: 24px; }
-.fb-side { position: sticky; top: 0; min-width: 0; }
-.fb-main { display: flex; flex-direction: column; min-width: 0; }
-@container fbp (max-width: 700px) {
-  .fb-lay { grid-template-columns: minmax(0, 1fr); row-gap: var(--card-gap); }
-  .fb-gap { display: none; }
-  .fb-side { position: static; }
+/* Feedback's two panes (16 §2.14; 16 §7.3 item 12): the templates and My reports at the left,
+   38% by default as All lists' list, the picked one at the right in one card whose head has the
+   problems, the buttons and Archo. Both cards fill the page's height and start on one line; what
+   is longer scrolls inside its card. The gap drags (ui.gui.feedback.side). */
+.page.fill.fb-page { display: flex; flex-direction: column; }
+.fb-lay { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(220px, var(--fb-side, 38fr)) var(--card-gap) minmax(0, 62fr); grid-template-rows: minmax(0, 1fr); }
+.fb-split { align-self: stretch; margin: 0; }
+.fb-side { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.fb-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.fb-card { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.fb-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+@media (max-width: 900px) {
+  .page.fill.fb-page { height: auto; }
+  .fb-lay { display: flex; flex-direction: column; gap: var(--card-gap); }
+  .fb-split { display: none; }
+  .fb-body { overflow: visible; }
 }
-.fb-kinds { overflow: visible; }
+.fb-kinds { overflow-y: auto; }
 .fb-kind { position: relative; width: 100%; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .fb-kind:first-child { border-top-left-radius: var(--r-lg); border-top-right-radius: var(--r-lg); }
 .fb-kind:last-child { border-bottom-left-radius: var(--r-lg); border-bottom-right-radius: var(--r-lg); }
@@ -1752,12 +1757,13 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .fb-kind.prio .nt::after { content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 8px; border-radius: 50%; background: var(--red); vertical-align: middle; }
 .fb-mine-row { margin-top: 0; }
 .fb-kinds > .fb-mine-row { border-top: var(--hairline) solid var(--line); }
-/* the bar over the form: the problems and the buttons at the left, Archo standing at the right */
-.fb-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 8px 14px; align-items: end; margin-bottom: var(--card-gap); padding-left: 4px; }
+/* the right card's head: the problems and the buttons at the left, Archo standing at the right
+   on its bottom line (176 px, 16 §7.1); she has her own column, so she covers no control */
+.fb-bar { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 8px 14px; align-items: end; align-content: end; padding: 12px 4px 0 14px; border-bottom: var(--hairline) solid var(--line-2); }
 .fb-bar .fig { grid-column: 2; grid-row: 1 / span 2; display: flex; align-self: end; min-height: 24px; }
 .fb-bar .fig > .archo-spot.archo-stand { margin: 0; }
 .fb-probs { grid-column: 1; grid-row: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
-.fb-acts { grid-column: 1; grid-row: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; padding-bottom: 6px; }
+.fb-acts { grid-column: 1; grid-row: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; padding-bottom: 12px; }
 .fb-status { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 4px 10px; min-width: 0; color: var(--muted); font-size: 12px; }
 .fb-status:empty { display: none; }
 .fb-status.warn, .fb-prio-note { color: var(--amber); }
@@ -1769,7 +1775,7 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .fb-prob-x svg { width: 12px; height: 12px; }
 .page .btn.link.fb-add { padding-left: 2px; font-size: 12px; }
 .fb-mine-bar { grid-template-rows: auto; }
-.fb-mine-bar .fb-mine-note { grid-column: 1; grid-row: 1; padding-bottom: 6px; color: var(--muted); font-size: 12px; }
+.fb-mine-bar .fb-mine-note { grid-column: 1; grid-row: 1; padding-bottom: 12px; color: var(--muted); font-size: 12px; }
 /* the form: a hint, the title, the questions, the contact, what goes with it */
 .fb-opt { margin-left: 6px; font-weight: 400; color: var(--faint); }
 .fb-note { padding: 8px 10px; border-radius: var(--r-sm); background: var(--card-2); color: var(--fg-2); font-size: 12px; }
@@ -1798,8 +1804,10 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .fb-p-ans { display: flex; flex-direction: column; gap: 2px; }
 .fb-p-prio { color: var(--red); font-weight: 600; }
 /* similar requests under a feature request: each with its +1 */
-.fb-sim { padding: 4px 0; }
-.fb-sim-row { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 14px; }
+.fb-similar:empty { display: none; }
+.fb-similar { padding-top: 8px; border-top: var(--hairline) solid var(--line-2); }
+.fb-sim { padding: 2px 0 0; }
+.fb-sim-row { display: flex; align-items: center; gap: 8px; min-height: 34px; }
 .fb-sim-row + .fb-sim-row { border-top: var(--hairline) solid var(--line-2); }
 .page .btn.link.fb-sim-t { min-width: 0; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); }
 .page .btn.link.fb-sim-t:hover { color: var(--accent-11, var(--accent)); }
@@ -2177,10 +2185,13 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .xc-split { margin: 0; }
 .xc-lay > .xc-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; }
 .xc-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-.xc-main > .xc-preview:not([hidden]) { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
-.xc-main > .xc-preview > .ld { flex: 1 1 auto; min-height: 0; }
+/* the result's card: its head (.xc-bar) over what it shows; shown only with a result */
+.xc-rcard { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.xc-lay:not([data-showing]) .xc-rcard, .xc-lay[data-showing] .xc-empty { display: none; }
+.xc-rcard > .xc-preview:not([hidden]) { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
+.xc-rcard > .xc-preview > .ld { flex: 1 1 auto; min-height: 0; }
 /* every result's buttons sit at the card's foot, as the comparison's do */
-.xc-main > .xc-preview > .xc-acts { margin-top: auto; }
+.xc-rcard > .xc-preview > .xc-acts { margin-top: auto; }
 @container xcp (max-width: 820px) {
   .xc-lay { height: auto; grid-template-columns: minmax(0, 1fr); grid-template-rows: none; row-gap: var(--card-gap); }
   .xc-split { display: none; }
@@ -2210,7 +2221,6 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 /* empty: the drop pane, Archo in its middle and the words under her */
 .xc-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; flex: 1 1 auto; min-height: 0; padding: 32px;
   border: var(--hairline) dashed var(--line); border-radius: var(--r-lg); background: color-mix(in srgb, var(--card) 55%, transparent); text-align: center; }
-.xc-res:not([hidden]) ~ .xc-empty { display: none; }
 .xc-empty .fig { display: flex; justify-content: center; min-height: 120px; }
 .xc-empty .fig > .archo-spot.archo-stand { margin: 0; }
 .xc-empty .dz-t { max-width: 360px; font-size: 15px; color: var(--fg-2); }
@@ -3437,14 +3447,14 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 /* over a result: the counts card and the buttons at the left, inset a little, Archo at her
    full size at the right; shown with a result only */
 .xc-bar { display: none; }
-.xc-lay[data-showing] .xc-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 8px 14px; align-items: end; flex: none; margin-bottom: var(--card-gap); padding-left: 14px; }
+.xc-lay[data-showing] .xc-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 8px 14px; align-items: end; align-content: end; flex: none; padding: 12px 4px 0 14px; border-bottom: var(--hairline) solid var(--line-2); }
 .xc-bar .fig { grid-column: 2; grid-row: 1 / span 2; display: flex; align-self: end; }
 .xc-bar .fig > .archo-spot.archo-stand { margin: 0; }
 .xc-bar .rh { grid-column: 1; grid-row: 1; min-width: 0; }
 .xc-bar .rf { grid-column: 1; grid-row: 2; min-width: 0; }
 .xc-bar .xc-rhead { justify-content: flex-start; min-height: 0; padding: 0; border: 0; }
-.xc-bar .ld-legend { padding: 10px 14px; border-radius: var(--r-lg); background: var(--card); }
-.xc-bar .xc-acts { position: static; flex-wrap: wrap; justify-content: flex-start; gap: 6px; padding: 0 0 8px; border: 0; background: transparent; }
+.xc-bar .ld-legend { padding: 8px 12px; border-radius: var(--r-sm); background: var(--card-2); }
+.xc-bar .xc-acts { position: static; flex-wrap: wrap; justify-content: flex-start; gap: 6px; padding: 0 0 12px; border: 0; background: transparent; }
 .xc-bar .xc-acts .note:empty { display: none; }
 .xc-bar .xc-opts { margin: 0 6px 0 0; }
 .xc-bar .xc-tsum { padding: 0 0 6px; border: 0; }
