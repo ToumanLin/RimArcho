@@ -1,7 +1,8 @@
 // The steps after a sort (16 §6.1): what the sort found that ordering cannot fix, one step at
 // a time. A strip at the top shows every step as an icon and a count (done, skipped, now,
-// later); below it the current step shows what it changes, Mod by Mod, with the place each
-// lands in the list, before the player applies or skips it. Each list step is its own undo
+// later); the current chip is the title. Below it, only the current step's Mods, one row
+// each with the place it lands in the list, before the player applies or skips it. Nothing
+// is said twice: no heading under the chip, no count beside the rows, no icon per row. Each list step is its own undo
 // step: the latest applied one (the sort included) offers undo here. Words are on hover and
 // in aria labels (16 §7 principle 9); the dialog reads the plan again after every step.
 import { S, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
@@ -75,6 +76,8 @@ export async function offerAfterSort(o) {
     state.keys = (e) => keys(flow, node, e);
     draw(flow, node);
   });
+  // the modal setup names a dialog by its title line; this one has none (the strip is its title)
+  node?.setAttribute("aria-label", T("after the sort"));
 }
 
 async function refresh(flow, node) {
@@ -94,14 +97,15 @@ function keys(flow, node, e) {
 function draw(flow, node) {
   const data = flow.data;
   node.replaceChildren();
-  node.append(el("div", "ttl", T("after the sort")));
+  node.setAttribute("aria-label", T("after the sort"));
   node.append(strip(flow, node));
   const body = el("div", "body");
   const step = data.current >= 0 ? data.steps[data.current] : null;
-  body.append(step ? card(step) : summary(flow));
+  // when every step is done the strip says so; the body keeps only what is left to know
+  if (step) body.append(card(step));
   if (flow.error) body.append(el("div", "ss-err", flow.error));
   if ((data.unfixable || []).length) body.append(unfixable(data.unfixable));
-  node.append(body);
+  if (body.children.length) node.append(body);
   node.append(buttons(flow, node, step));
   node.setAttribute("aria-busy", flow.busy ? "true" : "false");
 }
@@ -140,35 +144,25 @@ function strip(flow, node) {
   return row;
 }
 
-// card: the current step: its sentence, its counts, then every Mod it changes.
+// card: the current step's Mods. Its name, icon and count are on its chip; the sentence
+// saying what it does is the card's accessible name and the chip's hover.
 function card(step) {
-  const k = KINDS[step.kind], n = step.items.length;
   const box = el("div", "ss-card");
   box.dataset.kind = step.kind;
-  const head = el("div", "ss-head");
-  head.append(mark(k.icon), el("span", "", k.say()));
-  box.append(head);
-  const sum = el("div", "ss-sum");
-  const pill = (cls, glyph, text, title) => { const p = el("span", "ss-pill " + cls); p.append(mark(glyph), el("span", "", text)); p.title = title; p.setAttribute("aria-label", title); sum.append(p); };
-  if (step.kind === "enable") pill("add", "plus", "+" + n, Tf("%d mods enabled", n));
-  if (step.kind === "use-installed") pill("copy", "copy", String(n), Tf("%d entries use an installed copy", n));
-  if (step.kind === "replace") pill("swap", "swap", String(n), Tf("%d mods replaced, each at its own place", n));
-  if (step.kind === "subscribe") pill("get", "import", String(n), Tf("%d mods to download", n));
-  if (step.moved) pill("moved", "order", String(step.moved), Tf("%d other mods change place", step.moved));
-  if (!step.preview && step.kind !== "subscribe") pill("later", "hint", T("no preview"), T("the preview could not be read"));
-  box.append(sum);
+  box.setAttribute("aria-label", KINDS[step.kind].say());
   const list = el("ol", "ss-rows");
   for (const it of step.items) list.append(row(it));
   box.append(list);
+  // the one thing the rows do not show: Mods outside the step that change place
+  if (step.moved) box.append(el("div", "ss-note", Tf("%d other mods change place", step.moved)));
   if (step.error) box.append(el("div", "ss-err", step.error));
   return box;
 }
 
-// row: one Mod: what happens to it (icon), its name, where it lands, and why (muted).
+// row: one Mod: its name (a replaced one struck through, then its replacement), where it
+// lands, and, muted, why: the Mods that require it, or why it cannot be fixed.
 function row(it) {
   const r = el("li", "ss-row " + it.change);
-  const glyph = { copy: "copy", replace: "swap", add: "plus", get: "import", none: "hint" }[it.change] || "hint";
-  r.append(mark(glyph));
   const names = el("span", "ss-names");
   if (it.old) { names.append(el("s", "ss-old", it.old), el("span", "ss-arrow", "→")); }
   names.append(el("span", "ss-mod", it.name));
@@ -181,32 +175,11 @@ function row(it) {
   return r;
 }
 
-// summary: nothing left: what was done and skipped, one row each.
-function summary(flow) {
-  const box = el("div", "ss-card ss-done");
-  const head = el("div", "ss-head");
-  head.append(mark("ok"), el("span", "", T("all steps done")));
-  box.append(head);
-  const list = el("ol", "ss-rows");
-  for (const d of flow.done) {
-    const r = el("li", "ss-row done");
-    r.append(mark(KINDS[d.kind].icon), el("span", "ss-mod", d.text || KINDS[d.kind].say()));
-    list.append(r);
-  }
-  for (const k of ORDER.filter((x) => flow.skipped.has(x))) {
-    const r = el("li", "ss-row skipped");
-    r.append(mark(KINDS[k].icon), el("span", "ss-mod", Tf("skipped: %s", KINDS[k].short())));
-    list.append(r);
-  }
-  box.append(list);
-  return box;
-}
-
 // unfixable: what no step fixes here, folded under a count.
 function unfixable(items) {
   const box = el("details", "ss-unfix");
   const sum = el("summary", "");
-  sum.append(mark("hint"), el("span", "", Tf("%d cannot be fixed here", items.length)));
+  sum.append(el("span", "", Tf("%d cannot be fixed here", items.length)));
   box.append(sum);
   const list = el("ol", "ss-rows");
   for (const it of items) list.append(row(it));
@@ -225,12 +198,10 @@ function buttons(flow, node, step) {
   skip.append(keyCaps("s"));
   skip.onclick = () => { if (flow.busy) return; flow.skipped.add(step.kind); flow.error = ""; refresh(flow, node); };
   btns.append(skip);
-  const n = step.items.length;
   if (step.kind === "subscribe") {
     const [steam, cmd] = getChoices();
     const via = (label, title, i) => {
       const b = el("button", i === 0 ? "go" : "", label);
-      b.append(el("b", "ss-n", String(n)));
       if (i === 0) b.append(keyCaps("enter"));
       b.title = title;
       b.dataset.envWrite = "apply";
@@ -242,7 +213,7 @@ function buttons(flow, node, step) {
     return btns;
   }
   const go = el("button", "go", KINDS[step.kind].go());
-  go.append(el("b", "ss-n", String(n)), keyCaps("enter"));
+  go.append(keyCaps("enter"));
   go.dataset.envWrite = "apply";
   go.disabled = !!step.error;
   go.onclick = () => apply(flow, node, step);
