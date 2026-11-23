@@ -234,7 +234,8 @@ var ErrLogNotCached = errors.New("log not analysed yet")
 // --target suggestion for TargetMethod() patches (06 §2, §3); 21: native Linux paths;
 // 22: audio and other asset paths in stable finding keys and attribution on both platforms.
 // 23: isolated log ownership ignores later redirected sibling and pack launches.
-const logCacheVersion = 23
+// 24: 1.7 caller frames that name a source file ("[0x6] in <file>:<line>") (06 §1).
+const logCacheVersion = 24
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
