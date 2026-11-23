@@ -7,6 +7,7 @@
 //   5. few popups, each closed with esc, never nested.
 import { phase as perfPhase } from "./perf.js";
 import { hintLine } from "./hintline.js";
+import { editorLauncher } from "./editorlaunch.js";
 import { api, on, setText } from "./api.js";
 import "./window-theme.js";
 import { blockNativeMenu } from "./nativemenu.js";
@@ -279,40 +280,16 @@ function exportCurrent() {
   return planManage.exportOf(p.id, "editor");
 }
 
-// launchHere is the editor's launch (its button, L and the command panel's launch): it starts
-// the game from the editor, so a player testing a list again and again stays on it (16 §2.5,
-// issue #6). The open list becomes current first; then the same checks as Launch's ▶: the RAM
-// estimate's severe warning asks once (09 §2), run asks about missing required Mods and gives
-// a refusal (a running game, outside changes not loaded) in the status line.
-let launchingHere = false;
-async function launchHere() {
-  if (environmentReason()) return say("busy", environmentReason());
-  if (launchingHere) return;
-  launchingHere = true;
-  try {
-    const open = S.shell && S.shell.plan;
-    if (open && !open.current && !(await plans.usePlan(open.id))) return;
-    let m = null;
-    try { m = await api.HomeMemory(); } catch { /* unavailable means unknown, as on Launch */ }
-    if (m?.assessment?.ramSeverity === "severe") {
-      pop.memoryConfirm(m, () => startHere(m.token));
-      return;
-    }
-    await startHere(null);
-  } finally { launchingHere = false; }
-}
-
-// startHere launches after the RAM check; approved is the estimate the player accepted, and a
-// list edited since then asks again.
-async function startHere(approved) {
-  if (approved) {
-    let m = null;
-    try { m = await api.HomeMemory(); } catch { /* unknown */ }
-    if (!m || m.token !== approved) return say("busy", T("the list changed; review the updated estimate before launching"));
-  }
-  say("busy", T("starting…"));
-  await run("launch");
-}
+// launchHere is the editor's launch (its button, L and the command panel's launch; 16 §2.5,
+// editorlaunch.js): a running game is refused before the open list becomes current.
+const launchHere = editorLauncher({
+  S, T, say,
+  usePlan: (id) => plans.usePlan(id),
+  homeMemory: () => api.HomeMemory(),
+  memoryConfirm: (m, go) => pop.memoryConfirm(m, go),
+  run: (id) => run(id),
+  busy: () => environmentReason(),
+});
 
 // planActions: the list's actions in the top bar (16 §2.5): its "an outside version has not been loaded" mark,
 // how many entries are not saved to the game yet, rename and delete, import / export (the
