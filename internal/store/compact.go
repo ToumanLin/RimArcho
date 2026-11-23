@@ -17,5 +17,5 @@ func (s *Store) TruncateWAL() {
 	defer c.Close()
 	c.ExecContext(ctx, `PRAGMA busy_timeout=0`)
 	c.ExecContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`)
-	c.ExecContext(ctx, `PRAGMA busy_timeout=5000`)
+	c.ExecContext(ctx, `PRAGMA busy_timeout=`+busyTimeoutMS)
 }
