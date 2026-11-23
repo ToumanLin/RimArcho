@@ -25,6 +25,8 @@
   "%d mods cannot be read": "%d 个 Mod 读取不了",
   "%d mods changed": "%d 个 Mod 更新",
   "%d mods changed, %d need attention": "%d 个 Mod 更新，%d 个需要处理",
+  "1 mod changed": "1 个 Mod 更新",
+  "1 mod changed, it needs attention": "1 个 Mod 更新，需要处理",
   "%d mods do not list %s as supported": "%d 个 Mod 没有标明支持 %s",
   "%d mods do not list %s as supported (%d of them list %s)": "%d 个 Mod 没有标明支持 %s（其中 %d 个支持 %s）",
   "%d mods do not list game version %s": "%d 个 Mod 没有标明支持游戏版本 %s",

@@ -1132,15 +1132,25 @@ func BuildHome(a *app.App, st *app.LoadoutState, tx Text) *Home {
 			h.Launch++
 		}
 	}
-	switch {
-	case h.Count == 0:
-		h.Text = tx.T("nothing changed")
-	case h.Launch > 0:
-		h.Text = tx.Tf("%d mods changed, %d need attention", h.Count, h.Launch)
-	default:
-		h.Text = tx.Tf("%d mods changed", h.Count)
-	}
+	h.Text = homeText(tx, h.Count, h.Launch)
 	return h
+}
+
+// homeText is the line's count: "3 mods changed, 1 need attention"; one changed Mod is
+// singular (it read "1 mods changed", VM 2026-11-22).
+func homeText(tx Text, count, launch int) string {
+	switch {
+	case count == 0:
+		return tx.T("nothing changed")
+	case count == 1 && launch > 0:
+		return tx.T("1 mod changed, it needs attention")
+	case launch > 0:
+		return tx.Tf("%d mods changed, %d need attention", count, launch)
+	case count == 1:
+		return tx.T("1 mod changed")
+	default:
+		return tx.Tf("%d mods changed", count)
+	}
 }
 
 // Dependency states (as view.Deps).

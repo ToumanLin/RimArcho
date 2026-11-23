@@ -25,6 +25,8 @@
   "%d mods cannot be read": "%d件のMODを読み取れません",
   "%d mods changed": "変更されたMOD：%d件",
   "%d mods changed, %d need attention": "%d件のMODに変更があり、%d件は確認が必要です",
+  "1 mod changed": "変更されたMOD：1件",
+  "1 mod changed, it needs attention": "1件のMODに変更があり、確認が必要です",
   "%d mods do not list %s as supported": "%d件のMODが%sへの対応を明記していません",
   "%d mods do not list %s as supported (%d of them list %s)": "%d件のMODが%sへの対応を明記していません（うち%d件は%sへの対応を明記）",
   "%d mods do not list game version %s": "%d件のMODはゲームバージョン%sへの対応を宣言していません",

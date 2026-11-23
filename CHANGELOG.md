@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Fixed: the Launch page said "1 mods changed" for one changed Mod; it now says "1 mod changed".
 - Fixed: Updates said "checked 3 sources" under a list whose only source read "not checked yet": it counted sources with no Mods, which the page does not list, after an automatic check. It now counts the sources it lists, and one reads "checked 1 source".
 - Fixed: the Launch page's "last game" line counted the Mods in Can it run's last-run section instead of their errors, so a run with 69 errors from two sources said "2 errors". It now adds up the errors those items name.
 - **Linux:** a Windows copy of RimWorld that Steam runs through Proton is badged "Proton" instead of "Steam" on the first-run guide's cards, on the Game Config page (beside its name and after the game version), and in the Game Config switcher of the window and `archo` ("RimWorld 1.6  Proton"), so it can be told apart from a native Linux game. `archo env list` and `archo env detect` (MCP `manage` envs) add a `build: proton` line for it.
