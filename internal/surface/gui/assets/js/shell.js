@@ -46,12 +46,16 @@ export function initShell(u) {
 
 // toggleNav moves the navigation between the side and the top, and remembers it. The change
 // is a view transition (the entries move to their new places) unless motion is reduced.
+// viewTransitions: only Chromium (WebView2) animates the move. WebKitGTK 2.52 crashes its
+// UI process (SIGSEGV in GTK's main loop) on this view transition (16 §8.2).
+const viewTransitions = /Chrome\//.test(globalThis.navigator?.userAgent || "");
+
 export function toggleNav() {
   layout = layout === "side" ? "top" : "side";
   api.SetSetting(NAV_KEY, layout === "top" ? "top" : "").catch(() => {});
   try { localStorage.setItem("setting:" + NAV_KEY, layout === "top" ? "top" : ""); } catch { /* storage can be off */ }
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches || document.documentElement.dataset.motion === "reduced";
-  if (document.startViewTransition && !still) document.startViewTransition(() => applyNav());
+  if (viewTransitions && document.startViewTransition && !still) document.startViewTransition(() => applyNav());
   else applyNav();
 }
 
