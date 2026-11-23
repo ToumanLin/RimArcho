@@ -2883,7 +2883,7 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 /* the page line's legend (16 §2.11): the tiles' bar colours */
 .rv-legend { display: inline-flex; align-items: center; gap: 12px; font-size: 12px; color: var(--muted); }
 .rv-legend .k { display: inline-flex; align-items: center; gap: 5px; }
-.rv-legend i { display: block; width: 16px; height: 4px; border-radius: var(--r-sm); }
+.rv-legend i { display: block; width: 24px; height: 4px; border-radius: var(--r-sm); }
 .rv-legend .none i { background: var(--amber); }
 /* some: from "a little seen" (.rv-tile.some, 45 %) to "mostly seen" (75 %) */
 .rv-legend .some i { background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 45%, var(--card)), color-mix(in srgb, var(--accent) 75%, var(--card))); }
