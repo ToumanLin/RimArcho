@@ -11,7 +11,7 @@ import (
 
 func TestPackLinuxRelease(t *testing.T) {
 	dir := t.TempDir()
-	for _, name := range []string{"archo", "README.md", "LICENSE"} {
+	for _, name := range []string{"archo", "rimarcho", "README.md", "LICENSE"} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(name), 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -41,7 +41,7 @@ func TestPackLinuxRelease(t *testing.T) {
 			t.Fatal(err)
 		}
 		want := int64(0o644)
-		if h.Name == "archo" {
+		if h.Name == "archo" || h.Name == "rimarcho" {
 			want = 0o755
 		}
 		b, err := io.ReadAll(tr)
@@ -50,7 +50,7 @@ func TestPackLinuxRelease(t *testing.T) {
 		}
 		found++
 	}
-	if found != 3 {
+	if found != 4 {
 		t.Fatal(found)
 	}
 }

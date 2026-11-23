@@ -68,7 +68,7 @@ func pack(dir, out string) (err error) {
 			h.Mode = 0o755
 			h.Name += "/"
 		}
-		if name == "archo" {
+		if name == "archo" || name == "rimarcho" { // the programs (17 §5)
 			h.Mode = 0o755
 		}
 		if err := tw.WriteHeader(h); err != nil {

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
@@ -47,7 +48,7 @@ func TestGuideDownloadInfoReal(t *testing.T) {
 func TestGuideDownloadInfoSingleflight(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
-	e.WriteFile(filepath.Join(e.App.SteamCMDDir(), "steamcmd.exe"), "fake")
+	e.WriteFile(filepath.Join(e.App.SteamCMDDir(), deps.SteamCMDExecutable()), "fake")
 	e.App.SteamCMDNoPath = true
 	out, err := os.ReadFile(filepath.Join("..", "..", "..", "testdata", "steamcmd", "app_info_print_294100.txt"))
 	if err != nil {

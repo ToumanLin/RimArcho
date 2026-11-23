@@ -213,8 +213,17 @@ func (a *App) DefaultPacksTo() string { return filepath.Join(a.KeepBase(), "RimA
 // releaseFiles are what the release zip puts next to the program (17 §5); only these are
 // deleted from the program folder, and the folder only when nothing else is left in it.
 // Releases before this one shipped fonts/, so uninstall still removes it if present;
-// .archo-update is what RimArcho's own update leaves there (17 §5.1).
-var releaseFiles = []string{"archo.exe", "RimArcho.exe", "README.md", "README.zh-CN.md", "CHANGELOG.md", "LICENSE", "fonts", "monitor", "skills", UpdateDirName}
+// .archo-update is what RimArcho's own update leaves there (17 §5.1). Off Windows the
+// tarball's programs are archo and rimarcho (the Linux GUI, 16 §8.1).
+var releaseFiles = programFiles(runtime.GOOS)
+
+func programFiles(goos string) []string {
+	names := []string{"archo.exe", "RimArcho.exe", "README.md", "README.zh-CN.md", "CHANGELOG.md", "LICENSE", "fonts", "monitor", "skills", UpdateDirName}
+	if goos != "windows" {
+		names = append([]string{"archo", "rimarcho"}, names...)
+	}
+	return names
+}
 
 // downloadedGame reports whether a game folder was downloaded with SteamCMD: force_install_dir
 // leaves steamapps/appmanifest_294100.acf inside it (a Steam library keeps the manifest beside

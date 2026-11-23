@@ -12,10 +12,13 @@ The same source tree is linked twice:
 | --- | --- | --- | --- |
 | `archo.exe` | Console | TUI in the default terminal (§9.2) | CLI, `archo mcp`, and `archo tui`; `archo gui` starts the GUI |
 | `RimArcho.exe` | Windows GUI (`-H windowsgui`, no console window) | GUI | The player's double-click entry, accepting `--env <name>`; command arguments run as the CLI for GUI scan and analysis subprocesses |
+| `archo` (Linux) | Static, `CGO_ENABLED=0`; no GTK needed (SteamOS game mode, servers) | — | CLI, `archo mcp`, `archo tui`; `archo gui` starts `rimarcho` |
+| `rimarcho` (Linux, experimental) | Dynamic: `CGO_ENABLED=1 -tags gtk3`, links GTK 3 and WebKitGTK 4.1 (17 §1) | GUI | As `RimArcho.exe`: no command opens the window, command arguments run as the CLI for scan and analysis subprocesses |
 
 - Both executables share the data directory and database and may run together; SQLite WAL supports multiple processes. When the GUI gains focus, it compares `Stamp()` (the database state, `ChangeKey`) and reloads if it changed. An edit from a stale view never overwrites the other process's changes (G8).
-- If an adjacent `RimArcho.exe` exists, `archo gui` starts it and immediately returns. Otherwise, it runs the GUI in the current process.
-- GUI startup is compiled only on Windows (`surface/cli/gui_enabled.go`); other builds return the localized no-window message (13 §4.1). Linux build and test coverage is in 17 §5.
+- If an adjacent `RimArcho.exe` (Windows) or `rimarcho` (Linux) exists, `archo gui` starts it and immediately returns; on Linux it starts in its own session, so closing the terminal does not close the window (`cli.handOver`). Otherwise, it runs the GUI in the current process.
+- GUI startup is compiled on Windows and on Linux with cgo (`surface/cli/gui_enabled.go`, `windows || (linux && cgo)`); other builds, such as the static Linux `archo`, return the localized no-window message (13 §4.1) when no `rimarcho` is beside them. Linux build and test coverage is in 17 §5. The oldest Linux distributions supported are Ubuntu 22.04, Debian 12 and Fedora 40.
+- On Linux, a window started without a display (`DISPLAY` and `WAYLAND_DISPLAY` unset) does not reach GTK: it says the window needs a graphical desktop and that `archo` in a terminal is the same manager.
 - Before the window starts, the GUI checks for a WebView2 runtime (86 or later, `accounts.WebView2Installed`). Without one Wails creates no window and only logs, so the process would run unseen; instead a message box says the runtime is missing and where to get it, or, under Wine or Proton (`machine.Wine`), that WebView2 does not run there and `wine archo.exe` in a Linux terminal does. Wine with a WebView2 installed is given its chance. Any other error from starting the window also shows a message box in `RimArcho.exe`.
 - When opening the database runs upgrade steps for longer than 300 ms, `RimArcho.exe` shows a small progress window, which cannot be closed, before the main window; the TUI and CLI write the progress to stderr (04 §4).
 - Releases contain both executables; see 18 for their sizes.

@@ -222,6 +222,7 @@ var (
 	underWine         = machine.Wine
 	terminalDrawsTUI  = machine.TerminalDrawsTUI
 	ownConsole        = machine.OwnConsole
+	hasDisplay        = func() bool { return os.Getenv("DISPLAY") != "" || os.Getenv("WAYLAND_DISPLAY") != "" }
 )
 
 // windowUnavailable is why the window cannot open on this machine; its text is complete.
@@ -233,6 +234,10 @@ func (e *windowUnavailable) Error() string { return e.text }
 // WebView2 runtime Wails creates no window and only logs, so the process would run unseen.
 // Under Wine an installed WebView2 is given its chance.
 func guiPreflight() error {
+	if runtime.GOOS == "linux" && !hasDisplay() {
+		// GTK aborts without a display; say where the same manager is instead.
+		return &windowUnavailable{view.T("RimArcho's window needs a graphical desktop, and none was found (DISPLAY and WAYLAND_DISPLAY are not set).\n\nIn a terminal, use archo instead: the same manager as a text interface.")}
+	}
 	if runtime.GOOS != "windows" || webView2Installed() {
 		return nil
 	}

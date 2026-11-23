@@ -95,6 +95,7 @@ func TestTextureMeasureReturnsBeforeDiskAndRejectsLateResults(t *testing.T) {
 // the interface's words.
 func TestTexturesBackground(t *testing.T) {
 	t.Parallel()
+	windowsOnly(t, "todds is downloaded only on Windows; Linux shows build instructions (17 §2.1)")
 	e, api, events := fixture(t)
 	e.App.GameProbe = func(string) *app.GameRun { return nil }
 	p, err := api.Textures("plan", 50)

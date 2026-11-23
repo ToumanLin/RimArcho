@@ -19,6 +19,7 @@ import (
 
 func TestDependencySettingTasksInstallRemoveAndRetry(t *testing.T) {
 	t.Parallel()
+	windowsOnly(t, "the fake server serves the Windows SteamCMD zip; the Linux tarball bootstrap is tested in internal/deps")
 	e, api, events := fixture(t)
 	e.App.SteamCMDNoPath = true
 	var buf bytes.Buffer
@@ -76,6 +77,7 @@ func TestDependencySettingTasksInstallRemoveAndRetry(t *testing.T) {
 
 func TestToolInstallOfferUsesManagedDestinationAndServerSize(t *testing.T) {
 	t.Parallel()
+	windowsOnly(t, "todds is downloaded only on Windows; Linux shows build instructions (17 §2.1)")
 	e, api, _ := fixture(t)
 	requests := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
