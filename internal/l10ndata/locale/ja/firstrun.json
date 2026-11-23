@@ -85,5 +85,7 @@
   "the copy did not finish": "コピーは完了しませんでした",
   "copying the game…": "ゲームをコピー中…",
   "copy the game folder…": "ゲームフォルダーをコピー…",
-  "Reading your Mods…": "Mod を読み込み中…"
+  "Reading your Mods…": "Mod を読み込み中…",
+  "Your Mods are read": "Mod を読み込みました",
+  "Some Mods could not be read": "読み込めなかった Mod があります"
 }

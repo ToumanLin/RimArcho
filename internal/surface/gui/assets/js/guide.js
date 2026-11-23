@@ -675,9 +675,10 @@ export function guideEvent(ev) {
 }
 
 function step2(card) {
-  card.append(el("div", "guide-q", T("Reading your Mods…")));
-  card.lastChild.title = T("RimArcho reads every mod folder once; later scans only read what changed");
   const s = G.scan || { rows: [], done: true };
+  // the heading follows the scan: once it ends it no longer says reading (VM 2026-11-22)
+  card.append(el("div", "guide-q", T(!s.done ? "Reading your Mods…" : s.ok === false ? "Some Mods could not be read" : "Your Mods are read")));
+  card.lastChild.title = T("RimArcho reads every mod folder once; later scans only read what changed");
   const list = el("div", "scanlist");
   for (const r of s.rows) {
     const d = el("div", "scanrow " + r.state);

@@ -85,5 +85,7 @@
   "the copy did not finish": "复制没有完成",
   "copying the game…": "正在复制游戏…",
   "copy the game folder…": "复制游戏文件夹…",
-  "Reading your Mods…": "正在读取你的 Mod…"
+  "Reading your Mods…": "正在读取你的 Mod…",
+  "Your Mods are read": "你的 Mod 已读取",
+  "Some Mods could not be read": "有些 Mod 没能读取"
 }

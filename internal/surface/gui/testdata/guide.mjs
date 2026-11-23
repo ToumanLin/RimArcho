@@ -181,8 +181,11 @@ test("the preview shows the first run from finding the game and writes nothing",
   await button(h, "add and continue").onclick(); await flush();
   // the scan plays out on timers
   assert.match(h.screen.querySelector(".st.cur").textContent, /read the mods/);
+  assert.match(h.screen.querySelector(".guide-q").textContent, /Reading your Mods/);
   for (let i = 0; h.timers.length; i++) { assert.ok(i < 40, "the made-up scan did not end"); await h.tick(); }
   assert.match(h.screen.textContent, /✓/);
+  // the heading no longer says reading once the scan has ended (VM 2026-11-22)
+  assert.equal(h.screen.querySelector(".guide-q").textContent, "Your Mods are read");
   // where the first list comes from is Import & export (16 §2.15): a preview ends here
   await button(h, "next").onclick(); await flush();
   assert.deepEqual(h.writes, []);
