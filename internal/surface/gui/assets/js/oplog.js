@@ -145,7 +145,7 @@ function more(r) {
   if (r.back) { const d = el("div", "op-back-to"); const i = el("span", "mk"); i.innerHTML = icon.ok; d.append(i, el("span", "", r.back)); m.append(d); }
   if (r.steps && r.steps.length) {
     const st = el("div", "op-steps");
-    st.setAttribute("aria-label", Tf("%d steps", r.steps.length));
+    st.setAttribute("aria-label", Tf(r.steps.length === 1 ? "%d step" : "%d steps", r.steps.length));
     for (const s of r.steps) {
       const x = el("div", "op-step r-" + s.result + (s.bad ? " bad" : ""));
       const i = el("span", "op-ic"); i.innerHTML = icon[s.icon] || icon.log;
