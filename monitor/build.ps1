@@ -3,8 +3,8 @@
 #
 #   monitor/out/ArchoMonitor/
 #     About/About.xml        modVersion = monitor/VERSION (or explicit -Version)
-#     About/ModIcon.png      generated from RimArcho's icon (go run ./scripts/monitoricon)
-#     About/Preview.png
+#     About/ModIcon.png      crayon Archo's head (committed, 256 px)
+#     About/Preview.png      a still of the Workshop preview GIF (committed, 640x360)
 #     LoadFolders.xml
 #     LICENSE
 #     1.5/Assemblies/ArchoMonitor.dll
@@ -71,9 +71,7 @@ if ($Corpus) {
     New-Item -ItemType Directory -Force $cd | Out-Null
     Copy-Item -LiteralPath $Corpus (Join-Path $cd "corpus.json.gz")
 }
-Push-Location $repo
-try {
-    go run ./scripts/monitoricon -o $about
-    if ($LASTEXITCODE -ne 0) { throw "monitoricon failed" }
-} finally { Pop-Location }
+foreach ($png in "ModIcon.png", "Preview.png") {
+    Copy-Item -LiteralPath (Join-Path $here "About\$png") (Join-Path $about $png)
+}
 Write-Host "Archo Monitor $Version -> $Out"
