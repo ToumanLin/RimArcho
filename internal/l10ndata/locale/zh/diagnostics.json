@@ -505,5 +505,8 @@
   "%s has this error itself in %s shared logs (%s); may be fixed: it was updated after the last of them": "%s 自身在 %s 份共享日志中有这个错误（%s）；可能已修复：它在最后一份日志之后更新过",
   "Core is not in the list": "列表里没有 Core",
   "the game resets its mod list when it starts and loads Core alone; sort adds Core": "游戏启动时会重置 Mod 列表，只加载 Core；排序会加上 Core",
-  "the game needs Core in the list": "游戏要求列表里有 Core"
+  "the game needs Core in the list": "游戏要求列表里有 Core",
+  "part of %s does not take effect without %s": "没有 %[2]s，%[1]s 的一部分不起作用",
+  "it changes things that load only when %s is enabled.": "它改的东西只有启用 %s 时才会加载。",
+  "what it changes loads only when another Mod is enabled (or disabled): see which in its patches; harmless if you do not use that Mod, but the game logs a red error for it": "它改的东西只有启用（或停用）另一个 Mod 时才加载：在它的补丁里能看到是哪个；不用那个 Mod 就没有影响，但游戏会为此报红字"
 }

@@ -35,6 +35,18 @@ type Resolved struct {
 	// Requires maps a loaded conditional folder to the packageIds its IfModActive /
 	// IfModActiveAll condition names: content there targets those mods.
 	Requires map[string][]string
+	// Skipped are the picked tag's conditional folders that do not load with this list,
+	// with their conditions (for `folder-inactive`: a patch whose target is only there).
+	Skipped []Skipped
+}
+
+// Skipped is a conditional LoadFolders folder that does not load: Needs are the packageIds
+// its IfModActive / IfModActiveAll names, Not those its IfModNotActive names.
+type Skipped struct {
+	Folder string // absolute
+	Needs  []string
+	All    bool // Needs must all be active (IfModActiveAll); else any one
+	Not    []string
 }
 
 // Key identifies the ordered effective folders of this snapshot. mm has already been
@@ -85,6 +97,10 @@ func ResolveFS(root, loadFoldersXML, mm string, active Active, readDir func(stri
 						b = "1"
 					}
 					conds = append(conds, e.condText+":"+b)
+				}
+				if !ok && e.condText != "" {
+					r.Skipped = append(r.Skipped, Skipped{Folder: filepath.Join(root, e.folder),
+						Needs: append(append([]string{}, e.anyOf...), e.allOf...), All: len(e.allOf) > 0, Not: e.notAnyOf})
 				}
 				if ok {
 					f := filepath.Join(root, e.folder)

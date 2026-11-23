@@ -244,6 +244,7 @@ Classify the reasons at the innermost failed operation. An operation may have mu
 | `target-missing` | No installed Mod defines the target. |
 | `target-later` | The XPath matches after all patches have run: a later Mod's **patch** creates the target. Identify the creator by node allocation ranges. The game merges all `Defs` before applying patches, so a definition in a later Mod alone never causes a failure. |
 | `node-absent` | The `Def` exists, but the rest of the XPath does not. |
+| `folder-inactive` | The target is only in a conditional load folder of this game version that does not load (LoadFolders `IfModActive`, `IfModActiveAll`, `IfModNotActive`) of the patching Mod or its expected targets. The detail names the Mod(s) the condition needs; installed ones become subjects with `archo enable`, so Can it run offers "part of X does not take effect without Y" with Enable, and the quick check between checks drops it once they are enabled. Checked before `wrong-version-route`, which would otherwise point at an older version folder (`TestPatchTargetInInactiveConditionalFolder`). |
 | `wrong-version-route` | The target is on disk but outside the effective content. Search inactive XML in the patching Mod and its expected targets. |
 | `stale-name` | The expected target Mod is enabled but lacks the `defName`. List up to 3 similar names from that Mod by edit distance. |
 | `unguarded-optional` | Only occurs with `target-inactive`: there is no guard, and the definer is not a hard dependency. |

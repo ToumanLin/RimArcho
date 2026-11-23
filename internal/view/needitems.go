@@ -2,6 +2,7 @@ package view
 
 import (
 	"fmt"
+	"github.com/ToumanLin/RimArcho/internal/analyze"
 	"slices"
 	"sort"
 	"strings"
@@ -423,9 +424,25 @@ func (b *itemBuilder) patchNoMatch(c problemCtx) {
 		b.patchOther[x] = append(b.patchOther[x], p)
 		return
 	}
-	b.merge("patch|"+x+"|"+y, nm(x), nm(y), Need{Group: GroupDeps, Target: dependencyTarget(st, y), RequiredBy: owners(st, x), Text: Tf("part of %s does not take effect: %s, which it targets, is not enabled", nm(x), nm(y)),
+	text, why := Tf("part of %s does not take effect: %s, which it targets, is not enabled", nm(x), nm(y)), Tf("it changes things %s adds, and %s is not enabled.", nm(y), nm(y))
+	if hasReason(p, analyze.ReasonFolderInactive) {
+		// what it changes loads only with that Mod (a conditional load folder), which need not
+		// be the Mod that adds it (VM 2026-11-23: Reel Storage's defs, loaded with VE Props)
+		text, why = Tf("part of %s does not take effect without %s", nm(x), nm(y)), Tf("it changes things that load only when %s is enabled.", nm(y))
+	}
+	b.merge("patch|"+x+"|"+y, nm(x), nm(y), Need{Group: GroupDeps, Target: dependencyTarget(st, y), RequiredBy: owners(st, x), Text: text,
 		Actions: []Action{enable(st, y), problemAction(p.Ref)}, Counted: true, Mods: c.ids, Status: c.s,
-		Title: Tf("part of %s does not take effect", nm(x)), Why: Tf("it changes things %s adds, and %s is not enabled.", nm(y), nm(y)), Evidence: c.ev})
+		Title: Tf("part of %s does not take effect", nm(x)), Why: why, Evidence: c.ev})
+}
+
+// hasReason: a patch.no-match problem names this reason (analyze.Reason…).
+func hasReason(p *app.Problem, r string) bool {
+	for _, e := range p.Evidence {
+		if e.Text == "reason "+r {
+			return true
+		}
+	}
+	return false
 }
 
 // textureStale is a mod changed since its textures were converted.

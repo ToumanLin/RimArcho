@@ -385,6 +385,7 @@ Every item says where its evidence comes from: a Mod's own declaration, RimArcho
   | `target-missing` | No installed Mod defines the target: a missing dependency or an outdated patch |
   | `target-later` | A later patch creates the target |
   | `node-absent` | The Def exists, but the part being patched does not |
+  | `folder-inactive` | The target loads only when another Mod is enabled; the item names it and offers to enable it |
   | `wrong-version-route` | The target exists only in folders this game version does not load |
   | `stale-name` | The target Mod is enabled but renamed that thing; similar names are suggested |
   | `unguarded-optional` | A patch for an optional Mod has no check that the Mod is there |

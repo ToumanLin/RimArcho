@@ -505,5 +505,8 @@
   "%s has this error itself in %s shared logs (%s); may be fixed: it was updated after the last of them": "%s 自体のエラーとして共有ログ %s 件に出ています（%s）。最後のログの後に更新されたため、修正済みかもしれません",
   "Core is not in the list": "リストにCoreがありません",
   "the game resets its mod list when it starts and loads Core alone; sort adds Core": "ゲームは起動時にMODリストをリセットし、Coreだけを読み込みます。並べ替えるとCoreが追加されます",
-  "the game needs Core in the list": "ゲームはリストにCoreが必要です"
+  "the game needs Core in the list": "ゲームはリストにCoreが必要です",
+  "part of %s does not take effect without %s": "%[2]s がないと %[1]s の一部が効きません",
+  "it changes things that load only when %s is enabled.": "変更対象は %s を有効にしたときだけ読み込まれます。",
+  "what it changes loads only when another Mod is enabled (or disabled): see which in its patches; harmless if you do not use that Mod, but the game logs a red error for it": "変更対象は別のMODを有効（または無効）にしたときだけ読み込まれます：どのMODかはパッチ一覧で確認できます。そのMODを使わないなら無害ですが、ゲームは赤いエラーを出します"
 }

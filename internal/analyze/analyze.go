@@ -25,8 +25,9 @@ const Version = 12 // 12: unresolved content classification fields (12 §2).
 // PatchVersion versions the patch facts alone: it is in the run key (app.AnalysisKey), so
 // lists are simulated again, but not in the Def and assembly fact keys, which stay. 1:
 // succeeded operations reached only through a guard are marked (ReasonGuarded, Stats.Guards).
-// 2: touches under <success>Always</success> count as guarded (they cannot fail).
-const PatchVersion = 2
+// 2: touches under <success>Always</success> count as guarded (they cannot fail). 3: a
+// target only in a conditional load folder that does not load is folder-inactive.
+const PatchVersion = 3
 
 // Mod is one installed instance.
 type Mod struct {
@@ -156,6 +157,7 @@ type run struct {
 	isActive func(string) bool
 	folders  map[string][]string
 	requires map[string]map[string][]string
+	skipped  map[string][]content.Skipped // conditional folders that do not load, by instance
 	names    *xdoc.Names
 	doc      *xdoc.Doc
 	root     int32
@@ -181,6 +183,7 @@ func Run(in Input) (*Output, error) {
 	// Patch layer.
 	t1 := time.Now()
 	sim := newSim(r.doc, r.root, r.active, in.MM, r.folders)
+	sim.skippedOf = r.skipped
 	tops := r.parsePatches()
 	r.simulate(sim, tops)
 	if in.AfterSimulation != nil {
@@ -229,10 +232,12 @@ func newRun(in *Input) (*run, []*Mod) {
 func (r *run) resolveContent() {
 	r.folders = map[string][]string{}
 	r.requires = map[string]map[string][]string{}
+	r.skipped = map[string][]content.Skipped{}
 	for _, m := range r.in.Mods {
 		res := content.Resolve(m.Dir, m.Decl.LoadFolders, r.in.MM, r.isActive)
 		r.folders[m.Instance] = res.Folders
 		r.requires[m.Instance] = res.Requires
+		r.skipped[m.Instance] = res.Skipped
 		r.out.Content[m.Instance] = &ContentState{Key: res.Key(m.SnapHash, r.in.MM) + DefKeySuffix(), Folders: res.Folders}
 		if m.Pos > 0 {
 			r.out.Content[m.Instance].AssemblyKey = AssemblyKey(m, res.Folders, r.in.HarmonySkip)

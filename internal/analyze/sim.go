@@ -2,6 +2,7 @@ package analyze
 
 import (
 	"errors"
+	"github.com/ToumanLin/RimArcho/internal/content"
 	"regexp"
 	"sort"
 	"strings"
@@ -51,8 +52,9 @@ type sim struct {
 	evals     int
 	guards    map[*Op]guard
 
-	mm       string
-	folderOf map[string][]string
+	mm        string
+	folderOf  map[string][]string
+	skippedOf map[string][]content.Skipped
 
 	cur      *topOp
 	contests map[string]map[*Mod][]*topOp // node key → mods that Replace/Remove it

@@ -124,3 +124,43 @@ func TestPatchesThatFindNothingFoldForManyMods(t *testing.T) {
 		}
 	}
 }
+
+// 05 §4.4 folder-inactive: a patch whose target loads only in another Mod's conditional
+// folder (IfModActive) names the Mod that turns it on and offers to enable it, not "only in
+// another game version's files" (VM 2026-11-23: Progression: Storage, Reel Storage, VE Props).
+func TestPatchTargetLoadedOnlyWithAnotherMod(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	mods := filepath.Join(e.Game, "Mods")
+	plain := func(pkg, name string, files map[string]string) testkit.Mod {
+		return testkit.Mod{PackageID: pkg, Name: name, Author: "Tester", Files: files}
+	}
+	e.WriteMod(filepath.Join(mods, "Props"), plain("tester.props", "Props", map[string]string{"Defs/P.xml": "<Defs><ThingDef><defName>Props_Lamp</defName></ThingDef></Defs>\n"}))
+	e.WriteMod(filepath.Join(mods, "Reel"), plain("tester.reel", "Reel", map[string]string{
+		"LoadFolders.xml":         "<loadFolders><v1.6><li>/</li><li IfModActive=\"tester.props\">Props</li></v1.6></loadFolders>\n",
+		"Defs/R.xml":              "<Defs><ThingDef><defName>Reel_Barrel</defName></ThingDef></Defs>\n",
+		"Props/Defs/WineRack.xml": "<Defs><ThingDef><defName>Reel_WineRack</defName></ThingDef></Defs>\n",
+		"1.5/Defs/WineRack.xml":   "<Defs><ThingDef><defName>Reel_WineRack</defName></ThingDef></Defs>\n"}))
+	e.WriteMod(filepath.Join(mods, "Prog"), plain("tester.prog", "Prog", map[string]string{
+		"LoadFolders.xml":    "<loadFolders><v1.6><li>/</li><li IfModActive=\"tester.reel\">Reel</li></v1.6></loadFolders>\n",
+		"Reel/Patches/P.xml": "<Patch>\n  <Operation Class=\"PatchOperationAdd\">\n    <xpath>Defs/ThingDef[defName=\"Reel_WineRack\"]</xpath>\n    <value><x/></value>\n  </Operation>\n</Patch>\n"}))
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.reel", "tester.prog")
+	e.AddEnv(false)
+	e.MustRun("scan")
+	if _, err := e.App.EnsureAnalysis(nil); err != nil {
+		t.Fatal(err)
+	}
+	ps, err := e.App.Problems(false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, it := range view.BuildNeeds(e.App, ps.State, ps).Items {
+		if strings.Contains(it.Text, "Prog") {
+			if !strings.Contains(it.Text, "part of Prog does not take effect without Props") || !strings.Contains(it.Why, "load only when Props is enabled") {
+				t.Fatalf("item: %q / %q", it.Text, it.Why)
+			}
+			return
+		}
+	}
+	t.Fatal("no item for Prog's patch")
+}

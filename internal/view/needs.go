@@ -1112,6 +1112,8 @@ func patchItem(st *app.LoadoutState, x, name string, problems []*app.Problem, lo
 	switch {
 	case reasons[analyze.ReasonTargetLater]:
 		why = T("it changes things a Mod loaded after it adds: move it after that Mod")
+	case reasons[analyze.ReasonFolderInactive]:
+		why = T("what it changes loads only when another Mod is enabled (or disabled): see which in its patches; harmless if you do not use that Mod, but the game logs a red error for it")
 	case reasons[analyze.ReasonWrongVersion]:
 		why = T("what it changes is only in another game version's files: an update of it, or of the Mod it changes, usually fixes this")
 	case len(reasons) == 1 && reasons[analyze.ReasonTargetMissing]:

@@ -1,6 +1,7 @@
 package analyze
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"regexp"
@@ -28,6 +29,7 @@ const (
 	ReasonTargetMissing    = "target-missing"
 	ReasonTargetLater      = "target-later"
 	ReasonWrongVersion     = "wrong-version-route"
+	ReasonFolderInactive   = "folder-inactive" // only in a conditional load folder that does not load
 	ReasonStaleName        = "stale-name"
 	ReasonUnguarded        = "unguarded-optional"
 	ReasonNodeAbsent       = "node-absent"
@@ -253,6 +255,11 @@ func (s *sim) reasons(t *topOp, leaf *Op, k *knowledge, tops []*topOp) ([]string
 				add(ReasonUnguarded, "the patch is not wrapped in PatchOperationFindMod, a Conditional or a MayRequire list item")
 			}
 		default:
+			if where, needs := s.inactiveFolder(t.mod, tg, k, g, deps); where != "" {
+				d := fmt.Sprintf("%s is only in %s, which loads only when %s", tg, where, needs)
+				add(ReasonFolderInactive, d)
+				continue
+			}
 			if where := s.otherVersion(t.mod, tg, k, g, deps); where != "" {
 				add(ReasonWrongVersion, fmt.Sprintf("%s exists on disk but not in the effective content: %s", tg, where))
 				continue
@@ -338,6 +345,65 @@ func (s *sim) otherVersion(m *Mod, tg target, k *knowledge, g guard, deps map[st
 		}
 	}
 	return ""
+}
+
+// inactiveFolder searches the conditional load folders of this game version that do not
+// load (LoadFolders IfModActive …) of the patching mod and the mods it targets for the def
+// (folder-inactive): where it is, and the condition, naming installed Mods by token so the
+// item can offer to enable them. A def there is not another version's: enabling that Mod
+// makes the patch work (VM 2026-11-23: Progression: Storage's Reel patches and Reel's VE
+// Props folder read "only in another game version's files").
+func (s *sim) inactiveFolder(m *Mod, tg target, k *knowledge, g guard, deps map[string]bool) (where, needs string) {
+	needle := []byte(">" + tg.key + "<")
+	if tg.attr {
+		needle = []byte(`Name="` + tg.key + `"`)
+	}
+	for _, c := range append([]*Mod{m}, s.intendedOwners(g, deps, k)...) {
+		for _, sk := range s.skippedOf[c.Instance] {
+			for _, a := range content.Assets(c.Dir, []string{sk.Folder}, "Defs") {
+				b, err := os.ReadFile(a.Path)
+				if err != nil || !bytes.Contains(b, needle) {
+					continue
+				}
+				return finding.Inst(c.Instance) + " " + a.Rel, s.condWords(sk, k)
+			}
+		}
+	}
+	return "", ""
+}
+
+// condWords: "@{x} is active", "@{x} and @{y} are active", "pkg:a or @{b} is active", or
+// "@{z} is not active"; an installed Mod by its token, else by package ID.
+func (s *sim) condWords(sk content.Skipped, k *knowledge) string {
+	name := func(p string) string {
+		if ms := k.byPkg[p]; len(ms) > 0 {
+			return finding.Inst(ms[0].Instance)
+		}
+		return "pkg:" + p
+	}
+	var off []string
+	for _, p := range sk.Needs {
+		if !s.activePkg[p] {
+			off = append(off, name(p))
+		}
+	}
+	if len(off) > 0 {
+		sep, verb := " or ", " is active"
+		if sk.All {
+			sep = " and "
+			if len(off) > 1 {
+				verb = " are active"
+			}
+		}
+		return strings.Join(off, sep) + verb
+	}
+	var on []string
+	for _, p := range sk.Not {
+		if s.activePkg[p] {
+			on = append(on, name(p))
+		}
+	}
+	return strings.Join(on, " and ") + " is not active"
 }
 
 func (s *sim) folders(m *Mod) []string { return s.folderOf[m.Instance] }
@@ -628,8 +694,19 @@ func (s *sim) findings(tops []*topOp, facts []*PatchFact) []*Finding {
 				f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Inferred, Text: p.Detail})
 			}
 			for _, r := range p.Reasons {
-				if r == ReasonTargetInactive {
-					for _, tok := range regexp.MustCompile(`@\{[a-z0-9]+\}`).FindAllString(p.Detail, -1) {
+				from := ""
+				switch r {
+				case ReasonTargetInactive:
+					from = p.Detail
+				case ReasonFolderInactive:
+					// the Mods to enable, after the folder's place; none when another Mod
+					// being active keeps the folder off
+					if _, cond, ok := strings.Cut(p.Detail, "which loads only when "); ok && !strings.HasSuffix(cond, " is not active") {
+						from = cond
+					}
+				}
+				if from != "" {
+					for _, tok := range regexp.MustCompile(`@\{[a-z0-9]+\}`).FindAllString(from, -1) {
 						f.Subjects = append(f.Subjects, tok)
 						f.Suggestions = append(f.Suggestions, "archo enable "+tok)
 					}

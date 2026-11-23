@@ -385,6 +385,7 @@ RimArcho 把每个 Mod 文件夹作为一个 **副本** 跟踪，并把同一个
   | `target-missing` | 已安装的 Mod 中没有目标定义：可能缺少依赖，或补丁已过时 |
   | `target-later` | 目标要到后面的补丁才会创建 |
   | `node-absent` | Def 存在，但要修改的部分不存在 |
+  | `folder-inactive` | 目标只有启用另一个 Mod 时才会加载；提示里会写出是哪个，并可直接启用 |
   | `wrong-version-route` | 目标只存在于当前游戏版本不会加载的文件夹中 |
   | `stale-name` | 目标 Mod 已启用，但对应内容改了名；会建议相近名称 |
   | `unguarded-optional` | 针对可选 Mod 的补丁没有检查该 Mod 是否存在 |

@@ -163,7 +163,7 @@ func (a *App) quickPatchTargets(st *LoadoutState, an *AnalysisState, all []*find
 	return out
 }
 
-// targetsNowEnabled: a stored target-inactive no-match whose inactive targets are all
+// targetsNowEnabled: a stored target-inactive (or folder-inactive) no-match whose inactive targets are all
 // enabled now.
 func targetsNowEnabled(f *finding.Finding, enabled func(string) bool) bool {
 	if len(f.Subjects) < 2 {
@@ -171,7 +171,7 @@ func targetsNowEnabled(f *finding.Finding, enabled func(string) bool) bool {
 	}
 	inactive := false
 	for _, e := range f.Evidence {
-		if e.Text == "reason "+analyze.ReasonTargetInactive {
+		if e.Text == "reason "+analyze.ReasonTargetInactive || e.Text == "reason "+analyze.ReasonFolderInactive {
 			inactive = true
 		}
 	}
