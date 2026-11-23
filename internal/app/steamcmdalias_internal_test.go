@@ -10,18 +10,21 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
+// cjkUser is a Chinese Windows user name, the one the VM round used.
+var cjkUser = string([]rune{0x65b0, 0x73a9, 0x5bb6})
+
 // SteamCMD exits at once from a folder whose path has non-English characters (a Chinese
 // Windows user name, VM 2026-11-23); RimArcho starts such a copy through a junction under
 // %PUBLIC%\RimArcho that points at its folder, reuses it, and uninstall removes it (17 §2.1).
 func TestSteamCMDLaunchPathNonASCII(t *testing.T) {
 	if runtime.GOOS != "windows" {
-		if p, err := steamCMDLaunchPath("/home/新玩家/steamcmd/steamcmd.sh"); err != nil || p != "/home/新玩家/steamcmd/steamcmd.sh" {
+		if p, err := steamCMDLaunchPath("/home/"+cjkUser+"/steamcmd/steamcmd.sh"); err != nil || p != "/home/"+cjkUser+"/steamcmd/steamcmd.sh" {
 			t.Fatalf("off Windows the path is kept: %q %v", p, err)
 		}
 		return
 	}
 	tmp := t.TempDir()
-	local := filepath.Join(tmp, "新玩家", "Local", "RimArcho")
+	local := filepath.Join(tmp, cjkUser, "Local", "RimArcho")
 	dir := filepath.Join(local, "steamcmd")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -75,7 +78,7 @@ func TestSteamCMDLaunchPathNonASCII(t *testing.T) {
 	}
 
 	// no usable %PUBLIC%: an error that says what to do
-	t.Setenv("PUBLIC", filepath.Join(tmp, "公用"))
+	t.Setenv("PUBLIC", filepath.Join(tmp, string([]rune{0x516c, 0x7528})))
 	if _, err := steamCMDLaunchPath(exe); err == nil || !strings.Contains(err.Error(), "non-English characters") || !strings.Contains(err.Error(), "steamcmd.path") {
 		t.Fatalf("no link: %v", err)
 	}

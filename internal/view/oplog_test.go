@@ -83,8 +83,9 @@ func TestOperationsSaveCountInLanguage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	saves := string([]rune{0x4e2a, 0x5b58, 0x6863}) // "saves" counted in Chinese
 	got := []string{p.Rows[0].Subject, p.Rows[1].Subject, p.Rows[2].Subject}
-	if got[0] != "1 save" || got[1] != "3 个存档" || got[2] != "1 个存档" {
+	if got[0] != "1 save" || got[1] != "3 "+saves || got[2] != "1 "+saves {
 		t.Fatalf("subjects %q", got)
 	}
 }

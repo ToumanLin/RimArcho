@@ -24,8 +24,8 @@ func steamCMDAliasDir() string {
 
 // steamCMDLaunchPath is the path a SteamCMD program is started from (17 §2.1). SteamCMD
 // refuses to run from a folder whose path has non-English characters ("cannot run from a
-// folder path that includes non-English characters"), which a Windows user name such as
-// `新玩家` puts in %LOCALAPPDATA%\RimArcho\steamcmd: it then exits at once and every
+// folder path that includes non-English characters"), which a Windows user name
+// in Chinese puts in %LOCALAPPDATA%\RimArcho\steamcmd: it then exits at once and every
 // download said only "SteamCMD exited before confirming the download" (VM 2026-11-23).
 // Such a copy starts through a junction under %PUBLIC%\RimArcho (C:\Users\Public: ASCII,
 // open to every user) that points at its own folder, so its files, sign-in and downloads
