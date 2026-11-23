@@ -178,3 +178,18 @@ test("a mixed Mod seen only in what is picked from is not under never seen", asy
   }
   assert.deepEqual(under, { ide: "picked from, some in use", quiet: "never seen in the saves", plan: "only set up" });
 });
+
+// 16 §2.11: the page's line says what the map shows, with the bars' colours beside it, not
+// the counts the colonies card has ("1 colony, 1 save" read as a riddle, 2026-11-23).
+test("the page's line has a legend of the bar colours", async () => {
+  const h = await setup();
+  const opened = h.review.open();
+  const n = h.asked.at(-1).n;
+  h.send({ request: n, page: pageOf({ lead: "how much of each Mod's content has appeared in the colony" }) });
+  await opened;
+  const legend = find(h.screen, "rv-legend");
+  assert.ok(legend, "no legend");
+  assert.deepEqual(legend.querySelectorAll(".k").map((k) => ["none", "some", "whole"].find((c) => k.classList.contains(c))), ["none", "some", "whole"]);
+  assert.match(legend.textContent, /none yet.*some.*all/);
+  assert.equal(find(h.screen, "lead").textContent, "how much of each Mod's content has appeared in the colony");
+});

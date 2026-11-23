@@ -536,5 +536,9 @@
   "enable the required mods, then sort": "必要な Mod を有効にしてから並べ替えます",
   "get the missing mods from the Workshop": "足りない Mod をワークショップから入手します",
   "get with Steam": "Steam で入手",
-  "get with SteamCMD": "SteamCMD で入手"
+  "get with SteamCMD": "SteamCMD で入手",
+  "none yet": "まだ",
+  "some": "一部",
+  "all": "すべて",
+  "bar colours": "バーの色"
 }

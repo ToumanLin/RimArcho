@@ -197,6 +197,15 @@ function build() {
   sc.innerHTML = "";
   // the line is redrawn with each part of the review (drawHead), so it is there from the start
   const w = page("fill review", p.lead || " ");
+  // the bars' colours, as the tiles draw them (shade): yellow none, blue some, green all
+  const legend = el("span", "rv-legend");
+  legend.setAttribute("aria-label", T("bar colours"));
+  for (const [cls, label] of [["none", T("none yet")], ["some", T("some")], ["whole", T("all")]]) {
+    const k = el("span", "k " + cls);
+    k.append(el("i"), el("span", "", label));
+    legend.append(k);
+  }
+  w.querySelector(".page-head .lead")?.after(legend);
   const grid = el("div", "sv rv");
   const leftCol = el("div", "sv-leftcol");
   const search = el("label", "card sv-find");

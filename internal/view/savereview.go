@@ -138,7 +138,10 @@ func ReviewPageOf(r *app.SaveReview, cols []*app.Colony, colony string, tags map
 		p.Colonies = append(p.Colonies, ReviewColony{Key: c.Key, Name: colonyName(c), Line: line})
 	}
 	p.All = countColonies(len(cols)) + T(", ") + countSaves(saves)
-	p.Lead = countColonies(r.Colonies) + T(", ") + countSaves(r.Saves)
+	// what the map shows, with the bars' colours beside it (the page draws them); the counts
+	// are on the colonies card (All, each colony's line). "1 colony, 1 save" read as a
+	// riddle (2026-11-23).
+	p.Lead = T("how much of each Mod's content has appeared in the colony")
 	if r.Unread > 0 {
 		p.Note = Tf("%s could not be read and are not counted", countSaves(r.Unread))
 	}

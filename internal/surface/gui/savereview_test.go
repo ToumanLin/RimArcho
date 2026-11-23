@@ -122,7 +122,7 @@ func TestSaveReviewAPI(t *testing.T) {
 		t.Fatalf("review: %+v", ev)
 	}
 	p := ev.Page
-	if len(p.Colonies) != 1 || p.Colonies[0].Name != "Fort" || p.Note != "" || !strings.Contains(p.Lead, "1 colony, 1 save") {
+	if len(p.Colonies) != 1 || p.Colonies[0].Name != "Fort" || p.Note != "" || p.All != "1 colony, 1 save" || !strings.Contains(p.Lead, "has appeared in the colony") {
 		t.Fatalf("page: %+v", p)
 	}
 	var hats *string

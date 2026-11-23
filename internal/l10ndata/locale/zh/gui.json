@@ -536,5 +536,9 @@
   "enable the required mods, then sort": "启用必需的 Mod，然后排序",
   "get the missing mods from the Workshop": "从创意工坊获取缺少的 Mod",
   "get with Steam": "用 Steam 获取",
-  "get with SteamCMD": "用 SteamCMD 获取"
+  "get with SteamCMD": "用 SteamCMD 获取",
+  "none yet": "还没出现",
+  "some": "部分",
+  "all": "全部",
+  "bar colours": "进度条颜色"
 }
