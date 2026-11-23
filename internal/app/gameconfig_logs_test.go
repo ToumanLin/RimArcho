@@ -335,3 +335,26 @@ func TestOlderGameSkipsWaylithRunLog(t *testing.T) {
 		t.Fatalf("owner: %v", err)
 	}
 }
+
+// A new player's game, never started: the default folder has no Player.log and RimArcho has
+// no launch, so it has no last run rather than a missing log (VM 2026-11-23, first run).
+func TestDefaultFolderNeverStartedIsNotLaunchedYet(t *testing.T) {
+	t.Parallel()
+	e := loadoutEnv(t)
+	scanNow(t, e)
+	st, _ := e.App.Loadout()
+	for _, f := range []string{"Player.log", "Player-prev.log", filepath.Join("Logs", "Player.log"), filepath.Join("Logs", "Player-prev.log")} {
+		_ = os.Remove(filepath.Join(st.Ix.Env.UserDataRoot, f))
+	}
+	n := view.BuildNeeds(e.App, st, &app.ProblemSet{State: st})
+	if n.MissingLog != "not launched yet" || n.LastRun != "" {
+		t.Fatalf("never started: %+v", n.MissingLog)
+	}
+	if err := e.App.Store.AddLaunch(st.Ix.Env.ID, testkit.Start, "steam", "RimWorldWin64.exe"); err != nil {
+		t.Fatal(err)
+	}
+	n = view.BuildNeeds(e.App, st, &app.ProblemSet{State: st})
+	if !strings.Contains(n.MissingLog, "the last run's log was not found") {
+		t.Fatalf("launched, log gone: %+v", n.MissingLog)
+	}
+}

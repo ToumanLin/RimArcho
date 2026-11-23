@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Fixed: a new player whose RimWorld had never been started saw "last game: the last run's log was not found: …\Player.log" on Launch right after the first-run guide. With no log and no launch from RimArcho it now says "not launched yet", as a Game Config with its own saves already did.
 - First-run guide, where your first list comes from: the row for RimSort, RimCrow and RimPy said "looking for RimSort, RimCrow and RimPy…" for good, though the first run does not look for them. It now has a "look for RimSort, RimCrow and RimPy" button that does.
 - First-run guide: after reading your Mods, the card's heading still said "Reading your Mods…" beside "✓ 1.6: found 1303 Mods". It now says "Your Mods are read" (or "Some Mods could not be read" when a game's scan failed).
 - Fixed: with the window open, switching the current list from outside it (`archo plan use`, MCP `manage_plans` use, another window) could leave Can it run, the Mod library and the editor on the old list until the window restarted, while Launch showed the new one. This happened when the list open in the window had become current after it was opened. The window now follows the current list whenever its open list is the current one; a list you opened yourself while another one is current stays open. Can it run's head shows the list it checks as a pill, amber when that list is only open here and not the one the game launches (its tooltip names the current list).
