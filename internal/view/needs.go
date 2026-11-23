@@ -136,6 +136,9 @@ type Need struct {
 	Evidence *Evidence `json:"evidence,omitempty"`
 	Actions  []Action  `json:"actions"`
 	Counted  bool      `json:"counted"` // in the top bar's number; false for the folded stale log
+	// Errors: a last-run item's error messages (its title's "N errors"), which the Launch
+	// page's last game line adds up (LastRunErrors).
+	Errors int `json:"errors,omitempty"`
 	Mods     []string  `json:"mods,omitempty"`
 	Status   int       `json:"status"` // StatusErr, StatusWarn, StatusLog or StatusHint for the row icon
 	Dim      bool      `json:"dim,omitempty"`

@@ -170,8 +170,14 @@ func (s *API) homeRead() *view.Home {
 		return &view.Home{Featured: -1, Error: "could not read the current list"}
 	}
 	// The last run's line reads Player.log when it is newer than the one read last (06
-	// §2.3): the page loads, or the window comes back into focus, after a game.
+	// §2.3): the page loads, or the window comes back into focus, after a game. It reads it
+	// again when the stored report no longer matches (a later analysis, a Mod change, a new
+	// build): otherwise the line said "not checked yet" until Can it run was opened (VM
+	// 2026-11-22).
 	_, newer := r.NewLog(st)
+	if !newer {
+		newer = logReportMissing(r, st)
+	}
 	if !newer {
 		release, err := r.Store.ReadSnapshot()
 		if err != nil {
@@ -199,6 +205,17 @@ func (s *API) homeRead() *view.Home {
 	view.AddOtherEnvs(r, h, st.Ix.Env.ID)
 	view.PickFeatured(h, r.Store.Meta(view.FeaturedKey), st.Ix.Env.Name, st.Plan.ID)
 	return h
+}
+
+// logReportMissing: the current list's problem log has no stored report for the present
+// analysis and Mods, so a cache-only read leaves the last run pending.
+func logReportMissing(r *app.App, st *app.LoadoutState) bool {
+	path := r.ProblemLog(st)
+	if path == "" {
+		return false
+	}
+	_, err := r.CachedLog(path)
+	return errors.Is(err, app.ErrLogNotCached)
 }
 
 // ---- plans (07 §1.3, 16 §2.5) ----

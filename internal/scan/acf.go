@@ -32,9 +32,12 @@ func ACFPathFor(contentRoot string) string {
 }
 
 // ReadACF loads the workshop manifest; it returns nil if the file is absent or unreadable.
-// An item counts as subscribed when it is listed in WorkshopItemsInstalled or
-// WorkshopItemDetails; the Steam client drops unsubscribed items from both lists while the
-// folder may stay behind as residue.
+// WorkshopItemDetails is the subscription list: an item counts as subscribed when it is
+// listed there. On unsubscribing, the Steam client drops the item from WorkshopItemDetails
+// at once but keeps it under WorkshopItemsInstalled while its folder stays on disk (VM
+// 2026-11-22: 1,299 installed, 1,297 in Details, the two missing ones just unsubscribed), so
+// an item only installed is residue. A manifest without any WorkshopItemDetails entry falls
+// back to WorkshopItemsInstalled.
 func ReadACF(contentRoot string) *ACF {
 	a, _ := readACF(contentRoot)
 	return a
@@ -70,14 +73,15 @@ func readACF(contentRoot string) (*ACF, error) {
 		}
 		return it
 	}
+	details := kids(root.Get("WorkshopItemDetails"))
 	for _, c := range kids(root.Get("WorkshopItemsInstalled")) {
 		it := item(c.Key)
-		it.Subscribed = true
+		it.Subscribed = len(details) == 0
 		it.Manifest = c.Str("manifest")
 		it.TimeUpdated, _ = strconv.ParseInt(c.Str("timeupdated"), 10, 64)
 		it.Size, _ = strconv.ParseInt(c.Str("size"), 10, 64)
 	}
-	for _, c := range kids(root.Get("WorkshopItemDetails")) {
+	for _, c := range details {
 		it := item(c.Key)
 		it.Subscribed = true
 		if it.Manifest == "" {

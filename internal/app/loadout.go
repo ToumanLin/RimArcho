@@ -41,6 +41,9 @@ type LoadoutState struct {
 	// workshopLinks: this write is a launch without the Steam client, so the list's
 	// Workshop Mods are linked into Mods/ too (09 §3 "Workshop Mods without Steam").
 	workshopLinks bool
+	// testNoSteam: a test run without the Steam client: its game cannot see the Workshop,
+	// so the run links the list's Workshop Mods into Mods/ like such a launch (20 §2).
+	testNoSteam bool
 	// keepWorkshopLinks: a save while the game runs keeps the Workshop links it may have
 	// started with, adding none (09 §3).
 	keepWorkshopLinks bool

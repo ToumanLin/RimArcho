@@ -97,3 +97,22 @@ test("the check's state is an icon and check again is spare while the check is c
   assert.equal(again().getAttribute("aria-busy"), null);
   assert.ok(again().textContent.startsWith("up to date"));
 });
+
+// The editor's problems button reads "1 problem" for one (it said "1 problems" in the 1.1
+// VM round, 16 §4.2); two stay plural.
+test("the editor's problems button is singular for one problem", async () => {
+  const el = (tag, cls, text) => new Element(tag, cls, text);
+  const S = { board: { problems: { severity: "error", items: [{ counted: true, section: 0 }] } } };
+  const T = s => "T:" + s, Tf = (s, n) => "Tf:" + s.replace("%d", n);
+  const problems = await loadModules("./problems.js", {
+    "./state.js": { S, el, T, Tf, say() {}, errText: e => e.message, keyCaps: () => el("span"), factText() {} },
+    "./api.js": { api: {} },
+    "./icons.js": { statusIcon: () => "" },
+    "./needtext.js": { needText() {}, needParts() {}, needEvidence() {} },
+    "./popups.js": {},
+    "./screens.js": { runNeedAction() {}, needActionWrite() {} },
+  }, { document: { addEventListener() {} } });
+  assert.equal(problems.chip().querySelector(".t").textContent, "T:1 problem");
+  S.board.problems.items.push({ counted: true, section: 0 });
+  assert.equal(problems.chip().querySelector(".t").textContent, "Tf:2 problems");
+});

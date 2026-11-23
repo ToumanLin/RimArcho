@@ -19,3 +19,6 @@ func ModRow(a *app.App, st *app.LoadoutState, noFiles bool, id string, evs []*st
 	}
 	return b.mod(id, evs, info)
 }
+
+// HomeText is homeText for the tests.
+func HomeText(count, launch int) string { return homeText(English(time.UTC), count, launch) }

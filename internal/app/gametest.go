@@ -208,6 +208,9 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, 
 	if c.probe, err = a.checkProbe(st, c.o); err != nil {
 		return nil, err
 	}
+	// Without the Steam client the game lists no subscriptions: Workshop Mods need links
+	// too, as on a launch without Steam (09 §3).
+	st.testNoSteam = !a.steamRunning()
 	mods, add, hide, blocked := a.testRunLinks(st)
 	if c.probe != nil && c.probe.link != nil {
 		mods = modsDir(st.Ix)
@@ -496,13 +499,13 @@ func testRunMissing(st *LoadoutState, blocked map[string]string) []TestRunMissin
 }
 
 // testRunSeen maps each listed Mod a test run's game sees to the folder it sees it under.
-// It is the Mod's folder in Data/, Mods/ or the Workshop, or the name of a link in Mods/
-// to it (including the links a test run makes, 20 §2).
+// It is the Mod's folder in Data/, Mods/ or the Workshop (only while Steam runs), or the
+// name of a link in Mods/ to it (including the links a test run makes, 20 §2).
 func testRunSeen(st *LoadoutState) map[string]string {
 	parents, linked := map[string]bool{}, map[string]string{}
 	roots := []string{filepath.Join(st.Ix.Env.GameRoot, "Data"), filepath.Join(st.Ix.Env.GameRoot, "Mods")}
 	for _, s := range st.Ix.Sources {
-		if s.Kind == source.Workshop && s.Status != source.StatusRetired {
+		if s.Kind == source.Workshop && s.Status != source.StatusRetired && !st.testNoSteam {
 			roots = append(roots, s.Root)
 		}
 	}

@@ -38,7 +38,7 @@ export function chip() {
   const its = items(), n = problemCount(its);
   if (!p || (!n && !its.some((it) => it.status === -1))) { if (isOpen()) close(); return null; }
   const b = el("button", "chip prob " + (n ? (p.severity === "error" ? "err" : "warn") : "hint") + (p.updating ? " updating" : "") + (isOpen() ? " on" : ""));
-  b.append(el("span", "dot"), el("span", "t", n ? Tf("%d problems", n) : T("suggestions")), keyCaps("p"));
+  b.append(el("span", "dot"), el("span", "t", n === 1 ? T("1 problem") : n ? Tf("%d problems", n) : T("suggestions")), keyCaps("p"));
   b.title = (p.updating ? T("updating…") + T("; ") : "") + T(n ? "what is wrong with this list, and the fixes" : "suggestions") + T("; ") + "p";
   if (p.updating) b.setAttribute("aria-busy", "true");
   b.setAttribute("aria-haspopup", "dialog"); b.setAttribute("aria-expanded", String(isOpen())); if (isOpen()) b.setAttribute("aria-controls", box.id);
@@ -86,7 +86,8 @@ function draw() {
   const p = S.board.problems;
   const head = el("div", "pp-head");
   const lead = el("div", "pp-lead");
-  const title = el("b", "", problemCount(its) ? Tf("%d problems in this list", problemCount(its)) : T("suggestions"));
+  const pn = problemCount(its);
+  const title = el("b", "", pn === 1 ? T("1 problem in this list") : pn ? Tf("%d problems in this list", pn) : T("suggestions"));
   title.id = "problems-popup-title"; lead.append(title);
   if (p.updating) lead.append(el("span", "muted", T("updating…")));
   head.append(lead);

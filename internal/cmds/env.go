@@ -104,9 +104,7 @@ func envList(c *Ctx, a *Args) (*render.Doc, error) {
 		n.KV("user-data", e.UserDataRoot)
 		n.KV("launch", e.Launch)
 		n.KV("build", buildKind(e.GameRoot))
-		if e.UserDataRoot != "" {
-			n.KV("player-log", env.PlayerLog(e.UserDataRoot, e.GameVersion))
-		}
+		n.KV("player-log", c.App.EnvPlayerLog(e))
 	}
 	if fs, err := c.App.Folders(); err != nil {
 		return nil, err

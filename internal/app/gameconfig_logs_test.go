@@ -219,6 +219,10 @@ func TestWaylithOwnConfigReadsDefaultLogs(t *testing.T) {
 	if err := e.App.CheckLogOwner(st, got); err != nil {
 		t.Fatal(err)
 	}
+	// env list shows it too (VM round 2026-11-22: the line was missing).
+	if p := e.App.EnvPlayerLog(st.Ix.Env); p != cur {
+		t.Fatalf("env list player-log %q, want %q", p, cur)
+	}
 	// The default-folder sibling runs next: the file is now its run, not this config's.
 	e.Advance(time.Minute)
 	e.MustRun("env", "use", "main")
@@ -288,5 +292,36 @@ func TestWaylithPackReadsDefaultLogs(t *testing.T) {
 	touch()
 	if p := e.App.RunLog(st, w); p != "" {
 		t.Fatalf("borrowed the plan's log: %q", p)
+	}
+}
+
+// A 1.6 Game Config in the default folder does not read a 1.7 run's log: a 1.7 install
+// shares the folder and always writes Logs/Player.log (VM round 2026-11-22: `archo log
+// --env 1.6` read the 1.7 run's log, "analysed: as 1.7 (log version); Game Config is 1.6").
+func TestOlderGameSkipsWaylithRunLog(t *testing.T) {
+	t.Parallel()
+	e := loadoutEnv(t)
+	scanNow(t, e)
+	e.MustRun("env", "set", "main", "--launch", "direct")
+	g17 := filepath.Join(e.Root, "RimWorld17")
+	e.WriteFile(filepath.Join(g17, "RimWorldWin64.exe"), "")
+	e.WriteFile(filepath.Join(g17, "Waylith.dll"), "MZ")
+	e.WriteFile(filepath.Join(g17, "Version.txt"), "1.7.5014 rev1195")
+	e.MustRun("env", "add", "new17", "--game", g17, "--saves", "own")
+	e.MustRun("env", "use", "new17")
+	e.MustRun("launch")
+	e.MustRun("env", "use", "main")
+	e.Advance(time.Minute)
+	waylith := filepath.Join(e.UserData, "Logs", "Player.log")
+	e.WriteFile(waylith, "=== Waylith log ===\nVersion:   1.7.5014.1195\n")
+	if err := os.Chtimes(waylith, e.Now(), e.Now()); err != nil {
+		t.Fatal(err)
+	}
+	st, _ := e.App.Loadout()
+	if cur, prev := e.App.LogPaths(st); cur != "" || prev != "" {
+		t.Fatalf("1.6 read the 1.7 run's log: %q %q", cur, prev)
+	}
+	if err := e.App.CheckLogOwner(st, waylith); err == nil || !strings.Contains(err.Error(), "new17") {
+		t.Fatalf("owner: %v", err)
 	}
 }

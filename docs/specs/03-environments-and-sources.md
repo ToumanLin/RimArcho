@@ -127,6 +127,8 @@ Redirected plan and pack logs follow §6.3. For the game's default user data fol
 - Unknown version: check both and take the newer mtime. The previous run's log is `Player-prev.log` in the same directory.
 - Version components compare as numbers (`1.10` is later than `1.9`).
 
+`archo env list` prints each Game Config's `player-log` the same way (`App.EnvPlayerLog`): the file in its user data folder, else, for an own-folder 1.7+ Game Config, the default folder's `Logs/Player.log` it owns by §6.3.
+
 Which launch (environment, plan or pack) a log belongs to comes from launch records, not paths; see 06 §4.
 
 ### 3.4 Shared user data directories

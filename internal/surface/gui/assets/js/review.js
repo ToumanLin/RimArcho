@@ -378,9 +378,12 @@ function groupsBy() {
 }
 
 // tier is how far the saves went with a Mod: for what the game brings you to, nothing,
-// some (under half), most, all; for what is picked from, nothing or used.
+// some (under half), most, all; for what is picked from, nothing or used. A mixed Mod's
+// square counts only its meet categories, so one with none of those seen but some of what
+// is picked from (Ideology: memes, looks) is picked from, some in use, not never seen
+// (16 §2.11; VM 2026-11-22 put Ideology with 36 seen under never seen).
 function tier(m, mode) {
-  if (m.part === 0) return m.group === "configured" ? "set" : "none";
+  if (m.part === 0) return m.group === "configured" ? "set" : m.group === "seen" ? "used" : "none";
   if (mode !== "meet") return "used";
   return m.part >= m.size ? "whole" : m.part * 2 >= m.size ? "most" : "some";
 }

@@ -148,6 +148,20 @@ func (a *App) waylithDefaultLogs(st *LoadoutState) (cur, prev string) {
 	return a.waylithRunLogs(st.Ix.Env, st.Ix.Env.UserDataRoot, "")
 }
 
+// EnvPlayerLog is the Player.log `env list` shows for e (03 §3.3): the one in its user
+// data folder, else, for an own-folder 1.7+ environment, the default folder's Logs/
+// Player.log while its newest Waylith launch is e's own (waylithDefaultLogs).
+func (a *App) EnvPlayerLog(e *env.Environment) string {
+	if e.UserDataRoot == "" {
+		return ""
+	}
+	if p := env.PlayerLog(e.UserDataRoot, e.GameVersion); p != "" {
+		return p
+	}
+	cur, _ := a.waylithRunLogs(e, e.UserDataRoot, "")
+	return cur
+}
+
 // waylithRunLogs is waylithDefaultLogs for a run with data folder userData: e's own
 // (pack "") or pack's. The launch that owns the file must be that run's: same data folder,
 // and the same pack (none for e's list, then also e's launch).
@@ -234,7 +248,8 @@ var ErrLogNotCached = errors.New("log not analysed yet")
 // --target suggestion for TargetMethod() patches (06 §2, §3); 21: native Linux paths;
 // 22: audio and other asset paths in stable finding keys and attribution on both platforms.
 // 23: isolated log ownership ignores later redirected sibling and pack launches.
-const logCacheVersion = 23
+// 24: 1.7 caller frames that name a source file ("[0x6] in <file>:<line>") (06 §1).
+const logCacheVersion = 24
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a

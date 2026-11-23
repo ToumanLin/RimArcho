@@ -135,7 +135,7 @@ func lastRunNeed(name string, ps []*app.Problem, when string, attributed bool) N
 	}
 	kinds.Text = why
 	return Need{Group: GroupLastRun, Title: title, Text: title + T(": ") + why, Why: why, Evidence: ev,
-		Counted: true, Status: StatusLog, Actions: []Action{act}, Counts: kinds}
+		Counted: true, Errors: errs, Status: StatusLog, Actions: []Action{act}, Counts: kinds}
 }
 
 // CountBar is a count drawn as a bar (16 §7 principle 9): N in all, split into Parts by

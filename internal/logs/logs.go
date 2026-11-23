@@ -141,7 +141,7 @@ var (
 
 	waylithLineRe  = regexp.MustCompile(`^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d+ +([A-Z]+) (?:\[[^\]]*\] )?(.*)$`)
 	waylithVerRe   = regexp.MustCompile(`^Version:\s+(\d+\.\d+\.\d+)\.(\d+)`)
-	callerFrameRe  = regexp.MustCompile(` \[0x[0-9A-F]+\]$`)
+	callerFrameRe  = regexp.MustCompile(` \[0x[0-9A-F]+\]( in .+:\d+)?$`)
 	waylithPatchRe = regexp.MustCompile(`^\s*- (PREFIX|POSTFIX|TRANSPILER|FINALIZER|ILMANIPULATOR) ([^:]+): \S+ <- (.*)$`)
 )
 

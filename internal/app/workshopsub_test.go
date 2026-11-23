@@ -108,6 +108,17 @@ func TestWorkshopSubscribe(t *testing.T) {
 	if err != nil || op.Items[0].Result != "ok" || strings.Join(calls[1][1:], " ") != "subscribe 7300" {
 		t.Fatalf("subscribe: %+v %v", op, err)
 	}
+	// Steam deleted the unsubscribed folder: the next scan keeps a tombstone, which can be
+	// subscribed to again (VM 2026-11-22: it said "subscribed already").
+	e.Unsubscribe("7200")
+	if err := os.RemoveAll(filepath.Join(e.Workshop, "7200")); err != nil {
+		t.Fatal(err)
+	}
+	scanNow(t, e)
+	op, err = e.App.Workshop(steamworks.Subscribe, []string{drop}, false)
+	if err != nil || op.Items[0].Result != "ok" || strings.Join(calls[len(calls)-1][1:], " ") != "subscribe 7200" {
+		t.Fatalf("subscribe to a tombstone: %+v %v", op, err)
+	}
 	op, err = e.App.WorkshopState([]string{keep})
 	if err != nil || op.Items[0].State&steamworks.ItemSubscribed == 0 {
 		t.Fatalf("state: %+v %v", op, err)
