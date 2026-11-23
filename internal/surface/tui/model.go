@@ -226,12 +226,15 @@ func New(o Options) tea.Model {
 	return &model{opts: o, app: o.App, w: 120, h: 30, focus: cActive, marked: map[string]bool{}}
 }
 
-// MemoryLimit is the Go heap soft cap of the TUI process (16 §3.5 T5: idle ≤ 80 MB with
-// ≥ 15 MB headroom). The GC works harder near the cap instead of growing the heap.
-const MemoryLimit = 40 << 20
+// MemoryLimit is the Go heap soft cap of the TUI process: only a ceiling against runaway
+// growth, as the window's (17 §7.3). Idle memory (16 §3.5 T5: ≤ 80 MB) comes from GOGC 50
+// and the idle FreeOSMemory, not from the cap: at 40 MiB a list of 1,292 enabled Mods held
+// about 42 MB live, above the cap, and the idle TUI ran a collection every 20 ms, a whole
+// core busy with nothing on screen changing (VM 2026-11-23).
+const MemoryLimit = 256 << 20
 
 // TuneProcess applies the TUI process's memory settings (M3 measurements in
-// 17 §7.3): a soft heap cap, GOGC 50, and a 256 KiB SQLite page cache on the
+// 17 §7.3): a soft heap ceiling, GOGC 50, and a 256 KiB SQLite page cache on the
 // single connection (the default 2 MB stays resident in modernc's allocator).
 func TuneProcess(a *app.App) {
 	debug.SetMemoryLimit(MemoryLimit)

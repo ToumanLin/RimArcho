@@ -119,18 +119,35 @@ func BuildSubscriptionsFromLibrary(a *app.App, st *app.LoadoutState, o modchange
 	return p, nil
 }
 
+// subscriptionSourceName is a subscription source's name on Updates and in its check task
+// ("" for a key that is none).
+func subscriptionSourceName(key string) string {
+	switch key {
+	case app.LibWorkshop:
+		return T("Steam Workshop (client)")
+	case app.LibSteamCMD:
+		return "SteamCMD"
+	case app.LibGit:
+		return "Git"
+	case app.LibPage:
+		return T("download page / LoversLab")
+	case app.LibLocal:
+		return T("local (no source)")
+	}
+	return ""
+}
+
 // subscriptionSources are the sources with their last checks, the checks by source, and
 // by source the ids the last check found gone.
 func subscriptionSources(a *app.App) ([]SubscriptionSource, map[string]app.SourceCheck, map[string]map[string]bool) {
 	keys := []string{app.LibWorkshop, app.LibSteamCMD, app.LibGit, app.LibPage, app.LibLocal}
-	names := []string{T("Steam Workshop (client)"), "SteamCMD", "Git", T("download page / LoversLab"), T("local (no source)")}
 	checks := map[string]app.SourceCheck{}
 	gone := map[string]map[string]bool{}
 	var sources []SubscriptionSource
-	for i, key := range keys {
+	for _, key := range keys {
 		c := a.SubscriptionSourceCheck(key)
 		checks[key] = c
-		r := SubscriptionSource{Key: key, Name: names[i], Result: T("not checked yet")}
+		r := SubscriptionSource{Key: key, Name: subscriptionSourceName(key), Result: T("not checked yet")}
 		if !c.At.IsZero() {
 			r.Checked, r.Result = a.FormatTime(c.At), Text(c.Result)
 			gone[key] = map[string]bool{}

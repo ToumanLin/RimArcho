@@ -30,6 +30,7 @@ var frontendNodeSuites = []string{
 	"testdata/home-reads.mjs",
 	"testdata/nativemenu.mjs",
 	"testdata/needs.mjs",
+	"testdata/outsidechange.mjs",
 	"testdata/firstrun.mjs",
 	"testdata/gamelog.mjs",
 	"testdata/packs.mjs",

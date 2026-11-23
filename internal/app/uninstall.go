@@ -65,6 +65,9 @@ const (
 	DoDDS     = "delete-dds"  // the DDS RimArcho recorded in a mod folder are deleted, nothing else
 )
 
+// NotALinkNote is the note of a folder under Mods/ with RimArcho's prefix that is no link.
+const NotALinkNote = "not a link: left alone"
+
 // UninstallOptions are the player's answers; the zero value is the defaults.
 type UninstallOptions struct {
 	KeepLocked  bool   // move the lock library's copies into a game's Mods/ (default: recycle bin)
@@ -442,7 +445,7 @@ func (pl *uninstallPlanner) modsFolderLinks(mods, udKey string, owned map[string
 		}
 		path := filepath.Join(mods, name)
 		if !source.IsLink(path) {
-			links = append(links, &UninstallItem{Path: path, Do: DoLeave, Note: "not a link: left alone"})
+			links = append(links, &UninstallItem{Path: path, Do: DoLeave, Note: NotALinkNote})
 			continue
 		}
 		it := &UninstallItem{Path: path, Do: DoUnlink}
@@ -1055,6 +1058,9 @@ func (a *App) Uninstall(o UninstallOptions, progress func(UninstallProgress)) (p
 			removeIfEmpty(a.LockDir())
 		case UnMonitor:
 			removeIfEmpty(a.MonitorDir())
+		case UnSteamCMD:
+			// the junctions a non-English profile path needed to start SteamCMD (17 §2.1)
+			removeSteamCMDAliases(a.LocalDir())
 		case UnPacks:
 			if o.RemovePacks || source.Within(a.PacksDir(), a.Home) || source.Within(a.PacksDir(), a.LocalDir()) {
 				removeIfEmpty(a.PacksDir())

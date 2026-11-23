@@ -36,6 +36,10 @@ func startWorkshopCMD(exe string, args []string, console bool) (SteamCMDProc, er
 }
 
 func createSteamProcess(exe string, args []string, flags uint32, tracked bool) (SteamCMDProc, error) {
+	exe, err := steamCMDLaunchPath(exe)
+	if err != nil {
+		return nil, err
+	}
 	application, err := windows.UTF16PtrFromString(exe)
 	if err != nil {
 		return nil, err

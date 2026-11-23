@@ -71,3 +71,22 @@ func TestSubscriptionProgressUsesByteWeights(t *testing.T) {
 		t.Fatalf("progress %+v", r)
 	}
 }
+
+// A source check names the source it checked, not "RimArcho" (VM 2026-11-23: the status
+// line read "check for updates  RimArcho: 259 have updates" after Updates › Steam Workshop).
+func TestSourceCheckTaskNamesItsSource(t *testing.T) {
+	p := BuildTasks([]app.Task{
+		{ID: "1", Kind: TaskSourceCheck, Obj: "RimArcho", Args: []string{"source-check", app.LibWorkshop}, Lane: app.LaneSelf, State: app.TaskDone, Result: "259 have updates"},
+		{ID: "2", Kind: TaskSourceCheck, Obj: "RimArcho", Args: []string{"source-check", app.LibSteamCMD}, Lane: app.LaneSelf, State: app.TaskDone, Result: "up to date"},
+	}, time.Now())
+	objs := map[string]string{}
+	for _, r := range p.Rows {
+		objs[r.ID] = r.Obj
+		if strings.Contains(TaskStatus(r), "RimArcho") {
+			t.Fatalf("status names RimArcho: %q", TaskStatus(r))
+		}
+	}
+	if objs["1"] != "Steam Workshop (client)" || objs["2"] != "SteamCMD" {
+		t.Fatalf("objects %v", objs)
+	}
+}

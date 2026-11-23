@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/render"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -205,6 +206,14 @@ func TestSaveFilesToken(t *testing.T) {
 	e.App.GameProbe = func(string) *app.GameRun { return &app.GameRun{PID: 9} }
 	if _, err := e.App.TrashSaves([]*app.Save{find("Broken")}, false, ""); !errors.Is(err, app.ErrGameRunning) {
 		t.Fatalf("recycle preview while the game runs: %v", err)
+	}
+	// Confirmed, it is one refused row that gives the reason once (VM 2026-11-23: twice).
+	if _, err := e.App.TrashSaves([]*app.Save{find("Broken")}, true, ""); !errors.Is(err, app.ErrGameRunning) {
+		t.Fatalf("recycle while the game runs: %v", err)
+	}
+	if rows, _ := e.App.Operations(oplog.Query{}); len(rows) == 0 || rows[0].Op != oplog.SaveTrash || rows[0].Result != oplog.Refused ||
+		strings.Count(rows[0].Detail, "the game is running") != 1 {
+		t.Fatalf("refused row %+v", rows)
 	}
 	e.App.GameProbe = nil
 
