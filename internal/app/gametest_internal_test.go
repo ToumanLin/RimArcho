@@ -110,3 +110,35 @@ func TestTestRunMissingFolders(t *testing.T) {
 		t.Fatalf("missing %+v, want %+v", got, want)
 	}
 }
+
+// A Mod the game loaded through a Mods/ link to its own folder, such as the
+// _Archo_workshop_ link a launch without the Steam client leaves (09 §3), is the run's copy;
+// a link to another folder, or a plain folder, is not.
+func TestTestRunSameFolderThroughLink(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	game, workshop := filepath.Join(root, "game"), filepath.Join(root, "workshop")
+	own, other := filepath.Join(workshop, "1001"), filepath.Join(root, "other", "1001")
+	for _, d := range []string{own, other, filepath.Join(game, "Mods", "plain")} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ix := &Index{
+		Env: &env.Environment{GameRoot: game}, ByID: map[string]*store.Mod{},
+		Sources: []*source.Source{{Kind: source.Local, Root: filepath.Join(game, "Mods")}, {Kind: source.Workshop, Root: workshop}},
+	}
+	m := &store.Mod{ID: "m", PackageID: "brrainz.harmony", RealPath: own}
+	ix.ByID["m"] = m
+	st := &LoadoutState{Ix: ix}
+	for name, target := range map[string]string{"_Archo_workshop_1001": own, "_Archo_other": other} {
+		if err := source.CreateLink(filepath.Join(game, "Mods", name), target); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for name, want := range map[string]bool{"_Archo_workshop_1001": true, "_Archo_other": false, "plain": false, "absent": false} {
+		if got := sameFolder(st, m, name); got != want {
+			t.Errorf("%s: %v, want %v", name, got, want)
+		}
+	}
+}
