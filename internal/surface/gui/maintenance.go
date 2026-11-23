@@ -113,6 +113,7 @@ func (s *API) maintenanceCycle(parent context.Context) {
 	}
 	ctx, cancel := context.WithCancel(parent)
 	defer cancel()
+	yielded := s.maintenanceYield
 	done := make(chan struct{})
 	defer close(done)
 	go func() {
@@ -127,6 +128,9 @@ func (s *API) maintenanceCycle(parent context.Context) {
 			case <-ticker.C:
 				if _, idle := s.maintenanceSnapshot(); !idle || !noGame() {
 					cancel()
+					if yielded != nil {
+						yielded()
+					}
 					return
 				}
 			}

@@ -126,7 +126,7 @@ func TestConfigMissingLogIsNotClean(t *testing.T) {
 			if n.MissingLog != "not launched yet" || n.LastRun != "" {
 				t.Fatalf("never launched: %+v", n)
 			}
-			if err := e.App.Store.AddLaunch(st.Ix.Env.ID, testkit.Start, "steam", "RimWorldWin64.exe"); err != nil {
+			if err := e.App.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: st.Ix.Env.ID, PlanID: e.App.Store.CurrentPlanID(st.Ix.Env.ID), Started: testkit.Start, Method: "steam", Command: "RimWorldWin64.exe"}); err != nil {
 				t.Fatal(err)
 			}
 			n = view.BuildNeeds(e.App, st, &app.ProblemSet{State: st})
@@ -350,7 +350,7 @@ func TestDefaultFolderNeverStartedIsNotLaunchedYet(t *testing.T) {
 	if n.MissingLog != "not launched yet" || n.LastRun != "" {
 		t.Fatalf("never started: %+v", n.MissingLog)
 	}
-	if err := e.App.Store.AddLaunch(st.Ix.Env.ID, testkit.Start, "steam", "RimWorldWin64.exe"); err != nil {
+	if err := e.App.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: st.Ix.Env.ID, PlanID: e.App.Store.CurrentPlanID(st.Ix.Env.ID), Started: testkit.Start, Method: "steam", Command: "RimWorldWin64.exe"}); err != nil {
 		t.Fatal(err)
 	}
 	n = view.BuildNeeds(e.App, st, &app.ProblemSet{State: st})
