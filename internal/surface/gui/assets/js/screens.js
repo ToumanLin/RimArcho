@@ -438,10 +438,14 @@ export async function needs(keepCursor, shellRead = false) {
   let data;
   try { data = await api.Needs(); } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
-  // The read checks a list the sidebar does not show as the window's own: another process
-  // switched it (archo plan use, an agent) while the window stayed in front, so no focus
-  // read brought it. Read the shell first, or the pill names the old list (VM 2026-11-23).
-  if (data.plan && S.shell && S.shell.plan?.id !== data.plan && !shellRead) {
+  // Another process changed the lists (archo plan use, an agent) while the window stayed in
+  // front, so no focus read brought it: the read checks a list the sidebar does not show as
+  // the window's own, or the data's stamp moved on. Read the shell first, or the pill names
+  // the old list or the old current one (VM 2026-11-23).
+  let moved = false;
+  if (!shellRead && S.board && api.Stamp) { try { moved = (await api.Stamp()) !== S.board.stamp; } catch { /* keep the page */ } }
+  if (!read.current()) return;
+  if (!shellRead && S.shell && (moved || (data.plan && S.shell.plan?.id !== data.plan))) {
     try { await ui.reload(); } catch { /* the pill falls back to what the sidebar has */ }
     // the new open list ends this read: read again with it, once
     if (S.screen === "needs") return needs(keepCursor, true);

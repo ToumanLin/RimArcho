@@ -4,7 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
-- Fixed: when another process switched the current list (`archo plan use`, an agent through MCP) while the window stayed in front, Can it run checked the new list but its pill still named the old one, also after leaving and coming back; after the window got the focus back an open Can it run kept the old pill until you left it. Both now show the list checked.
+- Fixed: when another process switched the current list (`archo plan use`, an agent through MCP) while the window stayed in front, Can it run checked the new list but its pill still named the old one, also after leaving and coming back; after the window got the focus back an open Can it run kept the old pill until you left it. Both now show the list checked; the pill also turns plain when the list open in the window becomes current from outside (it stayed amber).
 - Import: the game's row read "快捷读取 1.6 的当前列表" in Chinese ("quick-read the current list of 1.6") and "…を読む" in Japanese; both now say "the current list of 1.6" as English does.
 - Fixed: for a new player whose RimWorld had never been started (no `ModsConfig.xml`), the first list was empty, without Core, and Mods added to it launched without Core (the game then disabled them all). The first list is now Core and the installed DLC, as the game itself loads.
 - Fixed: a new player whose RimWorld had never been started saw "last game: the last run's log was not found: …\Player.log" on Launch right after the first-run guide. With no log and no launch from RimArcho it now says "not launched yet", as a Game Config with its own saves already did.
