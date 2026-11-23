@@ -52,6 +52,28 @@ func TestUninstallConfirmation(t *testing.T) {
 	}
 }
 
+// Outside Windows (AtOnce) the data and program are deleted while uninstall runs, so the
+// confirmation must not say "after closing" (Linux-Test VM, 2026-11-23).
+func TestUninstallConfirmationAtOnce(t *testing.T) {
+	t.Setenv("ARCHO_LANG", "")
+	old := Lang()
+	defer SetLang(old)
+	SetLang("en")
+	p := &app.UninstallPlan{AtOnce: true, Steps: []*app.UninstallStep{
+		{Key: app.UnData, Items: []*app.UninstallItem{{Do: app.DoLater, Bytes: 16384}}},
+		{Key: app.UnProgram, Items: []*app.UninstallItem{{Do: app.DoLater, Bytes: 1024}}},
+	}}
+	c := UninstallView(p, false).Confirmation
+	if c == nil || len(c.Changes) != 2 {
+		t.Fatalf("bad groups: %+v", c)
+	}
+	for _, row := range c.Changes {
+		if row.Method != "delete directly" {
+			t.Fatalf("%s: method %q, want delete directly", row.Title, row.Method)
+		}
+	}
+}
+
 // The Archo Agent key item has its own method, no measured size, and its step says so.
 func TestUninstallAgentKeyRow(t *testing.T) {
 	t.Setenv("ARCHO_LANG", "")

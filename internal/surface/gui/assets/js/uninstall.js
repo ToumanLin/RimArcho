@@ -273,7 +273,7 @@ function drawProgress() {
   // Done steps get a check, later ones are muted; only the current step and the two
   // that run after closing carry a second line.
   [...list.children].forEach((row, i) => {
-    const later = ["data", "program"].includes(steps[i].key);
+    const later = !!steps[i].later;
     const state = later ? "later" : i === current ? "current" : i < current ? "done" : "pending";
     row.className = state;
     row.lastChild.textContent = state === "later" ? T("after closing") : state === "current" ? T("in progress") : "";

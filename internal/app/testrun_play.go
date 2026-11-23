@@ -15,6 +15,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/logs"
 	"github.com/ToumanLin/RimArcho/internal/savefile"
 	"github.com/ToumanLin/RimArcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // Save runs, ticks, time limits and what the game loaded (20 §2).
@@ -259,6 +260,11 @@ func (a *App) testRunLoaded(st *LoadoutState, r *TestRunReport, seen map[string]
 		_, name, _ := strings.Cut(folder, "/")
 		l := TestRunLoaded{PackageID: m.PackageID, Name: m.DisplayName(), Folder: folder, From: "disk"}
 		if f := folders[pkg]; f != "" {
+			if !strings.EqualFold(f, name) && sameFolder(st, m, f) {
+				// A Mods/ link to this very folder, such as the _Archo_workshop_ link a
+				// launch without the Steam client leaves (09 §3): the same copy.
+				l.Folder, name = "Mods/"+f, f
+			}
 			if !strings.EqualFold(f, name) {
 				r.Missing = append(r.Missing, TestRunMissing{PackageID: m.PackageID, Name: m.DisplayName(),
 					Reason: fmt.Sprintf("Archo Monitor saw the game load it from the folder %s, not this run's %s", f, folder)})
@@ -285,6 +291,17 @@ func (a *App) testRunLoaded(st *LoadoutState, r *TestRunReport, seen map[string]
 	if len(r.Loaded) > testRunListLimit {
 		r.Loaded = r.Loaded[:testRunListLimit]
 	}
+}
+
+// sameFolder reports whether the game's Mods/<name> is the Mod's own folder through a link.
+func sameFolder(st *LoadoutState, m *store.Mod, name string) bool {
+	mods := modsDir(st.Ix)
+	if mods == "" || !source.IsLink(filepath.Join(mods, name)) {
+		return false
+	}
+	link, err1 := source.RealPath(filepath.Join(mods, name))
+	own, err2 := source.RealPath(st.Ix.ModDir(m))
+	return err1 == nil && err2 == nil && env.PathKey(link) == env.PathKey(own)
 }
 
 // testRunNotTested turns a run that reached its target with Mods missing into

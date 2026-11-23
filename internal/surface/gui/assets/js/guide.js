@@ -492,12 +492,14 @@ function branchLabel(b) {
   return b.name;
 }
 
-// suggestDir is <drive>\Games\RimWorld <version> for the chosen branch.
+// suggestDir is <games folder>/RimWorld <version> for the chosen branch, joined with the
+// games folder's own separator (D:\Games\RimWorld on Windows, ~/Games/RimWorld on Linux).
 function suggestDir() {
   const b = ((D.info && D.info.branches) || []).find((x) => x.name === D.branch);
   const games = (D.info && D.info.games) || "";
   const v = b ? (b.version || (b.name === "public" ? "" : b.name)) : "";
-  return games ? games + "\\RimWorld" + (v ? " " + v : "") : "";
+  const sep = games.startsWith("/") ? "/" : "\\";
+  return games ? games + sep + "RimWorld" + (v ? " " + v : "") : "";
 }
 
 function download(card) {

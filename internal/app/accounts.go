@@ -107,7 +107,7 @@ func (a *App) SteamAccountAction(action string) error {
 		return errors.New("enter a Steam account name first")
 	}
 	run := func(args []string, console bool) ([]string, error) {
-		log := filepath.Join(filepath.Dir(i.Path), "logs", "console_log.txt")
+		log := steamCMDConsoleLog(i.Path)
 		var off int64
 		if st, e := os.Stat(log); e == nil {
 			off = st.Size()

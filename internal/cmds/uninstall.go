@@ -104,12 +104,15 @@ func uninstallCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	title := "uninstalled: RimArcho's folders and program are deleted once this command ends"
+	if p.AtOnce {
+		title = "uninstalled: RimArcho's folders and program are deleted"
+	}
 	if failed > 0 {
 		title = fmt.Sprintf("uninstall stopped short: %d failed; the data folder stays, so this can run again", failed)
 	}
 	d, root := render.New(title)
 	UninstallOutline(root, p, a.Bool("all"), true)
-	if failed == 0 {
+	if failed == 0 && !p.AtOnce {
 		root.KV("left over", "anything that could not be deleted is listed in "+p.Log)
 	}
 	return d, nil
@@ -131,6 +134,10 @@ func UninstallStepText(p *app.UninstallPlan, s *app.UninstallStep) string {
 	size := ""
 	if b := s.Bytes(); b > 0 {
 		size = ", " + render.Size(b)
+	}
+	later := "once RimArcho has closed, "
+	if p.AtOnce {
+		later = ""
 	}
 	var parts []string
 	// add adds a part when some item does do; {n} is the count with the word.
@@ -171,20 +178,24 @@ func UninstallStepText(p *app.UninstallPlan, s *app.UninstallStep) string {
 		add(app.DoDelete, "folder", "delete the SteamCMD RimArcho downloaded"+size)
 		add(app.DoLeave, "folder", "left alone")
 	case app.UnData:
-		add(app.DoLater, "folder", "once RimArcho has closed, delete its data: database, settings, caches, the Steam runtime folder ({n})"+size)
+		add(app.DoLater, "folder", later+"delete its data: database, settings, caches, the Steam runtime folder ({n})"+size)
 		add(app.DoLeave, "folder", "{n} kept")
 	case app.UnSource:
 		add(app.DoDelete, "folder", "delete the generated source library ({n}); it can be recreated"+size)
 	case app.UnProgram:
-		add(app.DoLater, "folder", "once RimArcho has closed, delete the program")
+		add(app.DoLater, "folder", later+"delete the program")
 		add(app.DoLeave, "folder", "the program stays")
 	}
 	return strings.Join(parts, "; ")
 }
 
 // UninstallItemText is one item: what happens, the path, where it goes, why.
-func UninstallItemText(it *app.UninstallItem) string {
-	s := fmt.Sprintf("%-11s %s", unVerb[it.Do], it.Path)
+func UninstallItemText(p *app.UninstallPlan, it *app.UninstallItem) string {
+	verb := unVerb[it.Do]
+	if it.Do == app.DoLater && p.AtOnce {
+		verb = unVerb[app.DoDelete]
+	}
+	s := fmt.Sprintf("%-11s %s", verb, it.Path)
 	if it.To != "" {
 		s += " → " + it.To
 	}
@@ -208,14 +219,14 @@ func UninstallOutline(n *render.Node, p *app.UninstallPlan, all, done bool) {
 	for _, s := range p.Steps {
 		sec := n.Add(s.Key + ": " + UninstallStepText(p, s))
 		for _, it := range s.Items {
-			l := UninstallItemText(it)
+			l := UninstallItemText(p, it)
 			switch {
 			case !done:
 			case it.Err != "":
 				l = "FAILED " + l + "  error: " + it.Err
 			case it.Done:
 				l = "done   " + l
-			case it.Do == app.DoLater:
+			case it.Do == app.DoLater && !p.AtOnce:
 				l = "later  " + l
 			default:
 				l = "       " + l

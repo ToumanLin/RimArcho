@@ -67,6 +67,14 @@ test("refresh polling backs off to five seconds and stops at two minutes", async
   assert.doesNotMatch(h.screen.textContent, /refreshing branch list…/);
 });
 
+test("the suggested game folder uses the games folder's own separator (Linux: /)", async () => {
+  const h = await setup();
+  h.respond({ ...info("fresh", false), games: "/home/player/Games" }); await h.tick();
+  h.screen.querySelectorAll(".branch")[1].onclick();
+  assert.ok(h.screen.textContent.includes("/home/player/Games/RimWorld 1.5"), h.screen.textContent);
+  assert.doesNotMatch(h.screen.textContent, /Games\\RimWorld/);
+});
+
 test("refresh completion keeps selected branch and typed directory", async () => {
   const h = await setup();
   h.screen.querySelectorAll(".branch")[1].onclick();

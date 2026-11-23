@@ -57,6 +57,9 @@ func uninstallConfirmation(p *app.UninstallPlan) *UninstallConfirmation {
 				method = "delete directly"
 			case app.DoLater:
 				method = "delete directly after closing"
+				if p.AtOnce { // outside Windows the data and program go while uninstall runs
+					method = "delete directly"
+				}
 			case app.DoUnlink:
 				method = "delete links only; targets stay"
 			case app.DoClean:

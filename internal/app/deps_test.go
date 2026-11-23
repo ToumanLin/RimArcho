@@ -162,6 +162,16 @@ func TestInstallDepSteamCMDOwnDirectoryAndRemove(t *testing.T) {
 	if v := e.App.Store.Meta("cfg:steamcmd.path"); v != "" {
 		t.Fatalf("config changed: %q", v)
 	}
+	// Removed on purpose, the folder is unused, not "moved": nothing asks where it went.
+	dirs, err := e.App.ManagedDirectories()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range dirs {
+		if d.ID == "steamcmd-tool" && d.Status != "unused" {
+			t.Fatalf("SteamCMD folder after removal: %s (%s)", d.Status, d.Note)
+		}
+	}
 }
 
 // The SteamCMD case is in TestInstallDepSteamCMDOwnDirectoryAndRemove.

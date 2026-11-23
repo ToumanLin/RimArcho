@@ -176,3 +176,15 @@ func (a *App) FinishWorkshopRelocation() error {
 	}
 	return selfupdate.CleanWorkshopRelease(old)
 }
+
+// GUIProgram is the window program's file name on goos (16 §8.1): RimArcho.exe on Windows,
+// rimarcho on Linux, none elsewhere.
+func GUIProgram(goos string) string {
+	switch goos {
+	case "windows":
+		return "RimArcho.exe"
+	case "linux":
+		return "rimarcho"
+	}
+	return ""
+}
