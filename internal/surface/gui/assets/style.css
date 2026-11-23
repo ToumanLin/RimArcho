@@ -2245,6 +2245,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; -webkit-user-s
 .xc-db .xc-mrow:hover { border-color: var(--line); }
 .xc-db .xc-mrow.on { border-color: var(--accent); background: var(--accent-soft); }
 .xc-db .xc-mrows > .xc-hint, .xc-db .xc-mrows > .xc-note { padding: 4px 0; }
+.xc-mrows > .btn { align-self: flex-start; } /* the first run's "look for …" (16 §2.18) */
 .xc-else { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 14px 0; font-size: 12px; color: var(--muted); }
 /* empty: the drop pane, Archo in its middle and the words under her */
 .xc-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; flex: 1 1 auto; min-height: 0; padding: 32px;
