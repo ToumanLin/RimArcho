@@ -25,7 +25,8 @@ const Version = 12 // 12: unresolved content classification fields (12 §2).
 // PatchVersion versions the patch facts alone: it is in the run key (app.AnalysisKey), so
 // lists are simulated again, but not in the Def and assembly fact keys, which stay. 1:
 // succeeded operations reached only through a guard are marked (ReasonGuarded, Stats.Guards).
-const PatchVersion = 1
+// 2: touches under <success>Always</success> count as guarded (they cannot fail).
+const PatchVersion = 2
 
 // Mod is one installed instance.
 type Mod struct {

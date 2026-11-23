@@ -243,7 +243,7 @@ export async function focusLaunch() {
   if (!data) return;
   const f = applied();
   if (!f || f.kind !== "plan" || !f.current) {
-    const r = rows().find((x) => x.kind === "plan" && x.current);
+    const r = rows().find((x) => x.kind === "plan" && x.current && !x.otherEnv);
     if (r) await apply(r);
   }
   focusStep(3);
@@ -399,7 +399,7 @@ function step(n, cls, title) {
 }
 
 // 01: the games, the applied one first; picking one applies its last row (this session's
-// pick, else its most recently played). Each says its full version ("1.6.4871 rev590";
+// pick, else its current list). Each says its full version ("1.6.4871 rev590";
 // the short one when the build is unknown).
 function gameStep(env) {
   const s = step("01", "hm-s1", T("Game Config"));
@@ -560,7 +560,11 @@ function pickGame(env) {
   const f = applied();
   if (!S.busy.env && f && f.envName === env) return;
   const want = picks.get(env);
-  const r = rows().find((x) => key(x) === want) || rows().find((x) => x.envName === env);
+  // else its current list: a switch never changes a Game Config's list by itself. Its most
+  // recently played row could be a list played only in another Game Config (lists are
+  // shared): VM round 2A 2026-11-23 switched to 1.7 and made the 1.6 list r11 its list.
+  const r = rows().find((x) => key(x) === want) || rows().find((x) => x.envName === env && x.kind === "plan" && x.current) ||
+    rows().find((x) => x.envName === env);
   if (r) apply(r);
 }
 

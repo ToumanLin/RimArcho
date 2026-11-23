@@ -73,7 +73,7 @@ func (a *App) PlanGameCopy(spec CopyGameSpec) (*CopyGamePlan, error) {
 	}
 	name := strings.TrimSpace(spec.Name)
 	if name == "" {
-		name = a.freeEnvName(from.Name + "-copy")
+		name = a.FreeEnvName(from.Name + "-copy")
 	} else if err := ValidEnvName(name); err != nil {
 		return nil, err
 	} else if e, err := a.Store.EnvByName(name); err != nil {

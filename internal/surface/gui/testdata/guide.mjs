@@ -297,6 +297,21 @@ test("copying a game folder: the plan, the copy's events, then reading its mods"
   assert.deepEqual(h.writes, ["copy", "scan"]);
 });
 
+// VM round 2A 2026-11-23: opened again after a copy, the way kept its pick and asked no plan,
+// so "copy and add" stayed off with no size line and no reason.
+test("the copy way opened again from the Game Config page after a copy asks a new plan", async () => {
+  const button = (h, label) => h.screen.querySelectorAll("button").find(b => b.textContent === label);
+  const h = await setup({ from: "env", envs: ["1.6", "1.5"] });
+  h.switchWay(2); await flush();
+  await button(h, "copy and add").onclick(); await flush();
+  h.handlers.copy({ end: true, ok: true, env: "1.6-copy" }); await flush();
+  // the Game Config page's "copy the game folder…" opens the way directly
+  h.S.guideWay = 2;
+  await h.guide.start("env"); await flush();
+  assert.match(h.screen.textContent, /copies %s; free: %s/);
+  assert.equal(button(h, "copy and add").disabled, false);
+});
+
 test("with no Game Config there is no copy way", async () => {
   const h = await setup();
   h.switchWay(2); await flush();

@@ -473,7 +473,7 @@ func AddOtherEnvs(a *app.App, h *Home, current string) {
 		chip, ver := EnvChip(e.Name, e.GameVersion), env.MajorMinor(e.GameVersion)
 		ps, _ := a.PlansIn(e.ID)
 		for _, p := range ps {
-			r := HomeRow{Kind: RowPlan, Name: p.Name, Env: chip, Played: T("never played"), at: p.LastPlayed, Plan: p.ID,
+			r := HomeRow{Kind: RowPlan, Name: p.Name, Env: chip, Played: T("never played"), at: p.LastPlayed, Plan: p.ID, Current: p.Current,
 				Facts: Tf("%d mods", p.Entries), Mode: T("follows Workshop updates"), EnvName: e.Name, GameVersion: e.GameVersion, Versions: ver, Mods: p.Entries, OtherEnv: true}
 			if len(p.Plan.Versions) > 0 { // the player's choice; the default needs that game's mods loaded
 				r.Versions = app.FormatVersions(p.Plan.Versions)

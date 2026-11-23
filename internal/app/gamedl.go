@@ -595,7 +595,7 @@ func (a *App) FetchGame(spec DownloadSpec, progress func(DownloadProgress)) (str
 func (a *App) AddDownloaded(spec DownloadSpec, dir string) (*SourceChangeEnv, error) {
 	name := spec.Name
 	if name == "" {
-		name = a.freeEnvName(env.MajorMinor(env.ReadGameVersion(dir)))
+		name = a.FreeEnvName(env.MajorMinor(env.ReadGameVersion(dir)))
 	}
 	e, changes, err := a.EnvAdd(name, EnvSpec{GameRoot: dir, Launch: "direct", Saves: spec.Saves})
 	if err != nil {
@@ -610,8 +610,8 @@ type SourceChangeEnv struct {
 	Changes []SourceChange
 }
 
-// freeEnvName is base ("1.6"), or base-2… when a environment has it.
-func (a *App) freeEnvName(base string) string {
+// FreeEnvName is base ("1.6"), or base-2… when an environment has it.
+func (a *App) FreeEnvName(base string) string {
 	if base == "" {
 		base = "rimworld"
 	}

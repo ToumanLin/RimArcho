@@ -211,8 +211,12 @@ func (s *API) homeRead() *view.Home {
 // analysis and Mods, so a cache-only read leaves the last run pending.
 func logReportMissing(r *app.App, st *app.LoadoutState) bool {
 	path := r.ProblemLog(st)
-	if path == "" {
-		return false
+	if path == "" || !fileExists(path) {
+		// Player.log is gone (deleted, or the selected one was): Can it run reads
+		// Player-prev.log instead (06 §4), and so does the last game line (VM 2026-11-23:
+		// it showed nothing).
+		cur, prev := r.LogPaths(st)
+		return cur == "" && prev != ""
 	}
 	_, err := r.CachedLog(path)
 	return errors.Is(err, app.ErrLogNotCached)
@@ -683,9 +687,11 @@ func (s *API) GuideCopyPlan(from, dir, name string, mods bool) (*CopyPlan, error
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if strings.TrimSpace(dir) == "" {
+		// the folder follows the name the copy gets: after a first copy "<from>-copy-2", not
+		// the first copy's folder (VM round 2A 2026-11-23)
 		base := name
 		if base == "" {
-			base = from + "-copy"
+			base = s.a.FreeEnvName(from + "-copy")
 		}
 		dir = filepath.Join(gamesFolder(s.a), "RimWorld "+base)
 	}
@@ -759,4 +765,9 @@ func (s *API) GuideCopy(from, dir, name string, mods, ownSaves bool) (bool, erro
 		s.send("copy", end)
 	}()
 	return true, nil
+}
+
+func fileExists(p string) bool {
+	fi, err := os.Stat(p)
+	return err == nil && !fi.IsDir()
 }

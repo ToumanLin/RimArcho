@@ -32,7 +32,7 @@ func addLaunchChecks(c *Ctx, root *render.Node, ix *app.Index) {
 	for _, w := range ws {
 		n += len(w.Problems)
 	}
-	sec := root.Add(fmt.Sprintf("before you play: %d problems that often cause errors in the game (they do not block the launch)", n))
+	sec := root.Add(fmt.Sprintf("before you play: %d %s errors in the game (they do not block the launch)", n, plural(n, "problem that often causes", "problems that often cause")))
 	for _, w := range ws {
 		sev := finding.Info
 		for _, p := range w.Problems {
