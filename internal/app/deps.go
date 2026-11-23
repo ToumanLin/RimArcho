@@ -84,7 +84,16 @@ func (a *App) RemoveDep(name string) error {
 	if err := a.CheckDepRemoval(name); err != nil {
 		return err
 	}
-	return os.RemoveAll(a.Deps().Status(name).Dir)
+	dir := a.Deps().Status(name).Dir
+	if err := os.RemoveAll(dir); err != nil {
+		return err
+	}
+	if name == deps.SteamCMD && env.PathKey(dir) == env.PathKey(a.SteamCMDDir()) {
+		// Removed on purpose: the managed SteamCMD folder is unused again, not moved
+		// (folder check would ask for its new location).
+		return a.Store.SetMeta(directoryKey("steamcmd-tool"), "")
+	}
+	return nil
 }
 
 // CheckDepRemoval checks ownership and protected content without changing files.
