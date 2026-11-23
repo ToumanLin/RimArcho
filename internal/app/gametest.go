@@ -156,7 +156,14 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, 
 	if err != nil {
 		return nil, err
 	}
-	defer unlock()
+	locked := true
+	release := func() {
+		if locked {
+			locked = false
+			unlock()
+		}
+	}
+	defer release()
 	st, err := a.testRunState(o)
 	if err != nil {
 		return nil, err
@@ -252,6 +259,12 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, 
 	unlinkErr := unlink()
 	if raw == nil {
 		return nil, errors.Join(runErr, unlinkErr)
+	}
+	// With the links gone the run no longer needs the lock, and the attribution analysis
+	// takes it itself (its loadout sync, in the `archo analyze` child or a session):
+	// holding it would make that wait out and fail.
+	if unlinkErr == nil {
+		release()
 	}
 	r, errs := a.reportTestRun(ctx, c, raw)
 	return r, errors.Join(append([]error{runErr, unlinkErr}, errs...)...)
