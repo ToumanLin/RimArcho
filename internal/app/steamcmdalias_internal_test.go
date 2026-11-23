@@ -18,7 +18,7 @@ var cjkUser = string([]rune{0x65b0, 0x73a9, 0x5bb6})
 // %PUBLIC%\RimArcho that points at its folder, reuses it, and uninstall removes it (17 §2.1).
 func TestSteamCMDLaunchPathNonASCII(t *testing.T) {
 	if runtime.GOOS != "windows" {
-		if p, err := steamCMDLaunchPath("/home/"+cjkUser+"/steamcmd/steamcmd.sh"); err != nil || p != "/home/"+cjkUser+"/steamcmd/steamcmd.sh" {
+		if p, err := steamCMDLaunchPath("/home/" + cjkUser + "/steamcmd/steamcmd.sh"); err != nil || p != "/home/"+cjkUser+"/steamcmd/steamcmd.sh" {
 			t.Fatalf("off Windows the path is kept: %q %v", p, err)
 		}
 		return

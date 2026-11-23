@@ -102,17 +102,18 @@ type API struct {
 	// development harness points it at archo.exe).
 	Exe string
 
-	environment     environmentWorker
-	monitorOnce     sync.Once
-	watchOnce       sync.Once // watchDownloads (04 §1.6)
-	repliesOnce     sync.Once // checkFeedbackReplies (16 §2.14)
-	autoOnce        sync.Once
-	maintenanceOnce sync.Once
-	autoWG          sync.WaitGroup
-	quit            func()        // closes the window (nil in the harness and in tests)
-	windowTheme     func(bool)    // synchronises the native frame with the resolved page scheme
-	zoom            windowZoom    // settings › interface size (zoom.go)
-	memTarget       *memoryTarget // WebView2's memory target (winmem_policy.go); nil off Windows and in tests
+	environment      environmentWorker
+	monitorOnce      sync.Once
+	watchOnce        sync.Once // watchDownloads (04 §1.6)
+	repliesOnce      sync.Once // checkFeedbackReplies (16 §2.14)
+	autoOnce         sync.Once
+	maintenanceOnce  sync.Once
+	maintenanceYield func() // called when the idle monitor cancels a pass (tests; nil otherwise)
+	autoWG           sync.WaitGroup
+	quit             func()        // closes the window (nil in the harness and in tests)
+	windowTheme      func(bool)    // synchronises the native frame with the resolved page scheme
+	zoom             windowZoom    // settings › interface size (zoom.go)
+	memTarget        *memoryTarget // WebView2's memory target (winmem_policy.go); nil off Windows and in tests
 	// tasks is the Background tasks record and its lanes (tasks.go, 16 §2.16)
 	tasks        *app.Tasks
 	taskEv       taskEvents

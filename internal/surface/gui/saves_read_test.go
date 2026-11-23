@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -218,13 +217,9 @@ func TestSavesFullReadPage(t *testing.T) {
 	}
 
 	// A new save while a run is busy elsewhere: selecting it does not wait for that run.
-	release := make(chan struct{})
-	var runMu sync.Mutex
-	var runFirst []string
+	release, entered := make(chan struct{}), make(chan []string, 1)
 	api.saves.runner = func(ctx context.Context, first []string, progress func(string)) error {
-		runMu.Lock()
-		runFirst = first
-		runMu.Unlock()
+		entered <- first
 		select {
 		case <-release:
 			return nil
@@ -237,12 +232,16 @@ func TestSavesFullReadPage(t *testing.T) {
 	e.WriteSave("Other.rws", testkit.SaveSpec{Mods: spec.Mods, ModTime: now.Add(-4 * time.Hour)})
 	p = read(2, "")
 	sel := p.Colonies[0].Saves[0].Ref
-	for tk := savesTask(api); tk == nil || tk.State != app.TaskRunning; tk = savesTask(api) {
-		time.Sleep(10 * time.Millisecond)
+	// The task shows running before its goroutine calls the runner: wait for the call.
+	var gotFirst []string
+	select {
+	case gotFirst = <-entered:
+	case <-time.After(time.Minute):
+		t.Fatal("the run did not start")
 	}
-	runMu.Lock()
-	gotFirst := runFirst
-	runMu.Unlock()
+	if tk := savesTask(api); tk == nil || tk.State != app.TaskRunning {
+		t.Fatalf("the run is not a running task: %+v", tk)
+	}
 	if !slices.Equal(gotFirst, []string{sel}) {
 		t.Fatalf("the run reads %q first, want the selected %s", gotFirst, sel)
 	}

@@ -105,6 +105,10 @@ func PeekMeta(path, key string) string {
 	return v
 }
 
+// busyTimeoutMS: how long a write waits for another connection's or process's write before
+// SQLITE_BUSY (04 §4). TruncateWAL sets it back after its nonwaiting checkpoint.
+const busyTimeoutMS = "5000"
+
 func open(path string, initialise bool, progress func(UpgradeProgress)) (*Store, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
@@ -117,7 +121,7 @@ func open(path string, initialise bool, progress func(UpgradeProgress)) (*Store,
 	// later gets SQLITE_BUSY at once when another process committed in between, whatever
 	// busy_timeout says (a scan's ApplyScan while the window saved an analysis). Every
 	// transaction RimArcho begins writes; reads outside transactions are unaffected.
-	dsn := "file:" + filepath.ToSlash(path) + "?_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(1)&_pragma=journal_size_limit(16777216)&_txlock=immediate"
+	dsn := "file:" + filepath.ToSlash(path) + "?_pragma=busy_timeout(" + busyTimeoutMS + ")&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(1)&_pragma=journal_size_limit(16777216)&_txlock=immediate"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
