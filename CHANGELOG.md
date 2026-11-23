@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Fixed: a test run (`archo test run`, MCP `test_run`) while the Steam client was not running loaded none of the list's Workshop Mods and reported "NOT TESTED: these Mods were not loaded". It now links them into the game's `Mods` folder for the run, as launching without Steam does, and removes the links afterwards.
 - Fixed: after Can it run checked the list again, Steam updated a Mod or RimArcho was updated, the Launch page's "last game" line said "not checked yet" until you opened Can it run, which then said the run's errors (or none). Launch now reads the last game's log again by itself.
 - Fixed: pressing launch (`L`) in the list editor while the game was running made the open list current and asked whether there was enough RAM (the running game was using it) before refusing. It now only says the game is running, and the current list stays as it was.
 - Fixed: Play review put a Mod under "never seen in the saves" when everything the saves showed of it was what you pick from (Ideology's memes, styles and abilities in a new colony), though its details said 36 seen. It is now under "picked from, some in use".

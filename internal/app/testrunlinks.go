@@ -46,9 +46,15 @@ type testHidden struct {
 func (a *App) testRunLinks(st *LoadoutState) (string, []LinkChange, []testHidden, map[string]string) {
 	seen := testRunSeen(st)
 	blocked := map[string]string{}
+	workshop := map[string]bool{} // without Steam: the Workshop Mods a launch would link (09 §3)
+	if st.testNoSteam {
+		for _, m := range st.workshopMods() {
+			workshop[m.ID] = true
+		}
+	}
 	var want []*store.Mod
 	for _, e := range st.List {
-		if m := st.Ix.ByID[e.Instance]; m != nil && m.Kind != source.Official && seen[m.ID] == "" && st.Deployable(m) {
+		if m := st.Ix.ByID[e.Instance]; m != nil && m.Kind != source.Official && seen[m.ID] == "" && (st.Deployable(m) || workshop[m.ID]) {
 			want = append(want, m)
 		}
 	}
