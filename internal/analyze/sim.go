@@ -30,6 +30,10 @@ type guard struct {
 	mayReq   []string // packageIds from MayRequire on a Sequence item
 	cond     bool     // inside a Conditional
 	folder   []string // packageIds of the conditional load folder (LoadFolders IfModActive)
+	// always: inside an operation with <success>Always</success>, whose result the game
+	// forces true: what it touches cannot make the top-level operation fail. Not a guard
+	// for the failure reasons (any); only for ReasonGuarded (openTouch).
+	always bool
 }
 
 func (g guard) any() bool {
@@ -84,6 +88,9 @@ func (s *sim) run(t *topOp) {
 
 func (s *sim) apply(o *Op, g guard) (bool, error) {
 	o.ran = true
+	if o.success == "Always" {
+		g.always = true
+	}
 	s.guards[o] = g
 	r, err := s.worker(o, g)
 	if err != nil {
@@ -135,7 +142,7 @@ func (s *sim) selectNodes(o *Op, one bool) ([]xdoc.Ref, error) {
 		}
 	}
 	o.hits += len(out)
-	if len(out) > 0 && !s.guards[o].any() {
+	if g := s.guards[o]; len(out) > 0 && !g.any() && !g.always {
 		s.openTouch[s.cur] = true
 	}
 	s.noteTargets(out)

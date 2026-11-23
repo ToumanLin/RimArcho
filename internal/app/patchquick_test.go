@@ -36,10 +36,33 @@ func TestPatchTargetsFollowTheListBetweenChecks(t *testing.T) {
 </Patch>
 `
 	delete(guarded.Files, "Patches/guarded.xml")
+	// success=Always cannot fail in the game, so the check never reports it; the quick
+	// path must not either (VM round 2A 2026-11-23: Progression: Gravship's Add on
+	// Royalty's Empire showed "does not take effect" until the check ended)
+	always := testkit.Sample("tester.always", "Always")
+	always.Files["Patches/Always.xml"] = `<Patch>
+  <Operation Class="PatchOperationAdd">
+    <success>Always</success>
+    <xpath>Defs/ThingDef[defName="Lib_Axe"]</xpath>
+    <value><x/></value>
+  </Operation>
+  <Operation Class="PatchOperationSequence">
+    <operations>
+      <li Class="PatchOperationAdd">
+        <success>Always</success>
+        <xpath>Defs/ThingDef[defName="Lib_Gun"]</xpath>
+        <value><y/></value>
+      </li>
+    </operations>
+  </Operation>
+</Patch>
+`
+	delete(always.Files, "Patches/always.xml")
 	e.WriteMod(filepath.Join(e.Game, "Mods", "Lib"), lib)
 	e.WriteMod(filepath.Join(e.Game, "Mods", "Open"), open)
 	e.WriteMod(filepath.Join(e.Game, "Mods", "Guarded"), guarded)
-	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.lib", "tester.open", "tester.guarded")
+	e.WriteMod(filepath.Join(e.Game, "Mods", "Always"), always)
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.lib", "tester.open", "tester.guarded", "tester.always")
 	scanNow(t, e)
 	noMatch := func() (quick, stored []string) {
 		t.Helper()
@@ -72,7 +95,8 @@ func TestPatchTargetsFollowTheListBetweenChecks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// disable Lib: Open's unguarded patch shows at once; Guarded's FindMod patch does not
+	// disable Lib: Open's unguarded patch shows at once; Guarded's FindMod patch and
+	// Always's success=Always patches do not
 	e.MustRun("disable", "pkg:tester.lib")
 	// the editor's incremental read (16 §8.7) gives the same
 	inc, err := e.App.IncrementalProblems(before)
