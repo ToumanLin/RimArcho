@@ -32,7 +32,8 @@ func TestMemoryToolParityAndSeverity(t *testing.T) {
 	if isErr || output != cli {
 		t.Fatalf("MCP/CLI differ:\n%s\n%s", output, cli)
 	}
-	if !strings.Contains(output, "[severe]") || !strings.Contains(output, "[warning]") {
+	// A 1-byte adapter is a token figure (machine.MinDedicatedVRAM): capacity unknown.
+	if !strings.Contains(output, "[severe]") || !strings.Contains(output, "dedicated capacity: unknown [unknown]") {
 		t.Fatalf("severity missing: %s", output)
 	}
 }

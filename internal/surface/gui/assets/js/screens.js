@@ -531,9 +531,38 @@ async function undoDone() {
   return true;
 }
 
+// checkedList: the list Can it run checks, the window's open list (07 §1.3): the one the
+// read names, else the open one; null before the sidebar is read.
+function checkedList(d) {
+  const sh = S.shell || {};
+  return (d && d.plan && (sh.plans || []).find((p) => p.id === d.plan)) || sh.plan || null;
+}
+
+// listChip: that list's name as a pill in the head (16 §2.4), so a list opened here while
+// another is the one launched shows at a glance: then the pill is amber and its tooltip
+// names the current list.
+function listChip(p) {
+  const other = !p.current && !!(S.shell && S.shell.current) && S.shell.current.id !== p.id;
+  const c = el("span", "list-chip" + (other ? " other" : ""), p.name);
+  c.title = other ? Tf("the game is launched with %s; this list is only open here", S.shell.current.name) : T("current list");
+  return c;
+}
+
+// chipLead puts the list's pill in place of its name in the lead's sentence; the sentence
+// stays the line's text for assistive technology.
+function chipLead(w, d) {
+  const p = checkedList(d), lead = w.querySelector(".page-head .lead");
+  if (!p || !lead || lead.classList.contains("run-sum")) return;
+  const text = lead.textContent, at = text.indexOf(p.name);
+  if (at < 0) return;
+  lead.setAttribute("aria-label", text);
+  lead.textContent = text.slice(0, at);
+  lead.append(listChip(p), text.slice(at + p.name.length));
+}
+
 // lead: what the page says about the plan in one sentence.
 function needsLead(d) {
-  const plan = (S.shell && S.shell.plan && S.shell.plan.name) || T("the list");
+  const plan = checkedList(d)?.name || T("the list");
   const left = N.cols[0].filter((x) => !x.done && x.counted).length;
   const runs = N.cols[1].filter((x) => !x.done && x.counted).length;
   const errs = (n) => n === 1 ? T("1 error last time") : Tf("%d errors last time", n);
@@ -555,7 +584,8 @@ function runSummary(w) {
   const sentence = lead.textContent;
   const line = el("p", "lead run-sum");
   const sum = visTip(el("span", "rs"), sentence);
-  sum.append(el("span", "rs-plan", (S.shell && S.shell.plan && S.shell.plan.name) || T("the list")));
+  const p = checkedList(N.data);
+  sum.append(p ? listChip(p) : el("span", "rs-plan", T("the list")));
   for (const [n, ic, cls] of [[left, icon.warn, "warn"], [runs, icon.err, "err"]]) {
     if (!n) continue;
     const c = el("span", "rs-n " + cls);
@@ -631,6 +661,7 @@ function drawNeeds() {
     act(T("game log"), "log", () => ui.go("log"), "l"));
   markAgain(again);
   runSummary(w);
+  chipLead(w, d);
   N.els = [[], []];
   const live = N.cols[1].some((x) => x.group === 6);
   // The columns have no heading of their own: every card heads itself in one style (16 §2.4).

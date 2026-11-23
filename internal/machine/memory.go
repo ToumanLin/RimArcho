@@ -24,10 +24,18 @@ type Memory struct {
 	Error               string `json:"error,omitempty"`
 }
 
+// MinDedicatedVRAM is the smallest dedicated size taken as a graphics card's own
+// memory (16 §2.4). Below it the adapter keeps its textures in shared system memory
+// or reports a token figure: VMware's SVGA adapter reports 4 MB and Intel integrated
+// graphics about 128 MB. Capping 1.7 textures (loadcost.Cap17) or sizing 1.6's spill
+// on such a figure would understate RAM, so it counts as unknown instead.
+const MinDedicatedVRAM = 1 << 30
+
 // VRAM uses Windows' high-performance adapter ordering. This is a candidate,
 // not proof of the adapter selected by the game's renderer or per-app overrides.
+// 0 (unknown) when no adapter was read or its dedicated memory is below MinDedicatedVRAM.
 func (m Memory) VRAM() int64 {
-	if len(m.Adapters) == 0 {
+	if len(m.Adapters) == 0 || m.Adapters[0].Dedicated < MinDedicatedVRAM {
 		return 0
 	}
 	return m.Adapters[0].Dedicated
