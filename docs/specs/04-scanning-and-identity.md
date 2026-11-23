@@ -27,7 +27,7 @@ Check source states → list source subdirectories → group (merge identical re
 ### 1.2 Residue and about-disabled
 
 **Subscriptions and residue** (workshop sources only; the game does not load SteamCMD directories directly):
-- The game loads only **subscribed** Workshop items (17 §6). Subscribed means listed in `WorkshopItemsInstalled` or `WorkshopItemDetails` of `appworkshop_294100.acf`.
+- The game loads only **subscribed** Workshop items (17 §6). Subscribed means listed in `WorkshopItemDetails` of `appworkshop_294100.acf`. On unsubscribing, Steam drops the item from `WorkshopItemDetails` at once but keeps it under `WorkshopItemsInstalled` while its folder stays on disk (VM 2026-11-22), so an item that is only installed is residue. A manifest with no `WorkshopItemDetails` entries falls back to `WorkshopItemsInstalled`.
 - Without an ACF, everything counts as subscribed.
 - An ACF that exists but cannot be read or parsed (Steam may be rewriting it) says nothing: the scan keeps each Instance's stored residue value (`Observation.ResidueUnknown`).
 - Folders missing from the subscription records are residue: they still get Instances but cannot be added to plans, and can it run suggests cleaning them up (05 §4.3, 02 §3).

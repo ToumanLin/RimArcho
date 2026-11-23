@@ -179,11 +179,31 @@ func TestACF(t *testing.T) {
 }
 `), 0o644)
 	a := ReadACF(content)
-	if a == nil || !a.Items["111"].Subscribed || a.Items["111"].Manifest != "42" || a.Items["111"].TimeUpdated != 1700000000 || !a.Items["222"].Subscribed {
+	// 111 is installed but not in Details: Steam's state right after an unsubscribe while
+	// the folder is still on disk (VM 2026-11-22), so it is residue.
+	if a == nil || a.Items["111"].Subscribed || a.Items["111"].Manifest != "42" || a.Items["111"].TimeUpdated != 1700000000 || !a.Items["222"].Subscribed {
 		t.Fatalf("acf = %+v", a)
 	}
 	if a.Items["333"] != nil {
 		t.Fatal("unknown item present")
+	}
+	// A manifest with no Details entries: what is installed counts as subscribed.
+	os.WriteFile(filepath.Join(root, "steamapps", "workshop", "appworkshop_294100.acf"), []byte(`"AppWorkshop"
+{
+	"WorkshopItemsInstalled"
+	{
+		"111"
+		{
+			"manifest"		"42"
+		}
+	}
+	"WorkshopItemDetails"
+	{
+	}
+}
+`), 0o644)
+	if a := ReadACF(content); a == nil || !a.Items["111"].Subscribed {
+		t.Fatalf("installed-only manifest: %+v", a)
 	}
 }
 
