@@ -50,6 +50,7 @@ import { pickClick } from "./select.js";
 import { go, openPage, initNavigation, pageEntering, pageEntered, wireHistory, travel } from "./navigation.js";
 import { checkCredit } from "./credit.js";
 import { initSortSteps, offerAfterSort } from "./sortsteps.js";
+import { planActions as headActions } from "./planhead.js";
 import * as problems from "./problems.js";
 import * as fileSearch from "./filesearch.js";
 import * as modSettings from "./modsettings.js";
@@ -271,7 +272,9 @@ function render() {
 function renderTop() {
   if (!S.board) return;
   // one line (style.css #planhead): a narrow window cuts the lead, its hover keeps it whole
-  $("#planhead .lead").textContent = $("#planhead .lead").title = Tf("%d enabled, in the order the game loads them", col(1).items.length);
+  const lead = $("#planhead .lead"), n = col(1).items.length;
+  lead.textContent = Tf("%d enabled", n);
+  lead.title = Tf("%d enabled, in the order the game loads them", n);
 }
 
 // exportCurrent is the editor's e: the current list's export sub-page (16 §2.5, §2.17).
@@ -292,56 +295,23 @@ const launchHere = editorLauncher({
   busy: () => environmentReason(),
 });
 
-// planActions: the list's actions in the top bar (16 §2.5): its "an outside version has not been loaded" mark,
-// how many entries are not saved to the game yet, rename and delete, import / export (the
-// list's page in all lists), save, and set current or launch. Undo sits beside sort in the
-// enabled list's head.
+// planActions: the list's actions in the top bar (planhead.js, 16 §2.5).
 function planActions() {
-  const u = (S.board && S.board.unsaved) || 0;
-  const btn = (label, k, run, cls = "", envWrite = "") => {
-    const b = el("button", "btn " + cls, label);
-    if (envWrite) b.dataset.envWrite = envWrite;
-    if (k) { b.append(keyCaps(k)); b.title = k; }
-    b.onclick = (e) => { e.stopPropagation(); run(); };
-    return b;
-  };
-  const out = [problems.chip()];
-  const plan = S.shell && S.shell.plan;
-  if (plan && plan.conflict) {
-    const m = el("button", "chip mark");
-    m.append(el("span", "dot"), el("span", "t", plan.conflictText));
-    m.title = plan.conflictText + T("; ") + T("can it run › needs your answer");
-    m.onclick = (e) => { e.stopPropagation(); go("needs"); };
-    out.push(m);
-  }
-  if (u) {
-    const n = el("span", "unwritten", Tf("%d unsaved", u));
-    n.title = T("different from the last saved list; launching or saving saves these changes to the game");
-    motion.bump("unwritten", n, u);
-    out.push(n);
-  } else motion.bump("unwritten", null, 0);
-  out.push(scr.rescanButton(T("rescan")));
-  if (plan) {
-    out.push(btn(T("rename"), "", () => plans.renamePlan(plan.id), "", "rename-plan"),
-      btn(T("delete"), "", () => plans.deletePlan(plan.id), "danger", "remove-plan"));
-  }
-  const io = btn(T("import/export"), "", manageCurrent);
-  io.title = T("the list's page in all lists: import, export, share");
-  const save = btn(u ? T("save changes") : T("no changes"), "w", () => run("save"), u ? "hot" : "", "save");
-  save.disabled = !u;
-  out.push(io, save);
-  // another list is the one launched (07 §1.3): this one can be made current first
-  if (plan && S.shell.current) {
-    const c = btn(T("set current"), "", () => plans.usePlan(plan.id), "primary", "use-plan");
-    c.title = Tf("the game is launched with %s; this list is only open here", S.shell.current.name) + T("; ") + T("no game file is written");
-    out.push(c);
-  } else {
-    // the game starts from here, as from Launch (16 §2.5)
-    const l = btn(T("launch"), "L", launchHere, "primary", "launch");
-    l.title = T("starts the game with this list; unsaved changes are saved first") + T("; ") + "L";
-    out.push(l);
-  }
-  return out;
+  return headActions({
+    unsaved: (S.board && S.board.unsaved) || 0,
+    plan: S.shell && S.shell.plan,
+    current: S.shell && S.shell.current,
+    problemsChip: () => problems.chip(),
+    openNeeds: () => go("needs"),
+    rescanButton: () => scr.rescanButton(T("rescan"), true),
+    rename: (id) => plans.renamePlan(id),
+    remove: (id) => plans.deletePlan(id),
+    use: (id) => plans.usePlan(id),
+    manage: manageCurrent,
+    save: () => run("save"),
+    launch: launchHere,
+    bump: (n, u) => motion.bump("unwritten", n, u),
+  });
 }
 
 // manageCurrent opens all lists with the open list selected: its import, export and sharing.
@@ -1407,6 +1377,7 @@ const ui = {
   importFirstList: () => exchange(true), // the first-run guide's hand-over (16 §2.15)
   manageLists: (id = 0) => { planManage.select(id); return go("plans"); },
   edited: (call, undoable = true) => edited(call, undoable),
+  showMod: (id, name) => showDetail({ id, name }), // the sort steps' Mod names (16 §6.1)
   ruleTarget: () => actionContext().sel[0],
   afterImport: null, // the first-run guide's next step once an import is applied
 };

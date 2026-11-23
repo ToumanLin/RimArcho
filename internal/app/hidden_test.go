@@ -145,6 +145,10 @@ func TestHiddenAlone(t *testing.T) {
 	if st, err := e.App.Loadout(); err != nil || st.List.Index(id) < 0 {
 		t.Fatalf("H6: the plan lost the entry instead of keeping it as missing: %v", err)
 	}
+	// The folder is in the fixture's recycle bin, never the player's (17 §4).
+	if !source.HasAbout(filepath.Join(e.RecycleBin, "Mine")) {
+		t.Fatal("H6: the recycled folder is not in the fixture's recycle bin")
+	}
 }
 
 func refID(t *testing.T, e *testkit.Env, name string, kind source.Kind) string {

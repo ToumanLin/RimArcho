@@ -256,8 +256,11 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .page-acts .btn.primary { color: var(--accent-fg); background: var(--accent); border-color: transparent; }
 .page-acts .btn.hot { color: var(--accent-11, var(--accent)); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .page-acts .field { flex: 0 1 200px; }
-.page-acts .unwritten { color: var(--accent-11, var(--accent)); font-size: 12px; white-space: nowrap; margin-right: 2px; }
-.page-acts .unwritten::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; }
+.page-acts .unwritten { min-width: 18px; height: 18px; line-height: 18px; padding: 0 5px; margin-left: 6px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-11, var(--accent)); font-size: 12px; font-weight: 600; text-align: center; }
+/* the list editor's tools (16 §2.5): icons side by side, quiet until hovered */
+.page-acts .ph-tools { display: inline-flex; align-items: center; gap: 2px; flex: none; }
+.page-acts .ph-tools .btn { border-color: transparent; background: none; box-shadow: none; color: var(--fg-2); }
+.page-acts .ph-tools .btn:hover { background: var(--pill); color: var(--fg); }
 /* a page's actions: quiet icon + text, no border (16 §2.2) */
 .page-acts .btn.quiet { border-color: transparent; background: none; box-shadow: none; color: var(--fg-2); font-size: 13px; padding: 0 6px; }
 .page-acts .btn.quiet:hover { background: var(--pill); color: var(--fg); }
@@ -1816,7 +1819,7 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .fb-att { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; border-top: var(--hairline) solid var(--line-2); }
 .fb-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .fb-att-l { color: var(--muted); font-size: 12px; margin-right: 2px; }
-.fb-chip { display: inline-flex; align-items: center; max-width: 280px; height: 22px; padding: 0 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 999px; background: var(--pill); color: var(--fg-2); font-size: 12px; cursor: default; }
+.fb-chip { display: inline-block; max-width: 280px; height: 22px; line-height: 22px; padding: 0 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 999px; background: var(--pill); color: var(--fg-2); font-size: 12px; cursor: default; }
 .fb-chip.hot { background: color-mix(in srgb, var(--red) 16%, transparent); color: var(--red); }
 .fb-chip.wait { background: transparent; color: var(--muted); }
 .page .btn.link.fb-change { font-size: 12px; }
@@ -2530,6 +2533,14 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .ss-mod { overflow: hidden; text-overflow: ellipsis; color: var(--fg); }
 .ss-old { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
 .ss-arrow { color: var(--muted); }
+/* a Mod's name is a link (its details, or its Workshop page): plain text until hovered */
+.ss-link { min-width: 0; padding: 0; border: 0; background: none; font: inherit; text-align: left; white-space: nowrap; cursor: pointer; }
+.ss-link:hover { text-decoration: underline; }
+.ss-link.ss-old { text-decoration: line-through; }
+.ss-link.ss-old:hover { text-decoration: line-through underline; }
+/* remove a list entry that is not installed: a quiet bin at the row's end */
+.ss-remove { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: var(--r-sm); background: none; color: var(--muted); cursor: pointer; }
+.ss-remove:hover { color: var(--red); background: var(--red-soft); }
 .ss-at { flex: none; font: 12px var(--code); color: var(--accent); }
 .ss-for { flex: 0 1 auto; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted); }
 .ss-err { margin-top: 8px; font-size: 12px; color: var(--red); }
@@ -2698,7 +2709,10 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .sv-fixbar.bad { background: var(--red-soft); }
 .sv-fixbar.ok { background: var(--green-soft); }
 .sv-fixbar.busy { background: var(--pill); }
-.sv-fixbar .t { flex: 1 1 200px; font-weight: 600; }
+.sv-fixbar .t { flex: 1 1 200px; min-width: 0; font-weight: 600; }
+/* the verdict's button stays inside the card: a long label wraps instead of running out of a
+   narrow middle card (16 §2.11) */
+.sv-fixbar > .btn { flex: 0 1 auto; min-width: 0; max-width: 100%; height: auto; min-height: 22px; padding-top: 3px; padding-bottom: 3px; white-space: normal; text-align: left; }
 .sv-sect .sv-cur { margin: 12px 0 6px; font-size: 12px; color: var(--muted); }
 .sv-group { margin: 14px 0 0; font-size: 12px; font-weight: 600; color: var(--muted); }
 .sv-issues { margin-top: 2px; }

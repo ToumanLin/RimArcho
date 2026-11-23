@@ -414,7 +414,10 @@ func (a *App) linkInstances() (*linkInstances, error) {
 	}
 	li := &linkInstances{key: key, byName: map[string]*store.LinkMod{}, recorded: map[string]*store.LinkMod{}}
 	for _, m := range ms {
-		if m.Status == identity.Live && m.RealPath != "" {
+		// An instance found through a RimArcho-named link in a game's Mods/ (another
+		// home's link into its own folders, 02 §2) is that link, not a target proving
+		// the link is ours.
+		if m.Status == identity.Live && m.RealPath != "" && !seenThroughLink(m) {
 			li.recorded[env.PathKey(m.RealPath)] = m
 			li.live = append(li.live, m)
 		}
@@ -424,6 +427,13 @@ func (a *App) linkInstances() (*linkInstances, error) {
 	a.linkInst = li
 	shareLinks(a.Store, li)
 	return li, nil
+}
+
+// seenThroughLink: m is a game's Mods/ entry whose own folder name is a RimArcho link
+// name, so the scan found it through that link.
+func seenThroughLink(m *store.LinkMod) bool {
+	name := filepath.Base(m.Rel)
+	return managedLink(name) || packLink(name)
 }
 
 func (l *GameLink) Finding() *finding.Finding {

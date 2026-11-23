@@ -10,6 +10,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -119,7 +120,16 @@ func TestConfigMissingLogIsNotClean(t *testing.T) {
 			st.Ix.Env.GameVersion = version
 			// Even an error-free default log cannot stand in for the own-folder log.
 			e.WriteFile(filepath.Join(e.UserData, "Player.log"), "no errors")
+			// Never launched (a sibling's game has run and exited): it has not run yet,
+			// rather than a log that went missing (release VM round 2026-11-22).
 			n := view.BuildNeeds(e.App, st, &app.ProblemSet{State: st})
+			if n.MissingLog != "not launched yet" || n.LastRun != "" {
+				t.Fatalf("never launched: %+v", n)
+			}
+			if err := e.App.Store.AddLaunch(st.Ix.Env.ID, testkit.Start, "steam", "RimWorldWin64.exe"); err != nil {
+				t.Fatal(err)
+			}
+			n = view.BuildNeeds(e.App, st, &app.ProblemSet{State: st})
 			want := filepath.Join(st.Ix.Env.UserDataRoot, "Player.log")
 			if !strings.Contains(n.MissingLog, "the last run's log was not found") || !strings.Contains(n.MissingLog, want) || n.LastRun != "" {
 				t.Fatalf("unsubstantiated clean verdict: %+v", n)

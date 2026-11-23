@@ -85,6 +85,7 @@
   "other Game Configs use this game folder: its inventory and analysis stay": "他のゲーム構成がこのゲームフォルダーを使用するため、在庫と解析結果は残ります",
   "this is the last Game Config using this folder: its records and %d Mod inventory records are removed": "このフォルダーを使用する最後のゲーム構成です。記録と %d 件の Mod 在庫記録を削除します",
   "the last run's log was not found: %s": "前回の実行ログが見つかりません: %s",
+  "not launched yet": "まだ起動していません",
   "added Game Config %s": "ゲーム構成 %s を追加しました",
   "copies game settings and Mod settings; no Mod files or saves are copied": "ゲーム設定とMOD設定をコピーします。MODファイルとセーブはコピーしません",
   "copy the settings of %s": "%s の設定をコピー",

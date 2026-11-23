@@ -1,5 +1,6 @@
 {
   "%d enabled, in the order the game loads them": "启用了 %d 个，按游戏加载的顺序",
+  "%d enabled": "启用了 %d 个",
   "%d mods": "%d 个 Mod",
   "%d mods found": "找到 %d 个 Mod",
   "%d problems": "%d 个问题",
@@ -527,6 +528,9 @@
   "undo: %s": "撤销：%s",
   "undone": "已撤销",
   "use copies": "使用副本",
+  "remove %s from the list": "把 %s 从列表移除",
+  "%s: show its details": "%s：查看详情",
+  "%s: open its Workshop page": "%s：打开创意工坊页面",
   "use the installed copies for entries with no folder": "为没有文件夹的条目使用已安装的副本",
   "replace with the recommended mods": "替换为推荐的 Mod",
   "enable the required mods, then sort": "启用必需的 Mod，然后排序",

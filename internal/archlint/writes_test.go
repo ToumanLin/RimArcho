@@ -162,6 +162,27 @@ func TestArchSurfaceWrites(t *testing.T) {
 	report(t, staleProblems("surfaceWritesAllowed", surfaceWritesAllowed, used))
 }
 
+// testTrashAllowed: test files that call source.Trash itself. Outside Windows the
+// internal/app tests recycle into their own XDG data folder (17 §4); on Windows a test
+// binary's Trash refuses (source.ErrTestRecycle), so only internal/source tests it there.
+var testTrashAllowed = map[string]bool{"internal/app/main_other_test.go": true}
+
+// testTrashProblems: a test outside internal/source recycles through its App's TrashFunc
+// (testkit.Env.Recycle, a fake bin in the fixture), never source.Trash: on a developer's
+// machine that is the real recycle bin (17 §4).
+func testTrashProblems(g *goFile, mod string) []string {
+	var out []string
+	if g.dir == "internal/source" || testTrashAllowed[g.path] {
+		return nil
+	}
+	for _, r := range g.refs() {
+		if r.pkg == mod+"/internal/source" && r.name == "Trash" {
+			out = append(out, fmt.Sprintf("17 §4: %s in %s uses source.Trash; a test recycles through its App's TrashFunc (testkit.Env.Recycle), never the real recycle bin", loc(r.pos, g.path), r.fn))
+		}
+	}
+	return out
+}
+
 // trashProblems: one recycle bin entry point (02 §3). source.Trash is reached only through
 // App.ToTrash in internal/app/trash.go; only source/trash_windows.go calls SHFileOperationW;
 // the trash implementations never delete permanently.
@@ -169,6 +190,7 @@ func trashProblems(files []*goFile, mod string) []string {
 	var out []string
 	for _, g := range files {
 		if g.test {
+			out = append(out, testTrashProblems(g, mod)...)
 			continue
 		}
 		trashImpl := g.dir == "internal/source" && strings.HasPrefix(path.Base(g.path), "trash_")

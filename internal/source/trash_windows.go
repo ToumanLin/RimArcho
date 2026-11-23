@@ -34,7 +34,11 @@ const (
 
 // Trash moves a file or folder to the recycle bin (02 §3). It never deletes permanently:
 // where the volume has no recycle bin the shell reports an error instead.
+// A test binary never reaches the shell (ErrTestRecycle).
 func Trash(path string) error {
+	if realBinRefused() {
+		return ErrTestRecycle
+	}
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return err

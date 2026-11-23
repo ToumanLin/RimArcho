@@ -650,3 +650,23 @@ func TestUIContractsDetection(t *testing.T) {
 		t.Errorf("cssSelectors: %q", got)
 	}
 }
+
+// The saves page's verdict (16 §2.11): its button wraps inside the card instead of running
+// past a narrow middle card's edge ("make a list from this save to analyse its assemblies").
+func TestUISaveVerdictButtonWraps(t *testing.T) {
+	b, err := fs.ReadFile(assets, "assets/style.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, d := range cssDeclList(string(b)) {
+		if d.sel == ".sv-fixbar > .btn" {
+			got[d.name] = d.value
+		}
+	}
+	for name, want := range map[string]string{"white-space": "normal", "max-width": "100%", "height": "auto", "min-width": "0"} {
+		if got[name] != want {
+			t.Errorf("16 §2.11: .sv-fixbar > .btn %s is %q, want %q, so a long verdict button stays in the card", name, got[name], want)
+		}
+	}
+}

@@ -33,6 +33,13 @@ type SortStepItem struct {
 	For        []string `json:"for,omitempty"`
 	WorkshopID string   `json:"workshopId,omitempty"`
 	Why        string   `json:"why,omitempty"`
+	// ID and OldID: the installed instances Name and Old are, so each name links to its
+	// details; a name without one links to its Workshop page (WorkshopID) or to nothing.
+	ID    string `json:"id,omitempty"`
+	OldID string `json:"oldId,omitempty"`
+	// Remove: the reference of a list entry that is not installed, which the row offers to
+	// remove from the list (an undoable disable).
+	Remove string `json:"remove,omitempty"`
 }
 
 // SortStep is one step: what it changes. Only the current step carries a preview (positions
@@ -69,7 +76,10 @@ type sortFixes struct {
 	unfixable []SortStepItem
 }
 
-func readSortFixes(n app.SortNotices) sortFixes {
+// readSortFixes sorts what the sort found into steps. gone holds the Workshop IDs Steam said
+// are removed from the Workshop (delisted, deleted or private): those are never offered for
+// download. removeRef gives a missing list entry's reference for its remove button.
+func readSortFixes(n app.SortNotices, gone map[string]bool, removeRef func(pkg string) string) sortFixes {
 	var f sortFixes
 	addGet := func(it SortStepItem) {
 		if it.WorkshopID == "" || slices.Contains(f.wsIDs, it.WorkshopID) {
@@ -79,15 +89,19 @@ func readSortFixes(n app.SortNotices) sortFixes {
 		f.get = append(f.get, it)
 	}
 	for _, m := range n.MissingMods {
+		rm := removeRef(m.PackageID)
 		switch {
 		case m.CanEnable:
 			f.copies = append(f.copies, m)
-		case m.WorkshopID != "":
-			addGet(SortStepItem{Change: "get", Name: m.Name, WorkshopID: m.WorkshopID})
 		case m.Installed:
-			f.unfixable = append(f.unfixable, SortStepItem{Change: "none", Name: m.Name, Why: T("an installed copy cannot be loaded")})
+			f.unfixable = append(f.unfixable, SortStepItem{Change: "none", Name: m.Name, Why: T("an installed copy cannot be loaded"), Remove: rm})
+		case m.WorkshopID != "" && gone[m.WorkshopID]:
+			f.unfixable = append(f.unfixable, SortStepItem{Change: "none", Name: m.Name, WorkshopID: m.WorkshopID, Why: T("removed from the Workshop"), Remove: rm})
+		case m.WorkshopID != "":
+			addGet(SortStepItem{Change: "get", Name: m.Name, WorkshopID: m.WorkshopID, Remove: rm})
 		default:
-			f.unfixable = append(f.unfixable, SortStepItem{Change: "none", Name: m.Name, Why: T("in the list, no known source")})
+			// a local Mod, or one Steam never had: there is nothing to download
+			f.unfixable = append(f.unfixable, SortStepItem{Change: "none", Name: m.Name, Why: T("in the list, no known source"), Remove: rm})
 		}
 	}
 	for _, r := range n.Replacements {
@@ -95,10 +109,10 @@ func readSortFixes(n app.SortNotices) sortFixes {
 		case r.Enabled:
 		case r.CanReplace && r.Installed:
 			f.replace = append(f.replace, r)
-		case !r.Installed && r.Replacement.WorkshopID != "":
-			addGet(SortStepItem{Change: "get", Name: r.Replacement.Name, Old: r.Original.Name, WorkshopID: r.Replacement.WorkshopID})
+		case !r.Installed && r.Replacement.WorkshopID != "" && !gone[r.Replacement.WorkshopID]:
+			addGet(SortStepItem{Change: "get", Name: r.Replacement.Name, Old: r.Original.Name, OldID: r.Original.Instance, WorkshopID: r.Replacement.WorkshopID})
 		case r.Installed && r.BlockedReason != "":
-			f.unfixable = append(f.unfixable, SortStepItem{Change: "none", Name: r.Replacement.Name, Old: r.Original.Name, Why: r.BlockedReason})
+			f.unfixable = append(f.unfixable, SortStepItem{Change: "none", Name: r.Replacement.Name, Old: r.Original.Name, ID: r.Replacement.Instance, OldID: r.Original.Instance, Why: r.BlockedReason})
 		}
 	}
 	for _, d := range n.MissingDependencies {
@@ -106,6 +120,10 @@ func readSortFixes(n app.SortNotices) sortFixes {
 		case "installed":
 			f.enable = append(f.enable, d)
 		case "workshop":
+			if gone[d.WorkshopID] {
+				f.unfixable = append(f.unfixable, SortStepItem{Change: "none", Name: d.Name, For: d.RequiredBy, WorkshopID: d.WorkshopID, Why: T("removed from the Workshop")})
+				continue
+			}
 			addGet(SortStepItem{Change: "get", Name: d.Name, For: d.RequiredBy, WorkshopID: d.WorkshopID})
 		default:
 			f.unfixable = append(f.unfixable, SortStepItem{Change: "none", Name: d.Name, For: d.RequiredBy, Why: T("required, no known source")})
@@ -154,7 +172,7 @@ func ReadSortSteps(a *app.App, past []string) (*SortSteps, error) {
 	if err != nil {
 		return nil, err
 	}
-	f := readSortFixes(n)
+	f := readSortFixes(n, workshopGone(a), func(pkg string) string { return TokRef(st, "pkg:"+pkg) })
 	out := &SortSteps{Steps: []SortStep{}, Current: -1, Unfixable: f.unfixable}
 	for _, kind := range stepOrder {
 		if !f.has(kind) {
@@ -172,21 +190,32 @@ func ReadSortSteps(a *app.App, past []string) (*SortSteps, error) {
 	return out, nil
 }
 
+// workshopGone: the Workshop IDs the last Workshop check found removed from the Workshop.
+func workshopGone(a *app.App) map[string]bool {
+	gone := map[string]bool{}
+	for _, f := range a.SubscriptionSourceCheck(app.LibWorkshop).Failures {
+		if f.Gone() {
+			gone[f.ID] = true
+		}
+	}
+	return gone
+}
+
 // step lists a step's Mods without a dry run.
 func (f sortFixes) step(kind string) SortStep {
 	s := SortStep{Kind: kind, Items: []SortStepItem{}}
 	switch kind {
 	case StepUseInstalled:
 		for _, m := range f.copies {
-			s.Items = append(s.Items, SortStepItem{Change: "copy", Name: m.Name})
+			s.Items = append(s.Items, SortStepItem{Change: "copy", Name: m.Name, ID: m.Instance})
 		}
 	case StepReplace:
 		for _, r := range f.replace {
-			s.Items = append(s.Items, SortStepItem{Change: "replace", Name: r.Replacement.Name, Old: r.Original.Name})
+			s.Items = append(s.Items, SortStepItem{Change: "replace", Name: r.Replacement.Name, Old: r.Original.Name, ID: r.Replacement.Instance, OldID: r.Original.Instance})
 		}
 	case StepEnable:
 		for _, d := range f.enable {
-			s.Items = append(s.Items, SortStepItem{Change: "add", Name: d.Name, For: d.RequiredBy})
+			s.Items = append(s.Items, SortStepItem{Change: "add", Name: d.Name, For: d.RequiredBy, ID: d.Instance})
 		}
 	case StepSubscribe:
 		s.Items = append(s.Items, f.get...)
@@ -227,7 +256,7 @@ func (f sortFixes) preview(a *app.App, s *SortStep) error {
 				if m := r.State.Ix.ByID[id]; m != nil {
 					name = m.DisplayName()
 				}
-				s.Items = append(s.Items, SortStepItem{Change: "add", Name: name, For: need[id]})
+				s.Items = append(s.Items, SortStepItem{Change: "add", Name: name, For: need[id], ID: id})
 				ids = append(ids, id)
 			}
 		}
@@ -265,7 +294,7 @@ func ApplySortStep(a *app.App, kind string) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	f := readSortFixes(n)
+	f := readSortFixes(n, workshopGone(a), func(string) string { return "" })
 	if !f.has(kind) {
 		return &Result{Text: T("nothing left to do in this step")}, nil
 	}
