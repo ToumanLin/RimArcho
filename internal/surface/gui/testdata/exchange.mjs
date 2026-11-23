@@ -257,3 +257,28 @@ test("a drop a form already took is left to it", async () => {
   await h.listeners.drop(e);
   assert.ok(h.screen.querySelector(".xc-preview").hidden);
 });
+
+test("the first run does not look for managers; its row offers to, and then lists them (VM 2026-11-23)", async () => {
+  let surveys = 0;
+  const h = await setup({ ImportSurvey: async () => { surveys++; return []; } });
+  h.S.screen = "guide";
+  await h.m.exchange(true);
+  await flush();
+  assert.equal(surveys, 0);
+  assert.match(h.screen.textContent, /Where does your first list come from/);
+  assert.doesNotMatch(h.screen.textContent, /looking for RimSort/);
+  const look = h.screen.querySelectorAll(".xc-mrows button").find((b) => /look for RimSort/.test(b.textContent));
+  assert.ok(look, "a button looks for them");
+  look.onclick(); await flush();
+  assert.equal(surveys, 1);
+  assert.match(h.screen.textContent, /No RimSort, RimCrow or RimPy data found/);
+});
+
+test("outside the first run the page looks for managers at once, with no button for it", async () => {
+  let surveys = 0;
+  const h = await setup({ ImportSurvey: async () => { surveys++; return []; } });
+  await h.m.exchange();
+  await flush();
+  assert.equal(surveys, 1);
+  assert.ok(!h.screen.querySelectorAll(".xc-mrows button").some((b) => /look for/.test(b.textContent)));
+});

@@ -95,6 +95,7 @@ export async function exchange(first = false) {
   sc.append(w);
   area(card, null); area(rcard, null);
   M = freshM();
+  M.looking = !firstRun; // the survey below starts at once
   drawDo();
   placeArcho();
   read.finish(); ui.renderWhere(); ui.renderHints();
@@ -385,13 +386,14 @@ async function addManagerSource(f) {
 // survey asks what each manager holds (dry runs in their own session); rows fill in.
 async function survey() {
   const active = session;
-  M.managers = null; M.error = "";
+  M.managers = null; M.error = ""; M.looking = true;
   drawRows();
   try {
     const managers = await api.ImportSurvey(M.extra);
     if (!live(active)) return;
     M.managers = managers || [];
   } catch (e) { if (!live(active)) return; M.managers = []; M.error = errText(e); }
+  M.looking = false;
   drawRows(); drawTree();
 }
 
@@ -455,6 +457,9 @@ function drawRows() {
   const rows = $("#screen .xc-mrows");
   if (!rows) return;
   rows.textContent = "";
+  // the first run does not look for managers (16 §2.18): the row offers it instead of
+  // saying it is looking (VM 2026-11-23: "looking for…" stayed for good)
+  if (!M.managers && !M.looking) { rows.append(button(T("look for RimSort, RimCrow and RimPy"), "", () => survey())); return; }
   if (!M.managers) { rows.append(el("div", "xc-hint", T("looking for RimSort, RimCrow and RimPy…"))); return; }
   if (M.error) rows.append(el("div", "xc-note warn", M.error));
   if (!M.managers.length) { rows.append(el("div", "xc-hint", T("No RimSort, RimCrow or RimPy data found."))); return; }

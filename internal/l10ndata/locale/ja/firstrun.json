@@ -12,6 +12,7 @@
   "use this folder": "このフォルダを使用",
   "import from RimSort, RimCrow or RimPy": "RimSort／RimCrow／RimPyからインポート",
   "looking for RimSort, RimCrow and RimPy…": "RimSort・RimCrow・RimPyを検索中…",
+  "look for RimSort, RimCrow and RimPy": "RimSort・RimCrow・RimPyを検索",
   "reading the data…": "データを読み込み中…",
   "No RimSort, RimCrow or RimPy data found.": "RimSort・RimCrow・RimPyのデータが見つかりませんでした。",
   "Existing values stay; importing player data cannot be undone.": "既存の値は維持されます。プレイヤーデータのインポートは元に戻せません。",
