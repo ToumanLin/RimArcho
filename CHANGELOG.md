@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Development: on Windows, RimArcho's own tests no longer move their synthetic folders into your real Recycle Bin. A test build refuses the real bin, and the test fixtures recycle into a folder of their own.
 - **Linux (experimental): the mouse back and forward buttons work in the window**, as on Windows: one press goes one page back or forward. WebKitGTK handed both buttons to the page as the same unnamed button (which could also act as a left click where the pointer was); the window now takes them from GTK itself.
 - Fixed: the list editor's problems button and its panel said "1 problems" in English for a list with one problem; they now say "1 problem".
 - Fixed: with RimWorld 1.6 and 1.7 installed side by side, after a 1.7 game run the 1.6 Game Config's Can it run, `archo log` and `archo problems` read the 1.7 run's log as its own ("analysed: as 1.7 (log version)"). A 1.7 log that a 1.7 Game Config's launch wrote now belongs to that Game Config only.

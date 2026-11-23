@@ -45,6 +45,7 @@ type Env struct {
 	UserData   string
 	ModsConfig string
 	Home       string
+	RecycleBin string // <Root>/RecycleBin: the fake recycle bin every App here uses (Recycle)
 	App        *app.App
 	Launched   []string // command lines the stub launcher received
 
@@ -70,6 +71,7 @@ func New(t testing.TB) *Env {
 	e.UserData = filepath.Join(root, "AppData", "LocalLow", "Ludeon Studios", "RimWorld by Ludeon Studios")
 	e.ModsConfig = filepath.Join(e.UserData, "Config", "ModsConfig.xml")
 	e.Home = filepath.Join(root, "ArchoHome")
+	e.RecycleBin = filepath.Join(root, "RecycleBin")
 	e.WriteFile(filepath.Join(e.Game, "RimWorldWin64.exe"), "")
 	e.WriteFile(filepath.Join(e.Game, "Version.txt"), "1.6.4633 rev1261\n")
 	e.MkdirAll(filepath.Join(e.Game, "Mods"))
@@ -159,6 +161,9 @@ func (e *Env) openApp(seed [32]byte) (*app.App, error) {
 	a.Detect = env.DetectOptions{SteamRoots: []string{e.Steam}, ManualRoots: []string{}, Home: e.Root, GOOS: "windows", SkipRegistry: true}
 	// The lock library (07 §5) stays inside the fixture.
 	a.LockBase = filepath.Join(e.Root, "LocalAppData")
+	// Recycling stays inside the fixture: a test never reaches the player's own recycle
+	// bin (source.ErrTestRecycle, 17 §4). A test that watches recycles replaces it.
+	a.TrashFunc = e.Recycle
 	// Uninstall stays inside the fixture: kept saves and packs go to <root>/Documents, no
 	// other RimArcho is found, and the clean-up script is never started.
 	a.UninstallKeepBase = filepath.Join(e.Root, "Documents")
@@ -191,6 +196,26 @@ func (e *Env) openApp(seed [32]byte) (*app.App, error) {
 	// into the fixture after the test has ended.
 	a.HTTP = &http.Client{Timeout: 15 * time.Second, Transport: offline}
 	return a, nil
+}
+
+// Recycle is the fixture's recycle bin: it moves path into RecycleBin under a free name,
+// as the real bin keeps what it is given. A missing path fails, as the real bin does.
+func (e *Env) Recycle(path string) error {
+	if _, err := os.Lstat(path); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(e.RecycleBin, 0o755); err != nil {
+		return err
+	}
+	name := filepath.Base(path)
+	dst := filepath.Join(e.RecycleBin, name)
+	for i := 2; ; i++ {
+		if _, err := os.Lstat(dst); os.IsNotExist(err) {
+			break
+		}
+		dst = filepath.Join(e.RecycleBin, fmt.Sprintf("%s.%d", name, i))
+	}
+	return os.Rename(path, dst)
 }
 
 // offline dials loopback only and uses no proxy (a local proxy would forward to the internet).
