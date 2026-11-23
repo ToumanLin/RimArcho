@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Fixed: on a computer whose graphics adapter reports only a token amount of dedicated memory (a VMware VM's 4 MB, Intel integrated graphics' about 128 MB), RimWorld 1.7's memory estimate capped the textures at that card's size, so Can it run, All lists, `archo plan cost` and MCP `estimate_memory` said far less RAM than the same list needs on 1.6 (31–71 MB against 266–550 MB in a VM), and the VRAM bar read 4.0 MB. Dedicated memory under 1 GB now counts as unknown: the RAM estimate is the full, uncapped one and the VRAM capacity shows `—` (`unknown` in the CLI). Cards of 1 GB and more are estimated as before.
 - **Linux (experimental): the mouse back and forward buttons work in the window**, as on Windows: one press goes one page back or forward. WebKitGTK handed both buttons to the page as the same unnamed button (which could also act as a left click where the pointer was); the window now takes them from GTK itself.
 - Fixed: the list editor's problems button and its panel said "1 problems" in English for a list with one problem; they now say "1 problem".
 - Fixed: with RimWorld 1.6 and 1.7 installed side by side, after a 1.7 game run the 1.6 Game Config's Can it run, `archo log` and `archo problems` read the 1.7 run's log as its own ("analysed: as 1.7 (log version)"). A 1.7 log that a 1.7 Game Config's launch wrote now belongs to that Game Config only.
