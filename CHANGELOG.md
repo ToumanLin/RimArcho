@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- **Linux (experimental):** dragging a Mod in the list editor no longer selects the text of the rows it passes over (WebKitGTK ignored the rule that keeps rows unselectable).
 - After removing RimArcho's own SteamCMD (`archo deps remove steamcmd`, Settings › external tools), the terminal and `archo folder check` no longer ask where the SteamCMD folder moved; it is shown as unused until SteamCMD is installed again.
 - **Linux (experimental): SteamCMD downloads finish.** Downloading a Workshop Mod or a game version with SteamCMD always ended "download was not confirmed", even when SteamCMD had downloaded it: RimArcho reads SteamCMD's console log, which SteamCMD writes on Windows but not on Linux. RimArcho now writes that log itself, so `archo subscribe workshop … --steamcmd`, the SteamCMD fallback and `archo env download` see the result. (Linux-Test VM, anonymous download, 2026-11-23.)
 - Test runs (`archo test run`, MCP `test_run`): after a launch without the Steam client running, a Workshop Mod of the plan (Harmony, say) was reported as "not loaded" and the run as not tested, because the game took it through the `_Archo_workshop_…` link that launch left in `Mods/` instead of the Workshop folder. That link is the same folder, so the Mod now counts as loaded and the report names the link. (Linux-Test VM, 2026-11-23.)
