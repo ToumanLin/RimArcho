@@ -139,6 +139,7 @@ The shared page exists only in the GUI. The TUI keeps its own editor full-screen
 
 | Internal code | Player sees | One-step action / TUI key | Group |
 | --- | --- | --- | --- |
+| `official.core-missing` | Core is not in the list: the game resets its list when it starts and loads Core alone | S sort (adds Core) | breaks the game |
 | `official.order` | Core and DLC must come first | S sort | breaks the game |
 | `order.violated` strong warning | One requirement: A should follow B; the wrong order may prevent dependencies or content from working. Multiple requirements: 10 Mods are out of order, counting the Mods that need moving; Enter expands the individual requirements. | S sort | breaks the game |
 | `order.violated` weak / harmless info (08 §1.3) | Merge into the official or strong S item, adding `Need.Also`: also satisfies 5 weaker requirements. Without that item, show 5 unmet weaker requirements and explain that violating these author or community suggestions did not correlate with more shared-log errors. | S sort; f expands a standalone item | Merged error item, otherwise worth knowing |
