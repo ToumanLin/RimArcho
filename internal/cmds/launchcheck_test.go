@@ -111,7 +111,7 @@ func TestLaunchChecksOneProblem(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("launch blocked: %s", out)
 	}
-	if !strings.Contains(out, "before you play: 1 problem that often cause") {
-		t.Errorf("want \"1 problem\" in:\n%s", out)
+	if !strings.Contains(out, "before you play: 1 problem that often causes errors") {
+		t.Errorf("want \"1 problem that often causes\" in:\n%s", out)
 	}
 }
