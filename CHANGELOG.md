@@ -2,7 +2,7 @@
 
 All notable changes to RimArcho. Versions follow semantic versioning; the MVP is 0.5.0.
 
-## Unreleased
+## 1.1.0 — 2026-11-23
 
 - Update checks: the Archo Monitor Workshop item (3844969469) is now the third source beside GitHub and Lanzou. It is unlisted for now, so Steam does not show it to the check and its line reads "not found"; GitHub and Lanzou answer as before. Once the item is public, every 1.1.0 install starts reading it.
 - Play review: the line at the top said "1 colony, 1 save", which explained nothing. It now says "how much of each Mod's content has appeared in the colony", with a legend of the tiles' bar colours: yellow none yet, blue some, green all. The counts stay on the colonies card.
