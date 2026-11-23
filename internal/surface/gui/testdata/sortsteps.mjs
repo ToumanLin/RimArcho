@@ -69,9 +69,13 @@ test("one step at a time: each shows its changes and applies alone", async () =>
   assert.deepEqual(chips(h), ["sort:done", "use-installed:now", "replace:later", "enable:later", "subscribe:later"]);
   const card = h.popup.querySelector(".ss-card");
   assert.equal(card.dataset.kind, "use-installed");
-  assert.match(card.textContent, /use the installed copies for entries with no folder/);
+  // the chip is the title: no heading, count badge or row icon repeats it (16 §6.1)
+  assert.equal(card.getAttribute("aria-label"), "use the installed copies for entries with no folder");
+  assert.equal(card.querySelectorAll(".ss-head, .ss-sum, .ss-pill, .ss-ico").length, 0);
+  assert.equal(h.popup.querySelectorAll(".ttl").length, 0);
+  assert.equal(card.textContent, "One#3");
   assert.equal(card.querySelector(".ss-at").textContent, "#3");
-  assert.equal(button(h, ".go").textContent, "use copies1enter");
+  assert.equal(button(h, ".go").textContent, "use copiesenter");
   assert.deepEqual(p.calls, [["SortSteps", []]]);
 
   button(h, ".go").onclick(); await settle();
@@ -122,11 +126,13 @@ test("the Workshop step offers Steam and SteamCMD and subscribes its IDs; then a
   const p = plan(["subscribe"]), h = await setup(p);
   await h.mod.offerAfterSort({ text: "sorted", undo: true });
   const go = button(h, ".go");
-  assert.equal(go.textContent, "get with Steam1enter");
+  assert.equal(go.textContent, "get with Steamenter");
   assert.equal(go.title, "from Steam");
   go.onclick(); await settle();
   assert.equal(JSON.stringify(p.calls.find((c) => c[0] === "Subscribe")[1]), JSON.stringify({ kind: "workshop", url: "7002", steamcmd: false, batch: true }));
-  assert.match(h.popup.querySelector(".ss-card").textContent, /all steps done/);
+  // every chip done says it: no card repeats the list of what was done
+  assert.equal(h.popup.querySelector(".ss-card"), null);
+  assert.deepEqual(chips(h), ["sort:done", "subscribe:done"]);
   assert.equal(button(h, ".go").textContent, "closeenter");
 });
 
