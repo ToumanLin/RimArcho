@@ -215,3 +215,24 @@ func TestStatusLineAfterGame(t *testing.T) {
 		t.Fatalf("shift+2 went to %d", m.tab)
 	}
 }
+
+// The navigation row's digits are the entries' own shift keys: texture optimisation (shift+7)
+// is under Mod library, so Game Config is 8 and clicking it opens the switcher, not textures
+// (VM 2026-11-23: "7 Game Config" opened texture optimisation).
+func TestTopBarDigitsAreShiftKeys(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	e.AddEnv(false)
+	m := direct(t, e, 200, 40)
+	bar := ansi.Strip(m.topBar())
+	if !strings.Contains(bar, "8 "+T("Game Config")) || strings.Contains(bar, "7 "+T("Game Config")) {
+		t.Fatalf("top bar %q", bar)
+	}
+	var pages []int
+	for _, h := range m.nav.hits {
+		pages = append(pages, h.page)
+	}
+	if len(pages) == 0 || pages[len(pages)-1] != 8 {
+		t.Fatalf("hits %v", pages)
+	}
+}
