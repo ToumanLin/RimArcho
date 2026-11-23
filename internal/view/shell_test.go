@@ -167,7 +167,11 @@ func TestBuildHome(t *testing.T) {
 	if err != nil || other == nil {
 		t.Fatalf("other Game Config: %v", err)
 	}
-	if _, err := e.App.Store.CreatePlan(other.ID, "Other list", e.Now()); err != nil {
+	op, err := e.App.Store.CreatePlan(other.ID, "Other list", e.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.App.Store.SetCurrentPlan(other.ID, op.ID); err != nil {
 		t.Fatal(err)
 	}
 	view.AddOtherEnvs(e.App, h, b.St.Ix.Env.ID)
@@ -177,6 +181,11 @@ func TestBuildHome(t *testing.T) {
 			found = true
 			if r.GameVersion != "1.7.4985 rev1269" || r.Env != "other  1.7" {
 				t.Fatalf("other Game Config version: %+v", r)
+			}
+			// each Game Config's rows say which list is its current one, so picking that
+			// game on Launch keeps its list (16 §2.3; VM round 2A 2026-11-23)
+			if r.Kind == view.RowPlan && r.Current != (r.Plan == op.ID) {
+				t.Fatalf("other Game Config's current list: %+v", r)
 			}
 		}
 	}
