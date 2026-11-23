@@ -54,3 +54,15 @@ func TestDetachedPackBuildNotStopped(t *testing.T) {
 		}
 	}
 }
+
+// A running game copy offers "stop the rest" (03 §3.5: the copy can be stopped and leaves
+// nothing; VM round 2A 2026-11-23: the task row had no stop button).
+func TestRunningGameCopyCanStop(t *testing.T) {
+	task := app.Task{ID: "c1", Kind: TaskCopyGame, Lane: app.LaneSelf, State: app.TaskRunning, Frac: 0.2}
+	for _, a := range BuildTasks([]app.Task{task}, time.Now()).Rows[0].Acts {
+		if a.ID == "stop" {
+			return
+		}
+	}
+	t.Fatal("no stop on a running game copy")
+}

@@ -630,10 +630,10 @@ func TaskTargetName(target string) string {
 	return T("mod library")
 }
 
-// TaskCanStop says which self tasks stop part way (a pack build, a texture run).
+// TaskCanStop says which self tasks stop part way (a pack build, a texture run, a game copy).
 func TaskCanStop(kind string) bool {
 	return kind == TaskSourceDecompile || kind == TaskSourceClean || kind == TaskCreditReplace || kind == TaskPack || kind == TaskTextures || kind == TaskTexClean ||
-		kind == TaskSaves
+		kind == TaskSaves || kind == TaskCopyGame
 }
 
 // handedOver counts the items a new task took over.

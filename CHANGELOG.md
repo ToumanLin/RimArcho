@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Fixed: a game copy (Add Game Config › "copy a game folder", the Game Config page's "copy the game folder…") could not be stopped: its row on Background tasks had no "stop the rest". It now has, and a stopped copy leaves no folder and no Game Config.
 - Fixed: when a Game Config's `Player.log` was gone and only `Player-prev.log` was left (deleted by hand or by a cleaner), Can it run showed that previous run's errors but the Launch page had no "last game" line at all. Launch now reads the previous file too.
 - CLI: `archo launch` (and `--dry-run`) said "before you play: 1 problems" for one problem; it now says "1 problem".
 - Fixed: right after you disabled a Mod in the list editor, Can it run and the editor's problems could say "part of <Mod> does not take effect: <the disabled Mod> is not enabled" for a patch written to be harmless when its target is missing (`<success>Always</success>`), with an "enable" button and a problem count, until the check ended and dropped it. Seen with Progression: Gravship after disabling Royalty. Such patches no longer give that item; lists are checked again once after this update.
