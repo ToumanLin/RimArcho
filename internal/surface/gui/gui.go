@@ -96,7 +96,8 @@ func Run(o Options) error {
 		return err
 	}
 	win.RegisterHook(events.Common.WindowClosing, api.guardWindowClose)
-	wireNativeDrop(win, api) // files and links dropped on the window (16 §2.18)
+	wireNativeDrop(win, api)  // files and links dropped on the window (16 §2.18)
+	wireSideButtons(win, api) // mouse back and forward on Linux (16 §3.1 rule 11)
 	api.uninstall.shutdownBlock = uninstallShutdownBlock(win)
 	win.OnWindowEvent(events.Common.WindowShow, func(*application.WindowEvent) { perftrace.Mark("window-show") })
 	win.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) { perftrace.Mark("webview-runtime-ready") })

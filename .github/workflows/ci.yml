@@ -137,7 +137,7 @@ jobs:
       - name: GTK 3 and WebKitGTK 4.1
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.1-dev
+          sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.1-dev xvfb
           pkg-config --modversion gtk+-3.0 webkit2gtk-4.1
 
       - name: go vet
@@ -156,7 +156,8 @@ jobs:
           objdump -T rimarcho | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1
 
       - name: go test
-        run: go test -tags gtk3 -count=1 -timeout 20m ./internal/surface/gui ./internal/surface/cli ./internal/surface/upgradewin
+        # TestSideButtonsHookGTK drives real GTK and WebKitGTK widgets, so the tests need a display.
+        run: xvfb-run -a go test -tags gtk3 -count=1 -timeout 20m ./internal/surface/gui ./internal/surface/cli ./internal/surface/upgradewin
 
       - uses: actions/upload-artifact@v4
         with:

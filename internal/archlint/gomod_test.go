@@ -40,6 +40,7 @@ var pinnedIn17 = map[string]string{
 	"github.com/klauspost/compress":          "klauspost/compress ",
 	"github.com/woozymasta/bcn":              "woozymasta/bcn ",
 	"github.com/mattn/go-runewidth":          "mattn/go-runewidth ",
+	"github.com/ebitengine/purego":           "ebitengine/purego ",
 	"github.com/charmbracelet/x/ansi":        "x/ansi** is at ",
 	"github.com/clipperhouse/displaywidth":   "`clipperhouse/displaywidth` is at ",
 	"github.com/clipperhouse/uax29/v2":       "uax29 ",
