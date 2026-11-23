@@ -649,7 +649,7 @@ func (a *App) ensureTestAnalysis(ctx context.Context, st *LoadoutState, progress
 	a.OpenPlan, a.PlanName = st.Plan.ID, ""
 	defer func() { a.OpenPlan, a.PlanName = open, name }()
 	if a.AnalyzeRunner != nil {
-		return a.AnalyzeRunner(st.Ix.Env.Name, progress)
+		return a.AnalyzeRunner(a.AnalyzeFrom(st.Ix.Env.Name), progress)
 	}
 	if a.AnalyzeExe != "" {
 		return ChildAnalyzeExe(a.AnalyzeExe, a.Home, st.Ix.Env.Name, st.Plan.Name, "", progress)

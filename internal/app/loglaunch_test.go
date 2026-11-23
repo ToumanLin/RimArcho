@@ -215,7 +215,7 @@ func TestAnalysisPerPlan(t *testing.T) {
 	e.HarmonyLogFixture()
 	runs := 0
 	inner := e.App.AnalyzeRunner
-	e.App.AnalyzeRunner = func(env string, p func(string)) error { runs++; return inner(env, p) }
+	e.App.AnalyzeRunner = func(env *app.App, p func(string)) error { runs++; return inner(env, p) }
 	problems(t, e)
 	newPlan(t, e, "other")
 	usePlan(t, e, "other")

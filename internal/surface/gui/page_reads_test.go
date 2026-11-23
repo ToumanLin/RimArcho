@@ -76,7 +76,7 @@ func TestHomeAndNeedsReadersLeaveNavigationResponsive(t *testing.T) {
 		t.Run(page, func(t *testing.T) {
 			e, api, _ := fixture(t)
 			e.App.LazyLog, e.App.LogCacheOnly = true, true
-			e.App.AnalyzeRunner = func(string, func(string)) error { return errors.New("fixture") }
+			e.App.AnalyzeRunner = func(*app.App, func(string)) error { return errors.New("fixture") }
 			if _, err := api.LogPage(""); err != nil {
 				t.Fatal(err)
 			}

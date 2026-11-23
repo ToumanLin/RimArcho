@@ -79,8 +79,11 @@ type App struct {
 	// (tests replace it). A Steam launch without it starts the game directly (09 §2).
 	SteamRunning func() bool
 	// AnalyzeRunner brings the Def/Patch analysis up to date; nil means the `archo analyze`
-	// child process (05 §3). Tests run it in-process.
-	AnalyzeRunner func(envName string, progress func(string)) error
+	// child process (05 §3). Tests run it in-process (InProcessAnalyze). from says what to
+	// analyse, as the child's arguments do: its EnvName, open list and GameVersion. It is
+	// the caller's (AnalyzeFrom when the runner goes on another goroutine): the runner
+	// reads it and does not keep it.
+	AnalyzeRunner func(from *App, progress func(string)) error
 	// ScanProgress hears the scans this App runs without a Progress of their own, such as
 	// the rescan after Archo Monitor is installed (`scan --progress`).
 	ScanProgress func(ScanProgress)

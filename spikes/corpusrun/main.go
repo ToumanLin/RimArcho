@@ -114,7 +114,7 @@ func open(home string) (*app.App, error) {
 	if err != nil {
 		return nil, err
 	}
-	a.AnalyzeRunner = app.InProcessAnalyze(a)
+	a.AnalyzeRunner = app.InProcessAnalyze
 	return a, nil
 }
 

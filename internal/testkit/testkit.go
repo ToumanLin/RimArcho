@@ -5,6 +5,7 @@ package testkit
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"math/rand/v2"
@@ -17,6 +18,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -45,6 +47,8 @@ type Env struct {
 	Home       string
 	App        *app.App
 	Launched   []string // command lines the stub launcher received
+
+	children atomic.Uint64 // ChildApp calls, for each child's ID stream
 
 	now        time.Time
 	subscribed map[string]bool
@@ -124,13 +128,33 @@ func (e *Env) Open() {
 	if e.App != nil {
 		e.App.Close()
 	}
-	a, err := app.Open(e.Home)
+	a, err := e.openApp([32]byte{'r', 'i', 'm', 'a', 'r', 'c', 'h', 'o'})
 	if err != nil {
 		e.T.Fatal(err)
 	}
+	e.App = a
+	e.T.Cleanup(func() { a.Close() })
+}
+
+// ChildApp opens another App on the fixture's data directory, configured as Open configures
+// e.App: what a child process (`archo scan`, `archo analyze`) has. A stand-in for such a
+// child uses it instead of e.App, which the surface under test uses at the same time. The
+// caller closes it. Each child draws IDs from its own stream (a real child's are random):
+// the same seed as e.App would hand out IDs e.App already gave to rows.
+func (e *Env) ChildApp() (*app.App, error) {
+	seed := [32]byte{'c', 'h', 'i', 'l', 'd'}
+	binary.LittleEndian.PutUint64(seed[8:], e.children.Add(1))
+	return e.openApp(seed)
+}
+
+func (e *Env) openApp(seed [32]byte) (*app.App, error) {
+	a, err := app.Open(e.Home)
+	if err != nil {
+		return nil, err
+	}
 	a.MemoryProbe = func() machine.Memory { return machine.Memory{} }
 	a.Now = func() time.Time { return e.now }
-	a.Rand = rand.NewChaCha8([32]byte{'r', 'i', 'm', 'a', 'r', 'c', 'h', 'o'})
+	a.Rand = rand.NewChaCha8(seed)
 	a.Loc = time.UTC
 	a.Detect = env.DetectOptions{SteamRoots: []string{e.Steam}, ManualRoots: []string{}, Home: e.Root, GOOS: "windows", SkipRegistry: true}
 	// The lock library (07 §5) stays inside the fixture.
@@ -159,15 +183,14 @@ func (e *Env) Open() {
 	// Workshop retries do not sleep through the real 5 s / 15 s backoff.
 	a.SteamCMDWait = func(time.Duration) {}
 	// The Def/Patch analysis runs in-process instead of an `archo analyze` child.
-	a.AnalyzeRunner = app.InProcessAnalyze(a)
+	a.AnalyzeRunner = app.InProcessAnalyze
 	a.SavesIndexRunner = app.InProcessSavesIndex(a)
 	// Never go online: a test that needs a remote serves it on loopback (httptest) and points
 	// the matching URL or client there. Anything else, such as a Workshop description fetched
 	// when a detail pane opens, fails at once instead of waiting on the network and writing
 	// into the fixture after the test has ended.
 	a.HTTP = &http.Client{Timeout: 15 * time.Second, Transport: offline}
-	e.App = a
-	e.T.Cleanup(func() { a.Close() })
+	return a, nil
 }
 
 // offline dials loopback only and uses no proxy (a local proxy would forward to the internet).

@@ -61,13 +61,13 @@ func TestNeedsRealCopy(t *testing.T) {
 	})
 	defer s.Close()
 	// Every analysis uses a separate App and only the copied DB. No game writes, scans or subscriptions.
-	a.AnalyzeRunner = func(env string, progress func(string)) error {
+	a.AnalyzeRunner = func(env *app.App, progress func(string)) error {
 		r, err := app.Open(home)
 		if err != nil {
 			return err
 		}
 		defer r.Close()
-		r.EnvName = env
+		r.EnvName = env.EnvName
 		r.OpenPlan = openedPlan
 		r.HTTP = &http.Client{Transport: needsOffline{}}
 		report, err := r.Analyze(progress)

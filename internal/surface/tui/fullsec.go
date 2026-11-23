@@ -34,9 +34,18 @@ func (m *model) loadFullSecs() tea.Cmd {
 	if mod == nil {
 		return nil
 	}
-	a, ix, id := m.app, m.st.Ix, it.id
+	// Off the key path on a session of its own: the commands behind the sections (def,
+	// patches, harmony) take the list lock and may analyse, while keys go on using m.app.
+	snap, ix, id := m.snapshot(), m.st.Ix, it.id
 	m.fsecs = &fullSecs{id: id} // loading
-	return func() tea.Msg { return fullSecsMsg{&fullSecs{id: id, secs: view.Sections(a, ix, mod)}} }
+	return func() tea.Msg {
+		a, err := snap.ReadSession()
+		if err != nil {
+			return fullSecsMsg{&fullSecs{id: id, secs: []fullSec{{Title: T("error: ") + err.Error(), Count: -1}}}}
+		}
+		defer a.Close()
+		return fullSecsMsg{&fullSecs{id: id, secs: view.Sections(a, ix, mod)}}
+	}
 }
 
 // secLines lays out the sub-sections at width w; each header line carries its number.

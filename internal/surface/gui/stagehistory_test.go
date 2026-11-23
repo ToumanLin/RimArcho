@@ -68,7 +68,11 @@ func TestStageAPIHistory(t *testing.T) {
 	if _, err := api.Toggle(int(view.Active), []string{alpha}, nil); err != nil {
 		t.Fatal(err)
 	}
+	// e.App is the API's own App: read it under the API's lock, since the edit's needs
+	// refresh goes on using it on another goroutine.
+	api.mu.Lock()
 	staged, _, err := e.App.Staged()
+	api.mu.Unlock()
 	if err != nil {
 		t.Fatal(err)
 	}

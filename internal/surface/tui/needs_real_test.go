@@ -39,7 +39,7 @@ func TestT8NeedsReal(t *testing.T) {
 	}
 	defer a.Close()
 	a.Launcher = func(string, []string, string) error { t.Fatal("launch attempted"); return nil }
-	a.AnalyzeRunner = app.InProcessAnalyze(a) // never the child: that would be this test binary
+	a.AnalyzeRunner = app.InProcessAnalyze // never the child: that would be this test binary
 	opened := ""
 	m := New(Options{App: a, OpenURL: func(u string) error { opened = u; return nil },
 		Scan:    func(string) (string, error) { t.Fatal("scan"); return "", nil },

@@ -3,6 +3,7 @@ package mcp_test
 import (
 	"context"
 	"fmt"
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -443,7 +444,7 @@ func TestStillComputing(t *testing.T) {
 	e.HarmonyLogFixture()
 	inner := e.App.AnalyzeRunner
 	release := make(chan bool)
-	e.App.AnalyzeRunner = func(env string, p func(string)) error { <-release; return inner(env, p) }
+	e.App.AnalyzeRunner = func(env *app.App, p func(string)) error { <-release; return inner(env, p) }
 	e.App.AnalyzeWait = 50 * time.Millisecond
 	cs := connect(t, e)
 	out, isErr := call(t, cs, "list_problems", nil)

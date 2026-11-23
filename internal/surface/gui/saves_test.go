@@ -3,6 +3,7 @@
 package gui
 
 import (
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"os"
 	"path/filepath"
 	"slices"
@@ -154,7 +155,7 @@ func TestSavesPage(t *testing.T) {
 	// to analyse it: the new list's analysis runs in the background and the page stays
 	ran := make(chan struct{}, 1)
 	inner := e.App.AnalyzeRunner
-	e.App.AnalyzeRunner = func(env string, p func(string)) error {
+	e.App.AnalyzeRunner = func(env *app.App, p func(string)) error {
 		defer func() { ran <- struct{}{} }()
 		if inner == nil {
 			return nil
