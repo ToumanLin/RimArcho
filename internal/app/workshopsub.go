@@ -171,7 +171,9 @@ func (a *App) workshopItem(st *LoadoutState, action, ref string) (WorkshopItem, 
 	}
 	switch action {
 	case steamworks.Subscribe:
-		if !m.Residue {
+		// A leftover folder or a tombstone (Steam deleted the folder after an unsubscribe)
+		// can be subscribed to again; a live, subscribed copy cannot.
+		if !m.Residue && m.Status == identity.Live {
 			return WorkshopItem{}, fmt.Errorf("%s is subscribed already", st.Ix.Ref(m.ID))
 		}
 	case steamworks.Unsubscribe:
