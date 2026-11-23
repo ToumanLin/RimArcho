@@ -50,6 +50,10 @@ func (k branchKey) cacheKey() branchKey {
 }
 
 func runBranchSteamCMD(ctx context.Context, exe string, args []string) (string, error) {
+	exe, err := steamCMDLaunchPath(exe)
+	if err != nil {
+		return "", err
+	}
 	cmd := exec.CommandContext(ctx, exe, args...)
 	cmd.Dir = filepath.Dir(exe)
 	hideWindow(cmd)
