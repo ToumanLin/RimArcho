@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- The README (English and Chinese) is rewritten from the release post: badges, screenshots of each area, requirements, what RimArcho touches and never does, and a FAQ. The MCP tool count it gives is today's 47 (30 by default).
 - **Archo Monitor wears crayon Archo (Monitor 0.12.1).** Its icon in the game's Mod list and its preview picture are now Archo in her crayon style, as in RimArcho's window, instead of the vector portrait; the Workshop item's animated preview shows her watching the log, frowning at an error, tracing it and finding the Mod. Nothing else in Monitor changed; RimArcho installs 0.12.1 beside 0.12.0 and moves your lists to it as with any Monitor update.
 - Fixed: picking another Game Config on the Launch page could change that Game Config's list. It applied the list played most recently in any Game Config (lists are shared), so picking a 1.7 Game Config made the 28-Mod list last played in 1.6 its current list. Picking a game now keeps its own current list (or the item you applied there earlier in the session).
 - Fixed: after a game copy, opening "copy the game folder…" again left "copy and add" greyed out with no size and no reason. The form kept the last pick and proposed the first copy's folder, which is taken. It now starts from the current Game Config and proposes the next free name and folder (`RimWorld 1.6-copy-2`).
