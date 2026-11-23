@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 // Tests never open the file manager or the browser: a test that runs open the location / open page

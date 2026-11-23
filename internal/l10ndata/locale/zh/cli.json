@@ -1,3 +1,4 @@
 {
-  "This build has no window; the text interface (archo) has the same features.": "此构建不含窗口；文字界面（archo）提供相同功能。"
+  "This build has no window; the text interface (archo) has the same features.": "此构建不含窗口；文字界面（archo）提供相同功能。",
+  "RimArcho's window needs a graphical desktop, and none was found (DISPLAY and WAYLAND_DISPLAY are not set).\n\nIn a terminal, use archo instead: the same manager as a text interface.": "RimArcho 的窗口需要图形桌面，但没有找到（DISPLAY 和 WAYLAND_DISPLAY 都未设置）。\n\n请在终端里改用 archo：同一个管理器的文字界面。"
 }

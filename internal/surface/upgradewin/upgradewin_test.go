@@ -18,11 +18,11 @@ func TestSmoke(t *testing.T) {
 	if os.Getenv("RIMARCHO_UPGRADEWIN_SMOKE") != "1" {
 		t.Skip("set RIMARCHO_UPGRADEWIN_SMOKE=1 to show the native window")
 	}
-	if runtime.GOOS != "windows" {
+	if runtime.GOOS != "windows" && runtime.GOOS != "linux" {
 		if Open("RimArcho", "Upgrading database") != nil {
-			t.Fatal("Open must return nil outside Windows")
+			t.Fatal("Open must return nil outside Windows and Linux")
 		}
-		t.Skip("native window requires Windows")
+		t.Skip("the window needs Windows, or Linux with zenity")
 	}
 	w := Open("RimArcho", "正在升级数据库…")
 	if w == nil {

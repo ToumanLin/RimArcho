@@ -52,9 +52,14 @@ export function detect(text) {
   return u.protocol === "https:" ? "page" : "bad";
 }
 
-// localPath: a Windows path (a Mod folder or zip dropped on the window, or chosen) is installed
-// as a local Mod. Kept out of detect, whose table the TUI and MCP share (subscribe.Detect).
-export const localPath = (text) => /^([A-Za-z]:[\\/]|\\\\)[^\r\n]+$/.test(String(text || "").trim());
+// localPath: a full path (a Mod folder or zip dropped on the window, or chosen) is installed
+// as a local Mod: a Windows path, or off Windows (the Linux window, 16 §8.1) an absolute
+// path. Kept out of detect, whose table the TUI and MCP share (subscribe.Detect).
+const posix = !/Windows/.test(globalThis.navigator?.userAgent || "Windows");
+export const localPath = (text) => {
+  const t = String(text || "").trim();
+  return /^([A-Za-z]:[\\/]|\\\\)[^\r\n]+$/.test(t) || (posix && /^\/[^\r\n]+$/.test(t));
+};
 
 const KIND = { git: "Git repository", loverslab: "LoversLab", page: "web page", workshop: "Workshop item", local: "local Mod" };
 

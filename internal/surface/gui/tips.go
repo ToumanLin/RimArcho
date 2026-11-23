@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import "github.com/ToumanLin/RimArcho/internal/view"

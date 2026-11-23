@@ -148,7 +148,6 @@ var embedded = sync.OnceValue(func() *Data {
 
 var override *Data
 
-
 // EmbeddedJSON is the embedded dataset file (the 1.6 section of the embedded bundle).
 func EmbeddedJSON() []byte { return knownJSON }
 

@@ -72,13 +72,6 @@ type dropTarget struct {
 	dropped func(d dropData)
 }
 
-// dropData is what "files-dropped" carries.
-type dropData struct {
-	Paths []string `json:"paths"`
-	Dirs  []bool   `json:"dirs"`
-	Text  string   `json:"text,omitempty"`
-}
-
 var (
 	iidIUnknown    = windows.GUID{Data1: 0, Data2: 0, Data3: 0, Data4: [8]byte{0xC0, 0, 0, 0, 0, 0, 0, 0x46}}
 	iidIDropTarget = windows.GUID{Data1: 0x122, Data2: 0, Data3: 0, Data4: [8]byte{0xC0, 0, 0, 0, 0, 0, 0, 0x46}}

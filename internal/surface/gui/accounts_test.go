@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -70,6 +72,7 @@ func (f accountTransport) RoundTrip(r *http.Request) (*http.Response, error) { r
 
 func TestAutomaticSessionVerifiesWithoutOpeningSettings(t *testing.T) {
 	t.Parallel()
+	windowsOnly(t, "account sessions need DPAPI; elsewhere they report ErrSession (11 §4)")
 	for _, fail := range []bool{false, true} {
 		t.Run(map[bool]string{false: "available", true: "challenge"}[fail], func(t *testing.T) {
 			e := testkit.New(t)
@@ -161,6 +164,7 @@ func TestAutomaticSessionVerifiesWithoutOpeningSettings(t *testing.T) {
 
 func TestAutomaticSessionWarnsWhenServerDoesNotExtendExpiry(t *testing.T) {
 	t.Parallel()
+	windowsOnly(t, "account sessions need DPAPI; elsewhere they report ErrSession (11 §4)")
 	e := testkit.New(t)
 	clock := time.Now().Add(5 * time.Hour)
 	e.App.Now = func() time.Time { return clock }

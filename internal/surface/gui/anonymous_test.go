@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -7,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
@@ -17,7 +20,7 @@ func (anonymousProc) Wait() error { return nil }
 func TestGuideAnonymousAccount(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
-	e.WriteFile(filepath.Join(e.App.SteamCMDDir(), "steamcmd.exe"), "fake")
+	e.WriteFile(filepath.Join(e.App.SteamCMDDir(), deps.SteamCMDExecutable()), "fake")
 	e.App.SteamCMDNoPath = true
 	e.App.SteamCMDRun = func(_ string, args []string) (string, error) {
 		if args[1] != "anonymous" {

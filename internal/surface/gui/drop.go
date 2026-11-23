@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import "github.com/ToumanLin/RimArcho/internal/subscribe"
@@ -10,4 +12,12 @@ func (s *API) DropFolderKind(path string) string {
 		return "mod"
 	}
 	return "folder"
+}
+
+// dropData is what "files-dropped" carries: the paths, which of them are folders, and a link
+// (Windows only; WebKitGTK hands over files, not links).
+type dropData struct {
+	Paths []string `json:"paths"`
+	Dirs  []bool   `json:"dirs"`
+	Text  string   `json:"text,omitempty"`
 }
