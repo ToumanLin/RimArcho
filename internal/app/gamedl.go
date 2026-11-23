@@ -521,7 +521,7 @@ func (a *App) FetchGame(spec DownloadSpec, progress func(DownloadProgress)) (str
 		args = append(args, "-beta", spec.Branch)
 	}
 	args = append(args, "validate", "+quit")
-	logPath := filepath.Join(filepath.Dir(exe), "logs", "console_log.txt")
+	logPath := steamCMDConsoleLog(exe)
 	var off int64
 	if st, err := os.Stat(logPath); err == nil {
 		off = st.Size()

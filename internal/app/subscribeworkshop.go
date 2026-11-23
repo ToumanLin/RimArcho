@@ -478,7 +478,7 @@ func (a *App) runWorkshopSteamCMD(exe string, args []string, console bool, trans
 	if w.ctx.Err() != nil {
 		return "", w.ctx.Err()
 	}
-	log := filepath.Join(filepath.Dir(exe), "logs", "console_log.txt")
+	log := steamCMDConsoleLog(exe)
 	var off int64
 	if st, err := os.Stat(log); err == nil {
 		off = st.Size()

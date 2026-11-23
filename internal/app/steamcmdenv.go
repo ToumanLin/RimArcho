@@ -29,6 +29,21 @@ func steamCMDEnv(exe string) ([]string, error) {
 	return append(os.Environ(), "HOME="+home, "XDG_CONFIG_HOME="+config, "XDG_DATA_HOME="+data), nil
 }
 
+// steamCMDConsoleLog is the file RimArcho reads SteamCMD's console output from (11 §3):
+// logs/console_log.txt beside the program, which SteamCMD writes itself on Windows. On Linux
+// SteamCMD writes no console log, so a hidden run's output is sent there (startWorkshopCMD),
+// or, beside a read-only program (a distribution's steamcmd), among the logs in SteamCMD's
+// own home.
+func steamCMDConsoleLog(exe string) string {
+	logs := filepath.Join(filepath.Dir(exe), "logs")
+	if runtime.GOOS == "linux" && os.MkdirAll(logs, 0o755) != nil {
+		if home, err := steamCMDHome(exe); err == nil {
+			return filepath.Join(home, "Steam", "logs", "console_log.txt")
+		}
+	}
+	return filepath.Join(logs, "console_log.txt")
+}
+
 // steamCMDHome is "home" next to the program when that folder is writable (RimArcho's
 // own copy, or one the player unpacked), else under the user cache folder (a
 // distribution's steamcmd in /usr/games). A sign-in is kept there between runs.

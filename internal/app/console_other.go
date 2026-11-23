@@ -26,10 +26,22 @@ func startWorkshopCMD(exe string, args []string, console bool) (SteamCMDProc, er
 		return nil, err
 	}
 	cmd.Env = env
+	var log *os.File
 	if console {
 		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	} else {
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		// Linux SteamCMD writes no console log of its own: its output becomes the log
+		// that is read for progress and results (steamCMDConsoleLog).
+		path := steamCMDConsoleLog(exe)
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			return nil, err
+		}
+		if log, err = os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600); err != nil {
+			return nil, err
+		}
+		defer log.Close()
+		cmd.Stdout, cmd.Stderr = log, log
 	}
 	if err := cmd.Start(); err != nil {
 		return nil, steamCMDStartError(exe, "", err)
