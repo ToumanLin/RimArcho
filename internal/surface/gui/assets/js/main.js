@@ -8,6 +8,7 @@
 import { phase as perfPhase } from "./perf.js";
 import { hintLine } from "./hintline.js";
 import { editorLauncher } from "./editorlaunch.js";
+import { lookAgain } from "./outsidechange.js";
 import { api, on, setText } from "./api.js";
 import "./window-theme.js";
 import { blockNativeMenu } from "./nativemenu.js";
@@ -1526,9 +1527,11 @@ async function start() {
     if (!S.screen) { renderLists(); renderWhere(); } else if (S.screen === "needs") scr.needs(true);
   });
   // Another process (the TUI, the CLI, an agent) may have changed the data: look again
-  // when the window gets the focus (G8).
+  // when the window gets the focus (G8), and draw the page again when the open list moved.
   addEventListener("focus", async () => {
-    try { if (S.board && (await api.Stamp()) !== S.board.stamp) await reload(); } catch { /* keep the page */ }
+    try {
+      await lookAgain(S, () => api.Stamp(), () => reload(), async () => { S.screenSeq++; await openPage(S.screen); });
+    } catch { /* keep the page */ }
     checkCredit();
     // Steam or another tool may have added or removed mod folders meanwhile (04 §1.6): a
     // background scan then, whose "scan" event reloads the page.
