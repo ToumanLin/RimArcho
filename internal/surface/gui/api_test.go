@@ -547,3 +547,38 @@ func TestLaunchWithoutSteamOffersDirect(t *testing.T) {
 		t.Fatalf("launch after LaunchDirect: %+v %v %v", o, err, e.Launched)
 	}
 }
+
+// 07 §1.3: a launch starts the current list, the one Launch shows, also while another list is
+// open in the window (VM 2026-11-23: Launch showed r2b, its launch asked about and would have
+// started r2s, open in the editor). The open list stays open.
+func TestLaunchStartsTheCurrentListNotTheOpenOne(t *testing.T) {
+	t.Parallel()
+	e, api, _ := fixture(t)
+	e.MustRun("env", "set", "main", "--launch", "direct")
+	def := api.Shell().Plans[0]
+	d, err := api.NewPlan("other", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := view.PlanOfPage(d.Page)
+	if _, err := api.OpenPlan(other); err != nil {
+		t.Fatal(err)
+	}
+	if sh := api.Shell(); sh.Plan == nil || sh.Plan.ID != other || sh.Current == nil || sh.Current.ID != def.ID {
+		t.Fatalf("setup: open %+v current %+v", sh.Plan, sh.Current)
+	}
+	want := e.ReadModsConfig()
+	p, err := api.Preview(view.ListLaunch)
+	if err != nil || !strings.Contains(strings.Join(p.Lines, "\n"), "changes: 0") {
+		t.Fatalf("the launch preview is not the current list's: %v %v", p, err)
+	}
+	if _, err := api.RunAnyway(view.ListLaunch); err != nil {
+		t.Fatal(err)
+	}
+	if len(e.Launched) != 1 || e.ReadModsConfig() != want {
+		t.Fatalf("launched %v; ModsConfig.xml now %s", e.Launched, e.ReadModsConfig())
+	}
+	if sh := api.Shell(); sh.Plan == nil || sh.Plan.ID != other {
+		t.Fatalf("the open list changed: %+v", sh.Plan)
+	}
+}

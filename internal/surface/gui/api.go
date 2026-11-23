@@ -1069,7 +1069,21 @@ func (s *API) Swap(id string) (string, error) {
 func (s *API) Preview(what string) (*view.Preview, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	defer s.launchCurrent(what)()
 	return view.DryRun(s.a, what)
+}
+
+// launchCurrent: a launch starts the current list, the one Launch shows and checks the RAM
+// for (07 §1.3), not a list only open in the window (VM 2026-11-23: Launch showed r2b and
+// started r2s, open in the editor). The editor makes its list current before it launches.
+// The returned func gives the window its open list back.
+func (s *API) launchCurrent(what string) func() {
+	if what != view.ListLaunch || s.a.OpenPlan == 0 {
+		return func() {}
+	}
+	open, name := s.a.OpenPlan, s.a.PlanName
+	s.a.OpenPlan, s.a.PlanName = 0, ""
+	return func() { s.a.OpenPlan, s.a.PlanName = open, name }
 }
 
 // Run does sort, save or launch at once (S, w, L; 16 §6). A refusal comes back in
@@ -1094,6 +1108,7 @@ func (s *API) run(what string, ask bool) (*view.Outcome, error) {
 	default:
 		return nil, fmt.Errorf("no action %s", what)
 	}
+	defer s.launchCurrent(what)()
 	var o *view.Outcome
 	if ask {
 		o = view.RunAsking(s.a, what)
@@ -1143,6 +1158,7 @@ func (s *API) RunMoving(what string) (*view.Outcome, error) {
 	default:
 		return nil, fmt.Errorf("no action %s", what)
 	}
+	defer s.launchCurrent(what)()
 	o := view.RunMoving(s.a, what)
 	s.launchedPlan(o)
 	return o, nil

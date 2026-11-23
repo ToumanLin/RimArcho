@@ -476,7 +476,7 @@
   "no RimSort, RimCrow or RimPy data beside it": "它旁边没有 RimSort、RimCrow 或 RimPy 的数据",
   "RimArcho imports Mod lists (.xml, .rml, .json, .txt, .rws), packs (.archopack) and RimSort, RimCrow or RimPy data": "RimArcho 能导入 Mod 列表（.xml、.rml、.json、.txt、.rws）、整合包（.archopack）和 RimSort、RimCrow、RimPy 的数据",
   "Steam Workshop, LoversLab or GitHub links…": "Steam 创意工坊、LoversLab、GitHub 链接…",
-  "The current list of %s": "快捷读取 %s 的当前列表",
+  "The current list of %s": "%s 的当前列表",
   "a .archopack file: a list with its Mods, checked file by file": ".archopack 文件：列表连同其中的 Mod，逐个文件检查",
   "a share code, a Steam collection link, a list file…": "分享码、Steam 合集链接、列表文件…",
   "add it with “add…” under another manager's data": "请用“其他管理器的数据”下的“添加…”",

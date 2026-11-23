@@ -476,7 +476,7 @@
   "no RimSort, RimCrow or RimPy data beside it": "その隣に RimSort、RimCrow、RimPy のデータがありません",
   "RimArcho imports Mod lists (.xml, .rml, .json, .txt, .rws), packs (.archopack) and RimSort, RimCrow or RimPy data": "RimArcho が取り込めるのは Mod リスト（.xml、.rml、.json、.txt、.rws）、パック（.archopack）、RimSort・RimCrow・RimPy のデータです",
   "Steam Workshop, LoversLab or GitHub links…": "Steam ワークショップ、LoversLab、GitHub のリンク…",
-  "The current list of %s": "%s の現在のリストを読む",
+  "The current list of %s": "%s の現在のリスト",
   "a .archopack file: a list with its Mods, checked file by file": ".archopack ファイル：Mod ごとのリスト、ファイル単位で確認",
   "a share code, a Steam collection link, a list file…": "共有コード、Steam コレクションのリンク、リストファイル…",
   "add it with “add…” under another manager's data": "「他のマネージャーのデータ」の「追加…」で追加してください",

@@ -169,4 +169,27 @@ test("the head's list pill shows a list opened over the current one", async () =
   assert.ok(screen.querySelector(".lead.run-sum"));
   assert.equal(chip().textContent, "default");
   assert.ok(chip().classList.contains("other"));
+  // switched from outside while the window stayed in front (VM 2026-11-23): the read checks
+  // r2b, which the sidebar does not have yet; the shell is read again and the pill names it
+  const r2b = { id: 3, name: "r2b" };
+  items = []; plan = 3;
+  S.shell = { plans: [{ ...def, current: true, open: true }], plan: { ...def, current: true, open: true } };
+  let reloads = 0;
+  screens.initScreens({ reload: async () => { reloads++; S.shell = { plans: [{ ...r2b, current: true, open: true }, def], plan: { ...r2b, current: true, open: true } }; }, renderHints() {}, renderWhere() {}, edited: async () => null });
+  await screens.needs(true);
+  assert.equal(reloads, 1);
+  assert.equal(chip().textContent, "r2b");
+  assert.ok(!chip().classList.contains("other"));
+  await screens.needs(true);
+  assert.equal(reloads, 1, "a shell that knows the list is not read again");
+  // the open list became current outside (archo plan use default) while it was open over
+  // r2b: same list, but the data's stamp moved on; the shell is read and the pill is plain
+  plan = 1; S.board.stamp = "1";
+  S.shell = { plans: [{ ...r2b, current: true }, { ...def, open: true }], plan: { ...def, open: true }, current: { ...r2b, current: true } };
+  api.Stamp = async () => "2";
+  screens.initScreens({ reload: async () => { reloads++; S.board.stamp = "2"; S.shell = { plans: [r2b, { ...def, current: true, open: true }], plan: { ...def, current: true, open: true } }; }, renderHints() {}, renderWhere() {}, edited: async () => null });
+  await screens.needs(true);
+  assert.equal(reloads, 2);
+  assert.equal(chip().textContent, "default");
+  assert.ok(!chip().classList.contains("other"));
 });

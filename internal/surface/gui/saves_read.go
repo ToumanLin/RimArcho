@@ -254,7 +254,11 @@ func (s *API) startSavesIndex(l *app.SaveList, first string, visit uint64) {
 			ev.Text = view.Tf("read %d saves; %d could not be read: %s", read-failed, failed, why)
 			s.endSelf(task, nil, ev.Text)
 		default:
-			ev.Text = view.Tf("read %d saves", read)
+			if read == 1 {
+				ev.Text = view.T("read 1 save")
+			} else {
+				ev.Text = view.Tf("read %d saves", read)
+			}
 			s.endSelf(task, nil, ev.Text)
 		}
 		s.savesFlush(ev)

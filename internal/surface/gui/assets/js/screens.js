@@ -433,11 +433,24 @@ function orderNeeds() {
   if (!cols[N.col].length && cols[1 - N.col].length) N.col = 1 - N.col;
 }
 
-export async function needs(keepCursor) {
+export async function needs(keepCursor, shellRead = false) {
   const read = beginPageRead("needs");
   let data;
   try { data = await api.Needs(); } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
+  // Another process changed the lists (archo plan use, an agent) while the window stayed in
+  // front, so no focus read brought it: the read checks a list the sidebar does not show as
+  // the window's own, or the data's stamp moved on. Read the shell first, or the pill names
+  // the old list or the old current one (VM 2026-11-23).
+  let moved = false;
+  if (!shellRead && S.board && api.Stamp) { try { moved = (await api.Stamp()) !== S.board.stamp; } catch { /* keep the page */ } }
+  if (!read.current()) return;
+  if (!shellRead && S.shell && (moved || (data.plan && S.shell.plan?.id !== data.plan))) {
+    try { await ui.reload(); } catch { /* the pill falls back to what the sidebar has */ }
+    // the new open list ends this read: read again with it, once
+    if (S.screen === "needs") return needs(keepCursor, true);
+    return;
+  }
   // done lines belong to this visit and this game (16 §5)
   const env = (S.board && S.board.env) || "";
   if (!keepCursor || env !== N.env) { N.done = []; N.ask = null; N.before = null; N.ready = false; N.result = null; N.others = false; }

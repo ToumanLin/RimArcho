@@ -135,3 +135,20 @@ test("opening another list forgets the filter bar's search with the lists' own s
   assert.equal(forgot,1); assert.equal(reloads,1);
   assert.deepEqual(S.cols.map(c=>[c.query,c.cursor,c.sel.size,c.searching]),[["",0,0,false],["",0,0,false],["",0,0,false]]);
 });
+
+test("the history's bar says 1 step, 2 steps (VM 2026-11-23: \"1 steps\")", async () => {
+  const els = {};
+  const $ = (sel) => (els[sel] ||= { classList: { toggle() {} }, setAttribute() {}, dataset: {}, hidden: false, innerHTML: "", append() {} });
+  const S = { cols: [{ items: [] }, { items: [] }, { items: [] }], history: [{ kind: "save" }, { kind: "undo" }] };
+  const lists = await loadModules("./lists.js", {
+    "./state.js": { S, key: (it) => it.id, cur: () => null, col: (k) => S.cols[k], $, $$: () => [], el: (tag) => new Element(tag), factText: () => {}, esc: String, api: {}, T: (s) => s, Tf: (s, ...a) => s.replace("%d", String(a[0])), AREAS: [], ROW_H: 28, slideThumb: () => {} },
+    "./icons.js": { icon: {}, sourceIcon: () => "", statusIcon: () => "" },
+    "./badgepop.js": { wireBadges: () => {}, rowDrag: () => {} }, "./motion.js": { bump: () => {} },
+    "./screens.js": { beginPageRead: () => {}, pageLoading: () => false },
+  });
+  lists.renderHistory();
+  assert.match($(".hbar").innerHTML, /1 step</);
+  S.history.push({ kind: "undo" });
+  lists.renderHistory();
+  assert.match($(".hbar").innerHTML, /2 steps</);
+});

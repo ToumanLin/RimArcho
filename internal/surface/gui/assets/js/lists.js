@@ -423,7 +423,7 @@ export function renderHistory() {
   if (area.dataset.sig === sig) return;
   area.dataset.sig = sig;
   const steps = S.history.filter((h) => h.kind === "undo" || h.kind === "redo").length;
-  $(".hbar", area).innerHTML = `<span class="t">${esc(T("history"))}</span>` + (steps ? `<span class="num">${esc(Tf("%d steps", steps))}</span>` : "") + chev();
+  $(".hbar", area).innerHTML = `<span class="t">${esc(T("history"))}</span>` + (steps ? `<span class="num">${esc(Tf(steps === 1 ? "%d step" : "%d steps", steps))}</span>` : "") + chev();
   const body = $(".histbody", area);
   body.innerHTML = "";
   if (fold.hist) body.append(historyPanel());

@@ -443,9 +443,11 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 					path = filepath.Join(st.Ix.Env.UserDataRoot, "Logs", "Player.log")
 				}
 			}
-			// A Game Config with saves of its own runs only from RimArcho: never launched,
-			// it has no last run, not a missing log (16 §5).
-			if !same && a.Store.LastLaunch(st.Ix.Env.ID).IsZero() {
+			// Never launched from RimArcho and no log at all: it has no last run, not a
+			// missing log (16 §5). A Game Config with saves of its own runs only from
+			// RimArcho; the default folder of a game never started (a new player, VM
+			// 2026-11-23) has no Player.log either, since the game never deletes its own.
+			if a.Store.LastLaunch(st.Ix.Env.ID).IsZero() {
 				n.MissingLog = T("not launched yet")
 			} else {
 				n.MissingLog = Tf("the last run's log was not found: %s", path)

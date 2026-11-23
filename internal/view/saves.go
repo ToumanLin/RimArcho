@@ -88,7 +88,16 @@ func SavesRows(l *app.SaveList) *SavesPage {
 	case p.Saves == 0:
 		p.Empty = T("no save in the Saves folders of your games and packs")
 	default:
-		p.Lead = Tf("%d colonies  %d saves", len(p.Colonies), p.Saves)
+		switch nc := len(p.Colonies); {
+		case nc == 1 && p.Saves == 1:
+			p.Lead = T("1 colony  1 save")
+		case nc == 1:
+			p.Lead = Tf("1 colony  %d saves", p.Saves)
+		case p.Saves == 1: // cannot happen with more than one colony; kept for the plural
+			p.Lead = Tf("%d colonies  1 save", nc)
+		default:
+			p.Lead = Tf("%d colonies  %d saves", nc, p.Saves)
+		}
 	}
 	if len(p.Owners) < 2 {
 		p.Owners = nil

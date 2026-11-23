@@ -399,7 +399,10 @@ func (a *App) syncLocked(st *LoadoutState, now time.Time) error {
 		}
 	}
 	if plan == nil {
-		if st.File == nil && a.Saves(e) == SavesOwn {
+		// No ModsConfig.xml: the game would load Core and the installed DLC, so that is the
+		// first list, for any saves folder (a new player who never started the game, VM
+		// 2026-11-23: an empty list launched without Core).
+		if st.File == nil {
 			fileList = emptyEnvironmentList(st.Ix)
 		}
 		// First use (07 §1.4): ModsConfig.xml becomes a new list, current in this game.
