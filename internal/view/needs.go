@@ -437,12 +437,19 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 		cur, prev := a.LogPaths(st)
 		if cur == "" && prev == "" {
 			path := filepath.Join(st.Ix.Env.UserDataRoot, "Player.log")
-			if same := a.DefaultUserData(st.Ix.Env.GameRoot); env.PathKey(same) == env.PathKey(st.Ix.Env.UserDataRoot) {
+			same := env.PathKey(a.DefaultUserData(st.Ix.Env.GameRoot)) == env.PathKey(st.Ix.Env.UserDataRoot)
+			if same {
 				if mm := env.MajorMinor(st.Ix.Env.GameVersion); mm != "" && !env.VersionLess(mm, "1.7") {
 					path = filepath.Join(st.Ix.Env.UserDataRoot, "Logs", "Player.log")
 				}
 			}
-			n.MissingLog = Tf("the last run's log was not found: %s", path)
+			// A Game Config with saves of its own runs only from RimArcho: never launched,
+			// it has no last run, not a missing log (16 §5).
+			if !same && a.Store.LastLaunch(st.Ix.Env.ID).IsZero() {
+				n.MissingLog = T("not launched yet")
+			} else {
+				n.MissingLog = Tf("the last run's log was not found: %s", path)
+			}
 		}
 	}
 	n.LastSave = lastSaveView(a, st, ps.Logs)

@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Fixed: a Game Config with its own saves that you had never launched said "the last run's log was not found: …\Player.log" on Launch and Can it run (once a sibling Game Config's game had exited). It now says "not launched yet".
 - Fixed: with two RimArcho installs sharing one game (two data folders), uninstalling one removed the other's `_Archo_` links from the game's `Mods` folder, such as the link to its Archo Monitor, once a scan had seen them. Uninstall now removes only its own links, and `archo links check` reports the other's as not its own. Windows and Linux.
 - Development: on Windows, RimArcho's own tests no longer move their synthetic folders into your real Recycle Bin. A test build refuses the real bin, and the test fixtures recycle into a folder of their own.
 - **Linux (experimental): the mouse back and forward buttons work in the window**, as on Windows: one press goes one page back or forward. WebKitGTK handed both buttons to the page as the same unnamed button (which could also act as a left click where the pointer was); the window now takes them from GTK itself.
