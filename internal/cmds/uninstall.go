@@ -154,7 +154,20 @@ func UninstallStepText(p *app.UninstallPlan, s *app.UninstallStep) string {
 		}
 	case app.UnLinks:
 		add(app.DoUnlink, "link", "delete {n} in the games' Mods/ (never their targets)")
-		add(app.DoLeave, "folder", "{n} named like one but not a link: left alone")
+		// Left alone are folders that only carry the prefix and links not provably this
+		// home's (another home's sharing the game, 02 §2): name each kind for what it is.
+		folders := 0
+		for _, it := range s.Items {
+			if it.Do == app.DoLeave && it.Note == app.NotALinkNote {
+				folders++
+			}
+		}
+		if n := count[app.DoLeave] - folders; n > 0 {
+			parts = append(parts, render.Plural(n, "link")+" not proven to be this home's (another RimArcho's, or unhealthy): left alone")
+		}
+		if folders > 0 {
+			parts = append(parts, render.Plural(folders, "folder")+" named like one but not a link: left alone")
+		}
 	case app.UnModsConfig:
 		add(app.DoClean, "user data folder", "keep the ModsConfig.xml list of {n} without Archo Monitor and the mods only reached through a removed link; remove RimArcho's backups of the list and of Mod settings (the settings stay)")
 		add(app.DoRestore, "user data folder", "put the ModsConfig.xml backup back in {n}")

@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- `archo uninstall`: the `links` step called another RimArcho's link in the game's `Mods/` (left alone, correctly) "a folder named like one but not a link". It now counts links not proven to be this home's apart from folders that only carry the name.
 - Fixed: a second RimArcho data folder on the same Windows user (`RIMARCHO_HOME`, used by tests and harnesses) could not choose its own managed folder: `archo config set local.dir <folder>` said "managed folders are already in use" because the default folder held the first home's files. Before it has a Game Config, a home may now choose its own.
 - Fixed: the text interface kept a processor core busy while idle on a large list (1,292 enabled Mods): its memory cap was below what such a list needs, so it ran a garbage collection every few milliseconds with nothing changing on screen. The cap is now only a ceiling against runaway growth, as in the window; idle memory is still returned after two seconds without input.
 - Fixed: the text interface's navigation row numbered Game Config "7", but shift+7 opens texture optimisation and Game Config is shift+8; clicking "7 Game Config" also opened texture optimisation. The row now shows each entry's own shift digit, and a click opens that entry.
