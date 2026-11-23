@@ -63,6 +63,28 @@ func TestDiscoverManagerImports(t *testing.T) {
 	}
 }
 
+// A second home (RIMARCHO_HOME) on a Windows user whose default local folder another home
+// already uses: before it has a Game Config it chooses its own local.dir (02 §2); once it
+// has one, the default's contents may be its own and the choice is refused (VM 2026-11-23).
+func TestManagedRootOfAHomeBesideAnother(t *testing.T) {
+	e := testkit.New(t)
+	e.WriteFile(filepath.Join(e.App.LocalDir(), "monitor", "ArchoMonitor-0.12.0", "About", "About.xml"), "<ModMetaData/>")
+	own := filepath.Join(e.Root, "second", "RimArcho")
+	if err := e.App.SetManagedRoot(own); err != nil {
+		t.Fatalf("a new home could not choose its own folder: %v", err)
+	}
+	if e.App.LocalDir() != own {
+		t.Fatal(e.App.LocalDir())
+	}
+
+	used := testkit.New(t)
+	used.WriteFile(filepath.Join(used.App.LocalDir(), "monitor", "ArchoMonitor-0.12.0", "About", "About.xml"), "<ModMetaData/>")
+	used.AddEnv(false)
+	if err := used.App.SetManagedRoot(filepath.Join(used.Root, "another")); err == nil || !strings.Contains(err.Error(), "already in use") {
+		t.Fatalf("a home with a Game Config abandoned its default folder: %v", err)
+	}
+}
+
 func TestManagedRootAndWorkshopRefusal(t *testing.T) {
 	e := testkit.New(t)
 	root := filepath.Join(e.Root, "chosen", "RimArcho")

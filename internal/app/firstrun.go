@@ -21,7 +21,7 @@ func (a *App) SetManagedRoot(path string) error {
 	path = filepath.Clean(path)
 	current := a.LocalDir()
 	if !strings.EqualFold(directoryReal(current), directoryReal(path)) {
-		if entries, err := os.ReadDir(current); err == nil && len(entries) > 0 {
+		if entries, err := os.ReadDir(current); err == nil && len(entries) > 0 && !a.borrowsDefaultLocal() {
 			return errors.New("managed folders are already in use; move them individually in Settings")
 		} else if err != nil && !os.IsNotExist(err) {
 			return err
@@ -58,6 +58,22 @@ func (a *App) SetManagedRoot(path string) error {
 		}
 	}
 	return a.Store.SetMeta("cfg:local.dir", path)
+}
+
+// borrowsDefaultLocal: this home has no folder of its own yet (no `local.dir`) and no Game
+// Config or Mod folder, so what the default local folder holds belongs to another home on
+// this Windows user (a RIMARCHO_HOME override, 02 §2) and choosing another folder abandons
+// nothing of this home's.
+func (a *App) borrowsDefaultLocal() bool {
+	if a.storeMeta("cfg:local.dir") != "" {
+		return false
+	}
+	es, err := a.Store.Envs()
+	if err != nil || len(es) > 0 {
+		return false
+	}
+	ss, err := a.Store.AllSources()
+	return err == nil && len(ss) == 0
 }
 
 const WorkshopCleanupEnv = "RIMARCHO_WORKSHOP_CLEANUP"
