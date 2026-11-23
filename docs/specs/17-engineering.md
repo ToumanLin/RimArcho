@@ -65,7 +65,7 @@ internal/
   buildinfo/          Release version (-ldflags -X)
   procmem/            Process memory readings
   testkit/            Synthetic test environments
-scripts/release.ps1   Release script; scripts/winres/ writes .syso; scripts/monitoricon/ holds Archo Monitor icons
+scripts/release.ps1   Release script; scripts/winres/ writes .syso
 feedback-relay/       Feedback relay (Cloudflare Worker, JavaScript, 16 §2.14): worker.mjs, worker.test.mjs, wrangler.toml; deployment in README.md; excluded from releases, deployed by repository owner
 monitor/              Archo Monitor (in-game helper Mod, C#, 19): src/ source, About/ and LoadFolders.xml, build.ps1; outputs monitor/out/ArchoMonitor/ (not committed)
 spikes/               Technology experiments and measurement programs (same module, included by `go vet ./...`; excluded from releases)
