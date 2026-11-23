@@ -68,6 +68,7 @@ const (
 	ActUnlinkPacks     = "unlink-packs"     // remove the packs' links from Mods/ (10 §3)
 	ActRepairLinks     = "repair-links"
 	ActSwap            = "swap"           // Refs[0] → Refs[1] in the plan (one undoable step)
+	ActReplace         = "replace"        // Refs: enabled Mods, each replaced in place by its installed recommended replacement (one undoable step)
 	ActSubscribe       = "subscribe"      // Refs: Workshop IDs to subscribe to (a background task)
 	ActMoveLocked      = "move-to-locked" // Refs[0]: a Mods/ folder into the lock library (confirm first)
 	ActTextures        = "textures"       // Refs: convert their textures to DDS again (confirm first)
@@ -138,10 +139,10 @@ type Need struct {
 	Counted  bool      `json:"counted"` // in the top bar's number; false for the folded stale log
 	// Errors: a last-run item's error messages (its title's "N errors"), which the Launch
 	// page's last game line adds up (LastRunErrors).
-	Errors int `json:"errors,omitempty"`
-	Mods     []string  `json:"mods,omitempty"`
-	Status   int       `json:"status"` // StatusErr, StatusWarn, StatusLog or StatusHint for the row icon
-	Dim      bool      `json:"dim,omitempty"`
+	Errors int      `json:"errors,omitempty"`
+	Mods   []string `json:"mods,omitempty"`
+	Status int      `json:"status"` // StatusErr, StatusWarn, StatusLog or StatusHint for the row icon
+	Dim    bool     `json:"dim,omitempty"`
 	// DataMod: the item rests on shared-log data or the replacement library (EvCorpus,
 	// EvCommunity), and this is its Mod's packageId: the item offers "the data is outdated"
 	// besides "this is wrong" (16 §2.4, §2.14).
@@ -868,6 +869,8 @@ func Do(a *app.App, act Action, option int) (done string, err error) {
 		err = a.ConfirmLinkRepair(act.Refs[0])
 	case ActSwap:
 		_, err = a.Swap(act.Refs[0], act.Refs[1])
+	case ActReplace:
+		_, err = a.ReplaceRecommended(act.Refs)
 	case ActMoveLocked:
 		_, err = a.MoveToLocked(act.Refs[0], false)
 	case ActTextures:

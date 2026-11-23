@@ -353,7 +353,10 @@ func (b *itemBuilder) modReplaced(c problemCtx) {
 	}
 	acts := []Action{workshop(p, name)}
 	if y != "" {
-		acts = []Action{enable(st, y), disable(st, x, Tf("disable %s", nm(x)))}
+		// One step, in A's place (16 §4): two actions on space only ever enabled B, and with
+		// B named like A the pair read "enable MendAndRecycle / disable MendAndRecycle".
+		acts = []Action{{Kind: ActReplace, Key: "space", Label: Tf("use %s instead", name), Refs: []string{TokRef(st, x)}, Undo: true,
+			Done: T("replaced with recommended mods")}}
 	}
 	// The player may keep another version on purpose (an unofficial port for a newer game).
 	acts = append(acts, Action{Kind: ActIgnore, Key: "I", Label: T("ignore it"), Refs: []string{p.Ref}, Problem: p.Ref,
