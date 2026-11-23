@@ -12,7 +12,10 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 )
 
-const MonitorWorkshopItem = "" // Assign only after a standalone Monitor item exists.
+// MonitorWorkshopItem is the Archo Monitor Workshop item (17 §5.1), created 2026-11-23 as
+// unlisted: until it is public Steam's anonymous API answers it with result 9, so this source
+// fails on its own and the others still answer; once public it works with no new release.
+const MonitorWorkshopItem = "3844969469"
 const MonitorItemEnv = "RIMARCHO_UPDATE_MONITOR_ITEM"
 const DefaultSteamAPI = "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/"
 
