@@ -48,12 +48,13 @@ func PackLinksText(n *Needs) string {
 	return ""
 }
 
-// LastRunErrors is the number of the last run's errors in Can it run.
+// LastRunErrors is the number of the last run's errors in Can it run: the errors its
+// counted last-run items name ("Alpha — 68 errors"), not how many items there are.
 func LastRunErrors(n *Needs) int {
 	c := 0
 	for _, it := range n.Items {
 		if it.Counted && it.Group == GroupLastRun {
-			c++
+			c += it.Errors
 		}
 	}
 	return c

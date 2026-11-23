@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Fixed: the Launch page's "last game" line counted the Mods in Can it run's last-run section instead of their errors, so a run with 69 errors from two sources said "2 errors". It now adds up the errors those items name.
 - **Linux:** a Windows copy of RimWorld that Steam runs through Proton is badged "Proton" instead of "Steam" on the first-run guide's cards, on the Game Config page (beside its name and after the game version), and in the Game Config switcher of the window and `archo` ("RimWorld 1.6  Proton"), so it can be told apart from a native Linux game. `archo env list` and `archo env detect` (MCP `manage` envs) add a `build: proton` line for it.
 - **Linux (experimental):** the window no longer closes when the button at the top left moves the navigation between the side and the top (ctrl+b); on Linux it moves without the animation.
 - Test runs (`archo test run`, MCP `test_run`): when the plan's analysis was out of date, the run let go of the Mod list lock only at its very end, so the analysis it starts after the game exits waited for that lock, failed (`analysis_error`: "another launch or credit replacement is running") and an error from a Mod's code (a static constructor, a Harmony patch) named no Mod (on Windows too, where the analysis runs as a separate `archo analyze`). The run now lets go of the lock once the game has exited and its temporary links are gone, and the error names the Mod again.
