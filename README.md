@@ -2,7 +2,7 @@ English | [&#31616;&#20307;&#20013;&#25991;](README.zh-CN.md)
 
 <div align="center">
 
-<img src="docs/assets/readme/archo.webp" width="200" alt="Archo, RimArcho's mascot, drawn in crayon">
+<img src="docs/assets/readme/archo_ponder.gif" width="200" alt="Archo, RimArcho's mascot, drawn in crayon">
 
 # RimArcho
 
