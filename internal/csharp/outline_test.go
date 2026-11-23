@@ -272,7 +272,7 @@ func TestTokenizeFamilies(t *testing.T) {
 		{"@$\"a\n{y}\" z", "1:\" 2:z"},
 		{"$\"{ @\"}\" + $\"{1}\" + '}' }\" z", "1:\" 1:z"},
 		{"$\"{ (a) ? b : '\\'' }\" z", "1:\" 1:z"},
-		{"$\"{ @$\"a\\\"}\" }\" z", "1:\" 1:z"}, // inside a hole, @$" is @ then a $" string
+		{"$\"{ @$\"a\\\"}\" }\" z", "1:\" 1:z"},      // inside a hole, @$" is @ then a $" string
 		{"$\"{ $@\"a\\\"}\" }\" z", "1:\" 1:} 1:\""}, // verbatim: the backslash does not escape
 		{"\"\"\"\n{ \"\" }\n\"\"\" z", "1:\" 3:z"},
 		{"\"\"\"\" x \"\"\" y \"\"\"\" z", "1:\" 1:z"},

@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 // Package gui is the desktop interface (08): a Wails v3 window with plain HTML, CSS and
 // JavaScript (assets/, embedded), over the same internal/view models as the TUI.
 package gui

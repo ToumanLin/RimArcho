@@ -108,13 +108,14 @@ func TestArchImports(t *testing.T) {
 	report(t, staleProblems("importAllowed", importAllowed, used))
 }
 
-// cgoProblems: no import "C" anywhere (17 §1: CGO_ENABLED=0).
+// cgoProblems: no import "C" anywhere (17 §1). RimArcho's own packages are pure Go; only the
+// Linux GUI binary, rimarcho, is built with CGO_ENABLED=1, for Wails' Linux code (decision D7).
 func cgoProblems(files []*goFile) []string {
 	var out []string
 	for _, g := range files {
 		for _, s := range g.f.Imports {
 			if s.Path.Value == `"C"` {
-				out = append(out, fmt.Sprintf(`17 §1: %s imports "C"; RimArcho builds with CGO_ENABLED=0 (pure Go, no C toolchain)`, loc(g.fset.Position(s.Pos()), g.path)))
+				out = append(out, fmt.Sprintf(`17 §1: %s imports "C"; RimArcho's packages stay pure Go; cgo is allowed only inside Wails, for the Linux GUI binary (D7)`, loc(g.fset.Position(s.Pos()), g.path)))
 			}
 		}
 	}

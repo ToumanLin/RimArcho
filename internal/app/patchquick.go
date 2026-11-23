@@ -28,8 +28,8 @@ import (
 const quickPrefix = "quick|"
 
 type quickFacts struct {
-	ops      []*analyze.PatchFact      // succeeded, unguarded, with touched defs
-	definers map[string][]string       // "ThingDef/Gun_A" → instances that define it
+	ops      []*analyze.PatchFact // succeeded, unguarded, with touched defs
+	definers map[string][]string  // "ThingDef/Gun_A" → instances that define it
 	byInst   map[string][]*analyze.PatchFact
 }
 

@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -100,7 +102,9 @@ func (s *API) ChooseManagedFolder(path string) error {
 	return s.a.Store.SetMeta("guide.managed-folders", "done")
 }
 
-func (s *API) DiscoverManagerImports() []app.ManagerImport { return app.FindManagerImports(s.gameModsDirs()) }
+func (s *API) DiscoverManagerImports() []app.ManagerImport {
+	return app.FindManagerImports(s.gameModsDirs())
+}
 
 // gameModsDirs are the environments' game Mods folders, where RimCrow's links lead to its
 // install folder (07 §6.2).

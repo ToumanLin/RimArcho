@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 // Spike: GUI V0 (08 §V0). A Wails v3 window with plain HTML/CSS/JS (no npm, no generated
 // bindings) over the real internal/app: three columns of 1354 mods, a detail with the
 // thumbnail, then measure memory (archo + WebView2 processes) and binary size.

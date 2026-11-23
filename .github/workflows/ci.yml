@@ -5,6 +5,11 @@ on:
     branches: [master, "dev/**"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version stamped into the rimarcho artifact (17 §5); empty builds dev"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -95,7 +100,7 @@ jobs:
 
       - name: Select non-GUI packages
         run: |
-          go list -e ./... | grep -Ev '/(internal/surface/(gui|upgradewin)|spikes)(/|$)' > "$RUNNER_TEMP/linux-packages"
+          go list -e ./... | grep -Ev '/(internal/surface/gui|spikes)(/|$)' > "$RUNNER_TEMP/linux-packages"
 
       - name: go build
         run: go build ./cmd/archo
@@ -108,3 +113,54 @@ jobs:
 
       - name: go test
         run: xargs go test -count=1 -timeout 20m < "$RUNNER_TEMP/linux-packages"
+
+  linux-gui:
+    # The Linux GUI, rimarcho (16 §8.1, 17 §5): Wails' Linux code calls GTK 3 and WebKitGTK 4.1
+    # through cgo, so this is the one build with CGO_ENABLED=1 (17 §1, decision D7). Ubuntu
+    # 22.04 is the oldest distribution supported (D4): its glibc sets the binary's floor.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    env:
+      CGO_ENABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # The GUI tests drive their page scripts with Node.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: GTK 3 and WebKitGTK 4.1
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.1-dev
+          pkg-config --modversion gtk+-3.0 webkit2gtk-4.1
+
+      - name: go vet
+        run: go vet -tags gtk3 ./cmd/archo ./internal/surface/cli ./internal/surface/gui ./internal/surface/upgradewin
+
+      - name: go build rimarcho
+        # A release dispatches this workflow with its version (17 §5); a push builds "dev".
+        env:
+          VERSION: ${{ inputs.version || 'dev' }}
+        run: |
+          pkg=github.com/ToumanLin/RimArcho/internal/buildinfo
+          go build -tags gtk3 -trimpath -o rimarcho \
+            -ldflags "-s -w -X $pkg.Version=$VERSION -X $pkg.Commit=${GITHUB_SHA::12} -X $pkg.Date=$(date -u +%F) -X $pkg.GUI=1" \
+            ./cmd/archo
+          ldd rimarcho | grep -E 'webkit2gtk|gtk-3'
+          objdump -T rimarcho | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1
+
+      - name: go test
+        run: go test -tags gtk3 -count=1 -timeout 20m ./internal/surface/gui ./internal/surface/cli ./internal/surface/upgradewin
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rimarcho-linux-amd64
+          path: rimarcho
+          if-no-files-found: error
+          retention-days: 30
