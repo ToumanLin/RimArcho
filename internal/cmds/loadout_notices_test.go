@@ -66,6 +66,14 @@ func TestSortNoticesAndRepairCommands(t *testing.T) {
 	for _, args := range [][]string{
 		{"loadout", "complete-dependencies"}, {"loadout", "replace-recommended", "pkg:tester.old"}, {"loadout", "use-installed", "tester.installed"},
 	} {
+		// --dry-run shows the step's changes and writes nothing (16 §6.1).
+		out := e.MustRun(append(args, "--dry-run")...)
+		if !strings.Contains(out, "(dry run; the workspace is unchanged)") || !strings.Contains(out, "added") {
+			t.Fatal("dry run", args, out)
+		}
+		if now, _ := e.App.Store.Workspace(before.Plan.ID); now.Entries != stored.Entries || e.App.Store.LastStepID(before.Plan.ID, "undo") != head {
+			t.Fatal("dry run wrote", args)
+		}
 		e.MustRun(args...)
 		if e.App.Store.LastStepID(before.Plan.ID, "undo") == head {
 			t.Fatal("no edit", args)

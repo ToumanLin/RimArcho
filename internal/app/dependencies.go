@@ -326,8 +326,17 @@ type DependencyCompletion struct {
 }
 
 func (a *App) CompleteDependencies() (*DependencyCompletion, error) {
+	return a.completeDependencies(false)
+}
+
+// PreviewCompleteDependencies is CompleteDependencies without storing the edit.
+func (a *App) PreviewCompleteDependencies() (*DependencyCompletion, error) {
+	return a.completeDependencies(true)
+}
+
+func (a *App) completeDependencies(dry bool) (*DependencyCompletion, error) {
 	out := &DependencyCompletion{Enabled: []string{}, WorkshopIDs: []string{}}
-	r, err := a.edit("complete dependencies and sort", func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
+	r, err := a.editOrPreview(dry, "complete dependencies and sort", func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
 		state := *st
 		for {
 			state.List = l

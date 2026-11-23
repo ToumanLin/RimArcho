@@ -2504,6 +2504,48 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .link-arrow, .link-reason { color: var(--muted); }
 .link-tag { border-radius: 999px; background: var(--line); padding: 2px 8px; font-size: 12px; white-space: nowrap; }
 .pop.link-repair { width: min(1000px, 90vw); }
+/* the steps after a sort (16 §6.1, sortsteps.js): a strip of steps, the current one's changes below */
+.pop.sort-steps { width: min(680px, 92vw); }
+.sort-steps .ss-strip { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px; border-bottom: var(--hairline) solid var(--line-2); }
+.ss-chip { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border: var(--hairline) solid var(--line-2); border-radius: 999px; font-size: 12px; color: var(--muted); background: var(--card); }
+.ss-chip .ss-n { font-weight: 600; color: var(--fg-2); }
+.ss-chip.now { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.ss-chip.now .ss-n { color: inherit; }
+.ss-chip.done { color: var(--green); }
+.ss-chip.skipped { color: var(--faint); border-style: dashed; cursor: pointer; }
+.ss-chip.skipped .ss-name { text-decoration: line-through; }
+.ss-chip.skipped:hover { color: var(--fg-2); border-color: var(--muted); }
+.ss-chip.undone { color: var(--faint); }
+.ss-chip .ss-undo { display: inline-flex; align-items: center; gap: 3px; margin-left: 2px; padding: 0 4px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--accent); cursor: pointer; }
+.ss-chip .ss-undo:hover { background: var(--accent-soft); }
+.ss-ico { display: inline-flex; flex: none; }
+.ss-card .ss-head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--fg); }
+.ss-card .ss-head .ss-ico { color: var(--accent); }
+.ss-done .ss-head .ss-ico { color: var(--green); }
+.ss-sum { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 6px 22px; }
+.ss-pill { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--card-2); color: var(--fg-2); }
+.ss-pill.add { background: var(--accent-soft); color: var(--green); }
+.ss-pill.swap, .ss-pill.copy, .ss-pill.get { background: var(--accent-soft); color: var(--accent); }
+.ss-pill.later { font-weight: 400; color: var(--muted); }
+.ss-rows { list-style: none; margin: 0 0 0 22px; padding: 0; max-height: 34vh; overflow-y: auto; }
+.ss-row { display: flex; align-items: center; gap: 8px; min-height: 26px; font-size: 13px; color: var(--fg-2); border-bottom: var(--hairline) solid var(--line); }
+.ss-row:last-child { border-bottom: 0; }
+.ss-row > .ss-ico { color: var(--muted); }
+.ss-row.add > .ss-ico, .ss-row.done > .ss-ico { color: var(--green); }
+.ss-row.copy > .ss-ico, .ss-row.replace > .ss-ico, .ss-row.get > .ss-ico { color: var(--accent); }
+.ss-row.none > .ss-ico, .ss-row.skipped { color: var(--faint); }
+.ss-names { display: flex; align-items: baseline; gap: 6px; min-width: 0; flex: 1 1 auto; overflow: hidden; white-space: nowrap; }
+.ss-mod { overflow: hidden; text-overflow: ellipsis; color: var(--fg); }
+.ss-old { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+.ss-arrow { color: var(--muted); }
+.ss-at { flex: none; font: 12px var(--code); color: var(--accent); }
+.ss-for { flex: 0 1 auto; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted); }
+.ss-err { margin-top: 8px; font-size: 12px; color: var(--red); }
+.ss-unfix { margin-top: 12px; padding-top: 8px; border-top: var(--hairline) solid var(--line-2); }
+.ss-unfix summary { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); cursor: pointer; }
+.ss-unfix .ss-rows { margin-top: 4px; }
+.sort-steps[aria-busy="true"] .btns button { opacity: .6; pointer-events: none; }
+.sort-steps .btns .ss-n { margin-left: 6px; font-weight: 600; }
 @media (max-width: 760px) {
   .link-row { grid-template-columns: minmax(0, 1fr) auto minmax(0, 2fr); }
   .link-reason { grid-column: 1 / 3; }

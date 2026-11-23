@@ -193,7 +193,7 @@ The shared page exists only in the GUI. The TUI keeps its own editor full-screen
 
 ## 6. Confirmation and feedback
 
-- **Sort, save, and launch run directly** through `view.Run`, with one click or key. The status line shows `view.Outcome.Text`; sorting supports u undo, shown as a GUI Undo link or a TUI u hint. A refusal, such as a running game, outside edits, missing user data, or missing Steam, shows its reason without a confirmation. If `Outcome.Refused` includes commands, the GUI opens a read-only dialog and the TUI a panel listing remedies such as diff, load, or ignore.
+- **Sort, save, and launch run directly** through `view.Run`, with one click or key. The status line shows `view.Outcome.Text`; sorting supports u undo, shown as a GUI Undo link or a TUI u hint. What the sort found that ordering cannot fix opens the GUI's steps after a sort, one confirmation per step (§6.1). A refusal, such as a running game, outside edits, missing user data, or missing Steam, shows its reason without a confirmation. If `Outcome.Refused` includes commands, the GUI opens a read-only dialog and the TUI a panel listing remedies such as diff, load, or ignore.
 - **Preview** remains optional and never gates an action. The command-panel sort, save, and launch previews use `view.DryRun` and the CLI's --dry-run text. They are read-only and have no continue button. The CLI form is `archo sort|save|launch --dry-run`.
 - **Actions undoable in one step need no confirmation.** Besides sorting, these include history checkout and loading an external ModsConfig.xml with L. Each is a plan edit that keeps the replaced list in history and offers undo in the status line (`view.Action.Undo`).
 - **Confirm actions that RimArcho cannot undo.**
@@ -244,15 +244,39 @@ missingMods contains entries that do not resolve to instances in the current gam
 
 replacements reuses Use This Instead data and version filters, downloaded through update data. Without the data, no replacement is guessed. Workshop branches with the same package ID are distinguished by Workshop ID. An installed but unloadable replacement has canReplace=false and blockedReason. The before and after fields describe the dropped directed edge; strength is harmless/weak/strong, and kind is the sorter constraint type.
 
-Backend exports:
+**Steps after a sort** (GUI `sortsteps.js`; `view.ReadSortSteps`, `view.ApplySortStep`). When the arrays above leave something the list can fix, or something to know, the sort opens one dialog that takes the fixes **one step at a time**; it never applies two steps with one confirmation. The steps, in this order, are each one undoable edit, or a download:
 
-```go
-func (s *API) CompleteDependencies() (*view.Result, error)
-func (s *API) ReplaceRecommended(refs []string) (*view.Result, error)
+| Step (`kind`) | What it does | From |
+| --- | --- | --- |
+| use copies (`use-installed`) | List entries with no folder take the installed copy, in place (`App.UseInstalled`) | missingMods with canEnable |
+| replace (`replace`) | Enabled Mods give way to their installed recommended replacement, each at its own place; no sort (`App.ReplaceRecommended`) | replacements that canReplace, installed and not enabled |
+| enable (`enable`) | Installed required Mods are enabled, transitively, then the list is sorted (`App.CompleteDependencies`) | missingDependencies of kind installed |
+| download (`subscribe`) | The Workshop IDs are subscribed after Steam or SteamCMD is picked on the step's own buttons (`api.Subscribe({kind:"workshop", url: ids, steamcmd, batch:true})`); not a list edit, no undo | missingDependencies of kind workshop; missingMods not installed with a Workshop ID; replacements not installed with one |
+
+What no step can fix (a dependency or entry with no known source, an installed copy or replacement that cannot load) is listed under a folded "N cannot be fixed here", each with its reason. A broken cycle is settled by the sort and noted on Can it run, not here. A sort with nothing to fix and nothing to know opens no dialog: the status line says what it did.
+
+- **Layout** (§7 principle 9: pictures first, words on hover). A strip at the top shows the sort and every step as a chip: the kind's icon, a short name and a count. A done chip is green with a check, the current one accented, a skipped one dashed and struck through, a later one plain; hovering names the state and what the step does or did. Below, the current step: its icon and one sentence, count pills (+N enabled, N replaced, N to download, N other Mods change place), then one row per Mod: an icon for what happens to it, its name (a replaced Mod struck through, an arrow, its replacement), the load position it lands at (`#23`) and, muted, the Mods that require it. Counts are badges, not words.
+- **Preview before applying**: `API.SortSteps(past)` reads the plan as it is now (`App.CurrentSortNotices`) and previews the first step whose kind is not in `past` (the steps applied or skipped) with a dry run of its edit (`App.Preview…`, which stores nothing). Its rows get their positions and `moved`; the other steps list their Mods without positions. The dialog reads it again after every step, so a step shows what is left after the steps before it. A dry run that fails sets `error`, shown on the step, and disables its button.
+- **One confirmation per step**: the step's button (its verb and count badge: enable 2, replace 1, use copies 2; get with Steam, primary, and get with SteamCMD for downloads) applies only that step through `API.ApplySortStep(kind)`, which reads the fixes again and applies them as one undo step. Skip (`s`) moves on without a change; clicking a skipped chip takes the step up again. Stop here (`esc`) closes the dialog with the rest not applied. When no step is left, the card lists what was done and skipped, and close is the primary button.
+- **Undo per step**: the latest applied step, the sort included, carries an undo button (`u`) on its chip. It undoes that one edit; the step becomes current again with a fresh preview. Undoing the sort marks its chip undone; the steps stay. A download has no undo.
+- **CLI, MCP and TUI**: each step is its own command (13 §4.2): `archo loadout use-installed`, `replace-recommended` and `complete-dependencies`, each with `--dry-run` to see its changes first; MCP has no tool for them, so an agent runs the CLI. The TUI has no dialog after a sort: its status line reports the sort, and the same fixes are Can it run actions (§5), one per item.
+
+The JSON contract (`view.SortSteps`):
+
+```ts
+type SortStepItem = {
+  change: "copy" | "replace" | "add" | "get" | "none";
+  name: string; old?: string;   // replace: the Mod it replaces
+  at?: number;                  // the current step's preview: load position after the step
+  for?: string[]; workshopId?: string; why?: string;
+};
+type SortSteps = {
+  steps: { kind: "use-installed" | "replace" | "enable" | "subscribe";
+           items: SortStepItem[]; preview?: boolean; moved?: number;
+           workshopIds?: string[]; error?: string }[];
+  current: number;              // -1: nothing left
+  unfixable?: SortStepItem[];
+};
 ```
 
-`api.CompleteDependencies()` transitively enables all available installed required dependencies and sorts, with one undo. It returns `{text, undo?, enabled?: string[], workshopIds?: string[], missingDependencies?: MissingDependency[]}`. The enabled field contains newly enabled instance IDs, workshopIds contains deduplicated Workshop IDs, and missingDependencies contains the remaining missing dependencies.
-
-`api.ReplaceRecommended(replacements.filter(r => r.canReplace).map(r => r.original.ref))` revalidates the current suggestions and replaces enabled originals at their original positions, deduplicating already enabled targets. The batch is all-or-nothing with one undo. It does not automatically sort, subscribe, or edit Mod files. It returns `{text, undo?}`. An unavailable or stale suggestion returns an error and leaves the original unchanged. Chains within one batch are rejected and must be split.
-
-The frontend deduplicates the needed IDs, asks the player to choose Steam or SteamCMD, then uses the existing `api.Subscribe({kind:"workshop", url:"https://steamcommunity.com/sharedfiles/filedetails/?id=" + id, steamcmd: useSteamCMD, batch:true})`. After downloading and scanning, sort, enable, or replace again. Subscription never automatically replaces the original.
+`api.CompleteDependencies()` (Can it run's automatic fix, §5) is the enable step without the dialog: it returns `{text, undo?, enabled?: string[], workshopIds?: string[], missingDependencies?: MissingDependency[]}`. The replace step revalidates the current suggestions and replaces enabled originals at their original positions, deduplicating already enabled targets; it is all-or-nothing, does not sort, subscribe or edit Mod files, and rejects chains within one batch. After downloading and scanning, sort again to place the new Mods. Subscription never automatically replaces the original.

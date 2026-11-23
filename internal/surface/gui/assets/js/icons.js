@@ -44,6 +44,10 @@ export const icon = {
   settings: svg('<path d="M5.60 3.84L6.76 3.36L6.69 1.84L9.31 1.84L9.24 3.36L10.40 3.84L10.40 3.84L11.39 4.61L12.68 3.78L13.99 6.05L12.64 6.76L12.80 8.00L12.80 8.00L12.64 9.24L13.99 9.95L12.68 12.22L11.39 11.39L10.40 12.16L10.40 12.16L9.24 12.64L9.31 14.16L6.69 14.16L6.76 12.64L5.60 12.16L5.60 12.16L4.61 11.39L3.32 12.22L2.01 9.95L3.36 9.24L3.20 8.00L3.20 8.00L3.36 6.76L2.01 6.05L3.32 3.78L4.61 4.61L5.60 3.84Z"/><circle cx="8" cy="8" r="2.1"/>'),
   play: svg('<path d="M5 3.2v9.6L12.6 8z"/>', "fill"),
   plus: svg('<path d="M8 3v10M3 8h10"/>'),
+  // the steps after a sort (16 §6.1): sort, replace, undo
+  order: svg('<path d="M5 13V3M2.8 5.2L5 3l2.2 2.2M11 3v10M8.8 10.8L11 13l2.2-2.2"/>'),
+  swap: svg('<path d="M3 5.5h9.5M10 3l2.5 2.5L10 8M13 10.5H3.5M6 8l-2.5 2.5L6 13"/>'),
+  undo: svg('<path d="M5.5 3.6L2.8 6.3 5.5 9"/><path d="M3 6.3h6.2a3.4 3.4 0 0 1 0 6.8H6.4"/>'),
   // Background tasks: stacked bars, the work in a queue
   tasks: svg('<path d="M3 4.5h10M3 8h10M3 11.5h6"/>'),
   chev: svg('<path d="M6 4l4 4-4 4"/>'),
