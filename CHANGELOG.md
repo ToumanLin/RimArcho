@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Fixed: for a new player whose RimWorld had never been started (no `ModsConfig.xml`), the first list was empty, without Core, and Mods added to it launched without Core (the game then disabled them all). The first list is now Core and the installed DLC, as the game itself loads.
 - Fixed: a new player whose RimWorld had never been started saw "last game: the last run's log was not found: …\Player.log" on Launch right after the first-run guide. With no log and no launch from RimArcho it now says "not launched yet", as a Game Config with its own saves already did.
 - First-run guide, where your first list comes from: the row for RimSort, RimCrow and RimPy said "looking for RimSort, RimCrow and RimPy…" for good, though the first run does not look for them. It now has a "look for RimSort, RimCrow and RimPy" button that does.
 - First-run guide: after reading your Mods, the card's heading still said "Reading your Mods…" beside "✓ 1.6: found 1303 Mods". It now says "Your Mods are read" (or "Some Mods could not be read" when a game's scan failed).

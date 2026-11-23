@@ -507,3 +507,25 @@ func TestPrintedIgnoreRefsRoundTrip(t *testing.T) {
 		e.MustRun("rule", "remove", "r:"+map[bool]string{true: "1", false: "2"}[r == refs[0]])
 	}
 }
+
+// A game never started has no ModsConfig.xml; it would load Core and the installed DLC, and
+// so does the first list made from it (07 §1.4; VM 2026-11-23: it was empty, without Core).
+func TestFirstListWithoutModsConfigIsTheGamesDefault(t *testing.T) {
+	t.Parallel()
+	for _, before := range []bool{false, true} {
+		e := testkit.New(t)
+		if err := os.Remove(e.ModsConfig); err != nil {
+			t.Fatal(err)
+		}
+		e.AddEnv(true)
+		e.WriteMod(filepath.Join(e.Game, "Mods", "B"), testkit.Sample("tester.b", "B"))
+		if before {
+			// the window reads the list while the first-run guide's scan is still running
+			active(t, e)
+		}
+		scanNow(t, e)
+		if got := joined(active(t, e)); !strings.HasPrefix(got, "Core") || strings.Contains(got, "B") {
+			t.Fatalf("read before the scan %v: first list %q", before, got)
+		}
+	}
+}

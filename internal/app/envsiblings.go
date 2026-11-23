@@ -249,9 +249,40 @@ func emptyEnvironmentList(ix *Index) loadout.List {
 	for _, m := range installedOfficial(ix.Mods) {
 		list = append(list, loadout.Entry{Instance: m.ID})
 	}
+	if len(list) == 0 && ix.Env != nil && ix.Env.GameRoot != "" {
+		// Not scanned yet (the window reads the list while the first-run guide's scan runs):
+		// the game's Data folders by package ID, which the scan resolves like any entry
+		return officialByFolder(ix.Env.GameRoot)
+	}
 	sort.SliceStable(list, func(i, j int) bool {
 		return order.CompareOfficial(ix.ByID[list[i].Instance].PackageID, ix.ByID[list[j].Instance].PackageID) < 0
 	})
+	return list
+}
+
+// officialByFolder: Core and the DLC in the game's Data folder (Core, Royalty, …) as entries
+// by package ID, in release order.
+func officialByFolder(gameRoot string) loadout.List {
+	ds, _ := os.ReadDir(filepath.Join(gameRoot, "Data"))
+	var pkgs []string
+	for _, d := range ds {
+		if !d.IsDir() {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(gameRoot, "Data", d.Name(), "About", "About.xml")); err != nil {
+			continue
+		}
+		pkg := "ludeon.rimworld"
+		if !strings.EqualFold(d.Name(), "Core") {
+			pkg += "." + strings.ToLower(d.Name())
+		}
+		pkgs = append(pkgs, pkg)
+	}
+	sort.SliceStable(pkgs, func(i, j int) bool { return order.CompareOfficial(pkgs[i], pkgs[j]) < 0 })
+	var list loadout.List
+	for _, p := range pkgs {
+		list = append(list, loadout.Entry{Missing: p})
+	}
 	return list
 }
 

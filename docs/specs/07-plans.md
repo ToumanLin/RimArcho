@@ -54,8 +54,8 @@ The GUI gathers these actions on all lists (16 §2.17). Commands: `archo plan li
 
 - When an environment is read and has no current plan (`environment.current_plan = 0`):
   - If ModsConfig.xml still matches a plan's last write (its hash equals the write record), make that plan current; create none.
-  - If ModsConfig.xml is absent for own saves, create a separate plan with Core and installed DLC in release order. Other environments without the file may adopt the most recently edited global plan.
-  - Otherwise read ModsConfig.xml and create a plan: v1 has source `import` and note `ModsConfig.xml` (absent file: an empty list with note `no ModsConfig.xml`). It is named `default`; if that is taken, the environment's name, then numbered (`1.6 2`). The first-run guide also offers "move over from RimSort, RimCrow or RimPy" and "open a pack or a Steam collection" (16 §2.15).
+  - If ModsConfig.xml is absent for own saves, create a separate plan with Core and installed DLC in release order. Other environments without the file may adopt the most recently edited global plan; when none is adopted, their first plan is also Core and installed DLC, which is what the game loads with no ModsConfig.xml (a game never started). Before the first scan the entries are the game's `Data` folders by package ID (`Core` is `ludeon.rimworld`, `Royalty` is `ludeon.rimworld.royalty`, …), which the scan resolves.
+  - Otherwise read ModsConfig.xml and create a plan: v1 has source `import` and note `ModsConfig.xml` (absent file: Core and installed DLC as above, with note `no ModsConfig.xml`). It is named `default`; if that is taken, the environment's name, then numbered (`1.6 2`). The first-run guide also offers "move over from RimSort, RimCrow or RimPy" and "open a pack or a Steam collection" (16 §2.15).
 
 ### 1.5 Archo Monitor added by default
 
