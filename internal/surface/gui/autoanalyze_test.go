@@ -139,6 +139,13 @@ func TestAutoAnalysisKeepsFindingsCurrent(t *testing.T) {
 	if got := runs.Load(); got != 5 {
 		t.Fatalf("Launch after an edit ran %d checks, want 1", got-4)
 	}
+	// Back to a short settle. The next edit's needs refresh may end after Launch has
+	// already started its check, and then arms the edit settle once more (it finds the
+	// inputs checked and starts nothing); with the hour left in place settle would wait
+	// for that timer for an hour.
+	s.mu.Lock()
+	s.analyzeSettle = 300 * time.Millisecond
+	s.mu.Unlock()
 	// a check that leaves its inputs stale does not start again by itself
 	noop.Store(true)
 	toggle(view.Active, h)
