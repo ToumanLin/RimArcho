@@ -219,6 +219,10 @@ func TestWaylithOwnConfigReadsDefaultLogs(t *testing.T) {
 	if err := e.App.CheckLogOwner(st, got); err != nil {
 		t.Fatal(err)
 	}
+	// env list shows it too (VM round 2026-11-22: the line was missing).
+	if p := e.App.EnvPlayerLog(st.Ix.Env); p != cur {
+		t.Fatalf("env list player-log %q, want %q", p, cur)
+	}
 	// The default-folder sibling runs next: the file is now its run, not this config's.
 	e.Advance(time.Minute)
 	e.MustRun("env", "use", "main")

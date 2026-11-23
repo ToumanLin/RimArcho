@@ -148,6 +148,20 @@ func (a *App) waylithDefaultLogs(st *LoadoutState) (cur, prev string) {
 	return a.waylithRunLogs(st.Ix.Env, st.Ix.Env.UserDataRoot, "")
 }
 
+// EnvPlayerLog is the Player.log `env list` shows for e (03 §3.3): the one in its user
+// data folder, else, for an own-folder 1.7+ environment, the default folder's Logs/
+// Player.log while its newest Waylith launch is e's own (waylithDefaultLogs).
+func (a *App) EnvPlayerLog(e *env.Environment) string {
+	if e.UserDataRoot == "" {
+		return ""
+	}
+	if p := env.PlayerLog(e.UserDataRoot, e.GameVersion); p != "" {
+		return p
+	}
+	cur, _ := a.waylithRunLogs(e, e.UserDataRoot, "")
+	return cur
+}
+
 // waylithRunLogs is waylithDefaultLogs for a run with data folder userData: e's own
 // (pack "") or pack's. The launch that owns the file must be that run's: same data folder,
 // and the same pack (none for e's list, then also e's launch).
