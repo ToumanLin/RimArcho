@@ -83,7 +83,10 @@ export async function start(from = "first") {
   G.error = "";
   G.picked.clear();
   if (D.run && D.run.end) D.run = null;
-  if (K.run && K.run.end) { K.run = null; K.plan = null; }
+  // Without a running copy the copy way starts afresh: the current Game Config, its plan asked
+  // again. A kept pick asked no plan, so after a copy "copy and add" stayed off with no reason
+  // (VM round 2A 2026-11-23).
+  if (!K.run || K.run.end) Object.assign(K, { run: null, plan: null, from: "", dir: "", dirTyped: false, name: "" });
   G.way = D.run ? 1 : K.run && !K.run.end ? 2 : 0;
   // the Game Config page's "copy the game folder…" opens this way (03 §3.5)
   if (S.guideWay != null) { G.way = S.guideWay; S.guideWay = null; }

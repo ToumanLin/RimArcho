@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Fixed: after a game copy, opening "copy the game folder…" again left "copy and add" greyed out with no size and no reason. The form kept the last pick and proposed the first copy's folder, which is taken. It now starts from the current Game Config and proposes the next free name and folder (`RimWorld 1.6-copy-2`).
 - Fixed: a game copy (Add Game Config › "copy a game folder", the Game Config page's "copy the game folder…") could not be stopped: its row on Background tasks had no "stop the rest". It now has, and a stopped copy leaves no folder and no Game Config.
 - Fixed: when a Game Config's `Player.log` was gone and only `Player-prev.log` was left (deleted by hand or by a cleaner), Can it run showed that previous run's errors but the Launch page had no "last game" line at all. Launch now reads the previous file too.
 - CLI: `archo launch` (and `--dry-run`) said "before you play: 1 problems" for one problem; it now says "1 problem".

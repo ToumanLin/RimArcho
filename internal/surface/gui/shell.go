@@ -687,9 +687,11 @@ func (s *API) GuideCopyPlan(from, dir, name string, mods bool) (*CopyPlan, error
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if strings.TrimSpace(dir) == "" {
+		// the folder follows the name the copy gets: after a first copy "<from>-copy-2", not
+		// the first copy's folder (VM round 2A 2026-11-23)
 		base := name
 		if base == "" {
-			base = from + "-copy"
+			base = s.a.FreeEnvName(from + "-copy")
 		}
 		dir = filepath.Join(gamesFolder(s.a), "RimWorld "+base)
 	}
