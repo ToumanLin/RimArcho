@@ -3,6 +3,8 @@
   "%d mods": "MOD %d件",
   "%d mods found": "MOD %d件を検出",
   "%d problems": "問題%d件",
+  "1 problem": "問題1件",
+  "1 problem in this list": "このリストの問題：1件",
   "%d problems in this list": "このリストの問題：%d件",
   "%d selected": "%d件選択",
   "%d unsaved": "未保存：%d件",
