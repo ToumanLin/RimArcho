@@ -27,6 +27,7 @@ Investigations, measurements and open questions; once a report's conclusions are
 | [dds-texture-optimization.md](dds-texture-optimization.md) | How the game loads PNG and DDS textures; todds; PNG to DDS measurements | Implemented (10 §2); open: in-game visual checks (§6) and decisions (§7) |
 | [2026-10-26_page-load-time-and-optimization.md](2026-10-26_page-load-time-and-optimization.md) | Backend load times of every page on real data, with ranked optimizations | Open: P1–P3 done, P4–P8 not all done (§7) |
 | [2026-10-27_batch-operation-timing-audit.md](2026-10-27_batch-operation-timing-audit.md) | Timing of every batch action and the causes of slow previews | Open: recommendations in §8 not all done |
+| [2026-11-24_archo-animation-cpu.md](2026-11-24_archo-animation-cpu.md) | Archo's animated figure on Can it run, native window on a real GPU: animated / still / off at device scale 1.0 and 1.5, software rendering, smaller frames, 10 fps loops, a slower idle | Measured; the choice (§5) is the player's |
 
 ## Steam, SteamCMD and downloads
 
