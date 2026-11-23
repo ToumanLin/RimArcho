@@ -1,6 +1,10 @@
 {
   "no game is added yet, so there is no Saves folder to read": "ゲームがまだ登録されていないため、読み込めるセーブフォルダがありません",
   "no save in the Saves folders of your games and packs": "ゲームとMODパックのセーブフォルダにセーブデータがありません",
+  "1 colony  1 save": "コロニー1件／セーブ1件",
+  "1 colony  %d saves": "コロニー1件／セーブ%d件",
+  "%d colonies  1 save": "コロニー%d件／セーブ1件",
+  "read 1 save": "セーブ1件を読み込みました",
   "%d colonies  %d saves": "コロニー%d件／セーブ%d件",
   "autosaves": "オートセーブ",
   "autosave": "オートセーブ",

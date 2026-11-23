@@ -1,6 +1,10 @@
 {
   "no game is added yet, so there is no Saves folder to read": "还没有添加游戏，所以没有可读的存档文件夹",
   "no save in the Saves folders of your games and packs": "你的游戏和整合包的存档文件夹里没有存档",
+  "1 colony  1 save": "1 个殖民地  1 个存档",
+  "1 colony  %d saves": "1 个殖民地  %d 个存档",
+  "%d colonies  1 save": "%d 个殖民地  1 个存档",
+  "read 1 save": "读取了 1 个存档",
   "%d colonies  %d saves": "%d 个殖民地  %d 个存档",
   "autosaves": "自动存档",
   "autosave": "自动存档",

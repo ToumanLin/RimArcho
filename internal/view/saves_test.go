@@ -338,3 +338,29 @@ func TestSaveFilePreviews(t *testing.T) {
 		t.Fatal("accepted a RimSaves separator")
 	}
 }
+
+// One colony with one save reads "1 colony  1 save", not "1 colonies  1 saves" (VM 2026-11-23).
+func TestSavesLeadSingular(t *testing.T) {
+	save := func(n string) *app.Save { return &app.Save{Ref: "sv:" + n, Name: n, File: n + ".rws"} }
+	cases := []struct {
+		colonies [][]string
+		want     string
+	}{
+		{[][]string{{"a"}}, "1 colony  1 save"},
+		{[][]string{{"a", "b"}}, "1 colony  2 saves"},
+		{[][]string{{"a"}, {"b", "c"}}, "2 colonies  3 saves"},
+	}
+	for _, c := range cases {
+		l := &app.SaveList{}
+		for i, ss := range c.colonies {
+			col := &app.Colony{Key: fmt.Sprint(i), Name: fmt.Sprint("c", i)}
+			for _, s := range ss {
+				col.Saves = append(col.Saves, save(s))
+			}
+			l.Colonies = append(l.Colonies, col)
+		}
+		if got := view.SavesRows(l).Lead; got != c.want {
+			t.Errorf("%v: %q, want %q", c.colonies, got, c.want)
+		}
+	}
+}

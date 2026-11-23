@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Fixed: Saves said "1 colonies 1 saves" over one colony with one save, and "read 1 saves" in the status line, in English; they now say "1 colony 1 save" and "read 1 save".
 - Fixed: with a list open in the editor that was not the current one, the Launch page showed the current list but its launch button (and the command panel's launch) started the open list instead, asking about that list's missing Mods. Launch now starts the list it shows; the editor still launches its own list by making it current first.
 - Fixed: the list editor's history said "1 steps" in English for one step (and What RimArcho did's steps were read out the same way); it now says "1 step".
 - Fixed: when another process switched the current list (`archo plan use`, an agent through MCP) while the window stayed in front, Can it run checked the new list but its pill still named the old one, also after leaving and coming back; after the window got the focus back an open Can it run kept the old pill until you left it. Both now show the list checked; the pill also turns plain when the list open in the window becomes current from outside (it stayed amber).
