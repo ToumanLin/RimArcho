@@ -243,12 +243,6 @@ func ManagerSourcesIn(path string) []ManagerImport {
 	return DiscoverManagerImports(ManagerLocations{Installs: []string{dir}})
 }
 
-// managerExe reports whether an executable's name is RimCrow's, RimModManager's or RimSort's.
-func managerExe(name string) bool {
-	n := strings.ToLower(name)
-	return strings.HasPrefix(n, "rimcrow") || strings.HasPrefix(n, "rimmodmanager") || strings.HasPrefix(n, "rimsort")
-}
-
 // GameModsDirs are the Mods folders of every environment's game.
 func (a *App) GameModsDirs() []string {
 	envs, err := a.Store.Envs()

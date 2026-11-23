@@ -73,3 +73,9 @@ $t=$w.CreateShortcut($_.FullName).TargetPath; if($t){if([IO.Path]::GetExtension(
 	json.Unmarshal(b, &out)
 	return out
 }
+
+// managerExe reports whether an executable's name is RimCrow's, RimModManager's or RimSort's.
+func managerExe(name string) bool {
+	n := strings.ToLower(name)
+	return strings.HasPrefix(n, "rimcrow") || strings.HasPrefix(n, "rimmodmanager") || strings.HasPrefix(n, "rimsort")
+}
