@@ -1528,7 +1528,13 @@ async function start() {
   // Another process (the TUI, the CLI, an agent) may have changed the data: look again
   // when the window gets the focus (G8).
   addEventListener("focus", async () => {
-    try { if (S.board && (await api.Stamp()) !== S.board.stamp) await reload(); } catch { /* keep the page */ }
+    try {
+      if (S.board && (await api.Stamp()) !== S.board.stamp) {
+        await reload();
+        // Can it run draws its list's pill from the sidebar's lists: draw it again with them
+        if (S.screen === "needs") scr.needs(true);
+      }
+    } catch { /* keep the page */ }
     checkCredit();
     // Steam or another tool may have added or removed mod folders meanwhile (04 §1.6): a
     // background scan then, whose "scan" event reloads the page.
