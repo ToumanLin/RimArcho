@@ -645,6 +645,10 @@ func (a *App) steamCMD() steamCMDRunner {
 }
 
 func runSteamCMD(exe string, args []string) (string, error) {
+	exe, err := steamCMDLaunchPath(exe)
+	if err != nil {
+		return "", err
+	}
 	cmd := exec.Command(exe, args...)
 	cmd.Dir = filepath.Dir(exe)
 	hideWindow(cmd)
@@ -663,6 +667,10 @@ func startSteamCMD(exe string, args []string, console bool) (SteamCMDProc, error
 	}
 	if console {
 		return startConsole(exe, args)
+	}
+	exe, err := steamCMDLaunchPath(exe)
+	if err != nil {
+		return nil, err
 	}
 	cmd := exec.Command(exe, args...)
 	cmd.Dir = filepath.Dir(exe)

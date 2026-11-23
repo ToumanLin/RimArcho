@@ -1055,6 +1055,9 @@ func (a *App) Uninstall(o UninstallOptions, progress func(UninstallProgress)) (p
 			removeIfEmpty(a.LockDir())
 		case UnMonitor:
 			removeIfEmpty(a.MonitorDir())
+		case UnSteamCMD:
+			// the junctions a non-English profile path needed to start SteamCMD (17 §2.1)
+			removeSteamCMDAliases(a.LocalDir())
 		case UnPacks:
 			if o.RemovePacks || source.Within(a.PacksDir(), a.Home) || source.Within(a.PacksDir(), a.LocalDir()) {
 				removeIfEmpty(a.PacksDir())
