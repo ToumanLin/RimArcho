@@ -40,6 +40,7 @@ var frontendNodeSuites = []string{
 	"testdata/saves.mjs",
 	"testdata/select.mjs",
 	"testdata/separators.mjs",
+	"testdata/sortsteps.mjs",
 	"testdata/status-motion.mjs",
 	"testdata/subscribe.mjs",
 	"testdata/subscriptions.mjs",

@@ -114,7 +114,7 @@ func TestReplaceRecommendedAPI(t *testing.T) {
 	api.mu.Lock()
 	before, _ := e.App.Loadout()
 	api.mu.Unlock()
-	r, err := api.ReplaceRecommended([]string{out.Replacements[0].Original.Ref})
+	r, err := api.ApplySortStep(view.StepReplace)
 	if err != nil || !r.Undo {
 		t.Fatal(r, err)
 	}

@@ -96,7 +96,7 @@ func TestUseInstalledRealCopy(t *testing.T) {
 		t.Fatal("expected installed-copy needs item")
 	}
 	head := a.Store.LastStepID(before.Plan.ID, "undo")
-	r, err := s.UseInstalled(packages)
+	r, err := s.ApplySortStep(view.StepUseInstalled)
 	if err != nil || !r.Undo || r.Problems == nil {
 		t.Fatal(r, err)
 	}

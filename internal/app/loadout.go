@@ -528,6 +528,32 @@ type EditResult struct {
 	Notes   []string
 }
 
+// previewEdit runs f on the open plan as edit would and reports the result without storing
+// anything: State is a copy whose List is the edited one. The after-sort steps show it
+// before the player applies them (16 §6.1).
+func (a *App) previewEdit(f func(st *LoadoutState, l loadout.List) (loadout.List, []string, error)) (*EditResult, error) {
+	st, err := a.Loadout()
+	if err != nil {
+		return nil, err
+	}
+	before := st.List.Clone()
+	after, notes, err := f(st, st.List.Clone())
+	if err != nil {
+		return nil, err
+	}
+	state := *st
+	state.List = after
+	return &EditResult{State: &state, Before: before, Notes: notes, Changes: loadout.Diff(before, after, st.LineageOf)}, nil
+}
+
+// editOrPreview is edit, or previewEdit when dry.
+func (a *App) editOrPreview(dry bool, op string, f func(st *LoadoutState, l loadout.List) (loadout.List, []string, error)) (*EditResult, error) {
+	if dry {
+		return a.previewEdit(f)
+	}
+	return a.edit(op, f)
+}
+
 // edit applies f to the workspace, recording an undo step.
 func (a *App) edit(op string, f func(st *LoadoutState, l loadout.List) (loadout.List, []string, error)) (*EditResult, error) {
 	return a.editStaged(op, nil, f)

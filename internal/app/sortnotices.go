@@ -251,7 +251,16 @@ func (a *App) ReplacementSuggestions(st *LoadoutState) []ReplacementSuggestion {
 // ReplaceRecommended revalidates recommendations against the open plan. All requested
 // originals are replaced in one edit, retaining positions and avoiding duplicate targets.
 func (a *App) ReplaceRecommended(refs []string) (*EditResult, error) {
-	return a.edit("replace recommended mods", func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
+	return a.replaceRecommended(refs, false)
+}
+
+// PreviewReplaceRecommended is ReplaceRecommended without storing the edit.
+func (a *App) PreviewReplaceRecommended(refs []string) (*EditResult, error) {
+	return a.replaceRecommended(refs, true)
+}
+
+func (a *App) replaceRecommended(refs []string, dry bool) (*EditResult, error) {
+	return a.editOrPreview(dry, "replace recommended mods", func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
 		targets := map[string]*store.Mod{}
 		for _, ref := range refs {
 			old, err := st.Ix.ResolveOne(ref)
@@ -361,6 +370,20 @@ func sortCycles(st *LoadoutState, in order.Input, r order.Result) []SortCycle {
 }
 
 // SortNotices is the shared after-sort payload for GUI and CLI, including dry runs.
+// CurrentSortNotices are the notices for the open plan as it is now, without sorting: what
+// the steps after a sort read again after each step (16 §6.1). Cycles need a sort and are left out.
+func (a *App) CurrentSortNotices() (*LoadoutState, SortNotices, error) {
+	st, err := a.Loadout()
+	if err != nil {
+		return nil, SortNotices{}, err
+	}
+	deps, err := a.MissingDependencies(st)
+	if err != nil {
+		return nil, SortNotices{}, err
+	}
+	return st, SortNotices{MissingDependencies: deps, MissingMods: a.MissingMods(st), Replacements: a.ReplacementSuggestions(st)}, nil
+}
+
 type SortNotices struct {
 	MissingDependencies []MissingDependency     `json:"missingDependencies,omitempty"`
 	MissingMods         []MissingMod            `json:"missingMods,omitempty"`

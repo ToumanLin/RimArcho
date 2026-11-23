@@ -47,7 +47,8 @@ import { environmentReason, withEnvironmentSwitch } from "./environment.js";
 import { wireSeparator } from "./separator.js";
 import { pickClick } from "./select.js";
 import { go, openPage, initNavigation, pageEntering, pageEntered, wireHistory, travel } from "./navigation.js";
-import { checkCredit, getChoices } from "./credit.js";
+import { checkCredit } from "./credit.js";
+import { initSortSteps, offerAfterSort } from "./sortsteps.js";
 import * as problems from "./problems.js";
 import * as fileSearch from "./filesearch.js";
 import * as modSettings from "./modsettings.js";
@@ -878,7 +879,7 @@ async function drop(from, to, items, at) {
 }
 
 // run: sort, save and launch act at once and say what they did (16 §6); sort
-// offers undo. A refusal says why in the status line and shows the commands that resolve it.
+// offers undo, then the steps for what it found (sortsteps.js, 16 §6.1). A refusal says why in the status line and shows the commands that resolve it.
 // A launch with required mods missing asks once (VM run B8); run says "asked" then.
 async function run(what, anyway = false) {
   const before = motion.snapshot();
@@ -898,53 +899,6 @@ async function run(what, anyway = false) {
   await reload();
   motion.play(before, null);
   if (what === "sort") offerAfterSort(o);
-}
-
-// offerAfterSort: what a sort found that the list cannot fix by ordering (04): required
-// mods that are not enabled, list entries with no mod folder, and mods with a recommended
-// replacement. One window says it all and one button fixes all it can: installed mods are
-// enabled or put in place (one undo step each), the rest are subscribed after the usual
-// Steam / SteamCMD choice. A broken cycle is settled by the sort itself and only noted on
-// Can it run, so it asks nothing here.
-function offerAfterSort(o) {
-  const deps = o.missingDependencies || [], absent = o.missingMods || [], repl = o.replacements || [];
-  const enable = deps.filter((m) => m.kind === "installed");
-  const useCopies = absent.filter((m) => m.canEnable);
-  const replace = repl.filter((r) => r.canReplace && r.installed && !r.enabled);
-  const ws = [...deps.filter((m) => m.kind === "workshop").map((m) => m.workshopId),
-    ...absent.filter((m) => !m.canEnable && m.workshopId).map((m) => m.workshopId),
-    ...repl.filter((r) => !r.installed && r.replacement && r.replacement.workshopId).map((r) => r.replacement.workshopId)];
-  const subscribe = [...new Set(ws.filter(Boolean))];
-  const unknown = [...deps.filter((m) => m.kind === "unknown"), ...absent.filter((m) => !m.canEnable && !m.workshopId)];
-  if (!enable.length && !useCopies.length && !replace.length && !subscribe.length && !unknown.length) return;
-  const some = (names) => names.slice(0, 6).join(T(", ")) + (names.length > 6 ? " " + Tf("and %d more", names.length - 6) : "");
-  const lines = [];
-  const group = (head, names) => { if (names.length) lines.push(head, "  " + some(names), ""); };
-  group(Tf("required but not enabled, installed (%d):", enable.length), enable.map((m) => m.name || m.packageId));
-  group(Tf("in the list with no folder, a copy is installed (%d):", useCopies.length), useCopies.map((m) => m.name || m.packageId));
-  group(Tf("a recommended replacement is installed (%d):", replace.length), replace.map((r) => Tf("%s → %s", r.original.name, r.replacement.name)));
-  group(Tf("to get from the Workshop (%d):", subscribe.length), [
-    ...deps.filter((m) => m.kind === "workshop").map((m) => m.name || m.packageId),
-    ...absent.filter((m) => !m.canEnable && m.workshopId).map((m) => m.name || m.packageId),
-    ...repl.filter((r) => !r.installed && r.replacement && r.replacement.workshopId).map((r) => r.replacement.name)]);
-  group(Tf("missing, no known source (%d):", unknown.length), unknown.map((m) => m.name || m.packageId));
-  while (lines.length && !lines[lines.length - 1]) lines.pop();
-  const local = enable.length + useCopies.length + replace.length;
-  if (!local && !subscribe.length) return pop.text(T("the sort found mods the list is missing"), lines);
-  const go = local && subscribe.length ? Tf("fix %d and get %d", local, subscribe.length)
-    : local ? Tf("fix %d", local) : Tf("get %d mods", subscribe.length);
-  pop.confirm(T("the sort found mods the list is missing"), lines, go, async () => {
-    let ids = subscribe;
-    if (useCopies.length && api.UseInstalled) await edited(() => api.UseInstalled(useCopies.map((m) => m.packageId)), true);
-    if (replace.length) await edited(() => api.ReplaceRecommended(replace.map((r) => r.original.ref || r.original.instance)), true);
-    if (enable.length) {
-      const r = await edited(() => api.CompleteDependencies(), true);
-      if (r?.workshopIds?.length) ids = [...new Set([...ids, ...r.workshopIds])];
-    }
-    if (ids.length) pop.choose(Tf("get %d mods", ids.length), getChoices(), async (i) => {
-      try { say("ok", await api.Subscribe({ kind: "workshop", url: ids.join(" "), steamcmd: i === 1, batch: true })); } catch (e) { say("fail", errText(e)); }
-    });
-  }, "enable");
 }
 
 // offerDirect answers a Steam launch with no Steam client (view.Outcome.Direct, 16 §2.3): one
@@ -1496,6 +1450,7 @@ async function start() {
   pop.wireModalFocus();
   scr.initScreens(ui);
   problems.initProblems(ui);
+  initSortSteps(ui);
   shell.initShell(ui);
   homePage.initHome(ui);
   fullPage.initFull(ui);

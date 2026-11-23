@@ -30,9 +30,9 @@ func init() {
 	register(&Command{Name: "swap", Args: "<ref> [<ref>]", Summary: "replace an enabled mod by another instance of its lineage", MinArgs: 1, MaxArgs: 2, Run: swapCmd})
 	register(&Command{Name: "sort", Summary: "sort the workspace by load-order constraints", MaxArgs: 0,
 		Flags: []Flag{{Name: "dry-run", Help: "show the result without changing the workspace"}, {Name: "json", Help: "print changes and sort notices as JSON"}}, Run: sortCmd})
-	register(&Command{Name: "loadout complete-dependencies", Summary: "enable installed dependencies and sort in one undo step; report downloads separately", MaxArgs: 0, Run: completeDependenciesCmd})
-	register(&Command{Name: "loadout replace-recommended", Args: "<ref…>", Summary: "replace enabled mods with installed recommendations in one undo step", MinArgs: 1, MaxArgs: -1, Run: replaceRecommendedCmd})
-	register(&Command{Name: "loadout use-installed", Args: "<packageId…>", Summary: "restore missing entries using installed copies in one undo step", MinArgs: 1, MaxArgs: -1, Run: useInstalledCmd})
+	register(&Command{Name: "loadout complete-dependencies", Summary: "enable installed dependencies and sort in one undo step; report downloads separately", MaxArgs: 0, Flags: []Flag{{Name: "dry-run", Help: "show what the step would change without changing the workspace"}}, Run: completeDependenciesCmd})
+	register(&Command{Name: "loadout replace-recommended", Args: "<ref…>", Summary: "replace enabled mods with installed recommendations in one undo step", MinArgs: 1, MaxArgs: -1, Flags: []Flag{{Name: "dry-run", Help: "show what the step would change without changing the workspace"}}, Run: replaceRecommendedCmd})
+	register(&Command{Name: "loadout use-installed", Args: "<packageId…>", Summary: "restore missing entries using installed copies in one undo step", MinArgs: 1, MaxArgs: -1, Flags: []Flag{{Name: "dry-run", Help: "show what the step would change without changing the workspace"}}, Run: useInstalledCmd})
 
 	register(&Command{Name: "undo", Args: "[<n>]", Summary: "undo the last workspace edit (or the last n: archo history)", MaxArgs: 1, Run: func(c *Ctx, a *Args) (*render.Doc, error) { return undoRedo(c, a, false) }})
 	register(&Command{Name: "redo", Args: "[<n>]", Summary: "redo an undone workspace edit (or n of them)", MaxArgs: 1, Run: func(c *Ctx, a *Args) (*render.Doc, error) { return undoRedo(c, a, true) }})
@@ -837,28 +837,50 @@ func movedKV(root *render.Node, moved []app.DuplicateMove, dry bool) {
 	n.Truncate(10, "")
 }
 
+// stepDoc is editDoc for one of the steps after a sort (16 §6.1); --dry-run previews it.
+func stepDoc(c *Ctx, r *app.EditResult, dry bool) *render.Doc {
+	d := editDoc(c, r)
+	if dry {
+		d.Nodes[0].Line += " (dry run; the workspace is unchanged)"
+		d.Next = nil
+	}
+	return d
+}
+
 func completeDependenciesCmd(c *Ctx, a *Args) (*render.Doc, error) {
-	r, err := c.App.CompleteDependencies()
+	complete := c.App.CompleteDependencies
+	if a.Bool("dry-run") {
+		complete = c.App.PreviewCompleteDependencies
+	}
+	r, err := complete()
 	if err != nil {
 		return nil, err
 	}
-	d := editDoc(c, r.Edit)
+	d := stepDoc(c, r.Edit, a.Bool("dry-run"))
 	addSortNotices(d.Nodes[0], app.SortNotices{MissingDependencies: r.MissingDependencies})
 	return d, nil
 }
 func replaceRecommendedCmd(c *Ctx, a *Args) (*render.Doc, error) {
-	r, err := c.App.ReplaceRecommended(a.Pos)
+	replace := c.App.ReplaceRecommended
+	if a.Bool("dry-run") {
+		replace = c.App.PreviewReplaceRecommended
+	}
+	r, err := replace(a.Pos)
 	if err != nil {
 		return nil, err
 	}
-	return editDoc(c, r), nil
+	return stepDoc(c, r, a.Bool("dry-run")), nil
 }
 func useInstalledCmd(c *Ctx, a *Args) (*render.Doc, error) {
-	r, err := c.App.UseInstalled(a.Pos)
+	use := c.App.UseInstalled
+	if a.Bool("dry-run") {
+		use = c.App.PreviewUseInstalled
+	}
+	r, err := use(a.Pos)
 	if err != nil {
 		return nil, err
 	}
-	return editDoc(c, r), nil
+	return stepDoc(c, r, a.Bool("dry-run")), nil
 }
 func addSortNotices(root *render.Node, n app.SortNotices) {
 	for _, d := range n.MissingDependencies {

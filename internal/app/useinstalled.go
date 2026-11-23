@@ -11,7 +11,16 @@ import (
 // It preserves their first positions and records the whole batch as one undo step.
 // Deployment, when needed, remains part of save/launch.
 func (a *App) UseInstalled(packageIDs []string) (*EditResult, error) {
-	return a.edit("use installed copies", func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
+	return a.useInstalled(packageIDs, false)
+}
+
+// PreviewUseInstalled is UseInstalled without storing the edit.
+func (a *App) PreviewUseInstalled(packageIDs []string) (*EditResult, error) {
+	return a.useInstalled(packageIDs, true)
+}
+
+func (a *App) useInstalled(packageIDs []string, dry bool) (*EditResult, error) {
+	return a.editOrPreview(dry, "use installed copies", func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
 		available := map[string]MissingMod{}
 		for _, m := range a.MissingMods(st) {
 			available[m.PackageID] = m
