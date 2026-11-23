@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Fixed: in RimWorld 1.7, warnings logged from the game loop, such as `[Steamworks.NET] SteamAPI.Init() failed` when the game starts without Steam, were counted as exceptions (an error on Can it run and in `archo log`). Their stacks have frames that name a source file (`… [0x6] in …\PlatformBase.Loop.cs:143`), which were taken for an exception's own stack.
 - Fixed: `archo workshop subscribe` (MCP `manage_library` subscribe) refused a Workshop Mod you had unsubscribed from once Steam had deleted its folder, saying it was "subscribed already". It now subscribes to it again.
 - Fixed: after you unsubscribed from a Workshop Mod (in RimArcho or in Steam) and Steam had not yet deleted its folder, RimArcho went on treating it as subscribed and loadable: it could be added to lists the game would not load, `archo workshop subscribe` said it was "subscribed already", and it could not be moved to the recycle bin. It is now an unsubscribed leftover from the next scan. RimArcho now goes by Steam's subscription list (`WorkshopItemDetails` in `appworkshop_294100.acf`), not the list of installed folders, which keeps unsubscribed items until Steam deletes them.
 - Fixed: a test run (`archo test run`, MCP `test_run`) while the Steam client was not running loaded none of the list's Workshop Mods and reported "NOT TESTED: these Mods were not loaded". It now links them into the game's `Mods` folder for the run, as launching without Steam does, and removes the links afterwards.

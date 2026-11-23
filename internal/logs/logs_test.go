@@ -546,3 +546,31 @@ func TestNormalizeTickPawn(t *testing.T) {
 		t.Error("ThingIDs of different defs merged")
 	}
 }
+
+// A 1.7 warning whose engine frames name their source file is still a caller's
+// stack, not an exception (VM round 2026-11-22, 1.7.5014: SteamAPI.Init() failed
+// was counted as an error).
+func TestParseWaylithCallerFramesWithFile(t *testing.T) {
+	text := "=== Waylith log ===\nVersion:   1.7.5014.1290\n\n" +
+		"2026-11-23 00:04:03.143  WARN [Verse] [Steamworks.NET] SteamAPI.Init() failed. Possible causes: Steam client not running\n" +
+		"    at Verse.Log.Warning(String text) [0x19]\n" +
+		"    at Verse.Steam.SteamManager.InitIfNeeded() [0x75]\n" +
+		`    at Waylith.Windowing.Core.PlatformBase.DeliverUpdate() [0x6] in D:\Workspaces\Engine\Waylith.Windowing\Core\PlatformBase.Loop.cs:143` + "\n" +
+		"    at RimWorldWaylith.Program.Main(String[] args) [0x265]\n"
+	f, err := Parse(strings.NewReader(text))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f.Entries) != 1 {
+		t.Fatalf("entries %d", len(f.Entries))
+	}
+	e := f.Entries[0]
+	for _, fr := range e.Frames {
+		if !fr.Caller {
+			t.Fatalf("frame %q not a caller frame", fr.Text)
+		}
+	}
+	if Classify(e) == ClassException || e.Top().Type != "Verse.Steam.SteamManager" {
+		t.Fatalf("class %s top %+v", Classify(e), e.Top())
+	}
+}
