@@ -69,3 +69,22 @@ func TestOperationsMarkOfAStep(t *testing.T) {
 		t.Fatalf("uninstall %+v, subscription %+v", un, sub)
 	}
 }
+
+// A save batch's subject is a count stored in English ("1 save"); the list says it in the
+// player's language (VM 2026-11-23: "1 save" in the Chinese window).
+func TestOperationsSaveCountInLanguage(t *testing.T) {
+	e := testkit.New(t)
+	view.SetLang("zh")
+	t.Cleanup(func() { view.SetLang("en") })
+	e.App.Ops.Add(oplog.Row{Op: oplog.SaveTrash, Subject: "1 save"})
+	e.App.Ops.Add(oplog.Row{Op: oplog.SaveBackup, Subject: "3 saves"})
+	e.App.Ops.Add(oplog.Row{Op: oplog.Trash, Subject: "1 save"})
+	p, err := view.Operations(e.App)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := []string{p.Rows[0].Subject, p.Rows[1].Subject, p.Rows[2].Subject}
+	if got[0] != "1 save" || got[1] != "3 个存档" || got[2] != "1 个存档" {
+		t.Fatalf("subjects %q", got)
+	}
+}

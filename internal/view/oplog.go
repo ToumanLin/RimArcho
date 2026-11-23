@@ -2,6 +2,7 @@ package view
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -147,7 +148,7 @@ func Operations(a *app.App) (*OpsPage, error) {
 
 func opRow(r oplog.Row, now time.Time, loc *time.Location) OpRow {
 	at := r.At.In(loc)
-	o := OpRow{ID: r.ID, Op: r.Op, Icon: opIcon[r.Op], What: OpWhat(r.Op), Subject: r.Subject, Result: r.Result,
+	o := OpRow{ID: r.ID, Op: r.Op, Icon: opIcon[r.Op], What: OpWhat(r.Op), Subject: opSubject(r), Result: r.Result,
 		ResultText: T(opResult[r.Result]), Bad: oplog.Failure(r.Result), Origin: r.Origin, OriginText: T(opOrigin[r.Origin]),
 		Time: at.Format("15:04"), At: r.At.UnixMilli(), Target: r.Target, Detail: r.Detail, Back: opBack(r)}
 	if o.Icon == "" {
@@ -173,6 +174,22 @@ func opRow(r oplog.Row, now time.Time, loc *time.Location) OpRow {
 	}
 	o.Search = strings.ToLower(strings.Join([]string{o.What, r.Op, r.Subject, r.Target, r.Detail, o.ResultText, o.OriginText}, " "))
 	return o
+}
+
+// opSubject is the row's subject in the player's language: save batches store their count
+// as "1 save" / "N saves" (app.plural), which the list must not show in English.
+func opSubject(r oplog.Row) string {
+	if r.Op == oplog.SaveTrash || r.Op == oplog.SaveBackup {
+		if r.Subject == "1 save" {
+			return T("1 save")
+		}
+		if n, ok := strings.CutSuffix(r.Subject, " saves"); ok {
+			if k, err := strconv.Atoi(n); err == nil {
+				return Tf("%d saves", k)
+			}
+		}
+	}
+	return r.Subject
 }
 
 // opBack says, in the player's words, where an ok row's item can be got back (oplog.Where).

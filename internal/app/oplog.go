@@ -127,7 +127,8 @@ func (a *App) logUnsubscribe(items []WorkshopItem, rep *steamworks.Report, err e
 func joinDetail(parts ...string) string {
 	var out []string
 	for _, p := range parts {
-		if p = strings.TrimSpace(p); p != "" {
+		// a batch's errors already hold its first error: say it once
+		if p = strings.TrimSpace(p); p != "" && !strings.Contains(strings.Join(out, "; "), p) {
 			out = append(out, p)
 		}
 	}

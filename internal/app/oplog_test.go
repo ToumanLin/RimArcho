@@ -9,6 +9,8 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/oplog"
+	"github.com/ToumanLin/RimArcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/steamworks"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
@@ -236,4 +238,27 @@ func samePath(a, b string) bool {
 	ra, _ := filepath.EvalSymlinks(filepath.Dir(a))
 	rb, _ := filepath.EvalSymlinks(filepath.Dir(b))
 	return strings.EqualFold(filepath.Join(ra, filepath.Base(a)), filepath.Join(rb, filepath.Base(b)))
+}
+
+// Unsubscribing while the game runs is one refused row per item with the game's reason, also
+// when a launch without the Steam client left the item's `_Archo_workshop_` link in Mods/
+// (VM 2026-11-23: planning that link's removal refused first, and nothing was logged).
+func TestOpLogUnsubscribeRefusedWithWorkshopLink(t *testing.T) {
+	t.Parallel()
+	e := setup(t, false)
+	dir := e.AddWorkshop("7200", testkit.Sample("tester.drop", "Drop"))
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.drop")
+	e.Junction(filepath.Join(e.Game, "Mods", "_Archo_workshop_7200"), dir)
+	scanNow(t, e)
+	steamDLL(e)
+	drop := refID(t, e, "Drop", source.Workshop)
+	e.App.GameProbe = func(string) *app.GameRun { return &app.GameRun{PID: 42} }
+	_, err := e.App.Workshop(steamworks.Unsubscribe, []string{drop}, false)
+	if err == nil || !strings.Contains(err.Error(), "game is running (pid 42)") {
+		t.Fatalf("game running: %v", err)
+	}
+	r := findOp(opRows(t, e), oplog.Unsubscribe, oplog.Refused)
+	if r == nil || r.Subject != "Drop" || r.Target != "workshop:7200" || !strings.Contains(r.Detail, "game is running") {
+		t.Fatalf("refused row: %+v", r)
+	}
 }

@@ -72,21 +72,23 @@ func (a *App) Workshop(action string, refs []string, dryRun bool, callbacks ...B
 		return nil, err
 	}
 	op := &WorkshopOp{Action: action, DryRun: dryRun}
+	// Before the items: an item's removal plan for its `_Archo_workshop_` link (a launch
+	// without Steam left it) refuses with a bare path while the game runs, unlogged.
+	if action == steamworks.Unsubscribe || action == steamworks.Resubscribe {
+		if run, err := a.GameRunning(); err == nil && run != nil {
+			err := fmt.Errorf("the game is running (pid %d): Steam would delete folders it has loaded; close it first", run.PID)
+			if !dryRun {
+				a.logUnsubscribe(refItems(st, refs), nil, err, true, "")
+			}
+			return nil, err
+		}
+	}
 	for _, ref := range refs {
 		it, err := a.workshopItem(st, action, ref)
 		if err != nil {
 			return nil, err
 		}
 		op.Items = append(op.Items, it)
-	}
-	if action == steamworks.Unsubscribe || action == steamworks.Resubscribe {
-		if run, err := a.GameRunning(); err == nil && run != nil {
-			err := fmt.Errorf("the game is running (pid %d): Steam would delete folders it has loaded; close it first", run.PID)
-			if !dryRun {
-				a.logUnsubscribe(op.Items, nil, err, true, "")
-			}
-			return nil, err
-		}
 	}
 	if dryRun || len(op.Items) == 0 {
 		return op, nil
@@ -149,6 +151,20 @@ func (a *App) Workshop(action string, refs []string, dryRun bool, callbacks ...B
 
 // workshopItem resolves one reference of a Workshop action and checks the action can
 // apply to it.
+// refItems names refs for a refusal's rows: the Mod and its Workshop ID where the reference
+// resolves, the reference itself otherwise.
+func refItems(st *LoadoutState, refs []string) []WorkshopItem {
+	items := make([]WorkshopItem, 0, len(refs))
+	for _, ref := range refs {
+		it := WorkshopItem{Name: ref}
+		if m, err := st.Ix.ResolveOne(ref); err == nil {
+			it = WorkshopItem{ID: m.ID, Name: m.DisplayName(), WorkshopID: m.WorkshopID()}
+		}
+		items = append(items, it)
+	}
+	return items
+}
+
 func (a *App) workshopItem(st *LoadoutState, action, ref string) (WorkshopItem, error) {
 	m, err := st.Ix.ResolveOne(ref)
 	if err != nil {
