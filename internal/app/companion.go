@@ -119,7 +119,7 @@ func logStart(path string, fi os.FileInfo) time.Time {
 			}
 		}
 	}
-	if at := logCreationTime(fi); !at.IsZero() && !at.After(fi.ModTime()) {
+	if at := logCreationTime(path, fi); !at.IsZero() && !at.After(fi.ModTime()) {
 		return at
 	}
 	return fi.ModTime()

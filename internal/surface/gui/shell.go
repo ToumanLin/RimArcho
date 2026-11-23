@@ -573,19 +573,15 @@ func (s *API) GuideDownloadInfo() *DownloadInfo {
 	return d
 }
 
-// gamesFolder suggests where a downloaded game goes: <drive>\Games next to the games there
-// are (not inside a Steam library), else the system drive's.
+// gamesFolder suggests where a downloaded game goes: next to the games there are (not
+// inside a Steam library), else the system drive's (app.GamesFolder).
 func gamesFolder(a *app.App) string {
 	envs, _ := a.Store.Envs()
+	roots := make([]string, 0, len(envs))
 	for _, e := range envs {
-		if v := filepath.VolumeName(e.GameRoot); v != "" {
-			return v + `\Games`
-		}
+		roots = append(roots, e.GameRoot)
 	}
-	if v := os.Getenv("SystemDrive"); v != "" {
-		return v + `\Games`
-	}
-	return filepath.Join(os.Getenv("HOME"), "Games")
+	return app.GamesFolder(roots)
 }
 
 // GuideInstallSteamCMD queues the confirmed download and returns its task ID (16 §2.15).

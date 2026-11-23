@@ -103,6 +103,9 @@ func Trash(path string) error {
 	}
 }
 
+// MountRoot is the top folder of the file system holding path (its mount point).
+func MountRoot(path string) (string, error) { return trashMount(path) }
+
 // trashMount finds the top directory on this device without invoking mount tools.
 func trashMount(path string) (string, error) {
 	dev, err := deviceID(path)
