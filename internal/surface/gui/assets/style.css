@@ -1813,7 +1813,7 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .fb-att { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; border-top: var(--hairline) solid var(--line-2); }
 .fb-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .fb-att-l { color: var(--muted); font-size: 12px; margin-right: 2px; }
-.fb-chip { display: inline-flex; align-items: center; max-width: 280px; height: 22px; padding: 0 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 999px; background: var(--pill); color: var(--fg-2); font-size: 12px; cursor: default; }
+.fb-chip { display: inline-block; max-width: 280px; height: 22px; line-height: 22px; padding: 0 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 999px; background: var(--pill); color: var(--fg-2); font-size: 12px; cursor: default; }
 .fb-chip.hot { background: color-mix(in srgb, var(--red) 16%, transparent); color: var(--red); }
 .fb-chip.wait { background: transparent; color: var(--muted); }
 .page .btn.link.fb-change { font-size: 12px; }

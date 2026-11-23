@@ -4,7 +4,7 @@ import { Element, loadModules, flush } from "./dom.mjs";
 
 // Feedback (16 §2.14): two panes with a dragging gap, both starting with a card, the buttons in
 // the right card's head, and the template (or My reports) as the breadcrumb's second level.
-async function setup() {
+async function setup(over = {}) {
   const screen = new Element("div"); screen.id = "screen";
   const S = { screen: "", screenSeq: 1 };
   const el = (tag, cls = "", text = "") => new Element(tag, cls, text);
@@ -20,6 +20,7 @@ async function setup() {
     FeedbackCompose: async () => ({ body: "b", url: "u", full: true }),
     FeedbackCheck: async () => ({ reports: [] }),
     FeedbackChoices: async () => ({ diagnoses: [], mods: [] }),
+    ...over,
   };
   const wired = [];
   let synced = 0;
@@ -65,4 +66,17 @@ test("the breadcrumb names the template shown, then My reports", async () => {
   assert.ok(h.synced() >= 3);
   // My reports is one card too, its note in the head
   assert.ok(h.screen.querySelector(".fb-main .fb-card .fb-mine-bar"));
+});
+
+test("an attached part's chip says its short name; the heading with the file leads its hover", async () => {
+  const heading = "game log errors (Player.log of Nov 22 23:40)";
+  const h = await setup({ FeedbackAttach: async () => ({ send: true, basic: ["report: bug"], parts: [{ key: "log", label: "game log", note: "" }], sections: [{ key: "log", heading, lines: ["E1 exception x3"] }, { key: "mod", heading: "the Mod Harmony", lines: ["harmony"] }] }) });
+  await h.m.open();
+  await flush(); await flush(); await flush();
+  const chips = h.screen.querySelectorAll(".fb-chips .fb-chip");
+  const log = chips.find((c) => c.textContent === "game log");
+  assert.ok(log, "the log chip is short: " + chips.map((c) => c.textContent).join(" | "));
+  assert.equal(log.title.split("\n")[0], heading);
+  assert.ok(log.title.includes("E1 exception x3"));
+  assert.ok(chips.some((c) => c.textContent === "the Mod Harmony"), "a section without a part keeps its heading");
 });

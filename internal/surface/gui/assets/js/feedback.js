@@ -404,7 +404,12 @@ function drawAtt() {
   const row = el("div", "fb-chips");
   row.append(el("span", "fb-att-l", T("attached")));
   row.append(chip(T("basic information"), (F.at?.basic || []).join("\n")));
-  for (const s of F.at?.sections || []) row.append(chip(s.heading, s.lines.slice(0, 12).join("\n"), s.key === "ops" && priority(prob())));
+  // An optional part's chip says its short name ("game log"); the section's full heading,
+  // which can name a file and a time, leads the hover with the lines (16 §2.14).
+  for (const s of F.at?.sections || []) {
+    const short = F.at?.parts?.find(x => x.key === s.key)?.label || s.heading;
+    row.append(chip(short, [s.heading, ...s.lines.slice(0, 12)].join("\n"), s.key === "ops" && priority(prob())));
+  }
   if (prob().opts.log && F.at?.pending) row.append(el("span", "fb-chip wait", T("the game log is still being analysed…")));
   // files lost with nothing in the operation log: say so rather than leave the chip out
   const ops = F.at?.parts?.find(x => x.key === "ops");

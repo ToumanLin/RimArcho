@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Feedback: the "attached" chip of the game log was cut off in Chinese (`游戏日志里的错误（11月22日 23:40 的 Player.log）`). Chips now show the attachment's short name ("game log", "paths", "recent operations"); hovering shows the full heading with the file and time, then the lines. A long chip (a Mod's name) ends in "…" instead of being cut.
 - Fixed: a Game Config with its own saves that you had never launched said "the last run's log was not found: …\Player.log" on Launch and Can it run (once a sibling Game Config's game had exited). It now says "not launched yet".
 - Fixed: with two RimArcho installs sharing one game (two data folders), uninstalling one removed the other's `_Archo_` links from the game's `Mods` folder, such as the link to its Archo Monitor, once a scan had seen them. Uninstall now removes only its own links, and `archo links check` reports the other's as not its own. Windows and Linux.
 - Development: on Windows, RimArcho's own tests no longer move their synthetic folders into your real Recycle Bin. A test build refuses the real bin, and the test fixtures recycle into a folder of their own.
