@@ -157,3 +157,24 @@ test("a Mod marked functional leaves the map and the pick moves to the next tile
   assert.equal(named(), "Hats", "the details follow the picked tile");
   assert.ok(find(h.screen, "editor-full-link", (b) => b.dataset.key === "review-mark-hats"), "the mark button acts on it");
 });
+
+// VM 2026-11-22: Ideology, 36 seen (memes, looks, abilities: what is picked from) and none of
+// its meet categories, sat under never seen. By progress puts it under picked from, some in
+// use; a Mod with nothing seen stays under never seen, one only set up under only set up.
+test("a mixed Mod seen only in what is picked from is not under never seen", async () => {
+  const h = await setup();
+  const opened = h.review.open();
+  const meet = [
+    mod("Ideology", "ide", { part: 0, size: 37, seen: 36, group: "seen" }),
+    mod("Quiet", "quiet", { part: 0, size: 5, seen: 0, group: "never-seen" }),
+    mod("Planned", "plan", { part: 0, size: 3, seen: 0, group: "configured" }),
+  ];
+  h.send({ request: h.asked.at(-1).n, page: pageOf({ groups: [{ key: "meet", label: "meet", hint: "", mods: meet }] }) });
+  await opened;
+  const under = {};
+  for (const sec of h.screen.querySelectorAll(".rv-grp")) {
+    const label = sec.querySelector("h3 .l").textContent;
+    for (const t of sec.querySelectorAll(".rv-tile")) under[t.dataset.mod] = label;
+  }
+  assert.deepEqual(under, { ide: "picked from, some in use", quiet: "never seen in the saves", plan: "only set up" });
+});

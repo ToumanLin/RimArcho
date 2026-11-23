@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Fixed: Play review put a Mod under "never seen in the saves" when everything the saves showed of it was what you pick from (Ideology's memes, styles and abilities in a new colony), though its details said 36 seen. It is now under "picked from, some in use".
 - Fixed: the Launch page said "1 mods changed" for one changed Mod; it now says "1 mod changed".
 - Fixed: Updates said "checked 3 sources" under a list whose only source read "not checked yet": it counted sources with no Mods, which the page does not list, after an automatic check. It now counts the sources it lists, and one reads "checked 1 source".
 - Fixed: the Launch page's "last game" line counted the Mods in Can it run's last-run section instead of their errors, so a run with 69 errors from two sources said "2 errors". It now adds up the errors those items name.
