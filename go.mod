@@ -9,6 +9,7 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/charmbracelet/x/ansi v0.11.4
 	github.com/charmbracelet/x/exp/teatest v0.0.0-20261018003744-cb897cb4ed72
+	github.com/ebitengine/purego v0.11.3
 	github.com/go-git/go-git/v5 v5.19.3
 	github.com/google/jsonschema-go v0.4.3
 	github.com/klauspost/compress v1.20.3

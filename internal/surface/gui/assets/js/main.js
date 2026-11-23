@@ -1544,6 +1544,8 @@ async function start() {
     scr.analyzeEvent(ev);
     if (ev.done && S.screen === "home") homePage.home();
   });
+  // The Linux window's side buttons arrive from GTK, not as mouse events (sidebuttons_linux.go).
+  on("history-step", (step) => void travel(step < 0 ? -1 : 1));
   on("pack", (ev) => packsPage.packEvent(ev));
   on("uninstall", (ev) => uninst.event(ev));
   on("uninstall-close-blocked", () => uninst.closeBlocked());
