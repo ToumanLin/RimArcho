@@ -218,6 +218,7 @@ func (a *App) Loadout() (*LoadoutState, error) {
 	if err != nil {
 		return nil, err
 	}
+	a.followCurrent(ix.Env.ID)
 	key := a.Store.ChangeKey() + "|" + ix.Env.ID + fmt.Sprintf("|open=%d|%s", a.OpenPlan, a.PlanName)
 	if ix.Env.UserDataRoot != "" {
 		if fi, err := os.Stat(env.ModsConfigPath(ix.Env.UserDataRoot)); err == nil {

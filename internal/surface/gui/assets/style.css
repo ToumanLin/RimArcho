@@ -700,6 +700,9 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .page-head .corpus-chip { font-size: 12px; line-height: 16px; padding: 0 6px; border-radius: 999px; background: var(--pill); color: var(--muted); font-variant-numeric: tabular-nums; }
 .page-head .corpus-chip.none { color: var(--faint); text-decoration: line-through; }
 .page-head .corpus-chip.newer { color: var(--amber); }
+/* Can it run's list (16 §2.4): amber when it is open here but not the list launched */
+.page-head .list-chip { display: inline-block; font-size: 12px; line-height: 18px; padding: 0 8px; border-radius: 999px; background: var(--pill); color: var(--fg); font-weight: 600; vertical-align: baseline; }
+.page-head .list-chip.other { color: var(--amber); background: var(--amber-soft); }
 .parts { color: var(--muted); margin: 4px 0 0 2px; font-size: 12px; }
 .parts { padding-left: 18px; }
 .parts li + li { margin-top: 3px; }

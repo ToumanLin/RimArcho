@@ -116,3 +116,57 @@ test("the editor's problems button is singular for one problem", async () => {
   S.board.problems.items.push({ counted: true, section: 0 });
   assert.equal(problems.chip().querySelector(".t").textContent, "Tf:2 problems");
 });
+
+// Can it run's head names the list it checks as a pill (16 §2.4): plain when it is the
+// current list, amber with the current list in its tooltip when the player opened another
+// one here; the pill takes the name's place in the lead, which stays the line's sentence.
+test("the head's list pill shows a list opened over the current one", async () => {
+  class Node extends Element {
+    prepend(n) { this.insertBefore(n, this.firstChild); }
+    checkVisibility() { return true; }
+    constructor(...args) { super(...args); this.style.removeProperty = (k) => { delete this.style[k]; }; }
+  }
+  const el = (tag, cls, text) => new Node(tag, cls, text);
+  const screen = el("div");
+  const def = { id: 1, name: "default" }, r11 = { id: 2, name: "r11" };
+  let items = [], plan = 1;
+  const S = { screen: "needs", screenSeq: 1, busy: {}, board: { env: "game-a" }, live: null };
+  const api = { Needs: async () => ({ items, plan, memory: { estimated: true } }) };
+  const query = sel => sel === "#screen" ? screen : screen.querySelector(sel.replace(/^#screen /, ""));
+  const Tf = (s, ...a) => { let i = 0; return s.replace(/%[sd]/g, () => String(a[i++])); };
+  const screens = await loadModules("./screens.js", {
+    "./state.js": { S, $: query, el, api, T: s => s, Tf, errText: e => e.message, say() {}, cur() {}, slideThumb() {} },
+    "./icons.js": { icon: {}, statusIcon: () => "", bowMark: () => "" },
+    "./motion.js": { bump() {}, shimmer: () => el("div") },
+    "./popups.js": {},
+    "./bg.js": { bgSection: async () => el("div") },
+    "./virtualrows.js": { virtualRows() {} },
+    "./api.js": { on() {} },
+    "./separator.js": { wireSeparator() {} },
+    "./needtext.js": { initNeedText() {}, needText: (tag, cls, text) => el(tag, cls, text), needParts: () => el("div"), needEvidence: () => el("div"), evidenceMark: () => el("div") },
+    "./fulldetail.js": { full() {}, fullKey() {}, fullSection() {} },
+  }, { document: { activeElement: null, dispatchEvent() {}, querySelector: s => screen.querySelector(s), querySelectorAll: s => screen.querySelectorAll(s) }, URL, CSS: { escape: s => s }, requestAnimationFrame: fn => fn() });
+  screens.initScreens({ reload: async () => {}, renderHints() {}, renderWhere() {}, edited: async () => null });
+  const chip = () => screen.querySelector(".page-head .list-chip");
+  // followed: the window's open list is the current one
+  S.shell = { plans: [{ ...def, current: true, open: true }, r11], plan: { ...def, current: true, open: true } };
+  await screens.needs(false);
+  assert.equal(chip().textContent, "default");
+  assert.ok(!chip().classList.contains("other"));
+  assert.equal(chip().title, "current list");
+  const lead = screen.querySelector(".page-head .lead");
+  assert.equal(lead.getAttribute("aria-label"), "default can run: nothing to handle.");
+  assert.equal(lead.textContent, "default can run: nothing to handle.", "the pill takes the name's place");
+  // opened here while r11 is current: amber, and its tooltip names r11
+  S.shell = { plans: [{ ...r11, current: true }, { ...def, open: true }], plan: { ...def, open: true }, current: { ...r11, current: true } };
+  await screens.needs(true);
+  assert.equal(chip().textContent, "default");
+  assert.ok(chip().classList.contains("other"));
+  assert.equal(chip().title, "the game is launched with r11; this list is only open here");
+  // something to handle: the run summary's list is the same pill
+  items = [{ id: "x", section: 0, status: "error", title: "a missing Mod", counted: true, actions: [] }];
+  await screens.needs(true);
+  assert.ok(screen.querySelector(".lead.run-sum"));
+  assert.equal(chip().textContent, "default");
+  assert.ok(chip().classList.contains("other"));
+});
