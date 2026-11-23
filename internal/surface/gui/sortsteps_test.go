@@ -167,3 +167,31 @@ func TestSortStepsNothingToDo(t *testing.T) {
 		t.Fatalf("%+v %v", s, err)
 	}
 }
+
+// Each installed name carries its instance for its details link, and a list entry that is not
+// installed can be removed from the list from its row (16 §6.1; the delisted case is
+// TestReadSortFixesDelisted in view).
+func TestSortStepsLinksAndRemove(t *testing.T) {
+	e, api := sortStepsFixture(t)
+	if o, err := api.Run("sort"); err != nil || len(o.Refused) > 0 {
+		t.Fatal(o, err)
+	}
+	s, err := api.SortSteps(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, st := range s.Steps {
+		for _, it := range st.Items {
+			if st.Kind != view.StepSubscribe && it.ID == "" || it.Old != "" && it.OldID == "" {
+				t.Fatalf("%s: a name without its instance: %+v", st.Kind, it)
+			}
+		}
+	}
+	if len(s.Unfixable) != 1 || s.Unfixable[0].Remove == "" {
+		t.Fatalf("local-only entry: %+v", s.Unfixable)
+	}
+	e.MustRun("disable", s.Unfixable[0].Remove)
+	if s, err = api.SortSteps(nil); err != nil || len(s.Unfixable) != 0 {
+		t.Fatalf("removed entry still listed: %+v %v", s, err)
+	}
+}

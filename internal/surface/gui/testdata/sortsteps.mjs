@@ -27,7 +27,7 @@ function plan(kinds = ["use-installed", "replace", "enable", "subscribe"], unfix
   return { api, calls, applied };
 }
 
-async function setup(p) {
+async function setup(p, shown = []) {
   const S = { popup: null }, said = [];
   const popup = new Element("div");
   class Node extends Element { click() { if (!this.disabled) this.onclick?.(event("")); } }
@@ -41,7 +41,7 @@ async function setup(p) {
     },
     "./credit.js": { getChoices: () => ["from Steam", "from SteamCMD"] },
   });
-  mod.initSortSteps({ edited: async (call) => { try { return await call(); } catch { return null; } } });
+  mod.initSortSteps({ edited: async (call) => { try { return await call(); } catch { return null; } }, showMod: (id, name) => shown.push([id, name]) });
   return { mod, S, popup, said };
 }
 
@@ -156,4 +156,46 @@ test("stripOf orders chips by step and marks only the latest undoable one", () =
       ["sort", "done", 0, false], ["replace", "skipped", 1, false], ["enable", "done", 2, true], ["subscribe", "now", 2, false]]));
     assert.equal(JSON.stringify(mod.pastOf(flow)), JSON.stringify(["enable", "replace"]));
   });
+});
+
+test("Mod names link to their details or Workshop page; a missing entry can be removed", async () => {
+  const p = plan(["replace", "subscribe"], [{ change: "none", name: "Local Only", why: "in the list, no known source", remove: "pkg:local.only" }]);
+  const sw = p.api.SortSteps;
+  let removed = false;
+  p.api.SortSteps = async (past) => {
+    const r = await sw(past);
+    for (const s of r.steps) for (const it of s.items) {
+      if (it.change === "replace") Object.assign(it, { id: "new1", oldId: "old1" });
+      if (it.change === "get") it.remove = "pkg:fork";
+    }
+    if (removed) r.unfixable = [];
+    return r;
+  };
+  p.api.OpenURL = async (u) => { p.calls.push(["OpenURL", u]); };
+  p.api.DoAction = async (act, i) => { p.calls.push(["DoAction", act.kind, act.refs, i]); removed = true; return "removed"; };
+  const shown = [];
+  const h = await setup(p, shown);
+  await h.mod.offerAfterSort({ text: "sorted", undo: true });
+  await settle();
+  // replace: the old Mod and its replacement each open their details
+  const links = h.popup.querySelectorAll(".ss-card .ss-link");
+  assert.deepEqual(links.map((l) => l.textContent), ["Old", "New"]);
+  links.forEach((l) => l.click());
+  assert.deepEqual(shown, [["old1", "Old"], ["new1", "New"]]);
+  // the local-only entry is not offered a download; it can be removed from the list
+  const rm = h.popup.querySelector(".ss-unfix .ss-remove");
+  assert.ok(rm, "the local-only entry has a remove button");
+  rm.click();
+  await settle();
+  assert.equal(JSON.stringify(p.calls.find((c) => c[0] === "DoAction")), JSON.stringify(["DoAction", "disable", ["pkg:local.only"], 0]));
+  assert.equal(h.popup.querySelector(".ss-unfix"), null, "the steps are read again after the removal");
+  // the Workshop step: its Mod opens its Workshop page, and it can be removed instead
+  button(h, ".ss-skip").click();
+  await settle();
+  const ws = h.popup.querySelector(".ss-card .ss-link");
+  assert.equal(ws.textContent, "Fork");
+  ws.click();
+  await settle();
+  assert.equal(JSON.stringify(p.calls.find((c) => c[0] === "OpenURL")), JSON.stringify(["OpenURL", "https://steamcommunity.com/sharedfiles/filedetails/?id=7002"]));
+  assert.ok(h.popup.querySelector(".ss-card .ss-remove"), "a Mod to get can be removed from the list instead");
 });

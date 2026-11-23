@@ -102,9 +102,9 @@ function draw(flow, node) {
   const body = el("div", "body");
   const step = data.current >= 0 ? data.steps[data.current] : null;
   // when every step is done the strip says so; the body keeps only what is left to know
-  if (step) body.append(card(step));
+  if (step) body.append(card(step, flow, node));
   if (flow.error) body.append(el("div", "ss-err", flow.error));
-  if ((data.unfixable || []).length) body.append(unfixable(data.unfixable));
+  if ((data.unfixable || []).length) body.append(unfixable(data.unfixable, flow, node));
   if (body.children.length) node.append(body);
   node.append(buttons(flow, node, step));
   node.setAttribute("aria-busy", flow.busy ? "true" : "false");
@@ -146,12 +146,12 @@ function strip(flow, node) {
 
 // card: the current step's Mods. Its name, icon and count are on its chip; the sentence
 // saying what it does is the card's accessible name and the chip's hover.
-function card(step) {
+function card(step, flow, node) {
   const box = el("div", "ss-card");
   box.dataset.kind = step.kind;
   box.setAttribute("aria-label", KINDS[step.kind].say());
   const list = el("ol", "ss-rows");
-  for (const it of step.items) list.append(row(it));
+  for (const it of step.items) list.append(row(it, flow, node));
   box.append(list);
   // the one thing the rows do not show: Mods outside the step that change place
   if (step.moved) box.append(el("div", "ss-note", Tf("%d other mods change place", step.moved)));
@@ -159,30 +159,68 @@ function card(step) {
   return box;
 }
 
+const workshopPage = (id) => "https://steamcommunity.com/sharedfiles/filedetails/?id=" + id;
+
+// modName: a Mod's name as a link: an installed one opens its details beside the dialog, one
+// that is only on the Workshop opens its page there; a name with neither is plain.
+function modName(cls, name, id, workshopId) {
+  if (!id && !workshopId) return el(cls === "ss-old" ? "s" : "span", cls, name);
+  const a = el("button", cls + " ss-link", name);
+  a.title = id ? Tf("%s: show its details", name) : Tf("%s: open its Workshop page", name);
+  a.onclick = (e) => {
+    e.stopPropagation();
+    if (id) ui.showMod?.(id, name);
+    else api.OpenURL(workshopPage(workshopId)).catch((x) => say("fail", errText(x)));
+  };
+  return a;
+}
+
 // row: one Mod: its name (a replaced one struck through, then its replacement), where it
-// lands, and, muted, why: the Mods that require it, or why it cannot be fixed.
-function row(it) {
+// lands, and, muted, why: the Mods that require it, or why it cannot be fixed. A list entry
+// that is not installed can be removed from the list right here.
+function row(it, flow, node) {
   const r = el("li", "ss-row " + it.change);
   const names = el("span", "ss-names");
-  if (it.old) { names.append(el("s", "ss-old", it.old), el("span", "ss-arrow", "→")); }
-  names.append(el("span", "ss-mod", it.name));
+  if (it.old) { names.append(modName("ss-old", it.old, it.oldId, ""), el("span", "ss-arrow", "→")); }
+  names.append(modName("ss-mod", it.name, it.id, it.change === "get" ? it.workshopId : ""));
   r.append(names);
   if (it.at) { const at = el("span", "ss-at", "#" + it.at); at.title = Tf("position %d in the list", it.at); r.append(at); }
   if (it.for?.length) { const f = el("span", "ss-for", Tf("for %s", it.for.join(T(", ")))); f.title = Tf("required by %s", it.for.join(T(", "))); r.append(f); }
   if (it.why) r.append(el("span", "ss-for", it.why));
+  if (it.remove && flow) {
+    const x = el("button", "ss-remove");
+    x.append(mark("bin"));
+    x.title = Tf("remove %s from the list", it.name);
+    x.setAttribute("aria-label", x.title);
+    x.onclick = (e) => { e.stopPropagation(); removeEntry(flow, node, it); };
+    r.append(x);
+  }
   const words = [it.old ? Tf("%s replaces %s", it.name, it.old) : it.name, it.at ? Tf("position %d", it.at) : "", it.for?.length ? Tf("required by %s", it.for.join(T(", "))) : "", it.why || ""].filter(Boolean).join(", ");
   r.setAttribute("aria-label", words);
   return r;
 }
 
+// removeEntry takes a list entry that is not installed out of the list (an undoable edit,
+// as Can it run's "remove it from the list"), then reads the steps again.
+async function removeEntry(flow, node, it) {
+  if (flow.busy) return;
+  flow.busy = true; flow.error = "";
+  draw(flow, node);
+  const act = { kind: "disable", refs: [it.remove], label: T("remove it from the list"), done: Tf("disabled %s", it.name) };
+  const r = await ui.edited(() => api.DoAction(act, 0), true);
+  flow.busy = false;
+  if (!r) flow.error = T("this step did not apply; the list is unchanged");
+  await refresh(flow, node);
+}
+
 // unfixable: what no step fixes here, folded under a count.
-function unfixable(items) {
+function unfixable(items, flow, node) {
   const box = el("details", "ss-unfix");
   const sum = el("summary", "");
   sum.append(el("span", "", Tf("%d cannot be fixed here", items.length)));
   box.append(sum);
   const list = el("ol", "ss-rows");
-  for (const it of items) list.append(row(it));
+  for (const it of items) list.append(row(it, flow, node));
   box.append(list);
   return box;
 }

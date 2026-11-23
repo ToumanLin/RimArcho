@@ -2527,6 +2527,14 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .ss-mod { overflow: hidden; text-overflow: ellipsis; color: var(--fg); }
 .ss-old { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
 .ss-arrow { color: var(--muted); }
+/* a Mod's name is a link (its details, or its Workshop page): plain text until hovered */
+.ss-link { min-width: 0; padding: 0; border: 0; background: none; font: inherit; text-align: left; white-space: nowrap; cursor: pointer; }
+.ss-link:hover { text-decoration: underline; }
+.ss-link.ss-old { text-decoration: line-through; }
+.ss-link.ss-old:hover { text-decoration: line-through underline; }
+/* remove a list entry that is not installed: a quiet bin at the row's end */
+.ss-remove { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: var(--r-sm); background: none; color: var(--muted); cursor: pointer; }
+.ss-remove:hover { color: var(--red); background: var(--red-soft); }
 .ss-at { flex: none; font: 12px var(--code); color: var(--accent); }
 .ss-for { flex: 0 1 auto; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted); }
 .ss-err { margin-top: 8px; font-size: 12px; color: var(--red); }

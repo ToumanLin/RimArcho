@@ -1407,6 +1407,7 @@ const ui = {
   importFirstList: () => exchange(true), // the first-run guide's hand-over (16 §2.15)
   manageLists: (id = 0) => { planManage.select(id); return go("plans"); },
   edited: (call, undoable = true) => edited(call, undoable),
+  showMod: (id, name) => showDetail({ id, name }), // the sort steps' Mod names (16 §6.1)
   ruleTarget: () => actionContext().sel[0],
   afterImport: null, // the first-run guide's next step once an import is applied
 };
