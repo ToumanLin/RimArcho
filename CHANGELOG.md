@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Saves › all saves: in a narrow window the button under "can it load?" ("make a list from this save to analyse its assemblies") ran out of the middle card and was cut off. It now wraps inside the card.
 - List editor: the head is shorter. The line on the left says "603 enabled" (hover for the rest). Rescan, rename, import/export and delete are icons side by side (hover or a screen reader gives the word), the unsaved count is a badge on save instead of its own "32 unsaved" beside it, and the order is problems, the tools, save, launch.
 - List editor, the steps after a sort: each Mod's name is a link (an installed Mod opens its details beside the dialog, a Mod to download opens its Workshop page). A list entry that is not installed can be removed from the list on its row (a bin at the row's end; undo takes it back), instead of only being downloaded. A Mod that Steam's last check found removed from the Workshop (delisted, deleted or made private) is no longer offered for download: it is under "cannot be fixed here" with that reason, like a local Mod nobody can download, and can be removed from the list there.
 - Feedback: the "attached" chip of the game log was cut off in Chinese (`游戏日志里的错误（11月22日 23:40 的 Player.log）`). Chips now show the attachment's short name ("game log", "paths", "recent operations"); hovering shows the full heading with the file and time, then the lines. A long chip (a Mod's name) ends in "…" instead of being cut.
