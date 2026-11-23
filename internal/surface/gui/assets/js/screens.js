@@ -2281,7 +2281,9 @@ export async function environment() {
     const row = el("div", "envrow" + (e.current ? " on" : ""));
     row.id = "environment-row-" + encodeURIComponent(e.name);
     const l = el("div", "l");
-    l.append(el("div", "name", e.name), factText(el("div", "sub"), { text: e.game, paths: [e.path] }));
+    const name = el("div", "name", e.name);
+    if (e.build) name.append(el("span", "chip", e.build)); // Proton (16 §2.8)
+    l.append(name, factText(el("div", "sub"), { text: e.game, paths: [e.path] }));
     row.append(l);
     if (e.current) {
       const current = el("button", "chip cur", T("in use"));

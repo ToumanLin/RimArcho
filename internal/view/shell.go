@@ -557,6 +557,7 @@ type GameFound struct {
 	Game     string `json:"game"` // the game folder
 	Version  string `json:"version"`
 	Launch   string `json:"launch"`
+	Source   string `json:"source"` // the card's chip: "Steam", "Proton" (ProtonBadge), "started directly"
 	Workshop string `json:"workshop,omitempty"`
 	UserData string `json:"userData,omitempty"`
 	// Env is the environment that already uses this folder ("" when none).
@@ -631,6 +632,7 @@ func FindGames(a *app.App) []GameFound {
 		}
 		seen[k] = true
 		g.Env, g.Known, g.Current = used[k], known[k], k == cur
+		g.Source = gameSource(g)
 		if g.UserData != "" {
 			if mc, err := env.ReadModsConfig(env.ModsConfigPath(g.UserData)); err == nil {
 				g.GameMods = len(mc.ActiveMods)
@@ -683,8 +685,21 @@ func GameAt(a *app.App, path string, pending ...string) (*GameFound, error) {
 	if ws := env.WorkshopRootFor(path); ws != "" && dirExists(ws) {
 		g.Workshop, g.Launch = ws, "steam"
 	}
+	g.Source = gameSource(*g)
 	g.Name = freeName(env.MajorMinor(g.Version), taken)
 	return g, nil
+}
+
+// gameSource is the guide card's chip for how the game is started: Proton over Steam, since
+// a Proton game always starts through Steam (09 §2).
+func gameSource(g GameFound) string {
+	if b := ProtonBadge(g.Game); b != "" {
+		return b
+	}
+	if g.Launch == "steam" {
+		return "Steam"
+	}
+	return T("started directly")
 }
 
 // freeName is base (the game's version, "1.6"), or base-2, base-3… when it is taken.

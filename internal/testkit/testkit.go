@@ -475,3 +475,26 @@ func (e *Env) OtherGame(name, version string) string {
 	e.CopyTemplate("core", filepath.Join(g, "Data", "Core"))
 	return g
 }
+
+// ProtonLibrary adds a second Steam library <Root>/<name> holding a Windows game with a
+// Proton prefix (03 §3.2), listed in the fixture Steam's libraryfolders.vdf, and makes the
+// fixture's own game native Linux (RimWorldLinux). It returns the Proton game folder and
+// its user data inside the prefix. Launch and saves rules treat it as Proton only with
+// App.Detect.GOOS "linux"; the layout itself is the same on every OS.
+func (e *Env) ProtonLibrary(name string) (game, userData string) {
+	e.T.Helper()
+	e.WriteFile(filepath.Join(e.Game, "RimWorldLinux"), "")
+	lib := filepath.Join(e.Root, name)
+	game = filepath.Join(lib, "steamapps", "common", "RimWorld")
+	e.WriteFile(filepath.Join(game, "RimWorldWin64.exe"), "")
+	e.WriteFile(filepath.Join(game, "Version.txt"), "1.6.4633 rev1261\n")
+	e.MkdirAll(filepath.Join(game, "Mods"))
+	e.CopyTemplate("core", filepath.Join(game, "Data", "Core"))
+	userData = filepath.Join(lib, "steamapps", "compatdata", env.WorkshopAppID, "pfx", "drive_c", "users", "steamuser",
+		"AppData", "LocalLow", "Ludeon Studios", "RimWorld by Ludeon Studios")
+	e.MkdirAll(filepath.Join(userData, "Config"))
+	e.WriteFile(filepath.Join(e.Steam, "steamapps", "libraryfolders.vdf"), fmt.Sprintf(
+		"\"libraryfolders\"\n{\n\t\"0\"\n\t{\n\t\t\"path\"\t\t%q\n\t}\n\t\"1\"\n\t{\n\t\t\"path\"\t\t%q\n\t}\n}\n",
+		e.Steam, lib))
+	return game, userData
+}
