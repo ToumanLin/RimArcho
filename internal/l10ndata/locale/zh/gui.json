@@ -504,5 +504,6 @@
   "incompatible with %s": "与 %s 不兼容",
   "attached to %s": "跟随 %s",
   "loads at the top": "排在最前",
-  "loads at the bottom": "排在最后"
+  "loads at the bottom": "排在最后",
+  "RimArcho's window needs WebKitGTK %s or newer, and this system has %s.\n\nUpdate the system's WebKitGTK (the libwebkit2gtk-4.1-0 package on Ubuntu and Debian), or use archo in a terminal: the same manager as a text interface, which needs no WebKitGTK.": "RimArcho 的窗口需要 WebKitGTK %s 或更新版本，而这台系统是 %s。\n\n请更新系统的 WebKitGTK（Ubuntu 和 Debian 上是 libwebkit2gtk-4.1-0 软件包），或在终端里使用 archo：同一个管理器的文字界面，不需要 WebKitGTK。"
 }

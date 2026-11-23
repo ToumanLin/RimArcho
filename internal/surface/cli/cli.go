@@ -253,6 +253,10 @@ func windowFailureText(err error) string {
 	if errors.As(err, &u) {
 		return u.text
 	}
+	var g interface{ Unavailable() bool } // the window package's own refusal (an old WebKitGTK)
+	if errors.As(err, &g) && g.Unavailable() {
+		return err.Error()
+	}
 	return view.Tf("RimArcho could not open its window:\n%s", err.Error())
 }
 

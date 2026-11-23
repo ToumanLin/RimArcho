@@ -20,6 +20,8 @@ var childWindowAllowed = map[string]string{
 	"internal/surface/gui/selfupdate.go (*API).restartUpdated": "restarts the updated RimArcho.exe, a GUI program (17 §5.1 step 7)",
 	"internal/surface/cli/cli.go restartTUI":                   "runs the updated archo.exe TUI in this same terminal (17 §5.1 step 7)",
 	"internal/surface/cli/gui_handover.go handOver":            "`archo gui` starts the sibling RimArcho.exe or rimarcho, a GUI program",
+	"internal/surface/upgradewin/upgradewin_linux.go Open":     "zenity's progress dialog, a GUI program (16 §8.1)",
+	"internal/surface/upgradewin/error_linux.go ShowError":     "zenity, kdialog or notify-send show the startup error, GUI programs (16 §8.1)",
 	"internal/surface/gui/gui.go var openURL":                  "hands a link to the system browser (rundll32 / open / xdg-open, GUI programs)",
 	"internal/surface/gui/library.go var openDir":              "opens a folder in explorer / open / xdg-open (GUI programs)",
 	"internal/surface/tui/detail.go var openURL":               "hands a link to the system browser (rundll32 / open / xdg-open, GUI programs)",

@@ -173,7 +173,7 @@ Schema 35 adds unresolved Def classification inputs and per-set content readines
 | `logs/` | `gui.log`, `pack-build.log` (`wezterm-start.log` may remain from development builds before 1.0) |
 | `backups/` | Database backups `archo-YYYYMMDD-HHMMSS.db` (local time); save backups `saves/YYYYMMDD-HHMMSS/` (12 §4.4, same time format) |
 | `packs/` | Only in homes from before 1.1 that already had it: packs (10), kept here as their `pack.dir` (schema 42; new homes use `<local>/packs`) |
-| `webview2/` | WebView2 user data (not in `%APPDATA%\RimArcho.exe`) |
+| `webview2/` | WebView2 user data (not in `%APPDATA%\RimArcho.exe`). On Linux WebKitGTK writes `localstorage/`, `storage/`, `mediakeys/` and `hsts-storage.sqlite` into `$XDG_DATA_HOME/rimarcho/` itself, so into the default data directory, and its cache into `$XDG_CACHE_HOME/rimarcho/` (16 §8.2) |
 | `refnums/` | `<prefix>.txt` per page, written while GUI reference numbers are on (16 §3.5); only for looking numbers up, never read back |
 | `wezterm/`, `wezterm.lua` | A portable WezTerm and its configuration, left by development builds before 1.0; RimArcho neither uses, writes nor deletes them (16 §9.2) |
 | `rimcrow-*` | Temporary RimCrow database copies during `import rimcrow`; deleted afterward |

@@ -277,6 +277,12 @@ function wireDrop() {
     const dir = !!item?.webkitGetAsEntry?.()?.isDirectory;
     await dropped({ name: f.name, file: f, dir, more: (e.dataTransfer.files?.length || 1) - 1 });
   });
+  // Linux: Wails' GTK drop target reports a drop on an element marked data-file-drop-target,
+  // and marks it file-drop-target-active while files are dragged over it (16 §2.18).
+  const root = document.documentElement;
+  root.setAttribute("data-file-drop-target", "");
+  new MutationObserver(() => showDropOver(root.classList.contains("file-drop-target-active")))
+    .observe(root, { attributes: true, attributeFilter: ["class"] });
   try {
     on("file-drag", (v) => showDropOver(!!v));
     on("files-dropped", (d) => {

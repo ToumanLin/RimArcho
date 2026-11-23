@@ -59,7 +59,7 @@ func Run(o Options) error {
 	ico := windowIcon()
 	iconDone()
 	debug.FreeOSMemory() // the drawing's buffers
-	w := application.New(application.Options{
+	opts := application.Options{
 		Name:       "RimArcho",
 		Icon:       ico, // used when the exe has no icon resource (development builds, 16 §8.6)
 		Services:   []application.Service{application.NewService(api)},
@@ -71,14 +71,16 @@ func Run(o Options) error {
 			AdditionalBrowserArgs: BrowserArgs(cmds.Setting(a, "ui.gpu") != "off"),
 			WndProcInterceptor:    api.uninstallSessionEnd,
 		},
-	})
+	}
+	platformApp(a, &opts)
+	w := application.New(opts)
 	api.setEmit(func(name string, data any) { w.Event.Emit(name, data) })
 	api.x.native = wailsNative{w}
 	api.quit = w.Quit
 	frame := newWindowTheme(cmds.Setting(a, "ui.theme"))
 	// Composition hosting lets Windows hit-test our maximize button for Snap Layouts.
 	frame.options.WebView2CompositionHosting = true
-	win := w.Window.NewWithOptions(application.WebviewWindowOptions{
+	winOpts := application.WebviewWindowOptions{
 		Title: "RimArcho", Width: 1440, Height: 880, MinWidth: 720, MinHeight: 480, URL: perfURL(),
 		Frameless:        runtime.GOOS == "windows",
 		Zoom:             ZoomFactor(a), // settings › interface size (16 §2.14)
@@ -87,7 +89,12 @@ func Run(o Options) error {
 		// The page draws its own menus. Without the `production` build tag Wails ignores this,
 		// so nativemenu.js cancels the browser menu too (16 §8.5).
 		DefaultContextMenuDisabled: true,
-	})
+	}
+	platformWindow(a, &winOpts)
+	win := w.Window.NewWithOptions(winOpts)
+	if err := platformStart(w, win); err != nil {
+		return err
+	}
 	win.RegisterHook(events.Common.WindowClosing, api.guardWindowClose)
 	wireNativeDrop(win, api) // files and links dropped on the window (16 §2.18)
 	api.uninstall.shutdownBlock = uninstallShutdownBlock(win)
