@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Fixed: with RimWorld 1.6 and 1.7 installed side by side, after a 1.7 game run the 1.6 Game Config's Can it run, `archo log` and `archo problems` read the 1.7 run's log as its own ("analysed: as 1.7 (log version)"). A 1.7 log that a 1.7 Game Config's launch wrote now belongs to that Game Config only.
 - Fixed: `archo env list` showed no `player-log` for a RimWorld 1.7 Game Config with its own saves, although `archo log` read that Game Config's log. 1.7 always writes its log to the game's default folder; `env list` now shows that file when the last 1.7 launch was this Game Config's.
 - Fixed: in RimWorld 1.7, warnings logged from the game loop, such as `[Steamworks.NET] SteamAPI.Init() failed` when the game starts without Steam, were counted as exceptions (an error on Can it run and in `archo log`). Their stacks have frames that name a source file (`… [0x6] in …\PlatformBase.Loop.cs:143`), which were taken for an exception's own stack.
 - Fixed: `archo workshop subscribe` (MCP `manage_library` subscribe) refused a Workshop Mod you had unsubscribed from once Steam had deleted its folder, saying it was "subscribed already". It now subscribes to it again.

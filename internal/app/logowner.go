@@ -1,12 +1,14 @@
 package app
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
 )
@@ -80,6 +82,9 @@ func (a *App) logOwner(st *LoadoutState, path string) (own bool, err error) {
 		}
 	}
 	if fi, err := os.Stat(path); err == nil {
+		if o := a.waylithLogOwner(st.Ix.Env, path, fi.ModTime()); o != nil {
+			return false, fmt.Errorf("log belongs to Game Config %s", o.Name)
+		}
 		src := a.logSource(st, path, fi.ModTime())
 		if src.EnvID != "" && src.EnvID != st.Ix.Env.ID {
 			if es, err := a.Store.Envs(); err == nil {
@@ -94,6 +99,57 @@ func (a *App) logOwner(st *LoadoutState, path string) (own bool, err error) {
 		return src.EnvID == st.Ix.Env.ID, nil
 	}
 	return false, nil
+}
+
+// waylithLogOwner is the 1.7+ Game Config whose launch wrote a Waylith-format log that
+// a pre-1.7 Game Config would otherwise read: both installs share the default folder, and
+// 1.6 never writes that format (VM round 2026-11-22). The owner is the Game Config of the
+// newest Waylith launch before the file was written, as for own-folder 1.7 logs (03 §6.3);
+// nil when e is itself 1.7+, the log is not Waylith's, or no Waylith launch precedes it.
+func (a *App) waylithLogOwner(e *env.Environment, path string, mod time.Time) *env.Environment {
+	if isWaylith(e) || !waylithLogFile(path) {
+		return nil
+	}
+	envs, err := a.Store.Envs()
+	if err != nil {
+		return nil
+	}
+	var ids []string
+	for _, o := range envs {
+		if isWaylith(o) {
+			ids = append(ids, o.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	r, err := a.Store.LaunchRecordBefore(ids, mod)
+	if err != nil || r == nil || r.EnvID == e.ID {
+		return nil
+	}
+	for _, o := range envs {
+		if o.ID == r.EnvID {
+			return o
+		}
+	}
+	return nil
+}
+
+// waylithLogFile says whether path starts with the 1.7 log header (06 §1: within the
+// first 50 lines).
+func waylithLogFile(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	sc := bufio.NewScanner(io.LimitReader(f, 64<<10))
+	for i := 0; i < 50 && sc.Scan(); i++ {
+		if strings.HasPrefix(sc.Text(), "=== Waylith log ===") {
+			return true
+		}
+	}
+	return false
 }
 
 // envWithGame is the registered environment whose game folder is root (nil: none).
