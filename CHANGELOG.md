@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- **Linux (experimental):** the first-run guide's "download a version" suggested the game folder `~/Games\RimWorld 1.6`, with a backslash; it is now `~/Games/RimWorld 1.6`. (Linux-Test VM, 2026-11-23.)
 - **Linux (experimental):** dragging a Mod in the list editor no longer selects the text of the rows it passes over (WebKitGTK ignored the rule that keeps rows unselectable).
 - After removing RimArcho's own SteamCMD (`archo deps remove steamcmd`, Settings › external tools), the terminal and `archo folder check` no longer ask where the SteamCMD folder moved; it is shown as unused until SteamCMD is installed again.
 - **Linux (experimental): SteamCMD downloads finish.** Downloading a Workshop Mod or a game version with SteamCMD always ended "download was not confirmed", even when SteamCMD had downloaded it: RimArcho reads SteamCMD's console log, which SteamCMD writes on Windows but not on Linux. RimArcho now writes that log itself, so `archo subscribe workshop … --steamcmd`, the SteamCMD fallback and `archo env download` see the result. (Linux-Test VM, anonymous download, 2026-11-23.)
