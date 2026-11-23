@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"fmt"
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"os"
 	"path/filepath"
 	"strings"
@@ -58,7 +59,7 @@ func TestForeignLogExcludedBeforeAnalysis(t *testing.T) {
 		t.Fatal(err)
 	}
 	runs := 0
-	e.App.AnalyzeRunner = func(string, func(string)) error { runs++; return fmt.Errorf("unexpected analysis") }
+	e.App.AnalyzeRunner = func(*app.App, func(string)) error { runs++; return fmt.Errorf("unexpected analysis") }
 	seen := e.App.Store.Meta("log.seen:" + st.Ix.Env.ID)
 	if err := e.App.SelectLog(st, cur); err == nil || e.App.Store.Meta("log.seen:"+st.Ix.Env.ID) != seen {
 		t.Fatal("foreign log was selected or marked seen")
@@ -166,7 +167,7 @@ func TestLogOwnerEvidence(t *testing.T) {
 		t.Fatalf("unknown owner mistaken for foreign: %v", err)
 	}
 	calls := 0
-	e.App.AnalyzeRunner = func(string, func(string)) error { calls++; return fmt.Errorf("unexpected analysis") }
+	e.App.AnalyzeRunner = func(*app.App, func(string)) error { calls++; return fmt.Errorf("unexpected analysis") }
 	if err := e.App.EnsureLogFileAnalysis(st, p, nil); err != nil || calls != 0 {
 		t.Fatalf("unknown owner triggered version analysis: %d, %v", calls, err)
 	}
@@ -212,7 +213,7 @@ func TestOwnLogBeforeGameUpgrade(t *testing.T) {
 	e.MustRun("scan")
 	runs := []string{}
 	inner := e.App.AnalyzeRunner
-	e.App.AnalyzeRunner = func(name string, progress func(string)) error {
+	e.App.AnalyzeRunner = func(name *app.App, progress func(string)) error {
 		runs = append(runs, e.App.GameVersion)
 		return inner(name, progress)
 	}
@@ -263,7 +264,7 @@ func TestUnknownGameLogAttributedHere(t *testing.T) {
 	// Unknown game folder: analysed and attributed against env:main, and said so.
 	runs := 0
 	inner := e.App.AnalyzeRunner
-	e.App.AnalyzeRunner = func(name string, progress func(string)) error { runs++; return inner(name, progress) }
+	e.App.AnalyzeRunner = func(name *app.App, progress func(string)) error { runs++; return inner(name, progress) }
 	out := e.MustRun("log")
 	want := "game: log game path " + elsewhere + " is not this Game Config's game; attributed against env:main"
 	if runs != 1 || !strings.Contains(out, want) || strings.Contains(out, "not analysed yet") {

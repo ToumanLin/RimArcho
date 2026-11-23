@@ -309,7 +309,7 @@ func TestAnalysisPerGameVersion(t *testing.T) {
 	os.WriteFile(filepath.Join(e.UserData, "Player.log"), []byte(strings.Replace(log, "RimWorld 1.6.4633 rev1261", "RimWorld 1.5.4409 rev1118", 1)), 0o644)
 	runs := 0
 	inner := e.App.AnalyzeRunner
-	e.App.AnalyzeRunner = func(env string, p func(string)) error { runs++; return inner(env, p) }
+	e.App.AnalyzeRunner = func(env *app.App, p func(string)) error { runs++; return inner(env, p) }
 	e.MustRun("problems")
 	if runs != 2 {
 		t.Fatalf("first problems: %d analysis runs, want 2 (1.6 and the log's 1.5)", runs)

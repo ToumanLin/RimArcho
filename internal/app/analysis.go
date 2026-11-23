@@ -254,19 +254,28 @@ func ChildAnalyzeExe(exe, home, envName, plan, mm string, progress func(string))
 	return nil
 }
 
-// InProcessAnalyze runs the analysis in this process (tests), on a session of its own like
-// the `archo analyze` child: never on a itself, which the caller's page or request uses at
-// the same time.
-func InProcessAnalyze(a *App) func(string, func(string)) error {
-	return func(_ string, progress func(string)) error {
-		r, err := a.ReadSession()
-		if err != nil {
-			return err
-		}
-		defer r.Close()
-		_, err = r.Analyze(progress)
+// InProcessAnalyze is an App.AnalyzeRunner that runs the analysis in this process (tests),
+// on a session of its own like the `archo analyze` child: never on from itself, which the
+// caller's page or request may use at the same time.
+func InProcessAnalyze(from *App, progress func(string)) error {
+	r, err := from.ReadSession()
+	if err != nil {
 		return err
 	}
+	defer r.Close()
+	_, err = r.Analyze(progress)
+	return err
+}
+
+// AnalyzeFrom is a copy of a's options for an AnalyzeRunner on another goroutine, with
+// envName pinned: the runner reads it there while a goes on changing (another list opened,
+// another Game Config), as the child's arguments are fixed when it starts.
+func (a *App) AnalyzeFrom(envName string) *App {
+	b := &App{Store: a.Store}
+	b.ReadOptions(a)
+	b.OpenPlan, b.PlanName = 0, a.OpenPlanName()
+	b.EnvName = envName
+	return b
 }
 
 // ErrStillComputing: the analysis did not finish within App.AnalyzeWait; it goes on in
@@ -291,18 +300,18 @@ func (a *App) EnsureAnalysis(progress func(string)) (*AnalysisState, error) {
 	}
 	run := a.AnalyzeRunner
 	if run == nil {
-		// the version and the executable are read now: with AnalyzeWait the child starts
-		// in a goroutine, after EnsureLogAnalysis may have put GameVersion back
-		mm, exe, plan := a.GameVersion, a.AnalyzeExe, a.OpenPlanName()
-		run = func(envName string, p func(string)) error {
-			if exe != "" {
-				return ChildAnalyzeExe(exe, a.Home, envName, plan, mm, p)
+		run = func(from *App, p func(string)) error {
+			if from.AnalyzeExe != "" {
+				return ChildAnalyzeExe(from.AnalyzeExe, from.Home, from.EnvName, from.PlanName, from.GameVersion, p)
 			}
-			return ChildAnalyze(a.Home, envName, plan, mm, p)
+			return ChildAnalyze(from.Home, from.EnvName, from.PlanName, from.GameVersion, p)
 		}
 	}
+	// the options are read now: with AnalyzeWait the runner goes on in a goroutine, after
+	// EnsureLogAnalysis may have put GameVersion back
+	from := a.AnalyzeFrom(st.Ix.Env.Name)
 	if a.AnalyzeWait <= 0 {
-		if err := run(st.Ix.Env.Name, progress); err != nil {
+		if err := run(from, progress); err != nil {
 			return s, err
 		}
 	} else {
@@ -310,8 +319,7 @@ func (a *App) EnsureAnalysis(progress func(string)) (*AnalysisState, error) {
 		if a.analyzing == nil || a.analyzing.key != key {
 			p := &pendingAnalysis{key: key, done: make(chan error, 1)}
 			a.analyzing = p
-			name := st.Ix.Env.Name
-			go func() { p.done <- run(name, nil) }()
+			go func() { p.done <- run(from, nil) }()
 		}
 		select {
 		case err := <-a.analyzing.done:

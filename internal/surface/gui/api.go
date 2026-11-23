@@ -1862,6 +1862,11 @@ func (s *API) startAnalyzeOf(list string) bool {
 	if list != "" {
 		plan, obj = list, list
 	}
+	var from *app.App
+	if run != nil { // read here, under s.mu: the page goes on changing s.a meanwhile
+		from = s.a.AnalyzeFrom(env)
+		from.PlanName = plan
+	}
 	task := s.tasks.BeginOnce(view.TaskAnalyze, obj, nil) // one row, updated in place (16 §8.9)
 	// the open list's findings will change: its problems button says so while this runs
 	if c, _ := s.cachedNeedsLocked(); c != nil && c.scope == scope {
@@ -1881,7 +1886,7 @@ func (s *API) startAnalyzeOf(list string) bool {
 		var err error
 		switch {
 		case run != nil:
-			err = run(env, progress)
+			err = run(from, progress)
 		case exe != "":
 			err = app.ChildAnalyzeExe(exe, home, env, plan, mm, progress)
 		default:

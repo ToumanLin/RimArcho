@@ -53,12 +53,19 @@ func start(t *testing.T, e *testkit.Env, scans *atomic.Int32, w, h int) *teatest
 	// wait for them before the temp dir is removed (cleanups run last-registered first).
 	var running sync.WaitGroup
 	t.Cleanup(running.Wait)
-	opts := Options{App: e.App, Scan: func(string) (string, error) {
+	opts := Options{App: e.App, Scan: func(env string) (string, error) {
 		running.Add(1)
 		defer running.Done()
 		scans.Add(1)
-		// Stand-in for the child process: the same command, run by the test.
-		out, _ := cmds.Execute(e.App, []string{"scan"})
+		// Stand-in for the child process: the same command on an App of its own, as the
+		// child has; the TUI goes on using e.App meanwhile.
+		a2, err := e.ChildApp()
+		if err != nil {
+			return "", err
+		}
+		defer a2.Close()
+		a2.EnvName = env // the child's --env, which main turns into EnvName
+		out, _ := cmds.Execute(a2, []string{"scan"})
 		return out, nil
 	}, Analyze: func(env string, progress func(string)) error {
 		running.Add(1)

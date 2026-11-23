@@ -3,6 +3,7 @@
 package gui
 
 import (
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -41,7 +42,7 @@ func TestAutoAnalysisKeepsFindingsCurrent(t *testing.T) {
 	// hold: a check that has read its list waits (ran says so) until release closes
 	type held struct{ ran, release chan struct{} }
 	var hold atomic.Pointer[held]
-	e.App.AnalyzeRunner = func(env string, p func(string)) error {
+	e.App.AnalyzeRunner = func(env *app.App, p func(string)) error {
 		runs.Add(1)
 		var err error
 		if !noop.Load() { // a no-op check leaves the list as it was (the player's loop)
@@ -172,7 +173,7 @@ func TestAutoAnalysisKeepsFindingsCurrent(t *testing.T) {
 	s.analyzedAt = time.Time{}
 	s.mu.Unlock()
 	release := make(chan struct{})
-	e.App.AnalyzeRunner = func(string, func(string)) error { runs.Add(1); <-release; return nil }
+	e.App.AnalyzeRunner = func(*app.App, func(string)) error { runs.Add(1); <-release; return nil }
 	started := 0
 	for i := 0; i < 10; i++ {
 		if s.Analyze() {

@@ -268,7 +268,7 @@ func TestT1KeyLatencyReal(t *testing.T) {
 	}
 	defer a.Close()
 	a.Launcher = func(string, []string, string) error { t.Fatal("launch attempted"); return nil }
-	a.AnalyzeRunner = app.InProcessAnalyze(a) // never a child: that would be this test binary
+	a.AnalyzeRunner = app.InProcessAnalyze // never a child: that would be this test binary
 	TuneProcess(a)
 	m := New(Options{App: a, Scan: func(string) (string, error) { t.Fatal("scan"); return "", nil }}).(*model)
 	t0 := time.Now()

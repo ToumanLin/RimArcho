@@ -275,7 +275,7 @@ func openEnv(home string) (*app.App, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	a.AnalyzeRunner = app.InProcessAnalyze(a)
+	a.AnalyzeRunner = app.InProcessAnalyze
 	st, err := a.Loadout()
 	if err != nil {
 		a.Close()

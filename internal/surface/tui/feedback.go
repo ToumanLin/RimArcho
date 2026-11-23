@@ -249,9 +249,14 @@ func (m *model) askFeedback(p view.FeedbackProblem, i int) tea.Cmd {
 		}
 		m.prompt = &prompt{label: T("contact (optional, not public)") + ": ", submit: func(m *model, contact string) tea.Cmd {
 			m.say(sayBusy, T("sending…"))
-			a, st := m.app, m.st
+			snap, st := m.snapshot(), m.st // a session of its own: keys go on using m.app
 			n := m.feedbackNeeds()
 			return func() tea.Msg {
+				a, err := snap.ReadSession()
+				if err != nil {
+					return feedbackSentMsg{feedback.Sent{}, err}
+				}
+				defer a.Close()
 				at := view.FeedbackAttachments(a, st, p.Options(), n)
 				s, err := view.SendFeedbackProblems(context.Background(), []view.FeedbackProblem{p}, []*view.FeedbackAttach{at}, contact)
 				var one feedback.Sent

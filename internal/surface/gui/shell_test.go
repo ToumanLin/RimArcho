@@ -236,7 +236,10 @@ func TestOpenListKeepsCurrent(t *testing.T) {
 	if sh := api.Shell(); sh.Plan.Name != "Empty" || !sh.Plans[0].Current || sh.Plans[0].ID != def.ID {
 		t.Fatalf("opening changed the current list: %+v", sh.Plans)
 	}
-	// Writing the open list to the game chooses it.
+	// Writing the open list to the game chooses it. First let the automatic check that the
+	// Launch page started end: on a starved CI runner its analysis write overlapped this save
+	// past busy_timeout (SQLITE_BUSY), which is not what this test is about.
+	settle(api)
 	before := e.ReadModsConfig()
 	if o, err := api.Run(view.ListSave); err != nil || len(o.Refused) > 0 {
 		t.Fatalf("save %+v %v", o, err)
