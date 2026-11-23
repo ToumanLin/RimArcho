@@ -366,6 +366,13 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 	r := TaskRow{ID: t.ID, Kind: t.Kind, Lane: t.Lane, State: t.State, StateText: TaskStateText(t.State),
 		Title: TaskTitle(t.Kind), Obj: t.Obj, Seen: t.Seen}
 	r.LaneText, r.LaneNote = TaskLaneText(t.Lane)
+	if t.Kind == TaskSourceCheck && len(t.Args) > 1 {
+		// queued as "RimArcho" (VM 2026-11-23: "check for updates  RimArcho: 259 have
+		// updates"); the row names the source it checked
+		if n := subscriptionSourceName(t.Args[1]); n != "" {
+			r.Obj = n
+		}
+	}
 	r.Time = clock(t.Start, now)
 	switch t.State {
 	case app.TaskRunning:

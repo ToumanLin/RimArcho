@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Fixed: checking one source under Mod library › Updates (Steam Workshop, SteamCMD, …) showed in the status line and Background tasks as "check for updates  RimArcho: 259 have updates"; it now names the source it checked.
 - Fixed: after switching the current list from outside the window (`archo plan use`, MCP `manage_plans` use), coming back to the window updated the sidebar but left Launch and Can it run on the list from before (Can it run caught up only with a later background check, so it stayed one switch behind). The visible page now follows when the window gets the focus.
 - `archo uninstall`: the `links` step called another RimArcho's link in the game's `Mods/` (left alone, correctly) "a folder named like one but not a link". It now counts links not proven to be this home's apart from folders that only carry the name.
 - Fixed: a second RimArcho data folder on the same Windows user (`RIMARCHO_HOME`, used by tests and harnesses) could not choose its own managed folder: `archo config set local.dir <folder>` said "managed folders are already in use" because the default folder held the first home's files. Before it has a Game Config, a home may now choose its own.
