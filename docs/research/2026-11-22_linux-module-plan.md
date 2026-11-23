@@ -265,6 +265,7 @@ D4, D7, D8 and D9 were decided by the maintainer on 2026-11-22, as recommended. 
 | D8 (decided) | GTK 3 or GTK 4 | GTK 3 (`-tags gtk3`, WebKitGTK 4.1) for 1.2, because it is measured and on all D4 distributions; build once with GTK 4 (WebKitGTK 6.0) at the next pinned Wails, and switch when the D4 distributions carry it |
 | D9 (decided) | One Linux binary or two | Two: the static `archo` (CLI, TUI, MCP; no GTK needed: SteamOS game mode, servers) and the dynamic `rimarcho` GUI, as `archo.exe` and `RimArcho.exe` on Windows |
 | D10 (open) | Linux memory measure | Recommended: summed Pss of the process tree, recorded, not gating, while experimental |
+| WebKitGTK data folder (decided 2026-11-22) | Where the window's web data lives | Stays where WebKitGTK puts it, in the data directory; Wails beta.28 cannot move it (16 §8.2) |
 
 Discrepancies between docs and code found while checking:
 
