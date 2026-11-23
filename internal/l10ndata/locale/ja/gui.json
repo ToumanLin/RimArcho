@@ -1,5 +1,6 @@
 {
   "%d enabled, in the order the game loads them": "有効なMOD：%d件（ゲームの読み込み順）",
+  "%d enabled": "有効なMOD：%d件",
   "%d mods": "MOD %d件",
   "%d mods found": "MOD %d件を検出",
   "%d problems": "問題%d件",

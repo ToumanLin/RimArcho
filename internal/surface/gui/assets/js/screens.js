@@ -1780,10 +1780,14 @@ function patternCard(c) {
 // ---- Mod library › updates and add a subscription (16 §2.9): subscriptions.js ----
 export { changes, changesHints, changesFiltered, changesPlan, openAdd, addHints, addWith } from "./subscriptions.js";
 
-export function rescanButton(label) {
-  const b = button(S.busy.scan ? T("scanning…") : label || T("rescan"), "R", () => ui.cmd("rescan"), "", "rescan");
+// rescanButton: icon, label and R; iconOnly (the list editor's head, 16 §2.5) keeps the
+// words in the hover and the accessible name.
+export function rescanButton(label, iconOnly = false) {
+  const words = S.busy.scan ? T("scanning…") : label || T("rescan");
+  const b = button(iconOnly ? "" : words, iconOnly ? "" : "R", () => ui.cmd("rescan"), iconOnly ? "icon" : "", "rescan");
   b.classList.add("rescan");
   if (label) b.dataset.label = label;
+  if (iconOnly) { b.dataset.iconOnly = "1"; b.title = words + T("; ") + "R"; b.setAttribute("aria-label", words); }
   b.prepend(el("span", "ic" + (S.busy.scan ? " spin" : "")));
   b.firstChild.innerHTML = icon.rescan;
   b.disabled = !!S.busy.scan;
@@ -1796,7 +1800,7 @@ export function busyChanged() {
   if (S.screen === "env") return environment();
   if (S.screen === "changes") return changes();
   const b = document.querySelector(".page .rescan, #planhead .rescan");
-  if (b) b.replaceWith(rescanButton(b.dataset.label));
+  if (b) b.replaceWith(rescanButton(b.dataset.label, !!b.dataset.iconOnly));
 }
 
 

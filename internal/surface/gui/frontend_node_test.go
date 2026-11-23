@@ -34,6 +34,7 @@ var frontendNodeSuites = []string{
 	"testdata/gamelog.mjs",
 	"testdata/packs.mjs",
 	"testdata/paths.mjs",
+	"testdata/planhead.mjs",
 	"testdata/planmanage.mjs",
 	"testdata/popups.mjs",
 	"testdata/review.mjs",

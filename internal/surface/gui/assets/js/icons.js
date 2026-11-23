@@ -60,6 +60,9 @@ export const icon = {
   // the list management page (16 §2.17)
   import: svg('<path d="M8 2.4v7.2M5.2 6.8L8 9.6l2.8-2.8"/><path d="M2.8 10.4v2.2h10.4v-2.2"/>'),
   export: svg('<path d="M8 9.6V2.4M5.2 5.2L8 2.4l2.8 2.8"/><path d="M2.8 10.4v2.2h10.4v-2.2"/>'),
+  // the list editor's head (16 §2.5): rename, and import / export (both ways through a tray)
+  edit: svg('<path d="M10.6 2.8l2.6 2.6-7.4 7.4H3.2v-2.6z"/><path d="M9.2 4.2l2.6 2.6"/>'),
+  io: svg('<path d="M5.6 9.2V2.6M3.6 4.6l2-2 2 2M10.4 2.6v6.6M8.4 7.2l2 2 2-2"/><path d="M2.6 11.2v2.2h10.8v-2.2"/>'),
   more: svg('<circle cx="3.6" cy="8" r=".9"/><circle cx="8" cy="8" r=".9"/><circle cx="12.4" cy="8" r=".9"/>', "fill"),
   ext: svg('<path d="M9.4 2.6h4v4M13.2 2.8L7.6 8.4"/><path d="M11.8 9.6v3.6H2.8V4.2h3.6"/>'),
 };

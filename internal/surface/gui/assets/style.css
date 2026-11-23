@@ -256,8 +256,11 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .page-acts .btn.primary { color: var(--accent-fg); background: var(--accent); border-color: transparent; }
 .page-acts .btn.hot { color: var(--accent-11, var(--accent)); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .page-acts .field { flex: 0 1 200px; }
-.page-acts .unwritten { color: var(--accent-11, var(--accent)); font-size: 12px; white-space: nowrap; margin-right: 2px; }
-.page-acts .unwritten::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; }
+.page-acts .unwritten { min-width: 18px; height: 18px; line-height: 18px; padding: 0 5px; margin-left: 6px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-11, var(--accent)); font-size: 12px; font-weight: 600; text-align: center; }
+/* the list editor's tools (16 §2.5): icons side by side, quiet until hovered */
+.page-acts .ph-tools { display: inline-flex; align-items: center; gap: 2px; flex: none; }
+.page-acts .ph-tools .btn { border-color: transparent; background: none; box-shadow: none; color: var(--fg-2); }
+.page-acts .ph-tools .btn:hover { background: var(--pill); color: var(--fg); }
 /* a page's actions: quiet icon + text, no border (16 §2.2) */
 .page-acts .btn.quiet { border-color: transparent; background: none; box-shadow: none; color: var(--fg-2); font-size: 13px; padding: 0 6px; }
 .page-acts .btn.quiet:hover { background: var(--pill); color: var(--fg); }
