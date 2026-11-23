@@ -32,7 +32,7 @@ RimArcho manages several game versions and configs (yes, you can now have 1.6 an
 
 You can add subscriptions from GitHub and LoversLab, and RimArcho checks them for updates.
 
-RimArcho has Archo MCP built in, with 45 tools: from returning the right Mod folder, to giving a precise error log, to launching and testing the game. you say "something's wrong", and your agent looks into it, fixes it, launches the game to check the fix worked, and tells you.
+RimArcho has Archo MCP built in, with 47 tools: from returning the right Mod folder, to giving a precise error log, to launching and testing the game. you say "something's wrong", and your agent looks into it, fixes it, launches the game to check the fix worked, and tells you.
 
 About "launching and testing". RimArcho also ships the RimWorld Probe SKILL, a skeleton for an AI to control the game. Your agent can now launch the game, load a save, play and take screenshots. You don't need to describe to details how your prisoner cant path-finding, and your AI agent can see what actually happens.
 
