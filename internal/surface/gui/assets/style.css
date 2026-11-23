@@ -2885,7 +2885,8 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .rv-legend .k { display: inline-flex; align-items: center; gap: 5px; }
 .rv-legend i { display: block; width: 16px; height: 4px; border-radius: var(--r-sm); }
 .rv-legend .none i { background: var(--amber); }
-.rv-legend .some i { background: color-mix(in srgb, var(--accent) 75%, var(--card)); }
+/* some: from "a little seen" (.rv-tile.some, 45 %) to "mostly seen" (75 %) */
+.rv-legend .some i { background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 45%, var(--card)), color-mix(in srgb, var(--accent) 75%, var(--card))); }
 .rv-legend .whole i { background: var(--green); }
 .rv-tile .t { font-size: 12px; line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 .rv-ctl { margin-left: auto; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; font-weight: 400; }
