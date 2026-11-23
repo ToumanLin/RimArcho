@@ -141,7 +141,7 @@ test('background updates preserve hint links and evidence without counting them 
     assert.equal(h.state.board.needs, 1);
     assert.equal(h.state.board.status.one, 2);
     assert.equal(h.state.board.reasons.one[0].text, 'warning');
-    assert.equal(h.context.chip().children[1].textContent, '1 problems');
+    assert.equal(h.context.chip().children[1].textContent, '1 problem');
   }
   const card = h.context.card({ ...hint, actions: [], why: '', section: 0 });
   const title = card.children[1].children[0];
