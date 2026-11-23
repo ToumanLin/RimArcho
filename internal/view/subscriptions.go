@@ -262,7 +262,10 @@ func sourceSummary(a *app.App, sources []SubscriptionSource, checks map[string]a
 	var last time.Time
 	n := 0
 	for _, s := range sources {
-		if s.Key == app.LibLocal {
+		// The page lists only sources with Mods (16 §2.9); an automatic check also stamps
+		// the empty ones, and counting those said "checked 3 sources" over a list whose only
+		// source read "not checked yet" (VM 2026-11-22).
+		if s.Key == app.LibLocal || s.Count == 0 {
 			continue
 		}
 		if c := checks[s.Key]; !c.At.IsZero() {
@@ -276,7 +279,9 @@ func sourceSummary(a *app.App, sources []SubscriptionSource, checks map[string]a
 		}
 	}
 	sum.Line = T("sources not checked yet")
-	if n > 0 {
+	if n == 1 {
+		sum.Line = Tf("checked 1 source, the last at %s", a.FormatTime(last))
+	} else if n > 1 {
 		sum.Line = Tf("checked %d sources, the last at %s", n, a.FormatTime(last))
 	}
 	if sum.Failures == 1 {

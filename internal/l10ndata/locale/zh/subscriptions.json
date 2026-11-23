@@ -69,6 +69,7 @@
   "check the Steam password": "请检查 Steam 密码",
   "check unavailable offline": "暂时无法检查，联网后再试",
   "checked %d sources, the last at %s": "%[2]s 检查过 %[1]d 个来源",
+  "checked 1 source, the last at %s": "%s 检查过 1 个来源",
   "checking": "正在检查",
   "checking the selected mods…": "正在检查所选 Mod…",
   "choose a file": "要选文件",
