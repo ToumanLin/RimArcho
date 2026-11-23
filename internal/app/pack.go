@@ -321,10 +321,11 @@ func (a *App) planPack(name string, update bool) (*PackPlan, error) {
 		if p.Log != nil {
 			continue
 		}
-		// Order problems do not block: the pack is sorted on its own below. Nor does what
+		// Order problems do not block: the pack is sorted on its own below, which also adds
+		// a missing Core (official.core-missing). Nor does what
 		// Mods/ holds now (leftover links, two folders of one mod): launching the pack deals
 		// with it, and the build only writes to the packs folder.
-		if p.Severity == finding.Error && !strings.HasPrefix(p.Code, "order.") && p.Code != "official.order" && p.Code != CodePackLinks && p.Code != CodeModsDuplicate {
+		if p.Severity == finding.Error && !strings.HasPrefix(p.Code, "order.") && p.Code != "official.order" && p.Code != CodeCoreMissing && p.Code != CodePackLinks && p.Code != CodeModsDuplicate {
 			r.Blockers = append(r.Blockers, p.Claim)
 		} else if p.Code == "version.unsupported" && len(p.Subjects) > 0 {
 			line := p.Claim

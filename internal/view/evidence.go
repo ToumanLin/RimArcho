@@ -152,6 +152,8 @@ func evidenceFor(p *app.Problem) *Evidence {
 		return evidence(EvDeclared, T("the mods' load-order requirements"))
 	case "official.order":
 		return evidence(EvInferred, T("the game loads Core and the DLCs first"))
+	case app.CodeCoreMissing:
+		return evidence(EvInferred, T("the game needs Core in the list"))
 	case "pkg.duplicate-active":
 		return evidence(EvInferred, T("two folders have the same package id"))
 	case "entry.missing":

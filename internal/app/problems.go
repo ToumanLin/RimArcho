@@ -438,6 +438,33 @@ func (d *declRun) listFindings() {
 			d.activeByPkg[p] = append(d.activeByPkg[p], m)
 		}
 	}
+	d.coreFinding()
+}
+
+// CodeCoreMissing is the list without Core (05 §4.3): the game resets ModsConfig.xml when it
+// starts and loads Core alone (VM 2026-11-23, "Resetting mods config").
+const CodeCoreMissing = "official.core-missing"
+
+// coreFinding reports a list with no Core entry. A Core entry that is not installed is
+// entry.missing instead. Sorting adds the installed Core (08 §1).
+func (d *declRun) coreFinding() {
+	if len(d.activeByPkg["ludeon.rimworld"]) > 0 {
+		return
+	}
+	for _, e := range d.st.List {
+		if e.Instance == "" && dependencyPackage(e.Missing) == "ludeon.rimworld" {
+			return
+		}
+	}
+	const why = " is not in the list: the game resets its mod list when it starts and loads Core alone"
+	f := &finding.Finding{Code: CodeCoreMissing, Severity: finding.Error, Key: "ludeon.rimworld", Subjects: []string{"pkg:ludeon.rimworld"},
+		Claim: "Core (pkg:ludeon.rimworld)" + why + "; Core is not installed either", Suggestions: []string{"archo sort"}}
+	if core := d.st.Reg.Resolve("ludeon.rimworld").Instance; core != "" && d.st.Reg.Loadable(core) {
+		f.Subjects = []string{finding.Inst(core)}
+		f.Claim = finding.Inst(core) + why
+		f.Suggestions = append(f.Suggestions, "archo enable "+finding.Inst(core)+" --at 1")
+	}
+	d.add(f)
 }
 
 // modFindings reports what an enabled Mod declares: a replacement, unloadability, missing

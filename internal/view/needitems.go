@@ -223,6 +223,9 @@ func (b *itemBuilder) problem(p *app.Problem) {
 func (b *itemBuilder) item(c problemCtx) {
 	st, p, x, y, ids, s, ev, nm := b.st, c.p, c.x, c.y, c.ids, c.s, c.ev, b.nm
 	switch p.Code {
+	case app.CodeCoreMissing:
+		b.add(Need{rank: 0, Group: GroupList, Text: T("Core is not in the list"), Actions: []Action{sortAction()}, Counted: true, Status: s, Mods: ids,
+			Title: T("Core is not in the list"), Why: T("the game resets its mod list when it starts and loads Core alone; sort adds Core"), Evidence: ev})
 	case "official.order":
 		b.add(Need{rank: 0, Group: GroupList, Text: T("Core and the DLCs must come first in the list"), Actions: []Action{sortAction()}, Counted: true, Status: s,
 			Title: T("Core and the DLCs are out of place"), Why: T("Core and the DLCs must come first in the list"), Evidence: ev})
