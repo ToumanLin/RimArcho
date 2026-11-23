@@ -61,7 +61,7 @@
   "For the window, open RimArcho.exe.": "ウィンドウ版を使うにはRimArcho.exeを起動してください。",
   "Commands still work here: archo help": "ここでもコマンドを実行できます：archo help",
   "Press Enter to close.": "Enterキーで閉じます。",
-  "Or open RimArcho.exe in this folder: the window has a guide that finds your games.": "または、このフォルダのRimArcho.exeを開いてください。ウィンドウのガイドからゲームを検出できます。",
+  "Or open %s in this folder: the window has a guide that finds your games.": "または、このフォルダの%sを開いてください。ウィンドウのガイドからゲームを検出できます。",
   "This database was made by a RimArcho development build from before 1.0, and this version cannot open it:\n%s\n\nMove or rename the file, then start RimArcho again to begin with a new database.": "このデータベースはRimArcho 1.0以前の開発版で作られているため、このバージョンでは開けません：\n%s\n\nファイルを移動または名前変更してからRimArchoを起動すると、新しいデータベースを作成します。",
   "Upgrading the RimArcho database (schema %d → %d)…": "RimArchoのデータベースを更新中（スキーマ%d → %d）…",
   "Upgrading the RimArcho database…": "RimArchoのデータベースを更新中…",

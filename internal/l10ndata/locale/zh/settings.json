@@ -61,7 +61,7 @@
   "For the window, open RimArcho.exe.": "要使用窗口界面，请打开 RimArcho.exe。",
   "Commands still work here: archo help": "这里仍可以使用命令：archo help",
   "Press Enter to close.": "按 Enter 关闭。",
-  "Or open RimArcho.exe in this folder: the window has a guide that finds your games.": "或者打开同一文件夹里的 RimArcho.exe：窗口里有引导，会帮你找到游戏。",
+  "Or open %s in this folder: the window has a guide that finds your games.": "或者打开同一文件夹里的 %s：窗口里有引导，会帮你找到游戏。",
   "This database was made by a RimArcho development build from before 1.0, and this version cannot open it:\n%s\n\nMove or rename the file, then start RimArcho again to begin with a new database.": "这个数据库是 1.0 之前的 RimArcho 开发版建立的，当前版本无法打开：\n%s\n\n请移走或重命名这个文件，然后重新启动 RimArcho，就会建立新的数据库。",
   "Upgrading the RimArcho database (schema %d → %d)…": "正在升级 RimArcho 数据库（结构 %d → %d）…",
   "Upgrading the RimArcho database…": "正在升级 RimArcho 数据库…",

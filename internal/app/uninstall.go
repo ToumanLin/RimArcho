@@ -127,6 +127,10 @@ type UninstallPlan struct {
 	AfterExit AfterExit
 	// Log is where the script lists anything it could not delete.
 	Log string
+	// AtOnce: the last two steps run in this process, not after it exits (outside Windows;
+	// a test that replaces the clean-up with AfterExitFunc gets the deferred plan). Their
+	// items are then done or failed in the report, and Log is not used.
+	AtOnce bool
 
 	EstimatedSizes bool // preview bytes may come from a short-lived cache
 }
@@ -274,7 +278,7 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 	if err != nil {
 		return nil, err
 	}
-	p := &UninstallPlan{Options: o, Home: a.Home, Local: a.LocalDir(), Log: a.UninstallLog}
+	p := &UninstallPlan{Options: o, Home: a.Home, Local: a.LocalDir(), Log: a.UninstallLog, AtOnce: cleanupAtOnce && a.AfterExitFunc == nil}
 	if p.Log == "" {
 		p.Log = filepath.Join(os.TempDir(), "RimArcho-uninstall.log")
 	}
@@ -990,7 +994,8 @@ type UninstallProgress struct {
 // Uninstall carries out the plan for these answers. A failed item is reported and the
 // others go on; then the data folders and the program are left in place (run it again),
 // because they hold what is needed to finish. Otherwise the script that deletes them once
-// RimArcho has closed is started.
+// RimArcho has closed is started (Windows), or they are deleted at once and marked done or
+// failed (elsewhere: AtOnce).
 //
 // The operation log (13 §1.3) gets one parent row, with the recycle-bin moves, unlinked links
 // and failed items under it. It goes with the data folder when that is deleted.
@@ -1056,39 +1061,55 @@ func (a *App) Uninstall(o UninstallOptions, progress func(UninstallProgress)) (p
 			}
 		}
 	}
-	last := []*UninstallStep{p.Step(UnData), p.Step(UnProgram)}
 	if failed {
-		for _, s := range last {
-			if s == nil {
-				continue
-			}
-			for _, it := range s.Items {
-				if it.Do == DoLater {
-					it.Do, it.Note = DoLeave, "kept because a step above failed: fix it, then uninstall again"
-				}
-			}
-		}
+		p.eachLater(func(it *UninstallItem) {
+			it.Do, it.Note = DoLeave, "kept because a step above failed: fix it, then uninstall again"
+		})
 		return p, nil
 	}
 	progress(UninstallProgress{Step: UnData, I: n, N: n})
 	a.Uninstalled = true
-	after := a.AfterExitFunc
-	if after == nil {
-		after = func(x AfterExit) error { return startAfterExit(x, p.Log) }
-	}
-	if err := after(p.AfterExit); err != nil {
-		for _, s := range last {
-			if s == nil {
-				continue
-			}
+	a.cleanUp(p)
+	return p, nil
+}
+
+// eachLater calls f with every item of the last two steps that is deleted after the others.
+func (p *UninstallPlan) eachLater(f func(*UninstallItem)) {
+	for _, key := range []string{UnData, UnProgram} {
+		if s := p.Step(key); s != nil {
 			for _, it := range s.Items {
 				if it.Do == DoLater {
-					it.Err = "the clean-up could not start: " + err.Error() + "; delete it yourself"
+					f(it)
 				}
 			}
 		}
 	}
-	return p, nil
+}
+
+// cleanUp deletes the data folders and the program: the script after exit on Windows,
+// at once elsewhere, where each item is then done or names what was left.
+func (a *App) cleanUp(p *UninstallPlan) {
+	var left []string
+	var err error
+	if a.AfterExitFunc != nil {
+		err = a.AfterExitFunc(p.AfterExit)
+	} else {
+		left, err = startAfterExit(p.AfterExit, p.Log)
+	}
+	p.eachLater(func(it *UninstallItem) {
+		switch {
+		case err != nil:
+			it.Err = "the clean-up could not start: " + err.Error() + "; delete it yourself"
+		case p.AtOnce:
+			it.Done = true
+			for _, l := range left {
+				if source.Within(l, it.Path) {
+					it.Done, it.Err = false, "could not delete "+l+"; delete it yourself"
+					break
+				}
+			}
+		}
+	})
 }
 
 // uninstallItem carries out one item.

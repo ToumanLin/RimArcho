@@ -123,7 +123,11 @@ func UninstallView(p *app.UninstallPlan, ran bool) *UninstallPage {
 			st.Toggle, st.Label, st.On = "removeGames", T("delete them (recycle bin)"), o.RemoveGames
 		}
 		for _, it := range s.Items {
-			u := UnItem{Path: it.Path, To: it.To, Name: it.Name, Verb: T(unVerbs[it.Do]), Note: unNote(it.Note), Done: it.Done, Err: it.Err, Later: ran && it.Do == app.DoLater}
+			verb := unVerbs[it.Do]
+			if it.Do == app.DoLater && p.AtOnce {
+				verb = unVerbs[app.DoDelete]
+			}
+			u := UnItem{Path: it.Path, To: it.To, Name: it.Name, Verb: T(verb), Note: unNote(it.Note), Done: it.Done, Err: it.Err, Later: ran && it.Do == app.DoLater && !p.AtOnce}
 			if lines := it.Links.Lines(); len(lines) > 0 {
 				u.Note += "\n" + strings.Join(lines, "\n")
 			}
@@ -146,6 +150,8 @@ func UninstallView(p *app.UninstallPlan, ran bool) *UninstallPage {
 	if ran {
 		if pg.Failed > 0 {
 			pg.Result = Tf("%d steps failed; RimArcho's data stays so you can run it again", pg.Failed)
+		} else if p.AtOnce {
+			pg.Result = T("done. RimArcho's data and program are deleted")
 		} else {
 			pg.Result = Tf("done. RimArcho deletes its data and the program once it has closed; anything left is listed in %s", p.Log)
 		}
@@ -219,12 +225,20 @@ func uninstallText(p *app.UninstallPlan, s *app.UninstallStep) string {
 		add(app.DoDelete, "delete the SteamCMD RimArcho downloaded")
 		add(app.DoLeave, "it holds mods downloaded with SteamCMD: left alone")
 	case app.UnData:
-		add(app.DoLater, "once RimArcho has closed, delete its database, settings and caches (%d folders)")
+		if p.AtOnce {
+			add(app.DoLater, "delete its database, settings and caches (%d folders)")
+		} else {
+			add(app.DoLater, "once RimArcho has closed, delete its database, settings and caches (%d folders)")
+		}
 		add(app.DoLeave, "%d folders kept")
 	case app.UnSource:
 		add(app.DoDelete, "delete generated code; it can be recreated")
 	case app.UnProgram:
-		add(app.DoLater, "once RimArcho has closed, delete the program")
+		if p.AtOnce {
+			add(app.DoLater, "delete the program")
+		} else {
+			add(app.DoLater, "once RimArcho has closed, delete the program")
+		}
 		add(app.DoLeave, "the program stays")
 	}
 	return strings.Join(parts, T("; "))

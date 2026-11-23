@@ -12,15 +12,7 @@ import (
 
 // guiProgram is the GUI program's file name on this platform (16 §8.1): RimArcho.exe on
 // Windows, rimarcho on Linux, none elsewhere.
-func guiProgram(goos string) string {
-	switch goos {
-	case "windows":
-		return "RimArcho.exe"
-	case "linux":
-		return "rimarcho"
-	}
-	return ""
-}
+func guiProgram(goos string) string { return app.GUIProgram(goos) }
 
 // guiSibling is the GUI program next to this executable, or "" when there is none or this is
 // it. `archo gui` hands over to it.

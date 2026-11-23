@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -38,8 +39,8 @@ func (m *model) View() string {
 		}
 		content = []string{"", "  " + first,
 			"  " + sSecond.Render(fit(T("Add a game first: archo env detect, archo env add <name> --detected (or --game <dir> to name the game folder yourself)"), m.w-2))}
-		if windowNextToUs() {
-			content = append(content, "  "+sSecond.Render(fit(T("Or open RimArcho.exe in this folder: the window has a guide that finds your games."), m.w-2)))
+		if name := windowNextToUs(); name != "" {
+			content = append(content, "  "+sSecond.Render(fit(Tf("Or open %s in this folder: the window has a guide that finds your games.", name), m.w-2)))
 		}
 	case m.pal != nil:
 		content = m.paletteLines(body)
@@ -468,13 +469,26 @@ func (m *model) detailLines(w, n int) []string {
 
 var _ = fmt.Sprint
 
-// windowNextToUs reports whether RimArcho.exe sits next to this program: a player who
-// double-clicked archo.exe often meant the window (16 §9.2).
-var windowNextToUs = sync.OnceValue(func() bool {
+// windowNextToUs is the window program's name when it sits next to this program, else "":
+// a player who double-clicked archo.exe (or ran ./archo from the tarball) often meant the
+// window (16 §9.2).
+var windowNextToUs = sync.OnceValue(func() string {
 	exe, err := os.Executable()
-	if err != nil || strings.EqualFold(filepath.Base(exe), "RimArcho.exe") {
-		return false
+	if err != nil {
+		return ""
 	}
-	_, err = os.Stat(filepath.Join(filepath.Dir(exe), "RimArcho.exe"))
-	return err == nil
+	return windowNextTo(exe, runtime.GOOS)
 })
+
+// windowNextTo is the window program for goos in exe's folder, "" when there is none or
+// exe is it.
+func windowNextTo(exe, goos string) string {
+	name := app.GUIProgram(goos)
+	if name == "" || strings.EqualFold(filepath.Base(exe), name) {
+		return ""
+	}
+	if fi, err := os.Stat(filepath.Join(filepath.Dir(exe), name)); err != nil || !fi.Mode().IsRegular() {
+		return ""
+	}
+	return name
+}

@@ -31,10 +31,10 @@ func TestParseUninstallRequest(t *testing.T) {
 func TestUninstallAgentKeyText(t *testing.T) {
 	t.Parallel()
 	it := &app.UninstallItem{Do: "forget-agent-key", Path: "Windows Credential Manager: RimArcho/agent-api-key"}
-	if got := UninstallItemText(it); !strings.HasPrefix(got, "forget ") {
+	p := &app.UninstallPlan{}
+	if got := UninstallItemText(p, it); !strings.HasPrefix(got, "forget ") {
 		t.Fatalf("item text %q", got)
 	}
-	p := &app.UninstallPlan{}
 	s := &app.UninstallStep{Key: app.UnAccounts, Items: []*app.UninstallItem{{Do: "forget-accounts"}, it}}
 	if got := UninstallStepText(p, s); !strings.Contains(got, "Archo Agent API key") {
 		t.Fatalf("step text %q", got)
