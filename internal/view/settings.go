@@ -158,7 +158,8 @@ type EnvRow struct {
 	GameID       string `json:"gameID"`
 	Name         string `json:"name"`
 	Path         string `json:"path"`
-	Game         string `json:"game"` // "1.6.4633  D:\…\RimWorld"
+	Game         string `json:"game"`            // "1.6.4633  D:\…\RimWorld"
+	Build        string `json:"build,omitempty"` // "Proton" (ProtonBadge), also in Installation
 	Current      bool   `json:"current"`
 }
 
@@ -205,6 +206,9 @@ func EnvGroups(a *app.App, st *app.LoadoutState) []SettingGroup {
 	version := e.GameVersion
 	if version == "" {
 		version = T("unknown")
+	}
+	if b := ProtonBadge(e.GameRoot); b != "" {
+		version += "  " + b
 	}
 	current := ""
 	if p, _ := a.Store.CurrentPlan(e.ID); p != nil {
@@ -514,7 +518,21 @@ func EnvironmentRows(a *app.App, current string) []EnvRow {
 		if v := env.MajorMinor(e.GameVersion); v != "" {
 			title += " " + v
 		}
-		out = append(out, EnvRow{Name: e.Name, GameID: e.GameID, Installation: title, Path: e.GameRoot, Game: e.GameVersion + "  " + e.GameRoot, Current: e.ID == current})
+		build := ProtonBadge(e.GameRoot)
+		if build != "" {
+			title += "  " + build
+		}
+		out = append(out, EnvRow{Name: e.Name, GameID: e.GameID, Installation: title, Path: e.GameRoot, Game: e.GameVersion + "  " + e.GameRoot, Build: build, Current: e.ID == current})
 	}
 	return out
+}
+
+// ProtonBadge is "Proton" for a Windows game that Steam runs through Proton (the layout
+// of 03 §3.2), else "": the badge the guide, the Game Config page and the switchers show
+// beside an install (16 §2.8, §2.15). Only a Linux Steam library has that layout.
+func ProtonBadge(gameRoot string) string {
+	if gameRoot != "" && env.IsProtonGame(gameRoot) {
+		return "Proton"
+	}
+	return ""
 }

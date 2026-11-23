@@ -30,6 +30,9 @@ func TestEnvDetectListsUnmanagedProtonLibrary(t *testing.T) {
 		t.Fatalf("unmanaged library not detected: %+v", all)
 	}
 	out := e.MustRun("env", "detect")
+	if strings.Count(out, "build: proton") != 1 {
+		t.Fatalf("one Proton build line expected:\n%s", out)
+	}
 	for _, want := range []string{e.Game, "another detected Game Config", game, "user-data: " + ud, "--game"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q:\n%s", want, out)

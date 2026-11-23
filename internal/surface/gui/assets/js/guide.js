@@ -296,7 +296,7 @@ function step1(card) {
     cb.onchange = () => { if (one) pickOne(i); else cb.checked ? G.picked.add(i) : G.picked.delete(i); draw(); };
     const body = el("div", "b");
     const top = el("div", "top");
-    top.append(el("span", "v", "RimWorld " + (g.version || "—")), el("span", "chip", g.launch === "steam" ? "Steam" : T("started directly")));
+    top.append(el("span", "v", "RimWorld " + (g.version || "—")), el("span", "chip", g.source));
     if (g.env) top.append(el("span", "chip cur", Tf("added as %s", g.env)));
     else if (g.known && one) top.append(el("span", "chip", T("has a Game Config")));
     body.append(top, copyablePath(el("div", "path", g.game), g.game));

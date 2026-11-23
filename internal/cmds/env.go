@@ -103,6 +103,7 @@ func envList(c *Ctx, a *Args) (*render.Doc, error) {
 		n.KV("saves", c.App.Saves(e))
 		n.KV("user-data", e.UserDataRoot)
 		n.KV("launch", e.Launch)
+		n.KV("build", buildKind(e.GameRoot))
 		if e.UserDataRoot != "" {
 			n.KV("player-log", env.PlayerLog(e.UserDataRoot, e.GameVersion))
 		}
@@ -129,6 +130,7 @@ func envDetect(c *Ctx, a *Args) (*render.Doc, error) {
 		root.KV("game", det.GameRoot)
 		root.KV("version", versionText(det.GameVersion))
 		root.KV("launch", det.Launch)
+		root.KV("build", buildKind(det.GameRoot))
 		root.KV("steam-library", det.SteamLibrary)
 	}
 	if det.UserDataRoot != "" {
@@ -157,12 +159,22 @@ func envDetect(c *Ctx, a *Args) (*render.Doc, error) {
 		n.KV("game", other.GameRoot)
 		n.KV("version", versionText(other.GameVersion))
 		n.KV("launch", other.Launch)
+		n.KV("build", buildKind(other.GameRoot))
 		n.KV("steam-library", other.SteamLibrary)
 		n.KV("user-data", other.UserDataRoot)
 		n.KV("workshop", other.WorkshopRoot)
 		d.AddNext("archo env add <name> --game " + quoteArg(other.GameRoot))
 	}
 	return d, nil
+}
+
+// buildKind is "proton" for a Windows game Steam runs through Proton (03 §3.2), else ""
+// (the line is left out).
+func buildKind(gameRoot string) string {
+	if gameRoot != "" && env.IsProtonGame(gameRoot) {
+		return "proton"
+	}
+	return ""
 }
 
 func specFromArgs(a *Args) app.EnvSpec {
