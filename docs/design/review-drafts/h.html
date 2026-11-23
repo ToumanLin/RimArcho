@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>play review · H Three panes</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  #page { display: grid; grid-template-columns: 250px minmax(0, 1fr) 360px; gap: 12px; overflow: hidden; padding-bottom: 12px; }
+  #cols, #mid, #right { min-height: 0; display: flex; flex-direction: column; }
+  #right { gap: 12px; overflow-y: auto; }
+  /* left: colonies */
+  #cols .find { margin: 10px; flex: none; }
+  #clist { flex: 1; min-height: 0; overflow-y: auto; padding: 0 6px 8px; }
+  .col { display: block; width: 100%; text-align: left; padding: 8px 10px; border-radius: 10px; }
+  .col:hover { background: var(--pill); } .col.on { background: var(--sel); }
+  .col b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .col span { font-size: 12px; color: var(--muted); }
+  .col.all { margin-bottom: 4px; }
+  /* middle: the map */
+  .bar { flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: var(--hairline) solid var(--line-2); }
+  .bar .legend { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .bar .legend i { display: inline-block; width: 70px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--amber), color-mix(in srgb, var(--accent) 60%, var(--card)) 35%, var(--accent) 70%, var(--green)); }
+  .seg button { white-space: nowrap; }
+  #map { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 10px; }
+  .grp2 { padding: 12px 14px 2px; }
+  .grp2 h3 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+  .grp2 h3 .k { font-size: 12px; font-weight: 400; color: var(--muted); }
+  .tiles { display: flex; flex-wrap: wrap; gap: 3px; }
+  .tile { position: relative; height: var(--s); width: var(--s); border-radius: 4px; background: var(--c); overflow: hidden; color: var(--fg); }
+  .tile.edge { color: #1a1a1e; }
+  .tile.on { outline: 2px solid var(--fg); outline-offset: 1px; }
+  .tile:hover { filter: brightness(1.12); }
+  .tile .t { position: absolute; inset: 4px 5px; font-size: 11px; line-height: 1.2; font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; text-align: left; }
+  .tile.used { background: color-mix(in srgb, var(--accent) 38%, var(--card)); }
+  .tile.unused { background: none; box-shadow: inset 0 0 0 1.5px var(--amber); }
+  .fn { margin: 12px 14px 0; font-size: 12px; color: var(--muted); }
+  #tip { position: fixed; z-index: 40; pointer-events: none; padding: 6px 9px; border-radius: 8px; background: var(--card); box-shadow: var(--shadow); font-size: 12px; max-width: 320px; }
+  /* right: the Mod, then its progress */
+  .mc { padding: 12px; flex: none; }
+  .mc .cover { margin-bottom: 10px; aspect-ratio: auto; height: 96px; }
+  .mc h2 { margin: 0 0 4px; font-size: 15px; }
+  .mc .who { color: var(--muted); margin-top: 2px; }
+  .mc .facts { color: var(--faint); margin-top: 4px; display: flex; gap: 6px 10px; flex-wrap: wrap; font-size: 12px; }
+  .mc .acts { margin-top: 10px; }
+  #prog { flex: none; } #prog .dh { position: static; }
+  .pc { padding: 12px 14px; flex: none; }
+  .pc h3 { margin: 0 0 10px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .pr { display: grid; grid-template-columns: 18px 86px minmax(0, 1fr); gap: 4px 8px; align-items: start; margin-bottom: 8px; font-size: 12.5px; }
+  .pr .g { width: 16px; height: 16px; fill: none; stroke: var(--fg-2); stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+  .pips { display: flex; flex-wrap: wrap; gap: 2px; padding-top: 4px; }
+  .pips i { width: 7px; height: 7px; border-radius: 2px; box-shadow: inset 0 0 0 1px var(--line); }
+  .pips i.s { background: var(--accent); box-shadow: none; }
+  .pr .v { color: var(--muted); } .pr .v b { color: var(--fg); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="review" id="review"></div>
+<div id="app">
+  <aside id="side"><div class="side-head">RimArcho</div><nav id="nav"></nav></aside>
+  <main id="main">
+    <div id="top"></div><div class="page-head" id="head"></div>
+    <div id="page">
+      <div class="card" id="cols"><label class="find"><span id="si"></span><input id="q" placeholder="Find a colony" autocomplete="off"></label><div id="clist"></div></div>
+      <div class="card" id="mid"><div class="bar"><span class="muted">group by</span><div class="seg" id="by"></div>
+        <span class="legend">size: how much · none <i></i> all</span></div><div id="map"></div></div>
+      <div id="right"></div>
+    </div>
+    <div id="bottom"><span id="status"></span><span id="hints"></span></div>
+  </main>
+</div>
+<div id="toast"></div><div id="tip" hidden></div>
+<script src="shared.js"></script>
+<script src="real.js"></script>
+<script>
+shell("h", [["/", "find a colony"], ["↑↓", "colony"], ["click", "a Mod"]]);
+// Saves is a group of its own, with two pages.
+const it = (t, on = false) => `<button class="nav-item ${on ? "on" : ""}"><span>${t}</span></button>`;
+$("#nav").innerHTML = `<div class="grp">playing</div>${it("start")}${it("can it run")}${it("game log")}
+  <div class="grp">saves</div>${it("all saves")}${it("play review", true)}
+  <div class="grp">library</div>${it("lists")}${it("packs")}${it("mod library")}${it("texture optimisation")}${it("game")}`;
+$("#top").innerHTML = `<span class="crumb muted">saves</span><span class="faint">/</span><span class="crumb">play review</span>`;
+$("#head").innerHTML = ""; $("#si").innerHTML = ic("search");
+
+// What a game brings the player to; everything else is picked from.
+const AHEAD = new Set(["quests", "research", "events", "factions", "animals", "mechanoids", "creatures", "biomes"]);
+const LABEL = { hediffs: "health", xenotypes: "genes" };
+const DLC = new Set(["Core", "Royalty", "Ideology", "Biotech", "Anomaly", "Odyssey"]);
+const sum = (cs, i) => cs.reduce((n, c) => n + c[i], 0);
+const mods = REAL.mods.filter((m) => m.n !== "Core").map((m, i) => {
+  const a = m.c.filter((c) => AHEAD.has(c[0])), p = m.c.filter((c) => !AHEAD.has(c[0]));
+  return { id: "m" + i, n: m.n, c: m.c, a, p, aSeen: sum(a, 1), aAll: sum(a, 2), seen: sum(m.c, 1), all: sum(m.c, 2), main: [...m.c].sort((x, y) => y[2] - x[2])[0][0] };
+});
+let by = "two", sel = mods.find((m) => m.n === "Anomaly").id, col = "Fort Ember", q = "";
+const colorOf = (s, a) => { const p = a ? s / a : 0; return p === 0 ? "var(--amber)" : p >= 1 ? "var(--green)" : `color-mix(in srgb, var(--accent) ${Math.round(35 + p * 65)}%, var(--card))`; };
+const sizeOf = (n, k) => Math.round(Math.max(16, Math.min(120, Math.sqrt(n) * k)));
+function tile(m, mode) {
+  const n = mode === "ahead" ? m.aAll : m.all, s = sizeOf(n, mode === "ahead" ? 9 : 2.6);
+  const edge = mode === "ahead" && (m.aSeen === 0 || m.aSeen >= m.aAll);
+  const cls = mode === "pick" ? (m.seen ? "used" : "unused") : edge ? "edge" : "";
+  return `<button class="tile ${cls} ${m.id === sel ? "on" : ""}" data-m="${m.id}" style="--s:${s}px;${mode === "ahead" ? `--c:${colorOf(m.aSeen, m.aAll)}` : ""}">${s >= 58 ? `<span class="t">${esc(m.n)}</span>` : ""}</button>`;
+}
+function groups() {
+  if (by === "two") {
+    const a = mods.filter((m) => m.aAll).sort((x, y) => y.aAll - x.aAll), p = mods.filter((m) => !m.aAll).sort((x, y) => y.all - x.all);
+    return [{ head: "Quests, research, events, creatures, factions", k: "colour: how much of these is in the saves", mods: a, mode: "ahead" },
+      { head: "Buildings, floors, clothes, looks and the rest", k: `${p.filter((m) => !m.seen).length} with nothing in the saves (outlined)`, mods: p, mode: "pick" }];
+  }
+  const keys = [...new Set(mods.map((m) => m.main))];
+  return keys.map((k) => ({ head: LABEL[k] || k, k: "", mods: mods.filter((m) => m.main === k).sort((x, y) => y.all - x.all), mode: AHEAD.has(k) ? "ahead" : "pick" })).sort((x, y) => y.mods.length - x.mods.length);
+}
+const pips = (s, n) => `<span class="pips">${Array.from({ length: n }, (_, i) => `<i class="${i < s ? "s" : ""}"></i>`).join("")}</span>`;
+function right() {
+  const m = mods.find((x) => x.id === sel);
+  const pre = initials(m.n) || "X";
+  const cats = [...m.c].sort((x, y) => y[2] - x[2]);
+  // top: the Mod library's details card, short (picture, name, author, facts, tags);
+  // below: draft D's progress, as it was
+  $("#right").innerHTML = `<div class="card mc">${cover({ name: m.n, adds: m.all, seen: Math.max(1, m.seen), cats: [] })}<h2>${esc(m.n)}</h2>
+      <div class="who">${DLC.has(m.n) ? "Ludeon Studios" : "the Mod's author"}</div>
+      <div class="facts"><span>${DLC.has(m.n) ? "official expansion" : "Workshop"}</span><span>1.5, 1.6</span><span>in the current list</span></div>
+      <div class="acts"><button class="btn line small" data-toast="would open it in the Mod library">Open in Mod library</button></div></div>
+    <div class="card" id="prog"><div class="dh"><div class="big" style="margin-top:0">${meter(m.seen, m.all, 150)}${frac(m.seen, m.all)}<span class="muted">seen</span></div></div>
+      ${cats.map(([k, sn, ad]) => { const ns = names({ prefix: pre }, { adds: ad, seen: sn }); return `<section class="dc"><h3>${LABEL[k] || k} ${meter(sn, ad, 48)}${frac(sn, ad)}</h3>
+        ${ns.length ? `<p class="names">${ns.slice(0, 24).map((x) => `<span>${esc(x.n)}</span>`).join("")}${ns.length > 24 ? `<button class="btn link" data-toast="would show all ${ns.length}">${ns.length - 24} more</button>` : ""}</p>` : `<p class="names muted">all seen</p>`}</section>`; }).join("")}</div>`;
+}
+function draw() {
+  $("#by").innerHTML = [["two", "kind of content"], ["kind", "main category"], ["tags", "your tags"]].map(([k, t]) => `<button class="${by === k ? "on" : ""}" data-by="${k}">${t}</button>`).join("");
+  $("#map").innerHTML = groups().map((g) => `<section class="grp2"><h3>${g.head}<span class="k">${g.mods.length} Mods${g.k ? " · " + g.k : ""}</span></h3><div class="tiles">${g.mods.map((m) => tile(m, g.mode)).join("")}</div></section>`).join("") +
+    `<p class="fn">${REAL.whole} more Mods are all in the saves. ${REAL.functional} Mods add nothing a save can show.</p>`;
+  right();
+}
+function colonies() {
+  const cs = REAL.colonies.filter((c) => c.n.toLowerCase().includes(q)).sort((a, b) => b.days - a.days || b.saves - a.saves);
+  $("#clist").innerHTML = (q ? "" : `<button class="col all ${col === "" ? "on" : ""}" data-c=""><b>All colonies</b><span>${REAL.colonies.length} colonies · 209 saves</span></button>`) +
+    cs.map((c) => `<button class="col ${c.n === col ? "on" : ""}" data-c="${esc(c.n)}"><b>${esc(c.n)}</b><span>day ${c.days} · ${c.saves} ${c.saves === 1 ? "save" : "saves"} · ${c.latest}</span></button>`).join("");
+}
+$("#q").oninput = (e) => { q = e.target.value.toLowerCase(); colonies(); };
+$("#clist").onclick = (e) => { const b = e.target.closest("[data-c]"); if (!b) return; col = b.dataset.c; colonies(); if (col !== "Fort Ember") toast("the draft holds one colony's numbers; the map would change here"); };
+$("#by").onclick = (e) => { const b = e.target.closest("[data-by]"); if (!b) return; if (b.dataset.by === "tags") { toast("as draft D: one band a tag (this export has no tags)"); return; } by = b.dataset.by; draw(); };
+$("#map").onclick = (e) => { const b = e.target.closest("[data-m]"); if (b) { sel = b.dataset.m; draw(); } };
+$("#map").onmousemove = (e) => {
+  const b = e.target.closest("[data-m]"), tip = $("#tip");
+  if (!b) { tip.hidden = true; return; }
+  const m = mods.find((x) => x.id === b.dataset.m);
+  tip.innerHTML = `<b>${esc(m.n)}</b>${m.aAll ? `<br>${m.a.map(([k, s, a]) => `${LABEL[k] || k} ${s}/${a}`).join(" · ")}` : `<br>${m.seen ? m.seen + " used" : "never used"} of ${m.all}`}`;
+  tip.hidden = false; tip.style.left = Math.min(innerWidth - 340, e.clientX + 14) + "px"; tip.style.top = e.clientY + 16 + "px";
+};
+$("#map").onmouseleave = () => { $("#tip").hidden = true; };
+addEventListener("keydown", (e) => { if (e.key === "/" && document.activeElement?.id !== "q") { e.preventDefault(); $("#q").focus(); } });
+$("#status").textContent = "H: colonies on the left, the map in the middle, the Mod and its progress on the right. One real colony's numbers.";
+colonies(); draw();
+</script>
+</body>
+</html>

@@ -12,6 +12,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/deps"
+	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
@@ -832,10 +833,10 @@ func TestCreditCrossEnvironmentCandidateRequired(t *testing.T) {
 		t.Fatal("missing client copy")
 	}
 	// A sees the client copy, B does not. Scan preserves source ownership.
-	if _, err := e.App.Store.DB.Exec(`UPDATE source SET environment_id=? WHERE id=?`, mainEnv.ID, target.SourceID); err != nil {
+	if _, err := e.App.Store.DB.Exec(`UPDATE source SET game_id=? WHERE id=?`, mainEnv.ID, target.SourceID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.App.Store.DB.Exec(`UPDATE instance SET environment_id=? WHERE id=?`, mainEnv.ID, target.ID); err != nil {
+	if _, err := e.App.Store.DB.Exec(`UPDATE instance SET game_id=? WHERE id=?`, mainEnv.ID, target.ID); err != nil {
 		t.Fatal(err)
 	}
 	e.App.TrashFunc = func(string) error { t.Fatal("copy needed by blocked game recycled"); return nil }
@@ -844,7 +845,7 @@ func TestCreditCrossEnvironmentCandidateRequired(t *testing.T) {
 	}
 	it := creditItem(t, e, batch)
 	if it.State != "retained" || !strings.Contains(it.Result, "blocked") {
-		t.Fatalf("missing environment reason: %+v", it)
+		t.Fatalf("missing Game Config reason: %+v", it)
 	}
 	ws, err := e.App.Store.Workspace(shared)
 	if err != nil || loadout.Decode(ws.Entries).Index(old) < 0 || loadout.Decode(ws.Entries).Index(target.ID) >= 0 {
@@ -1151,5 +1152,165 @@ func TestCreditManagedLinkOutsideEnvironmentRetained(t *testing.T) {
 	}
 	if !source.IsLink(link) {
 		t.Fatal("managed link changed")
+	}
+}
+
+func TestCreditSiblingRootsSurviveEditAndRemoval(t *testing.T) {
+	e, batch, items := creditEnv(t, "8100")
+	e.App.TrashFunc = func(path string) error { return creditRecycle(e, path) }
+	creditStart(t, e, batch, items)
+	creditClient(t, e, items)
+	e.MustRun("enable", items[0].InstanceID)
+	e.MustRun("save")
+	main, _ := e.App.Env()
+	e.MustRun("env", "add", "sibling", "--game", e.Game, "--saves", "own")
+	e.MustRun("env", "use", "sibling")
+	e.MustRun("enable", items[0].InstanceID)
+	e.MustRun("save")
+	sibling, _ := e.App.Env()
+	e.MustRun("scan")
+	target := refID(t, e, "Credit 8100", source.Workshop)
+	for _, en := range []*env.Environment{main, sibling} {
+		if err := e.App.Store.AddCreditDeployment(items[0], en.ID, e.App.Store.CurrentPlanID(en.ID)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	it := items[0]
+	it.State, it.TargetID = "switching", target
+	if err := e.App.Store.SaveCreditItem(it); err != nil {
+		t.Fatal(err)
+	}
+	oldRoot := sibling.UserDataRoot
+	e.MustRun("env", "set", "sibling", "--user-data", filepath.Join(e.Root, "new-sibling-data"))
+	e.MustRun("env", "remove", "main", "--yes")
+	if err := e.App.CreditStep(nil); err != nil {
+		t.Fatal(err)
+	}
+	it = creditItem(t, e, batch)
+	if it.State != "done" {
+		t.Fatalf("handoff: %+v", it)
+	}
+	for _, root := range []string{main.UserDataRoot, oldRoot} {
+		b, err := os.ReadFile(filepath.Join(root, "Config", "ModsConfig.xml"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(b), "credit.mod8100") || strings.Contains(string(b), "credit.mod8100_steam") {
+			t.Fatalf("captured root not rewritten: %s", b)
+		}
+	}
+	if ds, err := e.App.Store.CreditDeployments(it); err != nil || len(ds) != 0 {
+		t.Fatalf("pending: %+v %v", ds, err)
+	}
+}
+
+// M8: a root whose snapshot cannot be rebuilt keeps its obligation and the item stays
+// switching with a retry; the root switched meanwhile stays switched, the SteamCMD copy
+// stays, and a later pass finishes the handoff.
+func TestCreditFailedRootRetries(t *testing.T) {
+	e, batch, items := creditEnv(t, "8100")
+	e.App.TrashFunc = func(path string) error { return creditRecycle(e, path) }
+	creditStart(t, e, batch, items)
+	creditClient(t, e, items)
+	e.MustRun("enable", items[0].InstanceID)
+	e.MustRun("save")
+	main, _ := e.App.Env()
+	e.MustRun("env", "add", "sibling", "--game", e.Game, "--saves", "own")
+	e.MustRun("env", "use", "sibling")
+	e.MustRun("enable", items[0].InstanceID)
+	e.MustRun("save")
+	sibling, _ := e.App.Env()
+	e.MustRun("env", "use", "main")
+	e.MustRun("scan")
+	old := mustCreditMod(t, e, items[0].InstanceID)
+	target := refID(t, e, "Credit 8100", source.Workshop)
+	for _, en := range []*env.Environment{main, sibling} {
+		if err := e.App.Store.AddCreditDeployment(items[0], en.ID, e.App.Store.CurrentPlanID(en.ID)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	it := items[0]
+	it.State, it.TargetID = "switching", target
+	if err := e.App.Store.SaveCreditItem(it); err != nil {
+		t.Fatal(err)
+	}
+	// the sibling's ModsConfig.xml is away for now
+	siblingConfig := filepath.Join(sibling.UserDataRoot, "Config", "ModsConfig.xml")
+	if err := os.Rename(siblingConfig, siblingConfig+".away"); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.App.CreditStep(nil); err != nil {
+		t.Fatal(err)
+	}
+	it = creditItem(t, e, batch)
+	if it.State != "switching" || it.Attempts != 1 || !strings.Contains(it.Result, "1 of 2 games switched") {
+		t.Fatalf("partial handoff: %+v", it)
+	}
+	ds, err := e.App.Store.CreditDeployments(it)
+	if err != nil || len(ds) != 1 || ds[0].EnvID != sibling.ID {
+		t.Fatalf("pending obligations: %+v %v", ds, err)
+	}
+	b, _ := os.ReadFile(filepath.Join(main.UserDataRoot, "Config", "ModsConfig.xml"))
+	if !strings.Contains(string(b), "credit.mod8100") || strings.Contains(string(b), "credit.mod8100_steam") {
+		t.Fatalf("switched root: %s", b)
+	}
+	if _, err := os.Stat(old.RealPath); err != nil {
+		t.Fatal("SteamCMD copy recycled with an obligation pending:", err)
+	}
+	// the file is back: the next pass after the retry delay finishes
+	if err := os.Rename(siblingConfig+".away", siblingConfig); err != nil {
+		t.Fatal(err)
+	}
+	e.Advance(time.Hour)
+	if err := e.App.CreditStep(nil); err != nil {
+		t.Fatal(err)
+	}
+	it = creditItem(t, e, batch)
+	if it.State != "done" {
+		t.Fatalf("retry: %+v", it)
+	}
+	b, _ = os.ReadFile(filepath.Join(sibling.UserDataRoot, "Config", "ModsConfig.xml"))
+	if !strings.Contains(string(b), "credit.mod8100") || strings.Contains(string(b), "credit.mod8100_steam") {
+		t.Fatalf("retried root: %s", b)
+	}
+}
+
+// A root whose installation is gone cannot come back by waiting: when only such roots are
+// left the item is retained (the SteamCMD copy stays) instead of retried forever.
+func TestCreditGoneRootRetains(t *testing.T) {
+	e, batch, items := creditEnv(t, "8101")
+	e.App.TrashFunc = func(path string) error { return creditRecycle(e, path) }
+	creditStart(t, e, batch, items)
+	creditClient(t, e, items)
+	e.MustRun("enable", items[0].InstanceID)
+	e.MustRun("save")
+	main, _ := e.App.Env()
+	e.MustRun("env", "add", "sibling", "--game", e.Game, "--saves", "own")
+	sibling, _ := e.App.Store.EnvByName("sibling")
+	e.MustRun("scan")
+	old := mustCreditMod(t, e, items[0].InstanceID)
+	target := refID(t, e, "Credit 8101", source.Workshop)
+	for _, en := range []*env.Environment{main, sibling} {
+		if err := e.App.Store.AddCreditDeployment(items[0], en.ID, e.App.Store.CurrentPlanID(en.ID)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	it := items[0]
+	it.State, it.TargetID = "switching", target
+	if err := e.App.Store.SaveCreditItem(it); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.App.Store.DB.Exec(`UPDATE credit_deployment SET game_id='gone' WHERE environment_id=?`, sibling.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.App.CreditStep(nil); err != nil {
+		t.Fatal(err)
+	}
+	it = creditItem(t, e, batch)
+	if it.State != "retained" || !strings.Contains(it.Result, "1 of 2 games switched") {
+		t.Fatalf("gone root: %+v", it)
+	}
+	if _, err := os.Stat(old.RealPath); err != nil {
+		t.Fatal("SteamCMD copy recycled with a root left:", err)
 	}
 }

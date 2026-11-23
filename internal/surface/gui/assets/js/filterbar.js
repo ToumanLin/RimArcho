@@ -277,6 +277,15 @@ export function createBar(opts) {
     showGhost();
   };
   b.clear = () => change("");
+  // forget empties the search without asking the page: the page is about to read a board
+  // the old search was not for (another list opened, 16 §2.5)
+  b.forget = () => {
+    clearTimeout(timer);
+    inp.value = b.search = "";
+    b.filters = [];
+    suggestOpen = false;
+    showGhost();
+  };
   b.active = () => !!(b.search.trim() || b.filters.length);
   // null follows the default 35% share; a number is a saved height, 0 fills the column.
   b.h = null;
@@ -445,7 +454,7 @@ export function createBar(opts) {
         x.dataset.at = gi + ":" + vi;
         x.tabIndex = -1;
         x.onclick = () => b.set(v.filter, v.on === 1 ? 0 : 1, g);
-        x.oncontextmenu = (e) => {
+        x.oncontextmenu = (e) => { // keys: x, -, Del exclude the focused value
           e.preventDefault();
           b.set(v.filter, v.on === -1 ? 0 : -1, g);
         };

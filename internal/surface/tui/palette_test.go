@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/ToumanLin/RimArcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 func TestPalScore(t *testing.T) {
@@ -91,6 +92,20 @@ func TestPalette(t *testing.T) {
 	if m.tab != tabProblems {
 		t.Fatal("needs attention did not open")
 	}
+	// 16 §3.5: an empty palette suggests the screen's own commands first, as the window does
+	m.update(ctrlK)
+	if r := m.pal.results[0]; r.id != view.PageCommands("needs")[0] {
+		t.Fatalf("can it run: first suggestion %q", r.name)
+	}
+	m.update(tea.KeyMsg{Type: tea.KeyEsc})
+	m.update(tea.KeyMsg{Type: tea.KeyEsc})
+	if m.tab != tabList {
+		t.Fatalf("esc: tab %d", m.tab)
+	}
+	m.update(ctrlK)
+	if r := m.pal.results[0]; r.id != view.PageCommands(view.EditorPage)[0] {
+		t.Fatalf("editor: first suggestion %q", r.name)
+	}
 }
 
 // 16 §3.5: the panel's own entries over a thousand Mods, many holding the typed letters in
@@ -105,7 +120,7 @@ func TestPaletteLibrary(t *testing.T) {
 		for _, c := range []struct{ q, alias string }{
 			{"sotr", "sort"},
 			{"subscirbe", "add a subscription"},
-			{"analyze", "check the files again"},
+			{"analyze", "check again"},
 		} {
 			m.update(tea.KeyMsg{Type: tea.KeyCtrlK})
 			typeIn(m, c.q)

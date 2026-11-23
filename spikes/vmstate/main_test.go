@@ -99,6 +99,56 @@ func TestSnapshotLegacyHistoryReadOnly(t *testing.T) {
 	}
 }
 
+func TestSnapshotBeforeGameSplitReadOnly(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "fixture")
+	fixture(root)
+	home := filepath.Join(root, "home")
+	want, err := json.Marshal(snapshot(home))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(home, "archo.db")
+	db, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{
+		`CREATE TABLE environment_legacy AS SELECT e.id,e.name,g.game_root,e.user_data_root,g.game_version,e.launch,e.created_at,e.current_plan FROM environment e JOIN game g ON g.id=e.game_id`,
+		`DROP TABLE environment`, `ALTER TABLE environment_legacy RENAME TO environment`, `DROP TABLE game`,
+	} {
+		if _, err := db.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, table := range []string{"source", "instance", "scan", "identity_question", "analysis", "game_assembly"} {
+		if _, err := db.Exec(`ALTER TABLE ` + table + ` RENAME COLUMN game_id TO environment_id`); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.Exec(`UPDATE meta SET value='37' WHERE key='schema_version'`); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := json.Marshal(snapshot(home))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(want) {
+		t.Fatalf("snapshot changed across identity split:\ngot %s\nwant %s", got, want)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(before) != string(after) {
+		t.Fatal("observer changed legacy database")
+	}
+}
+
 func TestScaleFixture(t *testing.T) {
 	if os.Getenv("RIMARCHO_SCALE_TESTS") == "" {
 		t.Skip("set RIMARCHO_SCALE_TESTS=1: builds and scans a 4000-Mod fixture (about a minute)")

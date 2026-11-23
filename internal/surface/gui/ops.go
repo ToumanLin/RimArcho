@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -150,19 +152,48 @@ func (s *API) CompleteDependencies() (*view.Result, error) {
 	return s.after(view.CompleteDependencies(s.a))
 }
 
-// ReplaceRecommended replaces the named enabled originals with their installed
-// recommendations, validated again at application time, as one undoable list edit.
-func (s *API) ReplaceRecommended(refs []string) (*view.Result, error) {
+// SortSteps reads the steps after a sort for the open plan (16 §6.1): past are the kinds the
+// player applied or skipped; the first other step comes with a preview of what it changes.
+func (s *API) SortSteps(past []string) (*view.SortSteps, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.needs, s.board = nil, nil
-	return s.after(view.ReplaceRecommended(s.a, refs))
+	r, err := view.ReadSortSteps(s.a, past)
+	if err != nil {
+		return nil, errors.New(view.Humanize(s.boardState(), err.Error()))
+	}
+	return r, nil
 }
 
-// UseInstalled binds missing package IDs to usable installed copies in one undo step.
-func (s *API) UseInstalled(packageIDs []string) (*view.Result, error) {
+// ApplySortStep applies one list step after a sort as its own undoable edit (16 §6.1).
+func (s *API) ApplySortStep(kind string) (*view.Result, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.needs, s.board = nil, nil
-	return s.after(view.UseInstalled(s.a, packageIDs))
+	return s.after(view.ApplySortStep(s.a, kind))
+}
+
+// DownloadedToAdd is what a finished subscription task can add to the current list (16 §2.9):
+// the status line offers "add to <list>" when it is not empty.
+func (s *API) DownloadedToAdd(taskID string) (*view.AddOffer, error) {
+	var task *app.Task
+	for _, t := range s.tasks.List() {
+		if t.ID == taskID {
+			task = &t
+			break
+		}
+	}
+	if task == nil {
+		return &view.AddOffer{}, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return view.DownloadedOffer(s.a, *task)
+}
+
+// AddDownloaded enables the downloaded Mods in the current list, one undo step.
+func (s *API) AddDownloaded(refs []string) (*view.Result, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.needs, s.board = nil, nil
+	return s.after(view.AddDownloaded(s.a, refs))
 }

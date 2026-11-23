@@ -79,7 +79,7 @@ var unTitles = map[string]string{
 }
 
 var unVerbs = map[string]string{
-	"forget-accounts": "forget sessions", app.DoDDS: "delete recorded DDS directly",
+	"forget-accounts": "forget sessions", "forget-agent-key": "remove the API key", app.DoDDS: "delete recorded DDS directly",
 	app.DoUnlink: "unlink", app.DoClean: "clean", app.DoRestore: "put the backup back", app.DoTrash: "recycle bin", app.DoMove: "move",
 	app.DoKeep: "keep", app.DoDelete: "delete", app.DoLater: "after closing", app.DoLeave: "left alone",
 }
@@ -123,7 +123,11 @@ func UninstallView(p *app.UninstallPlan, ran bool) *UninstallPage {
 			st.Toggle, st.Label, st.On = "removeGames", T("delete them (recycle bin)"), o.RemoveGames
 		}
 		for _, it := range s.Items {
-			u := UnItem{Path: it.Path, To: it.To, Name: it.Name, Verb: T(unVerbs[it.Do]), Note: unNote(it.Note), Done: it.Done, Err: it.Err, Later: ran && it.Do == app.DoLater}
+			verb := unVerbs[it.Do]
+			if it.Do == app.DoLater && p.AtOnce {
+				verb = unVerbs[app.DoDelete]
+			}
+			u := UnItem{Path: it.Path, To: it.To, Name: it.Name, Verb: T(verb), Note: unNote(it.Note), Done: it.Done, Err: it.Err, Later: ran && it.Do == app.DoLater && !p.AtOnce}
 			if lines := it.Links.Lines(); len(lines) > 0 {
 				u.Note += "\n" + strings.Join(lines, "\n")
 			}
@@ -146,6 +150,8 @@ func UninstallView(p *app.UninstallPlan, ran bool) *UninstallPage {
 	if ran {
 		if pg.Failed > 0 {
 			pg.Result = Tf("%d steps failed; RimArcho's data stays so you can run it again", pg.Failed)
+		} else if p.AtOnce {
+			pg.Result = T("done. RimArcho's data and program are deleted")
 		} else {
 			pg.Result = Tf("done. RimArcho deletes its data and the program once it has closed; anything left is listed in %s", p.Log)
 		}
@@ -187,6 +193,9 @@ func uninstallText(p *app.UninstallPlan, s *app.UninstallStep) string {
 	}
 	switch s.Key {
 	case app.UnAccounts:
+		if n["forget-agent-key"] > 0 {
+			return T("forget account sessions first; external SteamCMD caches stay; tools and data stay if this fails") + T("; ") + T("remove the Archo Agent API key from Windows Credential Manager")
+		}
 		return T("forget account sessions first; external SteamCMD caches stay; tools and data stay if this fails")
 	case app.UnTextures:
 		add(app.DoDDS, "delete recorded DDS in %d mod folders; original textures stay")
@@ -194,7 +203,7 @@ func uninstallText(p *app.UninstallPlan, s *app.UninstallStep) string {
 		add(app.DoUnlink, "delete %d links in the games' Mods folders; the folders they point to stay")
 		add(app.DoLeave, "%d folders named like them are not links: left alone")
 	case app.UnModsConfig:
-		add(app.DoClean, "keep each game's current list (%d), without Archo Monitor and the mods only there through a link; RimArcho's backup is deleted")
+		add(app.DoClean, "keep each game's current list (%d), without Archo Monitor and the mods only there through a link; RimArcho's backups of the list and of Mod settings are deleted (the settings stay)")
 		add(app.DoRestore, "put back the list from before RimArcho's last save (%d)")
 	case app.UnLocked:
 		add(app.DoTrash, "%d copies to the recycle bin")
@@ -216,12 +225,20 @@ func uninstallText(p *app.UninstallPlan, s *app.UninstallStep) string {
 		add(app.DoDelete, "delete the SteamCMD RimArcho downloaded")
 		add(app.DoLeave, "it holds mods downloaded with SteamCMD: left alone")
 	case app.UnData:
-		add(app.DoLater, "once RimArcho has closed, delete its database, settings and caches (%d folders)")
+		if p.AtOnce {
+			add(app.DoLater, "delete its database, settings and caches (%d folders)")
+		} else {
+			add(app.DoLater, "once RimArcho has closed, delete its database, settings and caches (%d folders)")
+		}
 		add(app.DoLeave, "%d folders kept")
 	case app.UnSource:
 		add(app.DoDelete, "delete generated code; it can be recreated")
 	case app.UnProgram:
-		add(app.DoLater, "once RimArcho has closed, delete the program")
+		if p.AtOnce {
+			add(app.DoLater, "delete the program")
+		} else {
+			add(app.DoLater, "once RimArcho has closed, delete the program")
+		}
 		add(app.DoLeave, "the program stays")
 	}
 	return strings.Join(parts, T("; "))

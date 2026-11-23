@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -43,11 +45,11 @@ func TestRemovalIOKeepsPagesAndEditorAvailable(t *testing.T) {
 		t.Fatal(err)
 	}
 	workspace := make(chan *EnvironmentResult, 1)
-	api.emit = func(name string, data any) {
+	api.setEmit(func(name string, data any) {
 		if name == "environment" {
 			workspace <- data.(*EnvironmentResult)
 		}
-	}
+	})
 	if !api.Workspace(1) {
 		t.Fatal("workspace not accepted")
 	}
@@ -162,7 +164,7 @@ func TestGUIFileBatchUsesAppLifecycle(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			e, api, _ := fixture(t)
-			api.emit = nil
+			api.setEmit(nil)
 			target := filepath.Join(e.Game, "Mods", "B")
 			if unhide {
 				if err := os.Rename(filepath.Join(target, "About", "About.xml"), filepath.Join(target, "About", "About.xml.disabled")); err != nil {
@@ -202,7 +204,7 @@ func TestGUIFileBatchUsesAppLifecycle(t *testing.T) {
 			}
 			env, _ := e.App.Store.EnvByName("incoming")
 			if scan, _, err := e.App.LastScan(env.ID); err != nil || scan == nil {
-				t.Fatalf("incoming environment was not scanned: %v", err)
+				t.Fatalf("incoming Game Config was not scanned: %v", err)
 			}
 		})
 	}

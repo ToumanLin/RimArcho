@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -178,83 +180,11 @@ func (s *API) TaskAct(act string, ids []string, ref string) (string, error) {
 	}
 	switch act {
 	case "stop":
-		n := 0
-		for _, id := range ids {
-			t := byID[id]
-			if err := s.tasks.Stop(id); err != nil {
-				if errors.Is(err, app.ErrCannotStop) {
-					return "", errors.New(view.Tf("%s cannot be stopped part way", view.TaskTitle(t.Kind)))
-				}
-				return "", err
-			}
-			n++
-		}
-		if len(ids) == 1 {
-			t := byID[ids[0]]
-			if t.State == app.TaskRunning && t.WorkshopSubscription() {
-				return view.T("cancelling the download; completed items are kept"), nil
-			}
-			if t.State == app.TaskQueued {
-				return view.Tf("cancelled %s, %s: nothing was touched", view.TaskTitle(t.Kind), t.Obj), nil
-			}
-			return view.Tf("%s, %s stops after the item it is on; what is done stays", view.TaskTitle(t.Kind), t.Obj), nil
-		}
-		return view.Tf("stopping %d tasks", n), nil
+		return s.taskStop(ids, byID)
 	case "retry", "resume":
 		t := byID[ids[0]]
 		if t.Lane == app.LaneSelf {
-			if view.IsSettingTask(t.Kind) {
-				if !t.Ended() {
-					return "", errors.New(view.Tf("%s cannot do that now", view.TaskTitle(t.Kind)))
-				}
-				args := t.Args
-				if t.Kind == view.TaskSubscribe && len(args) > 2 && args[1] == "workshop" && len(t.Items) > 0 {
-					state := app.ItemFail
-					if act == "resume" {
-						state = app.ItemSkip
-					}
-					args = append([]string(nil), args[:2]...)
-					for _, it := range t.Items {
-						if it.State == state && !it.Permanent && (ref == "" || ref == it.Ref) {
-							args = append(args, strings.TrimPrefix(it.Ref, "ws:"))
-						}
-					}
-					if len(args) == 2 {
-						return "", errors.New(view.T("nothing to retry"))
-					}
-					for _, flag := range t.Args[2:] {
-						if strings.HasPrefix(flag, "--") {
-							args = append(args, flag)
-						}
-					}
-				}
-				s.mu.Lock()
-				var resume []app.Task
-				if act == "resume" && t.WorkshopSubscription() {
-					resume = append(resume, t)
-				}
-				nt := s.queueSettingTaskLocked(t.Kind, args, t.Env, resume...)
-				s.mu.Unlock()
-				return settingQueued(nt), nil
-			}
-			switch t.Kind {
-			case view.TaskCreditReplace:
-				s.mu.Lock()
-				id, err := s.startCreditLocked()
-				s.mu.Unlock()
-				return id, err
-			case view.TaskScan:
-				if s.Scan() {
-					return view.T("scanning…"), nil
-				}
-				return "", errors.New(view.T("a scan is running"))
-			case view.TaskAnalyze:
-				if s.Analyze() {
-					return view.T("checking the mods' files…"), nil
-				}
-				return "", errors.New(view.T("a check is running"))
-			}
-			return "", errors.New(view.T("do it again from its page"))
+			return s.taskAgainSelf(act, t, ref)
 		}
 		state := app.ItemFail
 		if act == "resume" {
@@ -300,24 +230,122 @@ func (s *API) TaskAct(act string, ids []string, ref string) (string, error) {
 		n := s.tasks.Unforget()
 		return view.Tf("put %d back on the record", n), nil
 	case "folder":
-		t := byID[ids[0]]
-		r := ref
-		if r == "" && len(t.Items) > 0 {
-			r = t.Items[0].Ref
+		return "", s.taskFolder(byID[ids[0]], ref)
+	}
+	return "", errors.New("unknown action " + act)
+}
+
+// taskStop stops the tasks ids and says what happens to them.
+func (s *API) taskStop(ids []string, byID map[string]app.Task) (string, error) {
+	n := 0
+	for _, id := range ids {
+		t := byID[id]
+		if err := s.tasks.Stop(id); err != nil {
+			if errors.Is(err, app.ErrCannotStop) {
+				return "", errors.New(view.Tf("%s cannot be stopped part way", view.TaskTitle(t.Kind)))
+			}
+			return "", err
 		}
-		s.mu.Lock()
-		st, err := s.a.Loadout()
-		s.mu.Unlock()
+		n++
+	}
+	if len(ids) == 1 {
+		t := byID[ids[0]]
+		if t.State == app.TaskRunning && t.WorkshopSubscription() {
+			return view.T("cancelling the download; completed items are kept"), nil
+		}
+		if t.State == app.TaskQueued {
+			return view.Tf("cancelled %s, %s: nothing was touched", view.TaskTitle(t.Kind), t.Obj), nil
+		}
+		return view.Tf("%s, %s stops after the item it is on; what is done stays", view.TaskTitle(t.Kind), t.Obj), nil
+	}
+	return view.Tf("stopping %d tasks", n), nil
+}
+
+// taskAgainSelf retries or resumes a task of the window's own lane: a setting task is
+// queued again, a scan, check or credit replacement started again.
+func (s *API) taskAgainSelf(act string, t app.Task, ref string) (string, error) {
+	if view.IsSettingTask(t.Kind) {
+		if !t.Ended() {
+			return "", errors.New(view.Tf("%s cannot do that now", view.TaskTitle(t.Kind)))
+		}
+		args, err := settingTaskArgsAgain(act, t, ref)
 		if err != nil {
 			return "", err
 		}
-		m, err := st.Ix.ResolveOne(r)
-		if err != nil {
-			return "", errors.New(view.T("RimArcho has not seen this copy"))
+		s.mu.Lock()
+		var resume []app.Task
+		if act == "resume" && t.WorkshopSubscription() {
+			resume = append(resume, t)
 		}
-		return "", s.OpenFolder(m.ID)
+		nt := s.queueSettingTaskLocked(t.Kind, args, t.Env, resume...)
+		s.mu.Unlock()
+		return settingQueued(nt), nil
 	}
-	return "", errors.New("unknown action " + act)
+	switch t.Kind {
+	case view.TaskCreditReplace:
+		s.mu.Lock()
+		id, err := s.startCreditLocked()
+		s.mu.Unlock()
+		return id, err
+	case view.TaskScan:
+		if s.Scan() {
+			return view.T("scanning…"), nil
+		}
+		return "", errors.New(view.T("a scan is running"))
+	case view.TaskAnalyze:
+		if s.Analyze() {
+			return view.T("checking the mods' files…"), nil
+		}
+		return "", errors.New(view.T("a check is running"))
+	}
+	return "", errors.New(view.T("do it again from its page"))
+}
+
+// settingTaskArgsAgain is the command line that runs a setting task again; a Workshop
+// subscription keeps only its failed (retry) or skipped (resume) items, or ref.
+func settingTaskArgsAgain(act string, t app.Task, ref string) ([]string, error) {
+	args := t.Args
+	if t.Kind != view.TaskSubscribe || len(args) <= 2 || args[1] != "workshop" || len(t.Items) == 0 {
+		return args, nil
+	}
+	state := app.ItemFail
+	if act == "resume" {
+		state = app.ItemSkip
+	}
+	args = append([]string(nil), args[:2]...)
+	for _, it := range t.Items {
+		if it.State == state && !it.Permanent && (ref == "" || ref == it.Ref) {
+			args = append(args, strings.TrimPrefix(it.Ref, "ws:"))
+		}
+	}
+	if len(args) == 2 {
+		return nil, errors.New(view.T("nothing to retry"))
+	}
+	for _, flag := range t.Args[2:] {
+		if strings.HasPrefix(flag, "--") {
+			args = append(args, flag)
+		}
+	}
+	return args, nil
+}
+
+// taskFolder opens the folder of the task's item ref, or of its first item.
+func (s *API) taskFolder(t app.Task, ref string) error {
+	r := ref
+	if r == "" && len(t.Items) > 0 {
+		r = t.Items[0].Ref
+	}
+	s.mu.Lock()
+	st, err := s.a.Loadout()
+	s.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	m, err := st.Ix.ResolveOne(r)
+	if err != nil {
+		return errors.New(view.T("RimArcho has not seen this copy"))
+	}
+	return s.OpenFolder(m.ID)
 }
 
 // beginSelf records one of the window's own jobs.

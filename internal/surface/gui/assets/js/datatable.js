@@ -103,9 +103,9 @@ export function createTable({ key, columns, state = { cols: null, sort: "name", 
         cell.append(arrow);
       }
       const rz = el("span", "rz");
-      rz.ondblclick = (e) => { e.preventDefault(); e.stopPropagation(); size(c.key, 0); };
+      rz.ondblclick = (e) => { e.preventDefault(); e.stopPropagation(); size(c.key, 0); }; // keys: = resets the focused column (16 §3.9)
       cell.append(rz);
-      cell.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); focusTable(); menu(e.clientX, e.clientY, c.key); };
+      cell.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); focusTable(); menu(e.clientX, e.clientY, c.key); }; // keys: s opens this menu at the sorted column; Menu, shift+F10
       cell.onpointerdown = (e) => {
         if (e.button !== 0) return;
         focusTable();
@@ -138,7 +138,7 @@ export function createTable({ key, columns, state = { cols: null, sort: "name", 
       };
       head.append(cell);
     }
-    head.oncontextmenu = (e) => { e.preventDefault(); focusTable(); menu(e.clientX, e.clientY); };
+    head.oncontextmenu = (e) => { e.preventDefault(); focusTable(); menu(e.clientX, e.clientY); }; // keys: s opens this menu at the sorted column; Menu, shift+F10
   }
   function count(n) { root.setAttribute("aria-rowcount", String(n + 1)); }
   function row(node, index, identity) {

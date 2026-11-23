@@ -40,6 +40,12 @@ namespace ArchoMonitor
         {
             var l = new Listing_Standard();
             l.Begin(inRect);
+            // The error window (19 §9): opened only from here or the dev-mode action.
+            if (l.ButtonText("ArchoMonitor_OpenErrors".Translate(), null, 0.4f))
+            {
+                ErrorWindow.Open();
+            }
+            l.Gap(12f);
             l.CheckboxLabeled("ArchoMonitor_RecordMessages".Translate(), ref Settings.recordMessages,
                 "ArchoMonitor_RecordMessagesTip".Translate(), 0f, 1f);
             l.Gap(12f);

@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -9,6 +11,7 @@ import (
 )
 
 type buildPageJob struct {
+	tex  int
 	page *view.BuildPage
 	err  error
 	done bool
@@ -22,17 +25,27 @@ type buildPageReader struct {
 }
 
 // BuildPage starts a private reader and returns its ticket before measuring folders
-// (16 §2.6, 16 §3.1). Only the latest request may publish a result.
+// (16 §2.6, 16 §3.1). Only the latest request may publish a result. A request for the same
+// textures while that measurement is on its way joins it with a new ticket instead of
+// measuring the folders again (16 §8.9).
 func (s *API) BuildPage(tex int) (uint64, error) {
+	b := &s.buildRead
+	b.mu.Lock()
+	if b.job != nil && !b.job.done && b.job.tex == tex {
+		b.seq++
+		id := b.seq
+		b.mu.Unlock()
+		return id, nil
+	}
+	b.mu.Unlock()
 	r, err := s.detachedReader()
 	if err != nil {
 		return 0, err
 	}
-	b := &s.buildRead
 	b.mu.Lock()
 	b.seq++
 	id := b.seq
-	job := &buildPageJob{}
+	job := &buildPageJob{tex: tex}
 	b.job = job
 	b.workers.Add(1)
 	b.mu.Unlock()

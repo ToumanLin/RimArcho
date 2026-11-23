@@ -1,14 +1,15 @@
 > status {"show":"envs"}
-environments: 1
-  env:main  1.6.4633 rev1261  [current]
+Game Configs: 1
+  main  1.6.4633 rev1261
     game: $ROOT/Steam/steamapps/common/RimWorld
-    saves: shared
-    user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
-    launch: direct
     sources:
       src:official  $ROOT/Steam/steamapps/common/RimWorld/Data
       src:local     $ROOT/Steam/steamapps/common/RimWorld/Mods
-  mod folders (every environment):
+    env:main  [current]
+      saves: shared
+      user-data: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios
+      launch: direct
+  mod folders (every Game Config):
     src:workshop  $ROOT/Steam/steamapps/workshop/content/294100
 
 > status {"show":"settings"}
@@ -16,7 +17,9 @@ settings
   data.replacements.url: https://raw.githubusercontent.com/emipa606/UseThisInstead/main/replacements.json.gz
   data.rules.url: https://raw.githubusercontent.com/RimSort/Community-Rules-Database/main/communityRules.json
   data.steamdb.url: https://raw.githubusercontent.com/RimSort/Steam-Workshop-Database/main/steamDB.json
+  feedback.replies: on
   monitor.default: on
+  network.github_mirror: auto
   network.proxy: system
   tags.pinned: RimWorld,framework,visuals,apparel,races,weapons,buildings,furniture,QoL,balance,story,performance,language packs,testing,to delete
   ui.accent: default
@@ -28,6 +31,7 @@ settings
   ui.mouse: on
   ui.theme: auto
   ui.tui.theme: auto
+  ui.zoom: 100
   updates.auto: on
   updates.interval: normal
   updates.source: auto
@@ -195,24 +199,25 @@ moved to the recycle bin
   folder: $ROOT/Steam/steamapps/workshop/content/294100/4200
 
 > manage_packs {"action":"list"}
-packs: 0 ($ROOT/ArchoHome/packs)
+packs: 0 ($ROOT/LocalAppData/RimArcho/packs)
 next:
   archo pack build <name>
 
 > manage_packs {"action":"build","dry_run":true,"name":"first"}
 pack build: dry run, nothing written
-  folder: $ROOT/ArchoHome/packs/first
+  folder: $ROOT/LocalAppData/RimArcho/packs/first
   mods: 2 carried, 1 from the game (Core and DLCs)
   size: 868 B; 0 B of other game versions left out
   space: <free> free on the packs drive
   trimmed: nothing (no folders for other game versions)
   game: 1.6.4633 rev1261
+  Mod settings: none carried
 next:
   archo pack build first
 
 > manage_packs {"action":"build","dry_run":true,"name":"first","texture_scale":50}
 pack build: dry run, nothing written
-  folder: $ROOT/ArchoHome/packs/first
+  folder: $ROOT/LocalAppData/RimArcho/packs/first
   mods: 2 carried, 1 from the game (Core and DLCs)
   size: 868 B; 0 B of other game versions left out
   space: <free> free on the packs drive
@@ -222,6 +227,7 @@ pack build: dry run, nothing written
     encoder: todds (the DDS encoder) is not installed; archo textures tool --install downloads it — the build is refused
   trimmed: nothing (no folders for other game versions)
   game: 1.6.4633 rev1261
+  Mod settings: none carried
 next:
   archo pack build first
 
@@ -231,11 +237,12 @@ error: todds (the DDS encoder) is not installed; archo textures tool --install d
 
 > manage_packs {"action":"build","name":"first"}
 built pack first
-  folder: $ROOT/ArchoHome/packs/first
+  folder: $ROOT/LocalAppData/RimArcho/packs/first
   mods: 2 carried, 1 from the game (Core and DLCs)
   size: 868 B; 0 B of other game versions left out
   trimmed: nothing (no folders for other game versions)
   game: 1.6.4633 rev1261
+  Mod settings: none carried
 next:
   archo pack launch first
 
@@ -255,9 +262,9 @@ pack launch: dry run, nothing written
     + !ArchoPack_first_2009463077
   from Mods/: 1 mods: the same version is already in Mods/, so the pack's copy is not linked next to it
     A
-  list: $ROOT/ArchoHome/packs/first/userdata/Config/ModsConfig.xml (3 entries; the environment's ModsConfig.xml is not touched)
-  saves: $ROOT/ArchoHome/packs/first/userdata
-  command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe -savedatafolder=$ROOT/ArchoHome/packs/first/userdata
+  list: $ROOT/LocalAppData/RimArcho/packs/first/userdata/Config/ModsConfig.xml (3 entries; the Game Config's ModsConfig.xml is not touched)
+  saves: $ROOT/LocalAppData/RimArcho/packs/first/userdata
+  command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe -savedatafolder=$ROOT/LocalAppData/RimArcho/packs/first/userdata -logfile $ROOT/LocalAppData/RimArcho/packs/first/userdata/Player.log
 
 > manage_packs {"action":"launch","name":"first"}
 pack first: the game is starting
@@ -268,9 +275,9 @@ pack first: the game is starting
     + !ArchoPack_first_2009463077
   from Mods/: 1 mods: the same version is already in Mods/, so the pack's copy is not linked next to it
     A
-  list: $ROOT/ArchoHome/packs/first/userdata/Config/ModsConfig.xml (3 entries; the environment's ModsConfig.xml is not touched)
-  saves: $ROOT/ArchoHome/packs/first/userdata
-  command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe -savedatafolder=$ROOT/ArchoHome/packs/first/userdata
+  list: $ROOT/LocalAppData/RimArcho/packs/first/userdata/Config/ModsConfig.xml (3 entries; the Game Config's ModsConfig.xml is not touched)
+  saves: $ROOT/LocalAppData/RimArcho/packs/first/userdata
+  command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe -savedatafolder=$ROOT/LocalAppData/RimArcho/packs/first/userdata -logfile $ROOT/LocalAppData/RimArcho/packs/first/userdata/Player.log
 
 > list_problems {"code":"pack"}
 problems: 0 error, 1 warning, 0 info
@@ -323,13 +330,13 @@ error: no build of "first" is running
 [isError]
 
 > manage_packs {"action":"remove","dry_run":true,"name":"first"}
-dry run: would move $ROOT/ArchoHome/packs/first to the recycle bin
+dry run: would move $ROOT/LocalAppData/RimArcho/packs/first to the recycle bin
 
 > manage_packs {"action":"remove","name":"first"}
-moved $ROOT/ArchoHome/packs/first to the recycle bin
+moved $ROOT/LocalAppData/RimArcho/packs/first to the recycle bin
 
 > manage_packs {"action":"list"}
-packs: 0 ($ROOT/ArchoHome/packs)
+packs: 0 ($ROOT/LocalAppData/RimArcho/packs)
 next:
   archo pack build <name>
 
@@ -343,7 +350,7 @@ import rimcrow (dry run: nothing written)
   mods: 1 with data: 1 mapped (0 by path, 1 by packageId), 0 not mapped
   aliases: 1 new, 0 already set
   notes: 1 new, 0 already set
-  tags: 0 new, 0 already present (0 groups, 0 memberships)
+  tags: 0 new, 0 already present (0 groups, 0 memberships), 0 tags given a colour
   rules: 0: 0 new, 0 already present, 0 skipped (no user_rules.json found)
   conflicts: 0 (RimArcho's value kept)
 next:
@@ -355,7 +362,7 @@ import rimcrow
   mods: 1 with data: 1 mapped (0 by path, 1 by packageId), 0 not mapped
   aliases: 1 new, 0 already set
   notes: 1 new, 0 already set
-  tags: 0 new, 0 already present (0 groups, 0 memberships)
+  tags: 0 new, 0 already present (0 groups, 0 memberships), 0 tags given a colour
   rules: 0: 0 new, 0 already present, 0 skipped (no user_rules.json found)
   conflicts: 0 (RimArcho's value kept)
 next:
@@ -374,7 +381,7 @@ gc: removed 0 tombstones (tombstones older than 90 days, before 2026-07-03)
 database maintenance: would remove 6 old file records and compact the database
 
 > maintenance {"action":"vacuum"}
-database compacted: freed 44.3 KB (now 508.0 KB)
+database compacted: freed 64.4 KB (now 560.0 KB)
 
 > edit_loadout {"action":"disable","refs":["#hnyg"]}
 workspace: 2 active, 1 change unsaved (plan:default, env:main)
@@ -388,7 +395,7 @@ versions: 1 (plan:default, env:main)
   v1  2026-10-01 10:00  import  3 entries  1.6.4633 rev1261  ModsConfig.xml
 
 > plan_history {"action":"steps"}
-history: 1 unsaved edits, 0 redoable, 1 versions
+history: 1 edit to undo, 0 redoable, 1 version
   now: workspace: 2 active, 1 change unsaved (plan:default, env:main)
   undo: archo undo <n> returns to before step n
     1    disable    removed #hnyg Harmony was 2
@@ -409,7 +416,7 @@ workspace: 3 active, saved (plan:default, env:main)
   added  #hnyg  Harmony  at 2
 
 > plan_history {"action":"steps"}
-history: 2 unsaved edits, 0 redoable, 1 versions
+history: 2 edits to undo, 0 redoable, 1 version
   now: workspace: 3 active, saved (plan:default, env:main)
   undo: archo undo <n> returns to before step n
     1    checkout   added #hnyg Harmony at 2
@@ -485,8 +492,8 @@ launch: dry run (direct), nothing written
   entries: 3
   changes: 0 since v1
   history: same as v1, no new version
-  command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe "-savedatafolder=$ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios"
-  before you play: 1 problems that often cause errors in the game (they do not block the launch)
+  command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe
+  before you play: 1 problem that often causes errors in the game (they do not block the launch)
     warning patch.no-match  #iqmu A: Patches/a.xml:1 Verse.PatchOperationAdd(Defs/ThingDef[defName="a"]) matched nothing (exception)
       why: patches that find nothing usually fail with red errors: such mods were error sources in 37% of logs (4.5% by chance)
       fix: get_patches mod=iqmu
@@ -501,8 +508,8 @@ launched RimWorld via direct
   entries: 3
   changes: 0 since v1
   history: same as v1, no new version
-  command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe "-savedatafolder=$ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios"
-  before you play: 1 problems that often cause errors in the game (they do not block the launch)
+  command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe
+  before you play: 1 problem that often causes errors in the game (they do not block the launch)
     warning patch.no-match  #iqmu A: Patches/a.xml:1 Verse.PatchOperationAdd(Defs/ThingDef[defName="a"]) matched nothing (exception)
       why: patches that find nothing usually fail with red errors: such mods were error sources in 37% of logs (4.5% by chance)
       fix: get_patches mod=iqmu
@@ -544,6 +551,7 @@ next:
 
 > list_library {"lineage":"L#l4xt"}
 L#l4xt A  [2 copies, 1.3 KB]
+  added: 2026-10-01 10:00
   #6olp workshop  672 B
     path: $ROOT/Steam/steamapps/workshop/content/294100/1001
     workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=1001
@@ -602,6 +610,7 @@ tag deleted: visual, visuals
 
 > list_library {"lineage":"L#l4xt","sort":"-size"}
 L#l4xt A  [2 copies, 1.3 KB]
+  added: 2026-10-01 10:00
   #6olp workshop  672 B
     path: $ROOT/Steam/steamapps/workshop/content/294100/1001
     workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=1001

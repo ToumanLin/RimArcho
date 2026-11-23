@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -54,10 +56,12 @@ type savesState struct {
 	nextAt    uint64                     // the SaveDetail call that asked for next
 	fresh     []string                   // refs read since the last "saves-read" event
 	line      string                     // the run's newest progress, for the status line
-	dirty     bool                       // saves were read since the page was last relisted
-	timer     *time.Timer                // the next "saves-read" event, when one is due
-	sent      time.Time                  // when the last event went
-	listed    time.Time                  // when the page was last listed
+	lineRead  int                        // and as numbers: saves read of lineTotal
+	lineTotal int
+	dirty     bool        // saves were read since the page was last relisted
+	timer     *time.Timer // the next "saves-read" event, when one is due
+	sent      time.Time   // when the last event went
+	listed    time.Time   // when the page was last listed
 	// Events are numbered when their news is taken (flushes) and sent in that order: an
 	// event taken before one already sent drops its progress line, so a late flush never
 	// puts "reading the saves n/m" back after the run's end (sendMu: one send at a time).
@@ -78,13 +82,29 @@ const (
 // event (Refs), the run's progress for the status line (Line), the listing again with
 // their days and colonies (Page; nil when not relisted this time), and the run's end.
 type SavesReadEvent struct {
-	Refs  []string        `json:"refs,omitempty"`
-	Line  string          `json:"line,omitempty"`
+	Refs []string `json:"refs,omitempty"`
+	Line string   `json:"line,omitempty"`
+	// Read and Total are the run's progress as numbers (saves read of those to read), for
+	// the page's progress bar; sent with Line.
+	Read  int             `json:"read,omitempty"`
+	Total int             `json:"total,omitempty"`
 	Page  *view.SavesPage `json:"page,omitempty"`
 	Done  bool            `json:"done,omitempty"`
 	Text  string          `json:"text,omitempty"`
 	Error string          `json:"error,omitempty"`
 }
+
+// SavesProgressEvent is how far a listing's heads are, for the page's first listing
+// (16 §2.11 "Loading"): done of total saves, at most every savesProgressEvery.
+type SavesProgressEvent struct {
+	Request uint64 `json:"request"`
+	Done    int    `json:"done"`
+	Total   int    `json:"total"`
+}
+
+// savesProgressEvery throttles "saves-progress": often enough for a moving bar, rarely
+// enough not to flood the window with a cold library of thousands of saves.
+const savesProgressEvery = 120 * time.Millisecond
 
 // SavesEvent is a listing as the "saves" event carries it.
 type SavesEvent struct {
@@ -159,7 +179,14 @@ func (s *API) listSaves(request, visit uint64) (*SavesEvent, *app.SaveList) {
 		ev.Error = err.Error()
 		return ev, nil
 	}
-	l, err := r.ListSaves()
+	var last time.Time
+	l, err := r.ListSavesProgress(func(done, total int) {
+		if done < total && time.Since(last) < savesProgressEvery {
+			return
+		}
+		last = time.Now()
+		s.send("saves-progress", &SavesProgressEvent{Request: request, Done: done, Total: total})
+	})
 	if err != nil {
 		ev.Error = err.Error()
 		return ev, nil
@@ -265,8 +292,101 @@ func (s *API) SaveDetail(ref string) (*view.SaveDetail, error) {
 	g, _ := r.RunningGame()
 	current := target.Plan != nil && target.Env != nil && r.Store.CurrentPlanID(target.Env.ID) == target.Plan.ID
 	d := view.SaveDetailAgainst(c, g != nil, current, sv, own)
+	folderFacts(r, d, sv, target)
 	s.savePlay(r, sv, d, asked)
 	return d, nil
+}
+
+// folderFacts fills where the save's folder belongs (12 §4.8): who saves there, whether
+// the game started with what the Launch page applied (target's game and pack) lists it,
+// whether Steam Cloud syncs it, and whether Can it run checks it.
+func folderFacts(r *app.App, d *view.SaveDetail, sv, target *app.Save) {
+	f := sv.Folder
+	if f == nil || target.Env == nil {
+		return
+	}
+	// The header's game line names the save's own Game Config already: "saves of" only
+	// when the folder is a pack's or shared by several configs.
+	if f.Pack != "" || len(f.Envs) != 1 || sv.Env == nil || f.Envs[0].ID != sv.Env.ID {
+		d.Owner = view.FolderOwner(f)
+	}
+	cur := target.Env
+	switch {
+	case target.Pack != "" && f.Pack != target.Pack:
+		d.Unseen = view.UnseenText(f, view.Tf("pack %s", target.Pack))
+	case target.Pack == "" && !sv.SeenBy(cur):
+		d.Unseen = view.UnseenText(f, cur.Name)
+		d.CopyHere = cur.Name
+	}
+	d.NoCloud = f.Pack != "" || len(f.Envs) > 0
+	for _, e := range f.Envs {
+		if r.Saves(e) == app.SavesShared {
+			d.NoCloud = false
+		}
+	}
+	ch := r.SaveChoiceOf(cur.ID)
+	switch {
+	case ch.Chose(sv, true):
+		d.Chosen = app.ChooseColony
+	case ch.Chose(sv, false):
+		d.Chosen = app.ChooseSaveFile
+	}
+}
+
+// SaveChoose makes the save (colony: its colony, whose newest save counts) what Can it
+// run checks for the current Game Config (12 §4.8); clear goes back to the last loaded save.
+func (s *API) SaveChoose(ref string, colony, clear bool) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, err := s.a.Env()
+	if err != nil {
+		return "", err
+	}
+	if e == nil {
+		return "", app.ErrNoEnv
+	}
+	if clear {
+		if err := s.a.ClearSaveChoice(e.ID); err != nil {
+			return "", err
+		}
+		return view.T("Can it run checks the last loaded save again"), nil
+	}
+	sv, err := s.findSave(ref)
+	if err != nil {
+		return "", err
+	}
+	ch, err := s.a.ChooseSave(e.ID, sv, colony)
+	if err != nil {
+		return "", err
+	}
+	if colony {
+		return view.Tf("Can it run checks the newest save of %s", ch.Name), nil
+	}
+	return view.Tf("Can it run checks %s", ch.Name), nil
+}
+
+// SaveCopyTo copies a save into the current Game Config's Saves folder (12 §4.4), so the
+// game started with it lists the save; only the file is copied.
+func (s *API) SaveCopyTo(ref string) (*SaveFileReply, error) {
+	sv, err := s.findSave(ref)
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, err := s.a.Env()
+	if err != nil {
+		return nil, err
+	}
+	if e == nil {
+		return nil, app.ErrNoEnv
+	}
+	to, err := s.a.CopySaveTo(sv, e)
+	if err != nil {
+		return nil, saveErr(err)
+	}
+	_, shown := app.SplitSaveName(filepath.Base(to))
+	return &SaveFileReply{Text: view.Tf("copied %s to the saves of %s as %s", sv.Name, e.Name, shown), Ref: app.SaveRef(to)}, nil
 }
 
 // appliedTarget is what the Saves page checks a save against (16 §2.11): what the Launch
@@ -534,6 +654,9 @@ func (s *API) OpenSaveFolder(ref string) error {
 func saveErr(err error) error {
 	if errors.Is(err, app.ErrGameRunning) {
 		return errors.New(view.T("the game is running: close it first"))
+	}
+	if errors.Is(err, app.ErrPreviewChanged) {
+		return errors.New(view.T("the saves changed since you were shown them; press it again to see them as they are now"))
 	}
 	return errors.New(view.Humanize(nil, err.Error()))
 }

@@ -8,6 +8,7 @@ import { S, $, el, api, T, Tf, say, errText } from "./state.js";
 import { pathContent } from "./fields.js";
 import * as pop from "./popups.js";
 import { icon } from "./icons.js";
+import { stateMark, fileMarks } from "./membar.js";
 import { wireSeparator } from "./separator.js";
 import { addForm, pageUpdate } from "./subscribe.js";
 import { libraryLink, openLibraryInstance } from "./librarylink.js";
@@ -118,7 +119,7 @@ function draw() {
   V.items = buildItems();
   if (!selected()) V.sel = V.items.find((it) => it.t !== "day")?.key || V.items[0]?.key || "";
   sc.innerHTML = "";
-  const w = page("changes fill subs-page", T("First what waits for you to update, then what Steam already updated."),
+  const w = page("changes fill subs-page", "",
     act(T("check for updates"), "rescan", checkAll, "K"),
     act(T("add a subscription"), "plus", () => ui.go("subscribe"), "+"));
   const grid = el("div", "subs");
@@ -164,7 +165,11 @@ function scopeBar() {
     return bar;
   }
   const names = [h.plan ? Tf("list “%s”", h.plan) : T("the current list"), T("every mod")];
-  bar.append(seg(names, V.library ? 1 : 0, (i) => { if ((i === 1) !== V.library) toggleScope(); }, ["a", "a"]));
+  const s = seg(names, V.library ? 1 : 0, (i) => { if ((i === 1) !== V.library) toggleScope(); }, ["a", "a"]);
+  // a long list name ends in … (style.css): its button names it in full
+  const first = s.querySelector("button");
+  if (first && h.plan) first.title = names[0] + "  (a)";
+  bar.append(s);
   if (h.since) bar.append(el("span", "since muted word-facts", h.since));
   return bar;
 }
@@ -241,8 +246,13 @@ function row(it) {
     meta.textContent = T("removed from the Workshop");
   } else if (it.t === "change") {
     name.textContent = it.r.mod;
-    meta.textContent = it.r.text;
-    right.append(el("span", "tier " + (TIER[it.r.tier] || ""), it.r.tierText));
+    // V6: the files as + ~ − counts by kind beside the other facts, and the tier as one mark
+    // (▲ affects launch, a dot worth a look, none for content only), each named by its words
+    if (it.r.files?.length) {
+      if (it.r.others) meta.append(el("span", "", it.r.others));
+      meta.append(fileMarks(it.r.files, it.r.details?.[0] || it.r.text));
+    } else meta.textContent = it.r.text;
+    right.append(stateMark({ 1: "warn", 2: "dot" }[it.r.tier] || "", it.r.tierText, icon.warn));
   } else if (it.t === "group") {
     name.textContent = it.g.text;
     name.classList.add("plain");
@@ -299,7 +309,13 @@ function sourcesDetail(card) {
     label.id = "update-source-" + encodeURIComponent(s.key);
     r.setAttribute("role", "group");
     r.setAttribute("aria-labelledby", label.id);
-    l.append(n, el("div", "muted word-facts", (s.checked ? [s.checked, s.result] : [s.result || T("not checked yet")]).filter(Boolean).join("  ")));
+    // V6: whether it was checked as an icon after the name (✓, ✕ with failures, ○ not checked
+    // yet), named by the words; a checked source keeps its time and result below
+    if (s.failures?.length) n.append(stateMark("err", s.result || T("failed"), icon.err));
+    else if (s.checked) n.append(stateMark("ok", s.result || s.checked, icon.ok));
+    else n.append(stateMark("ring", s.result || T("not checked yet")));
+    l.append(n);
+    if (s.checked) l.append(el("div", "muted word-facts", [s.checked, s.result].filter(Boolean).join("  ")));
     if (s.account && ["steamcmd", "page"].includes(s.key)) {
       const a = el("div", "word-facts acct");
       a.append(el("span", "", s.account), button(T("accounts") + " →", "", () => goAccounts(), "link"));
@@ -400,10 +416,10 @@ function pendingDetail(card, r) {
   usedIn(body, r.usedIn);
   const acts = el("div", "subs-acts");
   if (r.opens) acts.append(button(r.opens === "compare" ? T("compare on the website") : r.opens === "notes" ? T("Workshop change notes") : T("open the source page"), "ctrl+w", () => openSource(r), "line small"));
-  acts.append(button(T("lock this version first"), "p", () => lock(r.ref), "small", "pin"));
+  acts.append(button(T("keep this version first"), "p", () => lock(r.ref), "small", "pin"));
   acts.append(button(T("show in the mod library"), "l", () => openLibraryInstance(r.id), "small"));
   const keep = section(body, T("keep the old one"));
-  keep.append(el("div", "muted subs-note", T("Updating replaces this copy. To keep the old one, lock this version first.")), acts);
+  keep.append(el("div", "muted subs-note", T("Updating replaces this copy. To keep the old one, keep this version first.")), acts);
   card.append(body);
 }
 
@@ -411,9 +427,9 @@ function goneDetail(card, r) {
   detailHead(card, r.name, []);
   const body = el("div", "scroll subs-gone");
   body.append(el("p", "word-facts", T("The author deleted the Workshop page or made it private; your installed copy still works, but Steam will never update it.")),
-    el("p", "word-facts", T("After unsubscribing, you cannot download it again; lock this version to keep it.")));
+    el("p", "word-facts", T("After unsubscribing, you cannot download it again; keep this version to hold on to it.")));
   const acts = el("div", "subs-acts");
-  acts.append(button(T("lock this version"), "p", () => lock(r.ref), "small", "pin"),
+  acts.append(button(T("keep this version"), "p", () => lock(r.ref), "small", "pin"),
     button(T("show in the mod library"), "l", () => openLibraryInstance(r.id), "small"));
   body.append(acts);
   card.append(body);
@@ -519,7 +535,7 @@ async function openSource(r) {
 async function lock(ref) {
   let p;
   try { p = await api.LibraryPreview("pin", [ref]); } catch (e) { return say("fail", errText(e)); }
-  pop.confirm(p.title, p.lines, T("lock this one"), p.apply ? async () => {
+  pop.confirm(p.title, p.lines, T("keep this one"), p.apply ? async () => {
     try { say("ok", await api.LibraryDo("pin", [ref])); } catch (e) { say("fail", errText(e)); }
     await ui.reload();
     changes();
@@ -552,21 +568,19 @@ async function changeAct(r, kind) {
 
 // ---- keys and hints ----
 
+// changesHints: the cursor's two most useful actions, then the page's, then ? (at most 7
+// with renderHints' esc for one Mod, 16 §2.2). ctrl+o, ctrl+w, a and + are in ?.
 export function changesHints() {
   const it = selected();
   const out = [{ key: "↑↓", label: T("move") }];
-  if (["pending", "gone"].includes(it?.t)) out.push({ key: "p", label: T("lock this version") }, { key: "l", label: T("show in the mod library") });
-  if (it?.t === "sources" || it?.t === "group") out.push({ key: "tab", label: T("the next field or button") }, { key: "enter", label: T("open") });
-  if (it?.t === "pending") out.push({ key: "u", label: T("update") }, ...(it.r.opens ? [{ key: "ctrl+w", label: T("open the source page") }] : []));
-  if (it?.t === "change") {
+  if (it?.t === "pending") out.push({ key: "u", label: T("update") }, { key: "p", label: T("keep this version") });
+  else if (it?.t === "gone") out.push({ key: "p", label: T("keep this version") }, { key: "l", label: T("show in the mod library") });
+  else if (it?.t === "sources" || it?.t === "group") out.push({ key: "enter", label: T("open") }, { key: "tab", label: T("the next field or button") });
+  else if (it?.t === "change") {
     if (hasFiles(it.r)) out.push({ key: "i", label: T("files") });
-    out.push({ key: "ctrl+o", label: T("open the folder") });
-    for (const a of it.r.actions || []) out.push({ key: a.key, label: a.label });
-  }
-  if (it?.t === "day") out.push({ key: "enter", label: T("open") });
-  out.push({ key: "U", label: T("update all") }, { key: "K", label: T("check for updates") });
-  if (!V.of) out.push({ key: "a", label: V.library ? T("the current list") : T("every mod") });
-  out.push({ key: "+", label: T("add a subscription") });
+    for (const a of it.r.actions || []) if (out.length < 3) out.push({ key: a.key, label: a.label });
+  } else if (it?.t === "day") out.push({ key: "enter", label: T("open") });
+  out.push({ key: "U", label: T("update all") }, { key: "K", label: T("check for updates") }, { key: "?", label: T("all keys") });
   return out;
 }
 
@@ -632,6 +646,15 @@ export function changesKey(e) {
 
 // ---- Mod library › add a subscription ----
 
+// addWith opens add a subscription with text in its box (a link, a Mod folder or zip dropped
+// on the window), or fills the box when the page is open; its card asks before anything is done.
+let addForm_ = null;
+export function addWith(text) {
+  if (S.screen === "subscribe" && addForm_) { addForm_.setText(text); addForm_.focus(); return; }
+  pasted = text;
+  return ui.go("subscribe");
+}
+
 // openAdd shows the add page; a paste on updates arrives filled in.
 export async function openAdd() {
   const read = beginPageRead("subscribe");
@@ -640,8 +663,9 @@ export async function openAdd() {
   if (!read.current()) return;
   const sc = $("#screen");
   sc.innerHTML = "";
-  const w = page("subscribe-page", T("Paste an address: RimArcho recognises what it is, where to download it and how to check it for updates."));
+  const w = page("subscribe-page", "");
   const form = addForm({ data, back: () => ui.go("changes"), done: () => {} });
+  addForm_ = form;
   w.append(form.el);
   sc.append(w);
   const text = pasted;

@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -71,8 +73,8 @@ func TestUseInstalledAPIAndNeedsAction(t *testing.T) {
 	}
 	checkNeeds("zh")
 	checkNeeds("en")
-	// First edit via the direct frontend method; then undo and execute the needs action.
-	r, err := s.UseInstalled(action.Refs)
+	// First edit via the sort steps' use-installed step (16 §6.1); then undo and execute the needs action.
+	r, err := s.ApplySortStep(view.StepUseInstalled)
 	if err != nil || !r.Undo || r.Text != "using installed copies" || r.Problems == nil {
 		t.Fatal(r, err)
 	}

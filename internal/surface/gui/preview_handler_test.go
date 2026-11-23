@@ -1,8 +1,11 @@
+//go:build windows || cgo
+
 package gui
 
 import (
 	"bytes"
 	"image"
+	"image/jpeg"
 	"image/png"
 	"net/http/httptest"
 	"os"
@@ -70,5 +73,54 @@ func TestPreviewHandlerDoesNotHoldSharedLock(t *testing.T) {
 	got, err := png.DecodeConfig(rec.Body)
 	if err != nil || got.Width != app.PreviewWidth || got.Height != 180 {
 		t.Fatalf("thumbnail: %+v %v", got, err)
+	}
+}
+
+func TestPreviewThumbHandler(t *testing.T) {
+	e, api, _ := fixture(t)
+	var pic bytes.Buffer
+	if err := png.Encode(&pic, image.NewNRGBA(image.Rect(0, 0, 1200, 600))); err != nil {
+		t.Fatal(err)
+	}
+	src := filepath.Join(e.Workshop, "1001", "About", "Preview.png")
+	if err := os.WriteFile(src, pic.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ix, err := e.App.Index()
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := ix.ResolveOne("ws:1001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	api.Board()
+	h := handler(api, fstest.MapFS{})
+	get := func(id string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", "/preview/"+id+"?w=thumb", nil))
+		return rec
+	}
+	first := get(m.ID)
+	if first.Code != 200 || first.Header().Get("Cache-Control") != "max-age=86400" || first.Header().Get("Content-Type") != "image/jpeg" {
+		t.Fatalf("response: %d %v", first.Code, first.Header())
+	}
+	cfg, err := jpeg.DecodeConfig(bytes.NewReader(first.Body.Bytes()))
+	if err != nil || cfg.Width != 192 || cfg.Height != 96 {
+		t.Fatalf("thumb: %+v %v", cfg, err)
+	}
+	// A repeat serves the same generated file, including Last-Modified.
+	second := get(m.ID)
+	if !bytes.Equal(first.Body.Bytes(), second.Body.Bytes()) || first.Header().Get("Last-Modified") != second.Header().Get("Last-Modified") {
+		t.Fatal("thumbnail was not kept")
+	}
+	if err := os.Remove(src); err != nil {
+		t.Fatal(err)
+	}
+	if got := get(m.ID); got.Code != 404 {
+		t.Fatalf("removed picture: %d", got.Code)
+	}
+	if got := get("gone"); got.Code != 404 {
+		t.Fatalf("unknown Mod: %d", got.Code)
 	}
 }

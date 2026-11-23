@@ -104,11 +104,12 @@ func TestFeedbackSendTUI(t *testing.T) {
 	t.Setenv("RIMARCHO_FEEDBACK_RELAY", srv.URL+"/report")
 	m.panel = nil
 	m.palRun("feedback")(m)
-	if !strings.Contains(strings.Join(m.panel.lines, "\n"), "s: send it here") {
+	if !strings.Contains(strings.Join(m.panel.lines, "\n"), "s: answer the questions here") {
 		t.Fatalf("s offered:\n%s", strings.Join(m.panel.lines, "\n"))
 	}
+	m.panelKey("5") // other / help: one question
 	m.panelKey("s")
-	for _, typed := range []string{"Crash", "on load"} {
+	for _, typed := range []string{"on load", "Crash"} {
 		if m.prompt == nil {
 			t.Fatal("asks on the input line")
 		}
@@ -119,7 +120,7 @@ func TestFeedbackSendTUI(t *testing.T) {
 		t.Fatal("sends in the background")
 	}
 	m.update(cmd())
-	if got.Title != "Crash" || got.Contact != "me#1" || !strings.HasPrefix(got.Body, "on load\n\n---\n") || !strings.Contains(m.status, "#7") {
+	if got.Title != "Crash" || got.Contact != "me#1" || got.Kind != "other" || !strings.HasPrefix(got.Body, "on load\n\n---\nreport: other / help\n") || !strings.Contains(m.status, "#7") {
 		t.Fatalf("sent %+v; status %q", got, m.status)
 	}
 }
@@ -140,16 +141,73 @@ func TestSettingsAboutFirst(t *testing.T) {
 			t.Fatal("no settings panel")
 		}
 		text := strings.Join(m.panel.lines, "\n")
-		if !strings.HasPrefix(text, view.T("about")+"\n") || strings.Index(text, view.T("this game")) < strings.Index(text, view.T("about")) {
+		if !strings.HasPrefix(text, view.T("about")+"\n") || strings.Index(text, view.T("Game Config")) < strings.Index(text, view.T("about")) {
 			t.Fatal(text)
 		}
-		for _, value := range []string{"config set updates.auto {}", "config set updates.interval {}", `config set steamcmd.path ""`, "https://discord.gg/HF2GVyurQs", "https://github.com/ToumanLin/RimArcho"} {
+		for _, value := range []string{"config set updates.auto {}", "config set updates.interval {}", `config set steamcmd.path ""`} {
 			if strings.Count(text, value) != 1 {
 				t.Fatalf("want one %q in settings: %s", value, text)
 			}
 		}
+		// the community links moved to the feedback panel (16 §2.14); the QQ group only in Chinese
+		if strings.Contains(text, "https://discord.gg/HF2GVyurQs") {
+			t.Fatal("community still in settings", text)
+		}
+		m.palRun("feedback")(m)
+		fb := strings.Join(m.panel.lines, "\n")
+		for _, value := range []string{"https://discord.gg/HF2GVyurQs", "https://github.com/ToumanLin/RimArcho"} {
+			if strings.Count(fb, value) != 1 {
+				t.Fatalf("want one %q in feedback: %s", value, fb)
+			}
+		}
+		if strings.Contains(fb, "1042873484") != (lang == "zh") {
+			t.Fatalf("QQ group in %s: %s", lang, fb)
+		}
 		if !strings.Contains(text, "env set") {
 			t.Fatal("lost text path commands", text)
 		}
+	}
+}
+
+// W on a Can it run item (16 §2.4): the feedback panel on wrong diagnosis with the item's ID;
+// an item that rests on the replacement library also fills outdated data (4) with its Mod.
+func TestFeedbackFromNeedW(t *testing.T) {
+	view.SetLang("en")
+	e := testkit.New(t)
+	e.AddWorkshop("1001", testkit.Mod{PackageID: "fan.port", Name: "Unofficial port"})
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "fan.port")
+	e.WriteFile(filepath.Join(e.Home, "cache", "replacements.json.gz"), `{"rules":[{"oldPackageId":"fan.port","newPackageId":"author.official","newName":"Official","newWorkshopId":"2002","newVersions":["1.6"]}]}`)
+	e.AddEnv(false)
+	e.MustRun("scan")
+	m := direct(t, e, 140, 40)
+	m.tab = tabProblems
+	m.loadProblems()
+	m.panel = nil
+	at := -1
+	for i, it := range m.prob.items {
+		if strings.Contains(it.text, "maintained replacement") {
+			at = i
+		}
+	}
+	if at < 0 {
+		t.Fatalf("no replacement item in %+v", m.prob.items)
+	}
+	m.prob.cursor = at
+	if _, ok := m.needItemKey("W"); !ok || m.panel == nil || m.panel.title != "feedback" {
+		t.Fatal("W did not open the feedback panel")
+	}
+	text := strings.Join(m.panel.lines, "\n")
+	if !strings.Contains(text, "> 3 wrong diagnosis") || !strings.Contains(text, "the diagnosis need:") || !strings.Contains(text, "kind: mod.replaced") {
+		t.Fatalf("W: wrong diagnosis filled in:\n%s", text)
+	}
+	m.panelKey("4")
+	text = strings.Join(m.panel.lines, "\n")
+	if !strings.Contains(text, "> 4 outdated data") || !strings.Contains(text, "the Mod fan.port") || !strings.Contains(text, "the diagnosis need:") {
+		t.Fatalf("4: outdated data filled in:\n%s", text)
+	}
+	// the command panel's feedback starts empty again
+	m.palRun("feedback")(m)
+	if text = strings.Join(m.panel.lines, "\n"); strings.Contains(text, "fan.port") {
+		t.Fatalf("a fresh panel kept the item:\n%s", text)
 	}
 }

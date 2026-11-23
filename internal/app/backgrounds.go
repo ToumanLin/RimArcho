@@ -263,12 +263,18 @@ func releaseSoon() {
 // BackgroundImage returns the cached JPEG of src at width BgFull or BgThumb (no wider
 // than the original), making both on first use from one decode.
 func (a *App) BackgroundImage(src string, width int) (string, error) {
+	return a.cachedScaledJPEG(src, width, "backgrounds", BgFull, BgThumb)
+}
+
+// cachedScaledJPEG shares bounded decoding, atomic writes and scaling between
+// backgrounds and Mod preview tiles. Only the requested variants are generated.
+func (a *App) cachedScaledJPEG(src string, width int, dir string, widths ...int) (string, error) {
 	st, err := os.Stat(src)
 	if err != nil {
 		return "", err
 	}
 	h := sha1.Sum([]byte(fmt.Sprintf("%s|%d|%d", src, st.Size(), st.ModTime().UnixNano())))
-	base := filepath.Join(a.cacheDir("backgrounds"), hex.EncodeToString(h[:10]))
+	base := filepath.Join(a.cacheDir(dir), hex.EncodeToString(h[:10]))
 	want := fmt.Sprintf("%s-%d.jpg", base, width)
 	if _, err := os.Stat(want); err == nil {
 		return want, nil
@@ -298,7 +304,7 @@ func (a *App) BackgroundImage(src string, width int) (string, error) {
 		return "", fmt.Errorf("cannot read %s: %v", filepath.Base(src), err)
 	}
 	os.MkdirAll(filepath.Dir(base), 0o755)
-	for _, w := range []int{BgFull, BgThumb} {
+	for _, w := range widths {
 		if err := writeScaled(img, w, fmt.Sprintf("%s-%d.jpg", base, w)); err != nil {
 			return "", err
 		}

@@ -17,6 +17,7 @@ library: 5 mods, 6 copies, 2.6 KB (env:main · 1.6)
     state: missing 1, residue 1
     used: none 5, plan:default 1
     updated: week 2, month 4, half-year 4
+    added: week 4, month 4, half-year 4
     content: xml 4
     has: error 1, problem 2, tag 1
     name: Gone 1, Idle 1, Lockable 1, Oldie 1, Workshop item 5300 1
@@ -62,6 +63,7 @@ library: 1 of 5 mods match (tag:QoL)
     state: missing 0, residue 0
     used: none 1, plan:default 0
     updated: week 0, month 1, half-year 1
+    added: week 1, month 1, half-year 1
     content: xml 1
     has: error 0, problem 0, tag 1
     name: Gone 0, Idle 1, Lockable 0, Oldie 0, Workshop item 5300 0
@@ -78,6 +80,7 @@ library: 5 of 5 mods match (source:workshop)
 
 $ archo library --lineage #iqmu
 L#l4xt Lockable  [2 copies, 1.1 KB]
+  added: 2026-10-01 10:00
   #6olp workshop  549 B
     path: $ROOT/Steam/steamapps/workshop/content/294100/5100
     workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=5100
@@ -99,7 +102,7 @@ ws:5300 Workshop item 5300  [1 copy, —]
     states: subscribed, not on disk
 
 $ archo library --include colour:red
-error: bad filter "colour:red": want key:value with key lists, tag, source, location, version, state, used, updated, content, has, name, author, id
+error: bad filter "colour:red": want key:value with key lists, tag, source, location, version, state, used, updated, added, content, has, name, author, id
 [exit 1]
 
 $ archo library --include state:hidden
@@ -139,6 +142,7 @@ next:
 
 $ archo library --lineage #iqmu
 L#l4xt Lockable  [2 copies, 1.1 KB]
+  added: 2026-10-01 10:00
   #6olp workshop  549 B
     path: $ROOT/Steam/steamapps/workshop/content/294100/5100
     workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=5100
@@ -161,6 +165,7 @@ copy note set for #iqmu Lockable
 
 $ archo library --lineage #iqmu
 L#l4xt Lockable  [2 copies, 1.1 KB]
+  added: 2026-10-01 10:00
   #6olp workshop  549 B
     path: $ROOT/Steam/steamapps/workshop/content/294100/5100
     workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=5100

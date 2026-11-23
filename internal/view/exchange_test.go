@@ -92,6 +92,23 @@ func TestImportPreview(t *testing.T) {
 	if enabled(t, e) != "Core,Alpha" {
 		t.Fatalf("the preview changed the list: %s", enabled(t, e))
 	}
+	// the order comparison (16 §2.18): both lists in order, keyed by package id; the
+	// missing Mod keeps its name and Workshop page
+	keys := func(rs []view.OrderRow) (out []string) {
+		for _, r := range rs {
+			out = append(out, r.Key)
+		}
+		return
+	}
+	if got := strings.Join(keys(p.Current), ","); got != "ludeon.rimworld,tester.a" {
+		t.Fatalf("current order: %s", got)
+	}
+	if got := strings.Join(keys(p.Incoming), ","); got != "ludeon.rimworld,brrainz.harmony,tester.b,tester.a,someone.gone" {
+		t.Fatalf("incoming order: %s", got)
+	}
+	if g := p.Incoming[4]; !g.Missing || g.Name != "Gone Mod" || !strings.HasSuffix(g.URL, "?id=777777777") {
+		t.Fatalf("missing order row: %+v", g)
+	}
 	// a typed path in the paste box is read as the file
 	if imp2, err := view.ReadImport(e.App, view.ImportText, `"`+path+`"`); err != nil || imp2.List.Format != app.FormatRML {
 		t.Fatalf("path as text: %v %+v", err, imp2)

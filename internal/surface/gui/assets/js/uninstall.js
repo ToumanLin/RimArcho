@@ -7,6 +7,7 @@ import * as pop from "./popups.js";
 import { editablePath, copyablePath } from "./fields.js";
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { openScreen, page, button, chooseLocalPath, beginPageRead } from "./screens.js";
+import { archoSpot } from "./archo.js";
 
 const fresh = () => ({ keepLocked: false, lockedTo: "", removePacks: false, packsTo: "", removeSaves: false, savesTo: "", removeGames: false, restoreBackup: false });
 const U = { choice: fresh(), page: null, running: false, prog: null, loading: false };
@@ -57,6 +58,9 @@ async function draw(fetch) {
   for (const s of pg.steps || []) card.append(stepRow(pg, s));
   w.append(card);
   w.append(foot(pg));
+  // Archo peeks over the card: sad to go, a salute when it is done (16 §7.1 "Placements")
+  // the plan, left open, is the calm state (sad faces in turn); the rest hold
+  spot().peek(card, pg.ran ? (pg.failed ? "dizzy" : "salute") : pg.blocked ? "skeptic" : "cry", !pg.ran && !pg.blocked);
   sc.scrollTop = top;
   read?.finish();
 }
@@ -215,11 +219,13 @@ async function run(choice) {
 function exclusive() {
   const lock = locked();
   document.body.classList.toggle("uninstall-exclusive", lock);
-  for (const selector of ["#nav", "#navtoggle", "#nav-settings", "#tasks-line", "#self-update", "#side-split", "#crumbs", "#env", "#hints", "#planhead"]) {
+  for (const selector of ["#nav", "#navtoggle", "#nav-settings", "#nav-feedback", "#tasks-line", "#self-update", "#side-split", "#crumbs", "#hints", "#planhead"]) {
     const node = $(selector);
     if (node) node.inert = lock;
   }
 }
+
+const spot = () => archoSpot("uninstall", { size: 140, calm: ["cry", "ponder", "sleepy", "neutral"] });
 
 function drawProgress() {
   const sc = S.screen === "uninstall-progress" ? $("#screen") : openScreen("uninstall-progress");
@@ -241,6 +247,7 @@ function drawProgress() {
     w.classList.add("un-progress-page");
     w.append(card, details);
     sc.append(w);
+    spot().peek(card, "think");
     // Drop focus from the old red button or navigation.
     card.tabIndex = -1;
     card.focus();
@@ -266,7 +273,7 @@ function drawProgress() {
   // Done steps get a check, later ones are muted; only the current step and the two
   // that run after closing carry a second line.
   [...list.children].forEach((row, i) => {
-    const later = ["data", "program"].includes(steps[i].key);
+    const later = !!steps[i].later;
     const state = later ? "later" : i === current ? "current" : i < current ? "done" : "pending";
     row.className = state;
     row.lastChild.textContent = state === "later" ? T("after closing") : state === "current" ? T("in progress") : "";

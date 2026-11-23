@@ -221,8 +221,8 @@ func TestGoldenSaves(t *testing.T) {
 		cmd("saves", "trash", "Broken"),
 		cmd("saves", "trash", "Broken", "--yes"),
 		act(func(e *testkit.Env) {
-			e.WriteFile(filepath.Join(e.Home, "packs", "P1", "pack.json"), `{"format":1,"name":"P1","entries":[]}`)
-			p := filepath.Join(e.Home, "packs", "P1", "userdata", "Saves", "Tundra.rws")
+			e.WriteFile(filepath.Join(e.App.PacksDir(), "P1", "pack.json"), `{"format":1,"name":"P1","entries":[]}`)
+			p := filepath.Join(e.App.PacksDir(), "P1", "userdata", "Saves", "Tundra.rws")
 			e.WriteFile(p, testkit.SaveXML(testkit.SaveSpec{Mods: []string{"ludeon.rimworld"}}))
 			at := e.Now().Add(-5 * time.Minute)
 			os.Chtimes(p, at, at)

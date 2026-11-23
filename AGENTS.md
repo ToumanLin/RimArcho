@@ -1,6 +1,7 @@
 # AGENTS.md
 
 RimArcho: a RimWorld launcher and Mod manager written in Go. `RimArcho.exe` is the window; `archo.exe` provides the TUI, CLI and MCP. Development branch: `dev/1.1`.
+This codebase is yours: what it's for and how it's built are your call, and you'll keep building on it.
 
 ## Before making changes
 
@@ -14,11 +15,16 @@ RimArcho: a RimWorld launcher and Mod manager written in Go. `RimArcho.exe` is t
 2. **[CHANGELOG.md](CHANGELOG.md)**: add an entry to the topmost unreleased version. Include changes visible to players and changes to CLI / MCP output and tools.
 3. **[UserGuide/release-vm-tests.md](UserGuide/release-vm-tests.md)**: add a row for each new feature, key or dialog, or existing feature whose behavior changed. Before a release, test the entire table in the VM to find bugs.
 
+## Delivering an interface change
+
+Any change to what the GUI or TUI shows comes with before-and-after screenshots of every affected state, delivered with the report (not committed): the same page, data and size, before from the base commit and after from the change. Take them on synthetic data (the offline memprobe host, never a real home on the host machine) and say which states could not be captured.
+
 ## Performance
 
 Pages must load quickly and use little memory. Requirements and thresholds: 16 §10; measured baselines: 18.
 
 ## Tests
 
+- Static checks: `go test -count=1 -run 'TestArch|TestSpec|TestStyleRules|TestUI|TestEndlessAnimations' ./internal/...` (about 15 s). They check architecture, forbidden APIs, specification ↔ code agreement, and the GUI's visual and interaction rules (17 §4 "Static checks"). Claude Code runs the matching subset after each edit. A failure names the spec section to read: fix the code or the spec. Do not add an exception unless the spec allows it.
 - `go test -count=1 ./...` (`-count=1` skips the test cache, whose file-access recording is slow on Windows), `node --test "scripts/vm/*.test.mjs" "feedback-relay/*.test.mjs"`.
 - Automated tests use only synthetic data (`internal/testkit`). Touch real games, Mods and `%APPDATA%\RimArcho` only inside the VM ([scripts/vm/README.md](scripts/vm/README.md); safety rules: 17 §4).

@@ -113,5 +113,8 @@ export function appearanceControl(it, refresh) {
   mark();
   wrap.append(options);
   if (swatches) wrap.append(name);
+  // A value set elsewhere in the window (ctrl+wheel's interface size, uizoom.js) moves the mark.
+  if (it.argv?.[2]) wrap.dataset.settingKey = it.argv[2];
+  wrap.showValue = v => { selected = v; mark(); };
   return wrap;
 }

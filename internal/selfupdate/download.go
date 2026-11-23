@@ -51,6 +51,16 @@ func ParseSum(b []byte, name string) (string, error) {
 
 // Download verifies a cached zip or streams a new one into an atomic .part file.
 func (c *Client) Download(ctx context.Context, r *Release, dir string, progress func(done, total int64)) (result string, err error) {
+	return c.download(ctx, r, dir, nil, progress)
+}
+
+// DownloadWithChecksum reuses an already fetched GitHub sidecar, so a failed ZIP
+// transfer cannot lose that checksum before a mirror fallback (17 §5.1).
+func (c *Client) DownloadWithChecksum(ctx context.Context, r *Release, dir string, checksum []byte, progress func(done, total int64)) (string, error) {
+	return c.download(ctx, r, dir, checksum, progress)
+}
+
+func (c *Client) download(ctx context.Context, r *Release, dir string, checksum []byte, progress func(done, total int64)) (result string, err error) {
 	if r == nil || !safeAssetName(r.Zip.Name) {
 		return "", errors.New("release has an invalid zip name")
 	}
@@ -71,17 +81,12 @@ func (c *Client) Download(ctx context.Context, r *Release, dir string, progress 
 	if r.Zip.Size > maxDownload {
 		return "", errors.New("release zip exceeds 200 mb")
 	}
-	resp, err := c.get(ctx, c.metadataClient(), r.Sum.URL)
-	if err != nil {
-		return "", fmt.Errorf("checksum download: %w", err)
-	}
-	b, readErr := readLimited(resp.Body, 64<<10)
-	closeErr := resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("checksum download: HTTP %d", resp.StatusCode)
-	}
-	if err := errors.Join(readErr, closeErr); err != nil {
-		return "", fmt.Errorf("checksum download: %w", err)
+	b := checksum
+	if b == nil {
+		b, err = c.Checksum(ctx, r)
+		if err != nil {
+			return "", err
+		}
 	}
 	want, err := ParseSum(b, r.Zip.Name)
 	if err != nil {
@@ -118,7 +123,7 @@ func (c *Client) Download(ctx context.Context, r *Release, dir string, progress 
 		client = *c.HTTP
 	}
 	client.Timeout = 0
-	resp, err = c.get(ctx, &client, r.Zip.URL)
+	resp, err := c.get(ctx, &client, r.Zip.URL)
 	if err != nil {
 		return "", fmt.Errorf("zip download: %w", err)
 	}
@@ -135,7 +140,7 @@ func (c *Client) Download(ctx context.Context, r *Release, dir string, progress 
 	}
 	h := sha256.New()
 	done, copyErr := copyDownload(ctx, io.MultiWriter(f, h), resp.Body, max(r.Zip.Size, 0), progress)
-	closeErr = f.Close()
+	closeErr := f.Close()
 	if err := errors.Join(copyErr, closeErr); err != nil {
 		return "", err
 	}
@@ -151,8 +156,29 @@ func (c *Client) Download(ctx context.Context, r *Release, dir string, progress 
 	return zipPath, nil
 }
 
+// Checksum fetches only the exact release's sidecar, even if its ZIP cannot be
+// downloaded. Callers must verify obtained bytes with VerifyLocal (17 §5.1).
+func (c *Client) Checksum(ctx context.Context, r *Release) ([]byte, error) {
+	if r == nil || r.Sum.URL == "" {
+		return nil, errors.New("release has no checksum file")
+	}
+	resp, err := c.get(ctx, c.metadataClient(), r.Sum.URL)
+	if err != nil {
+		return nil, fmt.Errorf("checksum download: %w", err)
+	}
+	b, readErr := readLimited(resp.Body, 64<<10)
+	err = errors.Join(readErr, resp.Body.Close())
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("checksum download: HTTP %d", resp.StatusCode)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("checksum download: %w", err)
+	}
+	return b, nil
+}
+
 // VerifyLocal checks an archive against its sidecar. A positive size is the GitHub
-// asset size; Workshop files use zero, with the checksum as their authority.
+// asset size; zero checks the checksum without a declared byte count.
 func VerifyLocal(ctx context.Context, zipPath, name string, checksum []byte, size int64) error {
 	want, err := ParseSum(checksum, name)
 	if err != nil {
@@ -180,69 +206,6 @@ func verifyDigest(want, hash string, got, size int64) error {
 		return fmt.Errorf("zip verification: %w", ErrChecksum)
 	}
 	return nil
-}
-
-// CopyLocal stages the exact checked Workshop archive and checksum, leaving the
-// subscribed item untouched. No unverified archive is published in download/.
-func CopyLocal(ctx context.Context, r *Release, source, dir string) (result string, err error) {
-	if r == nil || !safeAssetName(r.Zip.Name) || r.Sum.Name != r.Zip.Name+".sha256" {
-		return "", errors.New("release has invalid asset names")
-	}
-	sum, err := os.Open(filepath.Join(source, r.Sum.Name))
-	if err != nil {
-		return "", err
-	}
-	b, readErr := readLimited(sum, 64<<10)
-	if err := errors.Join(readErr, sum.Close()); err != nil {
-		return "", err
-	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", err
-	}
-	zipPath := filepath.Join(dir, r.Zip.Name)
-	part := zipPath + ".part"
-	defer func() {
-		if err != nil {
-			err = errors.Join(err, removeIfExists(part), removeIfExists(zipPath), removeIfExists(filepath.Join(dir, r.Sum.Name)))
-		}
-	}()
-	srcPath := filepath.Join(source, r.Zip.Name)
-	info, err := os.Lstat(srcPath)
-	if err != nil {
-		return "", err
-	}
-	if !info.Mode().IsRegular() || info.Size() > maxDownload {
-		return "", errors.New("release zip must be a regular file of at most 200 mb")
-	}
-	src, err := os.Open(srcPath)
-	if err != nil {
-		return "", err
-	}
-	defer src.Close()
-	if err := removeIfExists(part); err != nil {
-		return "", err
-	}
-	dst, err := os.OpenFile(part, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
-	if err != nil {
-		return "", err
-	}
-	_, copyErr := copyDownload(ctx, dst, src, 0, nil)
-	if err := errors.Join(copyErr, dst.Close()); err != nil {
-		return "", err
-	}
-	if err := VerifyLocal(ctx, part, r.Zip.Name, b, 0); err != nil {
-		return "", err
-	}
-	if err := os.WriteFile(filepath.Join(dir, r.Sum.Name), b, 0o600); err != nil {
-		return "", err
-	}
-	if err := removeIfExists(zipPath); err != nil {
-		return "", err
-	}
-	if err := os.Rename(part, zipPath); err != nil {
-		return "", err
-	}
-	return zipPath, nil
 }
 
 func safeAssetName(name string) bool {

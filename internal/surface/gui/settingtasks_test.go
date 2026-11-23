@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -78,6 +80,7 @@ func waitSettingEnd(t *testing.T, events <-chan string, id string) {
 // can still be read. SteamCMD and todds share the same queue entry points (16 §2.16).
 func TestToolDownloadsAreTasks(t *testing.T) {
 	t.Parallel()
+	windowsOnly(t, "todds is downloaded only on Windows; Linux shows build instructions (17 §2.1)")
 	e, api, events := fixture(t)
 	var b bytes.Buffer
 	w := zip.NewWriter(&b)

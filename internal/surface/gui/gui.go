@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 // Package gui is the desktop interface (08): a Wails v3 window with plain HTML, CSS and
 // JavaScript (assets/, embedded), over the same internal/view models as the TUI.
 package gui
@@ -36,6 +38,10 @@ type Options struct {
 
 // Run opens the window and returns when it is closed.
 func Run(o Options) error {
+	if app.IsChild() {
+		// a helper RimArcho started never opens a window: that would start helpers again (17 §3)
+		return fmt.Errorf("refusing to open a window from a RimArcho helper process (%s is set)", app.ChildEnvVar)
+	}
 	perftrace.Mark("gui-enter")
 	a := o.App
 	view.SetLang(cmds.Setting(a, "ui.lang"))
@@ -53,7 +59,7 @@ func Run(o Options) error {
 	ico := windowIcon()
 	iconDone()
 	debug.FreeOSMemory() // the drawing's buffers
-	w := application.New(application.Options{
+	opts := application.Options{
 		Name:       "RimArcho",
 		Icon:       ico, // used when the exe has no icon resource (development builds, 16 §8.6)
 		Services:   []application.Service{application.NewService(api)},
@@ -65,27 +71,38 @@ func Run(o Options) error {
 			AdditionalBrowserArgs: BrowserArgs(cmds.Setting(a, "ui.gpu") != "off"),
 			WndProcInterceptor:    api.uninstallSessionEnd,
 		},
-	})
-	api.emit = func(name string, data any) { w.Event.Emit(name, data) }
+	}
+	platformApp(a, &opts)
+	w := application.New(opts)
+	api.setEmit(func(name string, data any) { w.Event.Emit(name, data) })
 	api.x.native = wailsNative{w}
 	api.quit = w.Quit
 	frame := newWindowTheme(cmds.Setting(a, "ui.theme"))
 	// Composition hosting lets Windows hit-test our maximize button for Snap Layouts.
 	frame.options.WebView2CompositionHosting = true
-	win := w.Window.NewWithOptions(application.WebviewWindowOptions{
+	winOpts := application.WebviewWindowOptions{
 		Title: "RimArcho", Width: 1440, Height: 880, MinWidth: 720, MinHeight: 480, URL: perfURL(),
 		Frameless:        runtime.GOOS == "windows",
+		Zoom:             ZoomFactor(a), // settings › interface size (16 §2.14)
 		BackgroundColour: frame.background,
 		Windows:          frame.options,
 		// The page draws its own menus. Without the `production` build tag Wails ignores this,
 		// so nativemenu.js cancels the browser menu too (16 §8.5).
 		DefaultContextMenuDisabled: true,
-	})
+	}
+	platformWindow(a, &winOpts)
+	win := w.Window.NewWithOptions(winOpts)
+	if err := platformStart(w, win); err != nil {
+		return err
+	}
 	win.RegisterHook(events.Common.WindowClosing, api.guardWindowClose)
+	wireNativeDrop(win, api)  // files and links dropped on the window (16 §2.18)
+	wireSideButtons(win, api) // mouse back and forward on Linux (16 §3.1 rule 11)
 	api.uninstall.shutdownBlock = uninstallShutdownBlock(win)
 	win.OnWindowEvent(events.Common.WindowShow, func(*application.WindowEvent) { perftrace.Mark("window-show") })
 	win.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) { perftrace.Mark("webview-runtime-ready") })
 	api.windowTheme = frame.bind(win)
+	api.zoom.last, api.zoom.set = ZoomFactor(a), func(f float64) { win.SetZoom(f) }
 	api.memTarget = lowMemoryWhenAway(win)
 	perftrace.Mark("window-run")
 	return w.Run()
@@ -114,7 +131,7 @@ func BrowserArgs(gpu bool) []string {
 // window uses it, and so does the development harness (spikes/guidev).
 func NewAPI(a *app.App, emit func(name string, data any)) *API {
 	api := newAPI(a)
-	api.emit = emit
+	api.setEmit(emit)
 	return api
 }
 
@@ -148,7 +165,11 @@ func handler(api *API, files fs.FS) http.Handler {
 		var path string
 		var err error = app.ErrNoPreview
 		if target != nil {
-			path, _, _, err = previewOf(api.a, *target)
+			if r.URL.Query().Get("w") == "thumb" {
+				path, err = api.a.PreviewThumbOf(*target)
+			} else {
+				path, _, _, err = previewOf(api.a, *target)
+			}
 		}
 		serveFile(w, r, path, err)
 	})
@@ -171,7 +192,7 @@ func handler(api *API, files fs.FS) http.Handler {
 	files2 := application.BundledAssetFileServer(files)
 	archoETag := fmt.Sprintf(`"%x"`, sha256.Sum256([]byte(buildinfo.String())))
 	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'")
 		if strings.HasPrefix(r.URL.Path, "/archo/") {
 			// Unhashed paths must revalidate across upgrades. ServeContent in Wails'
 			// file server handles If-None-Match (including lists and weak tags).

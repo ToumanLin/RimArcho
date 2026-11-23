@@ -120,7 +120,7 @@ func (a *App) knownGameMods() ([]gameMods, error) {
 		if s.Kind == source.Local && s.Status != source.StatusRetired && s.Root != "" {
 			game := filepath.Dir(s.Root)
 			for _, e := range es {
-				if e.ID == s.EnvID && e.GameRoot != "" {
+				if e.GameID == s.EnvID && e.GameRoot != "" {
 					game = e.GameRoot
 					break
 				}
@@ -141,19 +141,32 @@ func (a *App) knownGameMods() ([]gameMods, error) {
 	}
 	seen := map[string]int{}
 	out := []gameMods{}
+	real := realPaths{} // the ledger names one folder for every link it ever made
 	for _, r := range roots {
-		r.mods = realOrAbs(r.mods)
+		r.mods = real.of(r.mods)
 		key := env.PathKey(r.mods)
 		if i, ok := seen[key]; ok {
 			out[i].past = out[i].past && r.past
 			continue
 		}
 		seen[key] = len(out)
-		r.game = realOrAbs(r.game)
+		r.game = real.of(r.game)
 		out = append(out, r)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].mods < out[j].mods })
 	return out, nil
+}
+
+// realPaths resolves each path once (realOrAbs) for the length of one look at the disk.
+type realPaths map[string]string
+
+func (c realPaths) of(p string) string {
+	if r, ok := c[p]; ok {
+		return r
+	}
+	r := realOrAbs(p)
+	c[p] = r
+	return r
 }
 
 // InspectGameLinks reads every known game Mods directory afresh. Healthy links
@@ -167,152 +180,17 @@ func (a *App) InspectGameLinks() ([]*GameLink, error) {
 	if err != nil {
 		return nil, err
 	}
-	// A link's target is matched against the real path its instance's scan recorded and
-	// confirmed on disk; only a miss resolves every instance's path again (one file-system
-	// call per mod, thousands with a large library).
-	var resolved map[string]*store.LinkMod
-	liveTarget := func(target string) *store.LinkMod {
-		key := env.PathKey(realOrAbs(target))
-		if m := li.recorded[key]; m != nil && env.PathKey(realOrAbs(m.RealPath)) == key {
-			return m
-		}
-		if resolved == nil {
-			resolved = make(map[string]*store.LinkMod, len(li.live))
-			for _, m := range li.live {
-				resolved[env.PathKey(realOrAbs(m.RealPath))] = m
-			}
-		}
-		return resolved[key]
-	}
-	// Packs' expected targets and evidence; a pack wins over an instance of the same name.
-	expected, evidence, packIDs := map[string]string{}, map[string]string{}, map[string]string{}
+	in := &linkInspection{li: li, real: realPaths{}}
 	ledger, err := a.Store.ManagedLinks()
 	if err != nil {
 		return nil, err
 	}
-	registered := map[string]store.ManagedLink{}
-	for _, l := range ledger {
-		if l.Phase == "complete" && l.NextTarget != "" {
-			delete(registered, env.PathKey(filepath.Join(l.Mods, l.Name)))
-			registered[env.PathKey(l.NextPath)] = l
-		} else if l.Phase == "rolled-back" && l.Target != "" {
-			l.NextTarget = l.Target
-			registered[env.PathKey(filepath.Join(l.Mods, l.Name))] = l
-		} else if store.LinkFinished(l.Phase) {
-			delete(registered, env.PathKey(filepath.Join(l.Mods, l.Name)))
-		}
-	}
-	packs, err := os.ReadDir(a.PacksDir())
-	packEvidenceError := ""
-	if err != nil && !os.IsNotExist(err) {
-		packEvidenceError = "cannot read pack ownership evidence: " + err.Error()
-	}
-	for _, p := range packs {
-		if !p.IsDir() {
-			continue
-		}
-		pack, err := a.ReadPack(p.Name())
-		if err != nil || pack.Light {
-			continue
-		}
-		for _, e := range pack.Entries {
-			if !e.Official && e.Folder != "" {
-				key := strings.ToLower(packLinkName(p.Name(), e.Folder))
-				expected[key] = filepath.Join(a.packPath(p.Name()), "mods", e.Folder)
-				packIDs[key] = p.Name()
-				evidence[key] = "known pack " + p.Name() + "; expected target: " + expected[key]
-			}
-		}
-	}
+	in.registered = registeredLinks(ledger)
+	a.readPackEvidence(in)
 	out := []*GameLink{}
+	var reader source.LinkReader
 	for _, root := range roots {
-		entries, err := os.ReadDir(root.mods)
-		if err != nil {
-			if os.IsNotExist(err) {
-				if state, _ := source.ProbeTarget(root.mods); state == source.TargetMissing {
-					continue
-				}
-			}
-			if root.past {
-				continue
-			}
-			out = append(out, &GameLink{Game: root.game, Mods: root.mods, Path: root.mods, State: source.TargetUnknown, Code: CodeLinkUnknown, Reason: err.Error(), Action: "keep"})
-			continue
-		}
-		for _, de := range entries {
-			name := de.Name()
-			if !managedLink(name) && !packLink(name) {
-				continue
-			}
-			l := &GameLink{Game: root.game, Mods: root.mods, Path: filepath.Join(root.mods, name), Action: "keep", State: source.TargetUnknown, Evidence: "prefix only; ownership is unproven"}
-			if packLink(name) && packEvidenceError != "" {
-				l.Evidence += "; " + packEvidenceError
-			}
-			info, err := source.ReadLink(l.Path)
-			if err != nil {
-				l.Code, l.Reason = CodeLinkUnknown, err.Error()
-				out = append(out, l)
-				continue
-			}
-			l.snapshot, l.Target, l.Kind, l.State = info, info.RawTarget, info.Kind, info.State
-			lname := strings.ToLower(name)
-			exp, ev := "", ""
-			if m := li.byName[lname]; m != nil {
-				l.Instance, exp, ev = m.ID, m.RealPath, "known instance "+m.ID+"; expected target: "+m.RealPath
-			}
-			if p, ok := expected[lname]; ok {
-				l.Pack, exp, ev = packIDs[lname], p, evidence[lname]
-			}
-			if exp != "" {
-				l.Owned, l.Evidence = true, ev
-			}
-			if row, ok := registered[env.PathKey(l.Path)]; ok {
-				exp, l.Owned, l.Instance, l.Pack = row.NextTarget, true, row.Instance, row.Pack
-				l.Evidence = "managed link ledger; operation " + row.Operation + "; expected target: " + exp
-				if row.Kind != info.Kind {
-					l.Owned = false
-					l.Evidence += "; reparse type differs from ledger"
-				}
-			}
-			// A surviving target proves ownership even after the name's ID was retired.
-			if (info.Kind == "junction" || info.Kind == "symlink") && info.State == source.TargetPresent {
-				if m := liveTarget(info.Target); m != nil {
-					exp, l.Owned, l.Instance, l.Pack = m.RealPath, true, m.ID, ""
-					l.Evidence = "target is known instance " + m.ID
-				}
-			}
-			switch {
-			case info.Kind == "plain":
-				l.Code, l.Reason = CodeLinkOccupied, "real directory or file uses a RimArcho prefix; rename it yourself"
-				// A game folder copied in Explorer turns RimArcho's links into folders holding
-				// their targets' files (09 §3): such a copy may go to the recycle bin, so the
-				// link can come back. Anything else under the prefix stays the player's.
-				if exp != "" && sameFiles(l.Path, exp) {
-					l.Copy, l.Action = exp, "recycle copy"
-					l.Reason = "a copy of the folder RimArcho links here (the game folder was copied?); it can go to the recycle bin and the link is made again"
-					l.Evidence += "; same files and sizes as " + exp
-				}
-			case info.Kind != "junction" && info.Kind != "symlink" || info.State == source.TargetUnknown:
-				l.Code, l.Reason = CodeLinkUnknown, info.Reason
-			case info.State == source.TargetMissing:
-				l.Code, l.Reason = CodeLinkDangling, info.Reason
-			case !l.Owned:
-				l.Code, l.Reason = CodeLinkForeign, "no matching instance or pack"
-			case env.PathKey(realOrAbs(info.Target)) != env.PathKey(realOrAbs(exp)):
-				l.Code, l.Reason = CodeLinkForeign, "target differs from known instance or pack"
-			default:
-				l.Reason = "target exists"
-			}
-			// Environment links are installed local mods; a present target always stays.
-			if l.Code == CodeLinkDangling || l.Code == CodeLinkForeign && !(envLink(name) && l.State == source.TargetPresent) {
-				if l.Owned {
-					l.Action = "remove link"
-				} else {
-					l.Action = "include explicitly to remove link"
-				}
-			}
-			out = append(out, l)
-		}
+		out = append(out, in.inspectRoot(root, &reader)...)
 	}
 	recoveries, err := a.linkRecoveries(ledger)
 	if err != nil {
@@ -326,6 +204,190 @@ func (a *App) InspectGameLinks() ([]*GameLink, error) {
 		}
 	}
 	return append(out, recoveries...), nil
+}
+
+// linkInspection is what one InspectGameLinks call knows about the links it may find:
+// instances, packs' expected targets and the managed link ledger.
+type linkInspection struct {
+	li *linkInstances
+	// Real paths are resolved once per call: a link's target is compared more than once.
+	real     realPaths
+	resolved map[string]*store.LinkMod
+	// Packs' expected targets and evidence; a pack wins over an instance of the same name.
+	expected, evidence, packIDs map[string]string
+	packEvidenceError           string
+	registered                  map[string]store.ManagedLink
+}
+
+// liveTarget is the live instance a link's target is. It is matched against the real path
+// its instance's scan recorded and confirmed on disk; only a miss resolves every instance's
+// path again (one file-system call per mod, thousands with a large library).
+func (in *linkInspection) liveTarget(target string) *store.LinkMod {
+	key := env.PathKey(in.real.of(target))
+	if m := in.li.recorded[key]; m != nil && env.PathKey(in.real.of(m.RealPath)) == key {
+		return m
+	}
+	if in.resolved == nil {
+		in.resolved = make(map[string]*store.LinkMod, len(in.li.live))
+		for _, m := range in.li.live {
+			in.resolved[env.PathKey(in.real.of(m.RealPath))] = m
+		}
+	}
+	return in.resolved[key]
+}
+
+// registeredLinks is the ledger's links that stand now, by path, with the target each
+// should have (NextTarget).
+func registeredLinks(ledger []store.ManagedLink) map[string]store.ManagedLink {
+	registered := map[string]store.ManagedLink{}
+	for _, l := range ledger {
+		if l.Phase == "complete" && l.NextTarget != "" {
+			delete(registered, env.PathKey(filepath.Join(l.Mods, l.Name)))
+			registered[env.PathKey(l.NextPath)] = l
+		} else if l.Phase == "rolled-back" && l.Target != "" {
+			l.NextTarget = l.Target
+			registered[env.PathKey(filepath.Join(l.Mods, l.Name))] = l
+		} else if store.LinkFinished(l.Phase) {
+			delete(registered, env.PathKey(filepath.Join(l.Mods, l.Name)))
+		}
+	}
+	return registered
+}
+
+// readPackEvidence records each full pack's links: their expected targets and evidence.
+func (a *App) readPackEvidence(in *linkInspection) {
+	in.expected, in.evidence, in.packIDs = map[string]string{}, map[string]string{}, map[string]string{}
+	packs, err := os.ReadDir(a.PacksDir())
+	if err != nil && !os.IsNotExist(err) {
+		in.packEvidenceError = "cannot read pack ownership evidence: " + err.Error()
+	}
+	for _, p := range packs {
+		if !p.IsDir() {
+			continue
+		}
+		pack, err := a.ReadPack(p.Name())
+		if err != nil || pack.Light {
+			continue
+		}
+		for _, e := range pack.Entries {
+			if !e.Official && e.Folder != "" {
+				key := strings.ToLower(packLinkName(p.Name(), e.Folder))
+				in.expected[key] = filepath.Join(a.packPath(p.Name()), "mods", e.Folder)
+				in.packIDs[key] = p.Name()
+				in.evidence[key] = "known pack " + p.Name() + "; expected target: " + in.expected[key]
+			}
+		}
+	}
+}
+
+// inspectRoot inspects the RimArcho links in one game's Mods/; a folder that cannot be read
+// is one unknown entry unless it is gone or a past game's.
+func (in *linkInspection) inspectRoot(root gameMods, reader *source.LinkReader) []*GameLink {
+	var out []*GameLink
+	entries, err := os.ReadDir(root.mods)
+	if err != nil {
+		if os.IsNotExist(err) {
+			if state, _ := source.ProbeTarget(root.mods); state == source.TargetMissing {
+				return nil
+			}
+		}
+		if root.past {
+			return nil
+		}
+		return append(out, &GameLink{Game: root.game, Mods: root.mods, Path: root.mods, State: source.TargetUnknown, Code: CodeLinkUnknown, Reason: err.Error(), Action: "keep"})
+	}
+	for _, de := range entries {
+		name := de.Name()
+		if !managedLink(name) && !packLink(name) {
+			continue
+		}
+		out = append(out, in.inspectLink(root, name, reader))
+	}
+	return out
+}
+
+// inspectLink reads one link and works out who owns it, what it should point at, and what
+// repair would do.
+func (in *linkInspection) inspectLink(root gameMods, name string, reader *source.LinkReader) *GameLink {
+	l := &GameLink{Game: root.game, Mods: root.mods, Path: filepath.Join(root.mods, name), Action: "keep", State: source.TargetUnknown, Evidence: "prefix only; ownership is unproven"}
+	if packLink(name) && in.packEvidenceError != "" {
+		l.Evidence += "; " + in.packEvidenceError
+	}
+	info, err := reader.Read(l.Path)
+	if err != nil {
+		l.Code, l.Reason = CodeLinkUnknown, err.Error()
+		return l
+	}
+	l.snapshot, l.Target, l.Kind, l.State = info, info.RawTarget, info.Kind, info.State
+	exp := in.expectedTarget(l, name, info)
+	in.classifyLink(l, info, exp)
+	// Environment links are installed local mods; a present target always stays.
+	if l.Code == CodeLinkDangling || l.Code == CodeLinkForeign && !(envLink(name) && l.State == source.TargetPresent) {
+		if l.Owned {
+			l.Action = "remove link"
+		} else {
+			l.Action = "include explicitly to remove link"
+		}
+	}
+	return l
+}
+
+// expectedTarget proves who owns link l (an instance of that name, a pack, the ledger, or
+// a live instance it points at) and returns the target it should have ("" unknown).
+func (in *linkInspection) expectedTarget(l *GameLink, name string, info *source.LinkInfo) string {
+	lname := strings.ToLower(name)
+	exp, ev := "", ""
+	if m := in.li.byName[lname]; m != nil {
+		l.Instance, exp, ev = m.ID, m.RealPath, "known instance "+m.ID+"; expected target: "+m.RealPath
+	}
+	if p, ok := in.expected[lname]; ok {
+		l.Pack, exp, ev = in.packIDs[lname], p, in.evidence[lname]
+	}
+	if exp != "" {
+		l.Owned, l.Evidence = true, ev
+	}
+	if row, ok := in.registered[env.PathKey(l.Path)]; ok {
+		exp, l.Owned, l.Instance, l.Pack = row.NextTarget, true, row.Instance, row.Pack
+		l.Evidence = "managed link ledger; operation " + row.Operation + "; expected target: " + exp
+		if row.Kind != info.Kind {
+			l.Owned = false
+			l.Evidence += "; reparse type differs from ledger"
+		}
+	}
+	// A surviving target proves ownership even after the name's ID was retired.
+	if (info.Kind == "junction" || info.Kind == "symlink") && info.State == source.TargetPresent {
+		if m := in.liveTarget(info.Target); m != nil {
+			exp, l.Owned, l.Instance, l.Pack = m.RealPath, true, m.ID, ""
+			l.Evidence = "target is known instance " + m.ID
+		}
+	}
+	return exp
+}
+
+// classifyLink sets link l's code and reason from what it is and where it points.
+func (in *linkInspection) classifyLink(l *GameLink, info *source.LinkInfo, exp string) {
+	switch {
+	case info.Kind == "plain":
+		l.Code, l.Reason = CodeLinkOccupied, "real directory or file uses a RimArcho prefix; rename it yourself"
+		// A game folder copied in Explorer turns RimArcho's links into folders holding
+		// their targets' files (09 §3): such a copy may go to the recycle bin, so the
+		// link can come back. Anything else under the prefix stays the player's.
+		if exp != "" && sameFiles(l.Path, exp) {
+			l.Copy, l.Action = exp, "recycle copy"
+			l.Reason = "a copy of the folder RimArcho links here (the game folder was copied?); it can go to the recycle bin and the link is made again"
+			l.Evidence += "; same files and sizes as " + exp
+		}
+	case info.Kind != "junction" && info.Kind != "symlink" || info.State == source.TargetUnknown:
+		l.Code, l.Reason = CodeLinkUnknown, info.Reason
+	case info.State == source.TargetMissing:
+		l.Code, l.Reason = CodeLinkDangling, info.Reason
+	case !l.Owned:
+		l.Code, l.Reason = CodeLinkForeign, "no matching instance or pack"
+	case env.PathKey(in.real.of(info.Target)) != env.PathKey(in.real.of(exp)):
+		l.Code, l.Reason = CodeLinkForeign, "target differs from known instance or pack"
+	default:
+		l.Reason = "target exists"
+	}
 }
 
 // linkInstances is what the game-link check needs from every game's instances, cached
@@ -352,7 +414,10 @@ func (a *App) linkInstances() (*linkInstances, error) {
 	}
 	li := &linkInstances{key: key, byName: map[string]*store.LinkMod{}, recorded: map[string]*store.LinkMod{}}
 	for _, m := range ms {
-		if m.Status == identity.Live && m.RealPath != "" {
+		// An instance found through a RimArcho-named link in a game's Mods/ (another
+		// home's link into its own folders, 02 §2) is that link, not a target proving
+		// the link is ours.
+		if m.Status == identity.Live && m.RealPath != "" && !seenThroughLink(m) {
 			li.recorded[env.PathKey(m.RealPath)] = m
 			li.live = append(li.live, m)
 		}
@@ -362,6 +427,13 @@ func (a *App) linkInstances() (*linkInstances, error) {
 	a.linkInst = li
 	shareLinks(a.Store, li)
 	return li, nil
+}
+
+// seenThroughLink: m is a game's Mods/ entry whose own folder name is a RimArcho link
+// name, so the scan found it through that link.
+func seenThroughLink(m *store.LinkMod) bool {
+	name := filepath.Base(m.Rel)
+	return managedLink(name) || packLink(name)
 }
 
 func (l *GameLink) Finding() *finding.Finding {
@@ -393,10 +465,25 @@ func (a *App) refuseUnhealthyLinks(mods string) error {
 	if err != nil {
 		return err
 	}
-	if len(links) > 0 {
-		return fmt.Errorf("%w: %s: %s; check archo links check and confirm a repair", ErrLaunchBlocked, links[0].Path, links[0].Reason)
+	for _, l := range links {
+		if a.droppedPackLink(l) {
+			continue
+		}
+		return fmt.Errorf("%w: %s: %s; check archo links check and confirm a repair", ErrLaunchBlocked, l.Path, l.Reason)
 	}
 	return nil
+}
+
+// droppedPackLink: a pack's link to a folder a newer revision of that pack left out (10 §3).
+// Every launch takes the pack links it does not use out of Mods/ (a plan launch all of
+// them), so such a link does not stop one; it would block the very launch that removes it.
+func (a *App) droppedPackLink(l *GameLink) bool {
+	if !packLink(filepath.Base(l.Path)) || l.State != source.TargetMissing || l.Target == "" {
+		return false
+	}
+	pack := filepath.Dir(filepath.Dir(l.Target))
+	return strings.EqualFold(filepath.Base(filepath.Dir(l.Target)), "mods") && dirExists(pack) &&
+		source.Within(realOrAbs(pack), realOrAbs(a.PacksDir()))
 }
 
 type LinkRepairPlan struct {
@@ -418,7 +505,7 @@ func (a *App) PlanLinkRepair(all bool, include []string) (*LinkRepairPlan, error
 			return nil, err
 		}
 		selected[env.PathKey(realOrAbs(filepath.Join(e.GameRoot, "Mods")))] = true
-		sources, err := a.Store.Sources(e.ID)
+		sources, err := a.Store.Sources(e.GameID)
 		if err != nil {
 			return nil, err
 		}
@@ -488,10 +575,11 @@ func (a *App) ApplyLinkRepair(plan *LinkRepairPlan) error {
 	return nil
 }
 
-func (a *App) applyLinkRepair(plan *LinkRepairPlan) error {
+func (a *App) applyLinkRepair(plan *LinkRepairPlan) (err error) {
 	if plan == nil {
 		return fmt.Errorf("missing link repair preview")
 	}
+	defer func() { a.logLinkRepair(plan, err) }()
 	locked := map[string]bool{}
 	var unlocks []func()
 	defer func() {
@@ -512,45 +600,12 @@ func (a *App) applyLinkRepair(plan *LinkRepairPlan) error {
 	probe := a.probe()
 	for _, l := range plan.Links {
 		if l.Action == "recycle copy" {
-			if !managedLink(filepath.Base(l.Path)) && !packLink(filepath.Base(l.Path)) || filepath.Dir(l.Path) != l.Mods || l.Copy == "" {
-				return fmt.Errorf("invalid repair entry: %s", l.Path)
-			}
-			if probe(l.Game) != nil {
-				return fmt.Errorf("game is running: %s; stop it before repairing links", l.Game)
-			}
-			if fresh, err := source.ReadLink(l.Path); err != nil {
+			if err := verifyRepairCopy(l, probe); err != nil {
 				return err
-			} else if fresh.Kind != "plain" {
-				return fmt.Errorf("link changed since preview: %s", l.Path)
-			}
-			// The preview compared names and sizes; the files themselves must match too.
-			have, err := treeDigest(l.Path)
-			if err != nil {
-				return fmt.Errorf("reading %s: %w", l.Path, err)
-			}
-			want, err := treeDigest(l.Copy)
-			if err != nil {
-				return fmt.Errorf("reading %s: %w", l.Copy, err)
-			}
-			if have != want {
-				return fmt.Errorf("%s is not an exact copy of %s; nothing was moved (move it out of Mods/ yourself if you do not need it)", l.Path, l.Copy)
 			}
 		}
 		if l.Action == "remove link" {
-			if !managedLink(filepath.Base(l.Path)) && !packLink(filepath.Base(l.Path)) || filepath.Dir(l.Path) != l.Mods || l.snapshot == nil {
-				return fmt.Errorf("invalid repair entry: %s", l.Path)
-			}
-			if probe(l.Game) != nil {
-				return fmt.Errorf("game is running: %s; stop it before repairing links", l.Game)
-			}
-			fresh, err := source.ReadLink(l.Path)
-			if err != nil {
-				return err
-			}
-			if fresh.Kind != l.Kind || fresh.RawTarget != l.Target || fresh.State == source.TargetUnknown || l.Code == CodeLinkDangling && fresh.State != source.TargetMissing || envLink(filepath.Base(l.Path)) && fresh.State == source.TargetPresent {
-				return fmt.Errorf("link changed since preview: %s", l.Path)
-			}
-			if err := source.VerifyLink(l.snapshot); err != nil {
+			if err := verifyRepairLink(l, probe); err != nil {
 				return err
 			}
 		}
@@ -560,30 +615,9 @@ func (a *App) applyLinkRepair(plan *LinkRepairPlan) error {
 	}
 	for _, l := range plan.Links {
 		if l.Action == "remove link" {
-			if a.probe()(l.Game) != nil {
-				return fmt.Errorf("game is running: %s", l.Game)
-			}
-			state, _ := source.ProbeTarget(l.snapshot.Target)
-			if state == source.TargetUnknown || l.Code == CodeLinkDangling && state != source.TargetMissing || envLink(filepath.Base(l.Path)) && state == source.TargetPresent {
-				return fmt.Errorf("target changed since preview: %s", l.Path)
-			}
-			var id [16]byte
-			if _, err := rand.Read(id[:]); err != nil {
+			if err := a.removeRepairLink(plan, l); err != nil {
 				return err
 			}
-			op := hex.EncodeToString(id[:])
-			row := store.ManagedLink{Operation: op, Mods: l.Mods, Name: filepath.Base(l.Path), Kind: l.Kind, Instance: l.Instance, Pack: l.Pack, Target: l.snapshot.Target}
-			if err := a.Store.RecordLinkIntent([]store.ManagedLink{row}); err != nil {
-				return err
-			}
-			if err := source.RemoveLinkChecked(l.snapshot); err != nil {
-				a.settleFailedLink(op, l.Path, l.snapshot, true)
-				return err
-			}
-			if err := a.Store.LinkPhase(op, "complete"); err != nil {
-				return err
-			}
-			plan.Removed = append(plan.Removed, l.Path)
 		}
 		if l.Action == "recycle copy" {
 			if a.probe()(l.Game) != nil {
@@ -596,6 +630,84 @@ func (a *App) applyLinkRepair(plan *LinkRepairPlan) error {
 		}
 	}
 	a.modsCopies = nil
+	return nil
+}
+
+// verifyRepairCopy checks, before anything changes, that a copy to recycle is still an
+// exact copy of the folder RimArcho links there and that its game is not running.
+func verifyRepairCopy(l *GameLink, probe func(string) *GameRun) error {
+	if !managedLink(filepath.Base(l.Path)) && !packLink(filepath.Base(l.Path)) || filepath.Dir(l.Path) != l.Mods || l.Copy == "" {
+		return fmt.Errorf("invalid repair entry: %s", l.Path)
+	}
+	if probe(l.Game) != nil {
+		return fmt.Errorf("game is running: %s; stop it before repairing links", l.Game)
+	}
+	if fresh, err := source.ReadLink(l.Path); err != nil {
+		return err
+	} else if fresh.Kind != "plain" {
+		return fmt.Errorf("link changed since preview: %s", l.Path)
+	}
+	// The preview compared names and sizes; the files themselves must match too.
+	have, err := treeDigest(l.Path)
+	if err != nil {
+		return fmt.Errorf("reading %s: %w", l.Path, err)
+	}
+	want, err := treeDigest(l.Copy)
+	if err != nil {
+		return fmt.Errorf("reading %s: %w", l.Copy, err)
+	}
+	if have != want {
+		return fmt.Errorf("%s is not an exact copy of %s; nothing was moved (move it out of Mods/ yourself if you do not need it)", l.Path, l.Copy)
+	}
+	return nil
+}
+
+// verifyRepairLink checks, before anything changes, that a link to remove is as the
+// preview saw it and that its game is not running.
+func verifyRepairLink(l *GameLink, probe func(string) *GameRun) error {
+	if !managedLink(filepath.Base(l.Path)) && !packLink(filepath.Base(l.Path)) || filepath.Dir(l.Path) != l.Mods || l.snapshot == nil {
+		return fmt.Errorf("invalid repair entry: %s", l.Path)
+	}
+	if probe(l.Game) != nil {
+		return fmt.Errorf("game is running: %s; stop it before repairing links", l.Game)
+	}
+	fresh, err := source.ReadLink(l.Path)
+	if err != nil {
+		return err
+	}
+	if fresh.Kind != l.Kind || fresh.RawTarget != l.Target || fresh.State == source.TargetUnknown || l.Code == CodeLinkDangling && fresh.State != source.TargetMissing || envLink(filepath.Base(l.Path)) && fresh.State == source.TargetPresent {
+		return fmt.Errorf("link changed since preview: %s", l.Path)
+	}
+	return source.VerifyLink(l.snapshot)
+}
+
+// removeRepairLink removes one link through the managed link ledger: the intent is
+// recorded first, and a failed removal is settled.
+func (a *App) removeRepairLink(plan *LinkRepairPlan, l *GameLink) error {
+	if a.probe()(l.Game) != nil {
+		return fmt.Errorf("game is running: %s", l.Game)
+	}
+	state, _ := source.ProbeTarget(l.snapshot.Target)
+	if state == source.TargetUnknown || l.Code == CodeLinkDangling && state != source.TargetMissing || envLink(filepath.Base(l.Path)) && state == source.TargetPresent {
+		return fmt.Errorf("target changed since preview: %s", l.Path)
+	}
+	var id [16]byte
+	if _, err := rand.Read(id[:]); err != nil {
+		return err
+	}
+	op := hex.EncodeToString(id[:])
+	row := store.ManagedLink{Operation: op, Mods: l.Mods, Name: filepath.Base(l.Path), Kind: l.Kind, Instance: l.Instance, Pack: l.Pack, Target: l.snapshot.Target}
+	if err := a.Store.RecordLinkIntent([]store.ManagedLink{row}); err != nil {
+		return err
+	}
+	if err := source.RemoveLinkChecked(l.snapshot); err != nil {
+		a.settleFailedLink(op, l.Path, l.snapshot, true)
+		return err
+	}
+	if err := a.Store.LinkPhase(op, "complete"); err != nil {
+		return err
+	}
+	plan.Removed = append(plan.Removed, l.Path)
 	return nil
 }
 

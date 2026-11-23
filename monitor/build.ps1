@@ -3,13 +3,15 @@
 #
 #   monitor/out/ArchoMonitor/
 #     About/About.xml        modVersion = monitor/VERSION (or explicit -Version)
-#     About/ModIcon.png      generated from RimArcho's icon (go run ./scripts/monitoricon)
-#     About/Preview.png
+#     About/ModIcon.png      crayon Archo's head (committed, 256 px)
+#     About/Preview.png      a still of the Workshop preview GIF (committed, 640x360)
 #     LoadFolders.xml
 #     LICENSE
 #     1.5/Assemblies/ArchoMonitor.dll
 #     1.6/Assemblies/ArchoMonitor.dll
 #     1.7/Assemblies/ArchoMonitor.dll
+#     Corpus/corpus.json.gz  with -Corpus: the weekly log-corpus bundle (05 §4.6); the game
+#                            never loads this folder, and a data-only update keeps modVersion
 #
 # Game assemblies come from NuGet (Krafs.Rimworld.Ref); -RimWorldDir builds the version that
 # game folder holds (read from its Version.txt) against the local game instead. Nothing is
@@ -17,11 +19,14 @@
 #
 #   pwsh monitor/build.ps1
 #   pwsh monitor/build.ps1 -Version 0.9.0 -RimWorldDir D:\SteamLibrary\steamapps\common\RimWorld
+#   pwsh monitor/build.ps1 -Corpus <RimArcho-corpus>\weekly\out\corpus.json.gz
 param(
     [string]$Version = "",
     [string]$RimWorldDir = "",
-    [string]$Out = ""
+    [string]$Out = "",
+    [string]$Corpus = ""
 )
+if ($Corpus -and -not (Test-Path -LiteralPath $Corpus)) { throw "-Corpus $Corpus not found" }
 $ErrorActionPreference = "Stop"
 $here = $PSScriptRoot
 $repo = Split-Path -Parent $here
@@ -61,9 +66,12 @@ foreach ($gv in "1.5", "1.6", "1.7") {
     New-Item -ItemType Directory -Force $dir | Out-Null
     Copy-Item (Join-Path $here "bin\$gv\ArchoMonitor.dll") $dir
 }
-Push-Location $repo
-try {
-    go run ./scripts/monitoricon -o $about
-    if ($LASTEXITCODE -ne 0) { throw "monitoricon failed" }
-} finally { Pop-Location }
+if ($Corpus) {
+    $cd = Join-Path $Out "Corpus"
+    New-Item -ItemType Directory -Force $cd | Out-Null
+    Copy-Item -LiteralPath $Corpus (Join-Path $cd "corpus.json.gz")
+}
+foreach ($png in "ModIcon.png", "Preview.png") {
+    Copy-Item -LiteralPath (Join-Path $here "About\$png") (Join-Path $about $png)
+}
 Write-Host "Archo Monitor $Version -> $Out"

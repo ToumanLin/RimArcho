@@ -2,6 +2,8 @@
 
 Archo's chibi figure keeps the player company while the GUI loads. Loading cards rotate seven calm expressions, as a still or as a live figure: neutral, smile, laugh, wink, think, ponder and yum. This folder holds the plan and the mockup it was reviewed with.
 
+**Update (2026-11-19):** the WebGL2 puppet is replaced by 18 baked crayon loops from crayon-rig (animated WebP, `scripts/archopack/build.py`); the cost figures below describe the puppet. Current behaviour: 16 §7.1 "Archo figure".
+
 **Status (2026-11-07):** the first three places are implemented (16 §7.1 "Archo figure"): the start-up screen, loading cards and the first-run guide, with usage tips (`view.Tips`) and the setting `ui.archo.motion`. The decisions below changed the mockup's plan:
 
 - Placement B: the figure left in the loading card, a usage tip on the right (above three shimmer lines).

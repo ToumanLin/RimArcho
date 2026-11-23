@@ -69,16 +69,19 @@ type LibCond struct {
 type LibCells struct {
 	Name    string `json:"name"`
 	Size    string `json:"size"`
+	Bytes   int64  `json:"bytes,omitempty"` // Size's number: the GUI's in-cell bar (16 §7 principle 9)
 	State   string `json:"state,omitempty"`
 	Code    string `json:"code,omitempty"` // the state (app.LibStates), for its colour
 	Source  string `json:"source"`
 	Used    string `json:"used,omitempty"`
 	UsedAt  string `json:"usedTitle,omitempty"` // every plan and pack, for the tooltip
+	Uses    int    `json:"uses,omitempty"`      // how many: the GUI's dots
 	Updated string `json:"updated,omitempty"`
 	Version string `json:"version,omitempty"`
 	Author  string `json:"author,omitempty"`
 	Tags    string `json:"tags,omitempty"`
 	Played  string `json:"played,omitempty"`
+	Added   string `json:"added,omitempty"` // when a scan first found the Mod (Lineage rows)
 }
 
 // LibColumns are the table's columns: key (= the sort), shown by default.
@@ -86,7 +89,7 @@ var LibColumns = []struct {
 	Key   string
 	Shown bool
 }{{"name", true}, {"size", true}, {"state", true}, {"source", true}, {"used", true},
-	{"updated", false}, {"version", false}, {"author", false}, {"tags", false}, {"played", false}}
+	{"updated", false}, {"added", false}, {"version", false}, {"author", false}, {"tags", false}, {"played", false}}
 
 // LibColumn is a table column: its key (= its sort), header, shown by default.
 type LibColumn struct {
@@ -103,6 +106,7 @@ type LibRow struct {
 	Tags []string `json:"tags,omitempty"`
 	LibCells
 	Single bool         `json:"single,omitempty"`
+	New    bool         `json:"new,omitempty"` // a scan first found it lately (app.IsNew)
 	Insts  []LibInstRow `json:"insts"`
 	Copies int          `json:"copies"` // all copies (Insts are the matching ones)
 }
@@ -224,7 +228,7 @@ func LibSourceText(s string) string {
 }
 
 func libKeyTitle(k string) string {
-	return map[string]string{"lists": T("lists"), "content": T("content"), "has": T("has"), "name": T("name"), "author": T("author"), "id": T("package"), "tag": T("tags"), "source": T("library source"), "location": T("location"), "version": T("supported versions"), "state": T("state"), "used": T("used in"), "updated": T("update date")}[k]
+	return map[string]string{"lists": T("lists"), "content": T("content"), "has": T("has"), "name": T("name"), "author": T("author"), "id": T("package"), "tag": T("tags"), "source": T("library source"), "location": T("location"), "version": T("supported versions"), "state": T("state"), "used": T("used in"), "updated": T("update date"), "added": T("added")}[k]
 }
 
 func libUseText(v string) string {
@@ -249,8 +253,18 @@ func libValueText(key, v, mm string) string {
 		return libUseText(v)
 	case "updated":
 		return map[string]string{"week": T("within a week"), "month": T("within a month"), "half-year": T("within half a year"), "older": T("earlier")}[v]
+	case "added":
+		return addedText(v)
 	}
 	return v
+}
+
+// addedText names an added: value (16 §2.9).
+func addedText(v string) string {
+	if v == "new" {
+		return T("new")
+	}
+	return libValueText("updated", v, "")
 }
 
 // LibSetNote sets a copy's own note from the page (16 §2.9); "" clears it.
@@ -268,7 +282,7 @@ func LibSetNote(a *app.App, ref, text string) (string, error) {
 // LibColumnTitle is a table column's header.
 func LibColumnTitle(k string) string {
 	return map[string]string{"name": T("name"), "size": T("size"), "state": T("state"), "source": T("library source"), "used": T("used in"),
-		"updated": T("update date"), "version": T("supported versions"), "author": T("author"), "tags": T("tags"), "played": T("last played")}[k]
+		"updated": T("update date"), "added": T("added"), "version": T("supported versions"), "author": T("author"), "tags": T("tags"), "played": T("last played")}[k]
 }
 
 // libStamp is a locked copy's creation time (16 §2.9).
@@ -419,15 +433,20 @@ func BuildLibrary(lib *app.Library, search string, filters []string, sort string
 	p := &LibPage{Total: res.Total, Shown: len(res.Matches), Sort: sort, Search: search, Complete: CompleteLibrary(search, lib), Ops: OpTable()}
 	var bytes int64
 	for _, m := range res.Matches {
-		r := LibRow{ID: m.ID, Ref: m.Ref, Name: m.Name, Tags: m.Tags, Copies: len(m.Instances), Single: len(m.Instances) == 1}
+		r := LibRow{ID: m.ID, Ref: m.Ref, Name: m.Name, Tags: m.Tags, Copies: len(m.Instances), Single: len(m.Instances) == 1, New: m.New}
+		r.Added = libDate(m.Added)
 		if m.Instances[0].Mod == nil {
 			r.Name = Tf("Workshop item %s", m.Instances[0].WorkshopID)
 		}
 		r.LibCells.Name = r.Name
 		n, ok := m.Bytes()
 		r.Size = libSize(n, ok)
+		if ok {
+			r.Bytes = n
+		}
 		us := m.UsedIn()
 		r.Used, r.UsedAt = libUsed(us)
+		r.Uses = len(us)
 		if len(us) > 1 {
 			r.Used = Tf("in %d lists", len(us))
 		}
@@ -528,6 +547,9 @@ func libInst(lib *app.Library, l *app.LibLineage, i *app.LibInstance) LibInstRow
 		r.SubscriptionKind = i.Subscription.Kind
 	}
 	r.Size, r.Source = libSize(i.Bytes, i.Sized), r.Label
+	if i.Sized {
+		r.Bytes = i.Bytes
+	}
 	if i.Mod != nil {
 		r.ID = i.Mod.ID
 		r.LibCells.Name = r.Label // player-facing copy name; raw folder remains in fields
@@ -545,6 +567,7 @@ func libInst(lib *app.Library, l *app.LibLineage, i *app.LibInstance) LibInstRow
 		r.States = append(r.States, LibStateText(s, lib.GameMM))
 	}
 	r.Used, r.UsedAt = libUsed(i.UsedIn)
+	r.Uses = len(i.UsedIn)
 	for _, u := range i.UsedIn {
 		r.UsedIn = append(r.UsedIn, libUseText(u.Value()))
 	}
@@ -750,7 +773,7 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 			p.Lines = append(p.Lines,
 				T("Changes made in this copy will be overwritten and lost. The old folder goes to the recycle bin."),
 				Tf("copy from: %s", r.From),
-				Tf("replace at: %s (%d files, %s)", r.Target, r.Copy.Files, SizeText(r.Copy.Bytes)),
+				replaceAt(r.Target, r.Copy.Files, SizeText(r.Copy.Bytes)),
 				T("The copy keeps its location and identity in every list."))
 			for _, skipped := range r.Copy.Skipped {
 				p.Lines = append(p.Lines, Tf("skip link: %s", skipped))
@@ -780,7 +803,7 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 			if strings.HasPrefix(strings.TrimSpace(l), "warning: used by ") {
 				continue // said below, in the interface language
 			}
-			l = Humanize(st, l)
+			l = CLILine(st, l)
 			// "#ref Name" became "Name Name"
 			if m, err := st.Ix.ResolveOne(ref); err == nil {
 				n := m.DisplayName()
@@ -793,9 +816,7 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 				p.Lines = append(p.Lines, T("RimArcho moves the folder to the recycle bin before Steam re-downloads it; local edits are lost"))
 			}
 		}
-		if w := usedWarning(a, st, kind, ref); w != "" {
-			p.Lines = append(p.Lines, w)
-		}
+		p.Lines = append(p.Lines, usedWarning(a, st, kind, ref)...)
 	}
 	// One copy that cannot go does not hold back the others (VM run B2: a moved folder
 	// blocked eleven deletions); the confirm says which are left out.
@@ -869,24 +890,34 @@ func previewFailure(st *app.LoadoutState, ref, out string) string {
 }
 
 // usedWarning: deleting or unsubscribing a copy the lists use only warns; the player's word
-// goes, and the lists show it as missing (16 §2.9). "" when no list uses it.
-func usedWarning(a *app.App, st *app.LoadoutState, kind, ref string) string {
+// goes, and the lists show it as missing (16 §2.9); a pack that reuses a Mods/ copy links
+// its own instead (10 §3). None when nothing uses it.
+func usedWarning(a *app.App, st *app.LoadoutState, kind, ref string) []string {
 	if kind != LibDelete && kind != LibUnsub && kind != OpSubRemove {
-		return ""
+		return nil
 	}
 	m, err := st.Ix.ResolveOne(ref)
 	if err != nil {
-		return ""
+		return nil
 	}
-	ps, err := a.PlansUsing(st, m.ID)
-	if err != nil || len(ps) == 0 {
-		return ""
+	var out []string
+	if ps, err := a.PlansUsing(st, m.ID); err == nil && len(ps) > 0 {
+		q := make([]string, len(ps))
+		for j, p := range ps {
+			q[j] = Tf("“%s”", libUseText(p))
+		}
+		out = append(out, Tf("⚠ %s is in list %s: it still goes, and the list shows it as missing", m.DisplayName(), strings.Join(q, T(", "))))
 	}
-	q := make([]string, len(ps))
-	for j, p := range ps {
-		q[j] = Tf("“%s”", libUseText(p))
+	if kind == LibDelete {
+		if ps, err := a.PacksUsing(st, m.ID); err == nil && len(ps) > 0 {
+			q := make([]string, len(ps))
+			for j, p := range ps {
+				q[j] = Tf("“%s”", p)
+			}
+			out = append(out, Tf("⚠ pack %s uses this copy: it still goes, and the pack launches with its own copy", strings.Join(q, T(", "))))
+		}
 	}
-	return Tf("⚠ %s is in list %s: it still goes, and the list shows it as missing", m.DisplayName(), strings.Join(q, T(", ")))
+	return out
 }
 
 // LibDo runs an action on copies and says what it did.
@@ -1127,7 +1158,7 @@ func LibDoes(kind string) bool {
 // the library does not have it.
 func LibCopy(lib *app.Library, ref string) *LibInstRow {
 	for _, l := range lib.Lineages {
-		for _, i := range l.Instances {
+		for _, i := range l.All() {
 			if i.Ref == ref || i.Mod != nil && i.Mod.ID == ref {
 				r := libInst(lib, l, i)
 				return &r
@@ -1135,4 +1166,12 @@ func LibCopy(lib *app.Library, ref string) *LibInstRow {
 		}
 	}
 	return nil
+}
+
+// replaceAt is the replace line of a copy refresh: the target, its file count and size.
+func replaceAt(target string, files int, size string) string {
+	if files == 1 {
+		return Tf("replace at: %s (%d file, %s)", target, files, size)
+	}
+	return Tf("replace at: %s (%d files, %s)", target, files, size)
 }

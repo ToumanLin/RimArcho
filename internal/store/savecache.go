@@ -111,6 +111,6 @@ func (s *Store) DeleteSaveCache(paths []string) error {
 				return err
 			}
 		}
-		return nil
+		return pruneReviewCatalogs(tx)
 	})
 }

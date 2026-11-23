@@ -110,6 +110,9 @@ type Input struct {
 	// Replacements: for a required package no node has, the packageIds of nodes that replace
 	// it (Use This Instead, 08 §1.1). The dependency then orders after those.
 	Replacements map[string][]string
+	// Observed: the log corpus's measured constraints for this game version (05 §4.6), from
+	// the caller's corpus choice; nil uses the embedded 1.6 file.
+	Observed ObservedSet
 }
 
 // Constraint kinds.
@@ -347,53 +350,101 @@ func withVersion(base []string, byV map[string][]string, mm string) []string {
 
 // Sort computes the new order (08 §1.2).
 func Sort(in Input) Result {
-	n := len(in.Nodes)
-	byPkg := map[string][]int{}
-	byLin := map[string][]int{}
+	s := newSorter(in)
+	s.officialEdges()
+	for i, nd := range in.Nodes {
+		if nd.Decl != nil {
+			s.declEdges(i, nd)
+		}
+	}
+	if in.Community != nil {
+		s.communityEdges()
+	}
+	attach := s.userEdges()
+	comp, members, seen := s.dropOfficialFirst()
+	nComp := len(members)
+	s.cycles(comp, members)
+	first := make([]int, nComp) // earliest current position of each component
+	for c, ms := range members {
+		first[c] = slices.Min(ms)
+	}
+	sort.Slice(s.res.Cycles, func(a, b int) bool {
+		return slices.Min(s.res.Cycles[a].Members) < slices.Min(s.res.Cycles[b].Members)
+	})
+
+	// loadTop / loadBottom (08 §1.5): a top mod pulls what it needs to the top, a bottom mod
+	// pulls what needs it to the bottom. A component's tier breaks ties in the Kahn pick.
+	tier := tiers(in, &s.res, s.byLin, s.ignore, s.n)
+	ctier := componentTiers(members, tier)
+	s.res.Order = kahn(componentGraph{comp: comp, members: members, seen: seen, tier: ctier, first: first}, attach)
+	return s.res
+}
+
+// sorter collects the constraints of one Sort as edges between nodes.
+type sorter struct {
+	in     Input
+	n      int
+	byPkg  map[string][]int
+	byLin  map[string][]int
+	ignore map[string]bool // ignore rules' references
+	res    Result
+}
+
+// newSorter indexes the nodes by package id and lineage, and the ignore rules.
+func newSorter(in Input) *sorter {
+	s := &sorter{in: in, n: len(in.Nodes), byPkg: map[string][]int{}, byLin: map[string][]int{}, ignore: map[string]bool{}}
 	for i, nd := range in.Nodes {
 		if nd.PackageID != "" {
-			byPkg[nd.PackageID] = append(byPkg[nd.PackageID], i)
+			s.byPkg[nd.PackageID] = append(s.byPkg[nd.PackageID], i)
 		}
 		if nd.Lineage != "" {
-			byLin[nd.Lineage] = append(byLin[nd.Lineage], i)
+			s.byLin[nd.Lineage] = append(s.byLin[nd.Lineage], i)
 		}
 	}
-	ignore := map[string]bool{}
 	for _, r := range in.Rules {
 		if r.Kind == RuleIgnore {
-			ignore[r.Target] = true
+			s.ignore[r.Target] = true
 		}
 	}
-	var res Result
-	add := func(from, to int, c Constraint) {
-		if from == to {
-			return
-		}
-		if c.Ref != "" && ignore[c.Ref] {
-			res.Ignored++
-			return
-		}
-		e := Edge{From: from, To: to, C: c}
-		if c.Kind != KindOfficial && c.Kind != KindUser {
-			rf, rt := officialRank(in.Nodes[from].PackageID), officialRank(in.Nodes[to].PackageID)
-			if rf >= 0 && rt >= 0 && rf > rt {
-				res.Dropped = append(res.Dropped, Dropped{Edge: e, Reason: ReasonOfficialOrder})
-				return
-			}
-		}
-		res.Edges = append(res.Edges, e)
-	}
-	pkgsOf := func(l []string) []string {
-		out := make([]string, 0, len(l))
-		for _, p := range l {
-			out = append(out, strings.ToLower(strings.TrimSpace(p)))
-		}
-		return out
-	}
+	return s
+}
 
+// add keeps an edge from → to unless an ignore rule names it; a non-official constraint
+// that contradicts the official order is dropped.
+func (s *sorter) add(from, to int, c Constraint) {
+	if from == to {
+		return
+	}
+	if c.Ref != "" && s.ignore[c.Ref] {
+		s.res.Ignored++
+		return
+	}
+	e := Edge{From: from, To: to, C: c}
+	if c.Kind != KindOfficial && c.Kind != KindUser {
+		rf, rt := officialRank(s.in.Nodes[from].PackageID), officialRank(s.in.Nodes[to].PackageID)
+		if rf >= 0 && rt >= 0 && rf > rt {
+			s.res.Dropped = append(s.res.Dropped, Dropped{Edge: e, Reason: ReasonOfficialOrder})
+			return
+		}
+	}
+	s.res.Edges = append(s.res.Edges, e)
+}
+
+// pkgsOf is a list of package ids lower-cased and trimmed.
+func pkgsOf(l []string) []string {
+	out := make([]string, 0, len(l))
+	for _, p := range l {
+		out = append(out, strings.ToLower(strings.TrimSpace(p)))
+	}
+	return out
+}
+
+// officialEdges is the built-in order: official content first, in official order.
+func (s *sorter) officialEdges() {
+	in := s.in
 	// Mods that explicitly load before an official package (Harmony) are exempt from the
 	// built-in "official first" order; otherwise every such list would be a cycle.
-	exempt := make([]bool, n)
+	exempt := make([]bool, s.n)
 	for i, nd := range in.Nodes {
 		if nd.Decl == nil {
 			continue
@@ -404,7 +455,6 @@ func Sort(in Input) Result {
 			}
 		}
 	}
-	// Built-in: official content first, in official order.
 	var officials []int
 	for i, nd := range in.Nodes {
 		if officialRank(nd.PackageID) >= 0 {
@@ -416,7 +466,7 @@ func Sort(in Input) Result {
 	})
 	for k := 1; k < len(officials); k++ {
 		o := in.Nodes[officials[k]]
-		add(officials[k-1], officials[k], Constraint{Kind: KindOfficial, Owner: officials[k], Field: "official-order", Target: in.Nodes[officials[k-1]].PackageID, Ref: OfficialRef(o.Lineage)})
+		s.add(officials[k-1], officials[k], Constraint{Kind: KindOfficial, Owner: officials[k], Field: "official-order", Target: in.Nodes[officials[k-1]].PackageID, Ref: OfficialRef(o.Lineage)})
 	}
 	if len(officials) > 0 {
 		last := officials[len(officials)-1]
@@ -424,113 +474,125 @@ func Sort(in Input) Result {
 			if officialRank(nd.PackageID) >= 0 || exempt[i] {
 				continue
 			}
-			add(last, i, Constraint{Kind: KindOfficial, Owner: i, Field: "official-first", Target: in.Nodes[last].PackageID, Ref: OfficialRef(nd.Lineage)})
+			s.add(last, i, Constraint{Kind: KindOfficial, Owner: i, Field: "official-first", Target: in.Nodes[last].PackageID, Ref: OfficialRef(nd.Lineage)})
 		}
 	}
-	// About.xml declarations.
-	for i, nd := range in.Nodes {
-		d := nd.Decl
-		if d == nil {
+}
+
+// declEdges are node i's About.xml declarations: its dependencies, then its load rules.
+func (s *sorter) declEdges(i int, nd Node) {
+	d := nd.Decl
+	s.depEdges(i, nd)
+	for _, f := range []struct {
+		kind, field string
+		list        []string
+		before      bool
+	}{
+		{KindLoadBefore, "loadBefore", withVersion(d.LoadBefore, d.LoadBeforeByVersion, s.in.GameMM), true},
+		{KindLoadAfter, "loadAfter", withVersion(d.LoadAfter, d.LoadAfterByVersion, s.in.GameMM), false},
+		{KindForceBef, "forceLoadBefore", d.ForceLoadBefore, true},
+		{KindForceAft, "forceLoadAfter", d.ForceLoadAfter, false},
+	} {
+		for _, p := range pkgsOf(f.list) {
+			for _, j := range s.byPkg[p] {
+				c := Constraint{Kind: f.kind, Owner: i, Field: f.field, Target: p, Ref: DeclRef(nd.Lineage, f.field, p)}
+				if f.before {
+					s.add(i, j, c)
+				} else {
+					s.add(j, i, c)
+				}
+			}
+		}
+	}
+}
+
+// depEdges are node i's dependencies, each on the package, its first alternative some
+// node has, or its replacement.
+func (s *sorter) depEdges(i int, nd Node) {
+	d := nd.Decl
+	deps := map[string][]string{} // required package → its alternativePackageIds
+	for _, x := range append(slices.Clone(d.Dependencies), d.DependenciesByVersion["v"+s.in.GameMM]...) {
+		p := strings.ToLower(x.PackageID)
+		deps[p] = append(deps[p], pkgsOf(x.Alternatives)...)
+	}
+	depList := make([]string, 0, len(deps))
+	for p := range deps {
+		depList = append(depList, p)
+	}
+	sort.Strings(depList)
+	for _, p := range depList {
+		// The package itself; when no node has it, the first alternative some node has
+		// (the game's ModDependency.IsSatisfied), then its replacements. The reference
+		// stays the declared package, so one ignore rule covers every stand-in.
+		targets, target := s.byPkg[p], p
+		for _, alt := range deps[p] {
+			if len(targets) > 0 {
+				break
+			}
+			targets, target = s.byPkg[alt], alt
+		}
+		for _, r := range s.in.Replacements[p] {
+			if len(targets) > 0 {
+				break
+			}
+			targets, target = s.byPkg[r], r
+		}
+		for _, j := range targets {
+			s.add(j, i, Constraint{Kind: KindDependency, Owner: i, Field: "modDependencies", Target: target, Ref: DeclRef(nd.Lineage, "dependency", p)})
+		}
+	}
+}
+
+// communityEdges are the community rules.
+func (s *sorter) communityEdges() {
+	for i, nd := range s.in.Nodes {
+		if nd.PackageID == "" {
 			continue
 		}
-		deps := map[string][]string{} // required package → its alternativePackageIds
-		for _, x := range append(slices.Clone(d.Dependencies), d.DependenciesByVersion["v"+in.GameMM]...) {
-			p := strings.ToLower(x.PackageID)
-			deps[p] = append(deps[p], pkgsOf(x.Alternatives)...)
-		}
-		depList := make([]string, 0, len(deps))
-		for p := range deps {
-			depList = append(depList, p)
-		}
-		sort.Strings(depList)
-		for _, p := range depList {
-			// The package itself; when no node has it, the first alternative some node has
-			// (the game's ModDependency.IsSatisfied), then its replacements. The reference
-			// stays the declared package, so one ignore rule covers every stand-in.
-			targets, target := byPkg[p], p
-			for _, alt := range deps[p] {
-				if len(targets) > 0 {
-					break
-				}
-				targets, target = byPkg[alt], alt
-			}
-			for _, r := range in.Replacements[p] {
-				if len(targets) > 0 {
-					break
-				}
-				targets, target = byPkg[r], r
-			}
-			for _, j := range targets {
-				add(j, i, Constraint{Kind: KindDependency, Owner: i, Field: "modDependencies", Target: target, Ref: DeclRef(nd.Lineage, "dependency", p)})
+		after, before := s.in.Community.Rules(nd.PackageID)
+		for _, p := range pkgsOf(after) {
+			for _, j := range s.byPkg[p] {
+				s.add(j, i, Constraint{Kind: KindCommunity, Owner: i, Field: "loadAfter", Target: p, Ref: CommunityRef(nd.PackageID, "loadAfter", p)})
 			}
 		}
-		for _, f := range []struct {
-			kind, field string
-			list        []string
-			before      bool
-		}{
-			{KindLoadBefore, "loadBefore", withVersion(d.LoadBefore, d.LoadBeforeByVersion, in.GameMM), true},
-			{KindLoadAfter, "loadAfter", withVersion(d.LoadAfter, d.LoadAfterByVersion, in.GameMM), false},
-			{KindForceBef, "forceLoadBefore", d.ForceLoadBefore, true},
-			{KindForceAft, "forceLoadAfter", d.ForceLoadAfter, false},
-		} {
-			for _, p := range pkgsOf(f.list) {
-				for _, j := range byPkg[p] {
-					c := Constraint{Kind: f.kind, Owner: i, Field: f.field, Target: p, Ref: DeclRef(nd.Lineage, f.field, p)}
-					if f.before {
-						add(i, j, c)
-					} else {
-						add(j, i, c)
-					}
-				}
+		for _, p := range pkgsOf(before) {
+			for _, j := range s.byPkg[p] {
+				s.add(i, j, Constraint{Kind: KindCommunity, Owner: i, Field: "loadBefore", Target: p, Ref: CommunityRef(nd.PackageID, "loadBefore", p)})
 			}
 		}
 	}
-	// Community rules.
-	if in.Community != nil {
-		for i, nd := range in.Nodes {
-			if nd.PackageID == "" {
-				continue
-			}
-			after, before := in.Community.Rules(nd.PackageID)
-			for _, p := range pkgsOf(after) {
-				for _, j := range byPkg[p] {
-					add(j, i, Constraint{Kind: KindCommunity, Owner: i, Field: "loadAfter", Target: p, Ref: CommunityRef(nd.PackageID, "loadAfter", p)})
-				}
-			}
-			for _, p := range pkgsOf(before) {
-				for _, j := range byPkg[p] {
-					add(i, j, Constraint{Kind: KindCommunity, Owner: i, Field: "loadBefore", Target: p, Ref: CommunityRef(nd.PackageID, "loadBefore", p)})
-				}
-			}
-		}
-	}
-	// User rules: hard, between lineages.
-	attach := map[int][]int{} // target node → nodes that want to follow it immediately
-	for _, r := range in.Rules {
-		for _, a := range byLin[r.A] {
-			for _, b := range byLin[r.B] {
-				c := Constraint{Kind: KindUser, Owner: a, Field: r.Kind, Target: in.Nodes[b].PackageID, RuleID: r.ID}
+}
+
+// userEdges are the user rules, hard, between lineages; it returns by target node the
+// nodes that want to follow it immediately.
+func (s *sorter) userEdges() map[int][]int {
+	attach := map[int][]int{}
+	for _, r := range s.in.Rules {
+		for _, a := range s.byLin[r.A] {
+			for _, b := range s.byLin[r.B] {
+				c := Constraint{Kind: KindUser, Owner: a, Field: r.Kind, Target: s.in.Nodes[b].PackageID, RuleID: r.ID}
 				switch r.Kind {
 				case RuleAfter:
-					add(b, a, c)
+					s.add(b, a, c)
 				case RuleBefore:
-					add(a, b, c)
+					s.add(a, b, c)
 				case RuleAttach:
-					add(b, a, c)
+					s.add(b, a, c)
 					attach[b] = append(attach[b], a)
 				}
 			}
 		}
 	}
+	return attach
+}
 
-	// A rule that puts a mod before official content, in a cycle with the built-in order:
-	// drop it and look again (the mod then simply follows what it needs).
-	var comp []int
-	var members [][]int
-	var seen map[[2]int]bool
+// dropOfficialFirst drops each rule that puts a mod before official content in a cycle
+// with the built-in order, and looks again (the mod then simply follows what it needs);
+// it returns the components of what is left.
+func (s *sorter) dropOfficialFirst() (comp []int, members [][]int, seen map[[2]int]bool) {
+	res := &s.res
 	for round := 0; ; round++ {
-		comp, members, seen = components(n, res.Edges)
+		comp, members, seen = components(s.n, res.Edges)
 		drop := map[int]bool{}
 		if round < 4 {
 			cyclic := map[int]bool{} // components with a built-in edge inside
@@ -540,13 +602,13 @@ func Sort(in Input) Result {
 				}
 			}
 			for k, e := range res.Edges {
-				if cyclic[comp[e.From]] && comp[e.From] == comp[e.To] && beforeOfficial(in, e) {
+				if cyclic[comp[e.From]] && comp[e.From] == comp[e.To] && beforeOfficial(s.in, e) {
 					drop[k] = true
 				}
 			}
 		}
 		if len(drop) == 0 {
-			break
+			return comp, members, seen
 		}
 		kept := res.Edges[:0:0]
 		for k, e := range res.Edges {
@@ -558,32 +620,31 @@ func Sort(in Input) Result {
 		}
 		res.Edges = kept
 	}
-	nComp := len(members)
+}
+
+// cycles orders each component of two or more nodes and records it as a cycle; members
+// takes each cycle's order.
+func (s *sorter) cycles(comp []int, members [][]int) {
 	for c, ms := range members {
 		if len(ms) < 2 {
 			continue
 		}
 		cy := Cycle{}
-		for _, e := range res.Edges {
+		for _, e := range s.res.Edges {
 			if comp[e.From] == c && comp[e.To] == c {
 				cy.Edges = append(cy.Edges, e)
 			}
 		}
-		cy.Members, cy.Broken = orderCycle(in, ms, cy.Edges)
+		cy.Members, cy.Broken = orderCycle(s.in, ms, cy.Edges)
 		members[c] = cy.Members
-		cy.Suggest = suggest(in, cy.Edges, cy.Broken)
-		res.Cycles = append(res.Cycles, cy)
+		cy.Suggest = suggest(s.in, cy.Edges, cy.Broken)
+		s.res.Cycles = append(s.res.Cycles, cy)
 	}
-	first := make([]int, nComp) // earliest current position of each component
-	for c, ms := range members {
-		first[c] = slices.Min(ms)
-	}
-	sort.Slice(res.Cycles, func(a, b int) bool { return slices.Min(res.Cycles[a].Members) < slices.Min(res.Cycles[b].Members) })
+}
 
-	// loadTop / loadBottom (08 §1.5): a top mod pulls what it needs to the top, a bottom mod
-	// pulls what needs it to the bottom. A component's tier breaks ties in the Kahn pick.
-	tier := tiers(in, &res, byLin, ignore, n)
-	ctier := make([]Tier, nComp)
+// componentTiers is each component's tier: top or bottom when its members ask only for that.
+func componentTiers(members [][]int, tier []Tier) []Tier {
+	ctier := make([]Tier, len(members))
 	for c, ms := range members {
 		top, bottom := false, false
 		for _, m := range ms {
@@ -597,53 +658,50 @@ func Sort(in Input) Result {
 			ctier[c] = TierBottom
 		}
 	}
+	return ctier
+}
 
-	// Kahn over components: pick the ready component attached to what was just emitted,
-	// then the one in the earlier tier, then the one earliest in the current list.
+// componentGraph is the constraint graph between components.
+type componentGraph struct {
+	comp    []int
+	members [][]int
+	seen    map[[2]int]bool // the node edges
+	tier    []Tier
+	first   []int // earliest current position of each component
+}
+
+// kahn orders the components: it picks the ready component attached to what was just
+// emitted, then the one in the earlier tier, then the one earliest in the current list.
+func kahn(g componentGraph, attach map[int][]int) []int {
+	nComp := len(g.members)
 	indeg := make([]int, nComp)
 	cadj := make([]map[int]bool, nComp)
 	for i := range cadj {
 		cadj[i] = map[int]bool{}
 	}
-	for k := range seen {
-		a, b := comp[k[0]], comp[k[1]]
+	for k := range g.seen {
+		a, b := g.comp[k[0]], g.comp[k[1]]
 		if a != b && !cadj[a][b] {
 			cadj[a][b] = true
 			indeg[b]++
 		}
 	}
-	key := func(c int) int { return first[c] }
 	ready := map[int]bool{}
 	for c := 0; c < nComp; c++ {
 		if indeg[c] == 0 {
 			ready[c] = true
 		}
 	}
+	var order []int
 	boost := map[int]bool{}
 	for len(ready) > 0 {
-		pick := -1
-		for c := range ready {
-			switch {
-			case pick < 0:
-				pick = c
-			case boost[c] != boost[pick]:
-				if boost[c] {
-					pick = c
-				}
-			case ctier[c] != ctier[pick]:
-				if ctier[c] < ctier[pick] {
-					pick = c
-				}
-			case key(c) < key(pick):
-				pick = c
-			}
-		}
+		pick := g.pick(ready, boost)
 		delete(ready, pick)
 		boost = map[int]bool{}
-		res.Order = append(res.Order, members[pick]...)
-		for _, m := range members[pick] {
+		order = append(order, g.members[pick]...)
+		for _, m := range g.members[pick] {
 			for _, a := range attach[m] {
-				boost[comp[a]] = true
+				boost[g.comp[a]] = true
 			}
 		}
 		for d := range cadj[pick] {
@@ -653,7 +711,30 @@ func Sort(in Input) Result {
 			}
 		}
 	}
-	return res
+	return order
+}
+
+// pick is the ready component to emit next: boosted, then the earlier tier, then the
+// earliest in the current list.
+func (g componentGraph) pick(ready, boost map[int]bool) int {
+	pick := -1
+	for c := range ready {
+		switch {
+		case pick < 0:
+			pick = c
+		case boost[c] != boost[pick]:
+			if boost[c] {
+				pick = c
+			}
+		case g.tier[c] != g.tier[pick]:
+			if g.tier[c] < g.tier[pick] {
+				pick = c
+			}
+		case g.first[c] < g.first[pick]:
+			pick = c
+		}
+	}
+	return pick
 }
 
 // Place finds where newly enabled mods go (07 §2.1): in.Nodes[:n] is the current list,

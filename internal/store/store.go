@@ -14,26 +14,36 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// SchemaVersion is the version schema.sql creates. A schema change bumps it, edits
-// schema.sql and appends the step that upgrades the previous version to upgrades.
-const SchemaVersion = 35
+// SchemaVersion is the version schema creates. A schema change bumps it, extends
+// the fresh schema and appends the step that upgrades the previous version to upgrades.
+const SchemaVersion = 43
 
 // FirstReleaseSchema is the schema of the first public release (1.0.0). Databases from
 // development builds before it are not upgraded (04 §4).
 const FirstReleaseSchema = 29
 
 //go:embed schema.sql
-var schema string
+var baseSchema string
+
+var schema = baseSchema + saveReviewSchema + saveReviewCatalogSchema + saveReviewCatalogReference + lineageFunctionalSchema + opLogSchema
 
 // upgrades[i] upgrades schema FirstReleaseSchema+i to the next version, inside one
 // transaction; report gives progress for slow steps (Done of Total rows).
 var upgrades = []func(tx *sql.Tx, report func(done, total int64)) error{
-	upgradeGameTypes,   // 29 → 30
-	upgradeSaveCache,   // 30 → 31
-	upgradeTagNotes,    // 31 → 32
-	upgradeColonyNames, // 32 → 33
-	upgradeTagOrder,    // 33 → 34
-	upgradeDefContent,  // 34 → 35
+	upgradeGameTypes,         // 29 → 30
+	upgradeSaveCache,         // 30 → 31
+	upgradeTagNotes,          // 31 → 32
+	upgradeColonyNames,       // 32 → 33
+	upgradeTagOrder,          // 33 → 34
+	upgradeDefContent,        // 34 → 35
+	upgradeSaveReview,        // 35 → 36
+	upgradeSaveReviewCatalog, // 36 → 37
+	upgradeGameEnvironment,   // 37 → 38
+	upgradeLaunchContext,     // 38 → 39
+	upgradeCreditRoots,       // 39 → 40
+	upgradeLineageFunctional, // 40 → 41
+	upgradeDataFolders,       // 41 → 42
+	upgradeOpLog,             // 42 → 43
 }
 
 // ErrPreRelease: the database was created by a development build before 1.0.0.
@@ -95,6 +105,10 @@ func PeekMeta(path, key string) string {
 	return v
 }
 
+// busyTimeoutMS: how long a write waits for another connection's or process's write before
+// SQLITE_BUSY (04 §4). TruncateWAL sets it back after its nonwaiting checkpoint.
+const busyTimeoutMS = "5000"
+
 func open(path string, initialise bool, progress func(UpgradeProgress)) (*Store, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
@@ -102,7 +116,12 @@ func open(path string, initialise bool, progress func(UpgradeProgress)) (*Store,
 	// Per-connection settings go in the DSN so every connection the pool opens gets them.
 	// journal_size_limit: after a large write the WAL file is cut back to 16 MB when it is
 	// next reset, instead of keeping its largest size while any connection is open (04 §4).
-	dsn := "file:" + filepath.ToSlash(path) + "?_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(1)&_pragma=journal_size_limit(16777216)"
+	// _txlock=immediate: every transaction takes the write lock when it begins, waiting
+	// busy_timeout for another process's write. A deferred one that reads first and writes
+	// later gets SQLITE_BUSY at once when another process committed in between, whatever
+	// busy_timeout says (a scan's ApplyScan while the window saved an analysis). Every
+	// transaction RimArcho begins writes; reads outside transactions are unaffected.
+	dsn := "file:" + filepath.ToSlash(path) + "?_pragma=busy_timeout(" + busyTimeoutMS + ")&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(1)&_pragma=journal_size_limit(16777216)&_txlock=immediate"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err

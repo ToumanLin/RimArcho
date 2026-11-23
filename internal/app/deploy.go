@@ -150,6 +150,44 @@ func (a *App) deploySet(ix *Index, aliases map[string][]store.Alias) (map[string
 	return set, nil
 }
 
+// workshopDeploy is the list's Workshop Mods a launch without the Steam client links into
+// Mods/ (09 §3 "Workshop Mods without Steam"): the game cannot list subscriptions then.
+// Left out: a Mod the game already sees in Mods/ through another tool's link, and one
+// whose packageId another Mods/ copy holds (the Workshop copy plays as "_steam"; a link
+// would make two copies in Mods/).
+func (st *LoadoutState) workshopDeploy() []*store.Mod {
+	if !st.workshopLinks {
+		return nil
+	}
+	return st.workshopMods()
+}
+
+// workshopMods is what workshopDeploy links when the launch is without Steam.
+func (st *LoadoutState) workshopMods() []*store.Mod {
+	kinds := map[string]source.Kind{}
+	for _, s := range st.Ix.Sources {
+		kinds[s.ID] = s.Kind
+	}
+	var out []*store.Mod
+	for _, e := range st.List {
+		m := st.Ix.ByID[e.Instance]
+		if m == nil || m.Kind != source.Workshop || m.Status != identity.Live || m.Residue || m.Unloadable != "" || !st.Reg.Loadable(m.ID) {
+			continue
+		}
+		if !strings.EqualFold(st.Reg.Token(m.ID), m.PackageID) {
+			continue
+		}
+		inMods := false
+		for _, al := range st.Aliases[m.ID] {
+			inMods = inMods || kinds[al.SourceID] == source.Local && !managedLink(al.Rel)
+		}
+		if !inMods {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
 // modsDir is the game's Mods/ folder: the root of the environment's local source.
 func modsDir(ix *Index) string {
 	for _, s := range ix.Sources {
@@ -180,9 +218,18 @@ func planLinks(st *LoadoutState, copies []ModsCopy) (string, []LinkChange, []Dup
 			want[strings.ToLower(DeployName(m))] = m
 		}
 	}
+	for _, m := range st.workshopDeploy() {
+		want[strings.ToLower(DeployName(m))] = m
+	}
+	keep := map[string]*store.Mod{} // Workshop links a running game may use (save only)
+	if st.keepWorkshopLinks {
+		for _, m := range st.workshopMods() {
+			keep[strings.ToLower(DeployName(m))] = m
+		}
+	}
 	if mods == "" {
 		if len(want) > 0 {
-			return "", nil, nil, fmt.Errorf("the environment has no Mods/ folder to link %d mod(s) into; set the game folder with archo env set --game <dir>", len(want))
+			return "", nil, nil, fmt.Errorf("the Game Config has no Mods/ folder to link %d mod(s) into; set the game folder with archo env set --game <dir>", len(want))
 		}
 		return "", nil, nil, nil
 	}
@@ -206,7 +253,7 @@ func planLinks(st *LoadoutState, copies []ModsCopy) (string, []LinkChange, []Dup
 		if envLink(name) && source.IsLink(filepath.Join(mods, name)) {
 			l, err := source.ReadLink(filepath.Join(mods, name))
 			if err != nil || l.State != source.TargetPresent || (l.Kind != "junction" && l.Kind != "symlink") {
-				return "", nil, nil, fmt.Errorf("unhealthy environment link: %s; inspect and confirm repair with archo links repair --dry-run", filepath.Join(mods, name))
+				return "", nil, nil, fmt.Errorf("unhealthy Game Config link: %s; inspect and confirm repair with archo links repair --dry-run", filepath.Join(mods, name))
 			}
 			for key, m := range want {
 				if sameDir(filepath.Join(mods, name), m.RealPath) {
@@ -220,11 +267,19 @@ func planLinks(st *LoadoutState, copies []ModsCopy) (string, []LinkChange, []Dup
 			if m := want[strings.ToLower(name)]; m != nil && sameFiles(p, m.RealPath) {
 				return "", nil, nil, copiedLinkError(p)
 			}
+			// A copy of a link the list no longer uses (VM 2026-11-10: the scan had moved the
+			// list to the Workshop Monitor) is still one the link repair can recycle.
+			if m := linkedInstance(st.Ix, name); m != nil && sameFiles(p, m.RealPath) {
+				return "", nil, nil, copiedLinkError(p)
+			}
 			return "", nil, nil, fmt.Errorf("%s starts with %s but is not a link; RimArcho does not touch it (rename or remove it yourself)", p, DeployPrefix)
 		}
 		m := want[strings.ToLower(name)]
 		if m != nil && sameDir(p, m.RealPath) {
 			have[strings.ToLower(name)] = true
+			continue
+		}
+		if k := keep[strings.ToLower(name)]; k != nil && sameDir(p, k.RealPath) {
 			continue
 		}
 		tgt, _ := source.RealPath(p)
@@ -317,4 +372,14 @@ func deployDuplicates(st *LoadoutState, want map[string]*store.Mod, copies []Mod
 // move it to the recycle bin (09 §3).
 func copiedLinkError(p string) error {
 	return fmt.Errorf("%s is a copy of the folder RimArcho links there (was the game folder copied?); repair it in Can it run, or run archo links repair --dry-run", p)
+}
+
+// linkedInstance is the live deployable instance whose link name is name (nil if none).
+func linkedInstance(ix *Index, name string) *store.Mod {
+	for _, m := range ix.Mods {
+		if m.TombstoneAt.IsZero() && strings.EqualFold(DeployName(m), name) {
+			return m
+		}
+	}
+	return nil
 }

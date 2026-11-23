@@ -9,31 +9,47 @@ import (
 // Scan is one recorded scan.
 type Scan struct {
 	ID       int64
-	EnvID    string
+	EnvID    string // GameID; legacy output field name.
 	Started  time.Time
 	Finished time.Time
 	Full     bool
 	Stats    string
 }
 
-// Scans lists an environment's scans, newest first.
-func (s *Store) Scans(envID string, limit int) ([]*Scan, error) {
-	return s.scans(``, envID, limit)
+// Scans lists an installation's scans, newest first.
+func (s *Store) Scans(gameID string, limit int) ([]*Scan, error) {
+	return s.scans(``, gameID, limit)
 }
 
-// LastFinishedScan is the environment's newest finished scan, or nil. A scan that failed
+// LastFinishedScan is the installation's newest finished scan, or nil. A scan that failed
 // or was cut short keeps its row without a finish time.
-func (s *Store) LastFinishedScan(envID string) (*Scan, error) {
-	list, err := s.scans(` AND finished_at IS NOT NULL`, envID, 1)
+func (s *Store) LastFinishedScan(gameID string) (*Scan, error) {
+	list, err := s.scans(` AND finished_at IS NOT NULL`, gameID, 1)
 	if err != nil || len(list) == 0 {
 		return nil, err
 	}
 	return list[0], nil
 }
 
-func (s *Store) scans(where, envID string, limit int) ([]*Scan, error) {
-	rows, err := s.DB.Query(`SELECT id, environment_id, started_at, coalesce(finished_at, 0), full, stats FROM scan
-		WHERE environment_id=?`+where+` ORDER BY id DESC LIMIT ?`, envID, limit)
+// FirstFinishedScan is the installation's oldest finished scan that read every source, or
+// nil. A scan that left sources out (stats "partial": a game-only scan) does not count: the
+// Mods it did not read were not found yet.
+func (s *Store) FirstFinishedScan(gameID string) (*Scan, error) {
+	var id int64
+	err := s.DB.QueryRow(`SELECT id FROM scan WHERE game_id=? AND finished_at IS NOT NULL
+		AND coalesce(json_extract(stats, '$.partial'), 0)=0 ORDER BY id LIMIT 1`, gameID).Scan(&id)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return s.ScanByID(id)
+}
+
+func (s *Store) scans(where, gameID string, limit int) ([]*Scan, error) {
+	rows, err := s.DB.Query(`SELECT id, game_id, started_at, coalesce(finished_at, 0), full, stats FROM scan
+		WHERE game_id=?`+where+` ORDER BY id DESC LIMIT ?`, gameID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +76,7 @@ func (s *Store) ScanByID(id int64) (*Scan, error) {
 	var sc Scan
 	var st, fin int64
 	var full int
-	err := s.DB.QueryRow(`SELECT id, environment_id, started_at, coalesce(finished_at, 0), full, stats FROM scan WHERE id=?`, id).
+	err := s.DB.QueryRow(`SELECT id, game_id, started_at, coalesce(finished_at, 0), full, stats FROM scan WHERE id=?`, id).
 		Scan(&sc.ID, &sc.EnvID, &st, &fin, &full, &sc.Stats)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -92,7 +108,7 @@ type Event struct {
 
 // EventFilter selects change events.
 type EventFilter struct {
-	EnvID       string
+	EnvID       string   // GameID; legacy output field name.
 	InstanceIDs []string // empty = all
 	MinScan     int64    // inclusive
 	MaxScan     int64    // inclusive, 0 = no bound
@@ -103,7 +119,7 @@ type EventFilter struct {
 func (s *Store) Events(f EventFilter) ([]*Event, error) {
 	q := `SELECT e.id, e.scan_id, sc.started_at, e.instance_id, e.kind, coalesce(e.before_snapshot, 0), coalesce(e.after_snapshot, 0), e.detail
 		FROM change_event e JOIN scan sc ON sc.id = e.scan_id JOIN instance i ON i.id = e.instance_id
-		WHERE i.environment_id IN ('', ?) AND e.scan_id >= ?`
+		WHERE i.game_id IN ('', ?) AND e.scan_id >= ?`
 	args := []any{f.EnvID, f.MinScan}
 	if f.MaxScan != 0 {
 		q += ` AND e.scan_id <= ?`
@@ -152,7 +168,7 @@ func placeholders(n int) string {
 // Question is a stored identity question.
 type Question struct {
 	ID          int64
-	EnvID       string
+	EnvID       string // GameID; legacy output field name.
 	ScanID      int64
 	InstanceID  string
 	SnapshotID  int64
@@ -165,14 +181,14 @@ type Question struct {
 }
 
 // Questions lists an environment's identity questions (open first unless all is false).
-func (s *Store) Questions(envID string, all bool) ([]*Question, error) {
-	q := `SELECT id, environment_id, scan_id, instance_id, observation_snapshot_id, candidate_instance_id, score, status, resolution,
-		coalesce(resolved_at, 0), summary FROM identity_question WHERE environment_id IN ('', ?)`
+func (s *Store) Questions(gameID string, all bool) ([]*Question, error) {
+	q := `SELECT id, game_id, scan_id, instance_id, observation_snapshot_id, candidate_instance_id, score, status, resolution,
+		coalesce(resolved_at, 0), summary FROM identity_question WHERE game_id IN ('', ?)`
 	if !all {
 		q += ` AND status='open'`
 	}
 	q += ` ORDER BY id`
-	rows, err := s.DB.Query(q, envID)
+	rows, err := s.DB.Query(q, gameID)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +212,7 @@ func (s *Store) Questions(envID string, all bool) ([]*Question, error) {
 func (s *Store) QuestionByID(id int64) (*Question, error) {
 	var x Question
 	var ra int64
-	err := s.DB.QueryRow(`SELECT id, environment_id, scan_id, instance_id, observation_snapshot_id, candidate_instance_id, score, status, resolution,
+	err := s.DB.QueryRow(`SELECT id, game_id, scan_id, instance_id, observation_snapshot_id, candidate_instance_id, score, status, resolution,
 		coalesce(resolved_at, 0), summary FROM identity_question WHERE id=?`, id).
 		Scan(&x.ID, &x.EnvID, &x.ScanID, &x.InstanceID, &x.SnapshotID, &x.CandidateID, &x.Score, &x.Status, &x.Resolution, &ra, &x.Summary)
 	if err == sql.ErrNoRows {
@@ -216,9 +232,9 @@ type Lineage struct {
 }
 
 // Lineages returns the lineages of the instances an environment sees, keyed by ID.
-func (s *Store) Lineages(envID string) (map[string]*Lineage, error) {
+func (s *Store) Lineages(gameID string) (map[string]*Lineage, error) {
 	rows, err := s.DB.Query(`SELECT id, coalesce(primary_instance_id, ''), created_at FROM lineage
-		WHERE id IN (SELECT lineage_id FROM instance WHERE environment_id IN ('', ?))`, envID)
+		WHERE id IN (SELECT lineage_id FROM instance WHERE game_id IN ('', ?))`, gameID)
 	if err != nil {
 		return nil, err
 	}

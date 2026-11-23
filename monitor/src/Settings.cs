@@ -15,6 +15,8 @@ namespace ArchoMonitor
         internal string File;      // the file name in Config/
         internal string Title;     // the settings window's title ("" without one)
         internal bool Stored;      // the Mod read its settings through the game (GetSettings)
+        internal string Path;      // the file's full path ("" when unknown); not written
+        internal string Hash;      // settings window record only: FileHash when the window opened
     }
 
     // SettingsRecord writes, once per session when the main menu first opens, which settings
@@ -68,14 +70,18 @@ namespace ArchoMonitor
             if (title.Length == 0 && !has) return null;
             string folder = content.FolderName ?? "";
             string cls = m.GetType().Name;
-            string file = null;
+            string file = null, path = "";
             if (name != null)
             {
-                try { file = System.IO.Path.GetFileName((string)name.Invoke(null, new object[] { folder, cls })); }
+                try
+                {
+                    path = (string)name.Invoke(null, new object[] { folder, cls }) ?? "";
+                    file = System.IO.Path.GetFileName(path);
+                }
                 catch { }
             }
             if (string.IsNullOrEmpty(file)) file = GenText.SanitizeFilename("Mod_" + folder + "_" + cls + ".xml");
-            return new SettingsFile { PackageId = Mods.Id(content) ?? "", Folder = folder, Class = cls, File = file, Title = title, Stored = has };
+            return new SettingsFile { PackageId = Mods.Id(content) ?? "", Folder = folder, Class = cls, File = file, Title = title, Stored = has, Path = path };
         }
     }
 }

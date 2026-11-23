@@ -11,7 +11,7 @@
 import { S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { on } from "./api.js";
 import { icon } from "./icons.js";
-import { detailFrame, stale } from "./detail.js";
+import { detailFrame, fetchRest, stale } from "./detail.js";
 import * as pop from "./popups.js";
 import { beginPageRead, pageLoading, openScreen, page, act, rescanButton, area, full } from "./screens.js";
 import { updateFromForm } from "./subscribe.js";
@@ -19,7 +19,9 @@ import { createBar } from "./filterbar.js";
 import * as ops from "./ops.js";
 import { createTable, mergeColumns } from "./datatable.js";
 import { wireSeparator } from "./separator.js";
+import { pickClick } from "./select.js";
 import { markOf, paintMark, tagCSS, tagColors, fromTagList } from "./tagcolor.js";
+import { sizeBar } from "./membar.js";
 import { tagPanel, tagInfo, startRename as tagStartRename, editTagNote as tagEditNote, pickMerge as tagPickMerge, confirmDelete as tagConfirmDelete } from "./tagmanager.js";
 
 const ROW = 30;      // every row has the same height: the list is drawn by position
@@ -28,7 +30,7 @@ const COLS_KEY = "ui.gui.library.columns";
 const VIEW_KEY = "ui.gui.library.view"; // "mods" or "tags" (16 §2.9)
 // a column's width when the player has not set one; the name column takes whatever is left
 // (its width here is its least), so the table grows with the window
-const WIDTH = { name: 200, size: 72, state: 116, source: 120, used: 150, updated: 84, version: 64, author: 130, tags: 160, played: 84 };
+const WIDTH = { name: 200, size: 72, state: 116, source: 120, used: 150, updated: 84, added: 84, version: 64, author: 130, tags: 160, played: 84 };
 // columns whose natural order is A to Z (the arrow points up); the rest start biggest or newest
 const ASC = new Set(["name", "source", "author", "tags"]);
 const L = {
@@ -175,6 +177,8 @@ function flatten() {
     }
   } else for (const r of L.page.rows || []) push(r);
   L.flat = out;
+  // the size bars' scale: the largest Mod listed (V8)
+  L.most = (L.page.rows || []).reduce((m, r) => Math.max(m, r.bytes || 0), 0);
   const at = keep ? out.findIndex((x) => rowKey(x) === keep) : -1;
   L.cur = at >= 0 ? at : Math.min(L.cur, Math.max(out.length - 1, 0));
   // a selected copy that is no longer listed is no longer selected
@@ -253,7 +257,7 @@ function build() {
   rows.addEventListener("scroll", drawRows, { passive: true });
   rows.addEventListener("mousedown", () => { L.focus = "rows"; rows.focus(); markFocus(); });
   scroll.addEventListener("mousedown", () => { L.focus = "detail"; markFocus(); });
-  rows.addEventListener("contextmenu", (e) => { if (!e.target.closest(".lib-row")) e.preventDefault(); });
+  rows.addEventListener("contextmenu", (e) => { if (!e.target.closest(".lib-row")) e.preventDefault(); }); // keys: none; it only stops the browser's menu outside rows
   draw();
   rows.focus();
 }
@@ -393,6 +397,16 @@ function drawRows() {
   else box.removeAttribute("aria-activedescendant");
 }
 
+// useDots: "in 3 lists" as a dot per list, up to 6 and then +N; the words stay for assistive
+// technology and the list names in the tooltip (V8)
+function useDots(cell, n, words) {
+  cell.textContent = "";
+  const d = el("span", "udots");
+  d.setAttribute("aria-hidden", "true");
+  d.textContent = "●".repeat(Math.min(n, 6)) + (n > 6 ? " +" + (n - 6) : "");
+  cell.append(d, el("span", "vis-hidden", words));
+}
+
 function rowEl(x, k) {
   if (x.t === "grp") return groupEl(x, k);
   const r = el("div", "lib-row " + x.t + (x.lone ? " lone" : "") + (x.gk != null ? " in" : "") + (k === L.cur ? " cur" : ""));
@@ -408,7 +422,8 @@ function rowEl(x, k) {
     if (c.key === "name") { r.append(nameCell(x, k)); continue; }
     const v = cells[c.key] || "";
     const cell = el("span", "word-facts c " + c.key + (c.key === "state" && cells.code ? " " + cells.code : ""), v);
-    if (c.key === "size") cell.classList.add("num");
+    if (c.key === "size") { cell.classList.add("num"); sizeBar(cell, cells.bytes, L.most); }
+    if (c.key === "used" && cells.uses > 1) useDots(cell, cells.uses, v);
     if (c.key === "used" && cells.usedTitle) cell.title = cells.usedTitle;
     else if (v) cell.title = v;
     r.append(cell);
@@ -420,8 +435,8 @@ function rowEl(x, k) {
   }
   table.row(r, k);
   r.onclick = (e) => click(k, e);
-  r.ondblclick = () => { if (x.t === "lin") toggle(x.r); };
-  r.oncontextmenu = (e) => {
+  r.ondblclick = () => { if (x.t === "lin") toggle(x.r); }; // keys: → / ← open and close a Mod's copies
+  r.oncontextmenu = (e) => { // keys: Menu, shift+F10 (menuAtCursor)
     e.preventDefault();
     if (!selected) { L.cur = k; L.sel.clear(); els.rows.dataset.sig = ""; drawRows(); follow(); drawBar(); }
     menuAt(e.clientX, e.clientY);
@@ -456,8 +471,8 @@ function groupEl(x, k) {
   r.setAttribute("aria-labelledby", t.id);
   table.row(r, k);
   r.onclick = (e) => click(k, e);
-  r.ondblclick = () => toggleGroup(g.key);
-  r.oncontextmenu = (e) => {
+  r.ondblclick = () => toggleGroup(g.key); // keys: → / ← open and close the group
+  r.oncontextmenu = (e) => { // keys: Menu, shift+F10 (menuAtCursor)
     e.preventDefault();
     L.cur = k; L.sel.clear(); els.rows.dataset.sig = ""; drawRows(); follow(); drawBar(); hints();
     groupMenu(e.clientX, e.clientY);
@@ -491,8 +506,10 @@ function nameCell(x, k) {
     c.setAttribute("aria-labelledby", "library-row-" + encodeURIComponent(rowKey(x)) + "-name");
     c.onclick = (e) => { e.stopPropagation(); toggle(x.r); };
     left.append(c, el("span", "t", x.r.name));
+    if (x.r.new) left.append(el("span", "nw", T("new")));
   } else if (x.lone) {
     left.append(el("span", "t", x.r.name));
+    if (x.r.new) left.append(el("span", "nw", T("new")));
   } else {
     const branch = el("span", "tree", "└");
     branch.setAttribute("aria-hidden", "true");
@@ -608,15 +625,9 @@ function land(dir) {
 function click(k, e) {
   const x = L.flat[k];
   L.focus = "rows";
-  if (e.shiftKey) {
-    if (L.anchor < 0) L.anchor = L.cur;
-    L.sel.clear();
-    const [a, b] = [Math.min(L.anchor, k), Math.max(L.anchor, k)];
-    for (let j = a; j <= b; j++) for (const i of shownCopies(L.flat[j])) L.sel.add(i.ref);
-  } else if (e.ctrlKey || e.metaKey) {
-    toggleSel(x);
-    L.anchor = k;
-  } else L.anchor = k;
+  // as the editor's lists (16 §3.4): click selects only this row, ctrl toggles, shift ranges
+  const refs = (cs) => cs.map((i) => i.ref), at = (f) => (j) => (L.flat[j] ? refs(f(L.flat[j])) : []);
+  L.anchor = pickClick(L.sel, e, { at: k, cursor: L.cur, anchor: L.anchor, one: at(copiesOf), range: at(shownCopies) });
   L.cur = k;
   // a click on a Lineage's row opens it and takes its first copy
   if (x.t === "lin") { const was = isOpen(x.r); land(1); if (!was) ensureVisible(); }
@@ -703,7 +714,7 @@ let detailSeq = 0, frame = null;
 // drawDetail: the cursor's copy in the details, laid out as the editor's (detail.js
 // detailFrame): its note, picture and name, where it comes from, Mod library's field list, its
 // actions, the description and history (16 §2.9). A Workshop page not read yet is fetched
-// straight away.
+// once the cursor rested (fetchRest).
 async function drawDetail() {
   if (!els) return;
   const x = L.flat[L.cur];
@@ -758,7 +769,7 @@ async function drawDetail() {
   if (!current()) return;
   f.show();
   const d = await detail;
-  if (!current() || d?.state !== "not cached") return;
+  if (!current() || d?.state !== "not cached" || !(await fetchRest(current))) return;
   f.fetching();
   const d2 = await api.Detail(i.id, false, true, false).catch(() => null);
   if (d2 && current()) f.detail(d2);
@@ -964,6 +975,7 @@ async function run(code, copies) {
       if (selected().length === 1 && i0.subscriptionKind === "page") return updatePage(i0.ref);
       break;
     case "folder": return api.OpenFolder(i0.id).then(() => say("ok", T("opened the folder")), (e) => say("fail", errText(e)));
+    case "linked": return api.ShowLink(i0.id).then((t) => say("", t), (e) => say("fail", errText(e)));
     case "steam": return api.OpenSteamWorkshop(i0.id || i0.ref).then((t) => say("ok", t), (e) => say("fail", errText(e)));
     case "workshop":
       if (i0.id) return api.OpenWorkshop(i0.id).then((t) => say("ok", t), (e) => say("", errText(e)));
@@ -1122,7 +1134,6 @@ export function hintList() {
   if (x && x.t === "inst" && !x.lone) list.push({ key: "←", label: T("open / close") });
   list.push({ key: "enter", label: L.full ? T("back") : T("details") });
   if (codes.includes("folder") || codes.includes("workshop")) list.push({ key: "ctrl+o", label: T("open the folder") }, { key: "ctrl+w", label: T("Workshop page") });
-  if (codes.includes("steam")) list.push({ key: "ctrl+s", label: T("steam page") });
   list.push({ key: "/", label: T("search") }, { key: "\\", label: T("filter") }, other);
   list.push({ key: "?", label: T("all keys") });
   return list;

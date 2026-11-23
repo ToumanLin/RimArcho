@@ -59,6 +59,13 @@ func T(s string) string {
 // modchanges write these in the CLI's words (plan, build), which the CLI keeps for agents;
 // the interface uses the player's (16 §7.2).
 var enText = map[string]string{
+	"enter an environment name":              "enter a Game Config name",
+	"environment name":                       "Game Config name",
+	"game installation":                      "game folder",
+	"add environment":                        "Add Game Config",
+	"environment":                            "Game Config",
+	"environments":                           "Game Configs",
+	"game folder":                            "game folder",
 	"RimArcho's link for this plan":          "RimArcho's link for this list",
 	"a plan needs a name":                    "a list needs a name",
 	"gone; the plan uses it":                 "gone; the list uses it",

@@ -19,12 +19,13 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// SourceDir is the managed, local-only library (05 §5.4, 17 §3).
+// SourceDir is the managed, local-only library (05 §5.4, 17 §3): config source.dir, else
+// <local>/source. Homes from before 1.1 that had <data>/source keep it (store schema 42).
 func (a *App) SourceDir() string {
 	if p := a.Store.Meta("cfg:source.dir"); p != "" {
 		return p
 	}
-	return filepath.Join(a.Home, "source")
+	return filepath.Join(a.LocalDir(), "source")
 }
 
 // Readers/decompilers share access; relocating and cleanup need exclusive access.
@@ -154,7 +155,9 @@ func (a *App) sourceVersion(ctx context.Context) string {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, exe, "--version").Output()
+	cmd := exec.CommandContext(ctx, exe, "--version")
+	hideWindow(cmd)
+	out, err := cmd.Output()
 	if err != nil {
 		return "unknown"
 	}
@@ -269,7 +272,7 @@ func containsSourceInstance(ids []string, id string) bool {
 func (a *App) GameSourceDLL(st *LoadoutState) (*SourceDLL, error) {
 	build := sourceGameBuild(st.Ix.Env.GameVersion)
 	if build == "" {
-		return nil, fmt.Errorf("the current environment has no game build; configure its game version first")
+		return nil, fmt.Errorf("the current Game Config has no game build; configure its game version first")
 	}
 	dir := env.ManagedDir(st.Ix.Env.GameRoot)
 	if dir == "" {
@@ -280,7 +283,7 @@ func (a *App) GameSourceDLL(st *LoadoutState) (*SourceDLL, error) {
 	if err != nil {
 		return nil, err
 	}
-	d := &SourceDLL{Instance: "game:" + st.Ix.Env.ID, File: "Assembly-CSharp.dll", Path: p, Hash: h, Kind: "game", GameBuild: build}
+	d := &SourceDLL{Instance: "game:" + st.Ix.Env.GameID, File: "Assembly-CSharp.dll", Path: p, Hash: h, Kind: "game", GameBuild: build}
 	if err := a.locateSource(d); err != nil {
 		return nil, err
 	}
@@ -372,7 +375,7 @@ func (a *App) unusedSourceArtifacts(ctx context.Context) ([]*store.SourceArtifac
 	ids := []string{store.Shared}
 	for _, e := range es {
 		builds[sourceGameBuild(e.GameVersion)] = true
-		ids = append(ids, e.ID)
+		ids = append(ids, e.GameID)
 	}
 	for _, id := range ids {
 		mods, err := a.Store.Mods(id)

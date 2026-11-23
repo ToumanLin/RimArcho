@@ -22,6 +22,6 @@ func TestProcessIn(t *testing.T) {
 		t.Fatalf("no game: %+v", r)
 	}
 	if r := processIn(procs, ""); r != nil {
-		t.Fatal("an environment without a game folder has no game")
+		t.Fatal("a Game Config without a game folder has no game")
 	}
 }

@@ -69,6 +69,12 @@ type scanner struct {
 
 	f *Facts
 	x extract
+
+	// The keys of the research dictionary being read (progress, techprints, knowledge), and
+	// how many of its values have been read: a key counts by its value (contentRef).
+	resKeys []string
+	resVals int
+	resDict int32
 }
 
 func newScanner(r io.Reader) *scanner {

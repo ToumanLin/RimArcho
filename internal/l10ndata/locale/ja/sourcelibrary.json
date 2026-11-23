@@ -1,0 +1,13 @@
+{
+  "delete generated code; it can be recreated": "生成したコードを削除（必要に応じて再作成できます）",
+  "source library": "ソースライブラリ",
+  "remove unused": "未使用の項目を削除",
+  "remove unused folders from the source library": "ソースライブラリの未使用フォルダを削除",
+  "decompile the current list's mods": "現在のリストのMODを逆コンパイル",
+  "decompiling…": "逆コンパイル中…",
+  "removed %d folders (%s)": "%dフォルダを削除（%s）",
+  "the current list's mods are in the source library": "現在のリストのMODはソースライブラリに登録されています",
+  "%d unused folders, %s": "未使用フォルダ%d件（%s）",
+  "same code in: %s": "同じコードを含むMOD：%s",
+  "the source library has no unused folders": "ソースライブラリに未使用フォルダはありません"
+}

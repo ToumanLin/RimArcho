@@ -23,24 +23,29 @@ type Asset struct {
 }
 
 type Release struct {
-	WorkshopItem string    `json:"workshop_item,omitempty"`
-	Version      string    `json:"version"`
-	Tag          string    `json:"tag"`
-	Name         string    `json:"name"`
-	Notes        string    `json:"notes"`
-	Page         string    `json:"page"`
-	Published    time.Time `json:"published"`
-	Prerelease   bool      `json:"prerelease"`
-	Zip          Asset     `json:"zip"`
-	Sum          Asset     `json:"sum"`
+	Mirror     bool      `json:"mirror,omitempty"` // Metadata-only release; resolve exact assets at install time.
+	Version    string    `json:"version"`
+	Tag        string    `json:"tag"`
+	Name       string    `json:"name"`
+	Notes      string    `json:"notes"`
+	Page       string    `json:"page"`
+	Published  time.Time `json:"published"`
+	Prerelease bool      `json:"prerelease"`
+	Zip        Asset     `json:"zip"`
+	Sum        Asset     `json:"sum"`
 }
 
 // Installable reports missing platform assets or checksum files.
 func (r *Release) Installable() error {
-	if r == nil || r.Zip.Name == "" || (r.Zip.URL == "" && r.WorkshopItem == "") {
+	if r != nil && r.Mirror && r.Zip.Name == ZipName(r.Version, "windows", "amd64") {
+		if _, ok := Compare(r.Version, r.Version); ok {
+			return nil
+		}
+	}
+	if r == nil || r.Zip.Name == "" || r.Zip.URL == "" {
 		return errors.New("release has no zip for this platform")
 	}
-	if r.Sum.Name == "" || (r.Sum.URL == "" && r.WorkshopItem == "") {
+	if r.Sum.Name == "" || r.Sum.URL == "" {
 		return errors.New("release has no checksum file")
 	}
 	return nil
@@ -51,6 +56,8 @@ type Client struct {
 	API          string
 	UserAgent    string
 	GOOS, GOARCH string
+	// Asset names a release's zip; nil means RimArcho's own (ZipName). The checksum is <zip>.sha256.
+	Asset func(version, goos, goarch string) string
 }
 
 var ErrNoRelease = errors.New("no release published yet")
@@ -121,7 +128,7 @@ func (c *Client) Latest(ctx context.Context, prerelease bool) (*Release, error) 
 	return c.release(selected), nil
 }
 
-// Version looks up the exact checked version when a Workshop download fails.
+// Version looks up the exact checked version, including a checked prerelease.
 func (c *Client) Version(ctx context.Context, version string) (*Release, error) {
 	if _, ok := Compare(version, version); !ok {
 		return nil, errors.New("invalid release version")
@@ -146,8 +153,9 @@ func (c *Client) Version(ctx context.Context, version string) (*Release, error) 
 	if err := json.Unmarshal(b, &selected); err != nil {
 		return nil, err
 	}
-	if selected.Draft || selected.Prerelease || strings.TrimPrefix(selected.Tag, "v") != version {
-		return nil, fmt.Errorf("GitHub has no stable release %s", version)
+	v, _ := parseVersion(version)
+	if selected.Draft || (selected.Prerelease && len(v.pre) == 0) || strings.TrimPrefix(selected.Tag, "v") != version {
+		return nil, fmt.Errorf("GitHub has no release %s", version)
 	}
 	return c.release(selected), nil
 }
@@ -165,7 +173,11 @@ func (c *Client) release(selected githubRelease) *Release {
 		Name: selected.Name, Notes: selected.Body, Page: selected.Page,
 		Published: selected.Published, Prerelease: selected.Prerelease,
 	}
-	name := ZipName(r.Version, goos, goarch)
+	zipName := ZipName
+	if c.Asset != nil {
+		zipName = c.Asset
+	}
+	name := zipName(r.Version, goos, goarch)
 	for _, a := range selected.Assets {
 		asset := Asset{Name: a.Name, URL: a.URL, Size: a.Size}
 		switch a.Name {
@@ -174,9 +186,6 @@ func (c *Client) release(selected githubRelease) *Release {
 		case name + ".sha256":
 			r.Sum = asset
 		}
-	}
-	if r.Zip.Name == "" {
-		r.Sum = Asset{}
 	}
 	return r
 }

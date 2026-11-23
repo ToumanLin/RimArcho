@@ -113,7 +113,7 @@ func TestOneGameAtATime(t *testing.T) {
 	running[env.PathKey(other)] = &app.GameRun{PID: 4242, Exe: filepath.Join(other, "RimWorldWin64.exe"), Started: started}
 
 	if r, _ := e.App.GameRunning(); r != nil {
-		t.Fatal("GameRunning is the current environment's game only")
+		t.Fatal("GameRunning is the current Game Config's game only")
 	}
 	g, err := e.App.RunningGame()
 	if err != nil || g == nil || g.Env.Name != "second" || g.Run.PID != 4242 {
@@ -122,7 +122,7 @@ func TestOneGameAtATime(t *testing.T) {
 	before := e.ReadModsConfig()
 	for _, args := range [][]string{{"launch"}, {"launch", "--dry-run"}, {"pack", "launch", "any"}} {
 		out, code := e.Run(args...)
-		if code == 0 || !strings.Contains(out, "a game is already running") || !strings.Contains(out, "environment second is running its list (pid 4242") {
+		if code == 0 || !strings.Contains(out, "a game is already running") || !strings.Contains(out, "Game Config second is running its list (pid 4242") {
 			t.Fatalf("%v: exit %d\n%s", args, code, out)
 		}
 	}
@@ -137,7 +137,7 @@ func TestOneGameAtATime(t *testing.T) {
 	if err := e.App.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: second.ID, Started: started.Add(-time.Minute), Method: "pack:Raid Night", Command: "x"}); err != nil {
 		t.Fatal(err)
 	}
-	if out, _ := e.Run("launch"); !strings.Contains(out, "environment second is running pack Raid Night (from the launch records)") {
+	if out, _ := e.Run("launch"); !strings.Contains(out, "Game Config second is running pack Raid Night (from the launch records)") {
 		t.Fatal(out)
 	}
 
@@ -154,7 +154,7 @@ func TestOneGameAtATime(t *testing.T) {
 	if !strings.Contains(out, "it reads the new list on its next start") || strings.Contains(e.ReadModsConfig(), "tester.b") {
 		t.Fatalf("save while running:\n%s", out)
 	}
-	if out, code := e.Run("launch"); code == 0 || !strings.Contains(out, "environment main is running its list (pid 7") {
+	if out, code := e.Run("launch"); code == 0 || !strings.Contains(out, "Game Config main is running its list (pid 7") {
 		t.Fatalf("exit %d\n%s", code, out)
 	}
 

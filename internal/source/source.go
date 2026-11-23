@@ -79,7 +79,7 @@ const (
 // Source is one root directory of mods within an environment.
 type Source struct {
 	ID          string
-	EnvID       string
+	EnvID       string // Installation GameID, or empty for shared folders; legacy output field name.
 	Kind        Kind
 	Label       string // unique per environment, used in refs: src:<label>
 	Root        string

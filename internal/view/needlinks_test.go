@@ -253,13 +253,19 @@ func TestCorpusAndDeclaredDependenciesStaySeparate(t *testing.T) {
 	}
 }
 
-func TestCorpusCutoffComesFromEmbeddedData(t *testing.T) {
-	// Not parallel: known.SetForTesting replaces the process-wide corpus.
+// The chip's month comes with the finding (its evidence Ref), from the data of the finding's
+// own environment.
+func TestCorpusCutoffComesWithTheFinding(t *testing.T) {
+	t.Parallel()
 	if known.Get().Cutoff == "" {
 		t.Fatal("embedded corpus must carry its cutoff")
 	}
-	defer known.SetForTesting(&known.Data{Cutoff: "2038-11"})()
-	if e := evidence(EvCorpus, ""); e.Cutoff != "2038-11" || !strings.Contains(e.Label, "2038-11") {
-		t.Fatalf("cutoff not from loader: %+v", e)
+	p := &app.Problem{Finding: &finding.Finding{Code: "mod.known-error", Evidence: []finding.Evidence{{Source: finding.Community, Ref: "log corpus to 2038-11", Text: "log corpus: 3 of 40 shared logs that enable x"}}}}
+	if e := corpusEvidence(p); e.Cutoff != "2038-11" || !strings.Contains(e.Label, "2038-11") {
+		t.Fatalf("cutoff not from the finding: %+v", e)
+	}
+	p.Evidence[0].Ref = "log corpus"
+	if e := corpusEvidence(p); e.Cutoff != "" {
+		t.Fatalf("a finding without a month got one: %+v", e)
 	}
 }

@@ -3,8 +3,10 @@
 package app
 
 import (
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -45,5 +47,65 @@ func TestWorkshopProcessCancellation(t *testing.T) {
 	time.Sleep(1200 * time.Millisecond)
 	if _, err := os.Stat(survived); !os.IsNotExist(err) {
 		t.Fatalf("descendant survived cancellation: %v", err)
+	}
+}
+
+// Under `archo mcp`, stdin and stdout are the protocol's pipes (14 §1): an interactive
+// SteamCMD run must neither write into stdout nor read the client's requests from stdin.
+// Not parallel: it swaps os.Stdin and os.Stdout while parallel tests are still paused.
+func TestWorkshopConsoleNeedsTerminal(t *testing.T) {
+	dir := t.TempDir()
+	sh := filepath.Join(dir, "sh")
+	if err := os.WriteFile(sh, []byte("#!/bin/sh\nexec /bin/sh \"$@\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	outR, outW, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	inR, inW, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := inW.WriteString("request\n"); err != nil {
+		t.Fatal(err)
+	}
+	inW.Close()
+	oldIn, oldOut := os.Stdin, os.Stdout
+	os.Stdin, os.Stdout = inR, outW
+	proc, err := startWorkshopCMD(sh, []string{"-c", `read x; echo "leaked $x"`}, true)
+	os.Stdin, os.Stdout = oldIn, oldOut
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = proc.Wait()
+	outW.Close()
+	out, _ := io.ReadAll(outR)
+	in, _ := io.ReadAll(inR)
+	if len(out) != 0 || string(in) != "request\n" {
+		t.Fatalf("SteamCMD inherited the protocol pipes: stdout got %q, stdin left %q", out, in)
+	}
+}
+
+// Linux SteamCMD writes no console log (11 §3): a hidden run's output goes to the log
+// RimArcho reads, so a download's "Success." line confirms it.
+func TestWorkshopHiddenRunWritesConsoleLog(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	exe := filepath.Join(dir, "steamcmd.sh")
+	script := "#!/bin/sh\necho 'Success. Downloaded item 2009463077 to \"x\" (7830591 bytes) '\necho 'stderr line' >&2\n"
+	if err := os.WriteFile(exe, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	out, err := (&App{}).runWorkshopSteamCMD(exe, []string{"+quit"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := parseWorkshopOutput([]string{"2009463077"}, out, nil)
+	if !got["2009463077"].confirmed {
+		t.Fatalf("not confirmed from %q", out)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "logs", "console_log.txt")); !strings.Contains(string(b), "stderr line") {
+		t.Fatalf("log %q", b)
 	}
 }

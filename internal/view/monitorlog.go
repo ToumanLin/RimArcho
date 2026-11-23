@@ -40,6 +40,7 @@ type MonitorLog struct {
 	Path     string         `json:"path"`
 	Facts    string         `json:"facts"` // 17:51–17:55
 	Running  bool           `json:"running,omitempty"`
+	TooNew   string         `json:"tooNew,omitempty"` // a newer Monitor's log, not read (19 §4)
 	Errors   int            `json:"errors"`
 	Warnings int            `json:"warnings"`
 	Entries  []MonitorEntry `json:"entries"`
@@ -66,6 +67,9 @@ func MonitorOf(a *app.App, st *app.LoadoutState, c *logs.Companion, links map[st
 		return nil
 	}
 	m := &MonitorLog{Label: filepath.Base(c.Path), Path: c.Path, Running: running, Entries: []MonitorEntry{}}
+	if c.TooNew > 0 {
+		m.TooNew = T(logs.TooNewText)
+	}
 	name := "RimCrow Companion"
 	if c.Monitor {
 		name = "Archo Monitor"

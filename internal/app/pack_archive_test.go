@@ -151,8 +151,8 @@ func TestPackArchiveRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Format != 2 {
-		t.Fatalf("format: %d", p.Format)
+	if p.Format != app.PackFormat || p.ID == "" || p.Revision != 1 {
+		t.Fatalf("format: %d id %q revision %d", p.Format, p.ID, p.Revision)
 	}
 	dir := filepath.Join(e.App.PacksDir(), p.Name)
 	var carried app.PackEntry
@@ -214,7 +214,7 @@ func TestPackArchiveRoundTrip(t *testing.T) {
 	}
 	zr.Close()
 	checked, problems, err := e.App.VerifyPackFile(file)
-	if err != nil || len(problems) != 0 || checked.Format != 2 {
+	if err != nil || len(problems) != 0 || checked.Format != app.PackFormat {
 		t.Fatalf("stream verify: %v %+v", err, problems)
 	}
 	if out := e.MustRun("pack", "check", file); !strings.Contains(out, "verified") {
@@ -271,7 +271,7 @@ func TestPackImportFormat1(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, err := e.App.ReadPack(p.Name)
-	if err != nil || got.Format != 2 || got.Entries[0].Files != 1 || len(got.Entries[0].SHA256) != 64 {
+	if err != nil || got.Format != app.PackFormat || got.ID == "" || got.Entries[0].Files != 1 || len(got.Entries[0].SHA256) != 64 {
 		t.Fatalf("upgrade: %+v %v", got, err)
 	}
 	if _, problems, err := e.App.VerifyPackFile(upgraded); err != nil || len(problems) > 0 {
@@ -413,7 +413,7 @@ func TestPackImportVerifies(t *testing.T) {
 	}
 	bad := filepath.Join(e.Root, "tampered.archopack")
 	q := *p
-	q.Name = "tampered"
+	q.Name, q.ID = "tampered", ""
 	writeTestPackArchive(t, bad, q, false, changed)
 	if _, err := e.App.ImportPack(bad, false); err == nil || !strings.Contains(err.Error(), target.Name) {
 		t.Fatalf("tampered import: %v", err)
@@ -490,7 +490,7 @@ func TestPackArchivePreflight(t *testing.T) {
 	if err := os.RemoveAll(tmp); err != nil {
 		t.Fatal(err)
 	}
-	for _, format := range []int{0, 3} {
+	for _, format := range []int{0, app.PackFormat + 1} {
 		q := p
 		q.Format = format
 		writeTestPackArchive(t, file, q, true, entries)

@@ -32,7 +32,7 @@ func TestGoldenUninstall(t *testing.T) {
 	e.WriteFile(filepath.Join(old, "steamapps", "appmanifest_294100.acf"), `"AppState" {}`)
 	e.MustRun("env", "add", "old", "--game", old, "--saves", "own", "--launch", "direct")
 	e.WriteFile(filepath.Join(e.Home, "userdata", "old", "Saves", "colony.rws"), "a save")
-	e.WriteFile(filepath.Join(e.Home, "packs", "P1", "pack.json"), `{"format":1,"name":"P1","entries":[]}`)
+	e.WriteFile(filepath.Join(e.App.PacksDir(), "P1", "pack.json"), `{"format":1,"name":"P1","entries":[]}`)
 	local := filepath.Join(e.Root, "LocalAppData", "RimArcho")
 	e.WriteFile(filepath.Join(local, "monitor", "ArchoMonitor-0.9.0", "About", "About.xml"), "<ModMetaData/>")
 	e.WriteFile(filepath.Join(local, "steamcmd", deps.SteamCMDExecutable()), "MZ")

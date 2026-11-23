@@ -466,7 +466,7 @@ func TestMonitorInPack(t *testing.T) {
 	e.App.MonitorBundle = monitorBundle(t, e, "0.9.0")
 	e.MustRun("monitor", "install")
 	out := e.MustRun("pack", "build", "p")
-	matches, _ := filepath.Glob(filepath.Join(e.App.Home, "packs", "p", "mods", "*", "About", "About.xml"))
+	matches, _ := filepath.Glob(filepath.Join(e.App.PacksDir(), "p", "mods", "*", "About", "About.xml"))
 	found := false
 	for _, m := range matches {
 		b, _ := os.ReadFile(m)

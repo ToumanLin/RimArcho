@@ -42,6 +42,9 @@ type ScanStats struct {
 	Reused     int            `json:"reused"`
 	Snapshots  int            `json:"snapshots"`
 	DurationMS int64          `json:"duration_ms"`
+	// Partial: some sources were left out (GameOnly, Sources). The first scan that is not
+	// partial is the one that finds the library already installed (NewSince).
+	Partial bool `json:"partial,omitempty"`
 }
 
 // ScanReport is the result of Scan.
@@ -57,7 +60,8 @@ type ScanReport struct {
 
 // ScanOptions choose what a scan reads.
 type ScanOptions struct {
-	Full bool // ignore cached hashes and read every semantic file again
+	deferLoadout bool // environment creation supplies its own initial plan
+	Full         bool // ignore cached hashes and read every semantic file again
 	// GameOnly reads only the environment's own Data/ and Mods/, not the shared mod folders
 	// (a game just added, 03 §2 item 8).
 	GameOnly bool
@@ -75,13 +79,13 @@ type ScanProgress struct {
 	Done, Total int  // mod folders read of all of them
 }
 
-// reads reports whether a scan with o reads source s of environment envID.
-func (o ScanOptions) reads(s *source.Source, envID string) bool {
+// reads reports whether a scan with o reads source s of installation gameID.
+func (o ScanOptions) reads(s *source.Source, gameID string) bool {
 	if slices.Contains(o.Sources, s.ID) {
 		return true
 	}
 	if o.GameOnly {
-		return s.EnvID == envID
+		return s.EnvID == gameID
 	}
 	return len(o.Sources) == 0
 }
@@ -100,6 +104,7 @@ func (a *App) ScanWith(o ScanOptions) (*ScanReport, error) {
 }
 
 func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, error) {
+	defer a.forgetCorpus() // a Workshop Monitor may have come or gone (05 §4.6)
 	if o.Progress == nil {
 		o.Progress = a.ScanProgress
 	}
@@ -108,7 +113,7 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 	if err := a.adoptGameWorkshops(); err != nil {
 		return nil, err
 	}
-	srcs, err := a.Store.Sources(e.ID)
+	srcs, err := a.Store.Sources(e.GameID)
 	if err != nil {
 		return nil, err
 	}
@@ -119,26 +124,135 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 	if err := a.checkRoots(roots...); err != nil {
 		return nil, err
 	}
-	skip := map[string]bool{}
-	present := map[string]bool{} // left out of this scan, not lost (identity.Input.Present)
-	var active []*source.Source
-	var listed []*source.Source // the sources this scan reports on
-	partial := false            // some sources are left out
+	set, err := a.scanSources(srcs, o, e.GameID)
+	if err != nil {
+		return nil, err
+	}
+
+	// What the folders look like as this scan starts (04 §1.6): recorded once it succeeds.
+	prints := map[string]string{}
+	for _, s := range set.listed {
+		if s.Status != source.StatusRetired && s.Status != source.StatusRebindPending {
+			prints[s.ID] = folderPrint(s)
+		}
+	}
+	known, err := a.Store.Known(e.GameID)
+	if err != nil {
+		return nil, err
+	}
+	collect, err := a.scanCollectOptions(e.GameID, full, known, o)
+	if err != nil {
+		return nil, err
+	}
+	scanID, err := a.Store.BeginScan(e.GameID, started, full)
+	if err != nil {
+		return nil, err
+	}
+	obs, sstats := scan.Collect(set.active, collect)
+	if o.Progress != nil {
+		o.Progress(ScanProgress{Saving: true, Done: len(obs), Total: len(obs)})
+	}
+	if set.partial {
+		sharedLinkObservations(obs, known, srcs, set.present, sstats)
+	}
+	collect = scan.Options{} // release the caches before reconciliation
+	lineages, err := a.Store.LineageIDs(e.GameID)
+	if err != nil {
+		return nil, err
+	}
+	if err := a.renameOriginAliases(obs); err != nil {
+		return nil, err
+	}
+	res := identity.Reconcile(identity.Input{
+		Obs: obs, Known: known, Skip: set.skip, Present: set.present, Lineages: lineages, NewID: a.NewID,
+		Semantic: func(k *identity.Known) scan.SemanticSet {
+			if k.Snap == nil {
+				return nil
+			}
+			s, _ := a.Store.SemanticSet(k.Snap.ID)
+			return s
+		},
+	})
+	now := a.Now()
+	var scanned []string
+	for _, s := range set.active {
+		scanned = append(scanned, s.ID)
+	}
+	if err := a.Store.ApplyScan(e.GameID, scanID, now, res, scanned); err != nil {
+		return nil, err
+	}
+	if v := env.ReadGameVersion(e.GameRoot); v != "" && v != e.GameVersion {
+		e.GameVersion = v
+		a.Store.UpdateGame(&store.Game{ID: e.GameID, Name: e.Name, GameRoot: e.GameRoot, GameVersion: e.GameVersion})
+	}
+	if err := a.indexGameTypes(e); err != nil {
+		return nil, err
+	}
+
+	st := newScanStats(set, sstats, res, obs)
+	mods, err := a.Store.Mods(e.GameID)
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range mods {
+		if m.Status == identity.Live {
+			st.Live++
+		} else {
+			st.Tombstones++
+		}
+	}
+	st.DurationMS = a.Now().Sub(started).Milliseconds()
+	if err := a.Store.FinishScan(scanID, a.Now(), st); err != nil {
+		return nil, err
+	}
+	a.recordFolderPrints(prints)
+	if st.Snapshots > 0 {
+		a.Store.TruncateWAL() // new snapshots wrote their file lists through the WAL (04 §4)
+	}
+	if err := a.tagOfficial(e.GameID); err != nil {
+		return nil, err
+	}
+	rep := &ScanReport{Env: e, ScanID: scanID, Full: full, GameOnly: o.GameOnly, Stats: st}
+	// 07 §4.3: every scan compares ModsConfig.xml with what RimArcho last wrote.
+	if !o.deferLoadout {
+		if ls, err := a.Loadout(); err == nil {
+			rep.Notices = ls.Notices
+		} else {
+			rep.Notices = []string{"loadout: " + err.Error()}
+		}
+	}
+	rep.GameLinks, err = a.InspectGameLinks()
+	return rep, err
+}
+
+// scanSourceSet is how a scan treats the installation's sources.
+type scanSourceSet struct {
+	skip    map[string]bool
+	present map[string]bool  // left out of this scan, not lost (identity.Input.Present)
+	active  []*source.Source // the sources read
+	listed  []*source.Source // the sources this scan reports on
+	partial bool             // some sources are left out
+}
+
+// scanSources sorts the sources into read, skipped and left out, recording a source whose
+// folder went missing or came back.
+func (a *App) scanSources(srcs []*source.Source, o ScanOptions, gameID string) (*scanSourceSet, error) {
+	set := &scanSourceSet{skip: map[string]bool{}, present: map[string]bool{}}
 	for _, s := range srcs {
-		if !o.reads(s, e.ID) {
-			partial = true
+		if !o.reads(s, gameID) {
+			set.partial = true
 			if s.Status != source.StatusRetired {
-				skip[s.ID] = true
-				present[s.ID] = s.Status == source.StatusOK
+				set.skip[s.ID] = true
+				set.present[s.ID] = s.Status == source.StatusOK
 			}
 			continue
 		}
-		listed = append(listed, s)
+		set.listed = append(set.listed, s)
 		switch s.Status {
 		case source.StatusRetired:
 			continue
 		case source.StatusRebindPending:
-			skip[s.ID] = true
+			set.skip[s.ID] = true
 			continue
 		}
 		status := source.StatusOK
@@ -152,40 +266,38 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 			}
 		}
 		if status == source.StatusMissing {
-			skip[s.ID] = true
+			set.skip[s.ID] = true
 			continue
 		}
-		active = append(active, s)
+		set.active = append(set.active, s)
 	}
+	return set, nil
+}
 
-	known, err := a.Store.Known(e.ID)
-	if err != nil {
-		return nil, err
-	}
+// scanCollectOptions reads what scan.Collect reuses: the known locations, the previous
+// file lists and hashes (unless full), and the DDS RimArcho wrote.
+func (a *App) scanCollectOptions(gameID string, full bool, known []*identity.Known, o ScanOptions) (scan.Options, error) {
 	knownLoc := map[string]bool{}
 	for _, k := range known {
 		knownLoc[scan.LocKey(k.SourceID, k.Rel)] = true
 	}
 	var prev map[string]map[string]scan.File
 	var prevHash map[string]scan.Hash
+	var err error
 	if !full {
-		if prev, err = a.Store.CurrentFiles(e.ID); err != nil {
-			return nil, err
+		if prev, err = a.Store.CurrentFiles(gameID); err != nil {
+			return scan.Options{}, err
 		}
-		if prevHash, err = a.Store.CurrentHashes(e.ID); err != nil {
-			return nil, err
+		if prevHash, err = a.Store.CurrentHashes(gameID); err != nil {
+			return scan.Options{}, err
 		}
 	}
 	// The DDS RimArcho wrote next to mods' PNGs are not part of the mods (Texture optimisation).
 	generated, err := a.Store.GeneratedFiles()
 	if err != nil {
-		return nil, err
+		return scan.Options{}, err
 	}
-	scanID, err := a.Store.BeginScan(e.ID, started, full)
-	if err != nil {
-		return nil, err
-	}
-	obs, sstats := scan.Collect(active, scan.Options{
+	return scan.Options{
 		Generated: func(dir string) map[string]bool {
 			if len(generated) == 0 {
 				return nil
@@ -205,61 +317,36 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 		},
 		Known:    func(l scan.Location) bool { return knownLoc[l.Key()] },
 		Progress: o.readProgress(),
-	})
-	if o.Progress != nil {
-		o.Progress(ScanProgress{Saving: true, Done: len(obs), Total: len(obs)})
-	}
-	if partial {
-		sharedLinkObservations(obs, known, srcs, present, sstats)
-	}
-	prev, prevHash = nil, nil // release the caches before reconciliation
-	lineages, err := a.Store.LineageIDs(e.ID)
+	}, nil
+}
+
+// renameOriginAliases renames the IDs merged away in origin markers written before
+// migration v14 (03 §2.1).
+func (a *App) renameOriginAliases(obs []*scan.Observation) error {
+	aliases, err := a.Store.IDAliases()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	// Origin markers written before migration v14 name IDs merged away (03 §2.1).
-	if aliases, err := a.Store.IDAliases(); err != nil {
-		return nil, err
-	} else if len(aliases) > 0 {
-		for _, ob := range obs {
-			if og := ob.Origin; og != nil {
-				if n := aliases[og.InstanceID]; n != "" {
-					og.InstanceID = n
-				}
-				if n := aliases[og.LineageID]; n != "" {
-					og.LineageID = n
-				}
+	if len(aliases) == 0 {
+		return nil
+	}
+	for _, ob := range obs {
+		if og := ob.Origin; og != nil {
+			if n := aliases[og.InstanceID]; n != "" {
+				og.InstanceID = n
+			}
+			if n := aliases[og.LineageID]; n != "" {
+				og.LineageID = n
 			}
 		}
 	}
-	res := identity.Reconcile(identity.Input{
-		Obs: obs, Known: known, Skip: skip, Present: present, Lineages: lineages, NewID: a.NewID,
-		Semantic: func(k *identity.Known) scan.SemanticSet {
-			if k.Snap == nil {
-				return nil
-			}
-			s, _ := a.Store.SemanticSet(k.Snap.ID)
-			return s
-		},
-	})
-	now := a.Now()
-	var scanned []string
-	for _, s := range active {
-		scanned = append(scanned, s.ID)
-	}
-	if err := a.Store.ApplyScan(e.ID, scanID, now, res, scanned); err != nil {
-		return nil, err
-	}
-	if v := env.ReadGameVersion(e.GameRoot); v != "" && v != e.GameVersion {
-		e.GameVersion = v
-		a.Store.UpdateEnv(e)
-	}
-	if err := a.indexGameTypes(e); err != nil {
-		return nil, err
-	}
+	return nil
+}
 
-	st := ScanStats{Events: map[string]int{}, Questions: len(res.Questions)}
-	for _, s := range listed {
+// newScanStats sums up a scan: per source, the events, the files read and the snapshots.
+func newScanStats(set *scanSourceSet, sstats map[string]*scan.SourceStats, res *identity.Result, obs []*scan.Observation) ScanStats {
+	st := ScanStats{Events: map[string]int{}, Questions: len(res.Questions), Partial: set.partial}
+	for _, s := range set.listed {
 		ss := SourceStat{Label: s.Label, Kind: string(s.Kind), Status: s.Status}
 		if x := sstats[s.ID]; x != nil {
 			ss.Folders, ss.Mods, ss.Residue, ss.Disabled, ss.NoAbout, ss.ResidueNoAbout, ss.Aliases, ss.HasACF, ss.Err =
@@ -281,36 +368,7 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 			st.Snapshots++
 		}
 	}
-	mods, err := a.Store.Mods(e.ID)
-	if err != nil {
-		return nil, err
-	}
-	for _, m := range mods {
-		if m.Status == identity.Live {
-			st.Live++
-		} else {
-			st.Tombstones++
-		}
-	}
-	st.DurationMS = a.Now().Sub(started).Milliseconds()
-	if err := a.Store.FinishScan(scanID, a.Now(), st); err != nil {
-		return nil, err
-	}
-	if st.Snapshots > 0 {
-		a.Store.TruncateWAL() // new snapshots wrote their file lists through the WAL (04 §4)
-	}
-	if err := a.tagOfficial(e.ID); err != nil {
-		return nil, err
-	}
-	rep := &ScanReport{Env: e, ScanID: scanID, Full: full, GameOnly: o.GameOnly, Stats: st}
-	// 07 §4.3: every scan compares ModsConfig.xml with what RimArcho last wrote.
-	if ls, err := a.Loadout(); err == nil {
-		rep.Notices = ls.Notices
-	} else {
-		rep.Notices = []string{"loadout: " + err.Error()}
-	}
-	rep.GameLinks, err = a.InspectGameLinks()
-	return rep, err
+	return st
 }
 
 func (o ScanOptions) readProgress() func(done, total int) {
@@ -371,9 +429,9 @@ func sharedLinkObservations(obs []*scan.Observation, known []*identity.Known, so
 	}
 }
 
-// LastScan returns the newest finished scan of the environment, or nil.
-func (a *App) LastScan(envID string) (*store.Scan, *ScanStats, error) {
-	sc, err := a.Store.LastFinishedScan(envID)
+// LastScan returns the newest finished scan of the installation, or nil.
+func (a *App) LastScan(gameID string) (*store.Scan, *ScanStats, error) {
+	sc, err := a.Store.LastFinishedScan(gameID)
 	if err != nil || sc == nil {
 		return nil, nil, err
 	}

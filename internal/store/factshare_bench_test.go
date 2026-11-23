@@ -30,10 +30,10 @@ func TestFactShareScale(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tx.Exec(`INSERT INTO source(id,environment_id,kind,label,root,status) VALUES('bench-src','','extra','bench',?,'ok')`, e.Root); err != nil {
+	if _, err := tx.Exec(`INSERT INTO source(id,game_id,kind,label,root,status) VALUES('bench-src','','extra','bench',?,'ok')`, e.Root); err != nil {
 		t.Fatal(err)
 	}
-	stmt, err := tx.Prepare(`INSERT INTO instance(id,environment_id,lineage_id,source_id,rel_path,status,first_seen,last_seen) VALUES(?,'',?,'bench-src',?,'live',1,1)`)
+	stmt, err := tx.Prepare(`INSERT INTO instance(id,game_id,lineage_id,source_id,rel_path,status,first_seen,last_seen) VALUES(?,'',?,'bench-src',?,'live',1,1)`)
 	if err != nil {
 		t.Fatal(err)
 	}

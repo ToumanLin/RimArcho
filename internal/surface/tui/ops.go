@@ -70,6 +70,11 @@ func (m *model) runEditorOp(code string) tea.Cmd {
 			return m.openFolderOf(it.id)
 		}
 		return nil
+	case view.OpLinked:
+		if it := m.current(); it != nil {
+			return m.showLinkOf(it.id)
+		}
+		return nil
 	case view.OpWorkshop, view.OpSteam:
 		if it := m.current(); it != nil {
 			return m.openWorkshopPage(m.workshopOf(it.id), code == view.OpSteam)
@@ -269,26 +274,33 @@ func (m *model) subPage(d int) tea.Cmd {
 	return nil
 }
 
-// helpPage is `?`: the keys of the page shown (view.KeyHelp).
-func (m *model) helpPage() tea.Cmd {
-	page := "other"
+// pageName names the screen shown as the GUI names its pages, for `?` (view.KeyHelp) and
+// the palette's page commands (view.PageCommands).
+func (m *model) pageName() string {
 	switch m.tab {
 	case tabList:
-		page = view.EditorPage
+		return view.EditorPage
+	case tabProblems:
+		return "needs"
 	case tabLibrary:
-		page = view.LibraryPage
+		return view.LibraryPage
 	case tabChanges:
-		page = view.ChangesPage
+		return view.ChangesPage
 	case tabSubscribe:
-		page = view.SubscribePage
+		return view.SubscribePage
 	case tabSearch:
-		page = view.PageSearch
+		return view.PageSearch
 	case tabRules:
-		page = view.RulesPage
+		return view.RulesPage
 	case tabHome:
-		page = "home"
+		return "home"
 	}
-	rows := view.KeyHelp(page, true)
+	return "other"
+}
+
+// helpPage is `?`: the keys of the page shown (view.KeyHelp).
+func (m *model) helpPage() tea.Cmd {
+	rows := view.KeyHelp(m.pageName(), true)
 	w := 0
 	for _, r := range rows {
 		w = max(w, width.StringWidth(r.Keys))

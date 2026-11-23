@@ -4,3 +4,4 @@ package app
 
 func managerProcessFolders() []string  { return nil }
 func managerShortcutFolders() []string { return nil }
+func managerRanFolders() []string      { return nil }

@@ -1,7 +1,10 @@
+//go:build windows || cgo
+
 package gui
 
 import (
 	"errors"
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
@@ -49,7 +52,7 @@ func TestLogAnalysisDoesNotBlockOtherPagesOrRestartBetweenPolls(t *testing.T) {
 	e.WriteFile(filepath.Join(e.UserData, "Player.log"), "RimWorld 1.5.4104 rev435\nNullReferenceException: fixture\n  at Fixture.Tick ()\n")
 	started, release := make(chan struct{}, 4), make(chan struct{})
 	var calls atomic.Int32
-	e.App.AnalyzeRunner = func(string, func(string)) error {
+	e.App.AnalyzeRunner = func(*app.App, func(string)) error {
 		calls.Add(1)
 		started <- struct{}{}
 		<-release
@@ -148,6 +151,6 @@ func TestLogPageSwitchesEnvironmentAndRejectsPreviousPath(t *testing.T) {
 		t.Fatal(r.Error)
 	}
 	if p, err := api.LogPage(next); err != nil || p.Path != "" || len(p.Files) != 0 {
-		t.Fatalf("empty environment retained old log: %+v, %v", p, err)
+		t.Fatalf("empty Game Config retained old log: %+v, %v", p, err)
 	}
 }

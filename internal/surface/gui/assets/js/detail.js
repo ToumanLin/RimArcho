@@ -7,6 +7,8 @@ import { fieldList } from "./fields.js";
 
 import * as ops from "./ops.js";
 import { versionNotice } from "./versionwarnings.js";
+import { reportMark } from "./reportmark.js";
+import { evidenceMark } from "./needtext.js";
 
 let seq = 0, detailTimer;
 
@@ -15,6 +17,10 @@ let seq = 0, detailTimer;
 // move. The old Mod is inert at once (its actions cannot run) and dims if the wait is long.
 // REVEAL_MS caps the wait: a slower part fills in place after the swap.
 const REVEAL_MS = 250;
+// FETCH_REST_MS: an uncached Workshop description is fetched only once the cursor has rested
+// this long on the Mod, so stepping through a list sends Steam nothing (16 §2.16.1 G12).
+const FETCH_REST_MS = 400;
+export const fetchRest = (current) => new Promise((done) => setTimeout(() => done(current()), FETCH_REST_MS));
 export function stale(box) { if (box) { box.dataset.stale = ""; box.inert = true; } }
 export function unstale(box) { if (box) { delete box.dataset.stale; box.inert = false; } }
 
@@ -35,7 +41,7 @@ export function followDetail(it, staged) {
 
 // showDetail draws the plan editor's details of a row (16 §4.1): its copies, name and
 // picture, the detail, and the copy's note and actions, shown together once Go has answered
-// (REVEAL_MS at most). A Workshop page not read yet is fetched straight away.
+// (REVEAL_MS at most). A Workshop page not read yet is fetched once the cursor rested.
 export async function showDetail(it, staged) {
  clearTimeout(detailTimer);
   const n = ++seq, gameRequest = S.envSeq;
@@ -64,6 +70,7 @@ export async function showDetail(it, staged) {
     run: (code, i) => document.dispatchEvent(new CustomEvent("detail-op", { detail: { code, id: i.id || it.id } })),
     noteSaved: async () => { const i = await api.LibraryCopy(it.id).catch(() => null); if (current() && i) f.inst(i); },
     tech: true,
+    ownNote: true, // the editor shows only the player's note (16 §4)
     later: !same,
     host: box,
   }));
@@ -84,7 +91,7 @@ export async function showDetail(it, staged) {
   box.dataset.ref = it.id;
   f.show();
   const d = await detail;
-  if (!current() || d?.state !== "not cached") return;
+  if (!current() || d?.state !== "not cached" || !(await fetchRest(current))) return;
   f.fetching();
   try {
     const d2 = await api.Detail(it.id, !!staged, true, false);
@@ -215,7 +222,7 @@ export function detailFrame(box, sc, o = {}) {
       if (!editing || P.note.dataset.ref !== r.ref) {
         P.note.innerHTML = "";
         P.note.dataset.ref = r.ref;
-        P.note.append(noteEl(r, { saved: o.noteSaved, leave: o.noteLeave }));
+        P.note.append(noteEl(r, { saved: o.noteSaved, leave: o.noteLeave, ownOnly: o.ownNote }));
       }
       P.acts.innerHTML = "";
       const codes = ops.sorted((r.ops || []).filter((c) => { const x = ops.op(c); return x.detail || x.group === 4; }));
@@ -241,6 +248,7 @@ export function detailFrame(box, sc, o = {}) {
       P.facts.append(facts);
       P.version.replaceChildren();
       if (d.version) P.version.append(versionNotice(d.version));
+      if (d.data?.length) P.version.append(dataNotes(d.data));
       if (!o.ownFields) f.fields(d.fields);
       P.desc.innerHTML = "";
       P.desc.append(description(d));
@@ -252,7 +260,7 @@ export function detailFrame(box, sc, o = {}) {
       }
       P.more.innerHTML = "";
       if (o.tech) {
-        const more = el("div", "sub link", T("technical information, enter"));
+        const more = el("div", "sub link", T("full details"));
         more.onclick = () => document.dispatchEvent(new CustomEvent("verb", { detail: "full" }));
         P.more.append(more);
       }
@@ -297,17 +305,21 @@ function description(d) {
 // else a place to write one; a click (or n) edits it, enter saves, shift+enter breaks the
 // line, esc leaves it as it was. o.saved() after a save, o.leave() when the editing ends;
 // o.save(text) saves another note (a tag's) in place of the copy's, o.placeholder its hint.
+// o.ownOnly (the editor's details, 16 §4): only the player's own note shows; what RimArcho
+// wrote is the empty note's hover, not a line read every time.
 export function noteEl(i, o = {}) {
-  const box = el("div", "lib-note" + (i.note ? "" : i.auto ? " auto" : " empty"));
+  const auto = o.ownOnly ? "" : i.auto;
+  const box = el("div", "lib-note" + (i.note ? "" : auto ? " auto" : " empty"));
   const show = () => {
     box.innerHTML = "";
     box.classList.remove("editing");
-    box.append(el("div", "txt", i.note || i.auto || T("write a note")));
-    if (!i.note && i.auto) box.append(el("div", "by", T("by RimArcho, click to edit")));
+    box.append(el("div", "txt", i.note || auto || T("write a note")));
+    if (!i.note && auto) box.append(el("div", "by", T("by RimArcho, click to edit")));
   };
   show();
+  const hover = !i.note && i.auto && o.ownOnly ? i.auto + "\n" : "";
   if (!i.id && !o.save) return box;
-  box.title = T("click to edit") + T("; ") + "n";
+  box.title = hover + T("click to edit") + T("; ") + "n";
   box.onclick = () => {
     if (box.classList.contains("editing")) return;
     box.classList.add("editing");
@@ -355,6 +367,7 @@ export function renderDetail(d, box, sc, keepScroll, opts = {}) {
   box.append(img, el("h1", "", d.name));
   if (d.authors) box.append(el("div", "who", d.authors));
   if (d.version) box.append(versionNotice(d.version));
+  if (d.data?.length) box.append(dataNotes(d.data));
   // a copy's details on Mod library draw their own note, actions and field list (16 §2.9)
   if (!opts.page) {
     const facts = el("div", "facts");
@@ -424,7 +437,7 @@ export function renderDetail(d, box, sc, keepScroll, opts = {}) {
     box.append(el("div", "sub", T("history")), el("div", "history word-facts", d.history), all);
   }
   if (!opts.page) {
-    const more = el("div", "sub link", T("technical information, enter"));
+    const more = el("div", "sub link", T("full details"));
     more.onclick = () => document.dispatchEvent(new CustomEvent("verb", { detail: "full" }));
     box.append(more);
   }
@@ -497,4 +510,18 @@ function host(u) {
 export function scrollDetail(dy, page) {
   const sc = $(".detail .scroll");
   sc.scrollTop += page ? dy * sc.clientHeight * 0.9 : dy * 40;
+}
+
+// dataNotes: what Can it run says of this Mod from shared logs or the replacement library,
+// one quiet line each with its source and the flag "the data is outdated" (16 §2.9).
+function dataNotes(notes) {
+  const box = el("div", "md-data");
+  for (const n of notes) {
+    const r = el("div", "md-data-row");
+    r.append(el("span", "t", n.text));
+    if (n.evidence) r.append(evidenceMark(n.evidence));
+    r.append(reportMark({ finding: n.finding, mod: n.mod, wrong: false }));
+    box.append(r);
+  }
+  return box;
 }

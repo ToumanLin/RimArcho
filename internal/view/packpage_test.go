@@ -8,6 +8,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/finding"
+	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
@@ -24,7 +25,7 @@ func TestBuildPackPageCheck(t *testing.T) {
 		t.Fatal(err)
 	}
 	game.GameVersion = "1.6.4871 rev590"
-	if err := e.App.Store.UpdateEnv(game); err != nil {
+	if err := e.App.Store.UpdateGame(&store.Game{ID: game.GameID, Name: game.Name, GameRoot: game.GameRoot, GameVersion: game.GameVersion}); err != nil {
 		t.Fatal(err)
 	}
 	p := app.Pack{Format: 2, Name: "page", Env: game.Name, Game: "1.6.4633 rev1261", Entries: []app.PackEntry{{PackageID: "ludeon.rimworld", Name: "Core", Official: true}, {PackageID: "test.missing.copy", Name: "Missing Copy", Folder: "missing", Bytes: 100}}}

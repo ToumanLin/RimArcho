@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -100,13 +102,27 @@ func (s *API) ChooseManagedFolder(path string) error {
 	return s.a.Store.SetMeta("guide.managed-folders", "done")
 }
 
-func (s *API) DiscoverManagerImports() []app.ManagerImport { return app.FindManagerImports() }
+func (s *API) DiscoverManagerImports() []app.ManagerImport {
+	return app.FindManagerImports(s.gameModsDirs())
+}
+
+// gameModsDirs are the environments' game Mods folders, where RimCrow's links lead to its
+// install folder (07 §6.2).
+func (s *API) gameModsDirs() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.a.GameModsDirs()
+}
+
+// ManagerSourcesIn is what a chosen or dropped manager .exe or folder holds (07 §6.2): its
+// data read like a found install's. nil for anything else, which ManagerFileKind classifies.
+func (s *API) ManagerSourcesIn(path string) []app.ManagerImport { return app.ManagerSourcesIn(path) }
 
 func (s *API) PickManagerImport() (string, error) {
 	if s.x.native == nil {
 		return "", nil
 	}
-	return s.x.native.openFile(view.T("import from RimSort or RimCrow"), [][2]string{{"Manager data and Mod lists", "*.db;*.json;*.xml;*.rml;*.txt"}, {"All files", "*.*"}})
+	return s.x.native.openFile(view.T("import from RimSort, RimCrow or RimPy"), [][2]string{{"Manager program or data", "*.exe;*.db;*.json;*.xml;*.rml;*.txt"}, {"All files", "*.*"}})
 }
 
 type managerPreview struct {
@@ -115,8 +131,9 @@ type managerPreview struct {
 }
 
 type ManagerPreview struct {
-	Text    string `json:"text"`
-	Request uint64 `json:"request"`
+	Text     string          `json:"text"`
+	Request  uint64          `json:"request"`
+	Profiles []app.RCProfile `json:"profiles,omitempty"`
 }
 
 func managerSignature(kind, path string) string {
@@ -124,6 +141,9 @@ func managerSignature(kind, path string) string {
 	paths := []string{path}
 	if kind == "rimcrow" {
 		paths = append(paths, path+"-wal", filepath.Join(filepath.Dir(path), "rules", "user_rules.json"))
+	}
+	if kind == "rimsort-aux" {
+		paths = append(paths, path+"-wal")
 	}
 	for _, p := range paths {
 		hash.Write([]byte(p))
@@ -146,7 +166,9 @@ func (s *API) managerReport(kind, path string, dry bool) (string, error) {
 	var err error
 	switch kind {
 	case "rimcrow":
-		r, err = s.a.ImportRimCrow(app.RimCrowOptions{DB: path, DryRun: dry})
+		r, err = s.a.ImportRimCrow(app.RimCrowOptions{DB: path, DryRun: dry, Tags: view.ManagerTags()})
+	case "rimsort-aux":
+		r, err = s.a.ImportRimSortAux(app.RimSortAuxOptions{DB: path, DryRun: dry, Tags: view.ManagerTags()})
 	case "rimsort-rules":
 		r, err = s.a.ImportRimSortRules(path, dry)
 	default:
@@ -154,6 +176,9 @@ func (s *API) managerReport(kind, path string, dry bool) (string, error) {
 	}
 	if err != nil {
 		return "", err
+	}
+	if dry {
+		return view.ManagerImportPreviewText(r), nil
 	}
 	return view.ManagerImportText(r), nil
 }
@@ -164,36 +189,70 @@ func (s *API) PreviewManagerImport(kind, path string) (*ManagerPreview, error) {
 	s.x.seq++
 	s.x.manager = nil
 	e, err := s.a.Env()
-	if err != nil {
+	if err != nil && !(kind == "rimcrow" && errors.Is(err, app.ErrNoEnv)) {
 		return nil, err
 	}
-	signature := managerSignature(kind, path)
+	envID := ""
+	if e != nil {
+		envID = e.ID
+	}
+	signature := s.managerSourceSignature(kind, path)
 	text, err := s.managerReport(kind, path, true)
 	if err != nil {
 		return nil, err
 	}
-	if signature != managerSignature(kind, path) {
+	if signature != s.managerSourceSignature(kind, path) {
 		return nil, errors.New("source data changed; preview it again")
 	}
-	s.x.manager = &managerPreview{kind, path, e.ID, signature, s.a.Store.ChangeKey(), s.x.seq}
-	return &ManagerPreview{text, s.x.seq}, nil
+	s.x.manager = &managerPreview{kind, path, envID, signature, s.a.Store.ChangeKey(), s.x.seq}
+	preview := &ManagerPreview{Text: text, Request: s.x.seq}
+	if kind == "rimcrow" {
+		r, err := s.a.ImportRimCrow(app.RimCrowOptions{DB: path, DryRun: true})
+		if err != nil {
+			return nil, err
+		}
+		preview.Profiles = append([]app.RCProfile(nil), r.Profiles...)
+		for i := range preview.Profiles {
+			preview.Profiles[i].DisplayStatus = view.ProfileStatus(preview.Profiles[i].Status)
+		}
+	}
+	return preview, nil
 }
 
 func (s *API) ApplyManagerImport(request uint64) (string, error) {
+	return s.applyManagerImport(request, nil, false)
+}
+func (s *API) ApplyManagerImportProfiles(request uint64, ids []string) (string, error) {
+	return s.applyManagerImport(request, ids, true)
+}
+func (s *API) applyManagerImport(request uint64, ids []string, selected bool) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	p := s.x.manager
 	e, err := s.a.Env()
-	if err != nil {
+	if err != nil && !(p != nil && p.Kind == "rimcrow" && errors.Is(err, app.ErrNoEnv)) {
 		return "", err
 	}
-	if p == nil || p.Sequence != request || p.Sequence != s.x.seq || p.Env != e.ID || p.State != s.a.Store.ChangeKey() {
+	envID := ""
+	if e != nil {
+		envID = e.ID
+	}
+	if p == nil || p.Sequence != request || p.Sequence != s.x.seq || p.Env != envID || p.State != s.a.Store.ChangeKey() {
 		return "", errors.New("import preview changed; preview it again")
 	}
-	if p.Signature != managerSignature(p.Kind, p.Path) {
+	if p.Signature != s.managerSourceSignature(p.Kind, p.Path) {
 		return "", errors.New("source data changed; preview it again")
 	}
-	text, err := s.managerReport(p.Kind, p.Path, false)
+	var text string
+	if p.Kind == "rimcrow" && selected {
+		r, e := s.a.ImportRimCrow(app.RimCrowOptions{DB: p.Path, SelectProfiles: true, ProfileIDs: ids, Tags: view.ManagerTags()})
+		err = e
+		if e == nil {
+			text = view.ManagerImportText(r)
+		}
+	} else {
+		text, err = s.managerReport(p.Kind, p.Path, false)
+	}
 	s.x.manager = nil
 	s.board, s.needs = nil, nil
 	return text, err
@@ -202,6 +261,9 @@ func (s *API) ApplyManagerImport(request uint64) (string, error) {
 func (s *API) FinishWorkshopRelocation() error { return s.a.FinishWorkshopRelocation() }
 
 func (s *API) ManagerFileKind(path string) string {
+	if strings.EqualFold(filepath.Base(path), "aux_metadata.db") {
+		return "rimsort-aux"
+	}
 	if strings.EqualFold(filepath.Ext(path), ".db") {
 		return "rimcrow"
 	}
@@ -216,4 +278,19 @@ func (s *API) ManagerFileKind(path string) string {
 		}
 	}
 	return "list"
+}
+
+// Profile Config files live outside the source database and can change independently.
+func (s *API) managerSourceSignature(kind, path string) string {
+	signature := managerSignature(kind, path)
+	if kind == "rimcrow" {
+		rep, err := s.a.ImportRimCrow(app.RimCrowOptions{DB: path, DryRun: true})
+		if err != nil {
+			return signature + err.Error()
+		}
+		data, _ := json.Marshal(rep.Profiles)
+		sum := sha256.Sum256(data)
+		signature += hex.EncodeToString(sum[:])
+	}
+	return signature
 }

@@ -1,0 +1,264 @@
+package app_test
+
+import (
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/oplog"
+	"github.com/ToumanLin/RimArcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/steamworks"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
+)
+
+func opRows(t *testing.T, e *testkit.Env) []oplog.Row {
+	t.Helper()
+	rows, err := e.App.Operations(oplog.Query{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return rows
+}
+
+func findOp(rows []oplog.Row, op, result string) *oplog.Row {
+	for i := range rows {
+		if rows[i].Op == op && (result == "" || rows[i].Result == result) {
+			return &rows[i]
+		}
+	}
+	return nil
+}
+
+// A launch is a parent row; the ModsConfig.xml write hangs under it with the version it
+// made. A refused launch is one refused row; a dry run writes none (13 §1.3).
+func TestOpLogLaunch(t *testing.T) {
+	t.Parallel()
+	e := loadoutEnv(t)
+	scanNow(t, e)
+	e.App.Ops.SetOrigin(oplog.TUI)
+	e.MustRun("env", "set", "main", "--launch", "direct")
+	e.MustRun("enable", refOf(t, e, "B", ""))
+	e.MustRun("launch", "--dry-run")
+	if rows := opRows(t, e); len(rows) != 0 {
+		t.Fatalf("a dry run wrote %d rows", len(rows))
+	}
+	e.MustRun("launch")
+	rows := opRows(t, e)
+	l := findOp(rows, oplog.Launch, oplog.OK)
+	w := findOp(rows, oplog.ModsConfigWrite, oplog.OK)
+	if l == nil || w == nil || w.Batch != l.ID || l.Origin != oplog.TUI || l.Subject != "default" {
+		t.Fatalf("rows: %+v", rows)
+	}
+	if !strings.HasPrefix(w.Detail, "v2, ") || !strings.HasSuffix(w.Target, "ModsConfig.xml") || l.Detail != "method direct" {
+		t.Fatalf("write %+v, launch %+v", w, l)
+	}
+
+	os.Remove(filepath.Join(e.Game, "RimWorldWin64.exe"))
+	if _, code := e.Run("launch"); code == 0 {
+		t.Fatal("launch without an executable")
+	}
+	r := opRows(t, e)[0]
+	if r.Op != oplog.Launch || r.Result != oplog.Refused || !strings.Contains(r.Detail, "no game executable") {
+		t.Fatalf("refusal row %+v", r)
+	}
+}
+
+// Saving writes one modsconfig.write row of its own.
+func TestOpLogSave(t *testing.T) {
+	t.Parallel()
+	e := loadoutEnv(t)
+	scanNow(t, e)
+	e.MustRun("enable", refOf(t, e, "B", ""))
+	e.MustRun("save")
+	rows := opRows(t, e)
+	if len(rows) == 0 || rows[0].Op != oplog.ModsConfigWrite || rows[0].Batch != 0 || !strings.Contains(rows[0].Detail, ", user") {
+		t.Fatalf("rows %+v", rows)
+	}
+	if !strings.Contains(e.MustRun("ops"), "back: the plan's history (archo history; archo loadout checkout v2") {
+		t.Fatal(e.MustRun("ops"))
+	}
+}
+
+// The recycle bin: a path off the allow-list is a refused row, a recycled folder an ok row
+// that says where it went.
+func TestOpLogTrash(t *testing.T) {
+	t.Parallel()
+	e := loadoutEnv(t)
+	scanNow(t, e)
+	var gone []string
+	e.App.TrashFunc = func(p string) error { gone = append(gone, p); return nil }
+	outside := filepath.Join(e.Root, "elsewhere")
+	e.MkdirAll(outside)
+	if err := e.App.ToTrash(outside); !errors.Is(err, app.ErrNotInTrashList) {
+		t.Fatal(err)
+	}
+	mod := filepath.Join(e.Game, "Mods", "B")
+	if err := e.App.ToTrash(mod); err != nil || len(gone) != 1 {
+		t.Fatal(err, gone)
+	}
+	rows := opRows(t, e)
+	if len(rows) != 2 || rows[1].Result != oplog.Refused || rows[1].Target != outside || rows[0].Result != oplog.OK || rows[0].Subject != "B" {
+		t.Fatalf("rows %+v", rows)
+	}
+	out := e.MustRun("ops", "--failed")
+	if !strings.Contains(out, "1 row") || !strings.Contains(out, "refused") || strings.Contains(out, "recycle bin\n") {
+		t.Fatal(out)
+	}
+	if !strings.Contains(e.MustRun("ops", "--op", "trash"), "back: the recycle bin") {
+		t.Fatal(e.MustRun("ops"))
+	}
+	if _, code := e.Run("ops", "--op", "nonsense"); code == 0 {
+		t.Fatal("unknown --op accepted")
+	}
+}
+
+// A log that cannot be written never fails the action.
+func TestOpLogWriteFailureKeepsTheAction(t *testing.T) {
+	t.Parallel()
+	e := loadoutEnv(t)
+	scanNow(t, e)
+	e.App.Ops.Fail = true
+	e.MustRun("env", "set", "main", "--launch", "direct")
+	e.MustRun("enable", refOf(t, e, "B", ""))
+	e.MustRun("launch")
+	if len(e.Launched) != 1 || !strings.Contains(e.ReadModsConfig(), "tester.b") {
+		t.Fatal("the launch did not happen")
+	}
+	e.App.Ops.Fail = false
+	if rows := opRows(t, e); len(rows) != 0 {
+		t.Fatalf("%d rows", len(rows))
+	}
+}
+
+// Save rename and copy: one row each, with the new name.
+func TestOpLogSaves(t *testing.T) {
+	t.Parallel()
+	e := loadoutEnv(t)
+	dir := filepath.Join(e.Root, "saves")
+	e.WriteFile(filepath.Join(dir, "Colony.rws"), "<savegame/>")
+	s := &app.Save{Path: filepath.Join(dir, "Colony.rws"), File: "Colony.rws", Name: "Colony"}
+	if _, err := e.App.RenameSave(s, "bad/name"); err == nil {
+		t.Fatal("bad name accepted")
+	}
+	to, err := e.App.CopySave(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows := opRows(t, e)
+	if len(rows) != 2 || rows[1].Op != oplog.SaveRename || rows[1].Result != oplog.Refused ||
+		rows[0].Op != oplog.SaveCopy || rows[0].Result != oplog.OK || rows[0].Detail != "to "+filepath.Base(to) {
+		t.Fatalf("rows %+v", rows)
+	}
+}
+
+// The process origin: an inherited ARCHO_ORIGIN wins over the surface's own.
+func TestOpLogOrigin(t *testing.T) {
+	e := testkit.New(t)
+	t.Setenv(oplog.EnvVar, oplog.Agent)
+	e.App.SetOrigin(oplog.MCP)
+	if e.App.Ops.Origin() != oplog.Agent {
+		t.Fatalf("origin %s", e.App.Ops.Origin())
+	}
+	os.Unsetenv(oplog.EnvVar)
+	e.App.SetOrigin(oplog.GUI)
+	if e.App.Ops.Origin() != oplog.GUI || os.Getenv(oplog.EnvVar) != oplog.GUI {
+		t.Fatal("origin not passed on to children")
+	}
+}
+
+// The player's case: a SteamCMD subscription removed with quick delete. Each removal is a
+// subscription.remove row with its delete (or recycle) as a step; a dry run writes nothing;
+// a refusal is a refused row; the parallel batch the window uses logs the same (13 §1.3).
+func TestOpLogSubscriptionQuickDelete(t *testing.T) {
+	t.Parallel()
+	e := setup(t, true)
+	quick := filepath.Join(e.SteamCMD, "3771446780")
+	slow := filepath.Join(e.SteamCMD, "3771446781")
+	par := filepath.Join(e.SteamCMD, "3771446782")
+	e.WriteMod(quick, testkit.Sample("fvc.fat", "Female Variant Clothing"))
+	e.WriteMod(slow, testkit.Sample("fvc.slow", "Slow One"))
+	e.WriteMod(par, testkit.Sample("fvc.par", "Parallel One"))
+	scanNow(t, e)
+	e.App.TrashFunc = os.RemoveAll
+
+	if _, err := e.App.RemoveSubscriptionsWith([]string{"pkg:fvc.fat"}, app.RemoveSubscriptionOptions{DryRun: true, Permanent: true}, app.BatchCalls{}); err != nil {
+		t.Fatal(err)
+	}
+	if rows := opRows(t, e); len(rows) != 0 {
+		t.Fatalf("a dry run wrote %+v", rows)
+	}
+
+	if _, err := e.App.RemoveSubscriptionsWith([]string{"pkg:fvc.fat"}, app.RemoveSubscriptionOptions{Permanent: true}, app.BatchCalls{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(quick); !os.IsNotExist(err) {
+		t.Fatalf("quick delete left the folder: %v", err)
+	}
+	rows := opRows(t, e)
+	p, d := findOp(rows, oplog.SubscriptionRemove, oplog.OK), findOp(rows, oplog.Delete, oplog.OK)
+	if p == nil || d == nil || d.Batch != p.ID || p.Subject != "Female Variant Clothing" || !samePath(p.Target, quick) || p.Detail != oplog.Permanent || !samePath(d.Target, quick) {
+		t.Fatalf("rows %+v", rows)
+	}
+	if oplog.Where(*p) != "" || oplog.Where(*d) != "" {
+		t.Fatalf("a permanent delete says it can be got back: %q %q", oplog.Where(*p), oplog.Where(*d))
+	}
+
+	// Recycled: the step is a trash row, and the row points to the recycle bin.
+	if _, err := e.App.RemoveSubscriptionsWith([]string{"pkg:fvc.slow"}, app.RemoveSubscriptionOptions{}, app.BatchCalls{}); err != nil {
+		t.Fatal(err)
+	}
+	rows = opRows(t, e)
+	if rows[1].Op != oplog.SubscriptionRemove || rows[0].Op != oplog.Trash || rows[0].Batch != rows[1].ID || oplog.Where(rows[1]) != "the recycle bin" {
+		t.Fatalf("recycled rows %+v", rows[:2])
+	}
+
+	// The window's batch: workers on their own sessions, and a reference that is not a
+	// subscription is refused.
+	if _, err := e.App.RemoveSubscriptionsWith([]string{"pkg:fvc.par", "pkg:nothing.here"}, app.RemoveSubscriptionOptions{Permanent: true, Workers: 4}, app.BatchCalls{}); err == nil {
+		t.Fatal("an unknown reference was accepted")
+	}
+	rows = opRows(t, e)
+	var gone, refused bool
+	for _, r := range rows {
+		gone = gone || r.Op == oplog.Delete && r.Result == oplog.OK && samePath(r.Target, par)
+		refused = refused || r.Op == oplog.SubscriptionRemove && r.Result == oplog.Refused && r.Subject == "pkg:nothing.here"
+	}
+	if !gone || !refused {
+		t.Fatalf("batch rows %+v", rows)
+	}
+	if out := e.MustRun("ops", "--op", "delete"); !strings.Contains(out, "3771446780") || strings.Contains(out, "back:") {
+		t.Fatal(out)
+	}
+}
+
+func samePath(a, b string) bool {
+	ra, _ := filepath.EvalSymlinks(filepath.Dir(a))
+	rb, _ := filepath.EvalSymlinks(filepath.Dir(b))
+	return strings.EqualFold(filepath.Join(ra, filepath.Base(a)), filepath.Join(rb, filepath.Base(b)))
+}
+
+// Unsubscribing while the game runs is one refused row per item with the game's reason, also
+// when a launch without the Steam client left the item's `_Archo_workshop_` link in Mods/
+// (VM 2026-11-23: planning that link's removal refused first, and nothing was logged).
+func TestOpLogUnsubscribeRefusedWithWorkshopLink(t *testing.T) {
+	t.Parallel()
+	e := setup(t, false)
+	dir := e.AddWorkshop("7200", testkit.Sample("tester.drop", "Drop"))
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.drop")
+	e.Junction(filepath.Join(e.Game, "Mods", "_Archo_workshop_7200"), dir)
+	scanNow(t, e)
+	steamDLL(e)
+	drop := refID(t, e, "Drop", source.Workshop)
+	e.App.GameProbe = func(string) *app.GameRun { return &app.GameRun{PID: 42} }
+	_, err := e.App.Workshop(steamworks.Unsubscribe, []string{drop}, false)
+	if err == nil || !strings.Contains(err.Error(), "game is running (pid 42)") {
+		t.Fatalf("game running: %v", err)
+	}
+	r := findOp(opRows(t, e), oplog.Unsubscribe, oplog.Refused)
+	if r == nil || r.Subject != "Drop" || r.Target != "workshop:7200" || !strings.Contains(r.Detail, "game is running") {
+		t.Fatalf("refused row: %+v", r)
+	}
+}

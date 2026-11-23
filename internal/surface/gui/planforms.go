@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -140,7 +142,7 @@ func (s *API) ImportPreviewFor(id int64, kind, src string) (*PlanImportPreview, 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if env, e := s.a.Env(); e != nil || env.ID != envID {
-		return nil, errors.New("import environment changed")
+		return nil, errors.New("import Game Config changed")
 	}
 	if seq != s.x.seq {
 		return nil, errors.New("import preview superseded")
@@ -148,7 +150,7 @@ func (s *API) ImportPreviewFor(id int64, kind, src string) (*PlanImportPreview, 
 	preview, err := view.PreviewImportFor(s.a, imp, id)
 	if err == nil {
 		s.x.imp, s.x.follow = imp, imp.Collection != nil
-		s.x.envID = envID
+		s.x.envID, s.x.settings = envID, imp.List.Settings
 	}
 	if err != nil {
 		return nil, err

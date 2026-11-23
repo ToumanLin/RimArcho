@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>import · B Moving in first</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  #page { --pad: max(20px, calc(50% - 460px)); display: flex; flex-direction: column; gap: 12px; }
+  .hd { padding: 16px 16px 4px; }
+  .hd h3 { margin: 0; font-size: 15px; }
+  .hd p { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; }
+  .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px 16px; }
+  .tile { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 2px 10px; align-items: center; padding: 10px 12px; border-radius: 10px; border: var(--hairline) solid var(--line-2); }
+  .tile:hover { background: var(--card-2); }
+  .tile.on { border-color: var(--accent); background: var(--accent-soft); }
+  .tile .mgr { grid-row: span 2; }
+  .tile .t { font-weight: 600; font-size: 14px; }
+  .tile .s { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .what { border-top: var(--hairline) solid var(--line-2); padding: 10px 16px 16px; }
+  .what .path { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .thing { display: grid; grid-template-columns: 22px 20px minmax(0, 1fr) auto; gap: 2px 8px; align-items: start; padding: 9px 4px; border-top: var(--hairline) solid var(--line-2); }
+  .thing:first-of-type { border-top: 0; }
+  .thing input { margin-top: 2px; accent-color: var(--accent); }
+  .thing .i { margin-top: 2px; color: var(--fg-2); }
+  .thing .t { font-weight: 600; }
+  .thing .b { grid-column: 3; font-size: 12.5px; }
+  .thing .sub { grid-column: 3 / 5; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 1px 14px; font-size: 12px; color: var(--fg-2); margin-top: 4px; }
+  .thing .sub .m { color: var(--muted); text-align: right; }
+  .thing .more { grid-row: 1; grid-column: 4; }
+  .one { padding: 14px 16px; }
+  .one h3 { margin: 0 0 2px; font-size: 14px; }
+  .one p { margin: 0 0 10px; color: var(--muted); font-size: 12.5px; }
+  .row1 { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: center; }
+  .kinds { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .kinds span { display: inline-flex; gap: 5px; align-items: center; }
+</style>
+</head>
+<body>
+<div class="review" id="review"></div>
+<div id="app">
+  <aside id="side"><div class="side-head">RimArcho</div><nav id="nav"></nav></aside>
+  <main id="main">
+    <div id="top"></div><div class="page-head" id="head"></div>
+    <div id="page">
+      <section class="card" id="move"></section>
+      <section class="card one">
+        <h3>Bring in one thing</h3>
+        <p>A list someone shared, a save's Mods, a Steam collection, or a pack.</p>
+        <div class="row1"><button class="btn line" data-sample="list">choose a file…</button>
+          <div class="paste"><input placeholder="paste a Steam collection or Rentry link, a share code (RC-…), or a copied list"><button class="btn line" data-sample="code">read</button></div></div>
+        <div class="kinds"></div>
+      </section>
+      <div id="result"></div>
+    </div>
+    <div id="bottom"><span id="status">Nothing changes until you confirm.</span><span id="hints"></span></div>
+  </main>
+</div>
+<div id="toast"></div>
+<script src="shared.js"></script>
+<script>
+shell("b", [["←→", "manager"], ["space", "tick"], ["enter", "bring over"]], "");
+// the "one thing" row: real icons instead of the placeholders above
+$(".row1 .btn").innerHTML = `${ic("file")} choose a file…`;
+$(".kinds").innerHTML = SOURCES.filter((s) => s.k !== "manager").map((s) => `<span>${ic(s.icon)} ${s.t.toLowerCase()}</span>`).join("") + `<span class="faint">or drop a file anywhere on this page</span>`;
+
+let cur = "rimcrow";
+function drawMove() {
+  const m = FOUND.find((x) => x.id === cur);
+  $("#move").innerHTML = `<div class="hd"><h3>Moving in from another manager?</h3><p>RimArcho found these on this computer. It only reads them; RimSort, RimCrow and RimPy keep working as before.</p></div>
+    <div class="tiles">${FOUND.map((x) => `<button class="tile ${x.id === cur ? "on" : ""}" data-m="${x.id}">${mark(x, 40)}<span class="t">${x.name}</span><span class="s">${x.when}  ·  ${x.things.reduce((n, t) => n + 1, 0)} kinds of data</span></button>`).join("")}</div>
+    <div class="what"><div class="path">From <span class="mono">${esc(m.where)}</span> <button class="btn link" data-toast="would open the file dialog">another folder…</button></div>
+      ${m.things.map((t) => `<label class="thing"><input type="checkbox" checked>${ic(t.icon)}<span class="t">${t.n} ${t.what}</span>
+        <span class="b becomes">${t.becomes}</span>
+        ${t.items ? `<div class="sub">${t.items.map(([a, b, c]) => `<span>${esc(a)}</span><span class="m">${b === "" ? "" : t.kind === "configs" ? "RimWorld " + b : b + " Mods"}</span><span class="m ${typeof c === "string" && c !== "ready" ? "warn" : ""}">${c === "" ? "" : typeof c === "number" ? (b - c ? `${b - c} not installed` : "all installed") : c}</span>`).join("")}</div>` : ""}
+      </label>`).join("")}
+      <div class="acts"><span class="note">Notes, aliases and tags you already have stay as they are. This cannot be undone.</span><button class="btn primary" data-toast="would bring them over">bring over ${m.things.length} things from ${m.name}</button></div></div>`;
+}
+drawMove();
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("[data-m]"); if (t) { cur = t.dataset.m; drawMove(); return; }
+  const s = e.target.closest("[data-sample]"); if (s) showSample(s.dataset.sample);
+});
+function showSample(k) {
+  const s = SAMPLES[k];
+  $("#result").innerHTML = `<section class="card"><div class="recog"><span class="ico">${ic(s.icon)}</span><span class="kind">${s.kind}</span><span class="name">${esc(s.name)}</span><span class="facts">${s.facts}</span></div>
+    <div style="padding:0 16px 16px">${s.dest ? destRadios("d", s.follow) : `<p class="muted">It is added to your packs; nothing else changes.</p>`}
+    <div class="acts"><button class="btn" onclick="document.getElementById('result').innerHTML=''">cancel</button><button class="btn primary" data-toast="would import">${s.pack ? "add the pack" : "import"}</button></div></div></section>`;
+  $("#result").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+</script>
+</body>
+</html>

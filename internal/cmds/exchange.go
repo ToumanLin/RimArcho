@@ -11,13 +11,14 @@ import (
 
 func init() {
 	register(&Command{Name: "loadout export", Summary: "write the workspace as a list file: a RimArcho list (each mod with its version), text, ModsConfig.xml (rimsort), RimWorld's .rml, or a RimCrow share code", MaxArgs: 0, Run: loadoutExport,
-		Flags: []Flag{{Name: "format", Value: "text|archo|modsconfig|rimsort|rml|rimcrow|rimcrow-xml|workshop"}, {Name: "out", Value: "<file>", Help: "default: print to stdout"}}})
+		Flags: []Flag{{Name: "format", Value: "text|archo|modsconfig|rimsort|rml|rimcrow|rimcrow-xml|workshop"}, {Name: "out", Value: "<file>", Help: "default: print to stdout"},
+			{Name: "settings", Help: "a RimArcho list (--format archo) also carries the list's Mod settings, by package and settings class"}}})
 	register(&Command{Name: "loadout import", Args: "<file|share code> [<name>]", Summary: "replace the workspace with a list (RimArcho, text, ModsConfig.xml, save, .rml, RimSort, RimCrow, workshop IDs; undoable), or with --new make it a new plan",
 		MinArgs: 1, MaxArgs: 2, Flags: []Flag{{Name: "new", Help: "import as a new plan named <name> (default: the list's own name or the file name)"}}, Run: loadoutImport})
 }
 
 func loadoutExport(c *Ctx, a *Args) (*render.Doc, error) {
-	b, err := c.App.ExportLoadout(a.Str("format"))
+	b, err := c.App.ExportLoadoutWith(a.Str("format"), a.Bool("settings"))
 	if err != nil {
 		return nil, err
 	}
@@ -37,6 +38,9 @@ func loadoutExport(c *Ctx, a *Args) (*render.Doc, error) {
 		f = app.FormatText
 	}
 	root.KV("format", f)
+	if a.Bool("settings") {
+		root.KV("Mod settings", "included")
+	}
 	d.AddNext("archo loadout import " + quoteArg(out))
 	return d, nil
 }
@@ -121,6 +125,9 @@ func loadoutImport(c *Ctx, a *Args) (*render.Doc, error) {
 			n.Children = append(n.Children, &render.Node{Line: x})
 		}
 		head = append(head, n)
+	}
+	if n := il.Settings.Mods(); n > 0 {
+		head = append(head, &render.Node{Line: fmt.Sprintf("Mod settings: the list carries settings of %s; not applied (archo mod-settings apply %s --dry-run)", render.Plural(n, "Mod"), quoteArg(a.Pos[0]))})
 	}
 	d.Nodes[0].Children = append(head, d.Nodes[0].Children...)
 	if !strings.Contains(strings.Join(d.Next, " "), "archo undo") {

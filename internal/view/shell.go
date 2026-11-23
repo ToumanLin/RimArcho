@@ -15,6 +15,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/finding"
 	"github.com/ToumanLin/RimArcho/internal/modchanges"
 	"github.com/ToumanLin/RimArcho/internal/perftrace"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // The window's shell (16 §2.1–§2.3, §2.15): the sidebar, the home page and the first-run
@@ -47,12 +48,13 @@ func PackLinksText(n *Needs) string {
 	return ""
 }
 
-// LastRunErrors is the number of the last run's errors in Can it run.
+// LastRunErrors is the number of the last run's errors in Can it run: the errors its
+// counted last-run items name ("Alpha — 68 errors"), not how many items there are.
 func LastRunErrors(n *Needs) int {
 	c := 0
 	for _, it := range n.Items {
 		if it.Counted && it.Group == GroupLastRun {
-			c++
+			c += it.Errors
 		}
 	}
 	return c
@@ -61,7 +63,7 @@ func LastRunErrors(n *Needs) int {
 // EnvChip is an environment as a chip: "steam · 1.6".
 func EnvChip(name, gameVersion string) string {
 	if name == "" {
-		return T("no game")
+		return T("no Game Config")
 	}
 	if mm := env.MajorMinor(gameVersion); mm != "" {
 		return name + "  " + mm
@@ -84,6 +86,8 @@ const (
 	PageLog      = "log"
 	PageSettings = "settings"
 	PageTextures = "textures" // Texture optimisation (10 §2), under Library
+	// PageImport: Library › Import, where every import starts (16 §2.18)
+	PageImport = "import"
 	// PageSubscribe: Mod library › add a subscription (16 §2.9)
 	PageSubscribe = "subscribe"
 	// PageSearch: Mod library › Search files (16 §2.9)
@@ -186,24 +190,34 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	library := []NavItem{
 		{ID: PagePlan, Label: T("lists"), Kids: planKids},
 		{ID: PagePacks, Label: T("packs"), Kids: packKids},
-		// Saves (16 §2.11), after the packs since 2026-11-04. Its own name: the plain
-		// "saves" key is translated for settings rows; the sidebar's name is longer.
-		{ID: PageSaves, Label: extraName("@nav.saves", "saves")},
 		// Below the packs (2026-10-28). The entry opens All, its first sub-entry (16 §2.9).
-		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all mods")}, {ID: PageChanges, Label: T("updates")}, {ID: PageSubscribe, Label: T("add a subscription")}, {ID: PageSearch, Label: T("search files")}, {ID: PageModSettings, Label: T("mod settings")}}},
-		// what the game loads faster (10 §2)
-		{ID: PageTextures, Label: T("texture optimisation")},
-		{ID: PageEnv, Label: T("game")},
+		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all mods")}, {ID: PageChanges, Label: T("updates")}, {ID: PageSubscribe, Label: T("add a subscription")}, {ID: PageSearch, Label: T("search files")}, {ID: PageModSettings, Label: T("mod settings")},
+			// what the game loads faster (10 §2); a sub-entry since 2026-11-18, keeping shift+7
+			{ID: PageTextures, Label: T("texture optimisation")}}},
+		{ID: PageEnv, Label: T("Game Config")},
+		// every import starts here (16 §2.18); last in the group since 2026-11-18, still
+		// without a shift key (below)
+		{ID: PageImport, Label: T("import")},
 	}
-	groups := []NavGroup{{Title: T("playing"), Items: playing}, {Title: T("library"), Items: library}}
+	// Saves is a group of its own (16 §2.11): the saves, and the play review (12 §3); below
+	// Library since 2026-11-18. Its own name: the plain "saves" key is translated for settings rows.
+	saves := []NavItem{{ID: PageSaves, Label: T("all saves")}, {ID: PageReview, Label: T("play review")}}
+	groups := []NavGroup{{Title: T("playing"), Items: playing}, {Title: T("library"), Items: library}, {Title: extraName("@nav.saves", "saves"), Items: saves}}
 	n := 0
 	for g := range groups {
 		for i := range groups[g].Items {
-			if groups[g].Items[i].ID == PageSaves {
+			if id := groups[g].Items[i].ID; id == PageSaves || id == PageReview || id == PageImport {
 				continue // no shift key: shift+1–8 stay the eight pages the TUI also has (16 §3.5)
 			}
 			n++
 			groups[g].Items[i].Key = fmt.Sprintf("shift+%d", n)
+			// Texture optimisation keeps its own key under Mod library (16 §2.1)
+			for k := range groups[g].Items[i].Kids {
+				if groups[g].Items[i].Kids[k].ID == PageTextures {
+					n++
+					groups[g].Items[i].Kids[k].Key = fmt.Sprintf("shift+%d", n)
+				}
+			}
 		}
 	}
 	return groups
@@ -229,8 +243,14 @@ func NavPath(groups []NavGroup, id string) []Crumb {
 		return []Crumb{{Label: T("background tasks"), ID: PageTasks}}
 	}
 	for _, g := range groups {
+		// the group's crumb opens its first page; Library's is Lists, not Import
+		// above it (16 §2.18)
+		top := g.Items[0].ID
+		if top == PageImport && len(g.Items) > 1 {
+			top = g.Items[1].ID
+		}
 		for _, it := range g.Items {
-			head := []Crumb{{Label: g.Title, ID: g.Items[0].ID}, {Label: it.Label, ID: it.ID}}
+			head := []Crumb{{Label: g.Title, ID: top}, {Label: it.Label, ID: it.ID}}
 			for _, k := range it.Kids {
 				if k.ID == id {
 					return append(head, Crumb{Label: k.Label, ID: k.ID})
@@ -308,7 +328,8 @@ type Home struct {
 	LastRunDay    string `json:"lastRunDay,omitempty"`
 	LastRunErrors int    `json:"lastRunErrors"`
 	// LastRunPending: the last run's log is not analysed yet (no count to show).
-	LastRunPending bool `json:"lastRunPending,omitempty"`
+	LastRunPending bool   `json:"lastRunPending,omitempty"`
+	MissingLog     string `json:"missingLog,omitempty"`
 	// Changes is the current plan's changes since it was last played (16 §2.3): one
 	// sentence that opens Updates with that scope and time.
 	Changes *modchanges.Home `json:"changes,omitempty"`
@@ -320,6 +341,9 @@ type Home struct {
 	Launch *LaunchHint `json:"launch,omitempty"`
 	// Update is the line about a new RimArcho at the top right (17 §5.1); nil when there is none.
 	Update *SelfUpdateLine `json:"update,omitempty"`
+	// GameUpdate is the line about a game update with "back up <game> first" (16 §2.3);
+	// nil when the game neither changed since the last scan nor has a Steam update waiting.
+	GameUpdate *GameUpdateLine `json:"gameUpdate,omitempty"`
 }
 
 // BuildHome builds the home page: one row per plan of the environment and one per pack.
@@ -390,10 +414,14 @@ func buildHome(a *app.App, st *app.LoadoutState, n *Needs, plans []PlanRow, pack
 	}
 	SortHome(h.Rows)
 	h.LastRun, h.LastRunDay, h.LastRunErrors, h.LastRunPending = n.LastRun, n.LastRunDay, LastRunErrors(n), n.LastRunPending
+	h.MissingLog = n.MissingLog
 	h.Launch = n.Launch
 	if !launchOnly {
 		h.Changes = ChangeHome(a, st)
 		h.Update = SelfUpdateHome(a)
+		if st.Ix != nil {
+			h.GameUpdate = GameUpdateHome(a, st.Ix.Env)
+		}
 	}
 	return h
 }
@@ -405,6 +433,9 @@ func planState(k int, checked, stale bool) (string, string) {
 	case !checked:
 		return T("not checked yet"), ""
 	case k > 0:
+		if k == 1 {
+			return T("1 problem breaks the game"), LevelBad
+		}
 		return Tf("%d problems break the game", k), LevelBad
 	case stale:
 		return T("the files changed since the last check"), ""
@@ -442,7 +473,7 @@ func AddOtherEnvs(a *app.App, h *Home, current string) {
 		chip, ver := EnvChip(e.Name, e.GameVersion), env.MajorMinor(e.GameVersion)
 		ps, _ := a.PlansIn(e.ID)
 		for _, p := range ps {
-			r := HomeRow{Kind: RowPlan, Name: p.Name, Env: chip, Played: T("never played"), at: p.LastPlayed, Plan: p.ID,
+			r := HomeRow{Kind: RowPlan, Name: p.Name, Env: chip, Played: T("never played"), at: p.LastPlayed, Plan: p.ID, Current: p.Current,
 				Facts: Tf("%d mods", p.Entries), Mode: T("follows Workshop updates"), EnvName: e.Name, GameVersion: e.GameVersion, Versions: ver, Mods: p.Entries, OtherEnv: true}
 			if len(p.Plan.Versions) > 0 { // the player's choice; the default needs that game's mods loaded
 				r.Versions = app.FormatVersions(p.Plan.Versions)
@@ -527,10 +558,50 @@ type GameFound struct {
 	Game     string `json:"game"` // the game folder
 	Version  string `json:"version"`
 	Launch   string `json:"launch"`
+	Source   string `json:"source"` // the card's chip: "Steam", "Proton" (ProtonBadge), "started directly"
 	Workshop string `json:"workshop,omitempty"`
 	UserData string `json:"userData,omitempty"`
 	// Env is the environment that already uses this folder ("" when none).
 	Env string `json:"env,omitempty"`
+	// Known: a Game Config already uses this game folder, so its Mods are read; Current:
+	// it is the current config's game (Add Game Config picks it first).
+	Known   bool `json:"known,omitempty"`
+	Current bool `json:"current,omitempty"`
+
+	// The Add Game Config page's choices (16 §2.15; none on the first run). AddConfig adds
+	// a Game Config for a folder another config already uses. Saves is "shared" (the
+	// game's default folder, UserData), "own" (RimArcho's own folder for this config) or
+	// "custom" (CustomData); "" is shared. Like copies that config's game and Mod settings
+	// (no Mod files, no saves). List selects a global list; NewList makes a Core and DLC
+	// list named after the config; neither keeps what env add does by default.
+	AddConfig  bool   `json:"addConfig,omitempty"`
+	Saves      string `json:"saves,omitempty"`
+	CustomData string `json:"customData,omitempty"`
+	Like       string `json:"like,omitempty"`
+	List       string `json:"list,omitempty"`
+	NewList    bool   `json:"newList,omitempty"`
+	// GameList starts the config from the game's own ModsConfig.xml in UserData (the
+	// game's current list); GameMods is how many Mods it enables (0: no such file).
+	GameList bool `json:"gameList,omitempty"`
+	GameMods int  `json:"gameMods,omitempty"`
+}
+
+// spec is the env add of a found game with the page's choices.
+func (g GameFound) spec() app.EnvSpec {
+	sp := app.EnvSpec{GameRoot: g.Game, UserDataRoot: g.UserData, Launch: g.Launch, Like: g.Like, List: g.List, NewList: g.NewList}
+	if g.GameList && g.UserData != "" {
+		sp.GameList = g.UserData
+	}
+	switch g.Saves {
+	case app.SavesOwn:
+		sp.UserDataRoot, sp.Saves = "", app.SavesOwn
+	case "custom":
+		sp.UserDataRoot = g.CustomData
+	}
+	if g.Like != "" {
+		sp.Launch = "" // the copied config's launch
+	}
+	return sp
 }
 
 // FindGames lists the installs detection finds (03 §3.2), each with a free name; the
@@ -540,17 +611,51 @@ func FindGames(a *app.App) []GameFound {
 	used := map[string]string{}
 	taken := map[string]bool{}
 	for _, e := range envs {
-		used[env.PathKey(e.GameRoot)] = e.Name
+		if store.UserDataKey(e.UserDataRoot) == store.UserDataKey(a.DefaultUserData(e.GameRoot)) {
+			used[env.PathKey(e.GameRoot)] = e.Name
+		}
 		taken[e.Name] = true
 	}
+	known := map[string]bool{}
+	for _, e := range envs {
+		known[env.PathKey(e.GameRoot)] = true
+	}
+	cur := ""
+	if e, err := a.Env(); err == nil && e != nil {
+		cur = env.PathKey(e.GameRoot)
+	}
 	var out []GameFound
-	for _, d := range env.DetectAll(a.Detect) {
-		g := GameFound{Game: d.GameRoot, Version: d.GameVersion, Launch: d.Launch, Workshop: d.WorkshopRoot, UserData: d.UserDataRoot, Env: used[env.PathKey(d.GameRoot)]}
-		if g.Env == "" {
-			g.Name = freeName(env.MajorMinor(d.GameVersion), taken)
-			taken[g.Name] = true
+	seen := map[string]bool{}
+	add := func(g GameFound) {
+		k := env.PathKey(g.Game)
+		if seen[k] {
+			return
 		}
+		seen[k] = true
+		g.Env, g.Known, g.Current = used[k], known[k], k == cur
+		g.Source = gameSource(g)
+		if g.UserData != "" {
+			if mc, err := env.ReadModsConfig(env.ModsConfigPath(g.UserData)); err == nil {
+				g.GameMods = len(mc.ActiveMods)
+			}
+		}
+		// a used folder gets a name too: Add Game Config may add another config for it
+		g.Name = freeName(env.MajorMinor(g.Version), taken)
+		taken[g.Name] = true
 		out = append(out, g)
+	}
+	// The games Game Configs use first (detection may not find a game in a folder of the
+	// player's own), the current config's at the top; then what detection finds.
+	for _, e := range envs {
+		if env.PathKey(e.GameRoot) == cur {
+			add(GameFound{Game: e.GameRoot, Version: e.GameVersion, Launch: e.Launch, UserData: a.DefaultUserData(e.GameRoot)})
+		}
+	}
+	for _, e := range envs {
+		add(GameFound{Game: e.GameRoot, Version: e.GameVersion, Launch: e.Launch, UserData: a.DefaultUserData(e.GameRoot)})
+	}
+	for _, d := range env.DetectAll(a.Detect) {
+		add(GameFound{Game: d.GameRoot, Version: d.GameVersion, Launch: d.Launch, Workshop: d.WorkshopRoot, UserData: d.UserDataRoot})
 	}
 	return out
 }
@@ -574,17 +679,28 @@ func GameAt(a *app.App, path string, pending ...string) (*GameFound, error) {
 	}
 	for _, e := range envs {
 		taken[e.Name] = true
-		if env.PathKey(e.GameRoot) == env.PathKey(path) {
+		if env.PathKey(e.GameRoot) == env.PathKey(path) && store.UserDataKey(e.UserDataRoot) == store.UserDataKey(g.UserData) {
 			g.Env = e.Name
 		}
 	}
 	if ws := env.WorkshopRootFor(path); ws != "" && dirExists(ws) {
 		g.Workshop, g.Launch = ws, "steam"
 	}
-	if g.Env == "" {
-		g.Name = freeName(env.MajorMinor(g.Version), taken)
-	}
+	g.Source = gameSource(*g)
+	g.Name = freeName(env.MajorMinor(g.Version), taken)
 	return g, nil
+}
+
+// gameSource is the guide card's chip for how the game is started: Proton over Steam, since
+// a Proton game always starts through Steam (09 §2).
+func gameSource(g GameFound) string {
+	if b := ProtonBadge(g.Game); b != "" {
+		return b
+	}
+	if g.Launch == "steam" {
+		return "Steam"
+	}
+	return T("started directly")
 }
 
 // freeName is base (the game's version, "1.6"), or base-2, base-3… when it is taken.
@@ -622,11 +738,14 @@ func CreateGames(a *app.App, games []GameFound) ([]string, error) {
 	}
 	var out []string
 	for _, g := range games {
-		if g.Env != "" {
+		if g.Env != "" && !g.AddConfig {
 			continue
 		}
 		name := strings.TrimSpace(g.Name)
-		if _, _, err := a.EnvAdd(name, app.EnvSpec{GameRoot: g.Game, UserDataRoot: g.UserData, Launch: g.Launch}); err != nil {
+		if g.Saves == "custom" && strings.TrimSpace(g.CustomData) == "" {
+			return out, errors.New(T("choose a user data folder"))
+		}
+		if _, _, err := a.EnvAdd(name, g.spec()); err != nil {
 			return out, err
 		}
 		out = append(out, name)
@@ -639,7 +758,7 @@ func CreateGames(a *app.App, games []GameFound) ([]string, error) {
 func checkGameNames(a *app.App, games []GameFound) error {
 	seen := map[string]bool{}
 	for _, g := range games {
-		if g.Env != "" {
+		if g.Env != "" && !g.AddConfig {
 			continue
 		}
 		name := strings.TrimSpace(g.Name)
@@ -664,7 +783,13 @@ func PackImportText(m *app.PackMatch) string {
 	if m == nil || m.Pack == nil {
 		return ""
 	}
+	if u := m.Update; u != nil && !u.Applied {
+		return Tf("pack %s: this file is revision %d, you have revision %d; nothing changed", u.Name, u.To, u.From)
+	}
 	parts := []string{Tf("pack %s is in the packs folder; play it from the home page", m.Pack.Name)}
+	if u := m.Update; u != nil {
+		parts[0] = Tf("pack %s is now revision %d; its saves and settings stay", u.Name, u.To)
+	}
 	if m.Verified {
 		parts = append(parts, T("every mod's files match the pack"))
 	} else {
@@ -679,4 +804,41 @@ func PackImportText(m *app.PackMatch) string {
 		}
 	}
 	return strings.Join(parts, "  ")
+}
+
+// PackUpdateOffer is the confirmation before a pack update (10 §4): what the newer revision
+// changes.
+type PackUpdateOffer struct {
+	Name  string   `json:"name"`
+	Title string   `json:"title"`
+	Lines []string `json:"lines"`
+}
+
+// PackUpdateOfferOf words an update offer.
+func PackUpdateOfferOf(u *app.PackUpdate) *PackUpdateOffer {
+	o := &PackUpdateOffer{Name: u.Name, Title: Tf("update pack %s to revision %d", u.Name, u.To)}
+	o.Lines = append(o.Lines, Tf("you have revision %d; its saves and settings stay, its Mods are replaced", u.From))
+	d := u.Diff
+	list := func(head string, xs []string) {
+		if len(xs) == 0 {
+			return
+		}
+		line := head + ": " + strings.Join(xs[:min(len(xs), 8)], ", ")
+		if len(xs) > 8 {
+			line += " " + Tf("and %d more", len(xs)-8)
+		}
+		o.Lines = append(o.Lines, line)
+	}
+	if d != nil {
+		if d.Empty() {
+			o.Lines = append(o.Lines, T("the same Mods"))
+		}
+		list(Tf("added %d", len(d.Added)), d.Added)
+		list(Tf("removed %d", len(d.Removed)), d.Removed)
+		list(Tf("changed %d", len(d.Changed)), d.Changed)
+		if d.Settings > 0 {
+			o.Lines = append(o.Lines, Tf("Mod settings of %d mods: only those the pack has none of yet", d.Settings))
+		}
+	}
+	return o
 }

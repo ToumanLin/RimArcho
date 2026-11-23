@@ -2,12 +2,12 @@
 0 subscriptions
 
 > manage_subscriptions {"action":"add","dry_run":true,"kind":"git","url":"$GIT"}
-dry run, nothing changed: git: 1 subscriptions
+dry run, nothing changed: git: 1 subscription
    mod
     folder: $ROOT/LocalAppData/RimArcho/subscribed/mod
 
 > manage_subscriptions {"action":"add","branch":"main","kind":"git","url":"$GIT"}
-git: 1 subscriptions
+git: 1 subscription
   #u2mx Git Mod
     folder: $ROOT/LocalAppData/RimArcho/subscribed/mod
     version: 042c1483128514fd15ed3eea67e1a2837481b335
@@ -23,27 +23,27 @@ git: 1 subscriptions
     state: not checked
 
 > manage_subscriptions {"action":"check"}
-check: 1 subscriptions
+check: 1 subscription
   #u2mx Git Mod
     folder: $ROOT/LocalAppData/RimArcho/subscribed/mod
     version: 042c1483128514fd15ed3eea67e1a2837481b335 → 042c1483128514fd15ed3eea67e1a2837481b335
     result: up to date
 
 > manage_subscriptions {"action":"check","refs":["#u2mx"]}
-check: 1 subscriptions
+check: 1 subscription
   #u2mx Git Mod
     folder: $ROOT/LocalAppData/RimArcho/subscribed/mod
     version: 042c1483128514fd15ed3eea67e1a2837481b335 → 76fc9e5d6b849b262681af6ef4c3a6908516e3cf
     result: update available
 
 > manage_subscriptions {"action":"update","dry_run":true,"refs":["#u2mx"]}
-dry run, nothing changed: update: 1 subscriptions
+dry run, nothing changed: update: 1 subscription
   #u2mx Git Mod
     folder: $ROOT/LocalAppData/RimArcho/subscribed/mod
     version: 042c1483128514fd15ed3eea67e1a2837481b335 → 76fc9e5d6b849b262681af6ef4c3a6908516e3cf
 
 > manage_subscriptions {"action":"update","refs":["#u2mx"]}
-update: 1 subscriptions
+update: 1 subscription
   #u2mx Git Mod
     folder: $ROOT/LocalAppData/RimArcho/subscribed/mod
     version: 042c1483128514fd15ed3eea67e1a2837481b335 → 76fc9e5d6b849b262681af6ef4c3a6908516e3cf
@@ -65,13 +65,13 @@ usage: archo subscribe update [ref…] [--all] [--from zip|folder] [--dry-run]
     state: up to date
 
 > manage_subscriptions {"action":"remove","dry_run":true,"refs":["#u2mx"]}
-dry run, nothing changed: remove: 1 subscriptions
+dry run, nothing changed: remove: 1 subscription
   #u2mx Git Mod
     folder: $ROOT/LocalAppData/RimArcho/subscribed/mod
     version: 76fc9e5d6b849b262681af6ef4c3a6908516e3cf → 76fc9e5d6b849b262681af6ef4c3a6908516e3cf
 
 > manage_subscriptions {"action":"remove","refs":["#u2mx"]}
-remove: 1 subscriptions
+remove: 1 subscription
   #u2mx Git Mod
     folder: $ROOT/LocalAppData/RimArcho/subscribed/mod
     version: 76fc9e5d6b849b262681af6ef4c3a6908516e3cf → 76fc9e5d6b849b262681af6ef4c3a6908516e3cf
@@ -81,6 +81,6 @@ remove: 1 subscriptions
 0 subscriptions
 
 > manage_subscriptions {"action":"add","url":"not an address"}
-error: unknown command "manage_subscriptions: url not recognised: give a Git repository, a download page, Workshop links or IDs, or kind" (archo help)
+error: manage_subscriptions: url not recognised: give a Git repository, a download page, Workshop links or IDs, or kind
 [isError]
 

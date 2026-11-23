@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <ArchoMonitor_RecordMessages>情報メッセージを記録（Log.Message）</ArchoMonitor_RecordMessages>
+  <ArchoMonitor_RecordMessagesTip>次回起動時から反映されます。初期設定ではオフです。情報メッセージは件数が多く、記録には負荷がかかります。</ArchoMonitor_RecordMessagesTip>
+  <ArchoMonitor_Log>ログ</ArchoMonitor_Log>
+  <ArchoMonitor_Entries>項目</ArchoMonitor_Entries>
+  <ArchoMonitor_HooksNotInstalled>フックが導入されていません</ArchoMonitor_HooksNotInstalled>
+</LanguageData>

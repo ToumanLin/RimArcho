@@ -70,7 +70,7 @@ func (a *App) CheckPack(p *Pack, e *env.Environment, problems []PackProblem) *Pa
 		case !same:
 			add("game", finding.Warning, fmt.Sprintf("built for %s, this game is %s", pv.Full, gv.Full), nil)
 		}
-		mods, err := a.Store.Mods(e.ID)
+		mods, err := a.Store.Mods(e.GameID)
 		if err != nil {
 			add("dlc", finding.Error, "cannot read installed official content: "+err.Error(), nil)
 		} else {

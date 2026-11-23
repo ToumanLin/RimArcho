@@ -51,3 +51,53 @@ func TestUninstallConfirmation(t *testing.T) {
 		}
 	}
 }
+
+// Outside Windows (AtOnce) the data and program are deleted while uninstall runs, so the
+// confirmation must not say "after closing" (Linux-Test VM, 2026-11-23).
+func TestUninstallConfirmationAtOnce(t *testing.T) {
+	t.Setenv("ARCHO_LANG", "")
+	old := Lang()
+	defer SetLang(old)
+	SetLang("en")
+	p := &app.UninstallPlan{AtOnce: true, Steps: []*app.UninstallStep{
+		{Key: app.UnData, Items: []*app.UninstallItem{{Do: app.DoLater, Bytes: 16384}}},
+		{Key: app.UnProgram, Items: []*app.UninstallItem{{Do: app.DoLater, Bytes: 1024}}},
+	}}
+	c := UninstallView(p, false).Confirmation
+	if c == nil || len(c.Changes) != 2 {
+		t.Fatalf("bad groups: %+v", c)
+	}
+	for _, row := range c.Changes {
+		if row.Method != "delete directly" {
+			t.Fatalf("%s: method %q, want delete directly", row.Title, row.Method)
+		}
+	}
+}
+
+// The Archo Agent key item has its own method, no measured size, and its step says so.
+func TestUninstallAgentKeyRow(t *testing.T) {
+	t.Setenv("ARCHO_LANG", "")
+	old := Lang()
+	defer SetLang(old)
+	for _, lang := range []string{"en", "zh", "ja"} {
+		SetLang(lang)
+		p := &app.UninstallPlan{Steps: []*app.UninstallStep{{Key: app.UnAccounts, Items: []*app.UninstallItem{
+			{Do: "forget-accounts"}, {Do: "forget-agent-key", Path: "Windows Credential Manager: RimArcho/agent-api-key"},
+		}}}}
+		pg := UninstallView(p, false)
+		c := pg.Confirmation
+		if c == nil || len(c.Changes) != 2 {
+			t.Fatalf("%s: bad groups: %+v", lang, c)
+		}
+		row := c.Changes[1]
+		if row.Method == "" || row.Method != T("remove the API key") || row.Size != T("size not measured") {
+			t.Fatalf("%s: key row = %+v", lang, row)
+		}
+		if lang != "en" && row.Method == "remove the API key" {
+			t.Fatalf("%s: key method not translated", lang)
+		}
+		if txt := uninstallText(p, p.Steps[0]); !strings.Contains(txt, T("remove the Archo Agent API key from Windows Credential Manager")) {
+			t.Fatalf("%s: step text %q", lang, txt)
+		}
+	}
+}

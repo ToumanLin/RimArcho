@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import "github.com/ToumanLin/RimArcho/internal/view"
@@ -8,6 +10,10 @@ import "github.com/ToumanLin/RimArcho/internal/view"
 // nothing. A fresh session here rebuilt the whole index and list each time (about 30 MB
 // allocated per call for 6,574 Mods, 17 §7.3).
 func (s *API) HomeMemory() (*view.MemoryLaunch, error) {
+	return join(&s.flight, "HomeMemory", s.homeMemoryRead)
+}
+
+func (s *API) homeMemoryRead() (*view.MemoryLaunch, error) {
 	s.logRead.mu.Lock()
 	defer s.logRead.mu.Unlock()
 	r, err := s.logSession()

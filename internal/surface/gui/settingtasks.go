@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -7,6 +9,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/accounts"
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/buildinfo"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -142,7 +145,31 @@ func (s *API) runSettingTask(a *app.App, id, kind string, argv []string) (string
 	case view.TaskSelfCheck:
 		return s.runSelfCheck(a)
 	case view.TaskSelfUpdate:
-		return s.runSelfUpdate(a, id)
+		return s.runSelfUpdate(a, id, argv)
+	case view.TaskAgentInstall:
+		if !buildinfo.AgentOn() { // a build without Archo Agent (15 §7) installs none
+			return "", errors.New("not a settings command: agent install")
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		s.tasks.SetStop(id, func() error { cancel(); return nil })
+		before := a.AgentStatus()
+		m, err := a.InstallAgent(ctx, "", func(phase string, frac float64) {
+			s.tasks.Update(id, func(t *app.Task) {
+				t.Phase = map[string]string{"check": view.T("checking…"), "download": view.T("downloading…"), "verify": view.T("checking…"), "extract": view.T("installing…"), "done": view.T("done")}[phase]
+				t.Frac = min(0.99, frac*0.8)
+				if phase == "extract" {
+					t.Frac = 0.85
+				}
+			})
+		})
+		if err != nil {
+			return "", err
+		}
+		if before.Installed && before.Manifest.Version == m.Version {
+			return view.Tf("Archo Agent %s is up to date", m.Version), nil
+		}
+		return view.Tf("Archo Agent %s installed", m.Version), nil
 	case view.TaskSteamCMD, view.TaskTodds:
 		var path string
 		var err error

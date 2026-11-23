@@ -92,7 +92,7 @@ type Options struct {
 	// stored one is still valid, which keeps no-change rescans small.
 	PrevHash func(loc Location) (Hash, bool)
 	// Known reports whether a location already belongs to an Instance; alias groups keep
-	// a known location as primary so R1 keeps matching.
+	// a known location as primary so R1 keeps matching (a real folder still beats a link).
 	Known func(loc Location) bool
 	// Generated lists the files RimArcho wrote into a mod folder (by its real path; lower-
 	// cased paths relative to it), left out of the fingerprint.
@@ -107,111 +107,146 @@ type Options struct {
 // (workshop, steamcmd, official, local, extra; then by relative path).
 func Collect(sources []*source.Source, o Options) ([]*Observation, map[string]*SourceStats) {
 	stats := map[string]*SourceStats{}
-	type cand struct {
-		loc      Location
-		real     string
-		residue  bool
-		unknown  bool // residue unknown: the manifest could not be read
-		disabled bool
-		acf      *ACFItem
-		srcOrder int
-	}
-	groups := map[string][]cand{}
+	groups := map[string][]folderCand{}
 	var order []string
 	for si, s := range sources {
 		st := &SourceStats{}
 		stats[s.ID] = st
-		entries, _, err := source.List(s.Root)
-		if err != nil {
-			st.Err = err.Error()
-			continue
-		}
-		var acf *ACF
-		acfErr := false
-		if s.Kind.WorkshopLike() {
-			var err error
-			acf, err = readACF(s.Root)
-			st.HasACF = acf != nil
-			acfErr = err != nil && s.Kind == source.Workshop
-		}
-		for _, e := range entries {
-			st.Folders++
-			var item *ACFItem
-			residue := false
-			if acf != nil {
-				item = acf.Items[e.Name]
-				// Only the Steam client's own library decides what the game loads; SteamCMD
-				// folders are never loaded directly, so residue applies to workshop only.
-				residue = s.Kind == source.Workshop && (item == nil || !item.Subscribed)
-			}
-			about := source.AboutState(e.Path)
-			if about == source.AboutNone {
-				if residue {
-					st.ResidueNoAbout++
-				} else {
-					st.NoAbout++
-				}
-				continue
-			}
-			c := cand{
-				loc:      Location{SourceID: s.ID, Kind: s.Kind, Label: s.Label, Rel: e.Name, Path: e.Path, IsLink: e.IsLink},
-				real:     e.RealPath,
-				residue:  residue,
-				unknown:  acfErr,
-				disabled: about == source.AboutDisabled,
-				acf:      item,
-				srcOrder: si,
-			}
-			k := env.PathKey(e.RealPath)
-			if _, ok := groups[k]; !ok {
-				order = append(order, k)
-			}
-			groups[k] = append(groups[k], c)
-		}
+		order = listSource(si, s, st, groups, order)
 	}
 
 	obs := make([]*Observation, 0, len(order))
 	for _, k := range order {
-		g := groups[k]
-		sort.SliceStable(g, func(i, j int) bool {
-			a, b := g[i], g[j]
-			if o.Known != nil {
-				if ka, kb := o.Known(a.loc), o.Known(b.loc); ka != kb {
-					return ka
-				}
-			}
-			if a.loc.IsLink != b.loc.IsLink {
-				return !a.loc.IsLink
-			}
-			if ra, rb := a.loc.Kind.ReconcileRank(), b.loc.Kind.ReconcileRank(); ra != rb {
-				return ra < rb
-			}
-			if a.srcOrder != b.srcOrder {
-				return a.srcOrder < b.srcOrder
-			}
-			return a.loc.Rel < b.loc.Rel
-		})
-		p := g[0]
-		ob := &Observation{Loc: p.loc, RealPath: p.real, Residue: p.residue, ResidueUnknown: p.unknown, ACF: p.acf}
-		if p.disabled {
-			ob.Unloadable = UnloadableAboutDisabled
-		}
-		for _, a := range g[1:] {
-			ob.Aliases = append(ob.Aliases, a.loc)
-			stats[a.loc.SourceID].Aliases++
-		}
-		obs = append(obs, ob)
-		st := stats[p.loc.SourceID]
-		st.Mods++
-		if p.residue {
-			st.Residue++
-		}
-		if p.disabled {
-			st.Disabled++
-		}
+		obs = append(obs, primaryObservation(groups[k], stats, o.Known))
 	}
 
-	// Read observations: sources in parallel, each with at most Workers goroutines.
+	readObservations(sources, obs, o)
+
+	sort.SliceStable(obs, func(i, j int) bool {
+		a, b := obs[i].Loc, obs[j].Loc
+		if ra, rb := a.Kind.ReconcileRank(), b.Kind.ReconcileRank(); ra != rb {
+			return ra < rb
+		}
+		if a.SourceID != b.SourceID {
+			return sourceIndex(sources, a.SourceID) < sourceIndex(sources, b.SourceID)
+		}
+		return strings.ToLower(a.Rel) < strings.ToLower(b.Rel)
+	})
+	return obs, stats
+}
+
+// folderCand is one mod folder a source lists, before the folders reached by more than
+// one path are merged into one observation.
+type folderCand struct {
+	loc      Location
+	real     string
+	residue  bool
+	unknown  bool // residue unknown: the manifest could not be read
+	disabled bool
+	acf      *ACFItem
+	srcOrder int
+}
+
+// listSource adds the mod folders of source s (index si) to groups by their real path,
+// counting what it saw in st; it returns order with the new real paths appended.
+func listSource(si int, s *source.Source, st *SourceStats, groups map[string][]folderCand, order []string) []string {
+	entries, _, err := source.List(s.Root)
+	if err != nil {
+		st.Err = err.Error()
+		return order
+	}
+	var acf *ACF
+	acfErr := false
+	if s.Kind.WorkshopLike() {
+		var err error
+		acf, err = readACF(s.Root)
+		st.HasACF = acf != nil
+		acfErr = err != nil && s.Kind == source.Workshop
+	}
+	for _, e := range entries {
+		st.Folders++
+		var item *ACFItem
+		residue := false
+		if acf != nil {
+			item = acf.Items[e.Name]
+			// Only the Steam client's own library decides what the game loads; SteamCMD
+			// folders are never loaded directly, so residue applies to workshop only.
+			residue = s.Kind == source.Workshop && (item == nil || !item.Subscribed)
+		}
+		about := source.AboutState(e.Path)
+		if about == source.AboutNone {
+			if residue {
+				st.ResidueNoAbout++
+			} else {
+				st.NoAbout++
+			}
+			continue
+		}
+		c := folderCand{
+			loc:      Location{SourceID: s.ID, Kind: s.Kind, Label: s.Label, Rel: e.Name, Path: e.Path, IsLink: e.IsLink},
+			real:     e.RealPath,
+			residue:  residue,
+			unknown:  acfErr,
+			disabled: about == source.AboutDisabled,
+			acf:      item,
+			srcOrder: si,
+		}
+		k := env.PathKey(e.RealPath)
+		if _, ok := groups[k]; !ok {
+			order = append(order, k)
+		}
+		groups[k] = append(groups[k], c)
+	}
+	return order
+}
+
+// primaryObservation is the observation of one real folder: its primary location, the
+// others its aliases, counted in stats.
+func primaryObservation(g []folderCand, stats map[string]*SourceStats, known func(Location) bool) *Observation {
+	sort.SliceStable(g, func(i, j int) bool {
+		a, b := g[i], g[j]
+		// a real folder is the copy and a link only its alias, even when the link was
+		// seen first (its target outside every source until the player added that
+		// folder): 04 §1.3 "Other managers' links"
+		if a.loc.IsLink != b.loc.IsLink {
+			return !a.loc.IsLink
+		}
+		if known != nil {
+			if ka, kb := known(a.loc), known(b.loc); ka != kb {
+				return ka
+			}
+		}
+		if ra, rb := a.loc.Kind.ReconcileRank(), b.loc.Kind.ReconcileRank(); ra != rb {
+			return ra < rb
+		}
+		if a.srcOrder != b.srcOrder {
+			return a.srcOrder < b.srcOrder
+		}
+		return a.loc.Rel < b.loc.Rel
+	})
+	p := g[0]
+	ob := &Observation{Loc: p.loc, RealPath: p.real, Residue: p.residue, ResidueUnknown: p.unknown, ACF: p.acf}
+	if p.disabled {
+		ob.Unloadable = UnloadableAboutDisabled
+	}
+	for _, a := range g[1:] {
+		ob.Aliases = append(ob.Aliases, a.loc)
+		stats[a.loc.SourceID].Aliases++
+	}
+	st := stats[p.loc.SourceID]
+	st.Mods++
+	if p.residue {
+		st.Residue++
+	}
+	if p.disabled {
+		st.Disabled++
+	}
+	return ob
+}
+
+// readObservations reads the observations: sources in parallel, each with at most
+// Workers goroutines.
+func readObservations(sources []*source.Source, obs []*Observation, o Options) {
 	bySource := map[string][]*Observation{}
 	for _, ob := range obs {
 		bySource[ob.Loc.SourceID] = append(bySource[ob.Loc.SourceID], ob)
@@ -252,18 +287,6 @@ func Collect(sources []*source.Source, o Options) ([]*Observation, map[string]*S
 		}(list, workers)
 	}
 	wg.Wait()
-
-	sort.SliceStable(obs, func(i, j int) bool {
-		a, b := obs[i].Loc, obs[j].Loc
-		if ra, rb := a.Kind.ReconcileRank(), b.Kind.ReconcileRank(); ra != rb {
-			return ra < rb
-		}
-		if a.SourceID != b.SourceID {
-			return sourceIndex(sources, a.SourceID) < sourceIndex(sources, b.SourceID)
-		}
-		return strings.ToLower(a.Rel) < strings.ToLower(b.Rel)
-	})
-	return obs, stats
 }
 
 func sourceIndex(sources []*source.Source, id string) int {

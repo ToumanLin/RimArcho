@@ -11,11 +11,13 @@ import (
 	"unicode/utf8"
 )
 
-// The project's public pages, shown on the settings page (16 §2.14).
+// The project's public places, shown on the Feedback page (16 §2.14).
 const (
 	Repo = "https://github.com/ToumanLin/RimArcho"
 	// Discord is the community server's invite.
 	Discord = "https://discord.gg/HF2GVyurQs"
+	// QQGroup is the Chinese players' QQ group, shown when the interface is in Chinese.
+	QQGroup = "1042873484"
 )
 
 // MaxURL is the longest link RimArcho opens. Windows hands a link to the browser through

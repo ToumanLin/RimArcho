@@ -6,6 +6,9 @@
 //   4. the hint line lists what you can do with the object now;
 //   5. few popups, each closed with esc, never nested.
 import { phase as perfPhase } from "./perf.js";
+import { hintLine } from "./hintline.js";
+import { editorLauncher } from "./editorlaunch.js";
+import { lookAgain } from "./outsidechange.js";
 import { api, on, setText } from "./api.js";
 import "./window-theme.js";
 import { blockNativeMenu } from "./nativemenu.js";
@@ -14,7 +17,7 @@ import "./activity.js";
 import "./fulltitle.js";
 import { applyAccent } from "./accent.js";
 import { factText, S, $, $$, el, esc, T, Tf, errText, say, clearSay, undoStatus, busyStart, col, cur, selection, key, idsOf, refsOf, named, AREAS, keyCaps } from "./state.js";
-import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, pageDelta, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn, setOnViewChange, detailHead } from "./lists.js";
+import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, pageDelta, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn, setOnViewChange, setOnSortChange, detailHead } from "./lists.js";
 import { G, grouped, headOf, curKey, shownItems, shape, findEntry, setGroupOpen, reveal, setView, loadView, refreshOrder, regroup } from "./disabledgroups.js";
 import { createBar } from "./filterbar.js";
 import { followDetail, showDetail, scrollDetail, refreshCopies, showPanel } from "./detail.js";
@@ -37,18 +40,23 @@ import * as ops from "./ops.js";
 import * as uninst from "./uninstall.js";
 import * as packsPage from "./packs.js";
 import * as planManage from "./planmanage.js";
+import { wireZoom } from "./uizoom.js";
 import * as tex from "./textures.js";
 import * as tasksPage from "./tasks.js";
 import * as selfUpdate from "./selfupdate.js";
 import { refreshBackgrounds } from "./bg.js";
 import { environmentReason, withEnvironmentSwitch } from "./environment.js";
 import { wireSeparator } from "./separator.js";
+import { pickClick } from "./select.js";
 import { go, openPage, initNavigation, pageEntering, pageEntered, wireHistory, travel } from "./navigation.js";
-import { checkCredit, getChoices } from "./credit.js";
+import { checkCredit } from "./credit.js";
+import { initSortSteps, offerAfterSort } from "./sortsteps.js";
+import { planActions as headActions } from "./planhead.js";
 import * as problems from "./problems.js";
 import * as fileSearch from "./filesearch.js";
 import * as modSettings from "./modsettings.js";
 import * as savesPage from "./saves.js";
+import * as reviewPage from "./review.js";
 import { initRules, refreshRules, startRule, showRules } from "./rules.js";
 import { setMode as setArchoMode, bootLive, bootDone } from "./archo.js";
 
@@ -265,12 +273,11 @@ function render() {
 function renderTop() {
   if (!S.board) return;
   // one line (style.css #planhead): a narrow window cuts the lead, its hover keeps it whole
-  $("#planhead .lead").textContent = $("#planhead .lead").title = Tf("%d enabled, in the order the game loads them", col(1).items.length);
+  const lead = $("#planhead .lead"), n = col(1).items.length;
+  lead.textContent = Tf("%d enabled", n);
+  lead.title = Tf("%d enabled, in the order the game loads them", n);
 }
 
-// goLaunch is the editor's launch game (and its L): the game starts from Start, so it opens that
-// page with this list applied — launching it from its editor makes it current — and the
-// focus on its launch button (16 §2.5).
 // exportCurrent is the editor's e: the current list's export sub-page (16 §2.5, §2.17).
 function exportCurrent() {
   const p = S.shell && S.shell.plan;
@@ -278,64 +285,34 @@ function exportCurrent() {
   return planManage.exportOf(p.id, "editor");
 }
 
-async function goLaunch() {
-  if (environmentReason()) return say("busy", environmentReason());
-  const open = S.shell && S.shell.plan;
-  if (open && !open.current && !(await plans.usePlan(open.id))) return;
-  await go("home");
-  await homePage.focusLaunch();
-}
+// launchHere is the editor's launch (its button, L and the command panel's launch; 16 §2.5,
+// editorlaunch.js): a running game is refused before the open list becomes current.
+const launchHere = editorLauncher({
+  S, T, say,
+  usePlan: (id) => plans.usePlan(id),
+  homeMemory: () => api.HomeMemory(),
+  memoryConfirm: (m, go) => pop.memoryConfirm(m, go),
+  run: (id) => run(id),
+  busy: () => environmentReason(),
+});
 
-// planActions: the list's actions in the top bar (16 §2.5): its "an outside version has not been loaded" mark,
-// how many entries are not saved to the game yet, rename and delete, import / export (the
-// list's page in all lists), save, and set current or launch. Undo sits beside sort in the
-// enabled list's head.
+// planActions: the list's actions in the top bar (planhead.js, 16 §2.5).
 function planActions() {
-  const u = (S.board && S.board.unsaved) || 0;
-  const btn = (label, k, run, cls = "", envWrite = "") => {
-    const b = el("button", "btn " + cls, label);
-    if (envWrite) b.dataset.envWrite = envWrite;
-    if (k) { b.append(keyCaps(k)); b.title = k; }
-    b.onclick = (e) => { e.stopPropagation(); run(); };
-    return b;
-  };
-  const out = [problems.chip()];
-  const plan = S.shell && S.shell.plan;
-  if (plan && plan.conflict) {
-    const m = el("button", "chip mark");
-    m.append(el("span", "dot"), el("span", "t", plan.conflictText));
-    m.title = plan.conflictText + T("; ") + T("can it run › needs your answer");
-    m.onclick = (e) => { e.stopPropagation(); go("needs"); };
-    out.push(m);
-  }
-  if (u) {
-    const n = el("span", "unwritten", Tf("%d unsaved", u));
-    n.title = T("different from the last saved list; launching or saving saves these changes to the game");
-    motion.bump("unwritten", n, u);
-    out.push(n);
-  } else motion.bump("unwritten", null, 0);
-  out.push(scr.rescanButton(T("rescan")));
-  if (plan) {
-    out.push(btn(T("rename"), "", () => plans.renamePlan(plan.id), "", "rename-plan"),
-      btn(T("delete"), "", () => plans.deletePlan(plan.id), "danger", "remove-plan"));
-  }
-  const io = btn(T("import/export"), "", manageCurrent);
-  io.title = T("the list's page in all lists: import, export, share");
-  const save = btn(u ? T("save changes") : T("no changes"), "w", () => run("save"), u ? "hot" : "", "save");
-  save.disabled = !u;
-  out.push(io, save);
-  // another list is the one launched (07 §1.3): this one can be made current first
-  if (plan && S.shell.current) {
-    const c = btn(T("set current"), "", () => plans.usePlan(plan.id), "primary", "use-plan");
-    c.title = Tf("the game is launched with %s; this list is only open here", S.shell.current.name) + T("; ") + T("no game file is written");
-    out.push(c);
-  } else {
-    // Start opens Start, where the game starts (16 §2.5)
-    const l = btn(T("launch"), "L", goLaunch, "primary", "launch");
-    l.title = T("opens the launch page, where the game starts") + T("; ") + "L";
-    out.push(l);
-  }
-  return out;
+  return headActions({
+    unsaved: (S.board && S.board.unsaved) || 0,
+    plan: S.shell && S.shell.plan,
+    current: S.shell && S.shell.current,
+    problemsChip: () => problems.chip(),
+    openNeeds: () => go("needs"),
+    rescanButton: () => scr.rescanButton(T("rescan"), true),
+    rename: (id) => plans.renamePlan(id),
+    remove: (id) => plans.deletePlan(id),
+    use: (id) => plans.usePlan(id),
+    manage: manageCurrent,
+    save: () => run("save"),
+    launch: launchHere,
+    bump: (n, u) => motion.bump("unwritten", n, u),
+  });
 }
 
 // manageCurrent opens all lists with the open list selected: its import, export and sharing.
@@ -347,9 +324,9 @@ function manageCurrent() {
 
 let lastList = 1;
 
-// The sidebar's entries in shift+1–8 order, Playing then Library (16 §3.5; view.Nav).
-// "plan" is list: like a click on it, the current list (16 §2.1).
-const NAV = ["home", "needs", "log", "plan", "packs", "library", "textures", "env"];
+// The sidebar entry with shift+n (16 §3.5): view.Nav numbers them, so the keys follow the
+// sidebar; a sub-entry can carry one (Texture optimisation). "plan" is list: like a click on it, the current list (16 §2.1).
+const navAt = (n) => ((S.shell && S.shell.nav) || []).flatMap((g) => g.items || []).flatMap((it) => [it, ...(it.kids || [])]).find((it) => it.key === "shift+" + n)?.id;
 const navTarget = (id) => id !== "plan" ? id : ((S.shell && S.shell.plans) || []).find((p) => p.current)?.page || "plans";
 
 // renderWhere: the position line (16 §3.2), the sidebar and the breadcrumb.
@@ -390,40 +367,49 @@ function renderWhere() {
   factText($("#where"), s);
 }
 
-// actions: what can be done with the object now (the hint line and the context menu).
+// actions: what can be done with the object now, for the hint line: at most 7, ending with
+// ? all keys (16 §2.2); the rest (ctrl+s, J K, x …) are in ? (view.KeyHelp).
 function actions() {
+  const help = { key: "?", label: T("all keys") };
   if (S.focus > 2) return [
-    { key: "PgDn", label: T("scroll") }, { key: "enter", label: T("full details"), run: () => verb("full") },
-    { key: "ctrl+o", label: T("open the folder"), run: () => verb("folder") }, { key: "ctrl+w", label: T("Workshop page"), run: () => verb("workshop-id") },
-    { key: "ctrl+s", label: T("steam page"), run: () => verb("steam") },
-    { key: "g", label: T("tags"), run: () => verb("tags") },
+    { key: "PgDn", label: T("scroll") }, { key: "enter", label: T("full details") },
+    { key: "ctrl+o", label: T("open the folder") }, { key: "ctrl+w", label: T("Workshop page") },
+    { key: "ctrl+s", label: T("steam page") }, { key: "g", label: T("tags") }, help,
   ];
   const sel = selection();
   const k = S.focus;
   const group = headOf(col(), col().view[col().cursor]);
-  if (group && !sel.length && !group.none) return [{ key: "← →", label: T("collapse / expand the group"), run: () => toggleGroup() },
-    { key: "F2", label: T("rename"), run: () => startRename(tagBox(), group, tagCtx) }, { key: "M", label: T("merge into…"), run: () => pickMerge(group.tag, tagCtx) },
-    { key: "Del", label: T("delete tag"), run: () => confirmDelete([group.tag], tagCtx) },
-    { key: "v", label: T("individual"), run: () => switchView() }, { key: "ctrl+k", label: T("commands"), run: () => pop.palette() }];
-  if (group && !sel.length) return [{ key: "← →", label: T("collapse / expand the group"), run: () => toggleGroup() },
-    { key: "v", label: T("individual"), run: () => switchView() }, { key: "/", label: T("search"), run: () => startSearch() }, { key: "ctrl+k", label: T("commands"), run: () => pop.palette() }];
-  if (!sel.length) return [{ key: "/", label: T("search"), run: () => startSearch() }, { key: "ctrl+k", label: T("commands"), run: () => pop.palette() }];
-  const out = [];
-  if (k === 0) out.push({ key: "space", label: T("enable"), run: () => verb("toggle") });
-  if (k === 1) out.push({ key: "space", label: T("disable"), run: () => verb("toggle") });
-  if (k === 2) out.push({ key: "space", label: T("put back"), run: () => verb("toggle") });
-  out.push({ key: "t", label: k === 2 ? T("put back") : T("stage"), run: () => verb("stage") });
-  out.push({ key: "m", label: k === 1 ? T("move to…") : T("enable at…"), run: () => verb("move") });
+  if (group && !sel.length && !group.none) return [{ key: "← →", label: T("collapse / expand the group") },
+    { key: "F2", label: T("rename") }, { key: "M", label: T("merge into…") }, { key: "Del", label: T("delete tag") },
+    { key: "v", label: T("individual") }, { key: "ctrl+k", label: T("commands") }, help];
+  if (group && !sel.length) return [{ key: "← →", label: T("collapse / expand the group") },
+    { key: "v", label: T("individual") }, { key: "/", label: T("search") }, { key: "ctrl+k", label: T("commands") }, help];
+  if (!sel.length) return [{ key: "/", label: T("search") }, { key: "ctrl+k", label: T("commands") }, help];
+  const out = [{ key: "space", label: [T("enable"), T("disable"), T("put back")][k] }];
+  out.push({ key: "t", label: k === 2 ? T("put back") : T("stage") });
+  out.push({ key: "m", label: k === 1 ? T("move to…") : T("enable at…") });
+  out.push({ key: "g", label: T("tags") });
+  if (sel.length === 1) out.push({ key: "enter", label: T("full details") });
   // ctrl+o / ctrl+w: the folder and the Workshop page of the cursor's mod (16 §3.5)
-  if (sel.length === 1 && sel[0].id) out.push({ key: "ctrl+o", label: T("open the folder"), run: () => verb("folder") }, { key: "ctrl+w", label: T("Workshop page"), run: () => verb("workshop-id") });
-  if (sel.length === 1 && sel[0].id) out.push({ key: "ctrl+s", label: T("steam page"), run: () => verb("steam") });
-  if (k === 1) out.push({ key: "J K", label: T("down / up"), run: null });
-  out.push({ key: "g", label: T("tags"), run: () => verb("tags") });
-  if (sel.length === 1) {
-    out.push({ key: "enter", label: T("full details"), run: () => verb("full") });
-    if (k === 1 && sel[0].id) out.push({ key: "x", label: T("switch version…"), run: () => verb("swap") });
-  }
+  if (sel.length === 1 && sel[0].id) out.push({ key: "ctrl+o", label: T("open the folder") }, { key: "ctrl+w", label: T("Workshop page") });
+  out.push(help);
   return out;
+}
+
+// keyboard mode (16 §3.1 rule 4): the hint line shows only after a key outside a text field
+// (or tab, an arrow, enter or esc anywhere) and goes at the next mouse press; a mouse player
+// never reads it, ? and the command panel still list every key.
+let keyboardMode = false;
+function wireKeyboardMode() {
+  const typing = (t) => t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ""));
+  const navKey = /^(Tab|Arrow|Enter$|Escape$|F\d|Page|Home$|End$)/;
+  document.addEventListener("keydown", (e) => {
+    if (keyboardMode || ["Shift", "Control", "Alt", "Meta"].includes(e.key)) return;
+    if (typing(e.target) && !navKey.test(e.key)) return;
+    keyboardMode = true;
+    renderHints();
+  }, true);
+  document.addEventListener("pointerdown", () => { if (keyboardMode) { keyboardMode = false; renderHints(); } }, true);
 }
 
 function renderHints() {
@@ -436,6 +422,7 @@ function renderHints() {
   else if (S.screen === "search") list = fileSearch.hintList();
   else if (S.screen === "mod-settings") list = modSettings.hintList();
   else if (S.screen === "saves") list = savesPage.hintList();
+  else if (S.screen === "review") list = reviewPage.hintList();
   else if (S.screen === "changes") list = scr.changesHints();
   else if (S.screen === "log") list = scr.logHints();
   else if (S.screen === "subscribe") list = scr.addHints();
@@ -447,17 +434,14 @@ function renderHints() {
   if (scr.changesFiltered()) list = [{ key: "esc", label: T("every mod") }, ...list];
   list = foldShortcuts(list);
   const c = S.focus < 3 ? col() : null;
-  if (c && c.sel.size && !S.screen) h.append(el("span", "accent", Tf("%d selected", c.sel.size)));
-  list.slice(0, 7).forEach((a) => {
+  const selected = c && c.sel.size && !S.screen;
+  if (selected) h.append(el("span", "accent", Tf("%d selected", c.sel.size)));
+  if (!keyboardMode) return;
+  hintLine(list, selected ? [{ key: "esc", label: T("clear the selection") }] : []).forEach((a) => {
     const group = el("span", "hint-group");
     group.append(keyCaps(a.key), " " + a.label);
     h.append(group);
   });
-  if (c && c.sel.size && !S.screen) {
-    const group = el("span", "hint-group");
-    group.append(keyCaps("esc"), " " + T("clear the selection"));
-    h.append(group);
-  }
 }
 
 // foldShortcuts: ctrl+o and ctrl+w share one place in the hint line.
@@ -520,29 +504,23 @@ async function step(d) {
   await showDetail(cur(lastList), lastList === 2);
 }
 
+// click is a press on row i of list k (16 §3.4, pickClick). e.keep: a plain press on a
+// selected row keeps the selection, so a drag can move it; its mouseup without a drag
+// clicks again without keep (lists.js).
 function click(k, i, e) {
   const c = S.cols[k];
-  if (S.focus !== k) focusArea(k);
+  const seed = S.focus === k;
+  if (!seed) focusArea(k);
   const g = headOf(c, c.view[i]);
-  if (g && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+  const ctrl = e.ctrlKey || e.metaKey;
+  if (g && !e.shiftKey && !ctrl) { c.cursor = i; S.anchor = i; return toggleGroup(); }
+  const it = c.view[i] >= 0 ? c.items[c.view[i]] : null;
+  if (!(e.keep && !e.shiftKey && !ctrl && it && c.sel.has(key(it)))) {
+    const range = (j) => (c.view[j] >= 0 ? [key(c.items[c.view[j]])] : []);
     // ctrl+click on a tag group's header selects its rows shown (again: unselects them)
-    const ks = g.rows.map((j) => key(c.items[j]));
-    const all = ks.length && ks.every((x) => c.sel.has(x));
-    for (const x of ks) all ? c.sel.delete(x) : c.sel.add(x);
-    c.cursor = i; S.anchor = i;
-    return clicked(k);
+    const one = (j) => { const h = headOf(c, c.view[j]); return h ? h.rows.map((r) => key(c.items[r])) : range(j); };
+    S.anchor = pickClick(c.sel, e, { at: i, cursor: c.cursor, anchor: S.anchor, one, range, seed });
   }
-  if (g && !e.shiftKey) { c.cursor = i; S.anchor = i; return toggleGroup(); }
-  if (e.shiftKey) {
-    if (S.anchor < 0) S.anchor = c.cursor;
-    c.sel.clear();
-    const [a, b] = [Math.min(S.anchor, i), Math.max(S.anchor, i)];
-    for (let j = a; j <= b; j++) if (c.view[j] >= 0) c.sel.add(key(c.items[c.view[j]]));
-  } else if (e.ctrlKey || e.metaKey) {
-    const kk = key(c.items[c.view[i]]);
-    c.sel.has(kk) ? c.sel.delete(kk) : c.sel.add(kk);
-    S.anchor = i;
-  } else S.anchor = i;
   c.cursor = i;
   clicked(k);
 }
@@ -756,7 +734,7 @@ function actionContext() {
 }
 
 async function verb(name) {
-  if (environmentReason() && !["full", "workshop", "folder", "workshop-id", "steam", "needs"].includes(name)) return say("busy", environmentReason());
+  if (environmentReason() && !["full", "workshop", "folder", "linked", "workshop-id", "steam", "needs"].includes(name)) return say("busy", environmentReason());
   const { k, sel } = actionContext();
   const ids = idsOf(sel);
   switch (name) {
@@ -796,10 +774,11 @@ async function verb(name) {
       if (S.detail && S.detail.url) return api.OpenURL(S.detail.url).then(() => say("ok", T("opened the Workshop page")), (e) => say("fail", errText(e)));
       return say("", T("not a workshop mod"));
     // ctrl+o / ctrl+w: the cursor's mod, not the details (they may still be loading)
-    case "folder": case "workshop-id": case "steam": {
+    case "folder": case "linked": case "workshop-id": case "steam": {
       const it = S.focus < 3 ? cur() : sel[0];
-      if (!it || !it.id) return say("", name === "folder" ? T("RimArcho has not seen this copy: no folder") : T("no Workshop ID: not a Workshop mod"));
+      if (!it || !it.id) return say("", name === "folder" || name === "linked" ? T("RimArcho has not seen this copy: no folder") : T("no Workshop ID: not a Workshop mod"));
       if (name === "folder") return api.OpenFolder(it.id).then(() => say("ok", T("opened the folder")), (e) => say("fail", errText(e)));
+      if (name === "linked") return api.ShowLink(it.id).then((t) => say("", t), (e) => say("fail", errText(e)));
       if (name === "steam") return api.OpenSteamWorkshop(it.id).then((t) => say("ok", t), (e) => say("", errText(e)));
       return api.OpenWorkshop(it.id).then((t) => say("ok", t), (e) => say("", errText(e)));
     }
@@ -848,7 +827,7 @@ async function drop(from, to, items, at) {
 }
 
 // run: sort, save and launch act at once and say what they did (16 §6); sort
-// offers undo. A refusal says why in the status line and shows the commands that resolve it.
+// offers undo, then the steps for what it found (sortsteps.js, 16 §6.1). A refusal says why in the status line and shows the commands that resolve it.
 // A launch with required mods missing asks once (VM run B8); run says "asked" then.
 async function run(what, anyway = false) {
   const before = motion.snapshot();
@@ -860,6 +839,7 @@ async function run(what, anyway = false) {
   }
   // another version in the way that can move into the lock library: one confirmation, then on
   if (o.moves) return confirmMoves(o, () => api.RunMoving(what), async (o2) => { say(o2.refused ? "fail" : "ok", o2.text); await reload(); motion.play(before, null); });
+  if (o.direct) return offerDirect(o, () => run(what, anyway));
   if (o.refused) {
     say("fail", o.text);
     if (o.refused.length > 1) pop.text({ sort: T("sort"), save: T("save"), launch: T("launch") }[what], o.refused);
@@ -869,51 +849,15 @@ async function run(what, anyway = false) {
   if (what === "sort") offerAfterSort(o);
 }
 
-// offerAfterSort: what a sort found that the list cannot fix by ordering (04): required
-// mods that are not enabled, list entries with no mod folder, and mods with a recommended
-// replacement. One window says it all and one button fixes all it can: installed mods are
-// enabled or put in place (one undo step each), the rest are subscribed after the usual
-// Steam / SteamCMD choice. A broken cycle is settled by the sort itself and only noted on
-// Can it run, so it asks nothing here.
-function offerAfterSort(o) {
-  const deps = o.missingDependencies || [], absent = o.missingMods || [], repl = o.replacements || [];
-  const enable = deps.filter((m) => m.kind === "installed");
-  const useCopies = absent.filter((m) => m.canEnable);
-  const replace = repl.filter((r) => r.canReplace && r.installed && !r.enabled);
-  const ws = [...deps.filter((m) => m.kind === "workshop").map((m) => m.workshopId),
-    ...absent.filter((m) => !m.canEnable && m.workshopId).map((m) => m.workshopId),
-    ...repl.filter((r) => !r.installed && r.replacement && r.replacement.workshopId).map((r) => r.replacement.workshopId)];
-  const subscribe = [...new Set(ws.filter(Boolean))];
-  const unknown = [...deps.filter((m) => m.kind === "unknown"), ...absent.filter((m) => !m.canEnable && !m.workshopId)];
-  if (!enable.length && !useCopies.length && !replace.length && !subscribe.length && !unknown.length) return;
-  const some = (names) => names.slice(0, 6).join(T(", ")) + (names.length > 6 ? " " + Tf("and %d more", names.length - 6) : "");
-  const lines = [];
-  const group = (head, names) => { if (names.length) lines.push(head, "  " + some(names), ""); };
-  group(Tf("required but not enabled, installed (%d):", enable.length), enable.map((m) => m.name || m.packageId));
-  group(Tf("in the list with no folder, a copy is installed (%d):", useCopies.length), useCopies.map((m) => m.name || m.packageId));
-  group(Tf("a recommended replacement is installed (%d):", replace.length), replace.map((r) => Tf("%s → %s", r.original.name, r.replacement.name)));
-  group(Tf("to get from the Workshop (%d):", subscribe.length), [
-    ...deps.filter((m) => m.kind === "workshop").map((m) => m.name || m.packageId),
-    ...absent.filter((m) => !m.canEnable && m.workshopId).map((m) => m.name || m.packageId),
-    ...repl.filter((r) => !r.installed && r.replacement && r.replacement.workshopId).map((r) => r.replacement.name)]);
-  group(Tf("missing, no known source (%d):", unknown.length), unknown.map((m) => m.name || m.packageId));
-  while (lines.length && !lines[lines.length - 1]) lines.pop();
-  const local = enable.length + useCopies.length + replace.length;
-  if (!local && !subscribe.length) return pop.text(T("the sort found mods the list is missing"), lines);
-  const go = local && subscribe.length ? Tf("fix %d and get %d", local, subscribe.length)
-    : local ? Tf("fix %d", local) : Tf("get %d mods", subscribe.length);
-  pop.confirm(T("the sort found mods the list is missing"), lines, go, async () => {
-    let ids = subscribe;
-    if (useCopies.length && api.UseInstalled) await edited(() => api.UseInstalled(useCopies.map((m) => m.packageId)), true);
-    if (replace.length) await edited(() => api.ReplaceRecommended(replace.map((r) => r.original.ref || r.original.instance)), true);
-    if (enable.length) {
-      const r = await edited(() => api.CompleteDependencies(), true);
-      if (r?.workshopIds?.length) ids = [...new Set([...ids, ...r.workshopIds])];
-    }
-    if (ids.length) pop.choose(Tf("get %d mods", ids.length), getChoices(), async (i) => {
-      try { say("ok", await api.Subscribe({ kind: "workshop", url: ids.join(" "), steamcmd: i === 1, batch: true })); } catch (e) { say("fail", errText(e)); }
-    });
-  }, "enable");
+// offerDirect answers a Steam launch with no Steam client (view.Outcome.Direct, 16 §2.3): one
+// button makes this game start without Steam from now on, then launches again.
+function offerDirect(o, again) {
+  say("fail", o.text);
+  pop.confirm(o.text, [T("This game will start without Steam from now on.")], T("start the game directly"), async () => {
+    try { await api.LaunchDirect(); } catch (e) { return say("fail", errText(e)); }
+    say("busy", T("starting…"));
+    await again();
+  }, "launch");
 }
 
 // confirmMoves asks once about moving folders into the lock library (09 §3), then runs again.
@@ -938,13 +882,13 @@ async function cmd(id) {
   if (uninst.locked()) return;
   if (environmentReason() && ["launch", "sort", "save", "undo", "redo", "restore-all", "stage-all", "rescan", "analyze"].includes(id)) return say("busy", environmentReason());
   // A page replaces the page shown once its data is in: the mod list never shows between.
-  const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", subscribe: "subscribe", library: "library", log: "log", settings: "settings", packs: "packs", build: "build", "env-page": "env", uninstall: "uninstall", feedback: "feedback", textures: "textures", tasks: "tasks", "search-files": "search", "mod-settings": "mod-settings" };
+  const pages = { needs: "needs", changes: "changes", subscribe: "subscribe", library: "library", log: "log", settings: "settings", packs: "packs", uninstall: "uninstall", feedback: "feedback", textures: "textures", tasks: "tasks", "search-files": "search", "mod-settings": "mod-settings" };
   if (pages[id]) return go(pages[id]);
   // the list's own actions show the list; the rest work on any page
   if (["filter", "details", "tech", "tags", "rules"].includes(id) && scr.closeScreen()) renderWhere();
   switch (id) {
-    // from the editor, Start opens the launch page, as L does there (16 §2.5)
-    case "launch": return S.screen ? run(id) : goLaunch();
+    // from the editor, launch checks the RAM estimate as its L does (16 §2.5)
+    case "launch": return S.screen ? run(id) : launchHere();
     case "sort": case "save": return run(id);
     case "preview-sort": case "preview-save": case "preview-launch": return preview(id.slice(8));
     case "undo": case "redo": case "restore-all": case "stage-all": return verb(id);
@@ -952,7 +896,7 @@ async function cmd(id) {
       await busyStart("scan", T("scanning…"), () => api.Scan(), () => scr.busyChanged());
       return;
     case "analyze":
-      await busyStart("analyze", T("checking the mods' files…"), () => api.Analyze());
+      await busyStart("analyze", T("checking the mods' files…"), () => api.Analyze(), () => scr.againChanged());
       return;
     case "env": return chooseEnv();
     case "plans": return plans.chooser();
@@ -963,18 +907,25 @@ async function cmd(id) {
     case "tech": return verb("full");
     case "tags": return verb("tags");
     case "cli": return commandLine();
-    case "import": return S.screen === "plans" ? planManage.newList("import") : exchange(0);
+    case "import": return S.screen === "plans" ? planManage.newList("import") : exchange();
     case "export": return exportCurrent();
+    // the RimArcho row of settings › About, its check or install focused (as the TUI's panel)
+    case "update": return selfUpdate.goSelfUpdate();
     case "help": return pop.help(S.screen || "plan");
     case "quit": return window.close();
   }
 }
 
 async function chooseEnv() {
-  const envs = (S.board && S.board.envs) || [];
-  if (!envs.length) return say("", T("no games yet (archo env add)"));
-  pop.choose(T("switch game"), envs, (i) => useEnv(envs[i]),
-    Math.max(0, envs.indexOf(S.board.env)), { key: "Delete", label: T("remove the game"), envWrite: "remove-env", run: (i) => scr.removeEnv(envs[i]) });
+  const rows = S.board?.environmentRows || [];
+  if (!rows.length) return go("guide"); // no game yet: Add Game Config is the page for it
+  const labels = rows.map(e => e.name + "  " + e.installation + (e.current ? "  " + T("in use") : ""));
+  labels.push("+ " + T("Add Game Config"));
+  pop.choose(T("switch Game Config"), labels, (i) => {
+    // Add Game Config is a page (16 §2.15), not a dialog
+    if (i === rows.length) return go("guide");
+    return useEnv(rows[i].name);
+  }, Math.max(0, rows.findIndex(e => e.current)), { key:"Delete", label:T("remove Game Config"), envWrite:"remove-env", run:i => { if(i<rows.length) scr.removeEnv(rows[i].name); } });
 }
 
 async function useEnv(name) {
@@ -998,7 +949,9 @@ async function useEnv(name) {
 async function refreshEnvironment() {
   S.screenSeq++;
   if (!S.screen) return openPage("plan");
-  if (S.screen && S.screen !== "guide") await openPage(S.screen);
+  // the guide is not reopened (that would restart it); Add Game Config rereads its choices
+  if (S.screen === "guide") await guide.envChanged();
+  else await openPage(S.screen);
 }
 
 function commandLine() {
@@ -1151,7 +1104,7 @@ function menuAtCursor() {
 // rowOp runs an op of the menu on the object: the plan's own as their verbs, the version
 // and disk ops as Mod library runs them (a dry run first when they change files).
 async function rowOp(code, only = null) {
-  const verbs = { enable: "toggle", disable: "toggle", "put-back": "toggle", "enable-at": "move", "move-to": "move", stage: "stage", swap: "swap", tags: "tags", note: "note", folder: "folder", workshop: "workshop-id", steam: "steam" };
+  const verbs = { enable: "toggle", disable: "toggle", "put-back": "toggle", "enable-at": "move", "move-to": "move", stage: "stage", swap: "swap", tags: "tags", note: "note", folder: "folder", linked: "linked", workshop: "workshop-id", steam: "steam" };
   if (verbs[code] && !only) return verb(verbs[code]);
   const ids = only || idsOf(actionContext().sel);
   if (!ids.length) return;
@@ -1226,7 +1179,8 @@ function onKey(e) {
   const dig = /^Digit([1-9])$/.exec(e.code || "");
   if (dig && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
     e.preventDefault();
-    if (NAV[+dig[1] - 1]) go(navTarget(NAV[+dig[1] - 1]));
+    const id = navAt(dig[1]);
+    if (id) go(navTarget(id));
     return;
   }
   // tab / shift+tab move the focus on every page, as on a web page (16 §3.5); sub-pages are
@@ -1262,6 +1216,7 @@ function onKey(e) {
     if (S.screen === "search") return fileSearch.key(e);
     if (S.screen === "mod-settings") return modSettings.key(e);
     if (S.screen === "saves") return savesPage.key(e);
+    if (S.screen === "review") return reviewPage.key(e);
     if (S.screen === "log" || S.screen === "changes") return scr.logsKey(e);
     // add a subscription: the form takes its keys; esc outside it goes back to updates
     if (S.screen === "subscribe") { if (k === "Escape") { e.preventDefault(); go("changes"); } return; }
@@ -1344,10 +1299,10 @@ function onKey(e) {
   const map = {
     " ": () => verb("toggle"), t: () => verb("stage"), m: () => verb("move"), J: () => verb("down"), K: () => verb("up"),
     g: () => verb("tags"), n: () => verb("note"), p: () => problems.toggle(), Enter: () => verb("full"), x: () => verb("swap"),
-    S: () => run("sort"), w: () => run("save"), L: () => goLaunch(), u: () => verb("undo"), T: () => verb(S.focus === 2 ? "restore-all" : "stage-all"),
+    S: () => run("sort"), w: () => run("save"), L: () => launchHere(), u: () => verb("undo"), T: () => verb(S.focus === 2 ? "restore-all" : "stage-all"),
     "/": () => startSearch(), "\\": () => S.bar.toggle(), c: () => go("changes"), l: () => go("log"), R: () => cmd("rescan"), A: () => cmd("analyze"),
     H: () => historyChooser(), C: () => changesOfCursor(), "<": () => widthKey(-1), ">": () => widthKey(1), "=": () => widthKey(0),
-    E: () => go("env"), P: () => plans.chooser(), "?": () => pop.help("plan"), ":": () => commandLine(), i: () => exchange(0), e: () => exportCurrent(),
+    E: () => go("env"), P: () => plans.chooser(), "?": () => pop.help("plan"), ":": () => commandLine(), i: () => exchange(), e: () => exportCurrent(),
     r: () => startRule(actionContext().sel[0]), v: () => switchView(),
   };
   // shift+letter is the capital letter even where the key reports it in lower case
@@ -1410,18 +1365,20 @@ async function loadWidths() {
 // ---- start ----
 
 const ui = {
-  reload, refreshEnvironment, relang, reaccent, render, pageEntering, pageEntered, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go, useEnv,
+  reload, refreshEnvironment, relang, reaccent, render, pageEntering, pageEntered, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go, useEnv, offerDirect,
   back: () => travel(-1),
-  palette: paletteChoice, commandDone, uninstallStarted: () => uninst.restore(), selectionItems: selection, planMenu: (id, x, y, opener, keys) => plans.menuAt(id, x, y, opener, keys),
+  palette: paletteChoice, paletteContext: () => ({ page: S.screen || "plan", parts: scr.pageParts() }), commandDone, uninstallStarted: () => uninst.restore(), selectionItems: selection, planMenu: (id, x, y, opener, keys) => plans.menuAt(id, x, y, opener, keys),
   menu: (x, y) => openRowMenu(x, y, false),
   detailFollow: (f) => detailFollow(f),
   newList: (from) => planManage.newList(from),
   duplicateList: (id) => planManage.duplicate(id),
   selectedList: () => planManage.selected(),
   resumeGuide: () => guide.resume(),
-  importManagers: () => exchange(true),
+  importManagers: () => exchange(),
+  importFirstList: () => exchange(true), // the first-run guide's hand-over (16 §2.15)
   manageLists: (id = 0) => { planManage.select(id); return go("plans"); },
   edited: (call, undoable = true) => edited(call, undoable),
+  showMod: (id, name) => showDetail({ id, name }), // the sort steps' Mod names (16 §6.1)
   ruleTarget: () => actionContext().sel[0],
   afterImport: null, // the first-run guide's next step once an import is applied
 };
@@ -1442,12 +1399,14 @@ async function start() {
   pop.wireModalFocus();
   scr.initScreens(ui);
   problems.initProblems(ui);
+  initSortSteps(ui);
   shell.initShell(ui);
   homePage.initHome(ui);
   fullPage.initFull(ui);
   packsPage.initPacks(ui);
   planManage.initPlanManage(ui);
   guide.initGuide(ui);
+  ui.addWith = scr.addWith; // a dropped link, Mod folder or zip (16 §2.18)
   initExchange(ui);
   plans.initPlans(ui);
   library.initLibrary(ui);
@@ -1461,11 +1420,16 @@ async function start() {
   $('.area[data-area="3"] > .head').addEventListener("click", () => { if (S.bar.fills()) S.bar.toggle(false); });
   wireLists(ui);
   setOnViewChange(viewChanged);
+  setOnSortChange(() => reload());
   // the Disabled column's last view (16 §2.5); the editor is not shown yet at start
   loadView().then((tags) => { if (tags) { regroup(); if (!S.screen) viewChanged(); } });
   initRules(ui);
   wireSplits();
   document.addEventListener("keydown", onKey);
+  wireKeyboardMode();
+  wireZoom(); // ctrl+wheel, ctrl+'+' / '-' / '0': interface size on every page (16 §2.14)
+  // a Can it run item's or a Mod's flag (js/reportmark.js): Feedback with the report filled in
+  document.addEventListener("feedback-report", (e) => { S.feedbackPrefill = e.detail; go("feedback"); });
   document.addEventListener("verb", (e) => { const v = e.detail; v === "needs" ? go("needs") : verb(v); });
   // a detail's settings row: Mod library › Mod settings at that Mod's files (16 §2.9)
   document.addEventListener("open-mod-settings", (e) => { modSettings.focusMod(e.detail); go("mod-settings"); });
@@ -1503,7 +1467,7 @@ async function start() {
   // the enabled list's head: import / export
   $("#board").addEventListener("click", (e) => {
     const b = e.target.closest(".head [data-cmd]");
-    if (b) { e.stopPropagation(); b.dataset.cmd === "exchange" ? exchange(0) : run(b.dataset.cmd); }
+    if (b) { e.stopPropagation(); b.dataset.cmd === "exchange" ? exchange() : run(b.dataset.cmd); }
   });
   $(".detail .scroll").addEventListener("scroll", () => { if (S.focus === 3) renderWhere(); }, { passive: true });
   $(".detail").addEventListener("mousedown", () => focusArea(3));
@@ -1511,17 +1475,26 @@ async function start() {
     S.busy.scan = false;
     say(ev.ok ? "ok" : "fail", ev.ok ? ev.text : ev.error);
     await reload();
+    if (ev.ok) tasksPage.scanned(); // a download that waited for this scan offers its Mods (16 §2.9)
     scr.busyChanged();
     if (S.screen === "home") homePage.home();
   });
   on("analyze", async (ev) => {
-    if (ev.line) { S.busy.analyze = true; say("busy", T("checking the mods' files…") + " " + ev.line); return; }
+    if (ev.line) {
+      const was = S.busy.analyze;
+      S.busy.analyze = true;
+      say("busy", T("checking the mods' files…") + " " + ev.line);
+      if (!was) scr.analyzeEvent(ev);
+      return;
+    }
     S.busy.analyze = false;
     say(ev.ok ? "ok" : "fail", ev.ok ? T("analysis done") : ev.error);
     await reload();
     scr.analyzeEvent(ev);
     if (ev.done && S.screen === "home") homePage.home();
   });
+  // The Linux window's side buttons arrive from GTK, not as mouse events (sidebuttons_linux.go).
+  on("history-step", (step) => void travel(step < 0 ? -1 : 1));
   on("pack", (ev) => packsPage.packEvent(ev));
   on("uninstall", (ev) => uninst.event(ev));
   on("uninstall-close-blocked", () => uninst.closeBlocked());
@@ -1531,14 +1504,15 @@ async function start() {
     if (!S.screen && ["subscribe", "subscription-from", "subscription-check", "subscription-update", "subscription-remove"].includes(e.detail?.kind)) reload();
   });
   // Menu art is prepared after the first draw, outside the task page (16 §2.14).
+  // The launch page hears it on every page: one that comes before its first read may be
+  // newer than the backdrop read at start.
   on("backgrounds", () => {
-    if (S.screen === "home") homePage.home({ keep: true });
+    homePage.backgroundChanged();
     if (S.screen === "settings") refreshBackgrounds();
   });
   // a task's o on a mod: Mod library searching for it (16 §2.16)
   document.addEventListener("library-search", async (e) => { shell.navigated(); await library.openSearch(e.detail); renderWhere(); });
   document.addEventListener("library-instance", async (e) => { shell.navigated(); await library.openInstance(e.detail); renderWhere(); });
-  tasksPage.refreshFoot();
   on("guide", (ev) => guide.guideEvent(ev));
   on("download", (ev) => guide.downloadEvent(ev));
   // launching waits (up to ten seconds) for a background Steam credit switch to finish
@@ -1546,24 +1520,36 @@ async function start() {
   // the background check of the open list finished: the problems button, the panel and the
   // row icons follow without reading the lists again; an open Can it run shows the new answer
   // (VM run 2026-10-28: after the game exited it kept the run's old time until revisited)
+  // a developer's reply to a sent report: the dot on Feedback (16 §2.14)
+  on("feedback-replies", (ev) => { S.feedbackUnseen = ev.unseen || 0; shell.sync(); });
   on("list-problems", (ev) => {
     if (!problems.event(ev)) return;
     if (!S.screen) { renderLists(); renderWhere(); } else if (S.screen === "needs") scr.needs(true);
   });
   // Another process (the TUI, the CLI, an agent) may have changed the data: look again
-  // when the window gets the focus (G8).
+  // when the window gets the focus (G8), and draw the page again when the open list moved.
   addEventListener("focus", async () => {
-    try { if (S.board && (await api.Stamp()) !== S.board.stamp) await reload(); } catch { /* keep the page */ }
+    try {
+      // the visible page is drawn again when the open list moved (C); otherwise Can it run
+      // draws its list's pill again from the sidebar's new lists (B)
+      let redrawn = false;
+      const read = await lookAgain(S, () => api.Stamp(), () => reload(), async () => { redrawn = true; S.screenSeq++; await openPage(S.screen); });
+      if (read && !redrawn && S.screen === "needs") scr.needs(true);
+    } catch { /* keep the page */ }
     checkCredit();
+    // Steam or another tool may have added or removed mod folders meanwhile (04 §1.6): a
+    // background scan then, whose "scan" event reloads the page.
+    api.RescanIfChanged().catch(() => {});
   });
   // From here on a failing step says why and the window still boots: a page, the live
   // poll and Ready (an early throw used to leave the boot screen with no page behind it).
   const failed = (e) => say("fail", errText(e));
   try { if (!(await firstRun.workshopStart())) return; } catch (e) { failed(e); }
-  try { if (await uninst.restore()) { bootDone(); shell.settle(); return; } } catch (e) { failed(e); }
+  try { if (await uninst.restore()) { bootDone(); shell.settle(); tasksPage.showFoot(); return; } } catch (e) { failed(e); }
   // The start page needs only Workspace's shell and board. The editor behind it gets its
   // filter answer (the bar's first one reads every mod's content) and its rows afterwards,
-  // so the first page does not wait for them.
+  // so the first page does not wait for them. The launch page's own read starts now too.
+  homePage.readEarly();
   let shellIn;
   const shellRead = new Promise((r) => { shellIn = r; });
   reload(null, { current: () => true, commit(apply) { apply(); shellIn(); return true; } })
@@ -1578,11 +1564,16 @@ async function start() {
   // No environment yet: the first-run guide (16 §2.15); else the home page (16 §2.3).
   const first = !S.shell || !S.shell.envs;
   try {
-    if (first) await guide.start("first");
+    if (first) { homePage.forgetEarly(); await guide.start("first"); }
     else await go("home");
   } catch (e) { failed(e); }
+  // A first page that did not read the launch page (the guide, a lock, a failure) leaves the
+  // start's reads unused: a later visit reads afresh instead of drawing that old snapshot.
+  homePage.forgetEarly();
   bootDone();
   shell.settle();
+  // the sidebar's background-tasks line comes with the first page, not before it
+  tasksPage.showFoot();
   requestAnimationFrame(() => api.Ready().catch(() => {}));
   pollLive();
   try {
@@ -1606,19 +1597,26 @@ async function goHistory(h) {
   await reload();
 }
 
+// liveShown: what the launch page shows of the live state besides its items: whether a game
+// runs, and whose (the TUI's liveKey also counts owner and blocked).
+// No game is the same before the first poll and after it, so that poll redraws nothing.
+const liveShown = (l) => (l && (l.running || l.blocked) ? JSON.stringify([!!l.running, l.blocked || "", l.owner || ""]) : "");
+
 // pollLive follows the running game every two seconds (16 §2.1): its errors lead Can it run
 // (and its badge), Start says it runs, and launching waits until it exits (09 §4). A new
 // Player.log (the game exited, or ran without RimArcho) is read once when it appears.
 async function pollLive() {
   try {
     const l = await api.Live();
-    const before = JSON.stringify(S.live && S.live.items);
+    const before = JSON.stringify(S.live && S.live.items), shown = liveShown(S.live);
     const was = !!(S.live && S.live.running), hadNew = !!(S.live && S.live.newLog);
     S.live = l;
     if (l.newLog && !hadNew) readNewLog();
     if (JSON.stringify(l.items) !== before) { scr.liveChanged(); shell.sync(); }
     if (l.running) scr.logLive();
-    if (was !== !!l.running) { homePage.liveChanged(); savesPage.liveChanged(!!l.running); }
+    // the launch block also says whose game runs: another Game Config's (blocked) or ours
+    if (shown !== liveShown(l)) homePage.liveChanged();
+    if (was !== !!l.running) savesPage.liveChanged(!!l.running);
     // the game exited: a session that used SteamCMD mods may make a credit question due;
     // an open Can it run reads again, so the full analysis of the run replaces its items
     // (06 §6; VM run 2026-10-28: it kept the run's mid-way time and items)

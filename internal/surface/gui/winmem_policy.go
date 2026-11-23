@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -50,8 +52,9 @@ func (m *memoryTarget) update() {
 		if m.inactive {
 			wait = backgroundLow
 		}
+		// The callback reads t only under m.mu: a short wait can fire before AfterFunc returns.
 		var t *time.Timer
-		t = time.AfterFunc(wait, func() { m.ranOut(t) })
+		t = time.AfterFunc(wait, func() { m.ranOut(&t) })
 		m.timer = t
 	}
 	level := uintptr(memoryTargetNormal)
@@ -64,10 +67,10 @@ func (m *memoryTarget) update() {
 	}
 }
 
-func (m *memoryTarget) ranOut(t *time.Timer) {
+func (m *memoryTarget) ranOut(t **time.Timer) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.timer != t { // overtaken by another event
+	if m.timer != *t { // overtaken by another event
 		return
 	}
 	m.timer = nil

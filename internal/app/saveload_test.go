@@ -4,9 +4,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/logs"
+	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
@@ -171,6 +173,23 @@ func TestCheckSaveLastLoad(t *testing.T) {
 	}
 	if is := lastLoad(check("Colony1")); is != nil {
 		t.Fatalf("ambiguous run: %+v", is)
+	}
+
+	// A load made with another list says nothing about this one; with this list it does.
+	st := ps.State
+	for _, fp := range []string{"another list", app.ListFingerprint(st.List)} {
+		if err := e.App.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: st.Ix.Env.ID, PlanID: st.Plan.ID, Fingerprint: fp,
+			Started: e.Now().Add(-10 * time.Minute).UTC(), Method: "direct", Command: "x"}); err != nil {
+			t.Fatal(err)
+		}
+		write([]string{loadError}, "Colony1")
+		if _, err := e.App.AnalyzeLog(pl); err != nil {
+			t.Fatal(err)
+		}
+		is := lastLoad(check("Colony1"))
+		if other := fp == "another list"; other != (is == nil) {
+			t.Fatalf("launched with %q: %+v", fp, is)
+		}
 	}
 
 	// A load with no errors or warnings has no row.

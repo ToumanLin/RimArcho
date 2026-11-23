@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -256,7 +258,8 @@ var endlessWhileWorking = map[string]string{
 	".hm-go.switching::before":            "launch block while a list or game is applied",
 	".hm-go .bar::after":                  "launch block while a list or game is applied",
 	".prog .bar.busy i::after":            "task progress without a value",
-	".page-acts .chip.prob.updating .dot": "problems refresh or analysis running (needsWorkLocked)",
+	".page-acts .chip.prob.updating .dot": "problems refresh, analysis running or about to start (needsWorkLocked)",
+	".sv-progress.indeterminate .fill":    "saves listing before its first count",
 }
 
 var cssRule = regexp.MustCompile(`([^{}]+)\{([^{}]*)\}`)
@@ -283,5 +286,50 @@ func TestEndlessAnimationsOnlyWhileWorking(t *testing.T) {
 		if !seen[sel] {
 			t.Errorf("%s: listed in endlessWhileWorking but has no endless animation", sel)
 		}
+	}
+}
+
+// WebKitGTK (the Linux window, 16 §8.2) honours only -webkit-user-select: a row dragged
+// with only user-select: none selected the text of the rows it passed. Every user-select
+// declaration comes with the prefixed one, with the same value, in the same rule.
+func TestStyleUserSelectPrefixed(t *testing.T) {
+	t.Parallel()
+	b, err := fs.ReadFile(assets, "assets/style.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, problem := range userSelectProblems(string(b)) {
+		t.Error(problem)
+	}
+}
+
+var cssRuleBody = regexp.MustCompile(`\{[^{}]*\}`)
+var cssUserSelect = regexp.MustCompile(`(-webkit-)?user-select\s*:\s*([^;}]+)`)
+
+func userSelectProblems(source string) []string {
+	var problems []string
+	for _, loc := range cssRuleBody.FindAllStringIndex(source, -1) {
+		plain, prefixed := map[string]bool{}, map[string]bool{}
+		for _, m := range cssUserSelect.FindAllStringSubmatch(source[loc[0]:loc[1]], -1) {
+			if m[1] != "" {
+				prefixed[strings.TrimSpace(m[2])] = true
+			} else {
+				plain[strings.TrimSpace(m[2])] = true
+			}
+		}
+		for v := range plain {
+			if !prefixed[v] {
+				line := 1 + strings.Count(source[:loc[0]], "\n")
+				problems = append(problems, fmt.Sprintf("assets/style.css:%d: user-select: %s without -webkit-user-select: %s", line, v, v))
+			}
+		}
+	}
+	return problems
+}
+
+func TestStyleUserSelectDetection(t *testing.T) {
+	t.Parallel()
+	if got := userSelectProblems(".a { user-select: none; }\n.b { -webkit-user-select: text; user-select: text; }"); len(got) != 1 || !strings.Contains(got[0], ":1:") {
+		t.Fatalf("got %q", got)
 	}
 }

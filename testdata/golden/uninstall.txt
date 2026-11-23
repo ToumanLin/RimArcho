@@ -6,7 +6,7 @@ uninstall: dry run, nothing changed
     unlink      $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_locked_1001_local → $ROOT/LocalAppData/RimArcho/locked/1001_local
     left alone  $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_mine  — not a link: left alone
     unlink      $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_steamcmd_8888 → $ROOT/steamcmd/steamapps/workshop/content/294100/8888
-  modsconfig: keep the ModsConfig.xml list of 1 user data folder without Archo Monitor and the mods only reached through a removed link; remove RimArcho's backup
+  modsconfig: keep the ModsConfig.xml list of 1 user data folder without Archo Monitor and the mods only reached through a removed link; remove RimArcho's backups of the list and of Mod settings (the settings stay)
     clean       $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Config/ModsConfig.xml  (main)  takes out tester.cmd
   locked: 1 lock library copy to the recycle bin, <size> (--keep-locked: into a game's Mods/)
     recycle bin $ROOT/LocalAppData/RimArcho/locked/1001_local  (A)  <size>
@@ -14,7 +14,7 @@ uninstall: dry run, nothing changed
   monitor: delete Archo Monitor (1 folder), <size>
     delete      $ROOT/LocalAppData/RimArcho/monitor/ArchoMonitor-0.9.0  <size>
   packs: keep 1 pack: moved to $ROOT/Documents/RimArcho packs, <size> (--remove-packs: recycle bin)
-    move        $ROOT/ArchoHome/packs/P1 → $ROOT/Documents/RimArcho packs/P1  (P1)  <size>
+    move        $ROOT/LocalAppData/RimArcho/packs/P1 → $ROOT/Documents/RimArcho packs/P1  (P1)  <size>
   saves: keep 1 save folder: moved to $ROOT/Documents/RimArcho saves, <size> (--remove-saves: recycle bin)
     move        $ROOT/ArchoHome/userdata/old → $ROOT/Documents/RimArcho saves/old  (old)  <size>
   games: keep 1 game folder downloaded with SteamCMD (--remove-games: recycle bin)
@@ -45,7 +45,7 @@ uninstall: dry run, nothing changed
   monitor: delete Archo Monitor (1 folder), <size>
     delete      $ROOT/LocalAppData/RimArcho/monitor/ArchoMonitor-0.9.0  <size>
   packs: 1 pack to the recycle bin, <size>
-    recycle bin $ROOT/ArchoHome/packs/P1  (P1)  <size>
+    recycle bin $ROOT/LocalAppData/RimArcho/packs/P1  (P1)  <size>
   saves: 1 save folder to the recycle bin, <size>
     recycle bin $ROOT/ArchoHome/userdata/old  (old)  <size>
   games: 1 downloaded game folder to the recycle bin, <size>
@@ -68,7 +68,7 @@ uninstall: dry run, nothing changed
     unlink      $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_locked_1001_local → $ROOT/LocalAppData/RimArcho/locked/1001_local
     left alone  $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_mine  — not a link: left alone
     unlink      $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_steamcmd_8888 → $ROOT/steamcmd/steamapps/workshop/content/294100/8888
-  modsconfig: keep the ModsConfig.xml list of 1 user data folder without Archo Monitor and the mods only reached through a removed link; remove RimArcho's backup
+  modsconfig: keep the ModsConfig.xml list of 1 user data folder without Archo Monitor and the mods only reached through a removed link; remove RimArcho's backups of the list and of Mod settings (the settings stay)
     clean       $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Config/ModsConfig.xml  (main)  takes out tester.cmd
   locked: 1 lock library copy into env:old's Mods/ as ordinary mods, <size>
     move        $ROOT/LocalAppData/RimArcho/locked/1001_local → $ROOT/old/Mods/1001_local  (A)  <size>
@@ -76,7 +76,7 @@ uninstall: dry run, nothing changed
   monitor: delete Archo Monitor (1 folder), <size>
     delete      $ROOT/LocalAppData/RimArcho/monitor/ArchoMonitor-0.9.0  <size>
   packs: keep 1 pack: moved to $ROOT/Documents/RimArcho packs, <size> (--remove-packs: recycle bin)
-    move        $ROOT/ArchoHome/packs/P1 → $ROOT/Documents/RimArcho packs/P1  (P1)  <size>
+    move        $ROOT/LocalAppData/RimArcho/packs/P1 → $ROOT/Documents/RimArcho packs/P1  (P1)  <size>
   saves: keep 1 save folder: moved to $ROOT/Documents/RimArcho saves, <size> (--remove-saves: recycle bin)
     move        $ROOT/ArchoHome/userdata/old → $ROOT/Documents/RimArcho saves/old  (old)  <size>
   games: 1 downloaded game folder to the recycle bin, <size>
@@ -103,7 +103,7 @@ uninstalled: RimArcho's folders and program are deleted once this command ends
     done   unlink      $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_locked_1001_local → $ROOT/LocalAppData/RimArcho/locked/1001_local
            left alone  $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_mine  — not a link: left alone
     done   unlink      $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_steamcmd_8888 → $ROOT/steamcmd/steamapps/workshop/content/294100/8888
-  modsconfig: keep the ModsConfig.xml list of 1 user data folder without Archo Monitor and the mods only reached through a removed link; remove RimArcho's backup
+  modsconfig: keep the ModsConfig.xml list of 1 user data folder without Archo Monitor and the mods only reached through a removed link; remove RimArcho's backups of the list and of Mod settings (the settings stay)
     done   clean       $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Config/ModsConfig.xml  (main)  takes out tester.cmd
   locked: 1 lock library copy to the recycle bin (--keep-locked: into a game's Mods/)
     done   recycle bin $ROOT/LocalAppData/RimArcho/locked/1001_local  (A)
@@ -111,7 +111,7 @@ uninstalled: RimArcho's folders and program are deleted once this command ends
   monitor: delete Archo Monitor (1 folder)
     done   delete      $ROOT/LocalAppData/RimArcho/monitor/ArchoMonitor-0.9.0
   packs: keep 1 pack: moved to $ROOT/Documents/RimArcho packs (--remove-packs: recycle bin)
-    done   move        $ROOT/ArchoHome/packs/P1 → $ROOT/Documents/RimArcho packs/P1  (P1)
+    done   move        $ROOT/LocalAppData/RimArcho/packs/P1 → $ROOT/Documents/RimArcho packs/P1  (P1)
   saves: keep 1 save folder: moved to $ROOT/Documents/RimArcho saves (--remove-saves: recycle bin)
     done   move        $ROOT/ArchoHome/userdata/old → $ROOT/Documents/RimArcho saves/old  (old)
   games: keep 1 game folder downloaded with SteamCMD (--remove-games: recycle bin)

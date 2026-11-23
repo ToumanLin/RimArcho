@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -17,22 +19,37 @@ var frontendNodeSuites = []string{
 	"testdata/deps.mjs",
 	"testdata/detail-follow.mjs",
 	"testdata/editorfilter.mjs",
+	"testdata/editorlaunch.mjs",
+	"testdata/envnotice.mjs",
+	"testdata/envswitch.mjs",
+	"testdata/exchange.mjs",
+	"testdata/feedback.mjs",
 	"testdata/guide.mjs",
+	"testdata/hints.mjs",
 	"testdata/home-memory.mjs",
+	"testdata/home-reads.mjs",
 	"testdata/nativemenu.mjs",
 	"testdata/needs.mjs",
+	"testdata/outsidechange.mjs",
 	"testdata/firstrun.mjs",
+	"testdata/gamelog.mjs",
 	"testdata/packs.mjs",
 	"testdata/paths.mjs",
+	"testdata/planhead.mjs",
 	"testdata/planmanage.mjs",
 	"testdata/popups.mjs",
+	"testdata/review.mjs",
 	"testdata/rules.mjs",
+	"testdata/saves.mjs",
+	"testdata/select.mjs",
 	"testdata/separators.mjs",
+	"testdata/sortsteps.mjs",
 	"testdata/status-motion.mjs",
 	"testdata/subscribe.mjs",
 	"testdata/subscriptions.mjs",
 	"testdata/tasks.mjs",
 	"testdata/textures.mjs",
+	"testdata/uizoom.mjs",
 	"testdata/window-chrome.mjs",
 }
 

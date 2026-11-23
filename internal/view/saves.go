@@ -29,6 +29,9 @@ type SavesPage struct {
 	Empty   string   `json:"empty,omitempty"`
 	Folders []string `json:"folders"`
 	Errors  []string `json:"errors,omitempty"`
+	// Owners are the colonies' Owner values, in order of first colony, when there are two
+	// or more: the left card's Game Config filter (12 §4.8); none with one.
+	Owners []string `json:"owners,omitempty"`
 }
 
 // SaveColonyRow is one colony: its name and its saves, newest first.
@@ -38,6 +41,8 @@ type SaveColonyRow struct {
 	// Game is the name its saves give it when the player renamed it (12 §4.1).
 	Game  string    `json:"game,omitempty"`
 	Saves []SaveRow `json:"saves"`
+	// Owner is who saves in its folder: the Game Configs ("A, C") or "pack X" (12 §4.8).
+	Owner string `json:"owner,omitempty"`
 }
 
 // SaveRow is one save in the tree: its name and when it was played.
@@ -57,8 +62,16 @@ func SavesRows(l *app.SaveList) *SavesPage {
 	for _, f := range l.Folders {
 		p.Folders = append(p.Folders, f.Dir)
 	}
+	seenOwner := map[string]bool{}
 	for _, c := range l.Colonies {
 		row := SaveColonyRow{Key: c.Key, Name: colonyName(c), Game: c.GameName, Saves: []SaveRow{}}
+		if f := c.Latest().Folder; f != nil {
+			row.Owner = FolderOwner(f)
+		}
+		if row.Owner != "" && !seenOwner[row.Owner] {
+			seenOwner[row.Owner] = true
+			p.Owners = append(p.Owners, row.Owner)
+		}
 		for _, s := range c.Saves {
 			r := SaveRow{Ref: s.Ref, Name: s.Name, When: saveWhen(s), Auto: s.Auto}
 			if d, ok := SaveDay(s); ok {
@@ -75,7 +88,19 @@ func SavesRows(l *app.SaveList) *SavesPage {
 	case p.Saves == 0:
 		p.Empty = T("no save in the Saves folders of your games and packs")
 	default:
-		p.Lead = Tf("%d colonies  %d saves", len(p.Colonies), p.Saves)
+		switch nc := len(p.Colonies); {
+		case nc == 1 && p.Saves == 1:
+			p.Lead = T("1 colony  1 save")
+		case nc == 1:
+			p.Lead = Tf("1 colony  %d saves", p.Saves)
+		case p.Saves == 1: // cannot happen with more than one colony; kept for the plural
+			p.Lead = Tf("%d colonies  1 save", nc)
+		default:
+			p.Lead = Tf("%d colonies  %d saves", nc, p.Saves)
+		}
+	}
+	if len(p.Owners) < 2 {
+		p.Owners = nil
 	}
 	return p
 }
@@ -156,6 +181,19 @@ type SaveDetail struct {
 	Mods    []SaveModView `json:"mods"`
 	Changes []SaveModView `json:"changes"`
 	NewList *SaveFixView  `json:"newList,omitempty"`
+
+	// Where its folder belongs (12 §4.8): Owner names who saves there (FolderOwner) when
+	// the game line does not (a pack's folder, or one several Game Configs share);
+	// Unseen says the game started with what the Launch page applied does not list it;
+	// NoCloud that Steam Cloud does not sync the folder; CopyHere, when Unseen, is the
+	// Game Config whose Saves folder Copy to … copies it into.
+	Owner    string `json:"owner,omitempty"`
+	Unseen   string `json:"unseen,omitempty"`
+	NoCloud  bool   `json:"noCloud,omitempty"`
+	CopyHere string `json:"copyHere,omitempty"`
+	// Chosen: Can it run checks this save ("save") or its colony ("colony") for the
+	// current Game Config (12 §4.8); "" neither.
+	Chosen string `json:"chosen,omitempty"`
 
 	// Locked says why Rename and Recycle are off now (a game runs, the file is written).
 	Locked string `json:"locked,omitempty"`
@@ -267,6 +305,28 @@ func SaveDetailAgainst(c *app.SaveCheck, running, current bool, own *app.Save, o
 	if own == nil {
 		own = s
 	}
+	d := saveDetailHead(s, own, running)
+	gap := unchecked(c)
+	d.Level, d.Verdict = c.Level, verdictText(c, gap)
+	d.Against = againstText(s, current, ownCheck != nil)
+	var newList *SaveFixView
+	if s.Head != nil && s.Colony != nil {
+		nl := fixView(app.SaveFix{Action: app.FixNewList, Label: "Make a list from this save",
+			Command: "loadout import " + argQuote(s.Path) + " --new " + argQuote(s.Colony.Name), Target: s.Ref}, s)
+		newList, d.NewList = &nl, &nl
+	}
+	d.Quick = saveQuick(d, c, own, ownCheck, gap, newList)
+	if ownCheck != nil && own.Env != nil && ownCheck.Level != "writing" && (d.Quick == nil || d.Quick.Action != app.FixRecycle) {
+		d.Switch = saveSwitch(own, ownCheck)
+	}
+	d.Issues = issueViews(c, s)
+	saveModViews(d, c)
+	return d
+}
+
+// saveDetailHead is the detail's header: the file, its colony and game, its list and
+// what it is checked against, and whether it can be renamed now.
+func saveDetailHead(s, own *app.Save, running bool) *SaveDetail {
 	d := &SaveDetail{Ref: s.Ref, Name: s.Name, File: s.File, Path: s.Path, Folder: filepath.Dir(s.Path), Prefix: s.Prefix,
 		Auto: s.Auto, Size: SizeText(s.Size), Bytes: s.Size, Issues: []SaveIssueView{}, Mods: []SaveModView{}, Changes: []SaveModView{}}
 	if s.Colony != nil {
@@ -300,66 +360,72 @@ func SaveDetailAgainst(c *app.SaveCheck, running, current bool, own *app.Save, o
 	case s.Writing:
 		d.Locked = T("the game is writing this file: rename and recycle wait until it has saved")
 	}
+	return d
+}
 
-	gap := unchecked(c)
-	d.Level, d.Verdict = c.Level, verdictText(c, gap)
+// againstText says what the save is checked against.
+func againstText(s *app.Save, current, applied bool) string {
 	switch {
-	case ownCheck != nil && s.Env != nil:
-		d.Against = Tf("with the current %s and %s", s.Env.Name, listOf(s))
+	case applied && s.Env != nil:
+		return Tf("with the current %s and %s", s.Env.Name, listOf(s))
 	case s.Plan != nil && current:
-		d.Against = Tf("against the current list %s", s.Plan.Name)
+		return Tf("against the current list %s", s.Plan.Name)
 	case s.Plan != nil:
-		d.Against = Tf("against list %s", s.Plan.Name)
+		return Tf("against list %s", s.Plan.Name)
 	case s.Pack != "":
-		d.Against = Tf("against pack %s", s.Pack)
+		return Tf("against pack %s", s.Pack)
 	default:
-		d.Against = T("against the installed Mods")
+		return T("against the installed Mods")
 	}
-	var newList *SaveFixView
-	if s.Head != nil && s.Colony != nil {
-		nl := fixView(app.SaveFix{Action: app.FixNewList, Label: "Make a list from this save",
-			Command: "loadout import " + argQuote(s.Path) + " --new " + argQuote(s.Colony.Name), Target: s.Ref}, s)
-		newList, d.NewList = &nl, &nl
-	}
-	// The bar's one action: Recycle for a file that cannot load; while what the Mods own
-	// could not be checked, a list made from the save and analysed (it indexes the save's
-	// Mods); a save matching no list, Make a list; a save checked against its own list that
-	// loads, Launch, which opens the Launch page (the game starts only there). Fix and
-	// launch is not offered: each row has its fix. Checked against another list, the
-	// Switch line has the action.
+}
+
+// saveQuick is the bar's one action. Recycle for a file that cannot load; while what the
+// Mods own could not be checked, a list made from the save and analysed (it indexes the
+// save's Mods); a save matching no list, Make a list; a save checked against its own list
+// that loads, Launch, which opens the Launch page (the game starts only there). Fix and
+// launch is not offered: each row has its fix. Checked against another list, the Switch
+// line has the action.
+func saveQuick(d *SaveDetail, c *app.SaveCheck, own *app.Save, ownCheck *app.SaveCheck, gap string, newList *SaveFixView) *SaveFixView {
+	s := c.Save
 	switch q := c.Quick; {
 	case q != nil && q.Action == app.FixRecycle:
 		v := fixView(*q, s)
-		d.Quick = &v
+		return &v
 	case gap != "" && newList != nil:
 		v := *newList
 		v.Action, v.Label = SaveFixAnalyse, T("make a list from this save to analyse its assemblies")
 		v.Command += " && archo analyze --open-plan " + argQuote(s.Colony.Name)
-		d.Quick = &v
+		return &v
 	case ownCheck != nil:
 	case own.Plan == nil && own.Pack == "":
-		d.Quick = newList
+		return newList
 	case c.Level == "" && d.AgainstKind != "":
-		d.Quick = &SaveFixView{Action: SaveGoLaunch, Label: T("launch"), Command: T("open the Launch page")}
+		return &SaveFixView{Action: SaveGoLaunch, Label: T("launch"), Command: T("open the Launch page")}
 	}
-	if ownCheck != nil && own.Env != nil && ownCheck.Level != "writing" && (d.Quick == nil || d.Quick.Action != app.FixRecycle) {
-		w := &SaveSwitchView{Level: ownCheck.Level, Label: T("switch and launch"), Env: own.Env.Name, Kind: RowPlan, Pack: own.Pack}
-		if own.Pack != "" {
-			w.Kind = RowPack
-		} else {
-			w.Plan = own.Plan.ID
-		}
-		verdict := T("loads as it is")
-		switch ownCheck.Level {
-		case app.LevelError:
-			verdict = T("will not load cleanly")
-		case app.LevelWarning:
-			verdict = T("content will be lost")
-		}
-		w.Text = Tf("with %s and %s: %s", own.Env.Name, listOf(own), verdict)
-		d.Switch = w
+	return d.Quick
+}
+
+// saveSwitch is the Switch line: how the save loads with its own game and list or pack.
+func saveSwitch(own *app.Save, ownCheck *app.SaveCheck) *SaveSwitchView {
+	w := &SaveSwitchView{Level: ownCheck.Level, Label: T("switch and launch"), Env: own.Env.Name, Kind: RowPlan, Pack: own.Pack}
+	if own.Pack != "" {
+		w.Kind = RowPack
+	} else {
+		w.Plan = own.Plan.ID
 	}
-	d.Issues = issueViews(c, s)
+	verdict := T("loads as it is")
+	switch ownCheck.Level {
+	case app.LevelError:
+		verdict = T("will not load cleanly")
+	case app.LevelWarning:
+		verdict = T("content will be lost")
+	}
+	w.Text = Tf("with %s and %s: %s", own.Env.Name, listOf(own), verdict)
+	return w
+}
+
+// saveModViews lists the save's Mods and, checked against a list or pack, what changes.
+func saveModViews(d *SaveDetail, c *app.SaveCheck) {
 	var removed []SaveModView
 	for _, m := range c.Mods {
 		v := SaveModView{Name: m.Name, PackageID: m.PackageID, Missing: m.Instance == "", Moved: m.Moved, Library: m.Library}
@@ -376,7 +442,6 @@ func SaveDetailAgainst(c *app.SaveCheck, running, current bool, own *app.Save, o
 		}
 		d.Changes = append(d.Changes, removed...)
 	}
-	return d
 }
 
 // SaveModView.Change values.
@@ -748,6 +813,9 @@ func issueView(is app.SaveIssue, s *app.Save) SaveIssueView {
 	case app.IssueUnreadable:
 		v.Head = T("the file cannot be read as a save")
 		v.Consequence = T("it has no Mod list at its start, so the game cannot load it")
+		if strings.HasPrefix(is.Text, "open ") { // os.Open failed: permissions, or another program holds it
+			v.Consequence = T("the file could not be opened (its permissions, or another program holding it)")
+		}
 		if is.Text != "" {
 			v.Consequence += "  (" + is.Text + ")"
 		}
@@ -929,12 +997,6 @@ func SaveNameProblem(s *app.Save, name string) string {
 		}
 	}
 	return ""
-}
-
-// fileThere: a file or folder exists at p.
-func fileThere(p string) bool {
-	_, err := os.Stat(p)
-	return err == nil
 }
 
 // argQuote quotes a command argument that holds spaces or quotes.

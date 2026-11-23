@@ -310,6 +310,8 @@ func (m *model) runLibOp(code string) tea.Cmd {
 	switch code {
 	case view.OpFolder:
 		return m.openFolderOf(i0.ID)
+	case view.OpLinked:
+		return m.showLinkOf(i0.ID)
 	case view.OpWorkshop, view.OpSteam:
 		ws := strings.TrimPrefix(i0.Ref, "ws:")
 		if i0.ID != "" {
@@ -489,102 +491,134 @@ func (m *model) libraryKey(s string) tea.Cmd {
 			return nil
 		}
 	}
-	n := len(l.flat)
 	page := max(m.h-bodyTop-6-l.bar.lineCount(), 1)
 	if l.full || l.detail {
-		switch s {
-		case "down", "j":
-			l.detailOff++
-			return nil
-		case "up", "k":
-			l.detailOff = max(l.detailOff-1, 0)
-			return nil
-		case "pgdown":
-			l.detailOff += page
-			return nil
-		case "pgup":
-			l.detailOff = max(l.detailOff-page, 0)
-			return nil
-		case "home":
-			l.detailOff = 0
-			return nil
-		case "esc", "left", "h":
-			if l.full {
-				l.full = false
-			}
-			l.detail = false
-			return nil
-		case "enter":
-			l.full, l.detail = !l.full, false
+		if m.libDetailKey(s, page) {
 			return nil
 		}
 	}
-	move := func(d int, extend bool) tea.Cmd {
-		from := l.cursor
-		l.cursor = max(0, min(l.cursor+d, n-1))
-		if l.cursor != from {
-			l.detailOff = 0
-		}
-		if extend {
-			if l.anchor < 0 {
-				l.anchor = from
-			}
-			m.libRange()
-		} else {
-			l.anchor = -1
-		}
-		return nil
+	if cmd, done := m.libNavKey(s, page); done {
+		return cmd
 	}
+	return m.libActKey(s)
+}
+
+// libDetailKey scrolls or closes the open details; it reports whether s was its key.
+func (m *model) libDetailKey(s string, page int) bool {
+	l := &m.libr
 	switch s {
 	case "down", "j":
-		return move(1, false)
+		l.detailOff++
 	case "up", "k":
-		return move(-1, false)
-	case "shift+down":
-		return move(1, true)
-	case "shift+up":
-		return move(-1, true)
+		l.detailOff = max(l.detailOff-1, 0)
 	case "pgdown":
-		return move(page, false)
+		l.detailOff += page
 	case "pgup":
-		return move(-page, false)
+		l.detailOff = max(l.detailOff-page, 0)
 	case "home":
-		return move(-n, false)
+		l.detailOff = 0
+	case "esc", "left", "h":
+		if l.full {
+			l.full = false
+		}
+		l.detail = false
+	case "enter":
+		l.full, l.detail = !l.full, false
+	default:
+		return false
+	}
+	return true
+}
+
+// libMove moves the library cursor by d rows; extend grows the marked range from the anchor.
+func (m *model) libMove(d int, extend bool) tea.Cmd {
+	l := &m.libr
+	n := len(l.flat)
+	from := l.cursor
+	l.cursor = max(0, min(l.cursor+d, n-1))
+	if l.cursor != from {
+		l.detailOff = 0
+	}
+	if extend {
+		if l.anchor < 0 {
+			l.anchor = from
+		}
+		m.libRange()
+	} else {
+		l.anchor = -1
+	}
+	return nil
+}
+
+// libNavKey handles the library keys that move the cursor or open and close rows;
+// done is false when s is left to libActKey.
+func (m *model) libNavKey(s string, page int) (cmd tea.Cmd, done bool) {
+	l := &m.libr
+	n := len(l.flat)
+	switch s {
+	case "down", "j":
+		return m.libMove(1, false), true
+	case "up", "k":
+		return m.libMove(-1, false), true
+	case "shift+down":
+		return m.libMove(1, true), true
+	case "shift+up":
+		return m.libMove(-1, true), true
+	case "pgdown":
+		return m.libMove(page, false), true
+	case "pgup":
+		return m.libMove(-page, false), true
+	case "home":
+		return m.libMove(-n, false), true
 	case "end":
-		return move(n, false)
+		return m.libMove(n, false), true
 	case "right", "l":
-		x, ok := l.cur()
-		if !ok {
-			return nil
-		}
-		r := l.page.Rows[x.row]
-		if x.inst < 0 && !l.open[r.ID] && len(r.Insts) == r.Copies {
-			m.libToggleOpen(x)
-			return nil
-		}
-		if x.inst < 0 {
-			return move(1, false)
-		}
-		if tw, _ := m.libWidths(); tw < m.w {
-			l.detail = true // → on a copy: its detail has the keys
-		}
-		return nil
+		return m.libRightKey(), true
 	case "left", "h":
 		x, ok := l.cur()
 		if !ok {
-			return nil
+			return nil, true
 		}
 		if x.inst >= 0 && !x.lone {
 			l.cursor = slices.IndexFunc(l.flat, func(y libLine) bool { return y.row == x.row && y.inst < 0 })
-			return nil
+			return nil, true
 		}
 		if x.inst < 0 && l.open[l.page.Rows[x.row].ID] {
 			m.libToggleOpen(x)
 		}
-		return nil
+		return nil, true
 	case "enter":
 		l.full = true
+		return nil, true
+	}
+	return nil, false
+}
+
+// libRightKey is → in the library: open a mod's copies, step onto them, or show a copy's details.
+func (m *model) libRightKey() tea.Cmd {
+	l := &m.libr
+	x, ok := l.cur()
+	if !ok {
 		return nil
+	}
+	r := l.page.Rows[x.row]
+	if x.inst < 0 && !l.open[r.ID] && len(r.Insts) == r.Copies {
+		m.libToggleOpen(x)
+		return nil
+	}
+	if x.inst < 0 {
+		return m.libMove(1, false)
+	}
+	if tw, _ := m.libWidths(); tw < m.w {
+		l.detail = true // → on a copy: its detail has the keys
+	}
+	return nil
+}
+
+// libActKey handles the library keys that mark, search, switch areas or act on copies.
+func (m *model) libActKey(s string) tea.Cmd {
+	l := &m.libr
+	switch s {
 	case "esc":
 		switch {
 		case len(l.marked) > 0:
@@ -628,6 +662,13 @@ func (m *model) libraryKey(s string) tea.Cmd {
 			l.full = true // no room beside the table: the details over the page
 		}
 		return nil
+	}
+	return m.libOpKey(s)
+}
+
+// libOpKey handles the library keys that run an operation on the cursor's copy or the marked ones.
+func (m *model) libOpKey(s string) tea.Cmd {
+	switch s {
 	case "g":
 		return m.libFirst(view.OpTags)
 	case "n":
@@ -797,7 +838,7 @@ func (m *model) libRowLine(i, w, right int) string {
 	x := l.flat[i]
 	r := l.page.Rows[x.row]
 	cells := r.LibCells
-	var name string
+	var name, dim string
 	sel := m.libRowSelected(i)
 	mark := "  "
 	if i == l.cursor && !l.detail {
@@ -807,12 +848,20 @@ func (m *model) libRowLine(i, w, right int) string {
 	case x.lone:
 		cells = r.Insts[0].LibCells
 		name = "  " + r.Name
+		if r.New {
+			dim = T("new")
+			name += "  " + dim
+		}
 	case x.inst < 0:
 		chev := "▸ "
 		if l.open[r.ID] || len(r.Insts) < r.Copies {
 			chev = "▾ "
 		}
-		name = chev + r.Name + "  " + sDimS.Render(Tf("%d copies", r.Copies))
+		dim = Tf("%d copies", r.Copies)
+		if r.New {
+			dim = T("new") + "  " + dim
+		}
+		name = chev + r.Name + "  " + dim
 	default:
 		in := r.Insts[x.inst]
 		cells = in.LibCells
@@ -827,7 +876,7 @@ func (m *model) libRowLine(i, w, right int) string {
 			info = append(info, c)
 		}
 	}
-	line := mark + fit(name, w-right-4) + "  " + fit(strings.Join(info, "  "), right)
+	line := mark + fitDim(name, dim, w-right-4) + "  " + fit(strings.Join(info, "  "), right)
 	st := plainStyle
 	switch {
 	case i == l.cursor:
@@ -905,4 +954,18 @@ func (m *model) libPairs() [][2]string {
 	}
 	pairs = append(pairs, [2]string{"enter", T("details")}, [2]string{"F10", T("menu")}, [2]string{"/", T("search")}, [2]string{"?", T("all keys")})
 	return pairs
+}
+
+// fitDim fits s to w cells and greys its suffix dim when it is still whole. fit measures
+// plain text: styling inside it counted the escape codes as cells, which cut the copies
+// count and left the row short, pulling the details column left (VM round 2026-11-10).
+func fitDim(s, dim string, w int) string {
+	out := fit(s, w)
+	if dim == "" {
+		return out
+	}
+	if i := strings.LastIndex(out, dim); i >= 0 {
+		return out[:i] + sDimS.Render(dim) + out[i+len(dim):]
+	}
+	return out
 }

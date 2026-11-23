@@ -38,3 +38,31 @@ func TestStoppedBatchHandedOverOffersNoResume(t *testing.T) {
 		t.Fatalf("line %q items %+v", r.Line, r.Items)
 	}
 }
+
+// A pack build the window left running in its own process says so, points to the Packs page
+// for how it ended, and marks no step failed (VM round 2026-11-10: it read "stopped" with the
+// copy step failed, though the build finished; 10 K24).
+func TestDetachedPackBuildNotStopped(t *testing.T) {
+	task := app.Task{ID: "p1", Kind: TaskPack, Lane: app.LaneSelf, State: app.TaskStopped, Closed: true, Detached: true, Step: 2}
+	r := BuildTasks([]app.Task{task}, time.Now()).Rows[0]
+	if r.StateText != T("went on in the background") || strings.Contains(r.Say, T("stopped")) || !strings.Contains(r.Line, "Packs page") {
+		t.Fatalf("state %q line %q say %q", r.StateText, r.Line, r.Say)
+	}
+	for _, s := range r.Steps {
+		if s.State == app.ItemFail {
+			t.Fatalf("a step marked failed: %+v", r.Steps)
+		}
+	}
+}
+
+// A running game copy offers "stop the rest" (03 §3.5: the copy can be stopped and leaves
+// nothing; VM round 2A 2026-11-23: the task row had no stop button).
+func TestRunningGameCopyCanStop(t *testing.T) {
+	task := app.Task{ID: "c1", Kind: TaskCopyGame, Lane: app.LaneSelf, State: app.TaskRunning, Frac: 0.2}
+	for _, a := range BuildTasks([]app.Task{task}, time.Now()).Rows[0].Acts {
+		if a.ID == "stop" {
+			return
+		}
+	}
+	t.Fatal("no stop on a running game copy")
+}

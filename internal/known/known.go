@@ -3,8 +3,8 @@
 // (docs/research/decisions-corpus.md §2, generator spikes/knowndeps). Aggregate counts only: no log
 // ids, no full mod lists; every entry was seen in the logs of at least five different players.
 //
-// The data is embedded: `archo data update` only fetches third-party datasets, and RimArcho
-// has no data repository of its own yet (the same choice as internal/order/observed.json).
+// The embedded data is the fallback; newer weekly data comes in the corpus bundle shipped
+// with Archo Monitor (internal/corpus, 05 §4.6).
 package known
 
 import (
@@ -31,6 +31,15 @@ type Prereq struct {
 	Cosmetic  bool     `json:"cosmetic,omitempty"`  // only sounds or textures are missing
 	LoadAfter bool     `json:"loadAfter,omitempty"` // Mod lists Needs in loadAfter (optional on purpose)
 	Fix       *Fix     `json:"fix,omitempty"`
+	Seen
+}
+
+// Seen is when an entry was last supported (weekly corpus data, 05 §4.6): the newest shared
+// log with the error, and whether Mod's Workshop item was updated after it, which lowers the
+// entry's confidence.
+type Seen struct {
+	LastLog    string `json:"lastLog,omitempty"` // YYYY-MM-DD
+	MayBeFixed bool   `json:"mayBeFixed,omitempty"`
 }
 
 // Combo: an error attributed to Mods[0] alone (RimArcho named it the source). Three kinds:
@@ -49,6 +58,7 @@ type Combo struct {
 	WithoutErr int      `json:"withoutErr"` // … that still have the error
 	Fix        *Fix     `json:"fix,omitempty"`
 	G5         *G5      `json:"g5,omitempty"`
+	Seen
 }
 
 // Combination kinds.
@@ -138,13 +148,20 @@ var embedded = sync.OnceValue(func() *Data {
 
 var override *Data
 
-// Get returns the dataset in use.
+// EmbeddedJSON is the embedded dataset file (the 1.6 section of the embedded bundle).
+func EmbeddedJSON() []byte { return knownJSON }
+
+// Get returns the embedded dataset, or a test's (SetForTesting). Code with an App reads its
+// environment's choice instead (app.Index.Known, 05 §4.6).
 func Get() *Data {
 	if override != nil {
 		return override
 	}
 	return embedded()
 }
+
+// Override is the test's dataset (SetForTesting), nil otherwise; it wins over any choice.
+func Override() *Data { return override }
 
 // SetForTesting replaces the dataset until the returned function is called.
 func SetForTesting(d *Data) (restore func()) {

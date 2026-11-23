@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 )
@@ -16,28 +17,70 @@ var ErrNotInTrashList = errors.New("not something RimArcho moves to the recycle 
 
 // ToTrash is the one way into the recycle bin (02 §3). Whoever calls it, the path must be
 // on the allow-list; the caller's own rules (enabled, used by a plan, subscribed) come first.
-func (a *App) ToTrash(path string) error {
-	check := a.trashAllow
-	if check == nil {
-		check = a.trashAllowed
-	}
-	if err := check(path); err != nil {
+// Every call is a row in the operation log (13 §1.3): ok, refused (not on the allow-list,
+// gone) or failed.
+func (a *App) ToTrash(path string) error { return a.toTrash(nil, path) }
+
+// toTrash is ToTrash whose row belongs to the parent row h (a batch of saves, uninstall).
+func (a *App) toTrash(h *oplog.Handle, path string) error {
+	if err := a.trashCheck(path); err != nil {
+		a.logTrash(h, path, err, true)
 		return err
 	}
-	return a.withIncomingLinks(path, "", func() error { return a.recycleTarget(path) })
+	err := a.withIncomingLinks(path, "", func() error { return a.recycleChecked(path) })
+	a.logTrash(h, path, err, false)
+	return err
 }
 
 // recycleTarget is used inside an already journalled lifecycle. It retains the
 // existing trash allow-list; detaching a link never goes through this function.
-func (a *App) recycleTarget(path string) error {
+func (a *App) recycleTarget(path string) error { return a.recycleTargetIn(nil, path) }
+
+// recycleTargetIn is recycleTarget whose row belongs to the parent row h (a subscription
+// removal).
+func (a *App) recycleTargetIn(h *oplog.Handle, path string) error {
+	err := a.recycleChecked(path)
+	a.logTrash(h, path, err, refusedRemoval(err))
+	return err
+}
+
+// deleteChecked deletes a Mod folder for good (quick delete, skipping the recycle bin),
+// inside an already journalled lifecycle: the path must be on the recycle bin's allow-list
+// all the same (02 §3). Every call is a delete row (13 §1.3), the refusals too.
+func (a *App) deleteChecked(h *oplog.Handle, path string) error {
+	if err := a.trashAllowed(path); err != nil {
+		a.logDelete(h, path, err, true)
+		return err
+	}
+	return a.deleteTree(h, path)
+}
+
+// deleteTree is the only caller of removeModTree: every folder RimArcho deletes without
+// the recycle bin is a delete row (13 §1.3; TestArchOpLog checks the callers).
+func (a *App) deleteTree(h *oplog.Handle, path string) error {
+	err := removeModTree(path)
+	a.logDelete(h, path, err, errors.Is(err, os.ErrNotExist))
+	return err
+}
+
+// refusedRemoval: a recycle or delete turned down before anything changed.
+func refusedRemoval(err error) bool {
+	return errors.Is(err, ErrNotInTrashList) || errors.Is(err, os.ErrNotExist)
+}
+
+func (a *App) recycleChecked(path string) error {
+	if err := a.trashCheck(path); err != nil {
+		return err
+	}
+	return a.trash(path)
+}
+
+func (a *App) trashCheck(path string) error {
 	check := a.trashAllow
 	if check == nil {
 		check = a.trashAllowed
 	}
-	if err := check(path); err != nil {
-		return err
-	}
-	return a.trash(path)
+	return check(path)
 }
 
 // trash moves path to the recycle bin without the allow-list. Only a caller that has its
@@ -56,7 +99,8 @@ func (a *App) trash(path string) error {
 //   - a pack: a folder directly in the pack folder;
 //   - saves: inside a game's Saves/, an own save folder (<data>/userdata/<env>), or the save
 //     backups (<data>/backups/saves);
-//   - a game folder downloaded with SteamCMD (uninstall, when the player chose to delete it).
+//   - a game folder downloaded with SteamCMD (uninstall, when the player chose to delete it);
+//   - a Mod settings file Mod_*.xml directly in an environment's user data Config/.
 //
 // A link is never moved, whatever it points at.
 func (a *App) trashAllowed(path string) error {
@@ -127,7 +171,10 @@ func (a *App) trashAllowed(path string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("%w: %s is not a mod folder, a pack, saves or a downloaded game", ErrNotInTrashList, path)
+	if a.settingsFileTrashable(p) {
+		return nil // a Mod settings file in a Game Config's Config/ (16 §2.9)
+	}
+	return fmt.Errorf("%w: %s is not a mod folder, a pack, saves, a Mod settings file or a downloaded game", ErrNotInTrashList, path)
 }
 
 // realOrAbs resolves links where the path exists, else makes it absolute.

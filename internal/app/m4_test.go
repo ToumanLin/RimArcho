@@ -206,7 +206,7 @@ func TestLogOwnVersion(t *testing.T) {
 	p := filepath.Join(e.UserData, "Player.log")
 	os.WriteFile(p, []byte(strings.Replace(log, "RimWorld 1.6.4633 rev1261", "RimWorld 1.5.4409 rev1118", 1)), 0o644)
 	out := e.MustRun("log")
-	if !strings.Contains(out, "analysed: as 1.5 (log version); environment is 1.6") {
+	if !strings.Contains(out, "analysed: as 1.5 (log version); Game Config is 1.6") {
 		t.Fatalf("header:\n%s", out)
 	}
 	if out := e.MustRun("log", "--game-version", "1.6"); strings.Contains(out, "analysed:") {

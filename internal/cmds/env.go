@@ -1,8 +1,10 @@
 package cmds
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -21,18 +23,20 @@ var envFlags = []Flag{
 	{Name: "extra", Value: "<dir>", Multi: true, Help: "= archo folder add extra <dir>"},
 }
 
+var launchArgsFlag = Flag{Name: "launch-args", Value: "<args>", Help: "extra game arguments (JSON string array keeps token boundaries); use --user-data for -savedatafolder (\"\" removes arguments)"}
+
 var removeSourceFlag = Flag{Name: "remove-source", Value: "<src:label>", Multi: true, Help: "= archo folder remove <src:label>"}
 
 func init() {
-	register(&Command{Name: "env list", Summary: "list environments (one per game folder) and the shared mod folders", MaxArgs: 0, Run: envList})
+	register(&Command{Name: "env list", Summary: "list Game Configs (grouped by installation) and the shared mod folders", MaxArgs: 0, Run: envList})
 	register(&Command{Name: "env detect", Summary: "detect game, user data and workshop paths (suggestion only)", MaxArgs: 0, Run: envDetect})
-	register(&Command{Name: "env add", Args: "<name>", Summary: "add an environment: one game folder", MinArgs: 1, MaxArgs: 1,
-		Flags: append([]Flag{{Name: "detected", Help: "use the paths env detect finds"}}, envFlags...), Run: envAdd})
-	register(&Command{Name: "env set", Args: "<name>", Summary: "change an environment's game folder, saves or launch (re-binds a moved game)", MinArgs: 1, MaxArgs: 1,
-		Flags: append(append([]Flag(nil), envFlags...), removeSourceFlag, Flag{Name: "launch-args", Value: "<args>", Help: "extra game arguments, e.g. -popupwindow (\"\" removes them)"}), Run: envSet})
-	register(&Command{Name: "env remove", Args: "<name>", Summary: "forget an environment (RimArcho data only; no game files)", MinArgs: 1, MaxArgs: 1,
+	register(&Command{Name: "env add", Args: "<name>", Summary: "add a Game Config with separate saves and settings", MinArgs: 1, MaxArgs: 1,
+		Flags: append([]Flag{{Name: "list", Value: "<plan>", Help: "select an existing global plan"}, {Name: "new-list", Help: "create a Core and DLC plan named after the Game Config"}, {Name: "detected", Help: "use the paths env detect finds"}, {Name: "like", Value: "<config>", Help: "copy its game folder, launch and settings; select its current plan (defaults to own saves)"}}, append(envFlags, launchArgsFlag)...), Run: envAdd})
+	register(&Command{Name: "env set", Args: "<name>", Summary: "change a Game Config's game folder, saves or launch (re-binds a moved game)", MinArgs: 1, MaxArgs: 1,
+		Flags: append(append([]Flag{{Name: "name", Value: "<name>", Help: "rename only this Game Config; folders and launch history stay"}}, envFlags...), removeSourceFlag, launchArgsFlag), Run: envSet})
+	register(&Command{Name: "env remove", Args: "<name>", Summary: "forget a Game Config (RimArcho data only; no game files)", MinArgs: 1, MaxArgs: 1,
 		Flags: []Flag{{Name: "yes", Help: "remove (without it: the dry run)"}}, Run: envRemove})
-	register(&Command{Name: "env use", Args: "<name>", Summary: "select the current environment", MinArgs: 1, MaxArgs: 1, Run: envUse})
+	register(&Command{Name: "env use", Args: "<name>", Summary: "select the current Game Config", MinArgs: 1, MaxArgs: 1, Run: envUse})
 	register(&Command{Name: "env rebind", Args: "<src:label> yes|no", Summary: "answer a pending source re-binding", MinArgs: 2, MaxArgs: 2, Run: envRebind})
 }
 
@@ -67,36 +71,45 @@ func envList(c *Ctx, a *Args) (*render.Doc, error) {
 		return nil, err
 	}
 	cur, _ := c.App.Store.CurrentEnv()
-	d, root := render.New(fmt.Sprintf("environments: %d", len(envs)))
+	d, root := render.New(fmt.Sprintf("Game Configs: %d", len(envs)))
+	groups := map[string]*render.Node{}
 	for _, e := range envs {
-		line := envRef(e) + "  " + versionText(e.GameVersion)
+		group := groups[e.GameID]
+		if group == nil {
+			g, err := c.App.Store.GameByID(e.GameID)
+			if err != nil {
+				return nil, err
+			}
+			group = root.Add(g.Name + "  " + versionText(e.GameVersion))
+			groups[e.GameID] = group
+			group.KV("game", e.GameRoot)
+			srcs, err := c.App.Store.Sources(e.GameID)
+			if err != nil {
+				return nil, err
+			}
+			var own []*source.Source
+			for _, s := range srcs {
+				if s.EnvID == e.GameID {
+					own = append(own, s)
+				}
+			}
+			addSourceLines(group.Section("sources"), own)
+		}
+		line := envRef(e)
 		if cur != nil && cur.ID == e.ID {
 			line += "  [current]"
 		}
-		n := root.Add(line)
-		n.KV("game", e.GameRoot)
+		n := group.Add(line)
 		n.KV("saves", c.App.Saves(e))
 		n.KV("user-data", e.UserDataRoot)
 		n.KV("launch", e.Launch)
-		if e.UserDataRoot != "" {
-			n.KV("player-log", env.PlayerLog(e.UserDataRoot, e.GameVersion))
-		}
-		srcs, err := c.App.Store.Sources(e.ID)
-		if err != nil {
-			return nil, err
-		}
-		var own []*source.Source
-		for _, s := range srcs {
-			if s.EnvID == e.ID {
-				own = append(own, s)
-			}
-		}
-		addSourceLines(n.Section("sources"), own)
+		n.KV("build", buildKind(e.GameRoot))
+		n.KV("player-log", c.App.EnvPlayerLog(e))
 	}
 	if fs, err := c.App.Folders(); err != nil {
 		return nil, err
 	} else if len(fs) > 0 {
-		addSourceLines(root.Section("mod folders (every environment)"), fs)
+		addSourceLines(root.Section("mod folders (every Game Config)"), fs)
 	}
 	if len(envs) == 0 {
 		d.AddNext("archo env detect")
@@ -108,13 +121,14 @@ func envList(c *Ctx, a *Args) (*render.Doc, error) {
 
 func envDetect(c *Ctx, a *Args) (*render.Doc, error) {
 	det := c.App.Detected()
-	d, root := render.New("detected environment (suggestion, not saved)")
+	d, root := render.New("detected Game Config (suggestion, not saved)")
 	if det.GameRoot == "" {
 		root.KV("game", "not found")
 	} else {
 		root.KV("game", det.GameRoot)
 		root.KV("version", versionText(det.GameVersion))
 		root.KV("launch", det.Launch)
+		root.KV("build", buildKind(det.GameRoot))
 		root.KV("steam-library", det.SteamLibrary)
 	}
 	if det.UserDataRoot != "" {
@@ -139,10 +153,11 @@ func envDetect(c *Ctx, a *Args) (*render.Doc, error) {
 		if env.PathKey(other.GameRoot) == env.PathKey(det.GameRoot) {
 			continue
 		}
-		n := root.Section("another detected environment (suggestion, not saved)")
+		n := root.Section("another detected Game Config (suggestion, not saved)")
 		n.KV("game", other.GameRoot)
 		n.KV("version", versionText(other.GameVersion))
 		n.KV("launch", other.Launch)
+		n.KV("build", buildKind(other.GameRoot))
 		n.KV("steam-library", other.SteamLibrary)
 		n.KV("user-data", other.UserDataRoot)
 		n.KV("workshop", other.WorkshopRoot)
@@ -151,8 +166,17 @@ func envDetect(c *Ctx, a *Args) (*render.Doc, error) {
 	return d, nil
 }
 
+// buildKind is "proton" for a Windows game Steam runs through Proton (03 §3.2), else ""
+// (the line is left out).
+func buildKind(gameRoot string) string {
+	if gameRoot != "" && env.IsProtonGame(gameRoot) {
+		return "proton"
+	}
+	return ""
+}
+
 func specFromArgs(a *Args) app.EnvSpec {
-	return app.EnvSpec{GameRoot: a.Str("game"), UserDataRoot: a.Str("user-data"), Saves: a.Str("saves"), WorkshopRoot: a.Str("workshop"),
+	return app.EnvSpec{Rename: a.Str("name"), Like: a.Str("like"), List: a.Str("list"), NewList: a.Bool("new-list"), GameRoot: a.Str("game"), UserDataRoot: a.Str("user-data"), Saves: a.Str("saves"), WorkshopRoot: a.Str("workshop"),
 		Launch: a.Str("launch"), SteamCMD: a.List("steamcmd"), Extra: a.List("extra"), RemoveSources: a.List("remove-source")}
 }
 
@@ -195,6 +219,9 @@ func envRemovalLines(n *render.Node, r *app.EnvRemoval) {
 }
 
 func envAdd(c *Ctx, a *Args) (*render.Doc, error) {
+	if err := app.ValidateLaunchArgs(a.Pos[0], a.Str("launch-args")); err != nil {
+		return nil, err
+	}
 	spec := specFromArgs(a)
 	if a.Bool("detected") {
 		det := c.App.Detected()
@@ -218,10 +245,32 @@ func envAdd(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
-	return envDoc(c, e, "added", changes), nil
+	if a.Bool("launch-args") {
+		if err := c.App.SetLaunchArgs(e.ID, a.Str("launch-args")); err != nil {
+			return nil, err
+		}
+	}
+	d := envDoc(c, e, "added", changes)
+	if spec.Like != "" && c.App.CloneArgsOmitted(spec.Like) {
+		d.Nodes[0].Add("left -savedatafolder out of copied launch arguments; use --user-data to choose the data folder")
+	}
+	return d, nil
 }
 
 func envSet(c *Ctx, a *Args) (*render.Doc, error) {
+	if err := app.ValidateLaunchArgs(a.Pos[0], a.Str("launch-args")); err != nil {
+		return nil, err
+	}
+	// What changing the game folder does to other Game Configs and to the installation it
+	// leaves (16 §2.14), read before the change.
+	var gameChange []string
+	if a.Str("game") != "" {
+		lines, err := c.App.EnvGameChangePreview(a.Pos[0], a.Str("game"))
+		if err != nil {
+			return nil, err
+		}
+		gameChange = lines
+	}
 	e, changes, err := c.App.EnvSet(a.Pos[0], specFromArgs(a))
 	if err != nil {
 		return nil, err
@@ -231,7 +280,24 @@ func envSet(c *Ctx, a *Args) (*render.Doc, error) {
 			return nil, err
 		}
 	}
-	return envDoc(c, e, "updated", changes), nil
+	d := envDoc(c, e, "updated", changes)
+	if a.Str("game") != "" {
+		es, err := c.App.Store.Envs()
+		if err != nil {
+			return nil, err
+		}
+		names := []string{}
+		for _, o := range es {
+			if o.GameID == e.GameID {
+				names = append(names, envRef(o))
+			}
+		}
+		d.Nodes[0].KV("installation Game Configs", strings.Join(names, ", "))
+		for _, line := range gameChange {
+			d.Nodes[0].Add(line)
+		}
+	}
+	return d, nil
 }
 
 func envDoc(c *Ctx, e *env.Environment, verb string, changes []app.SourceChange) *render.Doc {
@@ -340,11 +406,11 @@ var steamcmdFlag = Flag{Name: "install-steamcmd", Help: "download SteamCMD from 
 func init() {
 	register(&Command{Name: "env branches", Summary: "list RimWorld's Steam branches (versions) SteamCMD can download", MaxArgs: 0,
 		Flags: []Flag{steamcmdFlag}, Run: envBranches})
-	register(&Command{Name: "env download", Args: "<branch>", Summary: "download a RimWorld version with SteamCMD and add it as an environment (anonymous by default)",
+	register(&Command{Name: "env download", Args: "<branch>", Summary: "download a RimWorld version with SteamCMD and add it as a Game Config (anonymous by default)",
 		MinArgs: 1, MaxArgs: 1, Flags: []Flag{
 			{Name: "to", Value: "<dir>", Help: "the new game folder"},
 			{Name: "account", Value: "<name>", Help: "override steamcmd.account for this download; anonymous forces anonymous login (the default when no account is set)"},
-			{Name: "name", Value: "<env>", Help: "the environment's name (default: the version, e.g. 1.6)"},
+			{Name: "name", Value: "<env>", Help: "the Game Config's name (default: the version, e.g. 1.6)"},
 			{Name: "saves", Value: "shared|own"},
 			steamcmdFlag,
 		}, Run: envDownload})
@@ -415,4 +481,50 @@ func envDownload(c *Ctx, a *Args) (*render.Doc, error) {
 		return nil, err
 	}
 	return envDoc(c, r.Env, "downloaded and added", r.Changes), nil
+}
+
+func init() {
+	register(&Command{Name: "env copy", Args: "<name>", Summary: "copy a Game Config's game folder (a backup before the game updates) and add the copy as a Game Config",
+		MinArgs: 1, MaxArgs: 1, Flags: []Flag{
+			{Name: "to", Value: "<dir>", Help: "the new game folder (absent or empty)"},
+			{Name: "name", Value: "<config>", Help: "the new Game Config's name (default: <name>-copy)"},
+			{Name: "mods", Help: "copy the game's Mods folder too (local Mods; RimArcho's links are never copied)"},
+			{Name: "saves", Value: "shared|own", Help: "own: the copy keeps its saves and settings apart (default shared)"},
+			{Name: "dry-run", Help: "say what would be copied and how much, write nothing"},
+		}, Run: envCopy})
+}
+
+// envCopy copies a game folder (03 §3.5).
+func envCopy(c *Ctx, a *Args) (*render.Doc, error) {
+	if a.Str("to") == "" {
+		return nil, &UsageError{Msg: "give the folder (--to)"}
+	}
+	saves := a.Str("saves")
+	if saves != "" && saves != app.SavesShared && saves != app.SavesOwn {
+		return nil, &UsageError{Msg: "--saves is shared or own"}
+	}
+	spec := app.CopyGameSpec{From: a.Pos[0], Dir: a.Str("to"), Name: a.Str("name"), Mods: a.Bool("mods"), OwnSaves: saves == app.SavesOwn}
+	if a.Bool("dry-run") {
+		p, err := c.App.PlanGameCopy(spec)
+		if err != nil {
+			return nil, err
+		}
+		d, root := render.New(fmt.Sprintf("env:%s  would be copied to %s as env:%s", p.From.Name, p.Dir, p.Name))
+		root.KV("copies", fmt.Sprintf("%d bytes", p.Bytes))
+		mods := "not copied"
+		if spec.Mods {
+			mods = "copied"
+		}
+		root.KV("Mods/", fmt.Sprintf("%d bytes, %s (RimArcho's links never are)", p.ModBytes, mods))
+		if p.Free >= 0 {
+			root.KV("free", fmt.Sprintf("%d bytes", p.Free))
+		}
+		d.AddNext(fmt.Sprintf("archo env copy %s --to %s", p.From.Name, strconv.Quote(p.Dir)))
+		return d, nil
+	}
+	r, err := c.App.CopyGame(context.Background(), spec, nil)
+	if err != nil {
+		return nil, err
+	}
+	return envDoc(c, r.Env, "copied and added", r.Changes), nil
 }

@@ -12,8 +12,14 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// applyLinks journals deployment independently of the scan's disposable aliases.
+// applyLinks journals deployment independently of the scan's disposable aliases. Its rows
+// in the operation log stand alone (applyLinksIn).
 func (a *App) applyLinks(mods string, changes []LinkChange) error {
+	return a.applyLinksIn(nil, mods, changes)
+}
+
+// applyLinkChanges carries out changes; each attempted step reports to step.
+func (a *App) applyLinkChanges(mods string, changes []LinkChange, step func(LinkChange, error)) error {
 	mods = realOrAbs(mods)
 	if len(changes) == 0 {
 		return nil
@@ -61,12 +67,15 @@ func (a *App) applyLinks(mods string, changes []LinkChange) error {
 		if snapshot != nil {
 			if err := source.RemoveLinkChecked(snapshot); err != nil {
 				a.settleFailedLink(row.Operation, path, snapshot, existed)
+				step(c, err)
 				return err
 			}
 		} else if err := applyLinks(mods, []LinkChange{c}); err != nil {
 			a.settleFailedLink(row.Operation, path, nil, existed)
+			step(c, err)
 			return err
 		}
+		step(c, nil)
 		if err := a.Store.LinkPhase(row.Operation, "complete"); err != nil {
 			return err
 		}

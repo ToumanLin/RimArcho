@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"strings"
@@ -28,7 +27,7 @@ func (a *App) attributeExternal(st *LoadoutState, mcs *store.ModsConfigState, h 
 	}
 	list, _ := reg.FromTokens(st.File.Active)
 	read := func(entries string) loadout.List {
-		return reg.Heal(a.localizer(tenv.ID, reg, nil)(loadout.Decode(entries)))
+		return reg.Heal(a.localizer(tenv.GameID, reg, nil)(loadout.Decode(entries)))
 	}
 	// The version the file was known to hold: the writer's, else (no record) the newest.
 	var ref *store.Version
@@ -191,35 +190,15 @@ func (a *App) Conflicts(st *LoadoutState) ([]*ExternalConflict, error) {
 var ErrExternalConflict = errors.New("unloaded external change")
 
 // writeBlocker is the unloaded external version a write of st would overwrite unseen
-// (05 I8): the plan's own, or the one ModsConfig.xml still holds for another plan.
+// (07 §4.1 item 1): the plan's own only. Another plan's unloaded version does not block
+// this plan: it is kept in that plan's history and stays marked there, and writing the
+// plan the player chose is what they asked for (player feedback 2026-11-18: an edit by
+// another tool blocked every other list until the player switched to the one it belonged to).
 func (a *App) writeBlocker(st *LoadoutState) (*ExternalConflict, error) {
 	if st.WS.Conflict != 0 {
 		return &ExternalConflict{Plan: st.Plan, Env: st.Ix.Env, Version: st.WS.Conflict, Current: true}, nil
 	}
-	if st.File == nil {
-		return nil, nil
-	}
-	mcs, err := a.Store.ModsConfigStateAt(st.Ix.Env.UserDataRoot)
-	if err != nil || mcs.WriterPlan == 0 || mcs.WriterPlan == st.Plan.ID || !bytes.Equal(mcs.Seen, loadout.Hash(st.File.Raw)) {
-		return nil, err
-	}
-	ws, err := a.Store.Workspace(mcs.WriterPlan)
-	if err != nil || ws == nil || ws.Conflict == 0 || ws.Conflict != mcs.WriterVersion {
-		return nil, err
-	}
-	p, err := a.Store.PlanByID(mcs.WriterPlan)
-	if err != nil || p == nil {
-		return nil, err
-	}
-	e := st.Ix.Env
-	if mcs.WriterEnv != "" && mcs.WriterEnv != e.ID {
-		if o, err := a.Store.EnvByID(mcs.WriterEnv); err != nil {
-			return nil, err
-		} else if o != nil {
-			e = o
-		}
-	}
-	return &ExternalConflict{Plan: p, Env: e, Version: ws.Conflict}, nil
+	return nil, nil
 }
 
 // conflictError is the refusal of a write over an unloaded external version.
@@ -256,10 +235,32 @@ func (a *App) IgnoreExternal() (int, *LoadoutState, error) {
 	return n, st, a.Store.SetWorkspace(st.WS)
 }
 
-// DismissConflict is IgnoreExternal for the UI's "ignore it" (16 §2.5).
-func (a *App) DismissConflict() error {
-	_, _, err := a.IgnoreExternal()
-	return err
+// DismissConflict is IgnoreExternal for the UI's "ignore it" (16 §2.5). With a plan name
+// it clears that plan's mark instead, without making it current: the card on another
+// list's Can it run is settled where it is shown.
+func (a *App) DismissConflict(plan ...string) error {
+	if len(plan) == 0 || plan[0] == "" {
+		_, _, err := a.IgnoreExternal()
+		return err
+	}
+	unlock, err := a.lockLaunch()
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	p, err := a.Store.PlanByName(plan[0])
+	if err != nil {
+		return err
+	}
+	if p == nil {
+		return fmt.Errorf("no list %q", plan[0])
+	}
+	ws, err := a.Store.Workspace(p.ID)
+	if err != nil || ws == nil || ws.Conflict == 0 {
+		return err
+	}
+	ws.Conflict = 0
+	return a.Store.SetWorkspace(ws)
 }
 
 // removedEntries counts the entries of before that after does not have.

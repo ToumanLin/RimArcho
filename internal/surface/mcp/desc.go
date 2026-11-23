@@ -17,9 +17,9 @@ const descGuide = `Read-only help: a tool's full reference (topic=<tool name>: e
 
 const descStatus = `Overview of the current environment: game version, mods per source, the current plan and how it differs from the game's list, whether a game runs, problem counts, pending updates. Call first in a session. show=envs|folders|settings|data|db|cache gives one read-only page of RimArcho's setup instead.`
 
-const descModSettings = `Mod settings, read only. No ref: the current list's Mods that have settings (window title, file, or defaults when there is none yet). ref: what one Mod's files and HugsLib packs store (a missing value is at its default; lists summarised), plus window labels and HugsLib titles and defaults as Archo Monitor saw them.`
+const descModSettings = `Mod settings, read only. No ref: the current list's Mods that have settings (window title, file, or defaults when there is none yet). ref: what one Mod's files and HugsLib packs store, with window labels and HugsLib defaults from Archo Monitor. files: the Config folder's files and where each stands.`
 
-const descModSettingsSet = `Change a Mod's simple settings values with the game closed: on/off, numbers, one line of text, a HugsLib choice; reset removes a stored value. Config files: only values the file stores. Backs the file up to <file>.rimarcho.bak first. Next: get_mod_settings.`
+const descModSettingsSet = `With the game closed: change simple values (on/off, numbers, text, a HugsLib choice; reset = default); action=recycle|reset|copy_from|apply: recycle files, copy from a Game Config, apply a list's (dry_run first, ask).`
 
 const descFind = `Find mods by name, packageId, author, workshop id or folder (query), or list them (no query; active=true: enabled mods in load order). A packageId can match several copies: each candidate is listed with its ref. Next: get_mod.`
 
@@ -55,6 +55,10 @@ const descTestRun = `Run a plan in isolated data to the menu (or map, save, prob
 
 const descPlans = `The environment's plans (named mod lists): list, new, use (switch; writes no game file), rename, remove, import, versions, follow / unfollow / sync a Workshop collection. remove deletes a plan with its whole history: ask the player first, naming the plan.`
 
+const descFeedback = `Drafts a report for RimArcho's developer from a Feedback template (read-only): its text and a GitHub link. Nothing is sent; the player sends it from the Feedback page. No kind: the templates`
+
+const descOps = `What RimArcho did to the player's files, newest first (read-only), with each row's origin (agent = Archo) and result. Answers "what changed?"`
+
 const descHistory = `The current plan's history (read-only): log lists its versions (lists saved to or read from the game), diff compares two versions or a version with the current list, steps shows the undo steps. Go back with edit_loadout action=checkout.`
 
 const descPin = `Lock a version of a mod: copy it into RimArcho's lock library and use the copy in the current plan (one undoable edit), so Workshop updates stop reaching it. Do this before editing a mod's files. update=true remakes it from the updated upstream; dry_run=true previews.`
@@ -73,7 +77,7 @@ const descScan = `Rescan the mod folders and reconcile them with RimArcho's reco
 
 const descExchange = `Exchange the current plan with list files and Workshop collections: export (several formats), import (replaces the plan; one undoable edit), collection (compare with, or import, a Workshop collection). Ask before replacing the player's plan.`
 
-const descPacks = `Packs: a plan compiled into a self-contained folder with its own mod copies, list and saves. list, check (read-only), build, launch, export, import, remove, stop, unlink. build copies gigabytes, launch starts the game, remove deletes: dry_run=true first and ask.`
+const descPacks = `Packs: a plan compiled into a folder with its own mod copies, settings, list and saves. list, check (read-only), build, launch, export, import, remove, stop, unlink. build copies gigabytes, launch starts the game, remove deletes: dry_run first, ask.`
 
 const descIdentity = `RimArcho's identity of mods: answer open questions (is this new folder the mod that vanished? same, copy or unrelated), split or merge lineages. Answers rewrite history: quote the comparison from action=list or why and ask the player.`
 
@@ -97,8 +101,8 @@ const descUninstall = `Preview what uninstalling RimArcho would delete, move or 
 
 const descMemory = `Estimate resident RAM, loading RAM and VRAM for a plan. Commit room below loading low is severe, free RAM below high warning, else ok; unknown stays unknown. 1.7 textures cap at the card (texturesOnDemand); only 1.6 warns on VRAM. Reads headers, caches estimates. Limits: guide estimate_memory.`
 
-const descListSaves = `Saves of every game and pack, grouped by colony, newest first: each with its sv: reference, in-game day, the list it matches and whether it loads with that list. mod=<ref> finds the saves that use a Mod; attention=true keeps those with warnings or errors. Read-only.`
+const descListSaves = `Saves of every game and pack by colony, newest first: sv: reference, day, matched list, whether it loads. mod=<ref>: saves using a Mod; attention=true: with warnings or errors; review=true: what Mods add, how much saves show. Read-only.`
 
-const descGetSave = `One save (sv:ref, name or colony/save): load issues with fixes, Mod differences and playthrough (play=true for all colonists/events). content=true shows referenced content by Mod/category, using installed versions, with coverage limits. Read-only.`
+const descGetSave = `One save: load issues with fixes, Mod differences, playthrough (play=true: all colonists, events). content=true: content by Mod; mod=<ref>: can that Mod be removed, why. Read-only.`
 
-const descManageSaves = `Save actions: fix (its Mod fixes as one undoable list edit, subscribing Workshop Mods; launch=true then starts it), rename, copy, backup, trash (recycle bin). dry_run=true previews fix; backup and trash only preview unless confirm=true with the preview's token: ask the player first.`
+const descManageSaves = `Save actions: fix (Mod fixes as one undoable list edit, then subscribes; launch=true runs), rename, copy, copy_to_current, backup, trash, choose, choose_colony, unchoose (what Can it run checks). dry_run previews fix; backup and trash preview unless confirm=true with the preview's token: ask first.`

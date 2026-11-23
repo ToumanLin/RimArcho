@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 
@@ -21,7 +22,10 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
+	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/scan"
+	"github.com/ToumanLin/RimArcho/internal/secret"
+	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
@@ -48,17 +52,21 @@ var UninstallSteps = []string{UnAccounts, UnLinks, UnModsConfig, UnTextures, UnL
 
 // What happens to an item.
 const (
-	DoUnlink  = "unlink"     // the link is deleted, never its target
-	DoClean   = "clean"      // ModsConfig.xml keeps the list without the mods that go away
-	DoRestore = "restore"    // ModsConfig.xml.rimarcho.bak goes back
-	DoTrash   = "trash"      // to the recycle bin; refused when there is none (02 §3)
-	DoMove    = "move"       // to Item.To (renamed, or copied, checked and the original trashed)
-	DoKeep    = "keep"       // stays where it is
-	DoDelete  = "delete"     // RimArcho's own: deleted
-	DoLater   = "after-exit" // deleted once RimArcho has closed
-	DoLeave   = "leave"      // left alone; Note says why
-	DoDDS     = "delete-dds" // the DDS RimArcho recorded in a mod folder are deleted, nothing else
+	DoUnlink  = "unlink"      // the link is deleted, never its target
+	DoClean   = "clean"       // ModsConfig.xml keeps the list without the mods that go away
+	DoRestore = "restore"     // ModsConfig.xml.rimarcho.bak goes back
+	DoTrash   = "trash"       // to the recycle bin; refused when there is none (02 §3)
+	DoMove    = "move"        // to Item.To (renamed, or copied, checked and the original trashed)
+	DoKeep    = "keep"        // stays where it is
+	DoDelete  = "delete"      // RimArcho's own: deleted
+	DoLater   = "after-exit"  // deleted once RimArcho has closed
+	DoLeave   = "leave"       // left alone; Note says why
+	DoAppID   = "remove-file" // RimArcho's steam_appid.txt in a game folder (09 §2)
+	DoDDS     = "delete-dds"  // the DDS RimArcho recorded in a mod folder are deleted, nothing else
 )
+
+// NotALinkNote is the note of a folder under Mods/ with RimArcho's prefix that is no link.
+const NotALinkNote = "not a link: left alone"
 
 // UninstallOptions are the player's answers; the zero value is the defaults.
 type UninstallOptions struct {
@@ -122,6 +130,10 @@ type UninstallPlan struct {
 	AfterExit AfterExit
 	// Log is where the script lists anything it could not delete.
 	Log string
+	// AtOnce: the last two steps run in this process, not after it exits (outside Windows;
+	// a test that replaces the clean-up with AfterExitFunc gets the deferred plan). Their
+	// items are then done or failed in the report, and Log is not used.
+	AtOnce bool
 
 	EstimatedSizes bool // preview bytes may come from a short-lived cache
 }
@@ -208,8 +220,17 @@ func (a *App) DefaultPacksTo() string { return filepath.Join(a.KeepBase(), "RimA
 // releaseFiles are what the release zip puts next to the program (17 §5); only these are
 // deleted from the program folder, and the folder only when nothing else is left in it.
 // Releases before this one shipped fonts/, so uninstall still removes it if present;
-// .archo-update is what RimArcho's own update leaves there (17 §5.1).
-var releaseFiles = []string{"archo.exe", "RimArcho.exe", "README.md", "README.zh-CN.md", "CHANGELOG.md", "LICENSE", "fonts", "monitor", "skills", UpdateDirName}
+// .archo-update is what RimArcho's own update leaves there (17 §5.1). Off Windows the
+// tarball's programs are archo and rimarcho (the Linux GUI, 16 §8.1).
+var releaseFiles = programFiles(runtime.GOOS)
+
+func programFiles(goos string) []string {
+	names := []string{"archo.exe", "RimArcho.exe", "README.md", "README.zh-CN.md", "CHANGELOG.md", "LICENSE", "fonts", "monitor", "skills", UpdateDirName}
+	if goos != "windows" {
+		names = append([]string{"archo", "rimarcho"}, names...)
+	}
+	return names
+}
 
 // downloadedGame reports whether a game folder was downloaded with SteamCMD: force_install_dir
 // leaves steamapps/appmanifest_294100.acf inside it (a Steam library keeps the manifest beside
@@ -240,12 +261,27 @@ func (a *App) PlanUninstallPreview(o UninstallOptions, sizes *UninstallSizeCache
 	return p, err
 }
 
+// uninstallPlanner holds what the steps of planUninstall share while the plan is built.
+type uninstallPlanner struct {
+	a        *App
+	o        UninstallOptions
+	p        *UninstallPlan
+	envs     []*env.Environment
+	sizeOf   func(string) int64
+	byName   map[string]*env.Environment // environments with a game folder
+	lockEnv  *env.Environment            // where kept lock library copies go (nil: none)
+	gone     map[string]map[string]bool  // user data key → package IDs only reached through a removed link
+	keptPkgs map[string]bool             // package IDs of the lock library copies that are kept
+	monRoot  string
+	keep     []string // folders that hold the player's things and must stay
+}
+
 func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*UninstallPlan, error) {
 	envs, err := a.Store.Envs()
 	if err != nil {
 		return nil, err
 	}
-	p := &UninstallPlan{Options: o, Home: a.Home, Local: a.LocalDir(), Log: a.UninstallLog}
+	p := &UninstallPlan{Options: o, Home: a.Home, Local: a.LocalDir(), Log: a.UninstallLog, AtOnce: cleanupAtOnce && a.AfterExitFunc == nil}
 	if p.Log == "" {
 		p.Log = filepath.Join(os.TempDir(), "RimArcho-uninstall.log")
 	}
@@ -253,52 +289,121 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 		return nil, err
 	}
 	p.Others = a.otherArcho()
-	byName := map[string]*env.Environment{}
+	pl := &uninstallPlanner{a: a, o: o, p: p, envs: envs, sizeOf: sizeOf, byName: map[string]*env.Environment{}}
 	for _, e := range envs {
 		if e.GameRoot != "" {
 			p.Envs = append(p.Envs, e.Name)
-			byName[e.Name] = e
+			pl.byName[e.Name] = e
 		}
 	}
-	add := func(key string, items []*UninstallItem) {
-		if len(items) > 0 {
-			p.Steps = append(p.Steps, &UninstallStep{Key: key, Items: items})
-		}
-	}
-	add(UnAccounts, []*UninstallItem{{Path: a.AccountsDir(), Do: "forget-accounts", Note: "Forget account sessions: delete site sessions and temporary login folders, and clear known authentication caches for all accounts in managed SteamCMD. External caches stay under their owner's control. This cannot be undone and does not sign out other devices."}})
-
-	// Where kept lock library copies go: a game that is not itself removed.
-	var lockEnv *env.Environment
-	if o.KeepLocked {
-		name := o.LockedTo
-		if name == "" {
-			if cur, err := a.Env(); err == nil && cur.GameRoot != "" {
-				name = cur.Name
-			} else if len(p.Envs) > 0 {
-				name = p.Envs[0]
-			}
-		}
-		lockEnv = byName[name]
-		if lockEnv != nil {
-			p.LockedTo = lockEnv.Name
-		}
-		switch {
-		case lockEnv == nil && o.LockedTo != "":
-			p.Problem = fmt.Sprintf("no environment named %q with a game folder (archo env list)", o.LockedTo)
-		case lockEnv == nil:
-			p.Problem = "no game folder to move the lock library's copies into; remove them instead"
-		case o.RemoveGames && downloadedGame(lockEnv.GameRoot):
-			p.Problem = fmt.Sprintf("the copies would go into %s, which is removed too; pick another game or keep the downloaded games", lockEnv.GameRoot)
-		default:
-			p.LockedTo = lockEnv.Name
-		}
-	}
+	pl.add(UnAccounts, pl.accountItems())
+	pl.pickLockEnv()
 
 	// 1. links, and the package IDs that disappear with them
-	gone := map[string]map[string]bool{} // user data key → package IDs only reached through a removed link
+	links, err := pl.linkItems()
+	if err != nil {
+		return nil, err
+	}
+	links = append(links, pl.appIDItems()...)
+	pl.add(UnLinks, links)
+
+	// 3. the lock library (planned before ModsConfig.xml: a kept copy stays in its game)
+	locked := pl.lockedItems()
+
+	// 2. ModsConfig.xml of each user data folder RimArcho wrote
+	mcs, err := pl.modsConfigItems()
+	if err != nil {
+		return nil, err
+	}
+	pl.add(UnModsConfig, mcs)
+	tex, err := a.uninstallTextures()
+	if err != nil {
+		return nil, err
+	}
+	pl.add(UnTextures, tex)
+	pl.add(UnLocked, locked)
+
+	pl.monRoot = a.MonitorDir()
+	pl.add(UnMonitor, pl.monitorItems())
+	pl.add(UnPacks, pl.packItems())
+	pl.add(UnSaves, pl.saveItems())
+	pl.add(UnGames, pl.gameItems())
+	pl.keep = pl.keptSources()
+	pl.add(UnSteamCMD, pl.steamCMDItems())
+
+	sourceRoot := a.SourceDir()
+	pl.checkKeptDestinations(sourceRoot)
+	data := pl.dataItems()
+	pl.noteManagedTools(data)
+	pl.addSourceStep(sourceRoot)
+	pl.add(UnData, data)
+	pl.add(UnProgram, pl.programItems())
+	pl.planIncomingLinks()
+	return p, nil
+}
+
+// add appends a step to the plan when it has something to do.
+func (pl *uninstallPlanner) add(key string, items []*UninstallItem) {
+	if len(items) > 0 {
+		pl.p.Steps = append(pl.p.Steps, &UninstallStep{Key: key, Items: items})
+	}
+}
+
+// setProblem records why the plan cannot run, keeping the first reason.
+func (pl *uninstallPlanner) setProblem(s string) {
+	if pl.p.Problem == "" {
+		pl.p.Problem = s
+	}
+}
+
+// accountItems is the accounts step: forget sessions, and the agent key when there is one.
+func (pl *uninstallPlanner) accountItems() []*UninstallItem {
+	a := pl.a
+	accountItems := []*UninstallItem{{Path: a.AccountsDir(), Do: "forget-accounts", Note: "Forget account sessions: delete site sessions and temporary login folders, and clear known authentication caches for all accounts in managed SteamCMD. External caches stay under their owner's control. This cannot be undone and does not sign out other devices."}}
+	if a.AgentStatus().HasKey {
+		accountItems = append(accountItems, &UninstallItem{Path: "Windows Credential Manager: " + secret.Prefix + AgentKeyName, Do: "forget-agent-key", Note: "Remove the Archo Agent API key from Windows Credential Manager."})
+	}
+	return accountItems
+}
+
+// pickLockEnv chooses where kept lock library copies go: a game that is not itself removed.
+func (pl *uninstallPlanner) pickLockEnv() {
+	o, p := pl.o, pl.p
+	if !o.KeepLocked {
+		return
+	}
+	name := o.LockedTo
+	if name == "" {
+		if cur, err := pl.a.Env(); err == nil && cur.GameRoot != "" {
+			name = cur.Name
+		} else if len(p.Envs) > 0 {
+			name = p.Envs[0]
+		}
+	}
+	lockEnv := pl.byName[name]
+	pl.lockEnv = lockEnv
+	if lockEnv != nil {
+		p.LockedTo = lockEnv.Name
+	}
+	switch {
+	case lockEnv == nil && o.LockedTo != "":
+		p.Problem = fmt.Sprintf("no Game Config named %q with a game folder (archo env list)", o.LockedTo)
+	case lockEnv == nil:
+		p.Problem = "no game folder to move the lock library's copies into; remove them instead"
+	case o.RemoveGames && downloadedGame(lockEnv.GameRoot):
+		p.Problem = fmt.Sprintf("the copies would go into %s, which is removed too; pick another game or keep the downloaded games", lockEnv.GameRoot)
+	default:
+		p.LockedTo = lockEnv.Name
+	}
+}
+
+// linkItems lists the _Archo_ and !ArchoPack_ links of every known game's Mods/ and
+// records in pl.gone the package IDs reached through them.
+func (pl *uninstallPlanner) linkItems() ([]*UninstallItem, error) {
+	pl.gone = map[string]map[string]bool{}
 	var links []*UninstallItem
 	seenMods := map[string]bool{}
-	observations, err := a.InspectGameLinks()
+	observations, err := pl.a.InspectGameLinks()
 	if err != nil {
 		return nil, err
 	}
@@ -306,13 +411,13 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 	for _, l := range observations {
 		owned[env.PathKey(l.Path)] = l
 	}
-	roots, err := a.knownGameMods()
+	roots, err := pl.a.knownGameMods()
 	if err != nil {
 		return nil, err
 	}
 	for _, root := range roots {
 		e := &env.Environment{GameRoot: root.game}
-		for _, candidate := range envs {
+		for _, candidate := range pl.envs {
 			if env.PathKey(realOrAbs(candidate.GameRoot)) == env.PathKey(root.game) {
 				e = candidate
 				break
@@ -323,135 +428,177 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 			continue
 		}
 		seenMods[env.PathKey(mods)] = true
-		ents, _ := os.ReadDir(mods)
-		for _, d := range ents {
-			name := d.Name()
-			if !managedLink(name) && !packLink(name) {
-				continue
-			}
-			path := filepath.Join(mods, name)
-			if !source.IsLink(path) {
-				links = append(links, &UninstallItem{Path: path, Do: DoLeave, Note: "not a link: left alone"})
-				continue
-			}
-			it := &UninstallItem{Path: path, Do: DoUnlink}
-			l := owned[env.PathKey(path)]
-			if l == nil || !l.Owned || l.Code == CodeLinkForeign || l.Code == CodeLinkUnknown || l.Code == CodeLinkRecovery {
-				it.Do, it.Note = DoLeave, "ownership or link health is unproven: left alone"
-			}
-			if tgt, err := source.RealPath(path); err == nil {
-				it.To = tgt
-				if pkg := scan.ReadDecl(tgt, false).PackageID; pkg != "" {
-					k := store.UserDataKey(e.UserDataRoot)
-					if gone[k] == nil {
-						gone[k] = map[string]bool{}
-					}
-					gone[k][pkg] = true
+		links = append(links, pl.modsFolderLinks(mods, store.UserDataKey(e.UserDataRoot), owned)...)
+	}
+	return links, nil
+}
+
+// modsFolderLinks lists the RimArcho links in one Mods/ folder whose game keeps its
+// user data under key udKey.
+func (pl *uninstallPlanner) modsFolderLinks(mods, udKey string, owned map[string]*GameLink) []*UninstallItem {
+	var links []*UninstallItem
+	ents, _ := os.ReadDir(mods)
+	for _, d := range ents {
+		name := d.Name()
+		if !managedLink(name) && !packLink(name) {
+			continue
+		}
+		path := filepath.Join(mods, name)
+		if !source.IsLink(path) {
+			links = append(links, &UninstallItem{Path: path, Do: DoLeave, Note: NotALinkNote})
+			continue
+		}
+		it := &UninstallItem{Path: path, Do: DoUnlink}
+		l := owned[env.PathKey(path)]
+		if l == nil || !l.Owned || l.Code == CodeLinkForeign || l.Code == CodeLinkUnknown || l.Code == CodeLinkRecovery {
+			it.Do, it.Note = DoLeave, "ownership or link health is unproven: left alone"
+		}
+		if tgt, err := source.RealPath(path); err == nil {
+			it.To = tgt
+			if pkg := scan.ReadDecl(tgt, false).PackageID; pkg != "" {
+				if pl.gone[udKey] == nil {
+					pl.gone[udKey] = map[string]bool{}
 				}
+				pl.gone[udKey][pkg] = true
 			}
-			links = append(links, it)
+		}
+		links = append(links, it)
+	}
+	return links
+}
+
+// appIDItems lists the steam_appid.txt that direct launches wrote (02 §1): only RimArcho's,
+// and only while it still holds the game's app ID.
+func (pl *uninstallPlanner) appIDItems() []*UninstallItem {
+	var links []*UninstallItem
+	seenGames := map[string]bool{}
+	for _, e := range pl.envs {
+		f := filepath.Join(e.GameRoot, AppIDFile)
+		if e.GameRoot == "" || seenGames[env.PathKey(f)] || pl.a.Store.Meta(appIDMeta(e.GameRoot)) == "" {
+			continue
+		}
+		seenGames[env.PathKey(f)] = true
+		if b, err := os.ReadFile(f); err == nil && strings.TrimSpace(string(b)) == env.WorkshopAppID {
+			links = append(links, &UninstallItem{Path: f, Do: DoAppID})
 		}
 	}
-	add(UnLinks, links)
+	return links
+}
 
-	// 3. the lock library (planned before ModsConfig.xml: a kept copy stays in its game)
+// lockedItems lists the lock library's copies, to the recycle bin or moved into the kept
+// game's Mods/, and records the kept ones' package IDs in pl.keptPkgs.
+func (pl *uninstallPlanner) lockedItems() []*UninstallItem {
 	var locked []*UninstallItem
-	keptPkgs := map[string]bool{}
-	lockRoot := a.LockDir()
+	pl.keptPkgs = map[string]bool{}
+	lockRoot := pl.a.LockDir()
 	used := map[string]bool{}
 	for _, dir := range lockCopies(lockRoot) {
 		d := scan.ReadDecl(dir, false)
-		it := &UninstallItem{Path: dir, Name: d.Name, Bytes: sizeOf(dir), Do: DoTrash}
-		if o.KeepLocked && lockEnv != nil {
-			mods := a.modsFolder(lockEnv)
+		it := &UninstallItem{Path: dir, Name: d.Name, Bytes: pl.sizeOf(dir), Do: DoTrash}
+		if pl.o.KeepLocked && pl.lockEnv != nil {
+			mods := pl.a.modsFolder(pl.lockEnv)
 			name := freeNameUsed(mods, filepath.Base(dir), used)
 			it.Do, it.To = DoMove, filepath.Join(mods, name)
 			if d.PackageID != "" {
-				keptPkgs[d.PackageID] = true
+				pl.keptPkgs[d.PackageID] = true
 			}
 		}
 		locked = append(locked, it)
 	}
+	return locked
+}
 
-	// 2. ModsConfig.xml of each user data folder RimArcho wrote
+// modsConfigItems lists the ModsConfig.xml of each user data folder RimArcho wrote: restored
+// from the backup or cleaned of the mods that go away.
+func (pl *uninstallPlanner) modsConfigItems() ([]*UninstallItem, error) {
 	var mcs []*UninstallItem
 	seenUD := map[string]bool{}
-	for _, e := range envs {
+	for _, e := range pl.envs {
 		k := store.UserDataKey(e.UserDataRoot)
 		if k == "" || seenUD[k] {
 			continue
 		}
 		seenUD[k] = true
-		path := env.ModsConfigPath(e.UserDataRoot)
-		bak := path + loadout.BackupSuffix
-		st, err := a.Store.ModsConfigStateAt(e.UserDataRoot)
+		it, err := pl.modsConfigItem(e, k)
 		if err != nil {
 			return nil, err
 		}
-		_, bakErr := os.Stat(bak)
-		if st.WrittenAt.IsZero() && bakErr != nil {
-			continue // RimArcho never wrote it
-		}
-		it := &UninstallItem{Path: path, Name: e.Name}
-		if o.RestoreBackup && bakErr == nil {
-			it.Do, it.Note = DoRestore, "the list from before RimArcho's last save"
+		if it != nil {
 			mcs = append(mcs, it)
-			continue
 		}
-		drop := map[string]bool{MonitorPackage: true}
-		for pkg := range gone[k] {
-			drop[pkg] = true
-		}
-		present, err := a.presentPackages(envs, k)
-		if err != nil {
-			return nil, err
-		}
-		if lockEnv != nil && store.UserDataKey(lockEnv.UserDataRoot) == k {
-			for pkg := range keptPkgs {
-				present[pkg] = true
-			}
-		}
-		if mc, err := loadout.ReadModsConfig(path); err == nil {
-			for _, id := range mc.Active {
-				if drop[id] && !present[id] {
-					it.Drop = append(it.Drop, id)
-				}
-			}
-		}
-		if len(it.Drop) == 0 && bakErr != nil {
-			continue // nothing to take out, nothing of RimArcho's left beside it
-		}
-		it.Do = DoClean
-		if o.RestoreBackup {
-			it.Note = "no backup to restore: cleaned instead"
-		}
-		mcs = append(mcs, it)
 	}
-	add(UnModsConfig, mcs)
-	tex, err := a.uninstallTextures()
+	return mcs, nil
+}
+
+// modsConfigItem plans one user data folder's ModsConfig.xml (nil: nothing to do).
+func (pl *uninstallPlanner) modsConfigItem(e *env.Environment, k string) (*UninstallItem, error) {
+	o := pl.o
+	path := env.ModsConfigPath(e.UserDataRoot)
+	bak := path + loadout.BackupSuffix
+	st, err := pl.a.Store.ModsConfigStateAt(e.UserDataRoot)
 	if err != nil {
 		return nil, err
 	}
-	add(UnTextures, tex)
-	add(UnLocked, locked)
-
-	// 4. Archo Monitor's folder (RimArcho's own)
-	var mon []*UninstallItem
-	monRoot := a.MonitorDir()
-	if ents, err := os.ReadDir(monRoot); err == nil {
-		for _, d := range ents {
-			path := filepath.Join(monRoot, d.Name())
-			if strings.HasPrefix(d.Name(), monitorFolder) || strings.HasSuffix(d.Name(), TmpSuffix) {
-				mon = append(mon, &UninstallItem{Path: path, Do: DoDelete, Bytes: sizeOf(path)})
+	_, bakErr := os.Stat(bak)
+	if st.WrittenAt.IsZero() && bakErr != nil {
+		return nil, nil // RimArcho never wrote it
+	}
+	it := &UninstallItem{Path: path, Name: e.Name}
+	if o.RestoreBackup && bakErr == nil {
+		it.Do, it.Note = DoRestore, "the list from before RimArcho's last save"
+		return it, nil
+	}
+	drop := map[string]bool{MonitorPackage: true}
+	for pkg := range pl.gone[k] {
+		drop[pkg] = true
+	}
+	present, err := pl.a.presentPackages(pl.envs, k)
+	if err != nil {
+		return nil, err
+	}
+	if pl.lockEnv != nil && store.UserDataKey(pl.lockEnv.UserDataRoot) == k {
+		for pkg := range pl.keptPkgs {
+			present[pkg] = true
+		}
+	}
+	if mc, err := loadout.ReadModsConfig(path); err == nil {
+		for _, id := range mc.Active {
+			if drop[id] && !present[id] {
+				it.Drop = append(it.Drop, id)
 			}
 		}
 	}
-	add(UnMonitor, mon)
+	if len(it.Drop) == 0 && bakErr != nil {
+		return nil, nil // nothing to take out, nothing of RimArcho's left beside it
+	}
+	it.Do = DoClean
+	if o.RestoreBackup {
+		it.Note = "no backup to restore: cleaned instead"
+	}
+	return it, nil
+}
 
-	// 5. packs: kept where they are, or moved out of the data folder, or to the recycle bin
+// monitorItems lists Archo Monitor's folders (RimArcho's own).
+func (pl *uninstallPlanner) monitorItems() []*UninstallItem {
+	var mon []*UninstallItem
+	if ents, err := os.ReadDir(pl.monRoot); err == nil {
+		for _, d := range ents {
+			path := filepath.Join(pl.monRoot, d.Name())
+			if strings.HasPrefix(d.Name(), monitorFolder) || strings.HasSuffix(d.Name(), TmpSuffix) {
+				mon = append(mon, &UninstallItem{Path: path, Do: DoDelete, Bytes: pl.sizeOf(path)})
+			}
+		}
+	}
+	return mon
+}
+
+// packItems lists the packs: kept where they are, or moved out of the data folder, or to
+// the recycle bin.
+func (pl *uninstallPlanner) packItems() []*UninstallItem {
+	a, o, p := pl.a, pl.o, pl.p
 	var packs []*UninstallItem
 	packsDir := a.PacksDir()
-	inHome := source.Within(packsDir, a.Home)
+	inHome := source.Within(packsDir, a.Home) || source.Within(packsDir, p.Local)
 	p.PacksTo = o.PacksTo
 	if p.PacksTo == "" {
 		p.PacksTo = a.DefaultPacksTo()
@@ -464,14 +611,14 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 			}
 			path := filepath.Join(packsDir, d.Name())
 			if strings.HasSuffix(d.Name(), TmpSuffix) {
-				packs = append(packs, &UninstallItem{Path: path, Do: DoDelete, Bytes: sizeOf(path), Note: "an unfinished build"})
+				packs = append(packs, &UninstallItem{Path: path, Do: DoDelete, Bytes: pl.sizeOf(path), Note: "an unfinished build"})
 				continue
 			}
 			pk, err := a.ReadPack(d.Name())
 			if err != nil {
 				continue // not a pack: inside the data folder it goes with it, elsewhere it stays
 			}
-			it := &UninstallItem{Path: path, Name: pk.Name, Bytes: sizeOf(path), Do: DoKeep}
+			it := &UninstallItem{Path: path, Name: pk.Name, Bytes: pl.sizeOf(path), Do: DoKeep}
 			switch {
 			case o.RemovePacks:
 				it.Do = DoTrash
@@ -481,9 +628,12 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 			packs = append(packs, it)
 		}
 	}
-	add(UnPacks, packs)
+	return packs
+}
 
-	// 6. the own save folders (<data>/userdata/<env>) and save backups
+// saveItems lists the own save folders (<data>/userdata/<env>) and save backups.
+func (pl *uninstallPlanner) saveItems() []*UninstallItem {
+	a, o, p := pl.a, pl.o, pl.p
 	var saves []*UninstallItem
 	p.SavesTo = o.SavesTo
 	if p.SavesTo == "" {
@@ -491,7 +641,7 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 	}
 	usedS := map[string]bool{}
 	saveItem := func(path, name string) {
-		it := &UninstallItem{Path: path, Name: name, Bytes: sizeOf(path), Do: DoTrash}
+		it := &UninstallItem{Path: path, Name: name, Bytes: pl.sizeOf(path), Do: DoTrash}
 		if !o.RemoveSaves {
 			it.Do, it.To = DoMove, filepath.Join(p.SavesTo, freeNameUsed(p.SavesTo, name, usedS))
 		}
@@ -507,75 +657,88 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 	if bk := filepath.Join(a.Home, "backups", "saves"); !emptyDir(bk) {
 		saveItem(bk, "backups")
 	}
-	add(UnSaves, saves)
+	return saves
+}
 
-	// 7. game folders downloaded with SteamCMD
+// gameItems lists the game folders downloaded with SteamCMD.
+func (pl *uninstallPlanner) gameItems() []*UninstallItem {
 	var games []*UninstallItem
-	for _, e := range envs {
+	for _, e := range pl.envs {
 		if downloadedGame(e.GameRoot) {
-			it := &UninstallItem{Path: e.GameRoot, Name: e.Name, Bytes: sizeOf(e.GameRoot), Do: DoKeep}
-			if o.RemoveGames {
+			it := &UninstallItem{Path: e.GameRoot, Name: e.Name, Bytes: pl.sizeOf(e.GameRoot), Do: DoKeep}
+			if pl.o.RemoveGames {
 				it.Do = DoTrash
 			}
 			games = append(games, it)
 		}
 	}
-	add(UnGames, games)
+	return games
+}
 
-	// Sources other than the lock library and Monitor never go: they hold the player's mods.
+// keptSources lists the roots of the sources other than the lock library and Monitor: they
+// never go, since they hold the player's mods.
+func (pl *uninstallPlanner) keptSources() []string {
 	var keep []string
-	if all, err := a.Store.AllSources(); err == nil {
+	if all, err := pl.a.Store.AllSources(); err == nil {
 		for _, s := range all {
-			if s.Status == source.StatusRetired || s.Root == "" || a.IsLockSource(s) || env.PathKey(s.Root) == env.PathKey(monRoot) {
+			if s.Status == source.StatusRetired || s.Root == "" || pl.a.IsLockSource(s) || env.PathKey(s.Root) == env.PathKey(pl.monRoot) {
 				continue
 			}
 			keep = append(keep, s.Root)
 		}
 	}
+	return keep
+}
 
-	// 8. RimArcho's SteamCMD
+// steamCMDItems plans RimArcho's SteamCMD: deleted, or left alone (and kept) when it is
+// custom or holds mods.
+func (pl *uninstallPlanner) steamCMDItems() []*UninstallItem {
+	a := pl.a
 	var scmd []*UninstallItem
 	if dir := a.SteamCMDDir(); dirExists(dir) {
-		it := &UninstallItem{Path: dir, Do: DoDelete, Bytes: sizeOf(dir)}
+		it := &UninstallItem{Path: dir, Do: DoDelete, Bytes: pl.sizeOf(dir)}
 		switch {
 		case a.Store.Meta("cfg:steamcmd.path") != "" && !source.Within(dir, a.LocalDir()):
 			it.Do, it.Note = DoLeave, "SteamCMD is in a custom directory: left alone"
-			keep = append(keep, dir)
-		case a.steamCMDContentCheck(dir) != nil || holdsAny(dir, keep):
+			pl.keep = append(pl.keep, dir)
+		case a.steamCMDContentCheck(dir) != nil || holdsAny(dir, pl.keep):
 			it.Do, it.Note = DoLeave, "holds mods downloaded with SteamCMD: left alone"
-			keep = append(keep, dir)
+			pl.keep = append(pl.keep, dir)
 		}
 		scmd = append(scmd, it)
 	}
-	add(UnSteamCMD, scmd)
+	return scmd
+}
 
-	sourceRoot := a.SourceDir()
-
-	// Kept and moved things must not land where the data folders are deleted.
+// checkKeptDestinations refuses kept and moved things that would land where the data
+// folders are deleted.
+func (pl *uninstallPlanner) checkKeptDestinations(sourceRoot string) {
+	a, p := pl.a, pl.p
 	for _, dst := range []struct{ dir, what string }{{p.SavesTo, "saves"}, {p.PacksTo, "packs"}} {
 		if source.Within(dst.dir, a.Home) || source.Within(dst.dir, p.Local) || source.Within(directoryReal(dst.dir), directoryReal(sourceRoot)) {
-			if p.Problem == "" {
-				p.Problem = fmt.Sprintf("the %s would be moved to %s, which is deleted too; pick a folder outside RimArcho's folders", dst.what, dst.dir)
-			}
+			pl.setProblem(fmt.Sprintf("the %s would be moved to %s, which is deleted too; pick a folder outside RimArcho's folders", dst.what, dst.dir))
 		}
 	}
+}
 
-	// 9. the data folders
+// dataItems plans the data folders and schedules them for after exit.
+func (pl *uninstallPlanner) dataItems() []*UninstallItem {
+	a, p := pl.a, pl.p
 	var data []*UninstallItem
 	if isArchoHome(a.Home) {
-		data = append(data, &UninstallItem{Path: a.Home, Do: DoLater, Bytes: sizeOf(a.Home)})
+		data = append(data, &UninstallItem{Path: a.Home, Do: DoLater, Bytes: pl.sizeOf(a.Home)})
 		p.AfterExit.Dirs = append(p.AfterExit.Dirs, a.Home)
 	} else {
 		data = append(data, &UninstallItem{Path: a.Home, Do: DoLeave, Note: "not a RimArcho data folder (no archo.db): left alone"})
 	}
 	if dirExists(p.Local) {
 		var kept []string
-		for _, k := range keep {
+		for _, k := range pl.keep {
 			if source.Within(k, p.Local) {
 				kept = append(kept, k)
 			}
 		}
-		it := &UninstallItem{Path: p.Local, Do: DoLater, Bytes: sizeOf(p.Local)}
+		it := &UninstallItem{Path: p.Local, Do: DoLater, Bytes: pl.sizeOf(p.Local)}
 		if len(kept) == 0 {
 			p.AfterExit.Dirs = append(p.AfterExit.Dirs, p.Local)
 		} else {
@@ -591,14 +754,19 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 		}
 		data = append(data, it)
 	}
-	// Name only managed tools actually covered by the scheduled data deletions.
+	return data
+}
+
+// noteManagedTools names on the data items only the managed tools actually covered by the
+// scheduled data deletions.
+func (pl *uninstallPlanner) noteManagedTools(data []*UninstallItem) {
 	for _, name := range []string{deps.Todds} {
-		i := a.Deps().Status(name)
+		i := pl.a.Deps().Status(name)
 		if !i.Own {
 			continue
 		}
 		deleted := false
-		for _, dir := range p.AfterExit.Dirs {
+		for _, dir := range pl.p.AfterExit.Dirs {
 			deleted = deleted || source.Within(i.Dir, dir)
 		}
 		if !deleted {
@@ -614,24 +782,28 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 			}
 		}
 	}
+}
+
+// addSourceStep plans the source library. One inside a deleted data folder goes with it; a
+// relocated one is its own step, and a link there blocks the uninstall with the reason on
+// the page.
+func (pl *uninstallPlanner) addSourceStep(sourceRoot string) {
 	sourceCovered := false
-	for _, dir := range p.AfterExit.Dirs {
+	for _, dir := range pl.p.AfterExit.Dirs {
 		sourceCovered = sourceCovered || source.Within(sourceRoot, dir)
 	}
-	// A source library inside a deleted data folder goes with it; a relocated one is its own
-	// step, and a link there blocks the uninstall with the reason on the page.
 	if !sourceCovered && dirExists(sourceRoot) {
-		if err := a.checkUninstallSource(sourceRoot); err != nil {
-			if p.Problem == "" {
-				p.Problem = err.Error()
-			}
+		if err := pl.a.checkUninstallSource(sourceRoot); err != nil {
+			pl.setProblem(err.Error())
 		} else {
-			add(UnSource, []*UninstallItem{{Path: sourceRoot, Do: DoDelete, Bytes: sizeOf(sourceRoot)}})
+			pl.add(UnSource, []*UninstallItem{{Path: sourceRoot, Do: DoDelete, Bytes: pl.sizeOf(sourceRoot)}})
 		}
 	}
-	add(UnData, data)
+}
 
-	// 10. the program
+// programItems plans the program: only RimArcho's own files, deleted after exit.
+func (pl *uninstallPlanner) programItems() []*UninstallItem {
+	a, p := pl.a, pl.p
 	var prog []*UninstallItem
 	exe := a.UninstallExe
 	if exe == "" {
@@ -642,7 +814,13 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 		prog = append(prog, &UninstallItem{Path: filepath.Dir(exe), Do: DoLeave, Note: "a development build: the program is not removed"})
 	case exe != "":
 		dir := filepath.Dir(exe)
-		for _, n := range releaseFiles {
+		names := slices.Clone(releaseFiles)
+		for _, n := range selfupdate.Installed(dir) { // entries later releases added (17 §5.1)
+			if !slices.ContainsFunc(names, func(m string) bool { return strings.EqualFold(m, n) }) {
+				names = append(names, n)
+			}
+		}
+		for _, n := range names {
 			path := filepath.Join(dir, n)
 			fi, err := os.Lstat(path)
 			if err != nil {
@@ -655,41 +833,43 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 			}
 		}
 		p.AfterExit.Empty = append(p.AfterExit.Empty, dir)
-		prog = append(prog, &UninstallItem{Path: dir, Do: DoLater, Bytes: sizeOf(dir), Note: "only RimArcho's own files; the folder goes when nothing else is in it"})
+		prog = append(prog, &UninstallItem{Path: dir, Do: DoLater, Bytes: pl.sizeOf(dir), Note: "only RimArcho's own files; the folder goes when nothing else is in it"})
 	}
-	add(UnProgram, prog)
+	return prog
+}
+
+// planIncomingLinks plans, for every item that is trashed, moved or deleted, the links
+// elsewhere that point into it. All targets use one fresh incoming-link observation.
+func (pl *uninstallPlanner) planIncomingLinks() {
 	var incoming *incomingLinkCheck
-	for _, step := range p.Steps {
+	var err error
+	for _, step := range pl.p.Steps {
 		if step.Key == UnSource {
 			continue // Source removal never changes links outside the recorded library.
 		}
 		for _, it := range step.Items {
 			if it.Do == DoTrash || it.Do == DoMove || it.Do == DoDelete {
-				// All targets in this plan use one fresh incoming-link observation.
 				if incoming == nil {
-					incoming, err = a.readIncomingLinks()
+					incoming, err = pl.a.readIncomingLinks()
 					if err != nil {
-						if p.Problem == "" {
-							p.Problem = err.Error()
-						}
-						return p, nil
+						pl.setProblem(err.Error())
+						return
 					}
 				}
-				it.Links, err = a.planIncomingLinks(it.Path, "", incoming)
-				if err != nil && p.Problem == "" {
-					p.Problem = err.Error()
+				it.Links, err = pl.a.planIncomingLinks(it.Path, "", incoming)
+				if err != nil {
+					pl.setProblem(err.Error())
 				}
 			}
 		}
 	}
-	return p, nil
 }
 
 // modsFolder is an environment's Mods/ folder: its local source's root, else <game>/Mods.
 func (a *App) modsFolder(e *env.Environment) string {
-	if srcs, err := a.Store.Sources(e.ID); err == nil {
+	if srcs, err := a.Store.Sources(e.GameID); err == nil {
 		for _, s := range srcs {
-			if s.Kind == source.Local && s.Status != source.StatusRetired && s.EnvID == e.ID {
+			if s.Kind == source.Local && s.Status != source.StatusRetired && s.EnvID == e.GameID {
 				return s.Root
 			}
 		}
@@ -709,7 +889,7 @@ func (a *App) presentPackages(envs []*env.Environment, udKey string) (map[string
 		if store.UserDataKey(e.UserDataRoot) != udKey {
 			continue
 		}
-		mods, err := a.Store.UninstallMods(e.ID)
+		mods, err := a.Store.UninstallMods(e.GameID)
 		if err != nil {
 			return nil, err
 		}
@@ -817,15 +997,30 @@ type UninstallProgress struct {
 // Uninstall carries out the plan for these answers. A failed item is reported and the
 // others go on; then the data folders and the program are left in place (run it again),
 // because they hold what is needed to finish. Otherwise the script that deletes them once
-// RimArcho has closed is started.
-func (a *App) Uninstall(o UninstallOptions, progress func(UninstallProgress)) (*UninstallPlan, error) {
-	p, err := a.CheckUninstall(o)
+// RimArcho has closed is started (Windows), or they are deleted at once and marked done or
+// failed (elsewhere: AtOnce).
+//
+// The operation log (13 §1.3) gets one parent row, with the recycle-bin moves, unlinked links
+// and failed items under it. It goes with the data folder when that is deleted.
+func (a *App) Uninstall(o UninstallOptions, progress func(UninstallProgress)) (p *UninstallPlan, err error) {
+	run := a.opStart(false, func() oplog.Row { return oplog.Row{Op: oplog.Uninstall, Subject: "RimArcho", Target: a.Home} })
+	failed := false
+	defer func() {
+		outcome := err
+		if outcome == nil && failed {
+			outcome = errPartial
+		}
+		run.end(outcome, "")
+	}()
+	p, err = a.CheckUninstall(o)
 	if err != nil {
 		return nil, err
 	}
 	if err := p.Blocked(); err != nil {
 		return p, err
 	}
+	run.begin()
+	h := run.parent()
 	if progress == nil {
 		progress = func(UninstallProgress) {}
 	}
@@ -835,7 +1030,6 @@ func (a *App) Uninstall(o UninstallOptions, progress func(UninstallProgress)) (*
 			n += len(s.Items)
 		}
 	}
-	failed := false
 	for _, s := range p.Steps {
 		if s.Key == UnData || s.Key == UnProgram {
 			continue
@@ -843,9 +1037,15 @@ func (a *App) Uninstall(o UninstallOptions, progress func(UninstallProgress)) (*
 		for _, it := range s.Items {
 			i++
 			progress(UninstallProgress{Step: s.Key, Item: it.Path, I: i, N: n})
-			if err := a.uninstallItem(s.Key, it); err != nil {
+			if err := a.uninstallItem(h, s.Key, it); err != nil {
 				it.Err = err.Error()
 				failed = true
+				if it.Do != DoTrash && it.Do != DoUnlink { // those write their own rows
+					a.opAdd(h, oplog.Row{Op: oplog.Uninstall, Subject: s.Key + ": " + it.Do, Target: it.Path, Result: oplog.Failed, Detail: err.Error()})
+				}
+				if it.Do == "forget-agent-key" {
+					return p, errors.New("could not remove the Archo Agent API key from Windows Credential Manager; tools and data were kept; retry")
+				}
 				if s.Key == UnAccounts {
 					return p, errors.New("could not forget account sessions; tools and data were kept; close the login window and retry")
 				}
@@ -858,67 +1058,93 @@ func (a *App) Uninstall(o UninstallOptions, progress func(UninstallProgress)) (*
 			removeIfEmpty(a.LockDir())
 		case UnMonitor:
 			removeIfEmpty(a.MonitorDir())
+		case UnSteamCMD:
+			// the junctions a non-English profile path needed to start SteamCMD (17 §2.1)
+			removeSteamCMDAliases(a.LocalDir())
 		case UnPacks:
-			if o.RemovePacks || source.Within(a.PacksDir(), a.Home) {
+			if o.RemovePacks || source.Within(a.PacksDir(), a.Home) || source.Within(a.PacksDir(), a.LocalDir()) {
 				removeIfEmpty(a.PacksDir())
 			}
 		}
 	}
-	last := []*UninstallStep{p.Step(UnData), p.Step(UnProgram)}
 	if failed {
-		for _, s := range last {
-			if s == nil {
-				continue
-			}
-			for _, it := range s.Items {
-				if it.Do == DoLater {
-					it.Do, it.Note = DoLeave, "kept because a step above failed: fix it, then uninstall again"
-				}
-			}
-		}
+		p.eachLater(func(it *UninstallItem) {
+			it.Do, it.Note = DoLeave, "kept because a step above failed: fix it, then uninstall again"
+		})
 		return p, nil
 	}
 	progress(UninstallProgress{Step: UnData, I: n, N: n})
 	a.Uninstalled = true
-	run := a.AfterExitFunc
-	if run == nil {
-		run = func(x AfterExit) error { return startAfterExit(x, p.Log) }
-	}
-	if err := run(p.AfterExit); err != nil {
-		for _, s := range last {
-			if s == nil {
-				continue
-			}
+	a.cleanUp(p)
+	return p, nil
+}
+
+// eachLater calls f with every item of the last two steps that is deleted after the others.
+func (p *UninstallPlan) eachLater(f func(*UninstallItem)) {
+	for _, key := range []string{UnData, UnProgram} {
+		if s := p.Step(key); s != nil {
 			for _, it := range s.Items {
 				if it.Do == DoLater {
-					it.Err = "the clean-up could not start: " + err.Error() + "; delete it yourself"
+					f(it)
 				}
 			}
 		}
 	}
-	return p, nil
+}
+
+// cleanUp deletes the data folders and the program: the script after exit on Windows,
+// at once elsewhere, where each item is then done or names what was left.
+func (a *App) cleanUp(p *UninstallPlan) {
+	var left []string
+	var err error
+	if a.AfterExitFunc != nil {
+		err = a.AfterExitFunc(p.AfterExit)
+	} else {
+		left, err = startAfterExit(p.AfterExit, p.Log)
+	}
+	p.eachLater(func(it *UninstallItem) {
+		switch {
+		case err != nil:
+			it.Err = "the clean-up could not start: " + err.Error() + "; delete it yourself"
+		case p.AtOnce:
+			it.Done = true
+			for _, l := range left {
+				if source.Within(l, it.Path) {
+					it.Done, it.Err = false, "could not delete "+l+"; delete it yourself"
+					break
+				}
+			}
+		}
+	})
 }
 
 // uninstallItem carries out one item.
-func (a *App) uninstallItem(step string, it *UninstallItem) error {
+func (a *App) uninstallItem(h *oplog.Handle, step string, it *UninstallItem) error {
 	switch it.Do {
 	case "forget-accounts":
 		return a.ForgetAccounts()
+	case "forget-agent-key":
+		return SetAgentKey("")
 	case DoKeep, DoLeave:
 		return nil
+	case DoAppID:
+		if err := os.Remove(it.Path); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		return nil
 	case DoUnlink:
-		return a.applyLinks(filepath.Dir(it.Path), []LinkChange{{Op: "remove", Name: filepath.Base(it.Path)}})
+		return a.applyLinksIn(h, filepath.Dir(it.Path), []LinkChange{{Op: "remove", Name: filepath.Base(it.Path)}})
 	case DoClean:
 		return cleanModsConfig(it.Path, it.Drop)
 	case DoRestore:
 		return restoreModsConfig(it.Path)
 	case DoTrash:
-		return a.ToTrash(it.Path)
+		return a.toTrash(h, it.Path)
 	case DoDelete:
 		if step == UnSource {
 			return a.uninstallSource(it.Path)
 		}
-		return a.withIncomingLinks(it.Path, "", func() error { return removeModTree(it.Path) })
+		return a.withIncomingLinks(it.Path, "", func() error { return a.deleteTree(h, it.Path) })
 	case DoDDS:
 		return a.deleteTexturesIn(it.Path)
 	case DoMove:
@@ -1113,7 +1339,7 @@ type partlyRemovedError struct {
 }
 
 func (e *partlyRemovedError) Error() string {
-	return fmt.Sprintf("%s was only partly deleted (%v); the game links to it were removed, delete the rest yourself", e.path, e.err)
+	return fmt.Sprintf("%s: only part of it was deleted (%s); the game links to it were removed, delete the rest yourself", e.path, e.err)
 }
 
 func (e *partlyRemovedError) Unwrap() error { return e.err }

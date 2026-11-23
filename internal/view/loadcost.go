@@ -30,6 +30,9 @@ type PlanCost struct {
 	Parts   []LoadCostRow `json:"parts"`
 	Top     []LoadCostTop `json:"top"`
 	Notes   []string      `json:"notes"`
+	// Bars: the GUI draws RAM and VRAM as game and Mods on the computer's capacity in
+	// place of Summary, Loading and Detail, which name them (16 §7 principle 9)
+	Bars []MemoryBar `json:"bars,omitempty"`
 }
 
 func costRange(low, high int64) string {
@@ -55,9 +58,21 @@ func PlanLoadCost(r *app.LoadCost) *PlanCost {
 		Mods:    Tf("%d mods", r.Mods),
 		Parts:   []LoadCostRow{}, Top: []LoadCostTop{},
 	}
+	c := r.Capacity
+	p.Bars = []MemoryBar{
+		ramBar(c, joinSentences([]string{p.Loading, p.Detail}),
+			BarPart{Kind: "game", Low: r.Baseline.RAM, High: r.Baseline.RAM},
+			BarPart{Kind: "mods", Low: max(0, f.LoadingLow-r.Baseline.RAM), High: max(0, f.LoadingHigh-r.Baseline.RAM)}),
+		vramBar(c, p.Summary,
+			BarPart{Kind: "game", Low: r.Baseline.VRAM, High: r.Baseline.VRAM},
+			BarPart{Kind: "mods", Low: max(0, f.VRAMLow-r.Baseline.VRAM), High: max(0, f.VRAMHigh-r.Baseline.VRAM)}),
+	}
 	categories := map[string]string{"textures": "textures", "dds": "DDS", "sounds": "sounds", "defs": "Defs", "patches": "Patches", "assemblies": "assemblies", "mod overhead": "mod overhead"}
 	for _, part := range r.Parts {
 		count := Tf("%d files", part.Count)
+		if part.Count == 1 {
+			count = Tf("%d file", 1)
+		}
 		if part.Key == "mod overhead" {
 			count = Tf("%d mods", part.Count)
 		}

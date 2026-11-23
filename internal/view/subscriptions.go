@@ -98,14 +98,56 @@ func BuildSubscriptionsFromLibrary(a *app.App, st *app.LoadoutState, o modchange
 		return nil, err
 	}
 	p := &SubscriptionsPage{History: history, Pending: []PendingUpdate{}, Gone: []RemovedSubscription{}}
+	var checks map[string]app.SourceCheck
+	var gone map[string]map[string]bool
+	p.Sources, checks, gone = subscriptionSources(a)
+	for _, l := range lib.Lineages {
+		for _, inst := range l.Instances {
+			for i := range p.Sources {
+				if p.Sources[i].Key == inst.Source {
+					subscriptionInstance(a, p, &p.Sources[i], l, inst, checks, gone)
+				}
+			}
+		}
+	}
+	for i := range p.Sources {
+		sourceResult(&p.Sources[i], p.Pending)
+	}
+
+	p.Recent = recentSubscriptions(a, lib.Lineages)
+	p.Summary = sourceSummary(a, p.Sources, checks)
+	return p, nil
+}
+
+// subscriptionSourceName is a subscription source's name on Updates and in its check task
+// ("" for a key that is none).
+func subscriptionSourceName(key string) string {
+	switch key {
+	case app.LibWorkshop:
+		return T("Steam Workshop (client)")
+	case app.LibSteamCMD:
+		return "SteamCMD"
+	case app.LibGit:
+		return "Git"
+	case app.LibPage:
+		return T("download page / LoversLab")
+	case app.LibLocal:
+		return T("local (no source)")
+	}
+	return ""
+}
+
+// subscriptionSources are the sources with their last checks, the checks by source, and
+// by source the ids the last check found gone.
+func subscriptionSources(a *app.App) ([]SubscriptionSource, map[string]app.SourceCheck, map[string]map[string]bool) {
 	keys := []string{app.LibWorkshop, app.LibSteamCMD, app.LibGit, app.LibPage, app.LibLocal}
-	names := []string{T("Steam Workshop (client)"), "SteamCMD", "Git", T("download page / LoversLab"), T("local (no source)")}
 	checks := map[string]app.SourceCheck{}
 	gone := map[string]map[string]bool{}
-	for i, key := range keys {
+	var sources []SubscriptionSource
+	for _, key := range keys {
 		c := a.SubscriptionSourceCheck(key)
 		checks[key] = c
-		r := SubscriptionSource{Key: key, Name: names[i], Result: T("not checked yet")}
+		r := SubscriptionSource{Key: key, Name: subscriptionSourceName(key), Result: T("not checked yet")}
 		if !c.At.IsZero() {
 			r.Checked, r.Result = a.FormatTime(c.At), Text(c.Result)
 			gone[key] = map[string]bool{}
@@ -128,97 +170,97 @@ func BuildSubscriptionsFromLibrary(a *app.App, st *app.LoadoutState, o modchange
 			r.Account, _ = LoversLabLine(a)
 		}
 
-		p.Sources = append(p.Sources, r)
+		sources = append(sources, r)
 	}
-	for _, l := range lib.Lineages {
-		for _, inst := range l.Instances {
-			for i := range p.Sources {
-				s := &p.Sources[i]
-				if s.Key != inst.Source {
-					continue
-				}
-				s.Count++
-				if sub := inst.Subscription; sub != nil && sub.CheckedAt.After(checks[s.Key].At) {
-					check := checks[s.Key]
-					check.At = sub.CheckedAt
-					checks[s.Key] = check
-					s.Checked, s.Result = a.FormatTime(sub.CheckedAt), T("check complete")
-					if sub.CheckError != "" {
-						s.Result = Text(sub.CheckError)
-					}
-				}
-				if sub := inst.Subscription; sub != nil && sub.CheckError != "" && inst.Mod != nil && !inst.Missing() {
-					addSourceFailure(s, l.Name, Text(sub.CheckError))
-				}
-				if inst.Mod == nil || inst.Missing() || s.Key == app.LibLocal {
-					continue
-				}
-				if gone[s.Key][inst.WorkshopID] {
-					p.Gone = append(p.Gone, RemovedSubscription{ID: inst.Mod.ID, Ref: inst.Ref, Name: l.Name, InPlan: inst.InPlan})
-					continue
-				}
-				r := PendingUpdate{ID: inst.Mod.ID, Ref: inst.Ref, Name: l.Name, Source: s.Name, Kind: s.Key, Installed: "—", Available: "—", UsedIn: []string{}, InPlan: inst.InPlan}
-				for _, u := range inst.UsedIn {
-					r.UsedIn = append(r.UsedIn, u.Name)
-				}
-				if sub := inst.Subscription; sub != nil {
-					if !sub.InstalledAt.IsZero() {
-						r.InstalledAt = a.FormatTime(sub.InstalledAt)
-					}
-					if !sub.CheckedAt.IsZero() {
-						r.Checked = a.FormatTime(sub.CheckedAt)
-					}
-					r.Tracking = subscriptionTracking(sub)
-					r.LoversLab = sub.Kind == "page" && subscribe.LoversLabPage(sub.URL)
-					r.Opens = subscriptionOpens(sub)
-				}
-				if s.Key == app.LibWorkshop || s.Key == app.LibSteamCMD {
-					r.Opens = "notes"
-				}
-				if sub := inst.Subscription; sub != nil && sub.HasUpdate() {
-					r.Installed, r.Available = subscriptionValue(a, sub.Kind, sub.Installed), subscriptionValue(a, sub.Kind, sub.Latest)
-				} else if s.Key == app.LibWorkshop || s.Key == app.LibSteamCMD {
-					latest := checks[s.Key].Latest[inst.Mod.ID]
-					installed := inst.Mod.ACFTimeUpdated
-					if s.Key == app.LibSteamCMD && inst.Subscription != nil && !inst.Subscription.InstalledAt.IsZero() {
-						installed = max(installed, inst.Subscription.InstalledAt.Unix())
-					}
-					if installed <= 0 || latest <= installed {
-						continue
-					}
-					r.Installed, r.Available = a.FormatTime(time.Unix(installed, 0)), a.FormatTime(time.Unix(latest, 0))
-				} else {
-					continue
-				}
-				p.Pending = append(p.Pending, r)
-			}
-		}
-	}
-	for i := range p.Sources {
-		s := &p.Sources[i]
-		n := 0
-		for _, update := range p.Pending {
-			if update.Kind == s.Key {
-				n++
-			}
-		}
-		if s.Result == T("check complete") || s.Result == T("up to date") {
-			s.Result = UpdateCheckResult(n, "check complete")
-		}
-		failed := 0
-		for _, g := range s.Failures {
-			failed += len(g.Items)
-		}
-		if failed == 1 {
-			s.Result = T("1 check failed")
-		} else if failed > 1 {
-			s.Result = Tf("%d checks failed", failed)
-		}
-	}
+	return sources, checks, gone
+}
 
-	p.Recent = recentSubscriptions(a, lib.Lineages)
-	p.Summary = sourceSummary(a, p.Sources, checks)
-	return p, nil
+// subscriptionInstance counts one copy under its source and files it as gone or as a
+// pending update.
+func subscriptionInstance(a *app.App, p *SubscriptionsPage, s *SubscriptionSource, l *app.LibLineage, inst *app.LibInstance, checks map[string]app.SourceCheck, gone map[string]map[string]bool) {
+	s.Count++
+	if sub := inst.Subscription; sub != nil && sub.CheckedAt.After(checks[s.Key].At) {
+		check := checks[s.Key]
+		check.At = sub.CheckedAt
+		checks[s.Key] = check
+		s.Checked, s.Result = a.FormatTime(sub.CheckedAt), T("check complete")
+		if sub.CheckError != "" {
+			s.Result = Text(sub.CheckError)
+		}
+	}
+	if sub := inst.Subscription; sub != nil && sub.CheckError != "" && inst.Mod != nil && !inst.Missing() {
+		addSourceFailure(s, l.Name, Text(sub.CheckError))
+	}
+	if inst.Mod == nil || inst.Missing() || s.Key == app.LibLocal {
+		return
+	}
+	if gone[s.Key][inst.WorkshopID] {
+		p.Gone = append(p.Gone, RemovedSubscription{ID: inst.Mod.ID, Ref: inst.Ref, Name: l.Name, InPlan: inst.InPlan})
+		return
+	}
+	if r, ok := pendingUpdate(a, s, l, inst, checks); ok {
+		p.Pending = append(p.Pending, r)
+	}
+}
+
+// pendingUpdate is the copy's row among the updates, when its source has a newer version.
+func pendingUpdate(a *app.App, s *SubscriptionSource, l *app.LibLineage, inst *app.LibInstance, checks map[string]app.SourceCheck) (PendingUpdate, bool) {
+	r := PendingUpdate{ID: inst.Mod.ID, Ref: inst.Ref, Name: l.Name, Source: s.Name, Kind: s.Key, Installed: "—", Available: "—", UsedIn: []string{}, InPlan: inst.InPlan}
+	for _, u := range inst.UsedIn {
+		r.UsedIn = append(r.UsedIn, u.Name)
+	}
+	if sub := inst.Subscription; sub != nil {
+		if !sub.InstalledAt.IsZero() {
+			r.InstalledAt = a.FormatTime(sub.InstalledAt)
+		}
+		if !sub.CheckedAt.IsZero() {
+			r.Checked = a.FormatTime(sub.CheckedAt)
+		}
+		r.Tracking = subscriptionTracking(sub)
+		r.LoversLab = sub.Kind == "page" && subscribe.LoversLabPage(sub.URL)
+		r.Opens = subscriptionOpens(sub)
+	}
+	if s.Key == app.LibWorkshop || s.Key == app.LibSteamCMD {
+		r.Opens = "notes"
+	}
+	if sub := inst.Subscription; sub != nil && sub.HasUpdate() {
+		r.Installed, r.Available = subscriptionValue(a, sub.Kind, sub.Installed), subscriptionValue(a, sub.Kind, sub.Latest)
+	} else if s.Key == app.LibWorkshop || s.Key == app.LibSteamCMD {
+		latest := checks[s.Key].Latest[inst.Mod.ID]
+		installed := inst.Mod.ACFTimeUpdated
+		if s.Key == app.LibSteamCMD && inst.Subscription != nil && !inst.Subscription.InstalledAt.IsZero() {
+			installed = max(installed, inst.Subscription.InstalledAt.Unix())
+		}
+		if installed <= 0 || latest <= installed {
+			return r, false
+		}
+		r.Installed, r.Available = a.FormatTime(time.Unix(installed, 0)), a.FormatTime(time.Unix(latest, 0))
+	} else {
+		return r, false
+	}
+	return r, true
+}
+
+// sourceResult words a source's result from its pending updates and failed checks.
+func sourceResult(s *SubscriptionSource, pending []PendingUpdate) {
+	n := 0
+	for _, update := range pending {
+		if update.Kind == s.Key {
+			n++
+		}
+	}
+	if s.Result == T("check complete") || s.Result == T("up to date") {
+		s.Result = UpdateCheckResult(n, "check complete")
+	}
+	failed := 0
+	for _, g := range s.Failures {
+		failed += len(g.Items)
+	}
+	if failed == 1 {
+		s.Result = T("1 check failed")
+	} else if failed > 1 {
+		s.Result = Tf("%d checks failed", failed)
+	}
 }
 
 // addSourceFailure groups reasons without hiding the affected mod names.
@@ -237,7 +279,10 @@ func sourceSummary(a *app.App, sources []SubscriptionSource, checks map[string]a
 	var last time.Time
 	n := 0
 	for _, s := range sources {
-		if s.Key == app.LibLocal {
+		// The page lists only sources with Mods (16 §2.9); an automatic check also stamps
+		// the empty ones, and counting those said "checked 3 sources" over a list whose only
+		// source read "not checked yet" (VM 2026-11-22).
+		if s.Key == app.LibLocal || s.Count == 0 {
 			continue
 		}
 		if c := checks[s.Key]; !c.At.IsZero() {
@@ -251,7 +296,9 @@ func sourceSummary(a *app.App, sources []SubscriptionSource, checks map[string]a
 		}
 	}
 	sum.Line = T("sources not checked yet")
-	if n > 0 {
+	if n == 1 {
+		sum.Line = Tf("checked 1 source, the last at %s", a.FormatTime(last))
+	} else if n > 1 {
 		sum.Line = Tf("checked %d sources, the last at %s", n, a.FormatTime(last))
 	}
 	if sum.Failures == 1 {

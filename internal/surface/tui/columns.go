@@ -32,6 +32,7 @@ const (
 	statusUnloadable = view.StatusUnloadable
 	statusWarn       = view.StatusWarn
 	statusHint       = view.StatusHint
+	statusVersion    = view.StatusVersion
 	statusLog        = view.StatusLog
 	statusErr        = view.StatusErr
 )
@@ -448,6 +449,9 @@ func (m *model) drawRowLines(c *column, vi int, focused bool, w int, wrapName bo
 	if it.unsaved {
 		dot = " " + ic.unsaved
 	}
+	if it.v.New { // a Mod a scan found in the last week (16 §2.5)
+		dot = " " + T("new") + dot
+	}
 	var more []string // wrapped lines after the first
 	if wrapName && width.StringWidth(name) > nameW {
 		if ls := wrap(name, nameW); len(ls) > 1 {
@@ -508,6 +512,8 @@ func statusGlyph(s int) string {
 	switch s {
 	case statusHint:
 		return ic.hint
+	case statusVersion:
+		return ic.ver
 	case statusErr:
 		return ic.err
 	case statusLog:
@@ -528,7 +534,7 @@ func statusStyle(s int) lipgloss.Style {
 		return sErrS
 	case statusWarn:
 		return sWarnS
-	case statusUnloadable:
+	case statusUnloadable, statusVersion:
 		return sDimS
 	}
 	return plainStyle

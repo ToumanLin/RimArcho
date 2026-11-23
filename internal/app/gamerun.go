@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
@@ -70,10 +71,34 @@ func (a *App) probe() func(gameRoot string) *GameRun {
 	}
 }
 
+// recentProcs is the process table listed for readProbe, with when.
+var recentProcs struct {
+	sync.Mutex
+	at    time.Time
+	procs []*GameRun
+}
+
+// readProbe is probe for reads that only choose what to show, such as which log is the
+// run in progress (LiveLog): a table listed in the last second will do. Listing it takes
+// tens of milliseconds, and the launch page asks once for every plan (1.0.9: a second at
+// start). Anything that writes, or refuses to while the game runs, uses probe.
+func (a *App) readProbe() func(gameRoot string) *GameRun {
+	if a.GameProbe != nil {
+		return a.GameProbe
+	}
+	recentProcs.Lock()
+	if recentProcs.at.IsZero() || time.Since(recentProcs.at) > time.Second {
+		recentProcs.procs, recentProcs.at = gameProcesses(), time.Now()
+	}
+	procs := recentProcs.procs
+	recentProcs.Unlock()
+	return func(gameRoot string) *GameRun { return processIn(procs, gameRoot) }
+}
+
 // processIn picks the process whose executable lies in gameRoot.
 func processIn(procs []*GameRun, gameRoot string) *GameRun {
-	if gameRoot == "" {
-		return nil
+	if gameRoot == "" || len(procs) == 0 {
+		return nil // no game runs: the folder's real path is not needed
 	}
 	root := env.PathKey(realOrAbs(gameRoot))
 	for _, r := range procs {
@@ -98,24 +123,30 @@ func underDir(p, dir string) bool {
 
 // RunningGame is a game running in any registered environment (09 §1, §4).
 type RunningGame struct {
-	Env  *env.Environment
-	Run  *GameRun
-	What RunWhat
+	Env        *env.Environment
+	Run        *GameRun
+	What       RunWhat
+	UnknownEnv bool
 }
 
 // Describe names what runs for a refusal or a status line: the environment and the list or
 // pack it plays.
 func (g *RunningGame) Describe(loc *time.Location) string {
+	if g.UnknownEnv {
+		return fmt.Sprintf("installation %s running, Game Config unknown (pid %d)", g.Env.GameRoot, g.Run.PID)
+	}
 	what := g.What.PlanText()
 	if g.What.Pack != "" {
 		what = "pack " + g.What.Pack
 		if g.What.Guess {
 			what += " (from the launch records)"
 		}
+	} else if g.What.Test {
+		what = "a test run"
 	} else if g.What.UserData != "" && env.PathKey(g.What.UserData) != env.PathKey(g.Env.UserDataRoot) {
 		what = "data folder " + g.What.UserData
 	}
-	s := fmt.Sprintf("environment %s is running %s (pid %d", g.Env.Name, what, g.Run.PID)
+	s := fmt.Sprintf("Game Config %s is running %s (pid %d", g.Env.Name, what, g.Run.PID)
 	if !g.Run.Started.IsZero() {
 		if loc == nil {
 			loc = time.Local
@@ -138,8 +169,12 @@ func (e *GameRunningError) Error() string {
 func (e *GameRunningError) Unwrap() error { return ErrLaunchBlocked }
 
 // RunningGame finds a running game in any registered environment, the current one first: a
-// process whose executable is under an environment's game folder (09 §4). nil when none.
+// process whose executable is under a environment's game folder (09 §4). nil when none.
 func (a *App) RunningGame() (*RunningGame, error) {
+	return a.runningGame(a.probe())
+}
+
+func (a *App) runningGame(probe func(string) *GameRun) (*RunningGame, error) {
 	envs, err := a.Store.Envs()
 	if err != nil {
 		return nil, err
@@ -152,10 +187,58 @@ func (a *App) RunningGame() (*RunningGame, error) {
 			}
 		}
 	}
-	probe := a.probe()
 	for _, e := range envs {
 		if r := probe(e.GameRoot); r != nil {
-			return &RunningGame{Env: e, Run: r, What: a.WhatRuns(e, r)}, nil
+			g := &RunningGame{Env: e, Run: r, UnknownEnv: true}
+			var siblings []*env.Environment
+			for _, o := range envs {
+				if o.GameID == e.GameID {
+					siblings = append(siblings, o)
+				}
+			}
+			if r.ArgsKnown {
+				root := r.SaveData
+				if root == "" {
+					root = a.DefaultUserData(e.GameRoot)
+				}
+				for _, o := range siblings {
+					if samePath(root, o.UserDataRoot) {
+						g.Env, g.UnknownEnv = o, false
+						break
+					}
+				}
+			}
+			if g.UnknownEnv {
+				at := r.Started
+				if at.IsZero() {
+					at = a.Now()
+				}
+				ids := []string{}
+				for _, o := range siblings {
+					ids = append(ids, o.ID)
+				}
+				l, err := a.Store.LaunchRecordBefore(ids, at.Add(time.Minute))
+				if err != nil {
+					return nil, err
+				}
+				if l != nil && at.Sub(l.Started) >= -time.Minute && at.Sub(l.Started) < launchSlack &&
+					(!r.ArgsKnown || l.UserDataRoot != "" && samePath(l.UserDataRoot, r.SaveData)) {
+					for _, o := range siblings {
+						if o.ID == l.EnvID {
+							g.Env, g.UnknownEnv = o, false
+							break
+						}
+					}
+				}
+				if len(siblings) == 1 && !r.ArgsKnown {
+					g.UnknownEnv = false
+				}
+			}
+			g.What = a.WhatRuns(g.Env, r)
+			if g.UnknownEnv {
+				g.What.Plan, g.What.Pack = "", ""
+			}
+			return g, nil
 		}
 	}
 	return nil, nil
@@ -176,13 +259,16 @@ func (a *App) checkNoGame() error {
 // RunWhat is what a game run plays: one of the environment's plans or a pack (10 §3).
 type RunWhat struct {
 	Pack     string // "" for the environment's list
-	UserData string // the run's data folder: its ModsConfig.xml, and on 1.7 its Logs/
+	UserData string // the run's data folder: its ModsConfig.xml and Player.log
 	Guess    bool   // read from the launch records: the command line was not available
 	// Plan names the plan played, from the launch records (09 §4) or, for a game started
 	// elsewhere, the plan last written to the game; "" when neither says.
 	Plan string
 	// PlanWritten: Plan comes from the write record, not from a launch.
 	PlanWritten bool
+	// Test: the game of a test run (archo test run, 20 §1), in RimArcho's own data folder;
+	// not the player's game.
+	Test bool
 }
 
 // PlanText names the plan a run plays: "plan:<name>", "plan:<name> (last written to the
@@ -221,17 +307,30 @@ func (a *App) WhatRuns(e *env.Environment, r *GameRun) RunWhat {
 		at = a.Now()
 	}
 	if r.ArgsKnown {
-		if r.SaveData == "" || env.PathKey(r.SaveData) == env.PathKey(e.UserDataRoot) {
+		root := r.SaveData
+		if root == "" {
+			root = a.DefaultUserData(e.GameRoot)
+		}
+		if samePath(root, e.UserDataRoot) {
 			return a.withPlan(e, own, at)
 		}
-		if name := a.packOfDir(r.SaveData); name != "" {
+		if name := a.packOfDir(root); name != "" {
 			return RunWhat{Pack: name, UserData: r.SaveData}
 		}
-		return RunWhat{UserData: r.SaveData}
+		return RunWhat{UserData: root, Test: a.Home != "" && underDir(env.PathKey(realOrAbs(r.SaveData)), env.PathKey(realOrAbs(filepath.Join(a.Home, "tests"))))}
 	}
-	if m, t := a.Store.LaunchBefore(e.ID, at.Add(time.Minute)); strings.HasPrefix(m, "pack:") && at.Sub(t) < launchSlack {
-		name := strings.TrimPrefix(m, "pack:")
-		return RunWhat{Pack: name, UserData: filepath.Join(a.packPath(name), "userdata"), Guess: true}
+	if l, err := a.Store.LaunchRecordBefore([]string{e.ID}, at.Add(time.Minute)); err == nil && l != nil && at.Sub(l.Started) < launchSlack {
+		if l.UserDataRoot != "" {
+			own.UserData = l.UserDataRoot
+			own.Guess = true
+		}
+		if name := l.Pack(); name != "" {
+			root := l.UserDataRoot
+			if root == "" {
+				root = filepath.Join(a.packPath(name), "userdata")
+			}
+			return RunWhat{Pack: name, UserData: root, Guess: true}
+		}
 	}
 	return a.withPlan(e, own, at)
 }
@@ -269,13 +368,19 @@ func (a *App) packOfDir(dir string) string {
 	return parts[0]
 }
 
-// RunLog is the Player.log a run writes: on 1.7 under its data folder's Logs/, before 1.7
-// the one Unity keeps (the environment's).
+// RunLog prefers the explicit Player.log in the run's own data folder (03 §6.3).
+// A pack never falls back to the selected environment's log; on 1.7 it reads the default
+// folder's Logs/ when its own launch wrote it.
 func (a *App) RunLog(st *LoadoutState, w RunWhat) string {
 	if w.UserData != "" && env.PathKey(w.UserData) != env.PathKey(st.Ix.Env.UserDataRoot) {
-		if p := env.PlayerLog(w.UserData, st.GameMM()); p != "" && a.CheckLogOwner(st, p) == nil {
-			return p
+		for _, p := range []string{filepath.Join(w.UserData, "Player.log"), env.PlayerLog(w.UserData, st.GameMM())} {
+			if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+				return p
+			}
 		}
+		// 1.7 ignores -logfile: a pack's run writes the default folder's Logs/ (03 §6.3).
+		cur, _ := a.waylithRunLogs(st.Ix.Env, w.UserData, w.Pack)
+		return cur
 	}
 	cur, _ := a.LogPaths(st)
 	return cur

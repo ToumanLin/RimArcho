@@ -43,8 +43,8 @@ func TestEnvModelSharedWorkshop(t *testing.T) {
 	e.MustRun("enable", "#"+ws[:6])
 
 	g2 := secondGame(e, "Game15")
-	if out, code := e.Run("env", "add", "again", "--game", e.Game); code == 0 || !strings.Contains(out, "one environment per game folder") {
-		t.Fatalf("a second environment for one game folder: exit %d\n%s", code, out)
+	if out, code := e.Run("env", "add", "again", "--game", e.Game); code == 0 || !strings.Contains(out, "--saves own") {
+		t.Fatalf("a second Game Config for one game folder: exit %d\n%s", code, out)
 	}
 	out := e.MustRun("env", "add", "old", "--game", g2, "--saves", "own")
 	if !strings.Contains(out, "saves: own") || strings.Contains(out, "src:workshop") {
@@ -169,7 +169,7 @@ func TestFolderCommands(t *testing.T) {
 	if !strings.Contains(list, "src:workshop") || !strings.Contains(list, "src:extra") || !strings.Contains(list, "1 mods") {
 		t.Fatalf("folder list:\n%s", list)
 	}
-	if out, code := e.Run("folder", "remove", "src:local"); code == 0 || !strings.Contains(out, "comes and goes with its environment") {
+	if out, code := e.Run("folder", "remove", "src:local"); code == 0 || !strings.Contains(out, "comes and goes with its Game Config") {
 		t.Fatalf("removing a game's Mods/: exit %d\n%s", code, out)
 	}
 	e.MustRun("folder", "remove", "src:extra")
@@ -189,9 +189,10 @@ func TestFolderCommands(t *testing.T) {
 	}
 }
 
-// 03 §2: a SteamCMD game keeps its own Workshop folder inside the game folder. It becomes a
-// shared SteamCMD folder on env add (and, for an environment added earlier, on a scan); it
-// never moves the Steam client's Workshop folder, and a removed one stays removed.
+// 03 §2: a SteamCMD game keeps its own Workshop folder inside the game folder. Without the
+// Steam client's Workshop folder on disk it becomes a shared SteamCMD folder on env add (and,
+// for an environment added earlier, on a scan); it never moves the Steam client's Workshop
+// folder, and a removed one stays removed. With the client's folder: gamemirror_test.go.
 func TestGameWorkshopIsSteamCMD(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
@@ -199,6 +200,7 @@ func TestGameWorkshopIsSteamCMD(t *testing.T) {
 	e.AddEnv(false)
 	scanNow(t, e)
 	wsRoot := sourcesOf(t, e)["workshop"].Root
+	e.Move(e.Workshop, filepath.Join(e.Root, "NoSteamClient")) // a SteamCMD-only player
 
 	g2 := secondGame(e, "Game16")
 	own := filepath.Join(g2, "steamapps", "workshop", "content", "294100")
@@ -282,7 +284,7 @@ func TestEnvRemoveCurrent(t *testing.T) {
 		return nil
 	}
 	if out, code := e.Run("env", "remove", "main", "--yes"); code == 0 || !strings.Contains(out, "running") {
-		t.Fatalf("removing a running game's environment is refused: exit %d\n%s", code, out)
+		t.Fatalf("removing a running game's Game Config is refused: exit %d\n%s", code, out)
 	}
 	e.App.GameProbe = func(string) *app.GameRun { return nil }
 	r, err := e.App.EnvRemovePreview("main")
@@ -291,13 +293,13 @@ func TestEnvRemoveCurrent(t *testing.T) {
 	}
 	e.MustRun("env", "remove", "main", "--yes")
 	if cur, _ := e.App.Store.CurrentEnv(); cur == nil || cur.Name != "old" {
-		t.Fatalf("the other environment becomes current: %+v", cur)
+		t.Fatalf("the other Game Config becomes current: %+v", cur)
 	}
 	out := e.MustRun("env", "remove", "old", "--yes")
 	if !strings.Contains(out, "none left") {
-		t.Fatalf("the last environment: none left\n%s", out)
+		t.Fatalf("the last Game Config: none left\n%s", out)
 	}
 	if cur, _ := e.App.Store.CurrentEnv(); cur != nil {
-		t.Fatalf("no current environment: %+v", cur)
+		t.Fatalf("no current Game Config: %+v", cur)
 	}
 }

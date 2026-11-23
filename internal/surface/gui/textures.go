@@ -1,8 +1,11 @@
+//go:build windows || cgo
+
 package gui
 
 import (
 	"context"
 	"errors"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -46,6 +49,10 @@ type textureMeasurement struct {
 // The page opens with it and changing a choice asks only this; Textures reads the textures
 // when the player asks (16 §2.13).
 func (s *API) TexturesInfo(scope string, scale int) (*TexturePage, error) {
+	return join(&s.flight, fmt.Sprint("TexturesInfo|", scope, "|", scale), func() (*TexturePage, error) { return s.texturesInfoRead(scope, scale) })
+}
+
+func (s *API) texturesInfoRead(scope string, scale int) (*TexturePage, error) {
 	if scope != app.TexAll {
 		scope = app.TexPlan
 	}

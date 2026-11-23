@@ -102,6 +102,9 @@ type LogReport struct {
 	// Companion is the companion log read with it (06 §7); CompanionBad its bad lines.
 	Companion    string `json:",omitempty"`
 	CompanionBad int    `json:",omitempty"`
+	// CompanionNewer: the companion is a newer Monitor's log (schema above
+	// logs.MonitorSchema), not read; logs.TooNewText.
+	CompanionNewer string `json:",omitempty"`
 	// Cursor marks how much of the log and its companion this report covers: get_log
 	// since=<cursor> lists what is new after it (06 §6). Empty for pasted text.
 	Cursor string `json:",omitempty"`
@@ -116,7 +119,7 @@ func (a *App) LogPaths(st *LoadoutState) (cur, prev string) {
 		return "", ""
 	}
 	dirs := []string{root, filepath.Join(root, "Logs")}
-	if mm := env.MajorMinor(st.Ix.Env.GameVersion); mm != "" && !env.VersionLess(mm, "1.7") {
+	if mm := env.MajorMinor(st.Ix.Env.GameVersion); mm != "" && !env.VersionLess(mm, "1.7") && samePath(root, a.DefaultUserData(st.Ix.Env.GameRoot)) {
 		dirs[0], dirs[1] = dirs[1], dirs[0]
 	}
 	pick := func(name string) string {
@@ -129,7 +132,80 @@ func (a *App) LogPaths(st *LoadoutState) (cur, prev string) {
 		return ""
 	}
 	cur, prev = pick("Player.log"), pick("Player-prev.log")
+	if cur == "" && prev == "" {
+		cur, prev = a.waylithDefaultLogs(st)
+	}
 	return cur, prev
+}
+
+// waylithDefaultLogs are the logs a 1.7+ (Waylith) game wrote for an own-folder
+// environment: Waylith ignores -logfile and always writes the default folder's Logs/
+// (03 §6.3). A file there counts only when the newest plan launch of any Waylith game
+// before it was written is this environment's, so a default-folder sibling's, a pack's
+// or another 1.7 install's run is never borrowed. A pack's run reads it the same way
+// (waylithRunLogs, RunLog).
+func (a *App) waylithDefaultLogs(st *LoadoutState) (cur, prev string) {
+	return a.waylithRunLogs(st.Ix.Env, st.Ix.Env.UserDataRoot, "")
+}
+
+// EnvPlayerLog is the Player.log `env list` shows for e (03 §3.3): the one in its user
+// data folder, else, for an own-folder 1.7+ environment, the default folder's Logs/
+// Player.log while its newest Waylith launch is e's own (waylithDefaultLogs).
+func (a *App) EnvPlayerLog(e *env.Environment) string {
+	if e.UserDataRoot == "" {
+		return ""
+	}
+	if p := env.PlayerLog(e.UserDataRoot, e.GameVersion); p != "" {
+		return p
+	}
+	cur, _ := a.waylithRunLogs(e, e.UserDataRoot, "")
+	return cur
+}
+
+// waylithRunLogs is waylithDefaultLogs for a run with data folder userData: e's own
+// (pack "") or pack's. The launch that owns the file must be that run's: same data folder,
+// and the same pack (none for e's list, then also e's launch).
+func (a *App) waylithRunLogs(e *env.Environment, userData, pack string) (cur, prev string) {
+	def := a.DefaultUserData(e.GameRoot)
+	if def == "" || userData == "" || samePath(userData, def) || !isWaylith(e) {
+		return "", ""
+	}
+	envs, err := a.Store.Envs()
+	if err != nil {
+		return "", ""
+	}
+	var ids []string
+	for _, o := range envs {
+		if isWaylith(o) {
+			ids = append(ids, o.ID)
+		}
+	}
+	owned := func(name string) string {
+		p := filepath.Join(def, "Logs", name)
+		fi, err := os.Stat(p)
+		if err != nil || fi.IsDir() {
+			return ""
+		}
+		r, err := a.Store.LaunchRecordBefore(ids, fi.ModTime())
+		if err != nil || r == nil || !strings.EqualFold(r.Pack(), pack) || pack == "" && r.EnvID != e.ID || !samePath(r.UserDataRoot, userData) {
+			return ""
+		}
+		return p
+	}
+	cur = owned("Player.log")
+	if cur == "" {
+		return "", "" // the previous run alone would be read as the last one
+	}
+	return cur, owned("Player-prev.log")
+}
+
+// isWaylith says whether e's game is 1.7 or later (Waylith.dll or its version, 20 §2).
+func isWaylith(e *env.Environment) bool {
+	if _, err := os.Stat(filepath.Join(e.GameRoot, "Waylith.dll")); err == nil {
+		return true
+	}
+	mm := env.MajorMinor(e.GameVersion)
+	return mm != "" && !env.VersionLess(mm, "1.7")
 }
 
 type logCacheEntry struct {
@@ -171,7 +247,9 @@ var ErrLogNotCached = errors.New("log not analysed yet")
 // was modified" and comp-list tick crashes, Harmony patches on callers listed only, no
 // --target suggestion for TargetMethod() patches (06 §2, §3); 21: native Linux paths;
 // 22: audio and other asset paths in stable finding keys and attribution on both platforms.
-const logCacheVersion = 22
+// 23: isolated log ownership ignores later redirected sibling and pack launches.
+// 24: 1.7 caller frames that name a source file ("[0x6] in <file>:<line>") (06 §1).
+const logCacheVersion = 24
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -246,6 +324,9 @@ func (a *App) analyzeLog(path string, cacheOnly bool) (*LogReport, error) {
 		comp, cm = readCompanion(compPath, -1)
 		if comp != nil {
 			rep.Companion, rep.CompanionBad = filepath.Base(compPath), comp.BadLines
+			if comp.TooNew > 0 {
+				rep.CompanionNewer = logs.TooNewText
+			}
 			cur.CompSize, cur.CompSum = cm.size, cm.sum
 		}
 	}
@@ -272,8 +353,11 @@ func (a *App) analyzeLog(path string, cacheOnly bool) (*LogReport, error) {
 func (a *App) logInputKey(st *LoadoutState) string {
 	h := sha1.New()
 	fmt.Fprintf(h, "v%d|%s|%s|", logCacheVersion, a.GameVersion, st.GameMM())
+	// Not the run's id alone: a new run of the same slot replaces the old row and SQLite
+	// gives it the same id again (VM 2026-11-10: after `archo analyze` the log still said
+	// two new Mods were not analysed and blamed another Mod).
 	if s, err := a.Analysis(st); err == nil && s.Run != nil {
-		fmt.Fprintf(h, "a%d|", s.Run.ID)
+		fmt.Fprintf(h, "a%d.%s.%d.%d|", s.Run.ID, s.Run.RunKey, s.Run.Started.UnixNano(), s.Run.Finished.UnixNano())
 	}
 	for _, e := range st.List {
 		fmt.Fprintf(h, "%s;", e.Instance)
@@ -866,9 +950,39 @@ var tickChecklist = []string{
 	"also check ExposeData/PostExposeData, SpawnSetup, DeSpawn and Destroy of the mods that patch the method",
 }
 
+// attributeCluster runs the attribution rules on one cluster, in order, and sets its confidence.
 func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.LogFailure) {
+	cx.messageOwners(lc)
+	cx.classRules(lc, failAt)
+	cx.typeRules(lc)
+	// 3. Stack frames and Harmony lines.
+	hot := cx.frameRules(lc)
+	if wantsListScan(lc, hot) {
+		cx.listModifiers(lc)
+	}
+	if hot {
+		// Who changes the comp list is not on the stack: the thrower and the patchers named
+		// there rarely hold the cause (h7), so these searches cover every enabled mod.
+		lc.next(`archo source search "AllComps.Remove(" --active --yes --budget 10`, `archo source search "AllComps.Add(" --active --yes --budget 10`)
+		lc.Checklist = append(lc.Checklist, tickChecklist...)
+	}
+	cx.messageTypes(lc)
+	// 5. Callers of failing code, HugsLib's log upload (logcallers.go).
+	cx.callerRules(lc)
+	if cx.comp != nil {
+		cx.companion(lc)
+	}
+	// 6. Who supplied the null (logtrace.go); the lord's AddPawn calls (loglordsites.go).
+	cx.nullTrace(lc)
+	cx.lordSites(lc)
+	lc.order()
+	clusterConfidence(lc)
+}
+
+// messageOwners applies the first rules: the mod a "[Mod Name] …" prefix names, and the
+// owners of file paths in the message or its continuation lines.
+func (cx *attrCtx) messageOwners(lc *LogCluster) {
 	e := lc.First
-	ix := cx.st.Ix
 	// 1. "[Mod Name] …" prefix: the mod logs its own problem. An XML Extensions block names
 	// the mod in full ("[[FSF] Vanilla Bionics Expansion] Verse.PatchOperation…").
 	if m := blockRe.FindStringSubmatch(e.Message); m != nil {
@@ -900,57 +1014,16 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 			}
 		}
 	}
+}
+
+// classRules applies the rules of the cluster's class.
+func (cx *attrCtx) classRules(lc *LogCluster, failAt map[string]analyze.LogFailure) {
+	e := lc.First
 	switch lc.Class {
 	case logs.ClassPatchFailed:
 		cx.patchFailure(lc, failAt)
 	case logs.ClassXrefMissing:
-		if typ, name, ok := xrefName(e.Message); ok {
-			short := typ[strings.LastIndexByte(typ, '.')+1:]
-			save := strings.HasPrefix(e.Message, "Could not load reference")
-			lc.Details = append(lc.Details, "missing: def:"+short+"/"+name)
-			if save {
-				lc.Details = append(lc.Details, "raised while loading a save: the save references a def no active mod provides")
-			} else if strings.HasPrefix(e.Message, "Failed to find ") {
-				lc.Details = append(lc.Details, "asked for by name at run time (DefDatabase.GetNamed), usually from a mod's code: the def is not loaded")
-			}
-			defs, _ := cx.defsNamed(name, false)
-			var prov []string
-			for _, d := range defs {
-				if d.Type != short && !strings.HasSuffix(typ, "."+d.Type) {
-					continue
-				}
-				if cx.st.Position(d.Instance) > 0 {
-					prov = append(prov, ix.Ref(d.Instance)+" (active)")
-				} else if ix.ByID[d.Instance] != nil {
-					prov = append(prov, ix.Ref(d.Instance)+" (not enabled)")
-					lc.add(d.Instance, RoleDependency, fmt.Sprintf("defines %s %s at %s:%d but is not enabled", short, name, d.File, d.Line))
-					lc.next("archo enable " + ix.Ref(d.Instance))
-					lc.providerOff = true
-				}
-			}
-			if len(prov) == 0 {
-				lc.Details = append(lc.Details, "providers: none among installed mods")
-				if save {
-					// The save names the def, not the mod that defined it: nothing to attribute.
-					lc.Details = append(lc.Details, "the mod that defined it was removed, or it renamed or removed the def; the game drops the reference (usually harmless once the game is saved again)")
-				}
-			} else {
-				lc.Details = append(lc.Details, "providers: "+strings.Join(uniqStr(prov), ", "))
-			}
-			lc.next("archo def "+short+"/"+name, fmt.Sprintf("archo files search %q", name))
-			// "… found to give to Verse.ThingDef RKU_Hammer": the def that wanted the missing one.
-			// Whoever defines it holds the reference (log corpus: a direct rule beats searching
-			// every file for the missing name).
-			if w := wanterRe.FindStringSubmatch(e.Message); w != nil {
-				wshort := w[1][strings.LastIndexByte(w[1], '.')+1:]
-				ws, _ := cx.defsNamed(w[2], false)
-				for _, d := range ws {
-					if d.Type == wshort && cx.st.Position(d.Instance) > 0 && !cx.official(d.Instance) {
-						lc.add(d.Instance, RoleSource, fmt.Sprintf("defines %s %s, which wants %s %s (%s:%d)", wshort, w[2], short, name, d.File, d.Line))
-					}
-				}
-			}
-		}
+		cx.xrefMissing(lc)
 	case logs.ClassTexture:
 		// "Could not load Texture2D at '…' for def 'X'": the mod defining X points at it.
 		if m := forDefRe.FindStringSubmatch(e.Message); m != nil {
@@ -963,32 +1036,7 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 	case logs.ClassSave:
 		cx.saveLoad(lc)
 	case logs.ClassXMLLoad:
-		// "XML error: … Context: <ThingDef …><defName>X</defName>…": the def's XML is at fault.
-		texts := strings.Join(append([]string{e.Message}, e.Extra...), "\n")
-		// A missing parent provided by an installed, disabled mod is a missing dependency.
-		if m := parentRe.FindStringSubmatch(e.Message); m != nil {
-			ds, _ := cx.defsNamed(m[1], true)
-			for _, d := range ds {
-				if cx.st.Position(d.Instance) == 0 && ix.ByID[d.Instance] != nil {
-					lc.add(d.Instance, RoleDependency, fmt.Sprintf("provides the abstract def %s (%s:%d) but is not enabled", m[1], d.File, d.Line))
-					lc.next("archo enable " + ix.Ref(d.Instance))
-				}
-			}
-		}
-		// Duplicate ThinkNode keys come from patches to the think tree, not from the tree itself.
-		if m := thinkKeyRe.FindStringSubmatch(e.Message); m != nil && cx.run != nil {
-			pf, _ := cx.a.Store.PatchFacts(cx.run.ID, store.PatchFilter{Target: "ThinkTreeDef/" + m[1]})
-			for _, p := range pf {
-				if cx.st.Position(p.Instance) > 0 && !cx.official(p.Instance) {
-					lc.add(p.Instance, RolePatcher, fmt.Sprintf("patches ThinkTreeDef %s at %s:%d", m[1], p.File, p.Line))
-				}
-			}
-		}
-		if m := ctxDefNameRe.FindStringSubmatch(texts); m != nil {
-			cx.definedBy(lc, m[1], false, "is the def the XML error is in")
-		} else if m := ctxNameRe.FindStringSubmatch(texts); m != nil {
-			cx.definedBy(lc, m[1], true, "is the abstract def the XML error is in")
-		}
+		cx.xmlLoad(lc)
 	case logs.ClassNoise:
 		if n := logs.KnownNoise(e.Message); n != nil {
 			lc.Details = append(lc.Details, n.Note)
@@ -1003,6 +1051,98 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 		lc.next(`archo files search "uiIconColor"`, `archo files search "uiIconPath"`)
 		lc.Checklist = append(lc.Checklist, "a _MainTex/ResolveIcon error is XML-side first: look for buildable defs with uiIconColor but no uiIconPath, uiIconPathsStuff or graphicData/texPath, including abstract bases")
 	}
+}
+
+// xrefMissing explains a cross-reference to a missing def: who provides it, enabled or not,
+// and the def that wanted it.
+func (cx *attrCtx) xrefMissing(lc *LogCluster) {
+	e, ix := lc.First, cx.st.Ix
+	typ, name, ok := xrefName(e.Message)
+	if !ok {
+		return
+	}
+	short := typ[strings.LastIndexByte(typ, '.')+1:]
+	save := strings.HasPrefix(e.Message, "Could not load reference")
+	lc.Details = append(lc.Details, "missing: def:"+short+"/"+name)
+	if save {
+		lc.Details = append(lc.Details, "raised while loading a save: the save references a def no active mod provides")
+	} else if strings.HasPrefix(e.Message, "Failed to find ") {
+		lc.Details = append(lc.Details, "asked for by name at run time (DefDatabase.GetNamed), usually from a mod's code: the def is not loaded")
+	}
+	defs, _ := cx.defsNamed(name, false)
+	var prov []string
+	for _, d := range defs {
+		if d.Type != short && !strings.HasSuffix(typ, "."+d.Type) {
+			continue
+		}
+		if cx.st.Position(d.Instance) > 0 {
+			prov = append(prov, ix.Ref(d.Instance)+" (active)")
+		} else if ix.ByID[d.Instance] != nil {
+			prov = append(prov, ix.Ref(d.Instance)+" (not enabled)")
+			lc.add(d.Instance, RoleDependency, fmt.Sprintf("defines %s %s at %s:%d but is not enabled", short, name, d.File, d.Line))
+			lc.next("archo enable " + ix.Ref(d.Instance))
+			lc.providerOff = true
+		}
+	}
+	if len(prov) == 0 {
+		lc.Details = append(lc.Details, "providers: none among installed mods")
+		if save {
+			// The save names the def, not the mod that defined it: nothing to attribute.
+			lc.Details = append(lc.Details, "the mod that defined it was removed, or it renamed or removed the def; the game drops the reference (usually harmless once the game is saved again)")
+		}
+	} else {
+		lc.Details = append(lc.Details, "providers: "+strings.Join(uniqStr(prov), ", "))
+	}
+	lc.next("archo def "+short+"/"+name, fmt.Sprintf("archo files search %q", name))
+	// "… found to give to Verse.ThingDef RKU_Hammer": the def that wanted the missing one.
+	// Whoever defines it holds the reference (log corpus: a direct rule beats searching
+	// every file for the missing name).
+	if w := wanterRe.FindStringSubmatch(e.Message); w != nil {
+		wshort := w[1][strings.LastIndexByte(w[1], '.')+1:]
+		ws, _ := cx.defsNamed(w[2], false)
+		for _, d := range ws {
+			if d.Type == wshort && cx.st.Position(d.Instance) > 0 && !cx.official(d.Instance) {
+				lc.add(d.Instance, RoleSource, fmt.Sprintf("defines %s %s, which wants %s %s (%s:%d)", wshort, w[2], short, name, d.File, d.Line))
+			}
+		}
+	}
+}
+
+// xmlLoad explains an XML error: "XML error: … Context: <ThingDef …><defName>X</defName>…"
+// puts the def's XML at fault.
+func (cx *attrCtx) xmlLoad(lc *LogCluster) {
+	e, ix := lc.First, cx.st.Ix
+	texts := strings.Join(append([]string{e.Message}, e.Extra...), "\n")
+	// A missing parent provided by an installed, disabled mod is a missing dependency.
+	if m := parentRe.FindStringSubmatch(e.Message); m != nil {
+		ds, _ := cx.defsNamed(m[1], true)
+		for _, d := range ds {
+			if cx.st.Position(d.Instance) == 0 && ix.ByID[d.Instance] != nil {
+				lc.add(d.Instance, RoleDependency, fmt.Sprintf("provides the abstract def %s (%s:%d) but is not enabled", m[1], d.File, d.Line))
+				lc.next("archo enable " + ix.Ref(d.Instance))
+			}
+		}
+	}
+	// Duplicate ThinkNode keys come from patches to the think tree, not from the tree itself.
+	if m := thinkKeyRe.FindStringSubmatch(e.Message); m != nil && cx.run != nil {
+		pf, _ := cx.a.Store.PatchFacts(cx.run.ID, store.PatchFilter{Target: "ThinkTreeDef/" + m[1]})
+		for _, p := range pf {
+			if cx.st.Position(p.Instance) > 0 && !cx.official(p.Instance) {
+				lc.add(p.Instance, RolePatcher, fmt.Sprintf("patches ThinkTreeDef %s at %s:%d", m[1], p.File, p.Line))
+			}
+		}
+	}
+	if m := ctxDefNameRe.FindStringSubmatch(texts); m != nil {
+		cx.definedBy(lc, m[1], false, "is the def the XML error is in")
+	} else if m := ctxNameRe.FindStringSubmatch(texts); m != nil {
+		cx.definedBy(lc, m[1], true, "is the abstract def the XML error is in")
+	}
+}
+
+// typeRules applies the assembly and type rules: a missing assembly dependency, assemblies
+// whose types could not be listed, and missing types an installed mod provides.
+func (cx *attrCtx) typeRules(lc *LogCluster) {
+	e, ix := lc.First, cx.st.Ix
 	// "Cannot resolve dependency to assembly 'X'" (FileNotFoundException, ReflectionOnly APIs).
 	if m := asmDepRe.FindStringSubmatch(e.Message + "\n" + strings.Join(e.Extra, "\n")); m != nil {
 		cx.missingAssembly(lc, m[1])
@@ -1036,9 +1176,13 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 			}
 		}
 	}
-	// 3. Stack frames and Harmony lines.
+}
+
+// frameRules attributes the stack frames and their Harmony lines; hot tells whether a frame
+// is one of the tick hot spots.
+func (cx *attrCtx) frameRules(lc *LogCluster) (hot bool) {
+	e, ix := lc.First, cx.st.Ix
 	firstMod := true
-	hot := false
 	throwing, own := cx.throwingModFrame(e), cx.ownFrames(e)
 	for i, fr := range e.Frames {
 		target := fr.Type + "." + fr.Method
@@ -1046,32 +1190,7 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 			hot = true
 		}
 		for _, p := range fr.Harmony {
-			ids, via := cx.harmonyOwners(p)
-			dynamic, listed := false, len(ids) > 0
-			for _, id := range ids {
-				ev := fmt.Sprintf("log harmony:%s#%s %q (%s)", target, p.Kind, "- "+strings.ToUpper(p.Kind)+" "+p.Owner, via)
-				if callerPatch(i, throwing, p.Kind, own[id]) {
-					lc.add(id, RoleListed, ev+"; a patch on a caller of the throwing frame, no frame of its own in the stack")
-				} else {
-					lc.add(id, RolePatcher, ev)
-					listed = false
-				}
-				if cx.dynamicPatch(id, p.PatchType) {
-					// TargetMethod() the analysis could not read: --target finds no row (MCP eval h4).
-					dynamic = true
-					lc.next("archo harmony --mod "+ix.Ref(id), fmt.Sprintf("archo source %s --type %s", ix.Ref(id), outerType(p.PatchType)))
-				}
-			}
-			if len(ids) == 0 {
-				d := fmt.Sprintf("harmony owner %q on %s: no installed mod matches", p.Owner, target)
-				if na := cx.notAnalysed(); na != "" {
-					d += " (" + na + ")"
-				}
-				lc.Details = append(lc.Details, d)
-			}
-			if !dynamic && !listed {
-				lc.next("archo harmony --target " + strings.ReplaceAll(target, "+", "."))
-			}
+			cx.harmonyLine(lc, i, target, p, throwing, own)
 		}
 		if logs.GameNamespace(fr.Type) {
 			continue
@@ -1095,15 +1214,44 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 			firstMod = false
 		}
 	}
-	if wantsListScan(lc, hot) {
-		cx.listModifiers(lc)
+	return hot
+}
+
+// harmonyLine attributes one Harmony patch line p of frame i (0-based), whose method is target.
+func (cx *attrCtx) harmonyLine(lc *LogCluster, i int, target string, p logs.Patch, throwing int, own map[string]bool) {
+	ix := cx.st.Ix
+	ids, via := cx.harmonyOwners(p)
+	dynamic, listed := false, len(ids) > 0
+	for _, id := range ids {
+		ev := fmt.Sprintf("log harmony:%s#%s %q (%s)", target, p.Kind, "- "+strings.ToUpper(p.Kind)+" "+p.Owner, via)
+		if callerPatch(i, throwing, p.Kind, own[id]) {
+			lc.add(id, RoleListed, ev+"; a patch on a caller of the throwing frame, no frame of its own in the stack")
+		} else {
+			lc.add(id, RolePatcher, ev)
+			listed = false
+		}
+		if cx.dynamicPatch(id, p.PatchType) {
+			// TargetMethod() the analysis could not read: --target finds no row (MCP eval h4).
+			dynamic = true
+			lc.next("archo harmony --mod "+ix.Ref(id), fmt.Sprintf("archo source %s --type %s", ix.Ref(id), outerType(p.PatchType)))
+		}
 	}
-	if hot {
-		// Who changes the comp list is not on the stack: the thrower and the patchers named
-		// there rarely hold the cause (h7), so these searches cover every enabled mod.
-		lc.next(`archo source search "AllComps.Remove(" --active --yes --budget 10`, `archo source search "AllComps.Add(" --active --yes --budget 10`)
-		lc.Checklist = append(lc.Checklist, tickChecklist...)
+	if len(ids) == 0 {
+		d := fmt.Sprintf("harmony owner %q on %s: no installed mod matches", p.Owner, target)
+		if na := cx.notAnalysed(); na != "" {
+			d += " (" + na + ")"
+		}
+		lc.Details = append(lc.Details, d)
 	}
+	if !dynamic && !listed {
+		lc.next("archo harmony --target " + strings.ReplaceAll(target, "+", "."))
+	}
+}
+
+// messageTypes attributes the type names in the message ("Error while instantiating a mod
+// of type X").
+func (cx *attrCtx) messageTypes(lc *LogCluster) {
+	e, ix := lc.First, cx.st.Ix
 	// 4. Type names in the message ("Error while instantiating a mod of type X").
 	for _, t := range typeTokRe.FindAllString(e.Message, -1) {
 		if logs.GameNamespace(t) || !strings.Contains(t, ".") {
@@ -1132,15 +1280,10 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 			}
 		}
 	}
-	// 5. Callers of failing code, HugsLib's log upload (logcallers.go).
-	cx.callerRules(lc)
-	if cx.comp != nil {
-		cx.companion(lc)
-	}
-	// 6. Who supplied the null (logtrace.go); the lord's AddPawn calls (loglordsites.go).
-	cx.nullTrace(lc)
-	cx.lordSites(lc)
-	lc.order()
+}
+
+// clusterConfidence sets an ordered cluster's confidence from its first candidate.
+func clusterConfidence(lc *LogCluster) {
 	switch {
 	case len(lc.Attr) > 0 && lc.Attr[0].Role == RoleDependency && lc.providerOff:
 		lc.Confidence, lc.Why = finding.Likely, whyProviderOff
@@ -1411,11 +1554,22 @@ func (a *App) LiveLog(st *LoadoutState) string {
 	if st == nil || st.Ix == nil || st.Ix.Env == nil {
 		return ""
 	}
-	r := a.probe()(st.Ix.Env.GameRoot)
+	// Log selection only needs this installation; probing unrelated games can wait
+	// behind their preparation while the current page must remain readable.
+	r := a.readProbe()(st.Ix.Env.GameRoot)
 	if r == nil {
 		return ""
 	}
-	return a.RunLog(st, a.WhatRuns(st.Ix.Env, r))
+	g, err := a.runningGame(func(root string) *GameRun {
+		if samePath(root, st.Ix.Env.GameRoot) {
+			return r
+		}
+		return nil
+	})
+	if err != nil || g == nil || g.UnknownEnv || g.Env.ID != st.Ix.Env.ID {
+		return ""
+	}
+	return a.RunLog(st, g.What)
 }
 
 // sameLog: two log paths name one file ("" names none).

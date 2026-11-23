@@ -39,6 +39,21 @@ func (a *App) ManagedDirectories() ([]ManagedDirectory, error) {
 	if err != nil {
 		return nil, err
 	}
+	out := a.gameDirectories(es, ss)
+	shared, used := a.sharedSourceDirectories(ss)
+	out = append(out, shared...)
+	out = append(out, a.fixedDirectories(ss, used)...)
+	out = append(out, a.steamCMDToolDirectory())
+	for i := range out {
+		if a.Store.Meta("directory.links:"+out[i].ID) != "" {
+			out[i].Status, out[i].Note = "changed", "Some managed links still need updating. Set this directory again to finish the location change."
+		}
+	}
+	return out, nil
+}
+
+// gameDirectories is each Game Config's game folder.
+func (a *App) gameDirectories(es []*env.Environment, ss []*source.Source) []ManagedDirectory {
 	var out []ManagedDirectory
 	for _, e := range es {
 		d := a.directoryState("game:"+e.ID, "game", e.Name, e.GameRoot, true)
@@ -46,13 +61,19 @@ func (a *App) ManagedDirectories() ([]ManagedDirectory, error) {
 			d.Status, d.Note = "changed", "This directory no longer looks like a RimWorld installation. Choose its current location."
 		}
 		for _, s := range ss {
-			if s.EnvID == e.ID && s.Status == source.StatusRebindPending {
+			if s.EnvID == e.GameID && s.Status == source.StatusRebindPending {
 				d.Status, d.Note = "rebind-pending", "A game folder change is waiting for confirmation. Set its current location to keep the same records."
 			}
 		}
 		out = append(out, d)
 	}
-	used := map[string]bool{}
+	return out
+}
+
+// sharedSourceDirectories is each shared mod folder; used records which of RimArcho's own
+// folders (lock, monitor, subscriptions) have a source.
+func (a *App) sharedSourceDirectories(ss []*source.Source) (out []ManagedDirectory, used map[string]bool) {
+	used = map[string]bool{}
 	for _, s := range ss {
 		if s.Status == source.StatusRetired || s.EnvID != store.Shared {
 			continue
@@ -79,6 +100,13 @@ func (a *App) ManagedDirectories() ([]ManagedDirectory, error) {
 		}
 		out = append(out, d)
 	}
+	return out, used
+}
+
+// fixedDirectories is RimArcho's own folders: lock and source libraries, packs, Archo
+// Monitor and subscriptions.
+func (a *App) fixedDirectories(ss []*source.Source, used map[string]bool) []ManagedDirectory {
+	var out []ManagedDirectory
 	for _, x := range []struct{ id, label, path string }{{"lock", "Lock library", a.LockDir()}, {"source", "Source library", a.SourceDir()}, {"packs", "Packs", a.PacksDir()}, {"monitor", "Archo Monitor", a.MonitorDir()}, {SubscribedLabel, "Subscriptions", a.SubscribedDir()}} {
 		configuredPack := x.id == "packs" && a.Store.Meta("cfg:pack.dir") != ""
 		d := a.directoryState(x.id, x.id, x.label, x.path, used[x.id] || configuredPack || a.Store.Meta(directoryKey(x.id)) != "")
@@ -86,15 +114,26 @@ func (a *App) ManagedDirectories() ([]ManagedDirectory, error) {
 			if s.Status == source.StatusRetired {
 				continue
 			}
-			if (x.id == "lock" && s.Label == LockLabel || x.id == "monitor" && s.Label == MonitorLabel || x.id == SubscribedLabel && s.Label == SubscribedLabel) && env.PathKey(s.Root) != env.PathKey(x.path) {
+			if labelledDirectorySource(x.id, s) && env.PathKey(s.Root) != env.PathKey(x.path) {
 				d.Status, d.Note = "changed", "The configured location differs from the registered source. Set the current location to keep the same records."
 			}
-			if (x.id == "lock" && (s.Label == LockLabel || a.IsLockSource(s)) || x.id == "monitor" && s.Label == MonitorLabel || x.id == SubscribedLabel && s.Label == SubscribedLabel) && s.Status == source.StatusRebindPending {
+			if (labelledDirectorySource(x.id, s) || x.id == "lock" && a.IsLockSource(s)) && s.Status == source.StatusRebindPending {
 				d.Status, d.Note = "rebind-pending", "A folder change is waiting for confirmation. Set its current location to keep the same records."
 			}
 		}
 		out = append(out, d)
 	}
+	return out
+}
+
+// labelledDirectorySource reports whether s is, by its label, the source of RimArcho's own
+// folder id (lock, monitor, subscriptions).
+func labelledDirectorySource(id string, s *source.Source) bool {
+	return id == "lock" && s.Label == LockLabel || id == "monitor" && s.Label == MonitorLabel || id == SubscribedLabel && s.Label == SubscribedLabel
+}
+
+// steamCMDToolDirectory is the folder SteamCMD is installed in.
+func (a *App) steamCMDToolDirectory() ManagedDirectory {
 	tool := a.directoryState("steamcmd-tool", "tool", "SteamCMD", a.SteamCMDDir(), a.Store.Meta("cfg:steamcmd.path") != "" || a.Store.Meta(directoryKey("steamcmd-tool")) != "")
 	if tool.Status == "ok" && steamCMDIn(tool.Path) == "" {
 		tool.Status, tool.Note = "unused", "SteamCMD has not been installed in this directory yet."
@@ -102,13 +141,7 @@ func (a *App) ManagedDirectories() ([]ManagedDirectory, error) {
 			tool.Status, tool.Note = "changed", "The SteamCMD program is missing from this directory. Choose its current location."
 		}
 	}
-	out = append(out, tool)
-	for i := range out {
-		if a.Store.Meta("directory.links:"+out[i].ID) != "" {
-			out[i].Status, out[i].Note = "changed", "Some managed links still need updating. Set this directory again to finish the location change."
-		}
-	}
-	return out, nil
+	return tool
 }
 
 func steamCMDIn(path string) string {
@@ -175,7 +208,7 @@ func (a *App) managedDirectory(id string) (*ManagedDirectory, error) {
 
 func (a *App) validateDirectory(d *ManagedDirectory, path string) error {
 	if d.ID == "packs" || d.ID == "source" {
-		// These managed directories default to their own child of Home.
+		// Homes from before 1.1 keep these as their own child of Home (store schema 42).
 		if directoriesOverlap(path, a.Home) && env.PathKey(path) != env.PathKey(filepath.Join(a.Home, d.ID)) {
 			return fmt.Errorf("the %s directory overlaps the data directory", d.ID)
 		}
@@ -209,8 +242,12 @@ func (a *App) validateDirectory(d *ManagedDirectory, path string) error {
 		if (d.ID == "lock" && (s.Label == LockLabel || a.IsLockSource(s))) || (d.ID == "monitor" && s.Label == MonitorLabel) || (d.ID == SubscribedLabel && s.Label == SubscribedLabel) {
 			continue
 		}
-		if d.Kind == "game" && s.EnvID == strings.TrimPrefix(d.ID, "game:") {
-			continue
+		if d.Kind == "game" {
+			if e, err := a.Store.EnvByID(strings.TrimPrefix(d.ID, "game:")); err != nil {
+				return err
+			} else if e != nil && s.EnvID == e.GameID {
+				continue
+			}
 		}
 		if (d.Kind == "game" || d.ID == "steamcmd-tool") && source.Within(s.Root, d.Path) {
 			continue
@@ -296,71 +333,11 @@ func (a *App) setDirectoryRecords(d *ManagedDirectory, path string) error {
 	var moves []store.SourceMove
 	meta := map[string]string{}
 	if d.Kind == "game" {
-		if e, err = a.Store.EnvByID(strings.TrimPrefix(d.ID, "game:")); err != nil {
+		if e, moves, err = a.gameDirectoryMoves(d, path, ss); err != nil {
 			return err
-		} else if e == nil {
-			return fmt.Errorf("no environment for %s", d.ID)
-		}
-		if !env.LooksLikeGameRoot(path) {
-			return fmt.Errorf("%s does not look like a RimWorld installation", path)
-		}
-		if o, err := a.envOfGame(path); err != nil {
-			return err
-		} else if o != nil && o.ID != e.ID {
-			return fmt.Errorf("environment %s already uses %s; one environment per game folder", o.Name, path)
-		}
-		if err := a.checkRoots(path, filepath.Join(path, "Data"), filepath.Join(path, "Mods")); err != nil {
-			return err
-		}
-		e.GameRoot, e.GameVersion = path, env.ReadGameVersion(path)
-		have := map[source.Kind]bool{}
-		for _, s := range ss {
-			if s.Status == source.StatusRetired {
-				continue
-			}
-			root := ""
-			if s.EnvID == e.ID && (s.Kind == source.Official || s.Kind == source.Local) {
-				root = filepath.Join(path, map[source.Kind]string{source.Official: "Data", source.Local: "Mods"}[s.Kind])
-				have[s.Kind] = true
-			}
-			if root == "" && source.Within(s.Root, d.Path) {
-				rel, _ := filepath.Rel(d.Path, s.Root)
-				root = filepath.Join(path, rel)
-			}
-			if root != "" {
-				moves = append(moves, store.SourceMove{Src: s, Rebind: root})
-			}
-		}
-		for kind, dir := range map[source.Kind]string{source.Official: "Data", source.Local: "Mods"} {
-			if !have[kind] {
-				s := &source.Source{ID: a.NewID(), EnvID: e.ID, Kind: kind, Label: nextLabel(ss, kind), Root: filepath.Join(path, dir), Status: source.StatusOK}
-				moves = append(moves, store.SourceMove{Src: s, Insert: true})
-				ss = append(ss, s)
-			}
 		}
 	} else {
-		for _, s := range ss {
-			if s.Status == source.StatusRetired {
-				continue
-			}
-			match := "source:"+s.ID == d.ID || d.ID == "lock" && (s.Label == LockLabel || a.IsLockSource(s)) || d.ID == "monitor" && s.Label == MonitorLabel || d.ID == SubscribedLabel && s.Label == SubscribedLabel || d.ID == "steamcmd-tool" && source.Within(s.Root, d.Path)
-			if !match {
-				continue
-			}
-			root := path
-			if (d.ID == "lock" && s.Label != LockLabel || d.ID == "steamcmd-tool") && source.Within(s.Root, d.Path) {
-				rel, _ := filepath.Rel(d.Path, s.Root)
-				root = filepath.Join(path, rel)
-			}
-			moves = append(moves, store.SourceMove{Src: s, Rebind: root})
-		}
-		if d.ID == "steamcmd-tool" {
-			meta["cfg:steamcmd.path"] = steamCMDIn(path)
-		}
-		key := map[string]string{"lock": "lock.dir", "source": "source.dir", "packs": "pack.dir", "monitor": "monitor.dir", SubscribedLabel: "subscribed.dir"}[d.ID]
-		if key != "" {
-			meta["cfg:"+key] = path
-		}
+		moves = a.directorySourceMoves(d, path, ss, meta)
 	}
 	meta[directoryKey(d.ID)] = path
 	// The marker of a move earlier versions left half done (shown as "changed") goes.
@@ -371,6 +348,86 @@ func (a *App) setDirectoryRecords(d *ManagedDirectory, path string) error {
 	a.ixCache, a.stCache, a.prCache, a.linkInst = nil, nil, nil, nil
 	forgetLinks(a.Store)
 	return nil
+}
+
+// gameDirectoryMoves checks a game folder's new path and lists the source moves: its Data/
+// and Mods/ (added when missing) and the sources inside the old folder. It returns the
+// Game Config with its new path.
+func (a *App) gameDirectoryMoves(d *ManagedDirectory, path string, ss []*source.Source) (*env.Environment, []store.SourceMove, error) {
+	e, err := a.Store.EnvByID(strings.TrimPrefix(d.ID, "game:"))
+	if err != nil {
+		return nil, nil, err
+	} else if e == nil {
+		return nil, nil, fmt.Errorf("no Game Config for %s", d.ID)
+	}
+	if !env.LooksLikeGameRoot(path) {
+		return nil, nil, fmt.Errorf("%s does not look like a RimWorld installation", path)
+	}
+	if o, err := a.envOfGame(path); err != nil {
+		return nil, nil, err
+	} else if o != nil && o.ID != e.ID {
+		return nil, nil, fmt.Errorf("Game Config %s already uses %s; one Game Config per game folder", o.Name, path)
+	}
+	if err := a.checkRoots(path, filepath.Join(path, "Data"), filepath.Join(path, "Mods")); err != nil {
+		return nil, nil, err
+	}
+	e.GameRoot, e.GameVersion = path, env.ReadGameVersion(path)
+	var moves []store.SourceMove
+	have := map[source.Kind]bool{}
+	for _, s := range ss {
+		if s.Status == source.StatusRetired {
+			continue
+		}
+		root := ""
+		if s.EnvID == e.GameID && (s.Kind == source.Official || s.Kind == source.Local) {
+			root = filepath.Join(path, map[source.Kind]string{source.Official: "Data", source.Local: "Mods"}[s.Kind])
+			have[s.Kind] = true
+		}
+		if root == "" && source.Within(s.Root, d.Path) {
+			rel, _ := filepath.Rel(d.Path, s.Root)
+			root = filepath.Join(path, rel)
+		}
+		if root != "" {
+			moves = append(moves, store.SourceMove{Src: s, Rebind: root})
+		}
+	}
+	for kind, dir := range map[source.Kind]string{source.Official: "Data", source.Local: "Mods"} {
+		if !have[kind] {
+			s := &source.Source{ID: a.NewID(), EnvID: e.GameID, Kind: kind, Label: nextLabel(ss, kind), Root: filepath.Join(path, dir), Status: source.StatusOK}
+			moves = append(moves, store.SourceMove{Src: s, Insert: true})
+			ss = append(ss, s)
+		}
+	}
+	return e, moves, nil
+}
+
+// directorySourceMoves lists the source moves of a folder other than a game's, and puts the
+// folder settings that change into meta.
+func (a *App) directorySourceMoves(d *ManagedDirectory, path string, ss []*source.Source, meta map[string]string) []store.SourceMove {
+	var moves []store.SourceMove
+	for _, s := range ss {
+		if s.Status == source.StatusRetired {
+			continue
+		}
+		match := "source:"+s.ID == d.ID || d.ID == "lock" && (s.Label == LockLabel || a.IsLockSource(s)) || d.ID == "monitor" && s.Label == MonitorLabel || d.ID == SubscribedLabel && s.Label == SubscribedLabel || d.ID == "steamcmd-tool" && source.Within(s.Root, d.Path)
+		if !match {
+			continue
+		}
+		root := path
+		if (d.ID == "lock" && s.Label != LockLabel || d.ID == "steamcmd-tool") && source.Within(s.Root, d.Path) {
+			rel, _ := filepath.Rel(d.Path, s.Root)
+			root = filepath.Join(path, rel)
+		}
+		moves = append(moves, store.SourceMove{Src: s, Rebind: root})
+	}
+	if d.ID == "steamcmd-tool" {
+		meta["cfg:steamcmd.path"] = steamCMDIn(path)
+	}
+	key := map[string]string{"lock": "lock.dir", "source": "source.dir", "packs": "pack.dir", "monitor": "monitor.dir", SubscribedLabel: "subscribed.dir"}[d.ID]
+	if key != "" {
+		meta["cfg:"+key] = path
+	}
+	return moves
 }
 
 // PlanDirectoryMove previews the common incoming-link plan without writing files.

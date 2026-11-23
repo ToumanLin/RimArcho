@@ -41,7 +41,7 @@ func LoadDetail(a *app.App, ix *app.Index, mod *store.Mod, fetch, refresh bool) 
 	}
 	d.Desc = a.Describe(ix, mod, fetch, refresh)
 	d.About, d.Workshop = bbcode.Parse(d.Desc.About), bbcode.Parse(d.Desc.Workshop)
-	d.Events, _ = a.Store.Events(store.EventFilter{EnvID: ix.Env.ID, InstanceIDs: []string{mod.ID}})
+	d.Events, _ = a.Store.Events(store.EventFilter{EnvID: ix.Env.GameID, InstanceIDs: []string{mod.ID}})
 	return d
 }
 
@@ -56,7 +56,7 @@ func HeaderFacts(mod *store.Mod, pos int, staged bool) []string {
 	}
 	switch {
 	case pos > 0:
-		facts = append(facts, Tf("number %d", pos))
+		// enabled: the list shows where (16 §2.5); the number was a word to decode
 	case staged:
 		facts = append(facts, T("staged"))
 	default:
@@ -222,7 +222,7 @@ func DescNote(d *DetailData) string {
 	case st == "offline":
 		return T("offline (workshop.fetch)")
 	case st != "" && st != "fetched" && st != "cached":
-		return T("Workshop page: ") + st
+		return T("Workshop page: ") + Text(st)
 	}
 	return ""
 }
@@ -422,7 +422,7 @@ func rulesSection(a *app.App, ix *app.Index, mod *store.Mod) Section {
 // historySection: every change event of the mod, newest first.
 func historySection(a *app.App, ix *app.Index, id string) Section {
 	sec := Section{Title: T("full history"), Count: -1}
-	evs, _ := a.Store.Events(store.EventFilter{EnvID: ix.Env.ID, InstanceIDs: []string{id}})
+	evs, _ := a.Store.Events(store.EventFilter{EnvID: ix.Env.GameID, InstanceIDs: []string{id}})
 	for i := len(evs) - 1; i >= 0; i-- {
 		e := evs[i]
 		l := "  " + e.ScanTime.Local().Format("2006-01-02 15:04") + "  " + EventText(e.Kind)

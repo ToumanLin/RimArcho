@@ -101,10 +101,24 @@ func register(c *Command) { registry = append(registry, c) }
 // order is the documented command order (13 §4.2); registration order depends on file names.
 var commandOrder = []string{"env list", "env detect", "env add", "env set", "env use", "env rebind", "env remove", "scan", "status", "list", "find",
 	"mod", "mod-settings", "describe", "def", "patches", "harmony", "why", "log", "problems", "problems show", "problems ignore", "problems unignore", "files search", "source", "source search", "analyze", "changes", "library", "library remove-from-plans", "library move-to-locked", "enable", "disable", "move", "swap", "sort", "undo", "redo", "save", "loadout log", "loadout diff",
-	"loadout checkout", "loadout ignore-external", "loadout complete-dependencies", "loadout replace-recommended", "loadout use-installed", "loadout export", "loadout import", "plan list", "plan new", "plan use", "plan rename", "plan remove", "plan cost", "stage list", "stage add", "stage drop", "stage restore", "pin", "copy-local", "import rimcrow", "alias", "note", "tag", "rule add", "rule edit", "rule list", "rule remove", "launch", "test run", "identity", "identity list", "identity why", "identity resolve", "lineage split", "lineage merge", "gc", "config get", "config set", "guide", "mcp", "gui", "version", "uninstall"}
+	"loadout checkout", "loadout ignore-external", "loadout complete-dependencies", "loadout replace-recommended", "loadout use-installed", "loadout export", "loadout import", "plan list", "plan new", "plan use", "plan rename", "plan remove", "plan cost", "stage list", "stage add", "stage drop", "stage restore", "pin", "copy-local", "import rimcrow", "alias", "note", "tag", "rule add", "rule edit", "rule list", "rule remove", "launch", "ops", "test run", "identity", "identity list", "identity why", "identity resolve", "lineage split", "lineage merge", "gc", "feedback", "config get", "config set", "agent status", "agent install", "agent key", "agent run", "agent remove", "guide", "mcp", "gui", "version", "uninstall"}
 
-// Commands returns the command table in documented order.
+// Commands returns the command table in documented order, without the commands of a feature
+// this build leaves out (featureOff).
 func Commands() []*Command {
+	all := allCommands()
+	out := all[:0:0]
+	for _, c := range all {
+		if !featureOff(c.Name) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// allCommands is every registered command in documented order, including those featureOff
+// hides; the specifications document them all.
+func allCommands() []*Command {
 	out := make([]*Command, 0, len(registry))
 	for _, n := range commandOrder {
 		for _, c := range registry {
@@ -127,7 +141,7 @@ func lookup(words []string) (*Command, []string) {
 	bestN := 0
 	for _, c := range registry {
 		parts := strings.Fields(c.Name)
-		if len(parts) > len(words) || len(parts) <= bestN {
+		if len(parts) > len(words) || len(parts) <= bestN || featureOff(c.Name) {
 			continue
 		}
 		ok := true
@@ -375,14 +389,14 @@ func Help() *render.Doc {
 	}
 	root.Section("commands").AddColumns(rows)
 	root.KV("references", "#<id> instance, L#<id> lineage, pkg:<packageId> or the bare packageId, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>, pattern:<id> error pattern")
-	root.KV("global flags", "--env <name> (use another environment for this command)")
+	root.KV("global flags", "--env <name> (use another Game Config for this command)")
 	return d
 }
 
 var gameVersionRe = regexp.MustCompile(`^\d+\.\d+$`)
 
 // gameVersionFlag is accepted by the analysis commands (05 §3).
-var gameVersionFlag = Flag{Name: "game-version", Value: "<X.Y>", Help: "analyse for another game version than the environment's"}
+var gameVersionFlag = Flag{Name: "game-version", Value: "<X.Y>", Help: "analyse for another game version than the Game Config's"}
 
 // CommandHelp is `archo <command> --help`: the usage line, the summary and each flag.
 func CommandHelp(c *Command) *render.Doc {

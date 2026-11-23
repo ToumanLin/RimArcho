@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ToumanLin/RimArcho/internal/netcfg"
 )
 
 // Background tasks (16 §2.16): what RimArcho does after a click that takes a while, kept
@@ -57,7 +59,8 @@ type TaskItem struct {
 	Got         int64  `json:"got,omitempty"`
 	Size        int64  `json:"size,omitempty"`
 	State       string `json:"state"`
-	Why         string `json:"why,omitempty"` // a failure's reason
+	Why         string `json:"why,omitempty"`  // a failure's reason
+	Note        string `json:"note,omitempty"` // what a done item came to (a migration's part)
 	FailureKind string `json:"failureKind,omitempty"`
 	Permanent   bool   `json:"permanent,omitempty"`
 	Again       string `json:"again,omitempty"` // the task that took this item over (retry, continue the rest)
@@ -89,6 +92,9 @@ type Task struct {
 	Args     []string   `json:"args,omitempty"`   // maintenance command, for retry after reopening
 	Env      string     `json:"env,omitempty"`    // the environment captured at submission
 	Owner    string     `json:"owner,omitempty"`  // the window that runs it (newTaskOwner)
+	// Net: requests this process made while the task ran that answered only on a later
+	// route, as "host route" (17 §2.2: "github.com mirror gh-proxy.com").
+	Net []string `json:"net,omitempty"`
 }
 
 // Ended reports whether the task has finished one way or another.
@@ -268,12 +274,48 @@ func (ts *Tasks) Begin(kind, obj string, stop func() error) string {
 	return t.ID
 }
 
+// BeginOnce is Begin for work that repeats by itself (the files' check, 16 §8.9): an
+// earlier task with the same kind and object that ended done, this window's or an earlier
+// window's, gives its row to this one, so the task list keeps one row for it, updated in
+// place, instead of a line of finished copies. Failed, stopped and partial ones stay.
+func (ts *Tasks) BeginOnce(kind, obj string, stop func() error) string {
+	ts.mu.Lock()
+	keep := ts.list[:0:0]
+	for _, t := range ts.list {
+		if t.Kind == kind && t.Obj == obj && t.State == TaskDone {
+			if t.Owner != ts.owner {
+				ts.gone[t.ID] = true // as Forget: the record's merge does not bring it back
+			}
+			continue
+		}
+		keep = append(keep, t)
+	}
+	if len(keep) < len(ts.list) {
+		ts.list = keep
+		ts.saveLocked()
+	}
+	ts.mu.Unlock()
+	return ts.Begin(kind, obj, stop)
+}
+
 // EnqueueSelf schedules work in the RimArcho lane: one of each kind at a time,
-// different kinds concurrently (16 §2.16). run reports progress through Update.
+// different kinds concurrently (16 §2.16). run reports progress through Update. A request
+// equal to a task still waiting (kind, object, arguments, Game Config) joins it: that task
+// is returned and nothing more is queued (16 §8.9). So repeated clicks give at most one
+// run after the one running, never a line of the same work.
 func (ts *Tasks) EnqueueSelf(request Task, run func(string) (string, error)) Task {
 	ts.mu.Lock()
 	if ts.selfRuns == nil {
 		ts.selfRuns = map[string]func(string) (string, error){}
+	}
+	if request.ID == "" {
+		for _, t := range ts.list {
+			if t.Lane == LaneSelf && t.State == TaskQueued && t.Kind == request.Kind && t.Obj == request.Obj && t.Env == request.Env && slices.Equal(t.Args, request.Args) {
+				cp := *t
+				ts.mu.Unlock()
+				return cp
+			}
+		}
 	}
 	t := &Task{ID: ts.newID(), Kind: request.Kind, Lane: LaneSelf, Obj: request.Obj, Args: slices.Clone(request.Args), Env: request.Env, State: TaskQueued, Queued: ts.stamp(), Owner: ts.owner}
 	if prior := ts.find(request.ID); prior != nil && prior.WorkshopSubscription() {
@@ -387,6 +429,11 @@ func (ts *Tasks) Finish(id, state, result string) {
 		return
 	}
 	t.State, t.Result, t.End, t.Phase = state, result, ts.ms(), ""
+	if t.Start > 0 {
+		for _, u := range netcfg.FallbacksSince(time.UnixMilli(t.Start)) {
+			t.Net = append(t.Net, u.Host+" "+u.Route)
+		}
+	}
 	if state == TaskDone {
 		t.Frac = 1
 		t.Done = t.Total

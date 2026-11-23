@@ -92,7 +92,7 @@ export function pathContent(node, text, paths = []) {
   const plain = value => {
     // Legacy command/task text has no metadata. Rooted paths and web addresses
     // need a clear boundary; shortcuts do not qualify.
-    const rooted = /(^|[\s("'\uff08\uff1a])((?:https?:\/\/[^\s<>"'\uff1f\u3002\uff1b\uff0c\uff09]+)|(?:(?:[a-z]:[\\/]|\\\\[^\\\s]+\\|\/[^/\s:]+\/)[^<>"|\n]*?)(?=:\s|:\d+\b|["'?\uff1f\u3002\uff1b\uff0c\uff09]|$))/gi;
+    const rooted = /(^|[\s("'\uff08\uff1a])((?:https?:\/\/[^\s<>"'\uff1f\u3002\uff1b\uff0c\uff09]+)|(?:(?:[a-z]:[\\/]|\\\\[^\\\s]+\\|\/[^/\s:]+\/)[^<>"|\n]*?)(?=[:;]\s|:\d+\b|["'?\uff1f\u3002\uff1b\uff0c\uff09]|$))/gi;
     for (const part of value.split(/( {2,}|\n| → )/)) {
       if (!part) continue;
       let at = 0;
@@ -157,6 +157,8 @@ export function fieldList(fields, acts = {}) {
         if (a.act === "steam") return api.OpenSteamWorkshop("ws:" + f.value).then((t) => say("ok", t), (e) => say("fail", errText(e)));
         // Mod library › Mod settings at this Mod's files (main.js opens it)
         if (a.act === "settings") return document.dispatchEvent(new CustomEvent("open-mod-settings", { detail: f.target }));
+        // another manager's link into the game: open where it is and say whose (16 §2.9)
+        if (a.act === "linked") return api.ShowLink(f.target).then((t) => say("", t), (e) => say("fail", errText(e)));
         if (acts[a.act]) return acts[a.act](f);
       };
       bar.append(b);
@@ -170,6 +172,7 @@ export function fieldList(fields, acts = {}) {
 const copyTimers = new WeakMap();
 
 // Copy feedback stays inside address buttons; other copy actions keep their text tip.
+// Without a node the caller says what was copied. Every copy in the window goes through here.
 export async function copy(text, node) {
   let ok = false;
   // the window's own clipboard (Wails), else the page's, else the old way
@@ -187,6 +190,7 @@ export async function copy(text, node) {
     focused?.focus({ preventScroll: true });
   }
   if (!ok) { say("fail", T("could not copy")); return false; }
+  if (!node) return true;
   if (node.classList.contains("address-copy")) {
     clearTimeout(copyTimers.get(node));
     node.innerHTML = icon.ok;

@@ -67,6 +67,12 @@ func TestMajorMinorAndPlayerLog(t *testing.T) {
 	if got := PlayerLog(ud, ""); got != filepath.Join(ud, "Player.log") {
 		t.Fatalf("unknown version should pick newest: %s", got)
 	}
+	// A 1.7 launch with its own user data folder writes <root>/Player.log (-logfile).
+	own := t.TempDir()
+	write(t, filepath.Join(own, "Player.log"), "redirected")
+	if got := PlayerLog(own, "1.7.1"); got != filepath.Join(own, "Player.log") {
+		t.Fatalf("1.7 redirected log: %q", got)
+	}
 }
 
 func TestParseVersion(t *testing.T) {

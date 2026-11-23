@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/corpus"
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
@@ -35,7 +36,7 @@ func monitorCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if s.Source != nil {
 		root.KV("source", fmt.Sprintf("src:%s %s", s.Source.Label, s.Source.Root))
 	} else {
-		root.KV("source", "not registered in this environment")
+		root.KV("source", "not registered in this Game Config")
 	}
 	root.KV("plan", MonitorPlanLine(c, s))
 	def := "on"
@@ -119,4 +120,19 @@ func MonitorLines(r *app.MonitorResult, all bool) []string {
 		}
 	}
 	return append(out, r.Notes...)
+}
+
+// CorpusLine is the corpus data in use (05 §4.6): "W47, 1.7; Workshop Archo Monitor,
+// 812 logs", or that this game version has none.
+func CorpusLine(ch corpus.Choice) string {
+	var s string
+	if ch.Data == "" {
+		s = "none for " + ch.Game + " (no corpus bundle has this game version yet)"
+	} else {
+		s = fmt.Sprintf("%s, %s; %s, %d logs", corpus.ShortWeek(ch.Data), ch.Game, ch.From(), ch.Logs)
+	}
+	if ch.NewerFormat {
+		s += "; newer corpus data needs a newer RimArcho"
+	}
+	return s
 }

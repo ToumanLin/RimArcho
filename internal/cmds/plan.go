@@ -13,7 +13,7 @@ import (
 // environment's current plan.
 
 func init() {
-	register(&Command{Name: "plan list", Summary: "list the environment's plans", MaxArgs: 0, Run: planList})
+	register(&Command{Name: "plan list", Summary: "list the Game Config's plans", MaxArgs: 0, Run: planList})
 	register(&Command{Name: "plan new", Args: "<name>", Summary: "create a plan: empty, or from the current plan, one of its versions, or a list file",
 		MinArgs: 1, MaxArgs: 1, Flags: []Flag{{Name: "from", Value: "current|v<n>|<file>", Help: "default: an empty list"}}, Run: planNew})
 	register(&Command{Name: "plan use", Args: "<name>", Summary: "make a plan current (writes no game file)", MinArgs: 1, MaxArgs: 1, Run: planUse})

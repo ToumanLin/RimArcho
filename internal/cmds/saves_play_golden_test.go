@@ -190,8 +190,8 @@ func TestGoldenSavesPlay(t *testing.T) {
 		cmd("saves", "show", "Autosave-1"),
 		act(func(e *testkit.Env) {
 			e.WriteSave("Outpost.rws", testkit.SaveSpec{Mods: []string{"ludeon.rimworld"}, ModTime: e.Now().Add(-time.Hour)})
-			e.WriteFile(filepath.Join(e.Home, "packs", "P1", "pack.json"), `{"format":1,"name":"P1","entries":[]}`)
-			p := filepath.Join(e.Home, "packs", "P1", "userdata", "Saves", "Rimward.rws")
+			e.WriteFile(filepath.Join(e.App.PacksDir(), "P1", "pack.json"), `{"format":1,"name":"P1","entries":[]}`)
+			p := filepath.Join(e.App.PacksDir(), "P1", "userdata", "Saves", "Rimward.rws")
 			e.WriteFile(p, testkit.SaveXML(testkit.SaveSpec{Mods: []string{"ludeon.rimworld"}}))
 			at := e.Now().Add(-7 * time.Hour)
 			os.Chtimes(p, at, at)

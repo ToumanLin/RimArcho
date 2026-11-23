@@ -17,15 +17,19 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/corpus"
 	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/ids"
 	"github.com/ToumanLin/RimArcho/internal/machine"
+	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/perftrace"
 	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/textures"
+	"github.com/ToumanLin/RimArcho/internal/updatechannel"
 )
 
 // Config is config.toml (17 §3). Only keys used by M1 are read.
@@ -71,9 +75,15 @@ type App struct {
 	Detect env.DetectOptions
 	// Launcher starts the game; nil means ExecLauncher.
 	Launcher Launcher
+	// SteamRunning reports whether the Steam client runs; nil means the process table
+	// (tests replace it). A Steam launch without it starts the game directly (09 §2).
+	SteamRunning func() bool
 	// AnalyzeRunner brings the Def/Patch analysis up to date; nil means the `archo analyze`
-	// child process (05 §3). Tests run it in-process.
-	AnalyzeRunner func(envName string, progress func(string)) error
+	// child process (05 §3). Tests run it in-process (InProcessAnalyze). from says what to
+	// analyse, as the child's arguments do: its EnvName, open list and GameVersion. It is
+	// the caller's (AnalyzeFrom when the runner goes on another goroutine): the runner
+	// reads it and does not keep it.
+	AnalyzeRunner func(from *App, progress func(string)) error
 	// ScanProgress hears the scans this App runs without a Progress of their own, such as
 	// the rescan after Archo Monitor is installed (`scan --progress`).
 	ScanProgress func(ScanProgress)
@@ -112,6 +122,8 @@ type App struct {
 	TestGameStart func(*exec.Cmd) error
 	// TrashFunc moves a folder to the recycle bin; nil means source.Trash (tests replace it).
 	TrashFunc func(path string) error
+	// Ops is the operation log (13 §1.3); nil records nothing (a bare App in tests).
+	Ops *oplog.Log
 	// SameVolume says whether a folder can be renamed from one path to another (MoveDirectory);
 	// nil uses source.SameVolume (tests replace it to copy on one volume).
 	SameVolume func(from, to string) bool
@@ -145,7 +157,9 @@ type App struct {
 	// SteamSignedIn replaces asking which account the running Steam client is signed in
 	// with (env.SteamSignedIn); tests fake it.
 	SteamSignedIn func() (account string, ok bool)
-	HTTP          *http.Client
+	// SteamSignedInID replaces env.SteamSignedInID (the Archo Agent's redaction list); tests fake it.
+	SteamSignedInID func() uint64
+	HTTP            *http.Client
 	// FindTool delegates dependency lookup; subscriptions never install tools.
 	FindTool func(name string) (path string, ok bool)
 	pageRepo func(string) string // resolved-repository override in local tests
@@ -175,6 +189,7 @@ type App struct {
 	// SelfVersionOf asking the new program its version, SelfOthers listing the other
 	// RimArcho processes in a folder, SelfWaitPoll how often that is asked while waiting.
 	SelfUpdateAPI string
+	SelfLanzou    updatechannel.LanzouClient // Synthetic tests; nil uses Lanzou's bounded client.
 	SelfVersion   string
 	SelfProgram   string
 	SelfVersionOf func(ctx context.Context, exe string) (string, error)
@@ -207,6 +222,14 @@ type App struct {
 
 	logCache          *logCacheEntry
 	subscriptionCache map[string]subscriptionCacheEntry
+
+	// Corpus data (corpus.go), chosen for the environment last asked about. This App's own:
+	// never process-wide, so Apps of different game versions in one process do not mix.
+	corpusMu     sync.Mutex
+	corpusKey    string
+	corpusChoice corpus.Choice
+	corpusData   *corpus.Active
+	corpusSet    bool
 }
 
 // Open opens (creating if needed) the data directory home.
@@ -240,6 +263,8 @@ func OpenWith(home string, o OpenOptions) (*App, error) {
 		return nil, err
 	}
 	a := &App{Home: home, Store: st, Config: cfg, Now: time.Now, Rand: rand.Reader, Loc: time.Local}
+	a.Ops = oplog.New(st, oplog.OriginFromEnv(oplog.CLI))
+	a.Ops.Now = func() time.Time { return a.Now() }
 	a.ApplyNetwork()
 	a.decl, a.ownDecl = &declReads{path: st.Path}, true
 	if st.Meta("source-library:legacy-cleared") == "" {
@@ -254,11 +279,8 @@ func OpenWith(home string, o OpenOptions) (*App, error) {
 	}
 	// The interfaces check the managed directories at each start (ManagedDirectories is
 	// read after Open, once overrides such as LockBase are installed); it never blocks.
-	// Older installations have no usage metadata. Packs are under Home or an
-	// explicit config path; unlike LockDir this never depends on LockBase.
-	if dirExists(a.PacksDir()) && st.Meta(directoryKey("packs")) == "" {
-		_ = st.SetMeta(directoryKey("packs"), a.PacksDir())
-	}
+	// Packs from older installations got their usage record and folder setting from store
+	// schema 42; new packs record it when they are made.
 	recoveryDone := perftrace.Span("startup-recovery")
 	defer recoveryDone()
 	rows, err := st.ManagedLinks()
@@ -317,11 +339,11 @@ func LoadConfig(path string) (Config, error) {
 	return c, sc.Err()
 }
 
-// NewID mints an Instance/Lineage/Environment/Source ID.
+// NewID mints an Instance/Lineage/environment/Source ID.
 func (a *App) NewID() string { return ids.New(a.Rand) }
 
 // ErrNoEnv is returned when no environment has been configured.
-var ErrNoEnv = errors.New("no environment configured (archo env detect, then archo env add <name> --detected)")
+var ErrNoEnv = errors.New("no Game Config configured (archo env detect, then archo env add <name> --detected; or give the game folder yourself: archo env add <name> --game <dir>)")
 
 // Env returns the environment for this invocation: --env, else the current one.
 func (a *App) Env() (*env.Environment, error) {
@@ -331,8 +353,9 @@ func (a *App) Env() (*env.Environment, error) {
 			return nil, err
 		}
 		if e == nil {
-			return nil, fmt.Errorf("no environment named %q (archo env list)", a.EnvName)
+			return nil, fmt.Errorf("no Game Config named %q (archo env list)", a.EnvName)
 		}
+		a.CorpusFor(e)
 		return e, nil
 	}
 	e, err := a.Store.CurrentEnv()
@@ -342,6 +365,7 @@ func (a *App) Env() (*env.Environment, error) {
 	if e == nil {
 		return nil, ErrNoEnv
 	}
+	a.CorpusFor(e)
 	return e, nil
 }
 

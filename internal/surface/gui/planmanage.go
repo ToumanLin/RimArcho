@@ -1,7 +1,10 @@
+//go:build windows || cgo
+
 package gui
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -124,6 +127,10 @@ func (s *API) cancelLoadCost(close bool) {
 
 // PlanManage is the page with the list sel picked (0: the current one). No network.
 func (s *API) PlanManage(sel int64) (*view.PlanManage, error) {
+	return join(&s.flight, fmt.Sprint("PlanManage|", sel), func() (*view.PlanManage, error) { return s.planManageRead(sel) })
+}
+
+func (s *API) planManageRead(sel int64) (*view.PlanManage, error) {
 	s.plansRead.mu.Lock()
 	defer s.plansRead.mu.Unlock()
 	defer s.retainReader(&s.plansRead)
@@ -192,23 +199,24 @@ func (s *API) PlanSync(id int64, ws string) (string, error) {
 }
 
 // PlanExport renders a list in a format for the export sub-page.
-func (s *API) PlanExport(id int64, format string) (*view.PlanExport, error) {
+// settings: a RimArcho list carries the list's Mod settings (07 §7.3).
+func (s *API) PlanExport(id int64, format string, settings bool) (*view.PlanExport, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return view.BuildPlanExport(s.a, id, format)
+	return view.BuildPlanExport(s.a, id, format, settings)
 }
 
 // PlanExportSave writes a list to a file; overwrite only for a path the save dialog chose.
-func (s *API) PlanExportSave(id int64, format, path string, overwrite bool) (string, error) {
+func (s *API) PlanExportSave(id int64, format, path string, overwrite, settings bool) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return view.ExportPlanTo(s.a, id, format, path, overwrite)
+	return view.ExportPlanTo(s.a, id, format, path, overwrite, settings)
 }
 
 // PlanExportCopy puts a list on the clipboard in a format.
-func (s *API) PlanExportCopy(id int64, format string) (*Copied, error) {
+func (s *API) PlanExportCopy(id int64, format string, settings bool) (*Copied, error) {
 	s.mu.Lock()
-	t, err := view.ExportPlanText(s.a, id, format)
+	t, err := view.ExportPlanText(s.a, id, format, settings)
 	s.mu.Unlock()
 	if err != nil {
 		return nil, err

@@ -261,3 +261,20 @@ func TestCopiedGameChangedCopyKept(t *testing.T) {
 		t.Fatal("the changed copy is gone")
 	}
 }
+
+// A copy of a link the list no longer uses still points to the repair, not "rename or remove
+// it yourself" (VM 2026-11-10: a Workshop Monitor of the same version had replaced the
+// installed one in the list, 19 §6).
+func TestCopiedGameUnusedLinkCopy(t *testing.T) {
+	t.Parallel()
+	e, game2, _ := copiedGame(t)
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.MustRun("disable", st.Ix.Ref(planMonitor(t, e).ID))
+	out, code := e.Run("save")
+	if code == 0 || !strings.Contains(out, filepath.Join(game2, "Mods", monitorLink)+" is a copy of the folder RimArcho links there") || !strings.Contains(out, "archo links repair --dry-run") {
+		t.Fatalf("save (%d):\n%s", code, out)
+	}
+}

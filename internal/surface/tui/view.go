@@ -1,14 +1,17 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -26,11 +29,18 @@ func (m *model) View() string {
 	body := h - bodyTop - 2 // rows bodyTop … h-3
 	var content []string
 	switch {
-	case m.loadErr != nil:
-		content = []string{"", "  " + sErrS.Render(fit(T("error: ")+m.loadErr.Error(), m.w-2)),
-			"  " + sSecond.Render(fit(T("Add a game first: archo env detect, archo env add <name> --detected"), m.w-2))}
-		if windowNextToUs() {
-			content = append(content, "  "+sSecond.Render(fit(T("Or open RimArcho.exe in this folder: the window has a guide that finds your games."), m.w-2)))
+	case m.loadErr != nil && m.panel == nil:
+		// (help, the Game Config picker and the command line still open over it: noGameKey)
+		// No game yet is where a new player starts, not an error: the hints below say
+		// what to do (the raw error repeated them in English).
+		first := sBold.Render(fit(T("No game added yet."), m.w-2))
+		if !errors.Is(m.loadErr, app.ErrNoEnv) {
+			first = sErrS.Render(fit(T("error: ")+view.Humanize(nil, m.loadErr.Error()), m.w-2))
+		}
+		content = []string{"", "  " + first,
+			"  " + sSecond.Render(fit(T("Add a game first: archo env detect, archo env add <name> --detected (or --game <dir> to name the game folder yourself)"), m.w-2))}
+		if name := windowNextToUs(); name != "" {
+			content = append(content, "  "+sSecond.Render(fit(Tf("Or open %s in this folder: the window has a guide that finds your games.", name), m.w-2)))
 		}
 	case m.pal != nil:
 		content = m.paletteLines(body)
@@ -39,7 +49,6 @@ func (m *model) View() string {
 	case m.insp != nil:
 		content = m.inspectLines(body)
 	case m.tab == tabProblems:
-		m.problemCounts() // reloads the items when the database changed (an edit, a rule, an answer)
 		content = m.needLines(body)
 	case m.tab == tabChanges:
 		content = m.changeLines(body)
@@ -139,7 +148,7 @@ func (m *model) statusLine() string {
 func (m *model) liveStatus() (string, int) {
 	l := m.live
 	switch {
-	case l != nil && l.Running:
+	case l != nil && (l.Running || l.Blocked != ""):
 		t := view.LiveText(l)
 		s, w := sOK.Render(ic.unsaved)+" "+sSecond.Render(t), 2+width.StringWidth(t)
 		if l.Errors > 0 {
@@ -196,8 +205,15 @@ func (m *model) statusText(w int) string {
 // hintLine: "key label   key label", only what the object can do now, at most 7 (16 §6,
 // §13.2 rule 4); ? lists everything and is never the one left out.
 func (m *model) hintLine() string {
-	var pairs [][2]string
-	prefix := ""
+	if m.menu == nil && m.pal == nil && m.pos == nil && m.prompt != nil {
+		return sAccent.Render(markPrompt+" ") + sSecond.Render(m.prompt.label) + sText.Render(m.prompt.text+"_")
+	}
+	pairs, prefix := m.hintPairs()
+	return m.hintRender(pairs, prefix)
+}
+
+// hintPairs is the hint line's key pairs for what has the keys, and a prefix before them.
+func (m *model) hintPairs() (pairs [][2]string, prefix string) {
 	switch {
 	case m.menu != nil:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("run")}, {"esc", T("close")}}
@@ -205,8 +221,6 @@ func (m *model) hintLine() string {
 		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("run")}, {"esc", T("close")}}
 	case m.pos != nil:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("move")}, {"tab", T("before / after")}, {"esc", T("close")}}
-	case m.prompt != nil:
-		return sAccent.Render(markPrompt+" ") + sSecond.Render(m.prompt.label) + sText.Render(m.prompt.text+"_")
 	case m.editing:
 		pairs = [][2]string{{"enter", T("done")}, {"esc", T("clear")}, {"tab", T("next area with matches")}, {"↑↓", T("move")}}
 	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().typing:
@@ -216,7 +230,7 @@ func (m *model) hintLine() string {
 	case m.panel != nil && m.panel.choices != nil:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"enter", T("confirm")}, {"esc", T("back")}}
 		if m.panel.onDelete != nil {
-			pairs = append(pairs, [2]string{"d", T("remove the game")})
+			pairs = append(pairs, [2]string{"d", T("remove Game Config")})
 		}
 	case m.tags != nil:
 		pairs = [][2]string{{"←→", T("choose")}, {"enter", T("apply")}, {"esc", T("close")}, {"←", T("type a new tag")}}
@@ -226,6 +240,15 @@ func (m *model) hintLine() string {
 		pairs = [][2]string{{"esc", T("back")}, {"backspace", T("previous page")}, {"tab", T("section")}, {"↑↓", T("scroll")}}
 	case m.full:
 		pairs = [][2]string{{"↑↓", T("scroll")}, {"←→", T("previous / next mod")}, {"tab", T("sections")}, {"g", T("tags")}, {"ctrl+w", T("Workshop page")}, {"esc", T("back")}, {"?", T("all keys")}}
+	default:
+		return m.hintPagePairs()
+	}
+	return pairs, ""
+}
+
+// hintPagePairs is hintPairs for a page with nothing open over it.
+func (m *model) hintPagePairs() (pairs [][2]string, prefix string) {
+	switch {
 	case m.tab == tabProblems:
 		// each item shows its own keys; F, A and l are the page's, in the context row unless
 		// the conclusion takes its room (needsLayout)
@@ -268,6 +291,12 @@ func (m *model) hintLine() string {
 		}
 		pairs = append(pairs, [2]string{"?", T("all keys")})
 	}
+	return pairs, prefix
+}
+
+// hintRender writes the hint line: at most 7 pairs, and when too wide it drops from the
+// middle, so the first actions and "? all keys" stay.
+func (m *model) hintRender(pairs [][2]string, prefix string) string {
 	if len(pairs) > 7 {
 		pairs = append(pairs[:6], pairs[len(pairs)-1])
 	}
@@ -348,6 +377,15 @@ func (m *model) panelLines(n int) []string {
 			out = append(out, "")
 		}
 		for i, c := range p.choices {
+			if h := p.choiceHeads[i]; h != "" {
+				out = append(out, "  "+sDimS.Render(fit(h, inner)))
+			}
+			if v := p.choiceLabels[c]; v != "" {
+				c = v
+			}
+			if p.choiceCurrent[i] {
+				c += "  " + T("in use")
+			}
 			if i == p.choice {
 				out = append(out, "  "+sAccent.Render(markSel+" ")+sSel.Render(fit(c, inner-2)))
 			} else {
@@ -431,13 +469,26 @@ func (m *model) detailLines(w, n int) []string {
 
 var _ = fmt.Sprint
 
-// windowNextToUs reports whether RimArcho.exe sits next to this program: a player who
-// double-clicked archo.exe often meant the window (16 §9.2).
-var windowNextToUs = sync.OnceValue(func() bool {
+// windowNextToUs is the window program's name when it sits next to this program, else "":
+// a player who double-clicked archo.exe (or ran ./archo from the tarball) often meant the
+// window (16 §9.2).
+var windowNextToUs = sync.OnceValue(func() string {
 	exe, err := os.Executable()
-	if err != nil || strings.EqualFold(filepath.Base(exe), "RimArcho.exe") {
-		return false
+	if err != nil {
+		return ""
 	}
-	_, err = os.Stat(filepath.Join(filepath.Dir(exe), "RimArcho.exe"))
-	return err == nil
+	return windowNextTo(exe, runtime.GOOS)
 })
+
+// windowNextTo is the window program for goos in exe's folder, "" when there is none or
+// exe is it.
+func windowNextTo(exe, goos string) string {
+	name := app.GUIProgram(goos)
+	if name == "" || strings.EqualFold(filepath.Base(exe), name) {
+		return ""
+	}
+	if fi, err := os.Stat(filepath.Join(filepath.Dir(exe), name)); err != nil || !fi.Mode().IsRegular() {
+		return ""
+	}
+	return name
+}

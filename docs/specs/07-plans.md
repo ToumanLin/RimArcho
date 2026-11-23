@@ -44,7 +44,7 @@ Data not owned by plans:
 | Action | Rules |
 | --- | --- |
 | Create | From an empty list, a copy of the current plan, a historical version, an imported list (§7.1) or a save's Mod list (12 §4). The first version has source `import`; its note names the origin (copies: "copied from <plan> v<n>") |
-| Switch | Changes only the environment's current plan, never game files. The current plan is used for launch, game writes and CLI/MCP plan commands. **Opening is not switching**: the GUI sidebar, command panel and all lists, and in the TUI `P`, the command panel or the editor's `tab`, only open the plan in this window for viewing and editing (the session's open plan, `App.OpenPlan`); the current plan stays as it is. A plan becomes current when it is chosen on launch, when the player clicks "make current", or when it is saved or launched from its editor. A new plan is only opened. CLI `--open-plan <name>` targets another plan for one command without switching (used by the GUI's analysis and pack-build child processes). What the game contains follows the user data directory's write record, shown as "in the game now: <list> v<n>" (GUI: a green dot on that sidebar child when there are several plans, 16 §2.5; TUI: status bar) |
+| Switch | Changes only the environment's current plan, never game files. The current plan is used for launch, game writes and CLI/MCP plan commands; in the GUI, Launch's button, the command panel's launch and its preview start the current plan while another is open (`API.launchCurrent`), and the editor makes its plan current before it launches. **Opening is not switching**: the GUI sidebar, command panel and all lists, and in the TUI `P`, the command panel or the editor's `tab`, only open the plan in this window for viewing and editing (the session's open plan, `App.OpenPlan`); the current plan stays as it is. A plan becomes current when it is chosen on launch, when the player clicks "make current", or when it is saved or launched from its editor. An open plan that is or becomes current, by any of these or by a switch in another process, is no longer held open: the session then follows the current plan, including a later switch made elsewhere (`App.followCurrent`); only a plan opened while another is current stays open over such a switch. A new plan is only opened. CLI `--open-plan <name>` targets another plan for one command without switching (used by the GUI's analysis and pack-build child processes). What the game contains follows the user data directory's write record, shown as "in the game now: <list> v<n>" (GUI: a green dot on that sidebar child when there are several plans, 16 §2.5; TUI: status bar) |
 | Rename | Name only; history unchanged |
 | Delete | Needs player confirmation; the last plan cannot be deleted. Its workspace, undo stack, versions and staging are deleted too; games using it as current plan switch to the oldest other plan |
 
@@ -54,8 +54,8 @@ The GUI gathers these actions on all lists (16 §2.17). Commands: `archo plan li
 
 - When an environment is read and has no current plan (`environment.current_plan = 0`):
   - If ModsConfig.xml still matches a plan's last write (its hash equals the write record), make that plan current; create none.
-  - If ModsConfig.xml is absent (for example, a new game with its own saves) and plans exist, make the most recently edited plan current; create none.
-  - Otherwise read ModsConfig.xml and create a plan: v1 has source `import` and note `ModsConfig.xml` (absent file: an empty list with note `no ModsConfig.xml`). It is named `default`; if that is taken, the environment's name, then numbered (`1.6 2`). The first-run guide also offers "move over from RimSort or RimCrow" and "open a pack or a Steam collection" (16 §2.15).
+  - If ModsConfig.xml is absent for own saves, create a separate plan with Core and installed DLC in release order. Other environments without the file may adopt the most recently edited global plan; when none is adopted, their first plan is also Core and installed DLC, which is what the game loads with no ModsConfig.xml (a game never started). Before the first scan the entries are the game's `Data` folders by package ID (`Core` is `ludeon.rimworld`, `Royalty` is `ludeon.rimworld.royalty`, …), which the scan resolves.
+  - Otherwise read ModsConfig.xml and create a plan: v1 has source `import` and note `ModsConfig.xml` (absent file: Core and installed DLC as above, with note `no ModsConfig.xml`). It is named `default`; if that is taken, the environment's name, then numbered (`1.6 2`). The first-run guide also offers "move over from RimSort, RimCrow or RimPy" and "open a pack or a Steam collection" (16 §2.15).
 
 ### 1.5 Archo Monitor added by default
 
@@ -89,6 +89,8 @@ Each plan records **allowed game versions** (major.minor, such as 1.5, 1.6, 1.7)
 - **Warning counts**: `PlanVersions.Missing` and the version notices in all lists leave out ignored version warnings and list them separately as `Muted` (05 §4.2). If all are ignored, say "no version warnings", never "every Mod supports it". `Common`, defaults, allowed versions and player selections still use the actual declarations: ignoring a warning does not count as support.
 
 ### 1.7 Plans shared across all games
+
+Sibling environments share installation inventory, not current-plan selection. `env add --like` selects the source environment's current global plan under 03 §6.2; adding an environment never copies a plan.
 
 A plan is only "what is enabled and in what order", independent of game directories, and allowed game versions (§1.6) say which versions it is meant for. So plans do not belong to environments.
 
@@ -213,7 +215,7 @@ UI: the plan editor's third column (16 §2.5). Data and behavior:
 
 Shared by **plan launch** (09 §2) and **`archo save`** (write without launching, for players who launch through Steam or elsewhere; UI "save").
 
-1. **Synchronize first**: check for outside changes before writing (§4.3), so outside content is kept as a version rather than silently overwritten. **Refuse while there are unloaded outside versions.** If the target plan has one, or the file holds another plan's unloaded outside content, `save` and `launch` (including `--dry-run`) refuse without writing and give the diff / checkout / ignore commands (13 I8): writing would overwrite changes the player has not reviewed.
+1. **Synchronize first**: check for outside changes before writing (§4.3), so outside content is kept as a version rather than silently overwritten. **Refuse while the target plan has an unloaded outside version**: `save` and `launch` (including `--dry-run`) refuse without writing and give the diff / checkout / ignore commands (13 I8): writing would overwrite changes the player has not reviewed. Another plan's unloaded outside version does not block: it is kept in that plan's history and stays marked there, and writing the plan the player chose is what they asked for. (Until 1.1 it blocked every other plan whose file held it, which left players with an error until they switched to that plan; player feedback 2026-11-18.)
 2. **Prechecks**: refuse an environment without a user data directory, suggesting `archo env set --user-data <directory>`; refuse an existing file that cannot be read, asking the player to repair or move it. Write paths must pass the safety-boundary checks (02 §1).
 3. **Synchronize links**: before writing ModsConfig.xml, synchronize `_Archo_` links and remove pack `!ArchoPack_` links (09 §3).
 4. **`activeMods`**: lowercase packageIds in plan order. When a packageId has both Workshop and non-Workshop copies, write `<packageId>_steam` if the plan chooses the Workshop copy, otherwise the unsuffixed `<packageId>`. Reason: the game registers official content, then `Mods/`, then subscribed Workshop content, in folder-name order within each group. A Workshop duplicate of a registered non-Workshop copy gets `_steam`; other duplicates are rejected (17 §6). With both enabled the game keeps only the unsuffixed copy, so a plan cannot contain both Instances (§2.3).
@@ -262,7 +264,8 @@ Several plans and environments can share one ModsConfig.xml (the default user da
    - Plan **edited** since the write: record only an `external` version without loading it; mark it as an "unloaded outside version" and report the conflict. The player can:
      - **Diff**: `archo loadout diff v<n> workspace`;
      - **Load**: `archo loadout checkout v<n>` (reversible edit), which clears the marker;
-     - **Ignore**: `archo loadout ignore-external`, which clears the marker but keeps the history. (The marker blocks game writes, §4.1 item 1, so no write ever clears it.)
+     - **Ignore**: `archo loadout ignore-external`, which clears the marker but keeps the history. (The marker blocks the plan's own game writes, §4.1 item 1, so no write ever clears it.)
+   - From another plan, "can it run" shows the marked plan's card ("list X keeps it as v<n>, not used yet") with **ignore it** for that plan (`App.DismissConflict(<plan>)`, without switching) and **go to list management**; that plan's launch is not stopped.
    - The marker shows in `archo status`, `archo loadout log`, the status bar and the plan page.
 
 - Without a write record (a new user data directory or a lost record), the change is attributed to the current environment's current plan and handled as in the two cases above; that plan becomes the writer. The same applies if the writer plan was deleted.
@@ -351,9 +354,11 @@ Storage: `lineage_data` (environment, Lineage, alias, note), `lineage_tag` (envi
 
 **Whole-tag edits** (`cmds.RenameTag`, `MergeTags`, `DeleteTags`, `SetTagNote`; each one store transaction): a merge gives every Mod carrying one of the source tags the target tag (new or existing; an existing target keeps its spelling) and removes the sources; their notes are appended to the target's. A rename is a merge into a new name and may change only the case; a name another tag already has is refused, because that is a merge (a pinned tag no Mod carries does not count, so a tag can take a preset name). A delete removes the tags and their notes and touches nothing else. `tags.pinned` (16 §3.8) follows: a renamed or merged tag takes the source's pinned place unless the target is pinned already, a deleted tag leaves the list, and an unchanged list is not written, so the preset stays a preset. Removing the last pinned tag stores `,` (none pinned), since an empty value would bring the preset back. These edits are player data, outside the undo history (16 §3.8). Test: `TestTagEdits`.
 
-### 6.2 One-time RimCrow import
+### 6.2 RimCrow import
 
 `archo import rimcrow --db <path> [--rules <path>] [--dry-run] [--include-disabled-rules] [--all]`
+
+Profile environments and their independent current plans follow 03 §6.4. The same preview/apply path is used by CLI, first-run and Settings; the preview lists installation groups, profile destinations, argv and list tokens, including the shared-folder/deletion warning. Profile conflicts never replace an existing current plan.
 
 1. `--db` is required: RimCrow keeps its database at `<installation directory>/data/mod_manager.db`, which cannot be found through the registry or a configuration file. `--rules` defaults to `data\rules\user_rules.json` beside the database.
 2. Copy the database and WAL into a temporary `rimcrow-*` directory under RimArcho's data, open the copy read-only, and delete it afterwards. RimCrow's originals are never opened for writing.
@@ -363,30 +368,69 @@ Storage: `lineage_data` (environment, Lineage, alias, note), `lineage_tag` (envi
    | RimCrow | RimArcho |
    | --- | --- |
    | Alias, note | Alias, note; do not overwrite differing existing values, report conflicts |
-   | Groups, tags | Tags |
+   | Groups, tags | Tags; a group's colour becomes its tag's colour unless it is RimCrow's default white or the tag already has one |
+   | sign_color (a Mod's colour mark) | A tag `RimCrow colour #rrggbb` with that colour (§6.4) |
+   | ignored_issues (any) | A tag `RimCrow: ignored warnings` (§6.4); the issue IDs themselves are RimCrow's and are not kept |
    | Interlock | `attach` rule |
    | `user_rules.json` loadAfter / loadBefore / incompatibleWith | `after` / `before` / `incompatible` |
    | `user_rules.json` loadTop / loadBottom (`value` true) | `top` / `bottom` (08 §1.5) |
-   | sign_color, user_mod_type, ignored_issues | No equivalent; count only |
+   | user_mod_type; a colour that is not hex | No equivalent; count only |
+   | subscribed collections, GitHub install records, profile inactive/temporary orders, the Workshop cache database | Not read |
 
 5. **Disabled** RimCrow user rules are left out unless `--include-disabled-rules` is given; importing them silently would change sorting.
 6. Report the mapped counts (by path or packageId), imported, already existing and conflicting; list every unmapped or conflicting item, and the count of resources disabled in RimCrow. Count the directories that have only About.xml.disabled, by source, with what to do (rename them back, or enable them again in RimCrow, then `archo scan`; or unsubscribe or delete them; RimArcho's handling: 09 §5).
 7. Running it again gives the same result: identical values are skipped, and rules are deduplicated by kind + Lineage. RimCrow's log tables are not imported.
 8. `--dry-run` only reports and writes nothing. By default 6 details per category; `--all` shows all.
 
-The GUI's shared manager-import flow (16 §2.15) discovers sources read-only with `app.DiscoverManagerImports`:
+The Import page's tree (§6.5; 16 §2.18) selects which RimCrow profiles become Game Configs (03 §6.5), and which kinds of player data and rules come over. Unconfigured profiles remain visible and skipped.
+
+The GUI's Import page (16 §2.18) discovers sources read-only with `app.DiscoverManagerImports`:
 
 - RimSort: `%LOCALAPPDATA%\RimSort` (Windows `platformdirs`, `appauthor=False`), with `%APPDATA%\RimSort` as a compatibility candidate; `modlists/`, `dbs/userRules.json`, and `settings.json`'s legacy `config_folder` or each `instances` entry's `config_folder` for ModsConfig.xml. Portable/development candidates also check the program folder and its `data/` child.
-- RimCrow: `<install>/data/mod_manager.db`; also a directly selected/recent data folder's `mod_manager.db`. Saved lists come from `<install>/backups/`, its `today`, `earlier`, `other` children, and up to 16 profile directories under `backups/profile/`.
-- Install candidates: running RimCrow/RimModManager/RimSort executable directories; named folders in Program Files, Local AppData/Programs, Local AppData, Downloads, Desktop, Games and beside RimArcho's parent folder; named Start-menu shortcuts and recent-folder shortcuts. Windows shortcut resolution is read-only, hidden and limited to four seconds and 200 shortcuts per root. No registry registration is assumed. Each list folder contributes at most its first 100 entries. Duplicate source paths are suppressed; inaccessible or absent locations are skipped.
+- RimSort's local database: `instances/<instance>/aux_metadata.db` under the RimSort folder (at most 16 instances), `aux_metadata.db` in the folder itself, and `<instance_folder_override>/<instance>/aux_metadata.db` for an instance whose settings move it (§6.4).
+- RimCrow: `<install>/data/mod_manager.db`; also a directly selected data folder's `mod_manager.db`. RimCrow (RimModManager) runs portable from any folder, with everything beside its exe and its Mods in `<install>/mods`, so its install is also found through its `_Link_<name>` entries in each environment's game `Mods/` (`App.GameModsDirs`; at most 2,000 entries per folder, read with `source.LinkReader` since on Windows they are junctions): a link whose target is in a folder named `mods` names that folder's parent as an install. Saved lists come from `<install>/backups/`, its `today`, `earlier`, `other` children, and up to 16 profile directories under `backups/profile/`.
+- RimPy: `ModLists/` in its data folder, `LocalLow\RimPy Mod Manager` beside `%APPDATA%` (Roaming). Its lists are read as any list (§7.2); the folder's `config.ini` is not read. The file format of RimPy's saved lists is not documented; a synthetic ModsConfig-style list is tested, a real RimPy file is a VM check.
+- Install candidates: running RimCrow/RimModManager/RimSort executable directories; the folders of those executables this Windows user has run, from `HKCU\Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache` (read-only, at most 5,000 values, only while the exe still exists), which finds a portable install anywhere after one run; named folders in Program Files, Local AppData/Programs, Local AppData, Downloads, Desktop, Games and beside RimArcho's parent folder; shortcuts named for a manager in the Start menu, on the user's and the public desktop, pinned to the taskbar and among recent items (a recent shortcut with another name is not a candidate). Windows shortcut resolution is read-only, hidden and limited to four seconds and 200 shortcuts per root. No installer registration is assumed. Each list folder contributes at most its first 100 entries, and only files that read as a Mod list with at least one Mod (`readListFile`, at most 4 MB), so an unrelated `.xml`, `.json` or `.txt` beside a manager is not offered. Duplicate source paths are suppressed; inaccessible or absent locations are skipped.
 
-Choosing a candidate does not import it. Lists use §7; RimCrow data uses the existing dry-run report and import above. Original databases, WAL files, settings and rules remain unchanged. The manual file picker remains available when discovery finds nothing.
+Choosing a candidate does not import it. Lists use §7; player data and rules come over part by part (§6.5). Original databases, WAL files, settings and rules remain unchanged. The manual picker remains available when discovery finds nothing. It takes the manager's `.exe` (or a dropped folder), whose folder is read like a found install (`app.ManagerSourcesIn`), or one data file classified by `API.ManagerFileKind`; an `.exe` with no manager data beside it is refused with that reason.
 
 Measured on real data: 18 §3.
 
 ### 6.3 RimSort user rules
 
-`app.ImportRimSortRules` reads `dbs/userRules.json` (at most 4 MB) without modifying it. Its `rules` map imports loadAfter/loadBefore/incompatibleWith and true loadTop/loadBottom values as after/before/incompatible/top/bottom user rules. A packageId must resolve to one live Lineage; missing or ambiguous packages are skipped and reported. Existing kind + Lineage rules are deduplicated, including repeats in the input; unsupported fields are counted. Preview and confirmation follow 16 §2.15; applying rules does not sort a plan or write ModsConfig.xml. RimSort's application settings and community databases are discovery inputs, not settings to apply to RimArcho.
+`app.ImportRimSortRules` reads `dbs/userRules.json` (at most 4 MB; a leading byte order mark is skipped) without modifying it. Its `rules` map imports loadAfter/loadBefore/incompatibleWith and true loadTop/loadBottom values as after/before/incompatible/top/bottom user rules. A packageId must resolve to one live Lineage; missing or ambiguous packages are skipped and reported. Existing kind + Lineage rules are deduplicated, including repeats in the input; unsupported fields are counted. Preview and confirmation follow 16 §2.15; applying rules does not sort a plan or write ModsConfig.xml. RimSort's application settings and community databases are discovery inputs, not settings to apply to RimArcho.
+
+### 6.4 RimSort local database and colour marks
+
+`archo import rimsort --db <aux_metadata.db> [--dry-run] [--all]`; in the GUI, the Import page's "found on this computer" (16 §2.18) or its file dialog (a file named `aux_metadata.db`).
+
+RimSort keeps one SQLite database per instance (SQLAlchemy). `app.ImportRimSortAux` copies it with its WAL and opens the copy read-only, as §6.2 does. It reads:
+
+| RimSort | RimArcho |
+| --- | --- |
+| `auxiliary_metadata.user_notes` | Note; a differing existing note is kept and reported |
+| `mod_tags` through `tags_table` | Tags |
+| `auxiliary_metadata.color_hex` (QColor `#rrggbb` or `#aarrggbb`) | A tag `RimSort colour #rrggbb` with that colour; another value is counted as not mapped |
+| `auxiliary_metadata.ignore_warnings` true | A tag `RimSort: ignored warnings` |
+| `type`, ACF and Workshop times, `outdated`, `db_time_touched` | Not read: RimSort's own cache |
+
+The preview and report show the Mods with data and how they matched, notes, tags and tag colours; there are no aliases or rules in this source.
+
+A row is keyed by the Mod folder's absolute path: it maps to the Lineage of the live Instance at that path, else to the single Lineage whose Workshop ID is `published_file_id`; otherwise it is reported as not installed or ambiguous. Rows with none of the player's data are not counted. Columns missing in older databases are read as empty.
+
+RimArcho keeps colours on tags (16 §3.8), not on Mods, so a colour mark from either manager (§6.2) becomes a tag named after the manager and the colour, coloured with it; the Mod's rows then take the colour as long as that tag is its first coloured one. "Ignore warnings" becomes a tag so the player keeps the information; it does not hide anything in Can it run. The tag names follow `ui.lang`, from the locale's supplemental table (`app.ManagerTagNamesIn`, keys `@tag.manager-colour` and `@tag.manager-ignore`), so the window and the CLI write the same names; after the language changes, importing again adds the tags under the new names. A tag that already has a colour keeps it. Running the import again changes nothing.
+
+### 6.5 Moving in part by part, and the record of earlier imports
+
+The Import page (16 §2.18) brings another manager's data over one part at a time, so the player chooses what comes over and sees what came in before.
+
+**Parts.** `app.RimCrowOptions.Parts` and `app.RimSortAuxOptions.Parts` limit an import to some parts (`app.Part*`); nil takes them all, as the CLI does. RimCrow: `aliases`, `notes`, `groups` (group memberships and their colours), `tags`, `colours` (colour marks), `ignored` (ignored issues), `interlocks`, and `rules` (user rules), or `rules-off` when user rules are switched off in RimCrow; an empty map imports profiles only. RimSort's local database: `notes`, `tags`, `colours`, `ignored`. RimSort's `userRules.json` is one part. Each profile (`profile:<id>`) and each list file found is a part of its own. Every import counts each part: values RimArcho does not have yet (new) and values it already has (same; a differing value of RimArcho's counts as same, since it stays) in `RimCrowReport.Parts`.
+
+**Survey.** `App.SurveyMigration(found, tags)` groups what discovery found by manager and kind (profiles, player data per source, rules, lists), with a dry run of each source (`IncludeDisabledRules`, so switched-off rules are counted). A source that cannot be read is a group with its `error` and an empty part list (never null), so the page draws the rest of that manager. A part is `new` (something to bring over), `had` (all of it already in RimArcho), `empty` (the source has none; not shown), `blocked` (a profile that cannot come over, with RimCrow's status), or `listed` (a list file imported before whose list still exists). A list file's facts are its Mod count and how many are not installed (by packageId and Workshop ID against live Mods). Switched-off rules are not on by default; everything else that is new is.
+
+**Bringing one part over.** `App.MigratePart(pick, tags)` imports one part: a list file becomes a new list named after the file (or its own title), with ` 2`, ` 3` … when that name is taken (`NewPlanFromImport`, §7), without opening it; a profile, a data part or rules use the imports of §6.2–§6.4 limited to that part. The window's `update` mode replaces the content of the list a file became, as the editor's import does, in one undoable step, without opening that list. The window runs the parts as one background task (16 §2.16), holding its lock for one part at a time.
+
+**The record of earlier imports** is the meta value `import.history`: per source path (lower-cased), the time of the last import, the file's SHA-256 then, and for a list file the list it became (a copy keeps the record's list). A manager's “imported” date is its sources' latest. A list file is `listed` while that list exists, and changed when the file's hash differs. Nothing is recorded for the CLI's whole imports or for list imports from a file or a link; what is already in RimArcho comes from the dry run, not from the record, so the CLI's imports still show as `had`.
 
 ## 7. List exchange
 
@@ -414,9 +458,9 @@ Formats are detected by content, not by extension (except `.rws`, read as a save
 
 | Format | Detection | Read |
 | --- | --- | --- |
-| RimArcho list (`.archolist.json`) | Starts `{`, has `entries` array and numeric `format` | `pack.json` format (10 §1): `name` is list name, `game`, `entries[]` fields `package_id`, `name`, `workshop_id`, `hash`; reject newer `format`. Read pack-directory `pack.json` the same way |
+| RimArcho list (`.archolist.json`) | Starts `{`, has `entries` array and numeric `format` | `pack.json` format (10 §1): `name` is list name, `game`, `entries[]` fields `package_id`, `name`, `workshop_id`, `hash`, and `settings` when it carries Mod settings (§7.3); reject newer `format`. Read pack-directory `pack.json` the same way |
 | Text list | Other text | One packageId per line (`author.name`), `#` comments, skip headings/prose |
-| ModsConfig.xml / RimSort exported list | Root `ModsConfigData` | `version`, `activeMods/li` |
+| ModsConfig.xml / RimSort or RimPy saved list | Root `ModsConfigData` | `version`, `activeMods/li` |
 | Save | `.rws` or `<savegame` in first 4096 bytes | `gameVersion`, `modIds`, `modNames` under `<meta>`; stop at `</meta>` (saves are tens of MB); names label missing entries |
 | RimWorld `.rml` (in-game "save Mod list", also written by RimCrow) | Root `savedModList` | Prefer `modList/ids` and `names`, else `meta/modIds`, `modNames`; matching `meta/modSteamIds` supplies Workshop IDs |
 | RimCrow `ModList.xml` | Root `ModList` | Parallel `modIds`, `modNames`, `modSteamWorkshopIds` (`0` = none) |
@@ -429,7 +473,7 @@ Formats are detected by content, not by extension (except `.rws`, read as a save
 
 - JSON entries may be strings or objects with `packageId` / `package_id` / `packageid` / `id`, `name`, `workshopId` / `workshop_id` / `publishedFileId`.
 - Of duplicate packageIds, the first is kept. UTF-16 and UTF-8 BOMs are detected and the text is normalized to UTF-8; files under 16 MB are read whole.
-- If no Mods are found, the error is "no mods found in it: a list from RimSort, RimCrow or RimWorld, a share code, packageIds or workshop links".
+- If no Mods are found, the error is "no mods found in it: a list from RimSort, RimCrow, RimPy or RimWorld, a share code, packageIds or workshop links".
 - Pasting one line in the UI: an existing file path reads the file; a Rentry link fetches `https://rentry.co/<id>/raw` (at most 4 MB; on failure, suggest opening the page, copying the list and pasting it); a Workshop link or a number of 6 or more digits reads a Steam collection (§7.5). Only the last two use the network.
 - Pack (`.archopack`) import: 10 §4. A pack's exported list is a RimArcho list, imported here.
 
@@ -439,7 +483,7 @@ Formats are detected by content, not by extension (except `.rws`, read as a save
 
 | Format | Content |
 | --- | --- |
-| `archo` | RimArcho list (`.archolist.json`): `pack.json` format (10 §1), `light` true, `name` the plan's name. Entries include `lineage`, `instance`, `workshop_id` and the semantic `hash` (Core/DLC only `official`); missing entries only `package_id`. The importer can see which versions match (§7.1). The UI's first export option, "RimArcho list" |
+| `archo` | RimArcho list (`.archolist.json`): `pack.json` format (10 §1), `light` true, `name` the plan's name. Entries include `lineage`, `instance`, `workshop_id` and the semantic `hash` (Core/DLC only `official`); missing entries only `package_id`. The importer can see which versions match (§7.1). With `--settings` ("include Mod settings", off by default) it also carries the list's Mod settings as a pack does (`settings`, 10 §1) and is written as format 3; without them it stays format 2. The UI's first export option, "RimArcho list" |
 | `text` (default) | Two `#` header lines (environment, Mod count, time; how to import), then one `<packageId>  # <name>` per line; missing entries are named `missing` |
 | `modsconfig` / `rimsort` | ModsConfig XML (`ModsConfigData`: `version`, `activeMods/li`, `knownExpansions/li`); a Workshop copy of a package that also has another copy uses `_steam`. RimSort exports this format; `rimsort` is an alias |
 | `rml` | RimWorld `savedModList`: `meta` holds `gameVersion`, `modIds`, `modSteamIds` (`0` if none), `modNames`; `modList` holds `ids`, `names`; loads directly in the game's Mod menu |
@@ -448,6 +492,8 @@ Formats are detected by content, not by extension (except `.rws`, read as a save
 | `workshop` | Workshop links: one `#` header (list name, Mod count, Workshop count), then one `- [<name>](https://steamcommunity.com/sharedfiles/filedetails/?id=<Workshop ID>)` per line in load order; a final comment lists the entries not on the Workshop (Core, DLC, local Mods, missing entries). Recipients can subscribe from it; it imports as a Workshop ID list (§7.2) |
 
 `archo` also has `versions`: the plan's allowed game versions (§1.6), for example `["1.5","1.6","1.7"]`. Older RimArcho versions ignore it.
+
+**Applying a list's settings** (decided 2026-11-18, X1). Importing a RimArcho list never applies its settings by itself: the import says the list carries settings of N Mods (CLI line, preview fact), and "apply settings" is a separate choice (`app.ApplyListSettings`; `archo mod-settings apply <file> [<package>…] [--replace] [--dry-run]`; MCP `set_mod_settings action=apply`; the GUI import's "apply settings", 16 §2.18). Each file is written under the folder the game sees the Mod under in the current Game Config (the current list's copy first, else an installed loadable copy); a Mod not installed is skipped. A file that is here is kept unless the player replaces it; a replaced file, and for a HugsLib pack the whole `HugsLib/ModSettings.xml`, goes to the recycle bin first (02 §1, §3); a file with the same text is left. Only while no game runs. The preview lists per Mod each file as new, kept, replaced or already the same (`TestListSettingsExportApply`, `TestHugsLibMerge`).
 
 In the UI, export is a subpage of the list (16 §2.17): preview each format, then save it to a file or copy it; share codes can only be copied.
 

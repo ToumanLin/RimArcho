@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -9,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -35,10 +38,10 @@ type API struct {
 	mu              sync.Mutex
 	filesMu         sync.RWMutex // scans and file jobs; never acquired by page reads/edits
 	a               *app.App
-	emit            func(name string, data any) // Wails events; nil in tests
-	open            func(url string) error      // the system browser
-	openDir         func(dir string) error      // the file manager (nil: the system's)
-	lib             *app.Library                // Mod library, as of libAt
+	emitFn          atomic.Pointer[func(name string, data any)] // Wails events; unset in tests (setEmit)
+	open            func(url string) error                      // the system browser
+	openDir         func(dir string) error                      // the file manager (nil: the system's)
+	lib             *app.Library                                // Mod library, as of libAt
 	libAt           string
 	libGate         sync.Mutex // coalesces full inventory builds, never acquired by edits
 	problemLookup   problemLookup
@@ -56,14 +59,28 @@ type API struct {
 	needsAt         string // the database state the needs were built at
 	content         view.ContentCache
 	busy            map[string]bool // scan, analyze, pack
+	flight          flights         // page reads on their way (flight.go)
+	feedbackAt      time.Time       // the last relay check of FeedbackCheck
+	// analyzedKey, analyzedAt: the inputs and end of the last check that succeeded; check
+	// again with the same inputs right after it does not start another (Analyze)
+	analyzedKey     string
+	analyzedAt      time.Time
 	workspace       *workspaceSnapshot
 	needsCache      map[string]*needsSnapshot
 	needsJobs       sync.WaitGroup
+	needsActive     atomic.Int32 // needsJobs still running, for waits that may overlap an Add (tests)
 	needsRefreshing bool
 	needsClosed     bool
-	needsWanted     bool
-	needsSequence   uint64
-	listEdits       uint64
+	// autoAnalyzed: the inputs (scope and analysis key) an automatic check already ran for
+	// this session; the same inputs never start another by themselves.
+	autoAnalyzed map[string]bool
+	// analyzeTimer: the pending automatic check (autoAnalyzeLocked); analyzeAfter: one more
+	// follows the running check; analyzeSettle: the edit settle time (0: analyzeSettle).
+	analyzeTimer  *time.Timer
+	analyzeAfter  bool
+	analyzeSettle time.Duration
+	needsSequence uint64
+	listEdits     uint64
 	// building is the pack this window's build child is making ("" none).
 	building  string
 	buildRead buildPageReader
@@ -75,24 +92,28 @@ type API struct {
 	// removedRule is the rule the editor removed last, for its undo (rules.go).
 	removedRule *store.UserRule
 	free        releaser // returns memory to the OS after heavy work (memory.go)
-	// bgs are the environment bgsEnv's backgrounds; bgPick the image rotation chose for
+	// bgs are the game installation bgsGame's backgrounds; bgPick the image rotation chose for
 	// this window (background.go)
-	bgs    []app.Background
-	bgsEnv string
-	bgPick string
-	bgRead backgroundReader
+	bgs     []app.Background
+	bgsGame string
+	bgPick  string
+	bgRead  backgroundReader
 	// Exe runs the scan, analysis and pack build children; "" is this executable (the
 	// development harness points it at archo.exe).
 	Exe string
 
-	environment     environmentWorker
-	monitorOnce     sync.Once
-	autoOnce        sync.Once
-	maintenanceOnce sync.Once
-	autoWG          sync.WaitGroup
-	quit            func()        // closes the window (nil in the harness and in tests)
-	windowTheme     func(bool)    // synchronises the native frame with the resolved page scheme
-	memTarget       *memoryTarget // WebView2's memory target (winmem_policy.go); nil off Windows and in tests
+	environment      environmentWorker
+	monitorOnce      sync.Once
+	watchOnce        sync.Once // watchDownloads (04 §1.6)
+	repliesOnce      sync.Once // checkFeedbackReplies (16 §2.14)
+	autoOnce         sync.Once
+	maintenanceOnce  sync.Once
+	maintenanceYield func() // called when the idle monitor cancels a pass (tests; nil otherwise)
+	autoWG           sync.WaitGroup
+	quit             func()        // closes the window (nil in the harness and in tests)
+	windowTheme      func(bool)    // synchronises the native frame with the resolved page scheme
+	zoom             windowZoom    // settings › interface size (zoom.go)
+	memTarget        *memoryTarget // WebView2's memory target (winmem_policy.go); nil off Windows and in tests
 	// tasks is the Background tasks record and its lanes (tasks.go, 16 §2.16)
 	tasks        *app.Tasks
 	taskEv       taskEvents
@@ -118,7 +139,8 @@ type API struct {
 	llFiles       map[string]loverDownload
 
 	uninstall      uninstallState
-	saves          savesState // the Saves page's reader and listing (saves.go)
+	saves          savesState  // the Saves page's reader and listing (saves.go)
+	review         reviewState // Saves › Play review (savereview.go)
 	uninstallSizes app.UninstallSizeCache
 	uninstallRead  logReader
 
@@ -140,9 +162,12 @@ func newAPI(a *app.App) *API {
 	return s
 }
 
+// setEmit sets where events go; nil drops them. Safe while background tasks send.
+func (s *API) setEmit(f func(name string, data any)) { s.emitFn.Store(&f) }
+
 func (s *API) send(name string, data any) {
-	if s.emit != nil {
-		s.emit(name, data)
+	if f := s.emitFn.Load(); f != nil && *f != nil {
+		(*f)(name, data)
 	}
 }
 
@@ -157,8 +182,11 @@ func (s *API) Ready() {
 	defer perftrace.Span("Ready")()
 	s.startAutomatic()
 	s.startMaintenance()
+	go s.a.PruneOps()           // the operation log's retention (13 §1.3), after the first draw
 	s.prepareBackgrounds(false) // menu extraction starts after the first draw (16 §3.1)
 	s.monitorOnce.Do(s.checkMonitor)
+	s.watchOnce.Do(func() { go s.watchDownloads() })
+	s.repliesOnce.Do(s.checkFeedbackReplies)
 	ms := time.Since(processStart).Milliseconds()
 	dir := filepath.Join(s.a.Home, "logs")
 	if os.MkdirAll(dir, 0o755) != nil {
@@ -177,6 +205,9 @@ func (s *API) Ready() {
 func (s *API) checkMonitor() {
 	home, env, exe := s.a.Home, s.a.EnvName, s.Exe
 	go func() {
+		// Then the mod folders: what changed while RimArcho was closed (04 §1.6). After the
+		// Monitor, so the two never scan at once.
+		defer s.RescanIfChanged()
 		var out string
 		var err error
 		if exe != "" {
@@ -222,6 +253,7 @@ type Start struct {
 
 // Init returns the page's start data.
 func (s *API) Init() *Start {
+	s.zoom.apply(ZoomFactor(s.a)) // the window opens zoomed; a change in Settings reaches it here (reaccent)
 	defer perftrace.Span("Init")()
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -236,14 +268,15 @@ type Board struct {
 	*view.Board
 	Status map[string]int `json:"status"` // row icons (16 §7)
 	// Reasons are the items behind each row icon, for its hover / pinned popover (16 §4.2).
-	Reasons   map[string][]view.Reason `json:"reasons,omitempty"`
-	Needs     int                      `json:"needs"` // the top bar's number
-	Stamp     string                   `json:"stamp"` // the database state: the page reloads when it changes
-	Envs      []string                 `json:"envs"`
-	Error     string                   `json:"error,omitempty"`
-	Scanning  bool                     `json:"scanning"`
-	Analyzing bool                     `json:"analyzing"`
-	Never     bool                     `json:"neverScanned"`
+	Reasons         map[string][]view.Reason `json:"reasons,omitempty"`
+	Needs           int                      `json:"needs"` // the top bar's number
+	Stamp           string                   `json:"stamp"` // the database state: the page reloads when it changes
+	EnvironmentRows []view.EnvRow            `json:"environmentRows"`
+	Envs            []string                 `json:"envs"`
+	Error           string                   `json:"error,omitempty"`
+	Scanning        bool                     `json:"scanning"`
+	Analyzing       bool                     `json:"analyzing"`
+	Never           bool                     `json:"neverScanned"`
 }
 
 // Board builds the columns (16 §2.5) and the counts from the workspace.
@@ -275,11 +308,18 @@ func (s *API) boardLocked() *Board {
 		out.Error = err.Error()
 		return out
 	}
-	for _, e := range envs {
+	cur, _ := s.a.Env()
+	current := ""
+	if cur != nil {
+		current = cur.ID
+	}
+	out.EnvironmentRows = view.EnvironmentRows(s.a, current)
+	out.Envs = make([]string, 0, len(envs))
+	for _, e := range out.EnvironmentRows {
 		out.Envs = append(out.Envs, e.Name)
 	}
 	if e, err := s.a.Env(); err == nil {
-		sc, _, _ := s.a.LastScan(e.ID)
+		sc, _, _ := s.a.LastScan(e.GameID)
 		out.Never = sc == nil
 	}
 	n := s.needsLocked()
@@ -304,6 +344,10 @@ type PackList struct {
 
 // Packs lists the current environment's packs (10).
 func (s *API) Packs() (*PackList, error) {
+	return join(&s.flight, "Packs", s.packsRead)
+}
+
+func (s *API) packsRead() (*PackList, error) {
 	r, err := s.detachedReader()
 	if err != nil {
 		return nil, err
@@ -337,14 +381,37 @@ func (s *API) PackNameCheck(name string) string {
 	return ""
 }
 
+// PackRevision is the revision of the pack name (0: no such pack): the build page offers
+// to make the next one (10 §2).
+func (s *API) PackRevision(name string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if p, err := s.a.ReadPack(strings.TrimSpace(name)); err == nil && !p.Light {
+		return p.Rev()
+	}
+	return 0
+}
+
+// packBuildFlags are a build's flags: textures, settings left out, a new revision.
+func packBuildFlags(tex int, noSettings, update bool) []string {
+	out := app.PackBuildArgs(view.PackTextureOptions(tex))
+	if noSettings {
+		out = append(out, "--no-settings")
+	}
+	if update {
+		out = append(out, "--update")
+	}
+	return out
+}
+
 // PackDryRun is preview the file list without writing to disk: the text of archo pack build --dry-run (nothing is written).
-func (s *API) PackDryRun(name string, tex int) []string {
+func (s *API) PackDryRun(name string, tex int, noSettings, update bool) []string {
 	r, err := s.detachedReader()
 	if err != nil {
 		return []string{err.Error()}
 	}
 	defer r.Close()
-	argv := append([]string{"pack", "build", strings.TrimSpace(name), "--dry-run"}, app.PackBuildArgs(view.PackTextureOptions(tex))...)
+	argv := append([]string{"pack", "build", strings.TrimSpace(name), "--dry-run"}, packBuildFlags(tex, noSettings, update)...)
 	text, _ := cmds.Execute(r, argv)
 	st, _ := r.Loadout()
 	var out []string
@@ -408,7 +475,9 @@ func (s *API) PackExport(name, file string, list bool) (string, error) {
 // once: the copy takes minutes and holds nothing here, so every page keeps working, and it
 // goes on when the window closes. "pack" events carry the progress (view.PackProgress) and
 // the end. One build at a time.
-func (s *API) PackBuild(name string, tex int) (string, error) {
+// noSettings leaves the list's Mod settings out; update makes the next revision of the
+// existing pack name (its Mods replaced, its saves and settings kept).
+func (s *API) PackBuild(name string, tex int, noSettings, update bool) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := app.CheckPackName(name); err != nil {
@@ -424,8 +493,10 @@ func (s *API) PackBuild(name string, tex int) (string, error) {
 			}
 		}
 	}
-	if _, err := s.a.ReadPack(name); err == nil {
+	if _, err := s.a.ReadPack(name); err == nil && !update {
 		return "", fmt.Errorf("pack %q exists; remove it first or pick another name", name)
+	} else if err != nil && update {
+		return "", err
 	}
 	s.busy["pack"], s.building = true, name
 	tmp := filepath.Join(s.a.PacksDir(), name+app.TmpSuffix)
@@ -433,7 +504,7 @@ func (s *API) PackBuild(name string, tex int) (string, error) {
 	if run == nil {
 		home, env, exe, plan := s.a.Home, s.a.EnvName, s.Exe, s.a.OpenPlanName()
 		log := filepath.Join(home, "logs", "pack-build.log")
-		extra := app.PackBuildArgs(view.PackTextureOptions(tex))
+		extra := packBuildFlags(tex, noSettings, update)
 		run = func(name string) error {
 			if exe != "" {
 				return app.ChildPackBuildExe(exe, home, env, plan, name, log, extra...)
@@ -552,18 +623,29 @@ func (s *API) Directories() ([]app.ManagedDirectory, error) {
 
 // Settings is the settings page (16 §2.14).
 func (s *API) Settings() []view.SettingGroup {
+	v, _ := join(&s.flight, "Settings", func() ([]view.SettingGroup, error) { return s.settingsRead(), nil })
+	return v
+}
+
+func (s *API) settingsRead() []view.SettingGroup {
 	r, err := s.detachedReader()
 	if err != nil {
 		return nil
 	}
 	defer r.Close()
 	defer s.free.soon()
+	// The Game Config's own settings are on the Game Config page (16 §2.8), not here.
 	return view.SettingsPage(r, nil)
 }
 
 // Environment is the environment page: the environments, the current one's folders and
 // launch.
 func (s *API) Environment() *view.EnvPage {
+	v, _ := join(&s.flight, "Environment", func() (*view.EnvPage, error) { return s.environmentRead(), nil })
+	return v
+}
+
+func (s *API) environmentRead() *view.EnvPage {
 	r, err := s.detachedReader()
 	if err != nil {
 		return &view.EnvPage{}
@@ -757,6 +839,9 @@ type Detail struct {
 	URL         string         `json:"url,omitempty"` // the Workshop page
 	Pos         int            `json:"pos,omitempty"`
 	Version     *view.Reason   `json:"version,omitempty"`
+	// Data: Can it run's items about this Mod that rest on shared-log data or the
+	// replacement library, each with "the data is outdated" (16 §2.9)
+	Data []view.DataNote `json:"data,omitempty"`
 }
 
 // Detail returns the detail of an instance; fetch allows the network for the Workshop
@@ -810,6 +895,7 @@ func (s *API) Detail(id string, staged, fetch, refresh bool) (*Detail, error) {
 		Show: data.Desc.Show, Note: view.DescNote(data), State: data.Desc.WorkshopState,
 		About: data.About, Workshop: data.Workshop, History: view.HistoryLine(data.Events), CanSeparate: st.Ix.CanSeparate(mod)}
 	d.Version = data.Version
+	d.Data = view.DataNotes(n, st, id)
 	d.Status = view.RowStatus(&item, n.Status)
 	switch d.Status {
 	case view.StatusNone:
@@ -984,7 +1070,21 @@ func (s *API) Swap(id string) (string, error) {
 func (s *API) Preview(what string) (*view.Preview, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	defer s.launchCurrent(what)()
 	return view.DryRun(s.a, what)
+}
+
+// launchCurrent: a launch starts the current list, the one Launch shows and checks the RAM
+// for (07 §1.3), not a list only open in the window (VM 2026-11-23: Launch showed r2b and
+// started r2s, open in the editor). The editor makes its list current before it launches.
+// The returned func gives the window its open list back.
+func (s *API) launchCurrent(what string) func() {
+	if what != view.ListLaunch || s.a.OpenPlan == 0 {
+		return func() {}
+	}
+	open, name := s.a.OpenPlan, s.a.PlanName
+	s.a.OpenPlan, s.a.PlanName = 0, ""
+	return func() { s.a.OpenPlan, s.a.PlanName = open, name }
 }
 
 // Run does sort, save or launch at once (S, w, L; 16 §6). A refusal comes back in
@@ -1009,10 +1109,43 @@ func (s *API) run(what string, ask bool) (*view.Outcome, error) {
 	default:
 		return nil, fmt.Errorf("no action %s", what)
 	}
+	defer s.launchCurrent(what)()
+	var o *view.Outcome
 	if ask {
-		return view.RunAsking(s.a, what), nil
+		o = view.RunAsking(s.a, what)
+	} else {
+		o = view.Run(s.a, what)
 	}
-	return view.Run(s.a, what), nil
+	s.launchedPlan(o)
+	return o, nil
+}
+
+// launchedPlan forgets a pack applied on Launch once the current plan launched (from the
+// editor, 16 §2.5, or the command panel): Launch's headline then names the plan that runs.
+func (s *API) launchedPlan(o *view.Outcome) {
+	if o == nil || o.What != view.ListLaunch || len(o.Refused) > 0 || len(o.Confirm) > 0 || len(o.Moves) > 0 {
+		return
+	}
+	if s.a.Store.Meta(view.FeaturedKey) != "" {
+		_ = s.a.Store.SetMeta(view.FeaturedKey, "")
+	}
+}
+
+// LaunchDirect makes the current Game Config start the game without Steam from now on: the
+// answer to a Steam launch with no Steam client (view.Outcome.Direct, 16 §2.3). The page
+// then launches again.
+func (s *API) LaunchDirect() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, err := s.a.Env()
+	if err != nil {
+		return err
+	}
+	if _, _, err := s.a.EnvSet(e.Name, app.EnvSpec{Launch: "direct"}); err != nil {
+		return err
+	}
+	s.needs, s.board = nil, nil
+	return nil
 }
 
 // RunMoving is Run after the player agreed to move the folders in the way into the lock
@@ -1026,7 +1159,10 @@ func (s *API) RunMoving(what string) (*view.Outcome, error) {
 	default:
 		return nil, fmt.Errorf("no action %s", what)
 	}
-	return view.RunMoving(s.a, what), nil
+	defer s.launchCurrent(what)()
+	o := view.RunMoving(s.a, what)
+	s.launchedPlan(o)
+	return o, nil
 }
 
 // ---- tags (16 §3.8) ----
@@ -1170,14 +1306,13 @@ func (s *API) tagDone(t string, err error) (string, error) {
 // starts the files' check when it is stale, as the TUI does.
 func (s *API) Needs() *view.Needs {
 	s.mu.Lock()
-	s.needsWanted = true
 	if c, key := s.cachedNeedsLocked(); c != nil {
 		if c.key == key {
 			s.refreshNeedsLocked(c)
 			st, _ := s.a.Loadout()
 			n := view.RefreshMemory(s.a, st, c.n)
-			if c.eager && n.Error == "" && (n.Stale || n.Never) && !s.busy["analyze"] {
-				s.startAnalyze()
+			if c.eager {
+				s.autoAnalyzeLocked(n, false)
 			}
 			out := *n
 			out.Updating = s.needsWorkLocked()
@@ -1217,10 +1352,8 @@ func (s *API) Needs() *view.Needs {
 	if sameNeedsList(st, current) {
 		// The eager pass may have saved a parsed log report. Read its ProblemSet again.
 		ps, _ = r.Problems(false, nil)
-		s.saveNeedsLocked(ps, n, true)
-		if (n.Stale || n.Never) && !s.busy["analyze"] {
-			s.startAnalyze()
-		}
+		s.saveFreshNeedsLocked(ps, n, true)
+		s.autoAnalyzeLocked(n, false)
 		n.Updating = s.needsWorkLocked()
 	}
 	return n
@@ -1295,7 +1428,7 @@ func (s *API) needsLocked() *view.Needs {
 		return &view.Needs{Status: map[string]int{}, Error: "could not read list problems"}
 	}
 	n := view.BuildNeeds(s.a, ps.State, ps)
-	s.saveNeedsLocked(ps, n, false)
+	s.saveFreshNeedsLocked(ps, n, false)
 	return n
 }
 
@@ -1478,6 +1611,10 @@ func (s *API) Logs() []string {
 
 // LogPage analyses a log for the Game log tab (the newest when path is empty).
 func (s *API) LogPage(path string) (*view.LogPage, error) {
+	return join(&s.flight, "LogPage|"+path, func() (*view.LogPage, error) { return s.logPageRead(path) })
+}
+
+func (s *API) logPageRead(path string) (*view.LogPage, error) {
 	// Serialise log reads with each other, not with the board, navigation or textures.
 	// Keeping this reader also preserves pending cross-version analysis between polls.
 	s.logRead.mu.Lock()
@@ -1498,7 +1635,7 @@ func (s *API) LogPage(path string) (*view.LogPage, error) {
 		if current := s.boardState(); current != nil && current.Ix.Env.ID == readState.Ix.Env.ID {
 			s.logLinks, s.logPath = p.Links, p.Path
 			if m := view.LiveMonitor(s.a, current, &s.live, p.Path, p.Links); m != nil {
-				p.Monitor, p.NoMonitor, p.AddMonitor = m, "", false
+				p.Monitor, p.NoMonitor, p.AddMonitor, p.InstallMonitor = m, "", false, false
 			}
 		}
 	}
@@ -1519,6 +1656,25 @@ func (s *API) LogMonitor(path string) (*view.MonitorLog, error) {
 		links = s.logLinks
 	}
 	return view.LiveMonitor(s.a, st, &s.live, path, links), nil
+}
+
+// InstallMonitor installs Archo Monitor now (the game log's install button, 16 §2.9): the
+// child process the window runs once at start (checkMonitor, 19 §6).
+func (s *API) InstallMonitor() (string, error) {
+	home, env, exe := s.a.Home, s.a.EnvName, s.Exe
+	var err error
+	if exe != "" {
+		_, err = app.ChildMonitorExe(exe, home, env)
+	} else {
+		_, err = app.ChildMonitor(home, env)
+	}
+	if err != nil {
+		return "", err
+	}
+	s.mu.Lock()
+	s.board, s.needs = nil, nil
+	s.mu.Unlock()
+	return view.T("Archo Monitor is ready"), nil
 }
 
 // AddMonitor puts Archo Monitor after Harmony in the current plan (the log page's action;
@@ -1586,6 +1742,51 @@ func (s *API) SelectLog(path string) (string, error) {
 func (s *API) Scan() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.startScanLocked(false)
+}
+
+// RescanIfChanged rescans, as Scan does, when a mod folder changed outside RimArcho since the
+// last scan (04 §1.6): Steam finished a new subscription, another tool added or removed a
+// mod. The window calls it when it starts and when it gets the focus; while Steam is still
+// downloading items it is also called every 20 s. False: nothing changed, or a scan runs.
+func (s *API) RescanIfChanged() bool {
+	if s.a == nil || s.a.Store == nil {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.busy["scan"] {
+		return false
+	}
+	if changed, err := s.a.ModFoldersChanged(); err != nil || !changed {
+		return false
+	}
+	return s.startScanLocked(true)
+}
+
+// watchDownloads calls RescanIfChanged every 20 s while Steam has subscribed items that are
+// not on disk yet (04 §1.6), so a list waiting for them fills in without the focus moving.
+// Without pending items it only reads the Steam manifest each round.
+func (s *API) watchDownloads() {
+	t := time.NewTicker(20 * time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-s.branchCtx.Done():
+			return
+		case <-t.C:
+		}
+		s.mu.Lock()
+		pending := len(s.a.WorkshopPending()) > 0
+		s.mu.Unlock()
+		if pending {
+			s.RescanIfChanged()
+		}
+	}
+}
+
+// startScanLocked starts a scan; auto: started by RescanIfChanged, which says so when done.
+func (s *API) startScanLocked(auto bool) bool {
 	if s.busy["scan"] {
 		return false
 	}
@@ -1617,6 +1818,9 @@ func (s *API) Scan() bool {
 			s.endSelf(task, errors.New(reason), "")
 		} else {
 			ev["text"] = view.T("scan complete")
+			if auto {
+				ev["text"], ev["auto"] = view.T("mod folders changed outside RimArcho: the library is up to date"), true
+			}
 			s.endSelf(task, nil, ev["text"].(string))
 		}
 		s.free.soon()
@@ -1627,10 +1831,29 @@ func (s *API) Scan() bool {
 
 // Analyze checks the mods' files again in a child process; "analyze" events carry the
 // progress lines and the end.
+//
+// Check again a few seconds after a check of the same inputs ended (a held key, a burst
+// of clicks) starts nothing: that result is the current one (16 §8.9).
 func (s *API) Analyze() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.analyzedKey != "" && time.Since(s.analyzedAt) < analyzeAgain && s.analyzedKey == s.analysisInputsLocked() {
+		return false
+	}
 	return s.startAnalyze()
+}
+
+// analyzeAgain: how long after a check its inputs count as just checked (Analyze).
+const analyzeAgain = 5 * time.Second
+
+// analysisInputsLocked is what a check of the open list depends on: its scope and
+// app.AnalysisKey ("" without a loadout). s.mu is held.
+func (s *API) analysisInputsLocked() string {
+	st, _ := s.a.Loadout()
+	if st == nil {
+		return ""
+	}
+	return s.needsScopeLocked() + "|" + s.a.AnalysisKey(st, "")
 }
 
 func (s *API) startAnalyze() bool { return s.startAnalyzeOf("") }
@@ -1645,6 +1868,10 @@ func (s *API) startAnalyzeOf(list string) bool {
 	home, env, exe, plan := s.a.Home, s.a.EnvName, s.Exe, s.a.OpenPlanName()
 	mm := s.a.GameVersion
 	scope, _, _, _ := s.needsKeyLocked()
+	inputs := ""
+	if list == "" {
+		inputs = s.analysisInputsLocked()
+	}
 	obj := env
 	if s.board != nil && s.board.St != nil && s.board.St.Plan != nil {
 		obj = s.board.St.Plan.Name
@@ -1652,15 +1879,22 @@ func (s *API) startAnalyzeOf(list string) bool {
 	if list != "" {
 		plan, obj = list, list
 	}
-	task := s.beginSelf(view.TaskAnalyze, obj, nil)
+	var from *app.App
+	if run != nil { // read here, under s.mu: the page goes on changing s.a meanwhile
+		from = s.a.AnalyzeFrom(env)
+		from.PlanName = plan
+	}
+	task := s.tasks.BeginOnce(view.TaskAnalyze, obj, nil) // one row, updated in place (16 §8.9)
 	// the open list's findings will change: its problems button says so while this runs
 	if c, _ := s.cachedNeedsLocked(); c != nil && c.scope == scope {
 		ev := s.problemsNowLocked(c.n)
 		go s.send("list-problems", ev)
 	}
 	s.needsJobs.Add(1)
+	s.needsActive.Add(1)
 	go func() {
 		defer s.needsJobs.Done()
+		defer s.needsActive.Add(-1)
 		progress := func(l string) {
 			l = view.AnalyzeProgress(strings.TrimPrefix(l, "progress: "))
 			s.tasks.Update(task, func(t *app.Task) { t.Phase = l })
@@ -1669,7 +1903,7 @@ func (s *API) startAnalyzeOf(list string) bool {
 		var err error
 		switch {
 		case run != nil:
-			err = run(env, progress)
+			err = run(from, progress)
 		case exe != "":
 			err = app.ChildAnalyzeExe(exe, home, env, plan, mm, progress)
 		default:
@@ -1677,6 +1911,9 @@ func (s *API) startAnalyzeOf(list string) bool {
 		}
 		s.mu.Lock()
 		s.busy["analyze"], s.needs = false, nil
+		if err == nil && inputs != "" {
+			s.analyzedKey, s.analyzedAt = inputs, time.Now()
+		}
 		if err != nil {
 			if c, _ := s.cachedNeedsLocked(); c != nil && c.scope == scope {
 				n := *c.n
@@ -1693,6 +1930,11 @@ func (s *API) startAnalyzeOf(list string) bool {
 				s.refreshNeedsLocked(c)
 			}
 		}
+		if s.analyzeAfter {
+			// the list changed while this ran: one more check for it as it is now
+			s.analyzeAfter = false
+			s.analyzeSoonLocked(0)
+		}
 		s.mu.Unlock()
 		s.endSelf(task, err, view.T("analysis done"))
 		ev := map[string]any{"done": true, "ok": err == nil}
@@ -1706,20 +1948,29 @@ func (s *API) startAnalyzeOf(list string) bool {
 
 // ---- palette and the rest ----
 
-// Palette ranks commands, mods and the other environments for a query (16 §3.5).
-func (s *API) Palette(query string) []view.PalEntry {
+// Palette ranks commands, mods and the other environments for a query on page (named as
+// for Keys), the page's own commands first; parts are the page's places (its numbered
+// areas), returned as PalPart entries whose ID is the index in parts (16 §3.5).
+func (s *API) Palette(query, page string, parts []string) []view.PalEntry {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	all := view.CommandEntries()
+	for i, name := range parts {
+		if name = strings.TrimSpace(name); name != "" {
+			all = append(all, view.PalEntry{Kind: view.PalPart, ID: strconv.Itoa(i), Name: name})
+		}
+	}
 	cur := ""
 	if s.board != nil {
 		cur = s.board.EnvName
 	}
-	if envs, err := s.a.Store.Envs(); err == nil {
+	if envs := view.EnvironmentRows(s.a, ""); len(envs) > 0 {
 		for _, e := range envs {
-			if e.Name != cur {
-				all = append(all, view.PalEntry{Kind: view.PalEnv, ID: e.Name, Name: view.Tf("switch to %s", e.Name), Alias: e.Name, Desc: "env"})
+			label := view.Tf("switch to %s", e.Name) + "  " + e.Installation
+			if e.Name == cur {
+				label = e.Name + "  " + e.Installation + "  " + view.T("current")
 			}
+			all = append(all, view.PalEntry{Kind: view.PalEnv, ID: e.Name, Name: label, Alias: e.Name})
 		}
 	}
 	if rows, err := view.PlanRows(s.a); err == nil {
@@ -1737,7 +1988,7 @@ func (s *API) Palette(query string) []view.PalEntry {
 			}
 		}
 	}
-	out := view.PalRank(query, all)
+	out := view.PalRankPage(query, page, all)
 	if len(out) > 50 {
 		out = out[:50]
 	}
@@ -1795,6 +2046,9 @@ func (s *API) SetSetting(key, value string) error {
 	if !strings.HasPrefix(key, "ui.gui.") {
 		return fmt.Errorf("not a GUI setting: %s", key)
 	}
+	if key == view.DisabledSortKey {
+		s.board = nil // Disabled's order is built into the board (16 §2.5)
+	}
 	return s.a.Store.SetMeta(key, value)
 }
 
@@ -1804,4 +2058,56 @@ func firstLine(s string) string {
 		return s[:i]
 	}
 	return s
+}
+
+// GameConfigLists returns every global list, with the source config's current list first.
+func (s *API) GameConfigLists(from string) ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, err := s.a.Store.EnvByName(from)
+	if err != nil {
+		return nil, err
+	}
+	if e == nil {
+		return nil, fmt.Errorf("Game Config %s not found", from)
+	}
+	current, err := s.a.Store.CurrentPlan(e.ID)
+	if err != nil {
+		return nil, err
+	}
+	plans, err := s.a.Store.Plans()
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	if current != nil {
+		names = append(names, current.Name)
+	}
+	for _, p := range plans {
+		if current == nil || p.ID != current.ID {
+			names = append(names, p.Name)
+		}
+	}
+	return names, nil
+}
+
+func (s *API) EnvGameChangePreview(name, path string) ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	lines, err := s.a.EnvGameChangePreview(name, path)
+	if err != nil {
+		return nil, err
+	}
+	for i, line := range lines {
+		lines[i] = view.Text(line)
+	}
+	return lines, nil
+}
+
+// AcknowledgeAliasNotice: the player dismissed the shared-game-folder notice on the Game
+// Config page ("got it"); drawing the notice does not call it.
+func (s *API) AcknowledgeAliasNotice() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.a.AcknowledgeAliasNotice()
 }

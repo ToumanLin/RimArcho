@@ -5,6 +5,7 @@ package testkit
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"math/rand/v2"
@@ -17,6 +18,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -43,8 +45,11 @@ type Env struct {
 	UserData   string
 	ModsConfig string
 	Home       string
+	RecycleBin string // <Root>/RecycleBin: the fake recycle bin every App here uses (Recycle)
 	App        *app.App
 	Launched   []string // command lines the stub launcher received
+
+	children atomic.Uint64 // ChildApp calls, for each child's ID stream
 
 	now        time.Time
 	subscribed map[string]bool
@@ -66,6 +71,7 @@ func New(t testing.TB) *Env {
 	e.UserData = filepath.Join(root, "AppData", "LocalLow", "Ludeon Studios", "RimWorld by Ludeon Studios")
 	e.ModsConfig = filepath.Join(e.UserData, "Config", "ModsConfig.xml")
 	e.Home = filepath.Join(root, "ArchoHome")
+	e.RecycleBin = filepath.Join(root, "RecycleBin")
 	e.WriteFile(filepath.Join(e.Game, "RimWorldWin64.exe"), "")
 	e.WriteFile(filepath.Join(e.Game, "Version.txt"), "1.6.4633 rev1261\n")
 	e.MkdirAll(filepath.Join(e.Game, "Mods"))
@@ -124,17 +130,40 @@ func (e *Env) Open() {
 	if e.App != nil {
 		e.App.Close()
 	}
-	a, err := app.Open(e.Home)
+	a, err := e.openApp([32]byte{'r', 'i', 'm', 'a', 'r', 'c', 'h', 'o'})
 	if err != nil {
 		e.T.Fatal(err)
 	}
+	e.App = a
+	e.T.Cleanup(func() { a.Close() })
+}
+
+// ChildApp opens another App on the fixture's data directory, configured as Open configures
+// e.App: what a child process (`archo scan`, `archo analyze`) has. A stand-in for such a
+// child uses it instead of e.App, which the surface under test uses at the same time. The
+// caller closes it. Each child draws IDs from its own stream (a real child's are random):
+// the same seed as e.App would hand out IDs e.App already gave to rows.
+func (e *Env) ChildApp() (*app.App, error) {
+	seed := [32]byte{'c', 'h', 'i', 'l', 'd'}
+	binary.LittleEndian.PutUint64(seed[8:], e.children.Add(1))
+	return e.openApp(seed)
+}
+
+func (e *Env) openApp(seed [32]byte) (*app.App, error) {
+	a, err := app.Open(e.Home)
+	if err != nil {
+		return nil, err
+	}
 	a.MemoryProbe = func() machine.Memory { return machine.Memory{} }
 	a.Now = func() time.Time { return e.now }
-	a.Rand = rand.NewChaCha8([32]byte{'r', 'i', 'm', 'a', 'r', 'c', 'h', 'o'})
+	a.Rand = rand.NewChaCha8(seed)
 	a.Loc = time.UTC
 	a.Detect = env.DetectOptions{SteamRoots: []string{e.Steam}, ManualRoots: []string{}, Home: e.Root, GOOS: "windows", SkipRegistry: true}
 	// The lock library (07 §5) stays inside the fixture.
 	a.LockBase = filepath.Join(e.Root, "LocalAppData")
+	// Recycling stays inside the fixture: a test never reaches the player's own recycle
+	// bin (source.ErrTestRecycle, 17 §4). A test that watches recycles replaces it.
+	a.TrashFunc = e.Recycle
 	// Uninstall stays inside the fixture: kept saves and packs go to <root>/Documents, no
 	// other RimArcho is found, and the clean-up script is never started.
 	a.UninstallKeepBase = filepath.Join(e.Root, "Documents")
@@ -147,6 +176,9 @@ func (e *Env) Open() {
 	a.ToddsNoPath = true
 	// The host's own Steam client is never asked who is signed in.
 	a.SteamSignedIn = func() (string, bool) { return "", false }
+	// The host's Steam client is never looked for: it counts as running, so a Steam
+	// launch stays one unless a test says otherwise.
+	a.SteamRunning = func() bool { return true }
 	// Never start a process from a test: launches are only recorded.
 	a.Launcher = func(exe string, args []string, dir string) error {
 		e.Launched = append(e.Launched, strings.Join(append([]string{exe}, args...), " "))
@@ -156,15 +188,34 @@ func (e *Env) Open() {
 	// Workshop retries do not sleep through the real 5 s / 15 s backoff.
 	a.SteamCMDWait = func(time.Duration) {}
 	// The Def/Patch analysis runs in-process instead of an `archo analyze` child.
-	a.AnalyzeRunner = app.InProcessAnalyze(a)
+	a.AnalyzeRunner = app.InProcessAnalyze
 	a.SavesIndexRunner = app.InProcessSavesIndex(a)
 	// Never go online: a test that needs a remote serves it on loopback (httptest) and points
 	// the matching URL or client there. Anything else, such as a Workshop description fetched
 	// when a detail pane opens, fails at once instead of waiting on the network and writing
 	// into the fixture after the test has ended.
 	a.HTTP = &http.Client{Timeout: 15 * time.Second, Transport: offline}
-	e.App = a
-	e.T.Cleanup(func() { a.Close() })
+	return a, nil
+}
+
+// Recycle is the fixture's recycle bin: it moves path into RecycleBin under a free name,
+// as the real bin keeps what it is given. A missing path fails, as the real bin does.
+func (e *Env) Recycle(path string) error {
+	if _, err := os.Lstat(path); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(e.RecycleBin, 0o755); err != nil {
+		return err
+	}
+	name := filepath.Base(path)
+	dst := filepath.Join(e.RecycleBin, name)
+	for i := 2; ; i++ {
+		if _, err := os.Lstat(dst); os.IsNotExist(err) {
+			break
+		}
+		dst = filepath.Join(e.RecycleBin, fmt.Sprintf("%s.%d", name, i))
+	}
+	return os.Rename(path, dst)
 }
 
 // offline dials loopback only and uses no proxy (a local proxy would forward to the internet).
@@ -471,4 +522,27 @@ func (e *Env) OtherGame(name, version string) string {
 	e.MkdirAll(filepath.Join(g, "Mods"))
 	e.CopyTemplate("core", filepath.Join(g, "Data", "Core"))
 	return g
+}
+
+// ProtonLibrary adds a second Steam library <Root>/<name> holding a Windows game with a
+// Proton prefix (03 §3.2), listed in the fixture Steam's libraryfolders.vdf, and makes the
+// fixture's own game native Linux (RimWorldLinux). It returns the Proton game folder and
+// its user data inside the prefix. Launch and saves rules treat it as Proton only with
+// App.Detect.GOOS "linux"; the layout itself is the same on every OS.
+func (e *Env) ProtonLibrary(name string) (game, userData string) {
+	e.T.Helper()
+	e.WriteFile(filepath.Join(e.Game, "RimWorldLinux"), "")
+	lib := filepath.Join(e.Root, name)
+	game = filepath.Join(lib, "steamapps", "common", "RimWorld")
+	e.WriteFile(filepath.Join(game, "RimWorldWin64.exe"), "")
+	e.WriteFile(filepath.Join(game, "Version.txt"), "1.6.4633 rev1261\n")
+	e.MkdirAll(filepath.Join(game, "Mods"))
+	e.CopyTemplate("core", filepath.Join(game, "Data", "Core"))
+	userData = filepath.Join(lib, "steamapps", "compatdata", env.WorkshopAppID, "pfx", "drive_c", "users", "steamuser",
+		"AppData", "LocalLow", "Ludeon Studios", "RimWorld by Ludeon Studios")
+	e.MkdirAll(filepath.Join(userData, "Config"))
+	e.WriteFile(filepath.Join(e.Steam, "steamapps", "libraryfolders.vdf"), fmt.Sprintf(
+		"\"libraryfolders\"\n{\n\t\"0\"\n\t{\n\t\t\"path\"\t\t%q\n\t}\n\t\"1\"\n\t{\n\t\t\"path\"\t\t%q\n\t}\n}\n",
+		e.Steam, lib))
+	return game, userData
 }

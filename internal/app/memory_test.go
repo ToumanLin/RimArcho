@@ -72,3 +72,39 @@ func TestMemoryAvailableUnknownIsNotZero(t *testing.T) {
 		t.Fatalf("unknown memory warned: %+v", c)
 	}
 }
+
+// A token dedicated size (VMware SVGA's 4 MB, Intel integrated's ~128 MB) counts as an
+// unknown card (machine.MinDedicatedVRAM): 1.7 stays uncapped, the VRAM capacity is
+// unknown. A real card keeps its watermark cap.
+func TestMemoryTokenDedicatedVRAMIsUnknown(t *testing.T) {
+	const gib, mib = int64(1 << 30), int64(1 << 20)
+	r := loadcost.Report{RAMLow: 3 * gib, RAMHigh: 6 * gib, VRAMLow: 2 * gib, VRAMHigh: 5 * gib, Parts: []loadcost.Part{
+		{Key: "textures", RAMLow: 2 * gib, RAMHigh: 5 * gib, VRAMLow: 2 * gib, VRAMHigh: 5 * gib},
+		{Key: "defs", RAMLow: gib, RAMHigh: gib},
+	}}
+	cost := &LoadCost{Game: loadcost.Game17, Report: r, LoadingRAMLow: 4 * gib, LoadingRAMHigh: 8 * gib}
+	cost.Baseline.RAM, cost.Baseline.VRAM = loadcost.Baseline(loadcost.Game17)
+	assess := func(dedicated int64) MemoryAssessment {
+		m := machine.Memory{TotalRAM: 16 * gib, AvailableRAM: 8 * gib, SampledAt: time.Now()}
+		if dedicated > 0 {
+			m.Adapters = []machine.Adapter{{Name: "synthetic GPU", Dedicated: dedicated}}
+		}
+		return AssessMemory(m, cost)
+	}
+	unknown := assess(0)
+	if unknown.TexturesOnDemand != 0 || unknown.VRAMSeverity != "unknown" {
+		t.Fatalf("unknown card capped: %+v", unknown)
+	}
+	for _, d := range []int64{4 * mib, 128 * mib, machine.MinDedicatedVRAM - 1} {
+		c := assess(d)
+		if c.RAMLow != unknown.RAMLow || c.RAMHigh != unknown.RAMHigh || c.VRAMLow != unknown.VRAMLow || c.VRAMHigh != unknown.VRAMHigh ||
+			c.TexturesOnDemand != 0 || c.VRAMSeverity != "unknown" || c.Hardware.VRAM() != 0 {
+			t.Fatalf("%d MiB dedicated differs from unknown: %+v vs %+v", d/mib, c, unknown)
+		}
+	}
+	c := assess(2 * gib)
+	_, ramHigh, _, vramHigh := loadcost.Cap17(loadcost.Game17, r, 2*gib)
+	if ramHigh == 0 || c.RAMHigh != unknown.RAMHigh-ramHigh || c.VRAMHigh != unknown.VRAMHigh-vramHigh || c.TexturesOnDemand == 0 || c.VRAMSeverity != "ok" {
+		t.Fatalf("2 GiB card not capped as before: %+v", c)
+	}
+}

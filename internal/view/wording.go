@@ -11,7 +11,7 @@ import (
 // retiredEn are the English words the interface no longer uses: list, game, a newer
 // version, switch version, locked, go back to a version, and the
 // light / full pack (a pack is always full; its list alone is a RimArcho list).
-var retiredEn = regexp.MustCompile(`(?i)\b(plans?|environments?|upstream|workspace|swap(s|ped)?|pinned|not written|checkout|light packs?|full packs?)\b`)
+var retiredEn = regexp.MustCompile(`(?i)\b(plans?|upstream|workspace|swap(s|ped)?|pinned|not written|checkout|light packs?|full packs?)\b`)
 
 // wordingExempt are texts whose Chinese is right although it holds a retired word.
 var wordingExempt = map[string]bool{

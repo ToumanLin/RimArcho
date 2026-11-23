@@ -26,6 +26,9 @@ type PatternCard struct {
 	Fixes     []string `json:"fixes,omitempty"`
 	Seen      string   `json:"seen,omitempty"` // how often shared logs show it
 	Gone      string   `json:"gone,omitempty"` // repeat uploads: went away after small list changes
+	// GonePct: Gone's first percentage, for the GUI's ten-step meter (16 §7 principle 9);
+	// only with Gone
+	GonePct int `json:"gonePct,omitempty"`
 	// Known: a known error of the cluster's source mod (a mod-specific pattern).
 	Known string `json:"known,omitempty"`
 }
@@ -70,7 +73,7 @@ func patternCard(st *app.LoadoutState, lc *app.LogCluster) *PatternCard {
 			src = append(src, strings.TrimSuffix(strings.ToLower(m.PackageID), "_steam"))
 		}
 	}
-	d := patterns.Load()
+	d := st.Ix.Patterns()
 	m := d.MatchCluster(lc.Class, lc.Template, src)
 	if m.Generic == nil && m.Mod == nil {
 		return nil
@@ -101,6 +104,9 @@ func patternCard(st *app.LoadoutState, lc *app.LogCluster) *PatternCard {
 		}
 		c.Seen = Tf("seen in %s of %s shared %s logs", patterns.Thousands(g.Logs), patterns.Thousands(d.Logs), d.Game)
 		c.Gone = goneLine(g.Res)
+		if c.Gone != "" {
+			c.GonePct = (100*g.Res.Gone["small"] + g.Res.Pairs["small"]/2) / g.Res.Pairs["small"]
+		}
 	}
 	if p := m.Mod; p != nil {
 		if c.Ref == "" {
@@ -112,6 +118,10 @@ func patternCard(st *app.LoadoutState, lc *app.LogCluster) *PatternCard {
 		}
 		c.Known = Tf("%s has this error itself in %s shared logs (%s); a newer version may have fixed it",
 			TokName(st, sourceTok(st, p.Mod)), patterns.Thousands(p.Logs), when)
+		if p.MayBeFixed {
+			c.Known = Tf("%s has this error itself in %s shared logs (%s); may be fixed: it was updated after the last of them",
+				TokName(st, sourceTok(st, p.Mod)), patterns.Thousands(p.Logs), when)
+		}
 	}
 	return c
 }

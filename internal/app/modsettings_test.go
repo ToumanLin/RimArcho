@@ -1,11 +1,14 @@
 package app_test
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/source"
@@ -62,7 +65,7 @@ func TestPackSettingsFollowTheMod(t *testing.T) {
 	e.MustRun("enable", "pkg:tester.versions")
 	e.MustRun("save")
 	e.MustRun("pack", "build", "first")
-	dir := filepath.Join(e.Home, "packs", "first")
+	dir := filepath.Join(e.App.PacksDir(), "first")
 	var p app.Pack
 	if err := json.Unmarshal([]byte(readFile(t, filepath.Join(dir, "pack.json"))), &p); err != nil {
 		t.Fatal(err)
@@ -192,11 +195,14 @@ func TestModSettingsWindow(t *testing.T) {
 	if out := e.MustRun("mod-settings"); strings.Contains(out, "B window") {
 		t.Fatalf("before any window:\n%s", out)
 	}
-	windows := `{"timestamp":"2026-11-03 10:05:00.000","level":"INFO","message":"[Archo Monitor] settings window A settings","details":"","count":1,"context":{"window":{"packageId":"tester.a","folder":"1001","class":"AMod","file":"Mod_1001_AMod.xml","title":"A settings","full":true,"controls":[{"kind":"label","label":"General"},{"kind":"checkbox","label":"Raids","value":"False"},{"kind":"slider","label":"Scale","value":"0.75","min":"0","max":"2"},{"kind":"button","label":"Reset"}]}},"source":"archo-monitor","schema":1,"kind":"settings-window"}` + "\n" +
+	// the file as A's window opened (Monitor's fileHash)
+	opened := `<?xml version="1.0" encoding="utf-8"?><SettingsBlock><ModSettings Class="AMod"><raids>False</raids></ModSettings></SettingsBlock>`
+	sum := sha256.Sum256([]byte(opened))
+	windows := `{"timestamp":"2026-11-03 10:05:00.000","level":"INFO","message":"[Archo Monitor] settings window A settings","details":"","count":1,"context":{"window":{"packageId":"tester.a","folder":"1001","class":"AMod","file":"Mod_1001_AMod.xml","title":"A settings","full":true,"fileHash":"sha256:` + hex.EncodeToString(sum[:]) + `","controls":[{"kind":"label","label":"General"},{"kind":"checkbox","label":"Raids","value":"False"},{"kind":"slider","label":"Scale","value":"0.75","min":"0","max":"2"},{"kind":"button","label":"Reset"},{"kind":"text","label":"Search:","value":""}]}},"source":"archo-monitor","schema":1,"kind":"settings-window"}` + "\n" +
 		`{"timestamp":"2026-11-03 10:06:00.000","level":"INFO","message":"[Archo Monitor] settings window B window","details":"","count":1,"context":{"window":{"packageId":"tester.b","folder":"B","class":"BMod","file":"Mod_B_BMod.xml","title":"B window","full":false,"controls":[{"kind":"text","label":"Name","value":"Bob"}]}},"source":"archo-monitor","schema":1,"kind":"settings-window"}` + "\n"
 	e.WriteFile(log, session+windows)
 	out := e.MustRun("mod-settings", "pkg:tester.a")
-	for _, want := range []string{"the game's window (seen 2026-11-03", "General:", "Raids: False (checkbox)", "Scale: 0.75 (slider 0 to 2)", "[Reset] (button)"} {
+	for _, want := range []string{"the game's window (seen 2026-11-03", "General:", "Raids: False (checkbox)", "Scale: 0.75 (slider 0 to 2)", "[Reset] (button)", `Search: "" (text)`} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q in:\n%s", want, out)
 		}
@@ -204,6 +210,32 @@ func TestModSettingsWindow(t *testing.T) {
 	if out := e.MustRun("mod-settings"); !strings.Contains(out, "B window") {
 		t.Fatalf("a window alone lists its Mod:\n%s", out)
 	}
+	if strings.Contains(out, "changed since") {
+		t.Fatalf("no file yet, nothing changed since:\n%s", out)
+	}
+	// closing the window writes the file again (Dialog_ModSettings.PreClose): with the same
+	// values it is the same file, however new its time
+	cfg := filepath.Join(e.UserData, "Config", "Mod_1001_AMod.xml")
+	e.WriteFile(cfg, opened)
+	seen := time.Date(2026, 11, 3, 10, 5, 0, 0, time.Local)
+	if err := os.Chtimes(cfg, seen.Add(time.Minute), seen.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if out := e.MustRun("mod-settings", "pkg:tester.a"); strings.Contains(out, "changed since") {
+		t.Fatalf("a file rewritten with the same values:\n%s", out)
+	}
+	// a value changed in that opening (or here): the window's values may be out of date
+	e.WriteFile(cfg, strings.Replace(opened, "False", "True", 1))
+	if out := e.MustRun("mod-settings", "pkg:tester.a"); !strings.Contains(out, "changed since: the values stored in the file are the current ones") {
+		t.Fatalf("a value changed since the window:\n%s", out)
+	}
+	// a record without the hash (Monitor before 0.11.1) cannot tell: never changed since
+	cfgB := filepath.Join(e.UserData, "Config", "Mod_B_BMod.xml")
+	e.WriteFile(cfgB, `<?xml version="1.0" encoding="utf-8"?><SettingsBlock><ModSettings Class="BMod"><name>Al</name></ModSettings></SettingsBlock>`)
+	if out := e.MustRun("mod-settings", "pkg:tester.b"); strings.Contains(out, "changed since") {
+		t.Fatalf("a record without a hash:\n%s", out)
+	}
+	os.Remove(cfgB)
 	// the next run rotates the log away: the window stays
 	e.WriteFile(filepath.Join(e.UserData, "ArchoMonitor-prev.log"), "")
 	e.WriteFile(log, strings.ReplaceAll(session, "0123456789ab", "ba9876543210"))
@@ -226,7 +258,7 @@ func TestModSettingsHugsLib(t *testing.T) {
 	e.WriteFile(filepath.Join(e.UserData, "HugsLib", "ModSettings.xml"), `<?xml version="1.0" encoding="utf-8"?>
 <settings>
   <tester.a><raids>True</raids></tester.a>
-  <BPack><scale>2</scale><seen>5</seen><gone>x</gone></BPack>
+  <BPack><scale>2</scale><seen>5</seen><gone>x</gone><news>True</news></BPack>
 </settings>`)
 	out := e.MustRun("mod-settings")
 	if !strings.Contains(out, "HugsLib (tester.a)") || strings.Contains(out, "BPack") {
@@ -238,7 +270,7 @@ func TestModSettingsHugsLib(t *testing.T) {
 
 	log := filepath.Join(e.UserData, "ArchoMonitor.log")
 	session := `{"timestamp":"2026-11-03 10:00:00.000","level":"INFO","message":"[Archo Monitor] session 0123456789ab","details":"","count":1,"context":{"session":"0123456789ab","version":"0.11.0","game":"1.6.4633 rev1261"},"source":"archo-monitor","schema":1,"kind":"session"}` + "\n"
-	record := `{"timestamp":"2026-11-03 10:01:00.000","level":"INFO","message":"[Archo Monitor] hugslib 1","details":"","count":1,"context":{"hugslib":[{"id":"BPack","packageId":"tester.b","folder":"B","title":"B options","full":true,"settings":[{"name":"scale","title":"Scale","value":"2","default":"1","type":"Single"},{"name":"mode","title":"Mode","description":"How B works","value":"Normal","default":"Normal","type":"BMode"},{"name":"seen","value":"5","default":"0","type":"Int32","hidden":true}]}]},"source":"archo-monitor","schema":1,"kind":"hugslib"}` + "\n"
+	record := `{"timestamp":"2026-11-03 10:01:00.000","level":"INFO","message":"[Archo Monitor] hugslib 1","details":"","count":1,"context":{"hugslib":[{"id":"BPack","packageId":"tester.b","folder":"B","title":"B options","full":true,"settings":[{"name":"scale","title":"Scale","value":"2","default":"1","type":"Single"},{"name":"mode","title":"Mode","description":"How B works","value":"Normal","default":"Normal","type":"BMode"},{"name":"seen","value":"5","default":"0","type":"Int32","hidden":true},{"name":"news","title":"Show all news","value":"False","default":"False","type":"Boolean","unsaved":true}]}]},"source":"archo-monitor","schema":1,"kind":"hugslib"}` + "\n"
 	e.WriteFile(log, session+record)
 	if out := e.MustRun("mod-settings"); !strings.Contains(out, "HugsLib: B options") {
 		t.Fatalf("the record maps a pack:\n%s", out)
@@ -254,6 +286,9 @@ func TestModSettingsHugsLib(t *testing.T) {
 	}
 	if strings.Contains(out, "seen") {
 		t.Fatalf("a hidden setting is shown:\n%s", out)
+	}
+	if strings.Contains(out, "news") {
+		t.Fatalf("a setting HugsLib never saves is shown:\n%s", out)
 	}
 }
 

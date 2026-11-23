@@ -1,13 +1,14 @@
 // The three lists (16 §2.5): virtual rows, the cursor, selection, search, dragging. The
 // board has three columns: Not enabled | Enabled | details, with Staging and history folded under details.
-import { factText, S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H, slideThumb } from "./state.js";
+import { factText, S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H, slideThumb, keyCaps } from "./state.js";
 import { icon, sourceIcon, statusIcon } from "./icons.js";
 import { wireBadges, rowDrag } from "./badgepop.js";
 import { listGeometry, rowAt } from "./listgeometry.js";
 import { bump } from "./motion.js";
 import { beginPageRead, pageLoading } from "./screens.js";
 import { markOf, paintMark, tagCSS, tagColors } from "./tagcolor.js";
-import { G, grouped, shape, curKey, headOf, findEntry, matched, foldAll, setView } from "./disabledgroups.js";
+import { G, grouped, shape, curKey, headOf, findEntry, matched, foldAll, setView, setSort } from "./disabledgroups.js";
+import { choiceControl } from "./choices.js";
 
 const rowID = (k, it) => `editor-${k}-${encodeURIComponent(key(it))}`;
 const rowsEl = (k) => $(`.area[data-area="${k}"] .rows`);
@@ -61,13 +62,16 @@ export function setItems(k, items) {
 
 // The filter bar over Not enabled and Enabled (16 §2.5): one search and one set of filters for both
 // lists; S.bar is the bar (filterbar.js), S.barData its last answer (view.BarFilter).
-// Both lists ask at once: one call per bar state; only the latest call's answer counts.
-let barCall = null, barSig = "";
+// Both lists ask at once: one call per bar state and board; only the latest call's answer
+// counts. The answer's rows are positions in that board's lists, so a board read again asks
+// again: opening another list changes no database state (the stamp stays), only the board.
+let barCall = null, barSig = "", barBoard = null;
 function fetchBar() {
   const on = !!S.bar;
   const sig = on ? JSON.stringify([S.bar.search, S.bar.filters, S.bar.open, S.board && S.board.stamp]) : "";
-  if (!barCall || sig !== barSig) {
+  if (!barCall || sig !== barSig || barBoard !== S.board) {
     barSig = sig;
+    barBoard = S.board;
     barCall = (on ? api.BarFilter(S.bar.search, S.bar.filters, true) : Promise.resolve(null)).catch(() => null);
   }
   const p = barCall, gameRequest = S.envSeq;
@@ -224,6 +228,10 @@ export function detailHead(h = $('.area[data-area="3"] .head')) {
 let controls = null;
 export let onViewChange = () => {};
 export function setOnViewChange(fn) { onViewChange = fn; }
+export let onSortChange = () => {};
+export function setOnSortChange(fn) { onSortChange = fn; }
+// The Disabled orders (16 §2.5): new Mods first in each, then the time newest first.
+const sortChoices = () => [["name", T("A-Z")], ["updated", T("last updated")], ["modified", T("files modified")], ["added", T("added")]].map(([value, label]) => ({ value, label }));
 function viewControls() {
   if (controls) return controls;
   controls = el("span", "acts dview");
@@ -249,13 +257,21 @@ function viewControls() {
     b.onclick = async (e) => { e.stopPropagation(); if (await setView(v)) onViewChange(); };
     seg.append(b);
   }
-  controls.append(fold, seg);
+  const order = choiceControl(T("sort"), sortChoices(), G.sort);
+  order.classList.add("dview-sort");
+  order.title = T("sort");
+  order.onmousedown = (e) => e.stopPropagation();
+  order.addEventListener("click", (e) => e.stopPropagation()); // keep choiceControl's own onclick (opens the menu)
+  order.onchange = async () => { if (await setSort(order.value)) onSortChange(); };
+  controls.append(fold, order, seg);
   return controls;
 }
 function syncViewControls() {
   if (!controls) return;
   const fold = $(".dview-fold", controls);
   fold.hidden = !grouped();
+  const order = $(".dview-sort", controls);
+  if (order && order.value !== G.sort) order.value = G.sort;
   for (const b of controls.querySelectorAll(".dview-seg > button")) {
     const on = b.dataset.view === G.view;
     b.classList.toggle("on", on);
@@ -268,8 +284,8 @@ function syncViewControls() {
 // listActions: undo and sort sit in the enabled list's head, since they change that list;
 // the list's other actions are in the top bar. main.js runs them by data-cmd.
 function listActions() {
-  return `<span class="acts"><button class="btn small" data-cmd="undo" data-env-write="undo" title="u">${esc(T("undo"))}<kbd>u</kbd></button>` +
-    `<button class="btn small" data-cmd="sort" data-env-write="sort" title="S">${esc(T("sort"))}<kbd>S</kbd></button></span>`;
+  return `<span class="acts"><button class="btn small" data-cmd="undo" data-env-write="undo" title="u">${esc(T("undo"))}${keyCaps("u").outerHTML}</button>` +
+    `<button class="btn small" data-cmd="sort" data-env-write="sort" title="S">${esc(T("sort"))}${keyCaps("S").outerHTML}</button></span>`;
 }
 
 const pools = [new Map(), new Map(), new Map()];
@@ -330,7 +346,10 @@ export function renderRows(k) {
     const st = S.board && S.board.status ? rowStatus(it) : 0;
     d.className = "row" + (i === c.cursor ? " cur" : "") + (c.sel.has(key(it)) ? " sel" : "") + (it.dim || it.missing ? " dimmed" : "");
     d.innerHTML = `<span class="m"></span>` + (k === 1 ? `<span class="p">${it.pos || ""}</span>` : "") +
-      `<span class="k">${it.missing ? "" : sourceIcon(it.kind)}</span><span class="t">${esc(it.name)}</span>` +
+      // no source icon in Disabled (16 §2.5): the copy shows in details and source: filters
+      (k === 0 ? "" : `<span class="k">${it.missing ? "" : sourceIcon(it.kind)}</span>`) + `<span class="t">${esc(it.name)}</span>` +
+      // a Mod a scan found in the last week (16 §2.5)
+      (it.new && !(k === 0 && it.copyCount > 1 && it.copyLabel) ? `<span class="nw">${esc(T("new"))}</span>` : "") +
       // what the row is short of, or which copy it is, sits on the name's line
       (it.missing || it.gone ? `<span class="src">${esc(T(it.canUse ? "installed copy available" : "not installed"))}</span>` : k === 1 && it.copyCount > 1 && it.copyLabel ? `<span class="src">${esc(it.copyLabel)}</span>` : "") +
       (it.unsaved ? `<span class="u" title="${esc(T("unsaved"))}"></span>` : "") + `<span class="s">${statusIcon(st)}</span>`;
@@ -338,7 +357,12 @@ export function renderRows(k) {
     if (k === 0 && it.copyCount > 1 && it.copyLabel) {
       d.classList.add("copy-item");
       $(".t",d).textContent="└ " + it.copyLabel;
-      if (layout.heads[i]) { d.classList.add("copy-group-start"); d.prepend(el("span","editor-copy-head",it.name)); }
+      if (layout.heads[i]) {
+        d.classList.add("copy-group-start");
+        const head = el("span","editor-copy-head",it.name);
+        if (it.new) head.append(el("span","nw",T("new")));
+        d.prepend(head);
+      }
     }
     $(".t", d).id = d.id + "-name";
     // A grouped copy shows only "└ <copy>"; its name carries the Mod, as the group head does.
@@ -399,7 +423,7 @@ export function renderHistory() {
   if (area.dataset.sig === sig) return;
   area.dataset.sig = sig;
   const steps = S.history.filter((h) => h.kind === "undo" || h.kind === "redo").length;
-  $(".hbar", area).innerHTML = `<span class="t">${esc(T("history"))}</span>` + (steps ? `<span class="num">${esc(Tf("%d steps", steps))}</span>` : "") + chev();
+  $(".hbar", area).innerHTML = `<span class="t">${esc(T("history"))}</span>` + (steps ? `<span class="num">${esc(Tf(steps === 1 ? "%d step" : "%d steps", steps))}</span>` : "") + chev();
   const body = $(".histbody", area);
   body.innerHTML = "";
   if (fold.hist) body.append(historyPanel());
@@ -426,7 +450,7 @@ function historyPanel() {
 
 function rowSig(k, i, it) {
   const c = S.cols[k];
-  return [key(it), it.pos, it.unsaved, it.dim, it.gone, it.canUse, (it.tags || []).join(","), i === c.cursor, c.sel.has(key(it)), rowStatus(it), it.name, it.copyLabel, it.copyCount, it.lineage].join("|");
+  return [key(it), it.pos, it.unsaved, it.dim, it.gone, it.canUse, (it.tags || []).join(","), it.new, i === c.cursor, c.sel.has(key(it)), rowStatus(it), it.name, it.copyLabel, it.copyCount, it.lineage].join("|");
 }
 
 // rowStatus mirrors view.RowStatus (missing entries are errors, unloadable rows dim).
@@ -482,14 +506,19 @@ export function wireLists(ui) {
     box.addEventListener("mousedown", (e) => {
       const r = e.target.closest(".row");
       if (!r || e.button !== 0) return;
-      ui.click(k, +r.dataset.i, e);
+      const i = +r.dataset.i;
+      // a plain press on a selected row keeps the selection until the mouseup, so it can be
+      // dragged; released without a drag, it selects only that row (16 §3.4)
+      const plain = !e.shiftKey && !e.ctrlKey && !e.metaKey;
+      ui.click(k, i, { shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey, keep: plain });
+      if (plain && press) press.collapse = true;
       box.focus({ preventScroll: true });
     });
-    box.addEventListener("dblclick", (e) => {
+    box.addEventListener("dblclick", (e) => { // keys: space
       const r = e.target.closest(".row");
       if (r && !r.classList.contains("group-head")) ui.verb("toggle");
     });
-    box.addEventListener("contextmenu", (e) => {
+    box.addEventListener("contextmenu", (e) => { // keys: Menu, shift+F10 (menuAtCursor in main.js)
       e.preventDefault();
       const r = e.target.closest(".row");
       if (!r) return;
@@ -538,8 +567,8 @@ function startDrag() {
   const c = S.cols[k];
   const it = c.items[c.view[i]];
   if (!it || (!it.id && k !== 1)) return; // a missing Mod moves only within Enabled
-  // Dragging a row outside the selection drags that row alone; a plain click keeps the
-  // selection (16 §3.1), so clear it first or the old selection would move instead.
+  // Dragging a row outside the selection drags that row alone (a ctrl+press that unselected
+  // it leaves the rest selected), so clear it first or the old selection would move instead.
   if (!c.sel.has(key(it)) || S.focus !== k) {
     c.sel.clear();
     ui.click(k, i, { shiftKey: false, ctrlKey: false });
@@ -605,7 +634,9 @@ function wireDragWindow() {
     overDrop();
   });
   window.addEventListener("mouseup", (e) => {
+    const p = press;
     press = null;
+    if (p && p.collapse && !drag && e.button === 0) p.ui.click(p.k, p.i, { shiftKey: false, ctrlKey: false });
     if (!drag || e.button !== 0) return;
     const d = drag;
     endDrag();

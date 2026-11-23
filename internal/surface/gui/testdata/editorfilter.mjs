@@ -92,3 +92,63 @@ test("a shell read that failed never replaces the sidebar's lists", async () => 
   S.shell={error:"busy"};
   assert.equal(shell.shellFailed({error:"still busy"}),false); // a failed shell is replaced
 });
+test("the bar's search asks again for another list's board even when the database stamp is the same", async () => {
+  // Player report (1.0.9): searched in one list, switched to another without clearing the
+  // search, and the lists showed the old list's rows. Opening a list changes no database
+  // state, so the stamp stays; the answer's rows are positions in the first board's lists.
+  const key=it=>it.id||it.ref;
+  const calls=[];
+  const S={cols:[{items:[],view:[],cursor:0,sel:new Set()},{items:[],view:[],cursor:0,sel:new Set()},{items:[],view:[],cursor:0,sel:new Set(),query:""}],
+    bar:{search:"armor",filters:[],open:false,active:()=>true},envSeq:0};
+  const api={BarFilter:async()=>{ calls.push(S.board.name); return S.board.name==="A"?{rows:[[0,1,2],[3]]}:{rows:[[0],[]]}; },Filter:async()=>({rows:[]})};
+  const lists=await loadModules("./lists.js", {
+    "./state.js":{S,key,cur:k=>S.cols[k].items[S.cols[k].view[S.cols[k].cursor]],col:k=>S.cols[k],$:()=>null,$$:()=>[],el:tag=>new Element(tag),factText:()=>{},esc:String,api,T:s=>s,Tf:s=>s,AREAS:[],ROW_H:28,slideThumb:()=>{}},
+    "./icons.js":{icon:{},sourceIcon:()=>"",statusIcon:()=>""},
+    "./badgepop.js":{wireBadges:()=>{},rowDrag:()=>{}},"./motion.js":{bump:()=>{}},
+    "./screens.js":{beginPageRead:()=>{},pageLoading:()=>false},
+  });
+  const ids=n=>Array.from({length:n},(_,i)=>({id:"m"+i}));
+  S.board={name:"A",stamp:"7.1"};
+  lists.setItems(0,ids(5)); lists.setItems(1,ids(4));
+  await Promise.all([0,1].map(k=>lists.refilter(k)));
+  assert.deepEqual([...S.cols[0].view],[0,1,2]);
+  // another list: a new board, the same stamp
+  S.board={name:"B",stamp:"7.1"};
+  lists.setItems(0,ids(1)); lists.setItems(1,[]);
+  await Promise.all([0,1].map(k=>lists.refilter(k)));
+  assert.deepEqual(calls,["A","B"]);
+  assert.deepEqual([...S.cols[0].view],[0]);
+  assert.deepEqual([...S.cols[1].view],[]);
+});
+test("opening another list forgets the filter bar's search with the lists' own searches", async () => {
+  let forgot=0, reloads=0;
+  const col=()=>({query:"x",cursor:3,sel:new Set(["a"]),searching:true});
+  const S={shell:{plan:{id:1},plans:[{id:1},{id:2}]},cols:[col(),col(),col()],bar:{forget(){ forgot++; }}};
+  const plans=await loadModules("./plans.js", {
+    "./state.js":{S,$:()=>null,el:tag=>new Element(tag),api:{OpenPlan:async()=>({})},T:s=>s,Tf:s=>s,errText:String,say(){},keyCaps:()=>new Element("span")},
+    "./popups.js":{},"./feedbacksemantics.js":{fieldError:()=>{}},
+  });
+  plans.initPlans({reload:async()=>{ reloads++; }});
+  assert.equal(await plans.openPlan(1),true); // already open: nothing forgotten
+  assert.equal(forgot,0);
+  assert.equal(await plans.openPlan(2),true);
+  assert.equal(forgot,1); assert.equal(reloads,1);
+  assert.deepEqual(S.cols.map(c=>[c.query,c.cursor,c.sel.size,c.searching]),[["",0,0,false],["",0,0,false],["",0,0,false]]);
+});
+
+test("the history's bar says 1 step, 2 steps (VM 2026-11-23: \"1 steps\")", async () => {
+  const els = {};
+  const $ = (sel) => (els[sel] ||= { classList: { toggle() {} }, setAttribute() {}, dataset: {}, hidden: false, innerHTML: "", append() {} });
+  const S = { cols: [{ items: [] }, { items: [] }, { items: [] }], history: [{ kind: "save" }, { kind: "undo" }] };
+  const lists = await loadModules("./lists.js", {
+    "./state.js": { S, key: (it) => it.id, cur: () => null, col: (k) => S.cols[k], $, $$: () => [], el: (tag) => new Element(tag), factText: () => {}, esc: String, api: {}, T: (s) => s, Tf: (s, ...a) => s.replace("%d", String(a[0])), AREAS: [], ROW_H: 28, slideThumb: () => {} },
+    "./icons.js": { icon: {}, sourceIcon: () => "", statusIcon: () => "" },
+    "./badgepop.js": { wireBadges: () => {}, rowDrag: () => {} }, "./motion.js": { bump: () => {} },
+    "./screens.js": { beginPageRead: () => {}, pageLoading: () => false },
+  });
+  lists.renderHistory();
+  assert.match($(".hbar").innerHTML, /1 step</);
+  S.history.push({ kind: "undo" });
+  lists.renderHistory();
+  assert.match($(".hbar").innerHTML, /2 steps</);
+});

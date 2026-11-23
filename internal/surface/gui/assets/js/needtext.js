@@ -45,3 +45,22 @@ export function needEvidence(ev) {
   if (ev.source) for (const part of ev.source.split(/ {2,}/)) if (part) line.append(el("span", "src", part));
   return line;
 }
+
+// evidenceMark: where a Can it run item's claim comes from, behind an ⓘ (16 §2.4): the
+// words stay its tooltip and accessible name, on hover and keyboard focus.
+export function evidenceMark(ev) {
+  const line = el("div", "ev-line");
+  line.append(infoMark([ev.label, ...(ev.source || "").split(/ {2,}/).filter(Boolean)].join("  ")));
+  return line;
+}
+
+// infoMark: an ⓘ that carries words taken off the page, as its tooltip and accessible name;
+// it takes keyboard focus, so the words are not hover-only (16 §11 A10).
+export function infoMark(text) {
+  const m = el("span", "ev-info", "ⓘ");
+  m.tabIndex = 0;
+  m.setAttribute("role", "img");
+  m.setAttribute("aria-label", text);
+  m.title = text;
+  return m;
+}

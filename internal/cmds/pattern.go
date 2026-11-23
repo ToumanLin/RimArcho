@@ -33,7 +33,7 @@ func clusterPatterns(ix *app.Index, lc *app.LogCluster) patterns.Match {
 			src = append(src, strings.TrimSuffix(strings.ToLower(m.PackageID), "_steam"))
 		}
 	}
-	return patterns.Load().MatchCluster(lc.Class, lc.Template, src)
+	return ix.Patterns().MatchCluster(lc.Class, lc.Template, src)
 }
 
 // patternTag is the short reference on a cluster's list line.
@@ -46,11 +46,11 @@ func patternTag(ix *app.Index, lc *app.LogCluster) string {
 
 // commonUnattributed labels a cluster with no candidate mod whose kind of error is in more than
 // 5% of the public logs (patterns.CommonShare), "" otherwise.
-func commonUnattributed(lc *app.LogCluster) string {
+func commonUnattributed(ix *app.Index, lc *app.LogCluster) string {
 	if logs.Informational(lc.Class) {
 		return ""
 	}
-	return patterns.Load().CommonUnattributed(lc.Class, lc.Template, len(lc.Attr) > 0)
+	return ix.Patterns().CommonUnattributed(lc.Class, lc.Template, len(lc.Attr) > 0)
 }
 
 // addClusterPatterns adds what the library knows about a cluster to its detail: the generic
@@ -58,7 +58,7 @@ func commonUnattributed(lc *app.LogCluster) string {
 // background: the confidence and attribution above stay RimArcho's own.
 func addClusterPatterns(root *render.Node, ix *app.Index, lc *app.LogCluster) {
 	m := clusterPatterns(ix, lc)
-	d := patterns.Load()
+	d := ix.Patterns()
 	if g := m.Generic; g != nil {
 		n := root.Add("pattern: " + g.Ref() + "  " + g.Summary)
 		n.KV("evidence", fmt.Sprintf("community: seen in %s (%.1f%% of error clusters); what this kind of error usually is, not evidence about this list", d.Seen(g), d.Share(g)))
@@ -77,6 +77,9 @@ func addClusterPatterns(root *render.Node, ix *app.Index, lc *app.LogCluster) {
 			when += " – " + p.Last
 		}
 		s := fmt.Sprintf("%s  this error of %s was seen in %s (%s); a newer version of the mod may have fixed it", p.Ref(), p.Mod, d.Seen(p), when)
+		if p.MayBeFixed {
+			s = fmt.Sprintf("%s  this error of %s was seen in %s (%s); may be fixed: the mod was updated on the Workshop after the last of these logs (%s)", p.Ref(), p.Mod, d.Seen(p), when, p.LastLog)
+		}
 		if len(p.Versions) > 0 {
 			s += "; versions seen: " + strings.Join(p.Versions, ", ")
 		}
@@ -99,7 +102,7 @@ func clusterRoute(p *patterns.Pattern, id string) string {
 }
 
 func patternCmd(c *Ctx, a *Args) (*render.Doc, error) {
-	d := patterns.Load()
+	d := c.App.Patterns()
 	if len(a.Pos) == 1 && a.Pos[0] != "list" {
 		p := d.Get(a.Pos[0])
 		if p == nil {

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/buildinfo"
 	"github.com/ToumanLin/RimArcho/internal/l10ndata"
 	"github.com/ToumanLin/RimArcho/internal/netcfg"
 	"github.com/ToumanLin/RimArcho/internal/render"
@@ -17,6 +18,8 @@ import (
 // allowed values; the first is the default.
 var configKeys = map[string][]string{
 	"updates.source":   {"auto", "github"},
+	"agent.api":        app.AgentAPIs,
+	"agent.thinking":   {"high", "medium", "low", "off"},
 	"updates.auto":     {"on", "off"},
 	"updates.interval": {"normal", "frequent", "relaxed"},
 	"ui.accent":        {"default", "indigo", "blue", "cyan", "teal", "green", "grass", "orange", "amber", "red", "crimson", "pink", "plum", "purple", "violet", "iris"},
@@ -31,12 +34,17 @@ var configKeys = map[string][]string{
 	"workshop.images": {"on", "off"},
 	// 07 §1.5: add Archo Monitor to new plans (and to each plan once on upgrade)
 	"monitor.default": {"on", "off"},
+	// 16 §2.14 Feedback: off stops asking the feedback relay for replies to sent reports
+	"feedback.replies": {"on", "off"},
 	// 16 §2.14: off starts the window's WebView2 without GPU acceleration (less memory,
 	// software drawing); read when the window opens
 	"ui.gpu":          {"on", "off"},
 	"ui.archo.motion": {"live", "still", "off"},
 	// 16 §2.14, §7.1: reduced stills the window as Windows' animation setting does
 	"ui.motion": {"auto", "reduced"},
+	// 16 §2.14: the window's interface size in percent (WebView2's zoom), for high-resolution
+	// screens at 100% Windows scaling
+	"ui.zoom": {"100", "110", "125", "150"},
 }
 
 // customValues are settings that take a free form besides their named choices, normalized
@@ -103,10 +111,19 @@ var freeKeys = map[string]struct {
 		return nil
 	}},
 	// 17 §2.2: RimArcho's own requests. system: HTTPS_PROXY / HTTP_PROXY, then the Windows
-	// system proxy; off; or a proxy URL.
+	// system proxy, falling back to direct and to a local proxy; off; or a proxy URL.
 	"network.proxy": {"system", netcfg.CheckProxy},
-	// a GitHub mirror tried before GitHub itself; "" is direct
-	"network.github_mirror": {"", netcfg.CheckMirror},
+	// auto: GitHub, then the built-in mirrors; off: never a mirror; or one mirror tried
+	// first. "" (never set, or cleared) is auto.
+	"network.github_mirror": {"auto", netcfg.CheckMirror},
+	// Archo Agent's model (15 §7.2); the API key is not a setting (archo agent key)
+	"agent.base_url": {"", app.CheckAgentBaseURL},
+	"agent.model": {"", func(v string) error {
+		if len(v) > 200 || strings.ContainsAny(v, "\r\n\"") {
+			return fmt.Errorf("agent.model must be a model ID on one line")
+		}
+		return nil
+	}},
 	"steamcmd-mods.dir": {"", func(v string) error {
 		if !filepath.IsAbs(v) {
 			return fmt.Errorf("steamcmd-mods.dir must be an absolute folder path")
@@ -153,18 +170,25 @@ func SettingChoices(key string) []string { return slices.Clone(configKeys[key]) 
 func SettingKeys() []string {
 	keys := make([]string, 0, len(configKeys)+len(freeKeys))
 	for k := range configKeys {
-		keys = append(keys, k)
+		if !featureOff(k) {
+			keys = append(keys, k)
+		}
 	}
 	for k := range freeKeys {
-		keys = append(keys, k)
+		if !featureOff(k) {
+			keys = append(keys, k)
+		}
 	}
 	sort.Strings(keys)
 	return keys
 }
 
+// agentSettingsUsage is config set's usage of the Archo Agent keys, in a build that offers it.
+var agentSettingsUsage = map[bool]string{true: "agent.api: openai-completions|anthropic-messages|openai-responses|google-generative-ai; agent.base_url: the model API's base URL; agent.model: a model ID; agent.thinking: high|medium|low|off; "}[buildinfo.AgentOn()]
+
 func init() {
 	register(&Command{Name: "config get", Args: "[<key>]", Summary: "show settings", MaxArgs: 1, Run: configGetCmd})
-	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (local.dir: unused managed-folder root; updates.source: auto|github; updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris or a #rrggbb colour; ui.icons: compat|nerd; ui.mouse: on|off; ui.tui.theme: auto|dark|light; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; ui.archo.motion: off|still|live; ui.motion: auto|reduced; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; network.proxy: system|off|a proxy URL; network.github_mirror: empty or a mirror prefix such as https://gh-proxy.org/)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
+	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (" + agentSettingsUsage + "local.dir: unused managed-folder root; updates.source: auto|github; updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris or a #rrggbb colour; ui.icons: compat|nerd; ui.mouse: on|off; ui.tui.theme: auto|dark|light; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; ui.archo.motion: off|still|live; ui.motion: auto|reduced; ui.zoom: 100|110|125|150 (the window's interface size in percent); tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; network.proxy: system|off|a proxy URL; network.github_mirror: auto|off or a mirror prefix such as https://gh-proxy.org/)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
 }
 
 // ConfigValue returns a setting, or its default.
@@ -187,6 +211,9 @@ func configGetCmd(c *Ctx, a *Args) (*render.Doc, error) {
 
 func configSetCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	k, v := a.Pos[0], a.Pos[1]
+	if featureOff(k) {
+		return nil, &UsageError{Msg: fmt.Sprintf("unknown setting %q", k)}
+	}
 	if f, ok := freeKeys[k]; ok {
 		if err := f.check(v); err != nil {
 			return nil, &UsageError{Msg: err.Error()}

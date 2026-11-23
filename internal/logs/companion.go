@@ -36,6 +36,14 @@ var RimCrowLogs = [2][]string{
 // 3f2a9c10ab12: D:\…\ArchoMonitor.log".
 var SessionRe = regexp.MustCompile(`\[Archo Monitor\] (\S+) session ([0-9a-f]{12})(?::\s*(.*?))?\s*$`)
 
+// MonitorSchema is the major schema of Archo Monitor's log this reader understands (19 §4).
+// A Monitor that writes a higher one is newer than this RimArcho; weekly corpus data updates
+// never change it.
+const MonitorSchema = 1
+
+// TooNewText is what a reader shows instead of the entries of a newer Monitor's log.
+const TooNewText = "Monitor is newer than RimArcho, update RimArcho"
+
 // CompanionEntry is one distinct entry of a companion log, its lines merged.
 type CompanionEntry struct {
 	Phase    *Phase       `json:",omitempty"`
@@ -69,11 +77,14 @@ type Companion struct {
 	Version   string // Archo Monitor's version
 	Game      string // the game version the session line names
 	Started   time.Time
-	Ended     time.Time      // the exit line's time: the game closed normally
-	Full      bool           // the monitor stopped adding entries (32 MiB, 19 §4)
-	Settings  []SettingsFile // the settings record written at the main menu
-	BadLines  int
-	Entries   []*CompanionEntry
+	Ended     time.Time // the exit line's time: the game closed normally
+	Full      bool      // the monitor stopped adding entries (32 MiB, 19 §4)
+	// TooNew is the schema of an Archo Monitor log newer than MonitorSchema: its entries are
+	// not read (19 §4), the reader says TooNewText instead.
+	TooNew   int
+	Settings []SettingsFile // the settings record written at the main menu
+	BadLines int
+	Entries  []*CompanionEntry
 
 	by      map[string]*CompanionEntry
 	byMatch map[string]*CompanionEntry
@@ -167,9 +178,19 @@ func (c *Companion) line(b []byte) *CompanionEntry {
 		return nil
 	}
 	c.lines++
+	if c.TooNew > 0 {
+		return nil
+	}
 	var j companionLine
 	if json.Unmarshal(b, &j) != nil || j.Message == "" && j.Kind == "" {
 		c.BadLines++
+		return nil
+	}
+	if j.Source == "archo-monitor" && j.Schema > MonitorSchema {
+		c.TooNew, c.Monitor = j.Schema, true
+		if j.Kind == "session" {
+			c.Session, c.Version, c.Game = j.Context.Session, j.Context.Version, j.Context.Game
+		}
 		return nil
 	}
 	at, _ := time.ParseInLocation("2006-01-02 15:04:05.000", j.Timestamp, time.Local)
@@ -369,7 +390,10 @@ type SettingsControl struct {
 // opened it, with the Mod's settings file.
 type SettingsWindow struct {
 	SettingsFile
-	Full     bool              `json:"full"` // false: Monitor stopped at its limit
+	Full bool `json:"full"` // false: Monitor stopped at its limit
+	// FileHash is the settings file as the window opened: "sha256:<hex>", "none" without a
+	// file, "" when Monitor did not record it (before 0.11.1, or it could not read the file).
+	FileHash string            `json:"fileHash,omitempty"`
 	Controls []SettingsControl `json:"controls"`
 }
 
@@ -395,6 +419,7 @@ type HugsLibSetting struct {
 	Default     string   `json:"default"`
 	Type        string   `json:"type"` // the value type's simple name: Boolean, Int32, an enum's
 	Hidden      bool     `json:"hidden,omitempty"`
+	Unsaved     bool     `json:"unsaved,omitempty"` // HugsLib never writes it (a button in its dialog)
 	Choices     []string `json:"choices,omitempty"` // an enum's names (at most 50)
 }
 

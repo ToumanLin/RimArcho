@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <ArchoMonitor_OpenErrors>Errors by Mod…</ArchoMonitor_OpenErrors>
+  <ArchoMonitor_ErrorsTitle>Errors this session</ArchoMonitor_ErrorsTitle>
+  <ArchoMonitor_Warnings>Warnings too</ArchoMonitor_Warnings>
+  <ArchoMonitor_StatErrors>errors</ArchoMonitor_StatErrors>
+  <ArchoMonitor_StatProblems>errors and warnings</ArchoMonitor_StatProblems>
+  <ArchoMonitor_StatMods>Mods</ArchoMonitor_StatMods>
+  <ArchoMonitor_Stopped>Game stopped logging at {1}: +{0} since</ArchoMonitor_Stopped>
+  <ArchoMonitor_StoppedTip>After 10,000 messages the game stops writing its log. Archo Monitor keeps counting: the amber numbers came back after that and are missing from Player.log.</ArchoMonitor_StoppedTip>
+  <ArchoMonitor_After>{0} after the game stopped logging</ArchoMonitor_After>
+  <ArchoMonitor_FileFull>ArchoMonitor.log is full: only counts are written</ArchoMonitor_FileFull>
+  <ArchoMonitor_Dropped>Over 4,000 different messages: older ones were dropped</ArchoMonitor_Dropped>
+  <ArchoMonitor_NoErrors>No errors this session</ArchoMonitor_NoErrors>
+  <ArchoMonitor_NoErrorsSub>Archo Monitor counts every error, even after the game stops logging.</ArchoMonitor_NoErrorsSub>
+  <ArchoMonitor_NoMod>No Mod found</ArchoMonitor_NoMod>
+  <ArchoMonitor_Distinct>{0} different messages</ArchoMonitor_Distinct>
+  <ArchoMonitor_More>+{0} more</ArchoMonitor_More>
+  <ArchoMonitor_Copy>Copy</ArchoMonitor_Copy>
+  <ArchoMonitor_Copied>Copied</ArchoMonitor_Copied>
+  <ArchoMonitor_Loading>Loading</ArchoMonitor_Loading>
+  <ArchoMonitor_AlsoMods>Also:</ArchoMonitor_AlsoMods>
+  <ArchoMonitor_Role_xml>its XML</ArchoMonitor_Role_xml>
+  <ArchoMonitor_Role_def>defines its parent Def</ArchoMonitor_Role_def>
+  <ArchoMonitor_Role_patch>patch</ArchoMonitor_Role_patch>
+  <ArchoMonitor_Role_stack>code on the stack</ArchoMonitor_Role_stack>
+  <ArchoMonitor_Role_text>named in the message</ArchoMonitor_Role_text>
+  <ArchoMonitor_Kind_DefConfigError>Def config</ArchoMonitor_Kind_DefConfigError>
+  <ArchoMonitor_Kind_CrossRefError>Missing reference</ArchoMonitor_Kind_CrossRefError>
+  <ArchoMonitor_Kind_PatchError>XML patch</ArchoMonitor_Kind_PatchError>
+  <ArchoMonitor_Kind_XMLSyntaxError>XML loading</ArchoMonitor_Kind_XMLSyntaxError>
+  <ArchoMonitor_Kind_AssemblyConflict>Assembly conflict</ArchoMonitor_Kind_AssemblyConflict>
+  <ArchoMonitor_Kind_TickException>Tick exception</ArchoMonitor_Kind_TickException>
+  <ArchoMonitor_Kind_DrawException>Drawing exception</ArchoMonitor_Kind_DrawException>
+  <ArchoMonitor_Kind_NullReference>Null reference</ArchoMonitor_Kind_NullReference>
+  <ArchoMonitor_Kind_OutOfMemory>Out of memory</ArchoMonitor_Kind_OutOfMemory>
+  <ArchoMonitor_Kind_MissingTexture>Missing texture</ArchoMonitor_Kind_MissingTexture>
+  <ArchoMonitor_Kind_Warning>Warning</ArchoMonitor_Kind_Warning>
+  <ArchoMonitor_Kind_Other>Other</ArchoMonitor_Kind_Other>
+</LanguageData>

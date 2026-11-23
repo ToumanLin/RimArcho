@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
@@ -23,6 +25,13 @@ func openTemp(t *testing.T) (*store.Store, string) {
 
 func saveGame(t *testing.T, s *store.Store, envID, file, mm string, types ...string) {
 	t.Helper()
+	if e, err := s.EnvByID(envID); err != nil {
+		t.Fatal(err)
+	} else if e == nil {
+		if err := s.InsertEnv(&env.Environment{ID: envID, Name: envID, GameRoot: t.TempDir()}); err != nil {
+			t.Fatal(err)
+		}
+	}
 	g := &store.GameAssembly{EnvID: envID, File: file, MM: mm, Path: `C:\g\` + file, Size: 1, MTime: 1, Reader: 1}
 	if err := s.SaveGameAssembly(g, types); err != nil {
 		t.Fatal(err)
@@ -130,6 +139,7 @@ func TestGameAssemblyReplacedAndDeleted(t *testing.T) {
 func TestUpgradeGameTypes(t *testing.T) {
 	s, path := openTemp(t)
 	want := gameTypeDDL(t, s.DB)
+	legacyGameSchema(t, s)
 	for _, q := range []string{`ALTER TABLE def_fact DROP COLUMN content_fields`, `ALTER TABLE fact_set DROP COLUMN def_content_version`, `DROP TABLE game_type`, `DROP TABLE game_assembly`, `DROP TABLE save_cache`, `DROP TABLE tag_note`, `DROP TABLE colony_name`, `DROP TABLE tag_color`, `DROP TABLE lineage_tag`,
 		`CREATE TABLE lineage_tag(
   environment_id TEXT NOT NULL, lineage_id TEXT NOT NULL, tag TEXT NOT NULL COLLATE NOCASE,
@@ -177,7 +187,7 @@ func gameTypeDDL(t *testing.T, db *sql.DB) string {
 	for rows.Next() {
 		var n, q string
 		rows.Scan(&n, &q)
-		out += n + ": " + q + "\n"
+		out += n + ": " + strings.ReplaceAll(q, "\r\n", "\n") + "\n"
 	}
 	if out == "" {
 		t.Fatal("no game type tables")

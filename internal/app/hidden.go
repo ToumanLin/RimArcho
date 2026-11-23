@@ -226,7 +226,18 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 	case !own && m.Unloadable != scan.UnloadableAboutDisabled && !m.Residue:
 		return nil, fmt.Errorf("%w: %s is a subscribed, loadable mod; unsubscribe it in Steam instead", ErrNotTrashable, st.Ix.Ref(m.ID))
 	case st.Ix.ModIsLink(m):
-		return nil, fmt.Errorf("%w: %s is a link, not a folder; RimArcho does not move it", ErrNotTrashable, st.Ix.ModDir(m))
+		// another tool's link (RimCrow `_Link_`): never ours to delete (09 §3); say whose it
+		// is and where, so the player can remove it there (16 §2.9 "a link")
+		link := st.Ix.LinkEntry(m)
+		if link == "" {
+			link = st.Ix.ModDir(m)
+		}
+		who := LinkMaker(link)
+		if who == "" {
+			who = "another tool"
+		}
+		return nil, fmt.Errorf("%w: %s is a link %s made to %s, not a folder; RimArcho does not delete other tools' links: remove it in %s, or delete the link itself in its folder (its target stays)",
+			ErrNotTrashable, link, who, st.Ix.ModDir(m), who)
 	}
 	// The plans that use it (the current one when it is enabled, any environment of this
 	// game) only hear about it: they keep the entry and show it missing (16 §2.9).
@@ -258,7 +269,7 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 	if dryRun {
 		return op, nil
 	}
-	op.Scan, err = a.removeMod(st.Ix, m, real, false)
+	op.Scan, err = a.removeMod(nil, st.Ix, m, real, false)
 	return op, err
 }
 
@@ -266,12 +277,12 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 // The selected environment and its current plan stay unchanged.
 func (a *App) scanAfterFileOp(ix *Index, m *store.Mod) (*ScanReport, error) {
 	if s := ix.Source(m.SourceID); s != nil && s.Kind == source.Elsewhere {
-		e, err := a.Store.EnvByID(s.EnvID)
+		e, err := a.Store.EnvForGame(s.EnvID)
 		if err != nil {
 			return nil, err
 		}
 		if e == nil {
-			return nil, fmt.Errorf("environment %s no longer exists", s.EnvID)
+			return nil, fmt.Errorf("Game Config %s no longer exists", s.EnvID)
 		}
 		if _, err := a.scanEnvironment(e, ScanOptions{GameOnly: true}); err != nil {
 			return nil, err

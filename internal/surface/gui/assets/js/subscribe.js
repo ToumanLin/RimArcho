@@ -52,7 +52,16 @@ export function detect(text) {
   return u.protocol === "https:" ? "page" : "bad";
 }
 
-const KIND = { git: "Git repository", loverslab: "LoversLab", page: "web page", workshop: "Workshop item" };
+// localPath: a full path (a Mod folder or zip dropped on the window, or chosen) is installed
+// as a local Mod: a Windows path, or off Windows (the Linux window, 16 §8.1) an absolute
+// path. Kept out of detect, whose table the TUI and MCP share (subscribe.Detect).
+const posix = !/Windows/.test(globalThis.navigator?.userAgent || "Windows");
+export const localPath = (text) => {
+  const t = String(text || "").trim();
+  return /^([A-Za-z]:[\\/]|\\\\)[^\r\n]+$/.test(t) || (posix && /^\/[^\r\n]+$/.test(t));
+};
+
+const KIND = { git: "Git repository", loverslab: "LoversLab", page: "web page", workshop: "Workshop item", local: "local Mod" };
 
 // LoversLab files: the site's statements stay text; every selection and agreement is the
 // player's click, and opaque IDs bind the choices (no CSRF or signed URL reaches the page).
@@ -156,7 +165,13 @@ export function addForm(ctx = {}) {
     tile("LoversLab", "A mod published only on LoversLab. Paste its file page and choose a file; RimArcho tells you when a new version is out.", "https://www.loverslab.com/files/file/…", account("page")),
     tile("Workshop item", "Subscribe with Steam; without the Steam client, download with SteamCMD.", "https://steamcommunity.com/sharedfiles/filedetails/?id=…", account("steamcmd")));
   const local = el("div", "subscribe-local");
-  local.append(el("span", "word-facts", T("Local mods need no subscription: copy them into the Mods folder and the next scan finds them.")),
+  // a local Mod: chosen (or dropped on the window) as a folder or zip, it fills the box
+  const pickLocal = (folder) => async () => {
+    const v = folder ? await api.PickFolder("") : await api.PickSubscriptionZip();
+    if (v) { field.value = v; recognise(); }
+  };
+  local.append(el("span", "word-facts", T("Local mods need no subscription: drop a Mod folder or zip on the window, or choose one, to install it.")),
+    button(T("choose zip…"), pickLocal(false), "link"), button(T("choose folder…"), pickLocal(true), "link"),
     button(T("open the Mods folder"), async () => { await api.OpenModsFolder(); say("ok", T("opened the folder")); }, "link"));
   below.append(tiles, local);
   const recent = ctx.data?.recent || [];
@@ -174,13 +189,13 @@ export function addForm(ctx = {}) {
   // card: what was recognised, its one decision, the dry run and subscribe.
   const recognise = () => {
     clearTimeout(timer);
-    const my = ++seq, text = field.value.trim(), kind = detect(text);
+    const my = ++seq, text = field.value.trim(), kind = localPath(text) ? "local" : detect(text);
     shown = text;
     result.replaceChildren();
     below.hidden = !!kind;
     if (!kind) return;
     if (kind === "bad") {
-      result.append(el("div", "subscribe-card subscribe-bad", T("Not recognised. Paste a GitHub or GitLab repository, a LoversLab file page, a web page with a download, Workshop links or IDs.")));
+      result.append(el("div", "subscribe-card subscribe-bad", T("Not recognised. Paste a GitHub or GitLab repository, a LoversLab file page, a web page with a download, Workshop links or IDs, or drop a Mod folder or zip.")));
       return;
     }
     const live = () => my === seq;
@@ -191,7 +206,7 @@ export function addForm(ctx = {}) {
     const preview = el("pre", "subscribe-preview word-facts");
     const foot = el("div", "subscribe-foot");
     let ready = "", args = () => null, own = false;
-    const sub = button(T("subscribe"), async () => {
+    const sub = button(kind === "local" ? T("install it") : T("subscribe"), async () => {
       const req = args();
       if (!req || ready !== JSON.stringify(req)) return;
       say("ok", await api.Subscribe(req));
@@ -235,6 +250,14 @@ export function addForm(ctx = {}) {
       };
       args = () => (type === "default" ? { kind: "git", url: text, refType: "branch", ref: "" } : ref ? { kind: "git", url: text, refType: type, ref } : null);
       draw(); refresh();
+      return;
+    }
+    if (kind === "local") {
+      // a Mod folder or zip: copied into the game's Mods folder, no subscription; the dry run
+      // says where, and "install" is the player's yes
+      choices.append(el("div", "subscribe-info muted word-facts", T("copied into the game's Mods folder as a local Mod: no subscription, no update checks")));
+      args = () => ({ kind: "local", from: text });
+      refresh();
       return;
     }
     if (kind === "workshop") {

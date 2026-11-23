@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -198,6 +200,37 @@ func TestRunAtOnce(t *testing.T) {
 	}
 }
 
+// 16 §2.5: the editor launches the current plan directly; a pack applied on Launch gives way,
+// so Launch's headline names the plan that runs. A launch that only asks keeps it.
+func TestLaunchForgetsAppliedPack(t *testing.T) {
+	t.Parallel()
+	e, api, _ := fixture(t)
+	e.MustRun("env", "set", "main", "--launch", "direct")
+	en, err := e.App.Store.CurrentEnv()
+	if err != nil || en == nil {
+		t.Fatal(en, err)
+	}
+	pack := view.FeaturedValue(en.Name, "Some pack", e.App.Store.CurrentPlanID(en.ID))
+	if err := e.App.Store.SetMeta(view.FeaturedKey, pack); err != nil {
+		t.Fatal(err)
+	}
+	// Alpha's Harmony is not enabled: launch asks first, starts nothing, keeps the pack.
+	o, err := api.Run(view.ListLaunch)
+	if err != nil || len(o.Confirm) == 0 || len(e.Launched) != 0 || e.App.Store.Meta(view.FeaturedKey) != pack {
+		t.Fatalf("launch with a missing requirement: %+v %v", o, err)
+	}
+	o, err = api.RunAnyway(view.ListLaunch)
+	if err != nil || len(o.Refused) > 0 || len(o.Confirm) > 0 {
+		t.Fatalf("launch anyway: %+v %v", o, err)
+	}
+	if len(e.Launched) != 1 {
+		t.Fatalf("launched %v", e.Launched)
+	}
+	if got := e.App.Store.Meta(view.FeaturedKey); got != "" {
+		t.Fatalf("the applied pack survived a plan launch: %q", got)
+	}
+}
+
 func previewAndInspect(t *testing.T, _ *testkit.Env, api *API) {
 	p, err := api.Preview(view.ListSort)
 	if err != nil || len(p.Lines) == 0 {
@@ -298,7 +331,7 @@ func TestPackBuildBackground(t *testing.T) {
 		return nil
 	}
 	start := time.Now()
-	if _, err := api.PackBuild("first", 0); err != nil {
+	if _, err := api.PackBuild("first", 0, false, false); err != nil {
 		t.Fatal(err)
 	}
 	if time.Since(start) > 2*time.Second {
@@ -319,7 +352,7 @@ func TestPackBuildBackground(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("the pages wait for the build")
 	}
-	if _, err := api.PackBuild("second", 0); err == nil {
+	if _, err := api.PackBuild("second", 0, false, false); err == nil {
 		t.Fatal("a second build started")
 	}
 	waitPack := func(want string) string {
@@ -382,7 +415,7 @@ func TestBuildPageG14(t *testing.T) {
 	if p.Name == "" || api.PackNameCheck(p.Name) != "" {
 		t.Fatalf("default name %q: %s", p.Name, api.PackNameCheck(p.Name))
 	}
-	lines := api.PackDryRun(p.Name, 0)
+	lines := api.PackDryRun(p.Name, 0, false, false)
 	if len(lines) == 0 || !strings.Contains(strings.Join(lines, "\n"), "cannot build") {
 		t.Fatalf("dry run: %v", lines)
 	}
@@ -410,7 +443,7 @@ func TestBuildPageG14(t *testing.T) {
 	if p, _ := buildPage(t, api, 75); !p.Ok || p.Tex != 75 || p.Steps[2].Go != "" || p.Steps[2].Level == view.LevelBad {
 		t.Fatalf("with an encoder: %+v", p)
 	}
-	if lines := strings.Join(api.PackDryRun("tex one", 75), " | "); !strings.Contains(lines, "dry run") {
+	if lines := strings.Join(api.PackDryRun("tex one", 75, false, false), " | "); !strings.Contains(lines, "dry run") {
 		t.Fatalf("dry run with textures: %s", lines)
 	}
 	e.App.TextureEncoder = nil
@@ -483,5 +516,69 @@ func TestPackLaunchMovesConfirm(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(e.Game, "Mods", "B")); err == nil {
 		t.Fatal("Mods/B is still there")
+	}
+}
+
+// 16 §2.3, §3.1 rule 14: a Steam launch with no Steam client says so without a command and
+// flags the direct start; LaunchDirect makes the Game Config start directly, and it launches.
+func TestLaunchWithoutSteamOffersDirect(t *testing.T) {
+	t.Parallel()
+	e, api, _ := fixture(t)
+	e.MustRun("env", "set", "main", "--launch", "steam")
+	e.App.Detect.SteamRoots = []string{t.TempDir()} // no steam.exe there
+	o, err := api.RunAnyway(view.ListLaunch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !o.Direct && len(o.Refused) == 0 && len(e.Launched) == 1 {
+		t.Skip("a steam Game Config already starts directly when Steam is not running (09 §2)")
+	}
+	if !o.Direct || strings.Contains(o.Text, "archo") || len(e.Launched) != 0 {
+		t.Fatalf("launch with no Steam: %+v", o)
+	}
+	if err := api.LaunchDirect(); err != nil {
+		t.Fatal(err)
+	}
+	en, err := e.App.Store.CurrentEnv()
+	if err != nil || en == nil || en.Launch != "direct" {
+		t.Fatalf("launch method after LaunchDirect: %+v %v", en, err)
+	}
+	if o, err := api.RunAnyway(view.ListLaunch); err != nil || o.Direct || len(o.Refused) > 0 || len(e.Launched) != 1 {
+		t.Fatalf("launch after LaunchDirect: %+v %v %v", o, err, e.Launched)
+	}
+}
+
+// 07 §1.3: a launch starts the current list, the one Launch shows, also while another list is
+// open in the window (VM 2026-11-23: Launch showed r2b, its launch asked about and would have
+// started r2s, open in the editor). The open list stays open.
+func TestLaunchStartsTheCurrentListNotTheOpenOne(t *testing.T) {
+	t.Parallel()
+	e, api, _ := fixture(t)
+	e.MustRun("env", "set", "main", "--launch", "direct")
+	def := api.Shell().Plans[0]
+	d, err := api.NewPlan("other", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := view.PlanOfPage(d.Page)
+	if _, err := api.OpenPlan(other); err != nil {
+		t.Fatal(err)
+	}
+	if sh := api.Shell(); sh.Plan == nil || sh.Plan.ID != other || sh.Current == nil || sh.Current.ID != def.ID {
+		t.Fatalf("setup: open %+v current %+v", sh.Plan, sh.Current)
+	}
+	want := e.ReadModsConfig()
+	p, err := api.Preview(view.ListLaunch)
+	if err != nil || !strings.Contains(strings.Join(p.Lines, "\n"), "changes: 0") {
+		t.Fatalf("the launch preview is not the current list's: %v %v", p, err)
+	}
+	if _, err := api.RunAnyway(view.ListLaunch); err != nil {
+		t.Fatal(err)
+	}
+	if len(e.Launched) != 1 || e.ReadModsConfig() != want {
+		t.Fatalf("launched %v; ModsConfig.xml now %s", e.Launched, e.ReadModsConfig())
+	}
+	if sh := api.Shell(); sh.Plan == nil || sh.Plan.ID != other {
+		t.Fatalf("the open list changed: %+v", sh.Plan)
 	}
 }

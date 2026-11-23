@@ -53,7 +53,7 @@ func (a *App) preflightWorkshop(ctx context.Context, ids []string) map[string]wo
 		}
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Set("User-Agent", UserAgent)
-		resp, err := a.httpClient().Do(req)
+		resp, err := a.steamDo(req) // a cooldown leaves the items unknown, like a failure
 		if err != nil {
 			cancel()
 			break

@@ -24,9 +24,9 @@
   <loadBefore>
     <li>Ludeon.RimWorld</li>
   </loadBefore>
-  <description>RimArcho 的游戏内辅助 Mod。它把 Player.log 说不出的事记到存档数据目录下的 ArchoMonitor.log：报错时正在加载哪个 XML 文件和 Def，调用栈上的代码和 Harmony 补丁属于哪个 Mod，以及游戏停止写日志之后的报错次数。RimArcho 读这份日志，在“能不能跑”里给出证据。紧跟在 Harmony 之后、Core 之前加载，才能看到所有 Mod 的加载过程。
+  <description>RimArcho 的游戏内辅助 Mod。它把 Player.log 说不出的事记到存档数据目录下的 ArchoMonitor.log：报错时正在加载哪个 XML 文件和 Def，调用栈上的代码和 Harmony 补丁属于哪个 Mod，以及游戏停止写日志之后的报错次数。RimArcho 读这份日志，在“能不能跑”里给出证据。紧跟在 Harmony 之后、Core 之前加载，才能看到所有 Mod 的加载过程。不装 RimArcho 也能用：在 Mod 设置里点“按 Mod 查看错误…”，就能看到本次运行的错误按 Mod 分组、各有多少次、加载时出错的文件和 Def，以及游戏停止写日志后又出现了多少次。
 
-RimArcho's in-game companion. It records what Player.log cannot say in ArchoMonitor.log in the save data folder: the XML file and def being loaded when an error happens, which mods own the code and Harmony patches on the stack, and how many errors came after the game stopped logging. RimArcho reads it to show evidence for each problem. Load it right after Harmony and before Core so it sees every mod load.
+RimArcho's in-game companion. It records what Player.log cannot say in ArchoMonitor.log in the save data folder: the XML file and def being loaded when an error happens, which mods own the code and Harmony patches on the stack, and how many errors came after the game stopped logging. RimArcho reads it to show evidence for each problem. Load it right after Harmony and before Core so it sees every mod load. Useful without RimArcho too: "Errors by Mod…" in its Mod settings shows this session's errors grouped by Mod, with counts, the file and def being loaded, and how many came back after the game stopped logging.
 
 Cheap by design: a repeated message costs one hash lookup; writes are buffered and errors reach the disk at once.
 

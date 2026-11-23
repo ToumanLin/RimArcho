@@ -6,7 +6,9 @@ Credentials come from `D:\VMs\Setup\Invoke-VMRun.ps1`, which reads them from DPA
 
 ## Once per VM (again after a snapshot revert)
 
-Real-data rounds revert to the snapshot `RimArcho-Real-Vulkan`, a live one: Player signed in, Steam up, the game, the Workshop mods and software Vulkan installed. If Steam shows its sign-in window after a revert (Steam can reject the snapshot's saved session; it did on 2026-10-30), the VM's owner signs in; game rounds need Steam for the Workshop mods. Never type the account's password from a script.
+Real-data rounds revert to the snapshot `RimArcho-Baseline` (2026-11-21; powered off, no memory), the VM's only snapshot: RimWorld 1.6 (Steam) and 1.7 (`C:\Games\RimWorld-1.7`), the Workshop mods, software Vulkan (Mesa lavapipe), 4 vCPUs, and Windows signs in as Player by itself. Because it holds no memory, a revert leaves the VM off: `start` it (a cold boot, about 30 s to Tools "running"), and autologon brings up Player's desktop with Steam signed in. Its RimArcho home (built from dev/1.1 on 2026-11-21) has two Game Configs, both launching direct: `1.6` (current; shared saves, so its saves reach Steam Cloud) and `1.7` (own saves in `%APPDATA%\RimArcho\userdata\1.7`; plan Harmony, Archo Monitor, Core and the five DLCs). A 1.7 round is `archo env use 1.7` and no download. If Steam shows its sign-in window after a revert, the VM's owner signs in (by QR code); never type the account's password from a script.
+
+**Guest launches are direct, never through Steam.** Every Game Config in the guest uses `--launch direct`, and `round.ps1` refuses to start when `archo launch --dry-run` is not a direct launch. Steam in the guest is signed in to the owner's account, and a game started through it can kick the owner out of their own game on another machine. Steam keeps running in the guest only for Workshop downloads and updates. A direct start still loads the Steam API and shows the Steam overlay while the client runs, so keep guest game sessions short when the owner may be playing.
 
 ```powershell
 pwsh scripts/vm/vm.ps1 status    # running, Tools "running", guest IP
@@ -65,7 +67,7 @@ How the round runs:
 
 A failed round kills the game and takes one guest screenshot (`failure.png`, `-NoShot` for none) for a person to look at. The driver acts only when `ArchoDrive.txt` is there and moves it away on start, so the next launch is not driven.
 
-The guest's saves sync to the player's real Steam Cloud when the game exits. So while a script runs, autosave is off; the game's Prefs are not changed. The standard round deletes its save before it quits. When a round fails, `round.ps1` deletes the round's saves before it stops the game.
+The guest's saves sync to the player's real Steam Cloud when the game exits. So while a script runs, autosave is off; the game's Prefs are not changed. The standard round deletes its save before it quits. When a round fails, `round.ps1` deletes the round's saves, and the saves its `delete` steps name, before it stops the game. It answers a mods mismatch with "Load anyway" (the message box of 1.5 and the 1.6 window).
 
 Round script, one step per line (`drive/src/Script.cs`):
 
@@ -101,7 +103,7 @@ A script that does not end with `quit` leaves the game running when its last ste
 
 `<ip>` is the guest IP from `status`; it comes from DHCP, so don't hard-code it.
 
-DevTools is on only because `launch` sets `RIMARCHO_DEVTOOLS_PORT`; players never set it, so nothing listens. CDP key presses and clicks go to the page, not to Windows. For anything that needs Windows input, use the input agent below. The game is not one of these: use `round.ps1`.
+DevTools is on only because `launch` sets `RIMARCHO_DEVTOOLS_PORT`; players never set it, so nothing listens. CDP key presses and clicks go to the page, not to Windows. A CDP key sends no character event, so Enter on a focused button does not press it; use `input.mjs key enter` for that. For anything that needs Windows input, use the input agent below. The game is not one of these: use `round.ps1`.
 
 ## Real mouse and keyboard
 
@@ -124,7 +126,7 @@ pwsh scripts/vm/vm.ps1 input stop
 | Keys, to whatever window has focus | `node scripts/vm/input.mjs <ip> key ctrl+shift+k [repeat]` (also `win+up`, `alt+f4`, `KeyK`, `Digit2`) |
 | Type text (Unicode, Chinese too; bypasses the IME) | `node scripts/vm/input.mjs <ip> type "plan new 测试 列表"` |
 | Read / set the clipboard | `node scripts/vm/input.mjs <ip> clip` · `setclip <text>` |
-| The text a window shows through UI Automation (Windows Terminal: the TUI screen) | `node scripts/vm/input.mjs <ip> text WindowsTerminal` |
+| The text a window shows through UI Automation (Windows Terminal: the TUI screen). Windows Terminal can report the screen before a key's redraw, even seconds later: a panel the key opened may show only after the next key. Read again after a harmless key (a page key such as shift+4 back and forth) before calling a key dead | `node scripts/vm/input.mjs <ip> text WindowsTerminal` |
 
 In a test script, `connectReal(ip)` from `input.mjs` gives both connections and a calibration: `real.click(sel, { mods: ['ctrl'] })`, `real.drag(from, to, { holdMs, during })`, `real.input.key('esc')`, `real.cdp.evaluate(...)`. Calibration moves the real cursor to two points in RimArcho's window and reads where the page saw them, so page zoom, display scaling and the frameless frame need no special handling; call `real.recalibrate()` after moving or resizing the window. Read results with `cdp.mjs text` and `input.mjs text`, not screenshots.
 
@@ -135,10 +137,11 @@ In a test script, `connectReal(ip)` from `input.mjs` gives both connections and 
 
 ## Limits
 
-- `launch` and `cdp.mjs` need a user signed in on the guest screen. Windows Update restarts the guest by itself and leaves it at the lock screen: `launch` then fails with `runProgramInGuest (exit -1)`, and a guest screenshot shows the clock. `status`, `exec`, `cli` and `push` still work. Sign in through the VMware window. Auto sign-in and pausing updates in the guest would remove this step; both are security settings, so the VM's owner makes that call.
+- `launch` and `cdp.mjs` need a user signed in on the guest screen. Since 2026-11-21 the guest signs in as Player by itself after every boot, the restarts Windows Update does included (the VM's owner set this up). If a screenshot still shows the lock screen (locked by hand, say), `launch` fails with `runProgramInGuest (exit -1)`: sign in through the VMware window.
 - GUI tests run as **Player** (an administrator), because Player is the user logged in on the guest screen. `-StandardUser` only applies to `exec` and `cli`. Before a release, also do the first run as **the standard test account (`\u65b0\u73a9\u5bb6`, Unicode escapes)**: log in as \u65b0\u73a9\u5bb6 in the guest, then run `launch -StandardUser`.
 - Files copied in by VMware Tools have no download mark, so SmartScreen warnings aren't tested.
 - The guest has no GPU driver. Vulkan comes from Mesa lavapipe (software, `C:\Mesa\x64`, in the snapshot; a host copy is in `D:\RimArcho-test\mesa`), so RimWorld 1.7 starts, at a very low frame rate. Game performance is checked on a real machine.
+- `round.ps1` does not drive 1.7: Archo Drive stops at "Entry busy" on the 1.7 engine (2026-11-21), and the round still prints `PASS round` when the driver never started. Play a 1.7 round by hand with `input.mjs`, and give each screen time to redraw. On the map a 30 ms click registers (2026-11-21, `docs/research/2026-11-21_vm-vulkan-options.md` §5); typed text and single key presses did not reach the dev settings search box. Esc from `input.mjs` did not open the game menu, so use the menu button at the bottom right.
 - Leftovers in the guest: `C:\Users\Public\Documents\VM-Test`, `%APPDATA%\RimArcho` and `%LOCALAPPDATA%\RimArcho` of the user who ran it. Delete the last two for a first run again.
 
 

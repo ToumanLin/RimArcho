@@ -64,7 +64,7 @@ func TestPackTextures(t *testing.T) {
 			folder = pe.Folder
 		}
 	}
-	mod := filepath.Join(e.Home, "packs", "tex", "mods", folder)
+	mod := filepath.Join(e.App.PacksDir(), "tex", "mods", folder)
 	for rel, want := range map[string]bool{
 		"Textures/Things/A.png": false, "Textures/Things/A.dds": true,
 		"1.6/Textures/Things/A.png": false, "1.6/Textures/Things/A.dds": true,
@@ -83,7 +83,7 @@ func TestPackTextures(t *testing.T) {
 	if json.Unmarshal(b, &og) != nil || og.Textures != "dds" {
 		t.Fatalf("origin %s", b)
 	}
-	b, _ = os.ReadFile(filepath.Join(e.Home, "packs", "tex", "pack.json"))
+	b, _ = os.ReadFile(filepath.Join(e.App.PacksDir(), "tex", "pack.json"))
 	if !strings.Contains(string(b), `"converted": 2`) {
 		t.Fatalf("pack.json:\n%s", b)
 	}

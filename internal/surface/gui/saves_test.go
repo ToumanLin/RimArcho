@@ -1,10 +1,14 @@
+//go:build windows || cgo
+
 package gui
 
 import (
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -17,6 +21,16 @@ import (
 // actions show what they touch before they act.
 func TestSavesPage(t *testing.T) {
 	e, api, events := fixture(t)
+	// Set before any background read copies the App's options (ReadOptions).
+	var trashMu sync.Mutex
+	var trashedAt []string
+	trashed := func() []string { trashMu.Lock(); defer trashMu.Unlock(); return slices.Clone(trashedAt) }
+	e.App.TrashFunc = func(path string) error {
+		trashMu.Lock()
+		trashedAt = append(trashedAt, path)
+		trashMu.Unlock()
+		return os.Remove(path)
+	}
 	lists, _ := savesDrain(events)
 	now := e.Now()
 	e.RecordLaunch(now.Add(-90 * time.Minute))
@@ -121,14 +135,12 @@ func TestSavesPage(t *testing.T) {
 	if b, err = api.SaveBackup([]string{"Colony 1"}, true, b.Preview.Token); err != nil || b.Failed || !strings.HasPrefix(b.Text, "backed up Colony 1 to ") {
 		t.Fatalf("backup %+v %v", b, err)
 	}
-	var trashed []string
-	e.App.TrashFunc = func(path string) error { trashed = append(trashed, path); return os.Remove(path) }
 	tr, err := api.SaveTrash([]string{"Colony 2"}, false, "")
-	if err != nil || tr.Preview == nil || tr.Preview.Button != "recycle" || len(trashed) != 0 {
-		t.Fatalf("recycle preview %+v %v %v", tr, err, trashed)
+	if err != nil || tr.Preview == nil || tr.Preview.Button != "recycle" || len(trashed()) != 0 {
+		t.Fatalf("recycle preview %+v %v %v", tr, err, trashed())
 	}
-	if tr, err = api.SaveTrash([]string{"Colony 2"}, true, tr.Preview.Token); err != nil || tr.Failed || len(trashed) != 1 {
-		t.Fatalf("recycle %+v %v %v", tr, err, trashed)
+	if tr, err = api.SaveTrash([]string{"Colony 2"}, true, tr.Preview.Token); err != nil || tr.Failed || len(trashed()) != 1 {
+		t.Fatalf("recycle %+v %v %v", tr, err, trashed())
 	}
 	if _, err := api.SaveTrash(nil, false, ""); err == nil {
 		t.Fatal("recycled nothing")
@@ -143,7 +155,7 @@ func TestSavesPage(t *testing.T) {
 	// to analyse it: the new list's analysis runs in the background and the page stays
 	ran := make(chan struct{}, 1)
 	inner := e.App.AnalyzeRunner
-	e.App.AnalyzeRunner = func(env string, p func(string)) error {
+	e.App.AnalyzeRunner = func(env *app.App, p func(string)) error {
 		defer func() { ran <- struct{}{} }()
 		if inner == nil {
 			return nil

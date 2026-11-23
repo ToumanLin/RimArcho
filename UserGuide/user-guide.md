@@ -2,7 +2,7 @@
 
 English | [&#31616;&#20307;&#20013;&#25991;](user-guide.zh-CN.md)
 
-This guide is for players. It walks through every part of RimArcho 1.0.9: what each page is for, what its controls do, and how to get common jobs done. For how things work inside, see the [specifications](../docs/specs/README.md).
+This guide is for players. It walks through every part of RimArcho 1.1.0: what each page is for, what its controls do, and how to get common jobs done. For how things work inside, see the [specifications](../docs/specs/README.md).
 
 ## Contents
 
@@ -143,6 +143,7 @@ The **can it run** badge counts the things you can act on. Under **lists**, a gr
 | `?` | Keys for this page |
 | Menu key / `shift+F10` / right-click | What you can do with the row under the cursor |
 | `ctrl+k` or `:` | The command panel |
+| `ctrl`+wheel, `ctrl+=` / `ctrl+-` / `ctrl+0` | Interface size one step larger / smaller / back to 100% (over the **saves** page's over-time chart, `ctrl`+wheel zooms the chart) |
 
 Two rules hold across pages: **arrow keys only move** (the cursor, focus, scrolling) and do not change your list; **letter keys act at once** on the selection, and `u` (or `ctrl+z`) undoes them.
 
@@ -236,7 +237,7 @@ Open **lists** (`shift+4`). The editor has three areas plus details:
 | Tags / note | `g` / `n` | |
 | Sort | `S` | **sort** |
 | Save to the game | `w` | **save changes** |
-| Make current and go to **start**, ready to launch (`L` again launches) | `L` | **launch** |
+| Make current and launch the game from here, with the same checks as **start** | `L` | **launch** |
 | Undo / redo | `u` or `ctrl+z` / `ctrl+y` or `ctrl+r` | **undo** |
 | History | `H` | |
 | Add a load-order rule | `r` | |
@@ -384,6 +385,7 @@ Every item says where its evidence comes from: a Mod's own declaration, RimArcho
   | `target-missing` | No installed Mod defines the target: a missing dependency or an outdated patch |
   | `target-later` | A later patch creates the target |
   | `node-absent` | The Def exists, but the part being patched does not |
+  | `folder-inactive` | The target loads only when another Mod is enabled; the item names it and offers to enable it |
   | `wrong-version-route` | The target exists only in folders this game version does not load |
   | `stale-name` | The target Mod is enabled but renamed that thing; similar names are suggested |
   | `unguarded-optional` | A patch for an optional Mod has no check that the Mod is there |
@@ -698,7 +700,7 @@ One failed item does not stop a batch, stopping keeps what is done, and retry sk
 | Section | Settings |
 | --- | --- |
 | **about** | Version and **release notes**; **check for updates** / **install update**; **automatically check for updates** (RimArcho, Mods, tools, community data; checks only, never installs); **bugs and suggestions…**; Discord and GitHub |
-| **interface** | Language (follow system, English, `简体中文`; changes in place); **day/night theme**; **accent colour**; **Archo animation** (off, still or animated; Archo keeps you company on the start-up screen, in loading cards and in the first-run guide); Workshop descriptions and their images on or off; GPU acceleration (off uses about 20–35 MB less memory; next start); the **start** page background: game art, background Mods or your own images, with dimming, blur, focus point, stars and rotation |
+| **interface** | Language (follow system, English, `简体中文`; changes in place); **interface size** 100–150% (also `ctrl`+wheel or `ctrl+=` / `ctrl+-` / `ctrl+0` anywhere); **day/night theme**; **accent colour**; **Archo animation** (off, still or animated; Archo keeps you company on the start-up screen, in loading cards and in the first-run guide); Workshop descriptions and their images on or off; GPU acceleration (off uses about 20–35 MB less memory; next start); the **start** page background: game art, background Mods or your own images, with dimming, blur, focus point, stars and rotation |
 | **accounts** | SteamCMD and LoversLab sign-in (section 11) |
 | **updates** | **update source**: automatic (Steam Workshop first, then GitHub) or GitHub; **check interval** |
 | **folders** | Every game, Workshop, SteamCMD and extra Mod folder, the lock library, source library, packs, Monitor and downloads: **locate**, **move to…**, add or remove sources (removing keeps the files); clean up or pre-decompile the source library |
@@ -876,8 +878,8 @@ Apart from those requested actions it does not change Mods' files. Your Mods, sa
 
 | Folder | Contains |
 | --- | --- |
-| `%APPDATA%\RimArcho\` | The database (lists, history, tags, rules), settings, caches, logs, the source library, packs and backups by default |
-| `%LOCALAPPDATA%\RimArcho\` (or the folder you chose) | Locked copies, Archo Monitor, subscriptions, SteamCMD and its downloads, tools, account sessions |
+| `%APPDATA%\RimArcho\` | The database (lists, history, tags, rules), settings, caches, logs and backups (an install from before 1.1 also keeps its source library and packs here) |
+| `%LOCALAPPDATA%\RimArcho\` (or the folder you chose) | Locked copies, Archo Monitor, subscriptions, SteamCMD and its downloads, tools, account sessions, and the source library and packs of installs since 1.1 |
 | The program folder | `RimArcho.exe`, `archo.exe`, docs, the bundled Monitor and agent skills |
 
 ### Backups
@@ -902,7 +904,7 @@ It never unsubscribes Workshop items or removes your ordinary Mods and saves. If
 
 ## 23. Recipes
 
-**Set up a new list from scratch.** **all lists** → **new / import** → **an empty list** → **create and edit**. Search, `space` to enable, `S` to sort, `F` on **can it run** to fill in dependencies, then `L` in the editor and `L` again on **start**.
+**Set up a new list from scratch.** **all lists** → **new / import** → **an empty list** → **create and edit**. Search, `space` to enable, `S` to sort, `F` on **can it run** to fill in dependencies, then `L` in the editor starts the game.
 
 **A Mod update broke my game.** **updates** → find the Mod (**Affects launch**) → open its changes. To keep playing, **lock this version** of a copy that still works (or switch to an older copy with `x`), or disable it and stage its dependants with `t`. Check **can it run** and launch.
 

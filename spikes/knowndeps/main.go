@@ -29,16 +29,15 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"math/bits"
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime/pprof"
 	"sort"
 	"strings"
 	"time"
@@ -46,6 +45,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/known"
 	"github.com/ToumanLin/RimArcho/internal/scan"
+	"github.com/ToumanLin/RimArcho/spikes/internal/jsonl"
 )
 
 type multi []string
@@ -71,7 +71,17 @@ func main() {
 	home := flag.String("verify", "", "verify mode: RIMARCHO_HOME of a corpusrun research environment")
 	userData := flag.String("userdata", "", "verify mode: its user data root")
 	perKind := flag.Int("lists", 20, "verify mode: mod lists per finding code")
+	cpuprof := flag.String("cpuprofile", "", "write a CPU profile to this file")
 	flag.Parse()
+	if *cpuprof != "" {
+		f, err := os.Create(*cpuprof)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(1)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
 	if *home != "" {
 		if err := verify(*home, *userData, *parsed, *mm, *perKind); err != nil {
 			fmt.Fprintln(os.Stderr, "error:", err)
@@ -80,6 +90,7 @@ func main() {
 		return
 	}
 	if err := run(*parsed, *results, *patterns, *steamdb, *out, *mm, roots); err != nil {
+		pprof.StopCPUProfile()
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
@@ -121,28 +132,7 @@ type logRec struct {
 
 // ---- input ----
 
-func eachLine(path string, f func([]byte) error) error {
-	fh, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer fh.Close()
-	r := bufio.NewReaderSize(fh, 1<<20)
-	for {
-		b, err := r.ReadBytes('\n')
-		if len(b) > 0 {
-			if e := f(b); e != nil {
-				return e
-			}
-		}
-		if err == io.EOF {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-	}
-}
+func eachLine(path string, f func([]byte) error) error { return jsonl.Each(path, f) }
 
 type pmod struct {
 	Pkg string `json:"pkg"`
@@ -333,15 +323,11 @@ func readLibrary(roots []string, mm string) map[string]*modInfo {
 type files struct{ xml, dll [][]byte }
 
 type fileCache struct {
-	lib   map[string]*modInfo
-	m     map[string]*files
-	order []string
+	lib map[string]*modInfo
 }
 
-func (c *fileCache) get(p string) *files {
-	if f := c.m[p]; f != nil {
-		return f
-	}
+// load reads a mod's files without caching them.
+func (c *fileCache) load(p string) *files {
 	f := &files{}
 	if mi := c.lib[p]; mi != nil {
 		for _, d := range mi.dirs {
@@ -369,12 +355,6 @@ func (c *fileCache) get(p string) *files {
 				return nil
 			})
 		}
-	}
-	c.m[p] = f
-	c.order = append(c.order, p)
-	if len(c.order) > 300 {
-		delete(c.m, c.order[0])
-		c.order = c.order[1:]
 	}
 	return f
 }
@@ -431,6 +411,21 @@ func uses(f *files, it item) bool {
 // ---- helpers ----
 
 type set map[int]bool
+
+// lastLog is the newest of the logs, YYYY-MM-DD (weekly data drops entries without a log in
+// the last 12 weeks, 05 §4.6).
+func lastLog(ls []*logRec, idx set) string {
+	var t time.Time
+	for i := range idx {
+		if ls[i].created.After(t) {
+			t = ls[i].created
+		}
+	}
+	if t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format("2006-01-02")
+}
 
 func players(ls []*logRec, idx set) int {
 	var ids []int
@@ -587,7 +582,7 @@ func run(parsedPath, resultsPath, patternsPath, steamPath, outPath, mm string, r
 		return err
 	}
 	lib := readLibrary(roots, mm)
-	fc := &fileCache{lib: lib, m: map[string]*files{}}
+	fc := &fileCache{lib: lib}
 	wsDeps := readSteamDB(steamPath)
 	links := sessions(ls)
 	nA := map[string]int{}
@@ -668,8 +663,30 @@ func run(parsedPath, resultsPath, patternsPath, steamPath, outPath, mm string, r
 	}
 	pairItems := map[pk][]pitem{}
 	nItems, nConf := 0, 0
+	// Candidates per item, then the file checks grouped by mod: each mod's files are read once
+	// (checking them item by item re-read mods evicted from the cache, hours on 40k logs).
+	type cand struct {
+		k ik
+		a []string
+	}
+	var cands []cand
+	type ak struct {
+		a  string
+		it item
+	}
+	need := map[string][]item{}
+	// The game's own content (Core, DLCs) defines a def or abstract parent that a log says is
+	// missing: Core failed to load it, or a mod removed it. A mod that defines the same name too
+	// (One with Death, Buildable Terrain redefining Core's defs) is an alternative, not the
+	// provider; only the DLC itself can be one (05 §4.6, 2026-11-22).
+	offXML := officialXML(fc, lib)
+	nOfficial := 0
 	for k, idx := range itemLogs {
 		if len(idx) < 3 {
+			continue
+		}
+		if !official(k.b) && officialDefines(offXML, k.it) {
+			nOfficial++
 			continue
 		}
 		nItems++
@@ -679,16 +696,34 @@ func run(parsedPath, resultsPath, patternsPath, steamPath, outPath, mm string, r
 				cnt[m]++
 			}
 		}
-		conf := false
-		for a, c := range cnt {
-			if float64(c) < *cover*float64(len(idx)) || a == k.b || official(a) || a == "brrainz.harmony" {
+		c := cand{k: k}
+		for a, n := range cnt {
+			if float64(n) < *cover*float64(len(idx)) || a == k.b || official(a) || a == "brrainz.harmony" {
 				continue
 			}
+			c.a = append(c.a, a)
+			if itemSrc[k][a] == 0 && k.it.kind != "error" && lib[a] != nil {
+				need[a] = append(need[a], k.it)
+			}
+		}
+		cands = append(cands, c)
+	}
+	used := map[ak]bool{}
+	for a, its := range need {
+		f := fc.load(a)
+		for _, it := range its {
+			used[ak{a, it}] = uses(f, it)
+		}
+	}
+	for _, c := range cands {
+		k := c.k
+		conf := false
+		for _, a := range c.a {
 			how := ""
 			switch {
 			case itemSrc[k][a] > 0:
 				how = "source"
-			case k.it.kind != "error" && lib[a] != nil && uses(fc.get(a), k.it):
+			case used[ak{a, k.it}]:
 				how = "files"
 			}
 			if how != "" {
@@ -700,7 +735,7 @@ func run(parsedPath, resultsPath, patternsPath, steamPath, outPath, mm string, r
 			nConf++
 		}
 	}
-	p("\n== Prerequisites\n\nmissing items (provider, what) in >= 3 logs: %d; with a confirmed dependent mod: %d; candidate pairs: %d", nItems, nConf, len(pairItems))
+	p("\n== Prerequisites\n\nmissing items (provider, what) in >= 3 logs: %d (and %d whose item the game's own content defines, dropped); with a confirmed dependent mod: %d; candidate pairs: %d", nItems, nOfficial, nConf, len(pairItems))
 	type prow struct {
 		pr                   *known.Prereq
 		declared, wsDeclared bool
@@ -757,7 +792,7 @@ func run(parsedPath, resultsPath, patternsPath, steamPath, outPath, mm string, r
 			}
 		}
 		pr := &known.Prereq{Mod: k.a, Needs: k.b, Logs: len(errs), Players: pl, Without: without, Items: items,
-			Class: top(class, 1)[0], Example: ex, Cosmetic: cosmetic}
+			Class: top(class, 1)[0], Example: ex, Cosmetic: cosmetic, Seen: known.Seen{LastLog: lastLog(ls, errs)}}
 		mi := lib[k.a]
 		row := &prow{pr: pr, rate: r, errs: errs}
 		if mi != nil {
@@ -878,7 +913,8 @@ func run(parsedPath, resultsPath, patternsPath, steamPath, outPath, mm string, r
 				continue
 			}
 			role := tothers[t][b] > 0
-			if bestB == "" || role && !bestRole || role == bestRole && r1-r0 > bestD {
+			// Ties go to the first packageId: map order would pick a different B each run.
+			if bestB == "" || role && !bestRole || role == bestRole && (r1-r0 > bestD || r1-r0 == bestD && b < bestB) {
 				bestB, bestD, bestRole = b, r1-r0, role
 			}
 		}
@@ -978,7 +1014,7 @@ func run(parsedPath, resultsPath, patternsPath, steamPath, outPath, mm string, r
 			continue
 		}
 		x := &known.Combo{Mods: mods, Version: k.v, Class: top(c.class, 1)[0], Templates: tpls, Logs: len(errs), Players: pl,
-			With: with, Without: without, WithoutErr: withoutErr}
+			With: with, Without: without, WithoutErr: withoutErr, Seen: known.Seen{LastLog: lastLog(ls, errs)}}
 		chg := []string{k.a}
 		if k.b != "" {
 			chg = append(chg, k.b)
@@ -1144,3 +1180,27 @@ func mergeG5(rs []*g5res) *g5res {
 }
 
 func bitsOn(x uint64) int { return bits.OnesCount64(x) }
+
+// officialXML is the XML of the game's own content (Core and the DLCs) in the library roots.
+func officialXML(fc *fileCache, lib map[string]*modInfo) [][]byte {
+	var out [][]byte
+	for p := range lib {
+		if official(p) {
+			out = append(out, fc.load(p).xml...)
+		}
+	}
+	return out
+}
+
+// officialDefines: the game's own content defines the item (a def by defName, an abstract
+// parent by Name).
+func officialDefines(xml [][]byte, it item) bool {
+	switch it.kind {
+	case "def":
+		n := it.name[strings.IndexByte(it.name, ' ')+1:]
+		return anyContains(xml, []byte("<defName>"+n+"</defName>"))
+	case "abstract":
+		return anyContains(xml, []byte(`Name="`+it.name+`"`))
+	}
+	return false
+}

@@ -18,6 +18,19 @@ import (
 // PreviewWidth is the cached thumbnail width in pixels.
 const PreviewWidth = 360
 
+// PreviewThumbWidth is the small JPEG used by the Play review grid.
+const PreviewThumbWidth = 192
+
+// PreviewThumbOf serves a picture only while its source exists; the shared scaler
+// caches by source path, size and mtime, outside the page's lock.
+func (a *App) PreviewThumbOf(t PreviewTarget) (string, error) {
+	src := findPreview(t.about)
+	if src == "" {
+		return "", ErrNoPreview
+	}
+	return a.cachedScaledJPEG(src, PreviewThumbWidth, "previews", PreviewThumbWidth)
+}
+
 // ErrNoPreview: the mod has no About/Preview.png.
 var ErrNoPreview = errors.New("no Preview.png")
 

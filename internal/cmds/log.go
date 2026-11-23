@@ -66,7 +66,7 @@ func loadLog(c *Ctx, a *Args) (*app.LogReport, *app.LoadoutState, error) {
 func analysedAs(c *Ctx, root *render.Node, r *app.LogReport) {
 	if st := c.Loadout(); st != nil {
 		if g := c.App.UnregisteredLogGame(st, r.Path); g != "" {
-			root.KV("game", fmt.Sprintf("log game path %s is not this environment's game; attributed against %s", g, envRef(st.Ix.Env)))
+			root.KV("game", fmt.Sprintf("log game path %s is not this Game Config's game; attributed against %s", g, envRef(st.Ix.Env)))
 		}
 	}
 	if c.logPending {
@@ -74,8 +74,11 @@ func analysedAs(c *Ctx, root *render.Node, r *app.LogReport) {
 	} else if r.Unanalysed > 0 {
 		root.KV("analysis", "assemblies not analysed yet for "+app.EnabledMods(r.Unanalysed)+": their types and Harmony IDs name no mod (archo analyze)")
 	}
+	if r.CompanionNewer != "" {
+		root.KV("monitor", r.CompanionNewer+" ("+r.Companion+" not read)")
+	}
 	if r.AnalysedAs != "" {
-		root.KV("analysed", fmt.Sprintf("as %s (log version); environment is %s", r.AnalysedAs, r.EnvMM))
+		root.KV("analysed", fmt.Sprintf("as %s (log version); Game Config is %s", r.AnalysedAs, r.EnvMM))
 	}
 }
 
@@ -255,7 +258,7 @@ func clusterLine(ix *app.Index, lc *app.LogCluster) string {
 			who += fmt.Sprintf(", +%d", len(lc.Attr)-1)
 		}
 		who += ")"
-	} else if commonUnattributed(lc) != "" {
+	} else if commonUnattributed(ix, lc) != "" {
 		who = "  (" + patterns.CommonLabel + ")"
 	}
 	if lc.Consequences > 0 {
@@ -345,7 +348,7 @@ func clusterDoc(c *Ctx, ix *app.Index, r *app.LogReport, lc *app.LogCluster) *re
 		conf += " (" + lc.Why + ")"
 	}
 	root.KV("confidence", conf)
-	if note := commonUnattributed(lc); note != "" {
+	if note := commonUnattributed(ix, lc); note != "" {
 		root.KV("note", note)
 	}
 	if fx := twoSourcesFix(ix, lc); fx != "" {

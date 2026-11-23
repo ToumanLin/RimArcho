@@ -19,8 +19,8 @@ import (
 func ChangeText() modchanges.Text {
 	// Shared format keys keep CLI punctuation; only the interface removes the separator.
 	return modchanges.Text{T: func(s string) string { return T(strings.ReplaceAll(s, string('\u00b7'), "")) }, Date: func(t time.Time) string {
-		if Lang() == "zh" {
-			return fmt.Sprintf(localeExtra("zh", "@date.short"), int(t.Month()), t.Day())
+		if format, ok := localeFormat("@date.short"); ok {
+			return fmt.Sprintf(format, int(t.Month()), t.Day())
 		}
 		return t.Format("Jan 2")
 	}}

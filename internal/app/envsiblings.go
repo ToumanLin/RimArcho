@@ -1,0 +1,361 @@
+package app
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"unicode"
+
+	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/loadout"
+	"github.com/ToumanLin/RimArcho/internal/order"
+	"github.com/ToumanLin/RimArcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/store"
+)
+
+// canonicalRoot resolves existing ancestors too, so a new child of an alias conflicts.
+func canonicalRoot(path string) string {
+	if path == "" {
+		return ""
+	}
+	if real, err := source.RealPath(path); err == nil {
+		return env.PathKey(real)
+	}
+	abs, _ := filepath.Abs(path)
+	parent := filepath.Dir(abs)
+	if parent == abs {
+		return env.PathKey(abs)
+	}
+	return env.PathKey(filepath.Join(canonicalRoot(parent), filepath.Base(abs)))
+}
+
+func (a *App) checkEnvironmentRoot(self, game, root string) error {
+	es, err := a.Store.Envs()
+	if err != nil {
+		return err
+	}
+	g, r := canonicalRoot(game), canonicalRoot(root)
+	if r != "" && (underDir(r, g) || underDir(g, r)) {
+		return fmt.Errorf("user data folder %s overlaps game folder %s; choose a separate --user-data <dir>", root, game)
+	}
+	for _, e := range es {
+		if e.ID == self {
+			continue
+		}
+		o := canonicalRoot(e.UserDataRoot)
+		if g == canonicalRoot(e.GameRoot) && r == o {
+			return fmt.Errorf("Game Config %s already uses this installation and user data folder; use --saves own or --user-data <dir>", e.Name)
+		}
+		if r != "" && o != "" && r != o && (underDir(r, o) || underDir(o, r)) {
+			return fmt.Errorf("user data folder %s overlaps Game Config %s's folder %s; choose a separate --user-data <dir>", root, e.Name, e.UserDataRoot)
+		}
+	}
+	return nil
+}
+
+func (a *App) siblingPlanName(name string) (string, error) {
+	base := strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return '_'
+		}
+		return r
+	}, name)
+	base = strings.TrimSpace(strings.TrimLeft(base, "-"))
+	if base == "" {
+		base = "environment"
+	}
+	if runes := []rune(base); len(runes) > 56 {
+		base = string(runes[:56])
+	}
+	ps, err := a.Store.Plans()
+	if err != nil {
+		return "", err
+	}
+	name = store.UniquePlanName(base, func(n string) bool {
+		for _, p := range ps {
+			if strings.EqualFold(n, p.Name) {
+				return true
+			}
+		}
+		return false
+	})
+	return a.checkPlanName(name, 0)
+}
+
+func (a *App) initializeSibling(e, like *env.Environment, plan int64, newList bool) error {
+	if newList {
+		if scan, _, err := a.LastScan(e.GameID); err != nil {
+			return err
+		} else if scan == nil {
+			reader := &App{Home: a.Home, Store: a.Store, Config: a.Config, Now: a.Now, Rand: a.Rand, Loc: a.Loc, Detect: a.Detect, EnvName: e.Name}
+			if _, err := reader.scanEnvironment(e, ScanOptions{GameOnly: true, deferLoadout: true}); err != nil {
+				return err
+			}
+		}
+		name, err := a.siblingPlanName(e.Name)
+		if err != nil {
+			return err
+		}
+		ix, err := a.loadIndex(e)
+		if err != nil {
+			return err
+		}
+		p, err := a.createPlan(e.ID, name, emptyEnvironmentList(ix), &store.Version{Source: "import", Note: "new environment", GameVersion: e.GameVersion})
+		if err != nil {
+			return err
+		}
+		plan = p.ID
+	}
+	if plan != 0 {
+		if err := a.Store.SetCurrentPlan(e.ID, plan); err != nil {
+			return err
+		}
+	}
+	if like != nil {
+		args, _ := withoutSaveData(a.LaunchArgs(like.ID))
+		return a.SetLaunchArgs(e.ID, args)
+	}
+	return nil
+}
+
+// seedSettings shares the pack step-4 rules, while reporting every copy failure.
+func seedSettings(from, to string, config bool) ([]string, error) {
+	return seedSettingsWith(from, to, config, true)
+}
+
+// seedSettingsWith is seedSettings; without mods it copies the game's own settings only
+// (Prefs.xml, KeyPrefs.xml…), not Mod_*.xml nor HugsLib/: a pack that carries its own Mod
+// settings (10 §3 step 4).
+func seedSettingsWith(from, to string, config, mods bool) ([]string, error) {
+	if from == "" {
+		return nil, nil
+	}
+	var copied []string
+	if config {
+		ents, err := os.ReadDir(filepath.Join(from, "Config"))
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+		for _, f := range ents {
+			if !f.Type().IsRegular() || strings.EqualFold(f.Name(), "ModsConfig.xml") || !strings.EqualFold(filepath.Ext(f.Name()), ".xml") ||
+				!mods && isModSettingsName(f.Name()) {
+				continue
+			}
+			cfg := filepath.Join(to, "Config")
+			if err := os.MkdirAll(cfg, 0o755); err != nil {
+				return copied, err
+			}
+			fi, err := f.Info()
+			if err != nil {
+				return copied, err
+			}
+			err = copyFile(filepath.Join(from, "Config", f.Name()), filepath.Join(cfg, f.Name()), fi)
+			if errors.Is(err, os.ErrExist) {
+				continue
+			}
+			if err != nil {
+				return copied, err
+			}
+			copied = append(copied, f.Name())
+		}
+	}
+	if err := os.MkdirAll(to, 0o755); err != nil {
+		return copied, err
+	}
+	if !mods {
+		return copied, nil
+	}
+	hl, err := copyHugsLib(from, to)
+	return append(copied, hl...), err
+}
+
+// Retain original quoting in arguments unrelated to the root override.
+func withoutSaveData(args string) (string, bool) {
+	if strings.HasPrefix(strings.TrimSpace(args), "[") {
+		argv, err := ParseLaunchArgs(args)
+		if err != nil {
+			return args, false
+		}
+		out := []string{}
+		omitted := false
+		for i := 0; i < len(argv); i++ {
+			key := strings.ToLower(argv[i])
+			if key == "-savedatafolder" || strings.HasPrefix(key, "-savedatafolder=") {
+				omitted = true
+				if key == "-savedatafolder" && i+1 < len(argv) {
+					i++
+				}
+				continue
+			}
+			out = append(out, argv[i])
+		}
+		data, _ := json.Marshal(out)
+		return string(data), omitted
+	}
+	var parts []string
+	start := -1
+	var quote rune
+	for i, r := range args {
+		if start < 0 && !unicode.IsSpace(r) {
+			start = i
+		}
+		if r == '"' || r == '\'' {
+			if quote == 0 {
+				quote = r
+			} else if quote == r {
+				quote = 0
+			}
+		}
+		if unicode.IsSpace(r) && quote == 0 && start >= 0 {
+			parts = append(parts, args[start:i])
+			start = -1
+		}
+	}
+	if start >= 0 {
+		parts = append(parts, args[start:])
+	}
+	out := []string{}
+	omitted := false
+	for i := 0; i < len(parts); i++ {
+		key := strings.ToLower(strings.Trim(parts[i], "\"'"))
+		if key == "-savedatafolder" || strings.HasPrefix(key, "-savedatafolder=") {
+			omitted = true
+			if key == "-savedatafolder" && i+1 < len(parts) {
+				i++
+			}
+			continue
+		}
+		out = append(out, parts[i])
+	}
+	return strings.Join(out, " "), omitted
+}
+
+// CloneArgsOmitted reports whether --like discards a stored data-root override.
+func (a *App) CloneArgsOmitted(name string) bool {
+	e, err := a.Store.EnvByName(strings.TrimPrefix(name, "env:"))
+	if err != nil || e == nil {
+		return false
+	}
+	_, omitted := withoutSaveData(a.LaunchArgs(e.ID))
+	return omitted
+}
+
+func emptyEnvironmentList(ix *Index) loadout.List {
+	var list loadout.List
+	for _, m := range installedOfficial(ix.Mods) {
+		list = append(list, loadout.Entry{Instance: m.ID})
+	}
+	if len(list) == 0 && ix.Env != nil && ix.Env.GameRoot != "" {
+		// Not scanned yet (the window reads the list while the first-run guide's scan runs):
+		// the game's Data folders by package ID, which the scan resolves like any entry
+		return officialByFolder(ix.Env.GameRoot)
+	}
+	sort.SliceStable(list, func(i, j int) bool {
+		return order.CompareOfficial(ix.ByID[list[i].Instance].PackageID, ix.ByID[list[j].Instance].PackageID) < 0
+	})
+	return list
+}
+
+// officialByFolder: Core and the DLC in the game's Data folder (Core, Royalty, …) as entries
+// by package ID, in release order.
+func officialByFolder(gameRoot string) loadout.List {
+	ds, _ := os.ReadDir(filepath.Join(gameRoot, "Data"))
+	var pkgs []string
+	for _, d := range ds {
+		if !d.IsDir() {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(gameRoot, "Data", d.Name(), "About", "About.xml")); err != nil {
+			continue
+		}
+		pkg := "ludeon.rimworld"
+		if !strings.EqualFold(d.Name(), "Core") {
+			pkg += "." + strings.ToLower(d.Name())
+		}
+		pkgs = append(pkgs, pkg)
+	}
+	sort.SliceStable(pkgs, func(i, j int) bool { return order.CompareOfficial(pkgs[i], pkgs[j]) < 0 })
+	var list loadout.List
+	for _, p := range pkgs {
+		list = append(list, loadout.Entry{Missing: p})
+	}
+	return list
+}
+
+// LegacyInstallationAliases lists environments under distinct game records resolving to one root.
+func (a *App) LegacyInstallationAliases() []string {
+	es, err := a.Store.Envs()
+	if err != nil {
+		return nil
+	}
+	groups := map[string]map[string]bool{}
+	names := map[string][]string{}
+	var order []string
+	for _, e := range es {
+		key := canonicalRoot(e.GameRoot)
+		if groups[key] == nil {
+			groups[key] = map[string]bool{}
+			order = append(order, key)
+		}
+		groups[key][e.GameID] = true
+		names[key] = append(names[key], e.Name)
+	}
+	var out []string
+	for _, key := range order {
+		if len(groups[key]) > 1 {
+			out = append(out, strings.Join(names[key], ", "))
+		}
+	}
+	return out
+}
+
+// EnvGameChangePreview distinguishes relocating siblings from reattaching one environment,
+// and says when reattaching forgets the inventory of an installation left without one.
+func (a *App) EnvGameChangePreview(name, path string) ([]string, error) {
+	e, err := a.Store.EnvByName(name)
+	if err != nil {
+		return nil, err
+	}
+	if e == nil {
+		return nil, fmt.Errorf("no Game Config named %q", name)
+	}
+	if canonicalRoot(path) == canonicalRoot(e.GameRoot) {
+		return nil, nil // nothing changes
+	}
+	other, err := a.envOfGame(path)
+	if err != nil {
+		return nil, err
+	}
+	es, err := a.Store.Envs()
+	if err != nil {
+		return nil, err
+	}
+	if other != nil && other.GameID != e.GameID {
+		lines := []string{"only Game Config " + e.Name + " changes game folder; other Game Configs stay"}
+		for _, o := range es {
+			if o.GameID == e.GameID && o.ID != e.ID {
+				return lines, nil
+			}
+		}
+		// Store.MoveRecords forgets an installation no environment uses any more.
+		var mods int
+		if err := a.Store.DB.QueryRow(`SELECT count(*) FROM instance WHERE game_id=? AND status='live'`, e.GameID).Scan(&mods); err != nil {
+			return nil, err
+		}
+		return append(lines, fmt.Sprintf("no other Game Config uses %s: its %d Mod inventory records and analysis are removed; no files are deleted", e.GameRoot, mods)), nil
+	}
+	var names []string
+	for _, o := range es {
+		if o.GameID == e.GameID && o.ID != e.ID {
+			names = append(names, o.Name)
+		}
+	}
+	if len(names) == 0 {
+		return nil, nil
+	}
+	return []string{fmt.Sprintf("%d other Game Configs use this folder and will change too: %s", len(names), strings.Join(names, ", "))}, nil
+}

@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/ToumanLin/RimArcho/internal/app"
 )
 
 // The filter bar of the plan editor (16 §2.5, §3.7): one search box and one set of filters
@@ -16,7 +18,7 @@ import (
 // of 16 §3.7 and may hold tag: type: has: version: words of its own.
 
 // BarKeys are the editor bar's groups in the order shown.
-var BarKeys = []string{"lists", "tag", "source", "location", "version", "content", "has"}
+var BarKeys = []string{"lists", "tag", "source", "location", "version", "content", "has", "added"}
 
 // barValues are the fixed values of a group, in the order shown (tags and versions come
 // from the rows).
@@ -24,6 +26,7 @@ var barValues = map[string][]string{
 	"source":  {"workshop", "steamcmd", "local", "locked", "official", "other"},
 	"content": {"assembly", "xml", "language"},
 	"has":     {"problem", "error", "note", "alias"},
+	"added":   app.LibAdded,
 }
 
 // BarFilter is the bar's result: the matching rows of Not enabled and Enabled (indexes into the
@@ -137,8 +140,53 @@ func FilterBoard(b *Board, search string, filters []string, f MatchFacts, groups
 	out := &BarFilter{Conds: []LibCond{}}
 	words, typed := splitBoardQuery(search)
 	filters = append(append([]string(nil), filters...), typed...)
+	words, filters = currentVersion(words, game), slices.Clone(filters)
+	for i, f := range filters {
+		filters[i] = currentVersion(f, game)
+	}
 	q := ParseQuery(words)
 	c := parseBar(filters)
+	out.Complete = boardComplete(b, search)
+	t := barTally{counts: map[string]map[string]int{}, shown: map[string]map[string]string{}}
+	for _, k := range BarKeys {
+		t.counts[k], t.shown[k] = map[string]int{}, map[string]string{}
+	}
+	if b.Lists != nil {
+		for _, name := range b.Lists.Names {
+			t.shown["lists"][strings.ToLower(name)] = name
+		}
+	}
+	for col := 0; col < 2; col++ {
+		out.Rows[col] = t.filterColumn(b.Cols[col], q, c, f, groups)
+	}
+	on := t.chosen(out, filters, groups)
+	if !groups {
+		return out
+	}
+	for _, k := range BarKeys {
+		g := LibGroup{Key: k, Title: barKeyTitle(k)}
+		for lv, v := range t.shown[k] {
+			if k == "lists" && b.Lists != nil && strings.EqualFold(v, b.Lists.Edited) {
+				continue // the list being edited is not an available-list choice
+			}
+			cur := k == "version" && v == game || k == "lists" && b.Lists != nil && strings.EqualFold(v, b.Lists.Current)
+			g.Values = append(g.Values, LibChoice{Filter: k + ":" + v, Label: boardValueText(b, k, v), Count: t.counts[k][lv], On: on[k+":"+lv], Cur: cur})
+		}
+		sortBar(k, g.Values)
+		out.Groups = append(out.Groups, g)
+	}
+	out.Groups = append(out.Groups, boardTextGroups(b)...)
+	return out
+}
+
+// barTally is each bar group's values as shown and their counts of rows in the search.
+type barTally struct {
+	counts map[string]map[string]int
+	shown  map[string]map[string]string // group → lower value → as shown
+}
+
+// boardComplete is the search's completions: the board's tags, versions and lists.
+func boardComplete(b *Board, search string) string {
 	var tags, vers []string
 	for k := range b.Cols {
 		for i := range b.Cols[k] {
@@ -151,48 +199,47 @@ func FilterBoard(b *Board, search string, filters []string, f MatchFacts, groups
 		}
 	}
 	sort.Slice(vers, func(i, j int) bool { return versionNewer(vers[i], vers[j]) })
-	out.Complete = CompleteQueryWith(search, tags, vers)
+	complete := CompleteQueryWith(search, tags, append([]string{"current"}, vers...))
 	if b.Lists != nil {
-		out.Complete = completeLists(search, b.Lists.Names, out.Complete, b.Lists.Edited)
+		complete = completeLists(search, b.Lists.Names, complete, b.Lists.Edited)
 	}
-	counts := map[string]map[string]int{}
-	shown := map[string]map[string]string{} // group → lower value → as shown
-	for _, k := range BarKeys {
-		counts[k], shown[k] = map[string]int{}, map[string]string{}
+	return complete
+}
+
+// filterColumn is the rows of one column that pass the search and the bar; groups also
+// counts each group's values ignoring that group's own choices.
+func (t barTally) filterColumn(items []Item, q Query, c barCond, f MatchFacts, groups bool) []int {
+	found := q.Filter(items, f) // the search's rows (with its fallback)
+	inSearch := make([]bool, len(items))
+	for _, i := range found {
+		inSearch[i] = true
 	}
-	if b.Lists != nil {
-		for _, name := range b.Lists.Names {
-			shown["lists"][strings.ToLower(name)] = name
-		}
-	}
-	for col := 0; col < 2; col++ {
-		items := b.Cols[col]
-		found := q.Filter(items, f) // the search's rows (with its fallback)
-		inSearch := make([]bool, len(items))
-		for _, i := range found {
-			inSearch[i] = true
-		}
-		out.Rows[col] = []int{}
-		for i := range items {
-			it := &items[i]
-			if groups {
-				for _, k := range BarKeys {
-					for _, v := range barRowValues(it, k, f) {
-						lv := strings.ToLower(v)
-						if _, ok := shown[k][lv]; !ok {
-							shown[k][lv] = v
-						}
-						if inSearch[i] && c.passes(it, f, k) {
-							counts[k][lv]++
-						}
+	rows := []int{}
+	for i := range items {
+		it := &items[i]
+		if groups {
+			for _, k := range BarKeys {
+				for _, v := range barRowValues(it, k, f) {
+					lv := strings.ToLower(v)
+					if _, ok := t.shown[k][lv]; !ok {
+						t.shown[k][lv] = v
+					}
+					if inSearch[i] && c.passes(it, f, k) {
+						t.counts[k][lv]++
 					}
 				}
 			}
-			if inSearch[i] && c.passes(it, f, "") {
-				out.Rows[col] = append(out.Rows[col], i)
-			}
+		}
+		if inSearch[i] && c.passes(it, f, "") {
+			rows = append(rows, i)
 		}
 	}
+	return rows
+}
+
+// chosen adds the bar's chosen filters to out's conditions and returns each one's state
+// by "group:value": 1 chosen, -1 excluded.
+func (t barTally) chosen(out *BarFilter, filters []string, groups bool) map[string]int {
 	on := map[string]int{}
 	for _, x := range filters {
 		ex := strings.HasPrefix(x, "-")
@@ -208,26 +255,17 @@ func FilterBoard(b *Board, search string, filters []string, f MatchFacts, groups
 		}
 		out.Conds = append(out.Conds, LibCond{Filter: x, Label: barKeyTitle(k) + " " + barValueText(k, v), Exclude: ex})
 		if groups {
-			if _, ok := shown[k][strings.ToLower(v)]; !ok {
-				shown[k][strings.ToLower(v)] = v // a chosen value no row has any more still shows
+			if _, ok := t.shown[k][strings.ToLower(v)]; !ok {
+				t.shown[k][strings.ToLower(v)] = v // a chosen value no row has any more still shows
 			}
 		}
 	}
-	if !groups {
-		return out
-	}
-	for _, k := range BarKeys {
-		g := LibGroup{Key: k, Title: barKeyTitle(k)}
-		for lv, v := range shown[k] {
-			if k == "lists" && b.Lists != nil && strings.EqualFold(v, b.Lists.Edited) {
-				continue // the list being edited is not an available-list choice
-			}
-			cur := k == "version" && v == game || k == "lists" && b.Lists != nil && strings.EqualFold(v, b.Lists.Current)
-			g.Values = append(g.Values, LibChoice{Filter: k + ":" + v, Label: boardValueText(b, k, v), Count: counts[k][lv], On: on[k+":"+lv], Cur: cur})
-		}
-		sortBar(k, g.Values)
-		out.Groups = append(out.Groups, g)
-	}
+	return on
+}
+
+// boardTextGroups are the name, author and id groups: every value the board has.
+func boardTextGroups(b *Board) []LibGroup {
+	var out []LibGroup
 	for _, key := range []string{"name", "author", "id"} {
 		g := LibGroup{Key: key, Title: libKeyTitle(key)}
 		seen := map[string]bool{}
@@ -240,7 +278,7 @@ func FilterBoard(b *Board, search string, filters []string, f MatchFacts, groups
 				}
 			}
 		}
-		out.Groups = append(out.Groups, g)
+		out = append(out, g)
 	}
 	return out
 }
@@ -268,7 +306,7 @@ func sortBar(k string, vs []LibChoice) {
 }
 
 func barKeyTitle(k string) string {
-	return map[string]string{"lists": T("lists"), "tag": T("tags"), "source": T("library source"), "location": T("location"), "version": T("supported versions"), "content": T("content"), "has": T("has")}[k]
+	return map[string]string{"lists": T("lists"), "tag": T("tags"), "source": T("library source"), "location": T("location"), "version": T("supported versions"), "content": T("content"), "has": T("has"), "added": T("added")}[k]
 }
 
 func barValueText(k, v string) string {
@@ -281,6 +319,8 @@ func barValueText(k, v string) string {
 		return T(map[string]string{"assembly": "with a DLL", "xml": "XML only", "language": "language pack"}[v])
 	case "has":
 		return T(map[string]string{"problem": "a problem", "error": "an error", "note": "a note", "alias": "an alias"}[v])
+	case "added":
+		return addedText(v)
 	}
 	return v
 }
@@ -380,4 +420,20 @@ func boardValueText(b *Board, k, v string) string {
 		return LibSourceText(v)
 	}
 	return barValueText(k, v)
+}
+
+// currentVersion reads version:current (also -version:current) as the game's own version
+// (16 §3.7), so one filter keeps meaning "runs on my game" after the game updates.
+func currentVersion(q, game string) string {
+	if game == "" || !strings.Contains(strings.ToLower(q), "version:current") {
+		return q
+	}
+	toks := strings.Fields(q)
+	for i, t := range toks {
+		neg := strings.HasPrefix(t, "-")
+		if strings.EqualFold(strings.TrimPrefix(t, "-"), "version:current") {
+			toks[i] = map[bool]string{true: "-", false: ""}[neg] + "version:" + game
+		}
+	}
+	return strings.Join(toks, " ")
 }

@@ -23,7 +23,7 @@ func TestLaunchGameRefusesWhileRunning(t *testing.T) {
 	before := e.ReadModsConfig()
 	for _, args := range []map[string]any{{"dry_run": true}, nil} {
 		out, isErr := call(t, cs, "launch_game", args)
-		if !isErr || !strings.Contains(out, "a game is already running") || !strings.Contains(out, "environment main is running its list (pid 7") {
+		if !isErr || !strings.Contains(out, "a game is already running") || !strings.Contains(out, "Game Config main is running its list (pid 7") {
 			t.Fatalf("launch_game %v while running: isError=%v\n%s", args, isErr, out)
 		}
 	}

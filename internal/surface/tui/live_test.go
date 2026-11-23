@@ -27,21 +27,20 @@ func TestLiveGame(t *testing.T) {
 	}
 	m := direct(t, e, 160, 40)
 	m.Update(liveTick{})
-	since := e.Now().Add(-10 * time.Minute).In(e.App.Loc).Format("15:04")
 	if m.live == nil || !m.live.Running || m.live.Errors == 0 {
 		t.Fatalf("live: %+v", m.live)
 	}
 	// the status line says so, the errors an amber number beside it; the top bar does not
 	line := ansi.Strip(m.statusLine())
-	if want := ic.unsaved + " " + Tf("game running since %s", since) + " " + itoa(m.live.Errors); !strings.HasSuffix(strings.TrimRight(line, " "), want) {
+	if want := ic.unsaved + " " + view.LiveText(m.live) + " " + itoa(m.live.Errors); !strings.HasSuffix(strings.TrimRight(line, " "), want) {
 		t.Fatalf("status line %q, want %q at its end", line, want)
 	}
-	if bar := ansi.Strip(m.topBar()); strings.Contains(bar, Tf("game running since %s", since)) || strings.Contains(bar, "RimArcho  RimArcho") {
+	if bar := ansi.Strip(m.topBar()); strings.Contains(bar, view.LiveText(m.live)) || strings.Contains(bar, "RimArcho  RimArcho") {
 		t.Fatalf("top bar %q", bar)
 	}
 	// a message takes the left of the line; the game stays on the right
 	m.say(sayOK, "done")
-	if line := ansi.Strip(m.statusLine()); !strings.HasPrefix(line, "✓ done") || !strings.Contains(line, Tf("game running since %s", since)) {
+	if line := ansi.Strip(m.statusLine()); !strings.HasPrefix(line, "✓ done") || !strings.Contains(line, view.LiveText(m.live)) {
 		t.Fatalf("status line with a message %q", line)
 	}
 	// this run leads its section, errors from the last run (16 §2.4)
@@ -60,9 +59,10 @@ func TestLiveGame(t *testing.T) {
 		t.Fatalf("no this-run group:\n%s", s)
 	}
 	m.tab = tabList
+	owner := view.LiveText(m.live)
 	running = false
 	m.Update(liveTick{})
-	if line := ansi.Strip(m.statusLine()); strings.Contains(line, Tf("game running since %s", since)) {
+	if line := ansi.Strip(m.statusLine()); strings.Contains(line, owner) {
 		t.Fatalf("still running: %q", line)
 	}
 	for _, it := range m.prob.items {
@@ -200,6 +200,7 @@ func TestTopBarLaunchBlocked(t *testing.T) {
 func TestStatusLineAfterGame(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
+	e.AddEnv(false) // a game ran, so there is one (with none, @ does nothing: noGameKey)
 	m := direct(t, e, 160, 40)
 	m.live = &view.Live{}
 	if live, _ := m.liveStatus(); live != "" {
@@ -212,5 +213,26 @@ func TestStatusLineAfterGame(t *testing.T) {
 	press(m, "@")
 	if m.tab != tabProblems {
 		t.Fatalf("shift+2 went to %d", m.tab)
+	}
+}
+
+// The navigation row's digits are the entries' own shift keys: texture optimisation (shift+7)
+// is under Mod library, so Game Config is 8 and clicking it opens the switcher, not textures
+// (VM 2026-11-23: "7 Game Config" opened texture optimisation).
+func TestTopBarDigitsAreShiftKeys(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	e.AddEnv(false)
+	m := direct(t, e, 200, 40)
+	bar := ansi.Strip(m.topBar())
+	if !strings.Contains(bar, "8 "+T("Game Config")) || strings.Contains(bar, "7 "+T("Game Config")) {
+		t.Fatalf("top bar %q", bar)
+	}
+	var pages []int
+	for _, h := range m.nav.hits {
+		pages = append(pages, h.page)
+	}
+	if len(pages) == 0 || pages[len(pages)-1] != 8 {
+		t.Fatalf("hits %v", pages)
 	}
 }

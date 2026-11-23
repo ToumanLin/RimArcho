@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -83,8 +85,13 @@ func TestNativeAddressSelections(t *testing.T) {
 	if err != nil || selected != n.picked || n.title != view.T("choose a pack") || len(n.filters) != 1 || n.filters[0][1] != "*.archopack" {
 		t.Fatal(selected, err, n)
 	}
+	// the Import page's one dialog takes packs and manager databases too (16 §2.18)
+	selected, err = api.PickAnyImport()
+	if err != nil || selected != n.picked || len(n.filters) != 2 || !strings.Contains(n.filters[0][1], "*.archopack") || !strings.Contains(n.filters[0][1], "*.db") || !strings.Contains(n.filters[0][1], "*.rws") {
+		t.Fatal(selected, err, n)
+	}
 	n.picked = ""
-	for _, pick := range []func() (string, error){func() (string, error) { return api.PickFolder(e.Root) }, api.PickProgram, api.PickImportFile, api.PickPackFile} {
+	for _, pick := range []func() (string, error){func() (string, error) { return api.PickFolder(e.Root) }, api.PickProgram, api.PickImportFile, api.PickAnyImport, api.PickPackFile} {
 		if path, err := pick(); err != nil || path != "" {
 			t.Fatal(path, err)
 		}

@@ -45,9 +45,9 @@ var Commands = []Command{
 	{"library", "@palette.library", "mod library", "all mods, copies, sizes, filter, clean up"},
 	{"subscribe", "@palette.subscribe", "add a subscription", "+ Git repository download page LoversLab Workshop SteamCMD"},
 	{"rescan", "@palette.rescan", "rescan", "R scan"},
-	{"analyze", "@palette.analyze", "check the files again", "A analyze"},
+	{"analyze", "@palette.analyze", "check again", "A analyze check the files again"},
 	{"log", "@palette.log", "game log", "l Player.log choose a log"},
-	{"env", "@palette.env", "switch game", "E env environment"},
+	{"env", "@palette.env", "switch Game Config", "E env environment Game Config"},
 	{"plans", "@palette.plans", "lists", "P switch, new, rename, delete a list"},
 	{"new-plan", "@palette.new-plan", "new list", "+ list copy import"},
 	{"restore-all", "@palette.restore-all", "put all back", "T staging"},
@@ -74,13 +74,49 @@ var Commands = []Command{
 }
 
 // Palette entry kinds, in tie order. A plan entry switches to that plan (its ID is
-// the plan's).
+// the plan's). A part is a place on the page the palette was opened on (a numbered area,
+// such as a Settings group): the interface that asks names them, and choosing one goes there.
 const (
 	PalCommand = iota
 	PalMod
 	PalEnv
 	PalPlan
+	PalPart
 )
+
+// pageCommands are each page's own commands, most used first (16 §3.5): the palette
+// suggests them before the rest when opened there. Pages are named as for `?`
+// (KeyHelp): EditorPage, LibraryPage and the others' names.
+var pageCommands = map[string][]string{
+	EditorPage:     {"sort", "save", "launch", "undo", "redo", "filter", "rules", "import", "export", "preview-sort", "preview-save", "preview-launch", "stage-all", "restore-all", "tags", "details"},
+	"home":         {"launch", "preview-launch", "needs", "plans", "env", "log"},
+	"needs":        {"analyze", "rescan", "undo", "sort", "log", "launch"},
+	LibraryPage:    {"rescan", "filter", "changes", "subscribe", "search-files", "textures", "tags", "details", "analyze"},
+	ChangesPage:    {"subscribe", "rescan", "library"},
+	SubscribePage:  {"changes", "library", "rescan"},
+	PageSearch:     {"library", "rescan"},
+	RulesPage:      {"sort", "preview-sort", "undo", "redo"},
+	"textures":     {"rescan", "library"},
+	"log":          {"analyze", "needs", "rescan"},
+	"env":          {"env", "rescan", "analyze"},
+	"plans":        {"new-plan", "import", "export", "plans"},
+	"plan-import":  {"new-plan", "plans"},
+	"plan-export":  {"plans", "packs"},
+	PackPages:      {"launch", "export"},
+	BuildPageID:    {"packs", "export"},
+	"settings":     {"update", "env", "feedback", "uninstall"},
+	"mod-settings": {"sort", "save", "launch"},
+	"saves":        {"launch", "log"},
+	"review":       {"launch", "log"},
+	"tasks":        {"rescan", "analyze"},
+	"feedback":     {"log", "needs"},
+	"full":         {"details", "tags", "tech"},
+	"uninstall":    {"settings"},
+}
+
+// PageCommands are the IDs of a page's own commands, in the order the palette suggests
+// them; none for an unknown page.
+func PageCommands(page string) []string { return pageCommands[page] }
 
 // PalEntry is one palette candidate.
 type PalEntry struct {
@@ -90,6 +126,7 @@ type PalEntry struct {
 	Alias string `json:"alias,omitempty"`
 	Match string `json:"-"` // a further name that matches but is not shown: a command's ID
 	Desc  string `json:"desc,omitempty"`
+	Own   bool   `json:"own,omitempty"` // the page's own command or part (PalRankPage)
 	Score int    `json:"-"`
 }
 
@@ -328,16 +365,36 @@ func PlanEntries(rows []PlanRow) []PalEntry {
 
 // PalRank filters and orders the candidates for a query; an empty query lists the
 // commands, environments and plans only.
-func PalRank(query string, all []PalEntry) []PalEntry {
+func PalRank(query string, all []PalEntry) []PalEntry { return PalRankPage(query, "", all) }
+
+// PalRankPage is PalRank on a page (16 §3.5): an empty query lists the page's own commands
+// first, in PageCommands order, then its parts, then the rest as PalRank does; a typed query
+// still matches everything, and between equal scores the page's commands (in that order)
+// and parts come first.
+func PalRankPage(query, page string, all []PalEntry) []PalEntry {
 	q := strings.ToLower(strings.TrimSpace(query))
 	pq := newPalQuery(q)
+	own := map[string]int{}
+	for i, id := range PageCommands(page) {
+		own[id] = i + 1
+	}
+	// rank: 0 not the page's; then the page's commands by table order, then its parts
+	rank := func(e PalEntry) int {
+		switch {
+		case e.Kind == PalCommand && own[e.ID] > 0:
+			return own[e.ID]
+		case e.Kind == PalPart && page != "":
+			return len(own) + 1
+		}
+		return 0
+	}
 	var out []PalEntry
 	for _, e := range all {
 		if q == "" && e.Kind == PalMod {
 			continue
 		}
 		if s := pq.score(e); s > 0 {
-			e.Score = s
+			e.Score, e.Own = s, rank(e) > 0
 			out = append(out, e)
 		}
 	}
@@ -345,6 +402,11 @@ func PalRank(query string, all []PalEntry) []PalEntry {
 		a, b := out[i], out[j]
 		if a.Score != b.Score {
 			return a.Score > b.Score
+		}
+		if ra, rb := rank(a), rank(b); (ra > 0) != (rb > 0) {
+			return ra > 0
+		} else if ra != rb {
+			return ra < rb
 		}
 		if a.Kind != b.Kind {
 			return a.Kind < b.Kind

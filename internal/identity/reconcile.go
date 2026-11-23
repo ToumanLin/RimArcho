@@ -164,44 +164,15 @@ func Reconcile(in Input) *Result {
 		if assigned[i] != nil || !ob.Loc.Kind.WorkshopLike() || !ValidWorkshopID(ob.Loc.Rel) {
 			continue
 		}
-		var best *Known
-		for _, k := range in.Known {
-			if k.seen || in.Skip[k.SourceID] || !k.Kind.WorkshopLike() || !strings.EqualFold(k.Rel, ob.Loc.Rel) {
-				continue
-			}
-			if best == nil || (best.Status == Tombstone && k.Status == Live) {
-				best = k
-			}
-		}
-		if best != nil {
+		if best := r.workshopFolder(ob); best != nil {
 			assigned[i] = r.match(ob, best, "R2")
 		}
 	}
-	// R5: origin marker (before R3/R4). A marker identical to that of a vanished instance
-	// is that instance renamed, not a new copy.
+	// R5: origin marker (before R3/R4).
 	for i, ob := range in.Obs {
-		if assigned[i] != nil || ob.Origin == nil {
-			continue
+		if assigned[i] == nil && ob.Origin != nil {
+			assigned[i] = r.origin(ob)
 		}
-		if k, _ := r.best(ob, r.vanishing(), MoveSimilarity, func(k *Known) bool {
-			return k.Snap != nil && k.Snap.Origin != nil && k.Snap.Origin.InstanceID == ob.Origin.InstanceID
-		}); k != nil {
-			assigned[i] = r.match(ob, k, "R3")
-			continue
-		}
-		lineage := ""
-		if in.Lineages[ob.Origin.LineageID] {
-			lineage = ob.Origin.LineageID
-		} else {
-			for _, k := range in.Known {
-				if k.ID == ob.Origin.InstanceID {
-					lineage = k.LineageID
-				}
-			}
-		}
-		a := r.create(ob, "R5", lineage, BasisConfirmed)
-		r.event(a, EvCopied, fmt.Sprintf("origin #%s (.rimarcho/origin.json)", ob.Origin.InstanceID), 0)
-		assigned[i] = a
 	}
 	// R3: moved — a vanished Instance with similar content and the same declaration.
 	for i, ob := range in.Obs {
@@ -214,43 +185,11 @@ func Reconcile(in Input) *Result {
 	}
 	// R4 / R6 / R7, observation by observation.
 	for i, ob := range in.Obs {
-		if assigned[i] != nil {
-			continue
-		}
-		if origID, origLineage := r.bestPresent(ob); origID != "" {
-			a := r.create(ob, "R4", origLineage, BasisInferred)
-			r.event(a, EvCopied, "inferred copy of #"+origID, 0)
-			assigned[i] = a
-			continue
-		}
-		var gone []*Known
-		for _, k := range in.Known {
-			if !k.seen && !in.Skip[k.SourceID] {
-				gone = append(gone, k)
-			}
-		}
-		k, score := r.question(ob, gone)
-		rule := "R7"
-		if k != nil {
-			rule = "R6"
-		}
-		a := r.create(ob, rule, "", BasisRoot)
-		r.event(a, EvDiscovered, "src:"+ob.Loc.Label+" "+ob.Loc.Rel, 0)
-		if k != nil {
-			r.res.Questions = append(r.res.Questions, &Question{New: a, Candidate: k, Score: score})
-		}
-		assigned[i] = a
-	}
-	for _, k := range in.Known {
-		if !k.seen && k.Status == Live && !in.Skip[k.SourceID] {
-			r.res.Disappeared = append(r.res.Disappeared, k)
-			ev := &Event{InstanceID: k.ID, Kind: EvDisappeared, Detail: "src:" + k.Label + " " + k.Rel}
-			if k.Snap != nil {
-				ev.Before = k.Snap.ID
-			}
-			r.res.Events = append(r.res.Events, ev)
+		if assigned[i] == nil {
+			assigned[i] = r.unmatched(ob)
 		}
 	}
+	r.disappeared()
 	// A missing mod that fits several new folders is ambiguous even when each new
 	// folder has only that one candidate. Never turn that fan-out into repeated asks.
 	r.res.Questions = slices.DeleteFunc(r.res.Questions, func(q *Question) bool {
@@ -262,6 +201,85 @@ func Reconcile(in Input) *Result {
 	})
 	r.res.Assignments = append(r.res.Assignments, assigned...)
 	return r.res
+}
+
+// workshopFolder is the unseen workshop-like Instance whose folder name is ob's (R2),
+// a live one before a tombstone.
+func (r *reconciler) workshopFolder(ob *scan.Observation) *Known {
+	var best *Known
+	for _, k := range r.in.Known {
+		if k.seen || r.in.Skip[k.SourceID] || !k.Kind.WorkshopLike() || !strings.EqualFold(k.Rel, ob.Loc.Rel) {
+			continue
+		}
+		if best == nil || (best.Status == Tombstone && k.Status == Live) {
+			best = k
+		}
+	}
+	return best
+}
+
+// origin assigns an observation with an origin marker (R5). A marker identical to that of
+// a vanished instance is that instance renamed, not a new copy.
+func (r *reconciler) origin(ob *scan.Observation) *Assignment {
+	if k, _ := r.best(ob, r.vanishing(), MoveSimilarity, func(k *Known) bool {
+		return k.Snap != nil && k.Snap.Origin != nil && k.Snap.Origin.InstanceID == ob.Origin.InstanceID
+	}); k != nil {
+		return r.match(ob, k, "R3")
+	}
+	lineage := ""
+	if r.in.Lineages[ob.Origin.LineageID] {
+		lineage = ob.Origin.LineageID
+	} else {
+		for _, k := range r.in.Known {
+			if k.ID == ob.Origin.InstanceID {
+				lineage = k.LineageID
+			}
+		}
+	}
+	a := r.create(ob, "R5", lineage, BasisConfirmed)
+	r.event(a, EvCopied, fmt.Sprintf("origin #%s (.rimarcho/origin.json)", ob.Origin.InstanceID), 0)
+	return a
+}
+
+// unmatched creates the Instance of an observation no earlier rule matched: an inferred
+// copy of a present Instance (R4), a new one with a question (R6) or without (R7).
+func (r *reconciler) unmatched(ob *scan.Observation) *Assignment {
+	if origID, origLineage := r.bestPresent(ob); origID != "" {
+		a := r.create(ob, "R4", origLineage, BasisInferred)
+		r.event(a, EvCopied, "inferred copy of #"+origID, 0)
+		return a
+	}
+	var gone []*Known
+	for _, k := range r.in.Known {
+		if !k.seen && !r.in.Skip[k.SourceID] {
+			gone = append(gone, k)
+		}
+	}
+	k, score := r.question(ob, gone)
+	rule := "R7"
+	if k != nil {
+		rule = "R6"
+	}
+	a := r.create(ob, rule, "", BasisRoot)
+	r.event(a, EvDiscovered, "src:"+ob.Loc.Label+" "+ob.Loc.Rel, 0)
+	if k != nil {
+		r.res.Questions = append(r.res.Questions, &Question{New: a, Candidate: k, Score: score})
+	}
+	return a
+}
+
+// disappeared records the live Instances of the scanned sources that did not appear.
+func (r *reconciler) disappeared() {
+	for _, k := range r.in.Known {
+		if !k.seen && k.Status == Live && !r.in.Skip[k.SourceID] {
+			r.res.Disappeared = append(r.res.Disappeared, k)
+			ev := &Event{InstanceID: k.ID, Kind: EvDisappeared, Detail: "src:" + k.Label + " " + k.Rel}
+			if k.Snap != nil {
+				ev.Before = k.Snap.ID
+			}
+			r.res.Events = append(r.res.Events, ev)
+		}
+	}
 }
 
 // vanishing returns live Instances that have not appeared (yet) in this scan.

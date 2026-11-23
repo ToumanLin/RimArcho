@@ -1,11 +1,11 @@
 package store
 
-// OfficialLineages are the lineages of envID's own live instances in the game's Data/
+// OfficialLineages are the lineages of gameID's own live instances in the game's Data/
 // folder: Core and the DLCs (16 §3.8, the RimWorld tag).
-func (s *Store) OfficialLineages(envID string) ([]string, error) {
+func (s *Store) OfficialLineages(gameID string) ([]string, error) {
 	rows, err := s.DB.Query(`SELECT DISTINCT i.lineage_id FROM instance i JOIN source s ON s.id = i.source_id
-		WHERE i.environment_id = ? AND s.kind = 'official' AND i.status = 'live' AND i.lineage_id != ''
-		ORDER BY i.lineage_id`, envID)
+		WHERE i.game_id = ? AND s.kind = 'official' AND i.status = 'live' AND i.lineage_id != ''
+		ORDER BY i.lineage_id`, gameID)
 	if err != nil {
 		return nil, err
 	}

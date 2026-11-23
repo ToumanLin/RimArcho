@@ -1,7 +1,7 @@
 package mcp
 
 type VersionMuteIn struct {
-	Env         string  `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env         string  `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Refs        StrList `json:"refs" jsonschema:"mods whose version warnings to ignore or restore; pkg: references accepted"`
 	GameVersion string  `json:"game_version,omitempty" jsonschema:"game major.minor, default the current game's"`
 	Undo        bool    `json:"undo,omitempty" jsonschema:"restore warnings instead of ignoring them"`

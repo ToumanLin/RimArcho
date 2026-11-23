@@ -62,7 +62,7 @@ func TestTestRunAttributesTypeToItsAssembly(t *testing.T) {
 	}
 	// The second run finds the analysis fresh and does not run it again.
 	runs := 0
-	e.App.AnalyzeRunner = func(string, func(string)) error { runs++; return nil }
+	e.App.AnalyzeRunner = func(*app.App, func(string)) error { runs++; return nil }
 	if _, err := e.App.TestRun(context.Background(), app.TestRunOptions{Timeout: 5 * time.Second, Settle: time.Millisecond}); err != nil || runs != 0 {
 		t.Fatalf("second run analysed %d times: %v", runs, err)
 	}

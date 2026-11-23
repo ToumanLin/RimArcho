@@ -19,7 +19,6 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/logs"
-	"github.com/ToumanLin/RimArcho/internal/patterns"
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
@@ -145,23 +144,165 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, 
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if o.Timeout < 0 || o.Settle < 0 || o.Ticks < 0 {
-		return nil, fmt.Errorf("test run: durations and ticks must not be negative")
-	}
-	switch {
-	case o.Save != "" && (o.Map || o.Probe != ""):
-		return nil, fmt.Errorf("test run: a save run loads the save; give a save or a map/probe, not both")
-	case o.Ticks > 0 && o.Probe != "":
-		return nil, fmt.Errorf("test run: a probe run ends at the probe's RESULT line; ticks do not apply")
-	case o.Ticks > 0 && !o.Map && o.Save == "":
-		return nil, fmt.Errorf("test run: ticks need a map or a save run")
+	if err := checkTestRunOptions(o); err != nil {
+		return nil, err
 	}
 	prevEnv := a.EnvName
 	if o.Env != "" {
 		a.EnvName = o.Env
 		defer func() { a.EnvName = prevEnv }()
 	}
+	unlock, err := a.lockLaunch()
+	if err != nil {
+		return nil, err
+	}
+	locked := true
+	release := func() {
+		if locked {
+			locked = false
+			unlock()
+		}
+	}
+	defer release()
+	st, err := a.testRunState(o)
+	if err != nil {
+		return nil, err
+	}
+	e := st.Ix.Env
+	c := &testRunSetup{st: st, o: o}
+	if o.Save != "" {
+		if c.save, err = a.testRunSave(st, o.Save); err != nil {
+			return nil, err
+		}
+		if c.o.Ticks == 0 {
+			c.o.Ticks = testRunSaveTicks
+		}
+	}
+	links, err := a.CheckGameLinks(modsDir(st.Ix))
+	if err != nil {
+		return nil, err
+	}
+	if len(links) > 0 {
+		return &TestRunReport{Env: e.Name, Plan: PlanRef(st.Plan), GameVersion: e.GameVersion, Status: "links-blocked", Links: links, Counts: map[string]int{}, Clusters: []TestRunCluster{}}, nil
+	}
+	base := filepath.Join(a.Home, "tests", e.ID)
+	c.data = filepath.Join(base, "userdata")
+	c.runs = filepath.Join(base, "runs")
+	protected := []string{e.GameRoot, e.UserDataRoot, a.DefaultUserData(e.GameRoot)}
+	for _, path := range []string{base, c.data, filepath.Join(c.data, "Config"), c.runs} {
+		if err := testRunPath(a.Home, path, protected); err != nil {
+			return nil, err
+		}
+	}
+	if o.Progress != nil {
+		o.Progress("preparing test data for " + PlanRef(st.Plan))
+	}
+	if err := os.MkdirAll(base, 0o755); err != nil {
+		return nil, err
+	}
+	// Links an interrupted run left, then this run's: the plan's Mods the game cannot see.
+	if err := a.removeTestLinks(base); err != nil {
+		return nil, err
+	}
+	// After the old links are gone, so a probe linked by an interrupted run is linked anew.
+	if c.probe, err = a.checkProbe(st, c.o); err != nil {
+		return nil, err
+	}
+	// Without the Steam client the game lists no subscriptions: Workshop Mods need links
+	// too, as on a launch without Steam (09 §3).
+	st.testNoSteam = !a.steamRunning()
+	mods, add, hide, blocked := a.testRunLinks(st)
+	if c.probe != nil && c.probe.link != nil {
+		mods = modsDir(st.Ix)
+		add = append(add, *c.probe.link)
+	}
+	unlink, hidden, notMoved, err := a.addTestLinks(base, mods, add, hide)
+	if err != nil {
+		return nil, err
+	}
+	for id, why := range notMoved {
+		blocked[id] = why
+	}
+	c.add = slices.DeleteFunc(add, func(c LinkChange) bool { return notMoved[c.Mod] != "" })
+	c.hidden = hidden
+	defer func() { err = errors.Join(err, unlink()) }() // a no-op once removed below
+	if err := a.prepareTestConfig(st, c.data, protected, c.probe); err != nil {
+		return nil, err
+	}
+	if c.probe != nil {
+		if err := clearProbeShot(c.data); err != nil {
+			return nil, err
+		}
+	}
+	c.missing = testRunMissing(st, blocked)
+	c.seen = testRunFolders(st) // while this run's links are there
+	if err := os.MkdirAll(c.runs, 0o755); err != nil {
+		return nil, err
+	}
+	if c.runDir, err = newTestRunDir(c.runs, a.Now().UTC()); err != nil {
+		return nil, err
+	}
+	c.mode = testRunMode(c.o.Map || c.probe != nil, c.save)
+	c.timeout = c.o.Timeout
+	if c.timeout == 0 {
+		c.timeout = testRunTimeout(c.runs, c.runDir, c.mode, c.o.Ticks)
+	}
+	if o.Progress != nil {
+		o.Progress(fmt.Sprintf("starting test run; waiting for the game to load (at most %s)", c.timeout))
+	}
+	savePath := ""
+	if c.save != nil {
+		savePath = c.save.Path
+	}
+	raw, runErr := gametest.Run(ctx, gametest.Options{
+		GameRoot: e.GameRoot, GameVersion: e.GameVersion, DataDir: c.data, RunDir: c.runDir,
+		Map: c.o.Map, Save: savePath, Ticks: c.o.Ticks, Probe: c.probe != nil, Timeout: c.timeout, Settle: c.o.Settle, Start: a.TestGameStart,
+	})
+	// The game has exited (gametest.Run reaps it): take the links away before anything else.
+	unlinkErr := unlink()
+	if raw == nil {
+		return nil, errors.Join(runErr, unlinkErr)
+	}
+	// With the links gone the run no longer needs the lock, and the attribution analysis
+	// takes it itself (its loadout sync, in the `archo analyze` child or a session):
+	// holding it would make that wait out and fail.
+	if unlinkErr == nil {
+		release()
+	}
+	r, errs := a.reportTestRun(ctx, c, raw)
+	return r, errors.Join(append([]error{runErr, unlinkErr}, errs...)...)
+}
+
+// checkTestRunOptions refuses negative durations and options that do not go together.
+func checkTestRunOptions(o TestRunOptions) error {
+	if o.Timeout < 0 || o.Settle < 0 || o.Ticks < 0 {
+		return fmt.Errorf("test run: durations and ticks must not be negative")
+	}
+	switch {
+	case o.Save != "" && (o.Map || o.Probe != ""):
+		return fmt.Errorf("test run: a save run loads the save; give a save or a map/probe, not both")
+	case o.Ticks > 0 && o.Probe != "":
+		return fmt.Errorf("test run: a probe run ends at the probe's RESULT line; ticks do not apply")
+	case o.Ticks > 0 && !o.Map && o.Save == "":
+		return fmt.Errorf("test run: ticks need a map or a save run")
+	}
+	return nil
+}
+
+// testRunState checks that the game can be started and returns the loadout of the plan to
+// test: the current one or o.Plan.
+func (a *App) testRunState(o TestRunOptions) (*LoadoutState, error) {
+	if err := a.checkLaunchArgs(); err != nil {
+		return nil, err
+	}
 	if err := a.checkNoGame(); err != nil {
+		return nil, err
+	}
+	effective, err := a.Env()
+	if err != nil {
+		return nil, err
+	}
+	if err := a.recoverInstallationTestLinks(filepath.Join(effective.GameRoot, "Mods"), false); err != nil {
 		return nil, err
 	}
 	st, err := a.Loadout()
@@ -184,149 +325,87 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, 
 	if (a.Detect.GOOS == "linux" || a.Detect.GOOS == "" && runtime.GOOS == "linux") && env.IsProtonGame(e.GameRoot) {
 		return nil, fmt.Errorf("test run: Proton games do not support isolated saves yet; use a native Linux game for test runs")
 	}
-	var save *TestRunSave
-	if o.Save != "" {
-		if save, err = a.testRunSave(st, o.Save); err != nil {
-			return nil, err
-		}
-		if o.Ticks == 0 {
-			o.Ticks = testRunSaveTicks
-		}
-	}
-	links, err := a.CheckGameLinks(modsDir(st.Ix))
-	if err != nil {
-		return nil, err
-	}
-	if len(links) > 0 {
-		return &TestRunReport{Env: e.Name, Plan: PlanRef(st.Plan), GameVersion: e.GameVersion, Status: "links-blocked", Links: links, Counts: map[string]int{}, Clusters: []TestRunCluster{}}, nil
-	}
-	base := filepath.Join(a.Home, "tests", e.ID)
-	data := filepath.Join(base, "userdata")
-	runs := filepath.Join(base, "runs")
-	protected := []string{e.GameRoot, e.UserDataRoot, a.DefaultUserData(e.GameRoot)}
-	for _, path := range []string{base, data, filepath.Join(data, "Config"), runs} {
-		if err := testRunPath(a.Home, path, protected); err != nil {
-			return nil, err
-		}
-	}
-	if o.Progress != nil {
-		o.Progress("preparing test data for " + PlanRef(st.Plan))
-	}
-	if err := os.MkdirAll(base, 0o755); err != nil {
-		return nil, err
-	}
-	// Links an interrupted run left, then this run's: the plan's Mods the game cannot see.
-	if err := a.removeTestLinks(base); err != nil {
-		return nil, err
-	}
-	// After the old links are gone, so a probe linked by an interrupted run is linked anew.
-	probe, err := a.checkProbe(st, o)
-	if err != nil {
-		return nil, err
-	}
-	mods, add, hide, blocked := a.testRunLinks(st)
-	if probe != nil && probe.link != nil {
-		mods = modsDir(st.Ix)
-		add = append(add, *probe.link)
-	}
-	unlink, hidden, notMoved, err := a.addTestLinks(base, mods, add, hide)
-	if err != nil {
-		return nil, err
-	}
-	for id, why := range notMoved {
-		blocked[id] = why
-	}
-	add = slices.DeleteFunc(add, func(c LinkChange) bool { return notMoved[c.Mod] != "" })
-	defer func() { err = errors.Join(err, unlink()) }() // a no-op once removed below
-	if err := a.prepareTestConfig(st, data, protected, probe); err != nil {
-		return nil, err
-	}
-	if probe != nil {
-		if err := clearProbeShot(data); err != nil {
-			return nil, err
-		}
-	}
-	missing := testRunMissing(st, blocked)
-	seen := testRunFolders(st) // while this run's links are there
-	if err := os.MkdirAll(runs, 0o755); err != nil {
-		return nil, err
-	}
-	// Reserve a timestamp without replacing an earlier run in the same second.
-	stamp := a.Now().UTC()
-	var runDir string
+	return st, nil
+}
+
+// newTestRunDir makes the run's folder under runs, named for stamp, without replacing an
+// earlier run in the same second.
+func newTestRunDir(runs string, stamp time.Time) (string, error) {
 	for {
-		runDir = filepath.Join(runs, stamp.Format("20060102-150405"))
+		runDir := filepath.Join(runs, stamp.Format("20060102-150405"))
 		if err := os.Mkdir(runDir, 0o755); os.IsExist(err) {
 			stamp = stamp.Add(time.Second)
 			continue
 		} else if err != nil {
-			return nil, err
+			return "", err
 		}
-		break
+		return runDir, nil
 	}
-	mode := testRunMode(o.Map || probe != nil, save)
-	timeout := o.Timeout
-	if timeout == 0 {
-		timeout = testRunTimeout(runs, runDir, mode, o.Ticks)
-	}
-	if o.Progress != nil {
-		o.Progress(fmt.Sprintf("starting test run; waiting for the game to load (at most %s)", timeout))
-	}
-	savePath := ""
-	if save != nil {
-		savePath = save.Path
-	}
-	raw, runErr := gametest.Run(ctx, gametest.Options{
-		GameRoot: e.GameRoot, GameVersion: e.GameVersion, DataDir: data, RunDir: runDir,
-		Map: o.Map, Save: savePath, Ticks: o.Ticks, Probe: probe != nil, Timeout: timeout, Settle: o.Settle, Start: a.TestGameStart,
-	})
-	// The game has exited (gametest.Run reaps it): take the links away before anything else.
-	unlinkErr := unlink()
-	if raw == nil {
-		return nil, errors.Join(runErr, unlinkErr)
-	}
+}
+
+// testRunSetup is what a test run prepared before starting the game, which its report needs.
+type testRunSetup struct {
+	st      *LoadoutState
+	o       TestRunOptions // with a save run's default ticks
+	save    *TestRunSave
+	probe   *probeSetup
+	data    string // the run's user data folder
+	runs    string
+	runDir  string
+	mode    string
+	timeout time.Duration
+	missing []TestRunMissing
+	add     []LinkChange
+	hidden  []string
+	seen    map[string]string
+}
+
+// reportTestRun builds, attributes and saves the report of a run whose game has exited, and
+// prunes old runs. The errors are the probe's, the log analysis's, saving's and pruning's.
+func (a *App) reportTestRun(ctx context.Context, c *testRunSetup, raw *gametest.Result) (*TestRunReport, []error) {
+	st, e := c.st, c.st.Ix.Env
 	r := &TestRunReport{
 		Env: e.Name, Plan: PlanRef(st.Plan), GameVersion: e.GameVersion, Status: raw.Status,
 		LoadSeconds: raw.LoadSeconds, TotalSeconds: raw.TotalSeconds, PeakMemoryMB: raw.PeakMemoryMB,
-		TimeoutSeconds: timeout.Seconds(), Phase: raw.Phase, MapSeconds: raw.MapSeconds, Ticks: o.Ticks,
-		TicksReached: raw.TicksReached, LastLogLine: raw.LastLine, Save: save,
-		Requested: len(st.List), Missing: missing, Linked: linkNames(add), Hidden: hidden, RunDir: runDir, LogPath: raw.LogPath,
+		TimeoutSeconds: c.timeout.Seconds(), Phase: raw.Phase, MapSeconds: raw.MapSeconds, Ticks: c.o.Ticks,
+		TicksReached: raw.TicksReached, LastLogLine: raw.LastLine, Save: c.save,
+		Requested: len(st.List), Missing: c.missing, Linked: linkNames(c.add), Hidden: c.hidden, RunDir: c.runDir, LogPath: raw.LogPath,
 		Args: raw.Args, Attribution: "tested-plan", Counts: map[string]int{}, Clusters: []TestRunCluster{},
 	}
-	if mode != "menu" && r.MapSeconds > 0 {
+	if c.mode != "menu" && r.MapSeconds > 0 {
 		r.TicksEstimated = int(r.MapSeconds * 60)
 	}
 	if r.TicksReached > 0 {
 		r.TicksEstimated = r.TicksReached
 	}
-	a.testRunLoaded(st, r, seen, data)
-	r.NotTested = testRunNotTested(r, mode)
+	a.testRunLoaded(st, r, c.seen, c.data)
+	r.NotTested = testRunNotTested(r, c.mode)
 	var probeErr error
-	if probe != nil {
-		r.Probe = probe.report
-		probeErr = finishProbe(r.Probe, raw.LogPath, data, runDir)
+	if c.probe != nil {
+		r.Probe = c.probe.report
+		probeErr = finishProbe(r.Probe, raw.LogPath, c.data, c.runDir)
 	}
 	// Attribution reads assembly types and Harmony IDs from the analysis (06 §2); a
 	// test run is often the first command in a fresh environment. After the game exits,
 	// so the measured load is not slowed by it.
-	if err := a.ensureTestAnalysis(ctx, st, o.Progress); err != nil {
+	if err := a.ensureTestAnalysis(ctx, st, c.o.Progress); err != nil {
 		r.AnalysisError = err.Error()
 	}
-	if o.Progress != nil {
-		o.Progress("analysing test log")
+	if c.o.Progress != nil {
+		c.o.Progress("analysing test log")
 	}
 	analysisErr := a.testRunLog(st, r)
-	if o.Progress != nil {
-		o.Progress("comparing with the player's log")
+	if c.o.Progress != nil {
+		c.o.Progress("comparing with the player's log")
 	}
 	a.comparePlayerLog(st, r)
 	compareTestRun(r)
 	b, saveErr := json.MarshalIndent(r, "", "  ")
 	if saveErr == nil {
-		saveErr = os.WriteFile(filepath.Join(runDir, "report.json"), append(b, '\n'), 0o644)
+		saveErr = os.WriteFile(filepath.Join(c.runDir, "report.json"), append(b, '\n'), 0o644)
 	}
-	pruneErr := pruneTestRuns(runs, runDir)
-	return r, errors.Join(runErr, unlinkErr, probeErr, analysisErr, saveErr, pruneErr)
+	pruneErr := pruneTestRuns(c.runs, c.runDir)
+	return r, []error{probeErr, analysisErr, saveErr, pruneErr}
 }
 
 func (a *App) prepareTestConfig(st *LoadoutState, data string, protected []string, probe *probeSetup) error {
@@ -420,13 +499,13 @@ func testRunMissing(st *LoadoutState, blocked map[string]string) []TestRunMissin
 }
 
 // testRunSeen maps each listed Mod a test run's game sees to the folder it sees it under.
-// It is the Mod's folder in Data/, Mods/ or the Workshop, or the name of a link in Mods/
-// to it (including the links a test run makes, 20 §2).
+// It is the Mod's folder in Data/, Mods/ or the Workshop (only while Steam runs), or the
+// name of a link in Mods/ to it (including the links a test run makes, 20 §2).
 func testRunSeen(st *LoadoutState) map[string]string {
 	parents, linked := map[string]bool{}, map[string]string{}
 	roots := []string{filepath.Join(st.Ix.Env.GameRoot, "Data"), filepath.Join(st.Ix.Env.GameRoot, "Mods")}
 	for _, s := range st.Ix.Sources {
-		if s.Kind == source.Workshop && s.Status != source.StatusRetired {
+		if s.Kind == source.Workshop && s.Status != source.StatusRetired && !st.testNoSteam {
 			roots = append(roots, s.Root)
 		}
 	}
@@ -521,7 +600,7 @@ func (a *App) testRunLog(st *LoadoutState, r *TestRunReport) error {
 		}
 		note := ""
 		if !settings {
-			note = patterns.Load().CommonUnattributed(class, lc.Template, len(lc.Attr) > 0)
+			note = st.Ix.Patterns().CommonUnattributed(class, lc.Template, len(lc.Attr) > 0)
 		}
 		if slices.Contains(lc.Details, ownArtNote) {
 			note = ownArtNote
@@ -573,7 +652,7 @@ func (a *App) ensureTestAnalysis(ctx context.Context, st *LoadoutState, progress
 	a.OpenPlan, a.PlanName = st.Plan.ID, ""
 	defer func() { a.OpenPlan, a.PlanName = open, name }()
 	if a.AnalyzeRunner != nil {
-		return a.AnalyzeRunner(st.Ix.Env.Name, progress)
+		return a.AnalyzeRunner(a.AnalyzeFrom(st.Ix.Env.Name), progress)
 	}
 	if a.AnalyzeExe != "" {
 		return ChildAnalyzeExe(a.AnalyzeExe, a.Home, st.Ix.Env.Name, st.Plan.Name, "", progress)

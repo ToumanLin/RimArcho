@@ -34,7 +34,7 @@ func Tips() []Tip {
 		{Text: T("Create a pack to keep Mod versions fixed and play with its own saves."), When: "first"},
 		{Text: T("Press Shift+E on a pack's page to export its list without the Mod files."), When: "any"},
 		{Text: T("Use Export in All lists to copy a share code for a friend."), When: "first"},
-		{Text: T("Choose move over from RimSort or RimCrow in the guide to import your lists."), When: "first"},
+		{Text: T("Import in the sidebar brings over your lists from RimSort, RimCrow or RimPy."), When: "first"},
 		{Text: T("Tick several detected games in the guide to add them together."), When: "first"},
 		{Text: T("Choose the game's current list in the guide to start with your enabled Mods."), When: "first"},
 		{Text: T("In the guide, open a pack file or paste a Steam Workshop collection link."), When: "first"},

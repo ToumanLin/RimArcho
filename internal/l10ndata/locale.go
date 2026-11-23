@@ -16,8 +16,18 @@ import (
 //go:embed locale/*/*.json
 var localeFiles embed.FS
 
-//go:embed locale/zh/name.txt
-var ChineseLanguageName string
+//go:embed locale/*/name.txt
+var nameFiles embed.FS
+
+// LanguageName is a bundled locale's own name for itself (name.txt), or the code without one.
+func LanguageName(code string) string {
+	if b, err := nameFiles.ReadFile("locale/" + code + "/name.txt"); err == nil {
+		if name := strings.TrimSpace(string(b)); name != "" {
+			return name
+		}
+	}
+	return code
+}
 
 type LocaleTable struct {
 	Name      string

@@ -10,6 +10,7 @@ func TestAnalyzeProgressInChinese(t *testing.T) {
 		"defs: 1559 files, 9000 defs from 12 active mods": "12 个启用的 Mod：1559 个文件，9000 个 Def",
 		"done: 0 failed operations, 1 findings, 421ms":    "完成：0 个操作失败，1 个发现，用时 421ms",
 		"patches: 3/40 operations":                        "Patch 操作 3/40",
+		"indexing def references":                         "正在为 Def 引用建索引",
 		"something new":                                   "something new",
 	} {
 		if got := AnalyzeProgress(in); got != want {

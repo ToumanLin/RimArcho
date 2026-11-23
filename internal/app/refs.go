@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/corpus"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/ids"
@@ -26,6 +27,7 @@ type Index struct {
 	Sources   []*source.Source
 	inst, lin *ids.Shortener
 	own       map[string]*store.Mod // packageId → this game's own Mods/ copy (OwnCopy)
+	corpus    func() *corpus.Active // this environment's corpus data (Patterns, Known, Observed)
 }
 
 // OwnCopy is this game's own Mods/ copy of a packageId (not a RimArcho link), or nil. A list
@@ -79,11 +81,11 @@ func (a *App) loadIndex(e *env.Environment) (*Index, error) {
 }
 
 func (a *App) readIndex(e *env.Environment, repair bool) (*Index, error) {
-	mods, err := a.Store.Mods(e.ID)
+	mods, err := a.Store.Mods(e.GameID)
 	if err != nil {
 		return nil, err
 	}
-	srcs, err := a.Store.Sources(e.ID)
+	srcs, err := a.Store.Sources(e.GameID)
 	if err != nil {
 		return nil, err
 	}
@@ -91,12 +93,12 @@ func (a *App) readIndex(e *env.Environment, repair bool) (*Index, error) {
 		if repaired, err := a.repairSharedLinkInstances(mods, srcs); err != nil {
 			return nil, err
 		} else if repaired {
-			if mods, err = a.Store.Mods(e.ID); err != nil {
+			if mods, err = a.Store.Mods(e.GameID); err != nil {
 				return nil, err
 			}
 		}
 	}
-	lins, err := a.Store.Lineages(e.ID)
+	lins, err := a.Store.Lineages(e.GameID)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +114,8 @@ func (a *App) readIndex(e *env.Environment, repair bool) (*Index, error) {
 	if mods, srcs, err = a.withElsewhere(e, mods, srcs); err != nil {
 		return nil, err
 	}
-	ix := &Index{store: a.Store, Env: e, Mods: mods, ByID: map[string]*store.Mod{}, ByLineage: map[string][]*store.Mod{}, Lineages: lins, Sources: srcs}
+	ix := &Index{store: a.Store, Env: e, Mods: mods, ByID: map[string]*store.Mod{}, ByLineage: map[string][]*store.Mod{}, Lineages: lins, Sources: srcs,
+		corpus: func() *corpus.Active { return a.CorpusData(e) }}
 	var iids, lids []string
 	ix.own = map[string]*store.Mod{}
 	for _, m := range mods {
@@ -372,7 +375,7 @@ func (a *App) IdentityQuestion(qid int64) (*store.Question, error) {
 	if err != nil {
 		return nil, err
 	}
-	if q == nil || (q.EnvID != e.ID && q.EnvID != store.Shared) {
+	if q == nil || (q.EnvID != e.GameID && q.EnvID != store.Shared) {
 		return nil, fmt.Errorf("no question q:%d in env:%s (archo identity list)", qid, e.Name)
 	}
 	return q, nil
@@ -442,7 +445,7 @@ func (a *App) GC(dryRun bool) (*store.GCResult, time.Time, error) {
 		return nil, time.Time{}, err
 	}
 	cutoff := a.Now().Add(-time.Duration(a.Config.TombstoneDays) * 24 * time.Hour)
-	r, err := a.Store.GC(e.ID, cutoff, dryRun)
+	r, err := a.Store.GC(e.GameID, cutoff, dryRun)
 	return r, cutoff, err
 }
 

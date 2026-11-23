@@ -3,6 +3,7 @@ package mcp_test
 import (
 	"context"
 	"fmt"
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -65,7 +66,7 @@ func TestToolsAndAnnotations(t *testing.T) {
 	want := map[string]string{ // name → expected annotation: ro, write, destructive
 		"guide":  "ro", // 14 §3: the detail behind the short descriptions
 		"status": "ro", "find_mods": "ro", "get_mod": "ro", "get_mod_settings": "ro", "get_def": "ro", "get_patches": "ro", "get_harmony": "ro",
-		"explain_relation": "ro", "list_problems": "ro", "list_changes": "ro", "analyze_log": "ro", "search_files": "ro",
+		"explain_relation": "ro", "list_problems": "ro", "list_changes": "ro", "list_operations": "ro", "analyze_log": "ro", "search_files": "ro",
 		"read_source": "ro", "edit_loadout": "write", "save_loadout": "destructive",
 		"get_description": "ro", "set_player_data": "write", "set_mod_settings": "write",
 		"test_run":        "write",
@@ -83,7 +84,7 @@ func TestToolsAndAnnotations(t *testing.T) {
 		// 11 §1: subscriptions RimArcho installs and updates (Git, download pages, SteamCMD).
 		"manage_subscriptions": "destructive",
 		// Uninstall: only its dry run (14 §2).
-		"preview_uninstall": "ro",
+		"preview_uninstall": "ro", "draft_feedback": "ro",
 		// Texture optimisation (10 §2).
 		"manage_textures": "destructive",
 		// Saves (12 §1.6, §4.4): a fix subscribes through Steam, so it is open-world.
@@ -166,6 +167,12 @@ func TestCLIParity(t *testing.T) {
 		{"get_mod", map[string]any{"ref": modA}, []string{"mod", modA}},
 		{"get_mod_settings", map[string]any{}, []string{"mod-settings"}},
 		{"get_mod_settings", map[string]any{"ref": modA, "all": true}, []string{"mod-settings", modA, "--all"}},
+		{"get_mod_settings", map[string]any{"files": "orphans"}, []string{"mod-settings", "files", "--filter", "orphans"}},
+		{"get_mod_settings", map[string]any{"files": "all"}, []string{"mod-settings", "files"}},
+		{"set_mod_settings", map[string]any{"action": "recycle", "files": []string{"orphans"}, "dry_run": true}, []string{"mod-settings", "recycle", "--orphans", "--dry-run"}},
+		{"set_mod_settings", map[string]any{"action": "recycle", "files": []string{"Mod_a_B.xml", "Mod_c_D.xml"}}, []string{"mod-settings", "recycle", "Mod_a_B.xml", "Mod_c_D.xml"}},
+		{"set_mod_settings", map[string]any{"action": "reset", "ref": modA, "dry_run": true}, []string{"mod-settings", "reset", modA, "--dry-run"}},
+		{"set_mod_settings", map[string]any{"action": "copy_from", "from": "other", "refs": []string{modA}}, []string{"mod-settings", "copy-from", "other", modA}},
 		{"get_def", map[string]any{"def": "ThingDef/Lib_Gun"}, []string{"def", "ThingDef/Lib_Gun"}},
 		{"get_patches", map[string]any{"failed": true}, []string{"patches", "--failed"}},
 		{"get_harmony", map[string]any{"target": "Verse.Pawn.Tick"}, []string{"harmony", "--target", "Verse.Pawn.Tick"}},
@@ -174,6 +181,8 @@ func TestCLIParity(t *testing.T) {
 		{"list_problems", nil, []string{"problems", "--min-severity", "warning"}},
 		{"list_problems", map[string]any{"code": "harmony", "min_severity": "info"}, []string{"problems", "--code", "harmony", "--min-severity", "info"}},
 		{"list_changes", nil, []string{"changes"}},
+		{"list_operations", nil, []string{"ops"}},
+		{"list_operations", map[string]any{"failed": true, "op": "save", "since": "2d", "all": true}, []string{"ops", "--since", "2d", "--op", "save", "--failed", "--all"}},
 		{"analyze_log", nil, []string{"log"}},
 		{"analyze_log", map[string]any{"cluster": "E3"}, []string{"log", "--cluster", "E3"}},
 		{"analyze_log", map[string]any{"text": testkit.FixtureLog(`C:\x\Compat.xml`)}, []string{"log", "--text", testkit.FixtureLog(`C:\x\Compat.xml`)}},
@@ -186,6 +195,8 @@ func TestCLIParity(t *testing.T) {
 		{"search_files", map[string]any{"pattern": "Lib_Gun", "page": -1}, []string{"files", "search", "Lib_Gun", "--page", "-1"}},
 		{"save_loadout", map[string]any{"dry_run": true}, []string{"save", "--dry-run"}},
 		{"preview_uninstall", map[string]any{"keep_locked": true}, []string{"uninstall", "--dry-run", "--keep-locked"}},
+		{"draft_feedback", nil, []string{"feedback"}},
+		{"draft_feedback", map[string]any{"kind": "bug", "title": "T", "answers": map[string]any{"did": "x", "files": "yes"}, "attach": []any{"mods", "ops"}}, []string{"feedback", "bug", "--title", "T", "--did", "x", "--files", "--attach", "mods,ops"}},
 		{"manage_textures", map[string]any{"action": "optimize", "plan": true, "scale": 50, "dry_run": true}, []string{"textures", "optimize", "--plan", "--scale", "50", "--dry-run"}},
 		{"manage_textures", map[string]any{"action": "status", "refs": []string{modA}}, []string{"textures", "status", modA}},
 		{"edit_loadout", map[string]any{"action": "sort", "dry_run": true}, []string{"sort", "--dry-run"}},
@@ -408,7 +419,7 @@ func TestEnvParameter(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
-	e.MustRun("env", "add", "other", "--game", e.OtherGame("Other", "1.6.4633 rev1261"), "--user-data", e.UserData)
+	e.MustRun("env", "add", "other", "--game", e.Game, "--saves", "own")
 	e.MustRun("env", "use", "main")
 	cs := connect(t, e)
 	if out, _ := call(t, cs, "status", nil); !strings.HasPrefix(out, "env:main") {
@@ -420,7 +431,7 @@ func TestEnvParameter(t *testing.T) {
 	if out, _ := call(t, cs, "status", nil); !strings.HasPrefix(out, "env:main") {
 		t.Fatalf("env is per call:\n%s", out)
 	}
-	if out, isErr := call(t, cs, "status", map[string]any{"env": "nope"}); !isErr || !strings.Contains(out, `no environment named "nope"`) {
+	if out, isErr := call(t, cs, "status", map[string]any{"env": "nope"}); !isErr || !strings.Contains(out, `no Game Config named "nope"`) {
 		t.Fatalf("unknown env:\n%s", out)
 	}
 }
@@ -433,7 +444,7 @@ func TestStillComputing(t *testing.T) {
 	e.HarmonyLogFixture()
 	inner := e.App.AnalyzeRunner
 	release := make(chan bool)
-	e.App.AnalyzeRunner = func(env string, p func(string)) error { <-release; return inner(env, p) }
+	e.App.AnalyzeRunner = func(env *app.App, p func(string)) error { <-release; return inner(env, p) }
 	e.App.AnalyzeWait = 50 * time.Millisecond
 	cs := connect(t, e)
 	out, isErr := call(t, cs, "list_problems", nil)

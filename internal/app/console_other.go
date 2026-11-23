@@ -15,6 +15,10 @@ import (
 // run stays in archo's group: a background group that reads the terminal is
 // stopped by SIGTTIN, so a login prompt would hang.
 func startWorkshopCMD(exe string, args []string, console bool) (SteamCMDProc, error) {
+	// An interactive run hands SteamCMD this process's terminal. Without one (`archo mcp`,
+	// whose stdin and stdout are the protocol's pipes, 14 §1) it runs hidden instead:
+	// SteamCMD would read the client's requests and write into the protocol stream.
+	console = console && (consoleForTest || callerConsole())
 	cmd := exec.Command(exe, args...)
 	cmd.Dir = filepath.Dir(exe)
 	env, err := steamCMDEnv(exe)
@@ -22,15 +26,41 @@ func startWorkshopCMD(exe string, args []string, console bool) (SteamCMDProc, er
 		return nil, err
 	}
 	cmd.Env = env
+	var log *os.File
 	if console {
 		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	} else {
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		// Linux SteamCMD writes no console log of its own: its output becomes the log
+		// that is read for progress and results (steamCMDConsoleLog).
+		path := steamCMDConsoleLog(exe)
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			return nil, err
+		}
+		if log, err = os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600); err != nil {
+			return nil, err
+		}
+		defer log.Close()
+		cmd.Stdout, cmd.Stderr = log, log
 	}
 	if err := cmd.Start(); err != nil {
 		return nil, steamCMDStartError(exe, "", err)
 	}
 	return &workshopProcess{Cmd: cmd, group: !console}, nil
+}
+
+// consoleForTest lets a test whose stdout is a file take the console path.
+var consoleForTest bool
+
+// callerConsole reports whether stdin and stdout are a terminal (not pipes or files).
+func callerConsole() bool {
+	for _, f := range []*os.File{os.Stdin, os.Stdout} {
+		fi, err := f.Stat()
+		if err != nil || fi.Mode()&os.ModeCharDevice == 0 {
+			return false
+		}
+	}
+	return true
 }
 
 type workshopProcess struct {

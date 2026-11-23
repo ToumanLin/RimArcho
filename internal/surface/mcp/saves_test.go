@@ -83,6 +83,8 @@ func TestSaveToolsCLIParity(t *testing.T) {
 		{"list_saves", map[string]any{"mod": "tester.gone"}, []string{"saves", "list", "--mod", "tester.gone"}},
 		{"list_saves", map[string]any{"mod": "pkg:tester.gamma", "colony": "tundra", "all": true}, []string{"saves", "list", "--colony", "tundra", "--mod", "pkg:tester.gamma", "--all"}},
 		{"list_saves", map[string]any{"colony": "nope"}, []string{"saves", "list", "--colony", "nope"}},
+		{"list_saves", map[string]any{"review": true}, []string{"saves", "review", "--read"}},
+		{"list_saves", map[string]any{"review": true, "mod": "tester.alpha", "all": true}, []string{"saves", "review", "--mod", "tester.alpha", "--read", "--all"}},
 		{"get_save", map[string]any{"save": "Tundra 2"}, []string{"saves", "show", "Tundra 2"}},
 		{"get_save", map[string]any{"save": "Tundra 2.rws", "mods": true, "all": true}, []string{"saves", "show", "Tundra 2.rws", "--mods", "--all"}},
 		{"get_save", map[string]any{"save": "Broken"}, []string{"saves", "show", "Broken"}},
@@ -102,6 +104,8 @@ func TestSaveToolsCLIParity(t *testing.T) {
 	for _, c := range cases {
 		got, isErr := call(t, cs, c.tool, c.args)
 		want, code := e.Run(c.cli...)
+		// MCP suggests tool calls where the CLI prints commands (MCPHints, 13 §1.1).
+		want = cmds.MCPHints(strings.ReplaceAll(want, "run it again with --yes --token ", "call it again with confirm=true token="))
 		if got != want {
 			t.Errorf("%s %v: MCP text differs from `archo %s`:\n--- mcp\n%s\n--- cli\n%s", c.tool, c.args, strings.Join(c.cli, " "), got, want)
 		}
@@ -164,11 +168,11 @@ func TestManageSavesActions(t *testing.T) {
 	if isErr || len(trashed) != 0 || !strings.Contains(out, "recycle preview, nothing moved") {
 		t.Errorf("trash without confirm moved %v:\n%s", trashed, out)
 	}
-	i := strings.Index(out, "--token ")
+	i := strings.Index(out, "token=")
 	if i < 0 {
 		t.Fatalf("the trash preview names no token:\n%s", out)
 	}
-	token := strings.Fields(out[i+len("--token "):])[0]
+	token := strings.Fields(out[i+len("token="):])[0]
 	if out, isErr = call(t, cs, "manage_saves", map[string]any{"action": "trash", "saves": []string{"Broken"}, "confirm": true}); !isErr || len(trashed) != 0 {
 		t.Errorf("trash confirm=true without its preview's token: trashed %v\n%s", trashed, out)
 	}
@@ -235,5 +239,13 @@ func TestManageSavesArgv(t *testing.T) {
 	}
 	if got, _ := mcp.ArgvFor("list_saves", []byte(`{"mod":"#z3bw","attention":true}`)); !slices.Equal(got, []string{"saves", "list", "--mod", "#z3bw", "--attention"}) {
 		t.Errorf("list_saves → %q", got)
+	}
+}
+
+// get_save mod=<ref> is saves show --mod: can that Mod be removed (12 §4.7).
+func TestGetSaveModArgv(t *testing.T) {
+	got := mcp.GetSaveArgv(mcp.GetSaveIn{Save: "Tundra 2", Mod: "tester.alpha"})
+	if !slices.Equal(got, []string{"saves", "show", "Tundra 2", "--mod", "tester.alpha"}) {
+		t.Fatalf("%q", got)
 	}
 }

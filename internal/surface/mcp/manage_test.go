@@ -21,6 +21,10 @@ import (
 
 var freeRe = regexp.MustCompile(`(space: )[0-9.]+ [KMGT]?B`)
 
+// Database footprint changes with the schema. MCP and CLI still compare their
+// actual byte counts above the golden check; only that check normalizes the size.
+var compactedSizeRe = regexp.MustCompile(`(database compacted: freed [0-9.]+ [KMGT]?B \(now )[0-9.]+ [KMGT]?B(\))`)
+
 var update = flag.Bool("update", false, "rewrite golden files")
 
 // manageEnv is the fixture for the tools of 13 §1.2: a lineage with two copies, a mod that
@@ -336,7 +340,8 @@ func TestGoldenManageTools(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v (run go test ./internal/surface/mcp -update)", err)
 	}
-	if want := strings.ReplaceAll(string(b), "\r\n", "\n"); sb.String() != want {
+	actual := compactedSizeRe.ReplaceAllString(sb.String(), "${1}<size>${2}")
+	if want := compactedSizeRe.ReplaceAllString(strings.ReplaceAll(string(b), "\r\n", "\n"), "${1}<size>${2}"); actual != want {
 		t.Errorf("mcp_manage.txt differs from golden (go test ./internal/surface/mcp -update):\n%s", sb.String())
 	}
 }

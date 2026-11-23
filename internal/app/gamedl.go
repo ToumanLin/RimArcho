@@ -462,7 +462,7 @@ func (a *App) CheckDownloadDir(dir string) (string, error) {
 	if e, err := a.envOfGame(dir); err != nil {
 		return "", err
 	} else if e != nil {
-		return "", fmt.Errorf("environment %s already uses %s", e.Name, dir)
+		return "", fmt.Errorf("Game Config %s already uses %s", e.Name, dir)
 	}
 	return dir, nil
 }
@@ -510,7 +510,7 @@ func (a *App) FetchGame(spec DownloadSpec, progress func(DownloadProgress)) (str
 			return "", err
 		}
 		if e, _ := a.Store.EnvByName(spec.Name); e != nil {
-			return "", fmt.Errorf("environment %q already exists", spec.Name)
+			return "", fmt.Errorf("Game Config %q already exists", spec.Name)
 		}
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -521,7 +521,7 @@ func (a *App) FetchGame(spec DownloadSpec, progress func(DownloadProgress)) (str
 		args = append(args, "-beta", spec.Branch)
 	}
 	args = append(args, "validate", "+quit")
-	logPath := filepath.Join(filepath.Dir(exe), "logs", "console_log.txt")
+	logPath := steamCMDConsoleLog(exe)
 	var off int64
 	if st, err := os.Stat(logPath); err == nil {
 		off = st.Size()
@@ -590,12 +590,12 @@ func (a *App) FetchGame(spec DownloadSpec, progress func(DownloadProgress)) (str
 	return dir, nil
 }
 
-// AddDownloaded adds a downloaded game folder as an environment named spec.Name, else after
+// AddDownloaded adds a downloaded game folder as a environment named spec.Name, else after
 // its version ("1.6").
 func (a *App) AddDownloaded(spec DownloadSpec, dir string) (*SourceChangeEnv, error) {
 	name := spec.Name
 	if name == "" {
-		name = a.freeEnvName(env.MajorMinor(env.ReadGameVersion(dir)))
+		name = a.FreeEnvName(env.MajorMinor(env.ReadGameVersion(dir)))
 	}
 	e, changes, err := a.EnvAdd(name, EnvSpec{GameRoot: dir, Launch: "direct", Saves: spec.Saves})
 	if err != nil {
@@ -604,14 +604,14 @@ func (a *App) AddDownloaded(spec DownloadSpec, dir string) (*SourceChangeEnv, er
 	return &SourceChangeEnv{Env: e, Changes: changes}, nil
 }
 
-// SourceChangeEnv is an environment just added with what happened to its sources.
+// SourceChangeEnv is a environment just added with what happened to its sources.
 type SourceChangeEnv struct {
 	Env     *env.Environment
 	Changes []SourceChange
 }
 
-// freeEnvName is base ("1.6"), or base-2… when an environment has it.
-func (a *App) freeEnvName(base string) string {
+// FreeEnvName is base ("1.6"), or base-2… when an environment has it.
+func (a *App) FreeEnvName(base string) string {
 	if base == "" {
 		base = "rimworld"
 	}
@@ -645,6 +645,10 @@ func (a *App) steamCMD() steamCMDRunner {
 }
 
 func runSteamCMD(exe string, args []string) (string, error) {
+	exe, err := steamCMDLaunchPath(exe)
+	if err != nil {
+		return "", err
+	}
 	cmd := exec.Command(exe, args...)
 	cmd.Dir = filepath.Dir(exe)
 	hideWindow(cmd)
@@ -664,9 +668,19 @@ func startSteamCMD(exe string, args []string, console bool) (SteamCMDProc, error
 	if console {
 		return startConsole(exe, args)
 	}
+	exe, err := steamCMDLaunchPath(exe)
+	if err != nil {
+		return nil, err
+	}
 	cmd := exec.Command(exe, args...)
 	cmd.Dir = filepath.Dir(exe)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	if callerConsole() {
+		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	} else {
+		// The GUI has no console, so SteamCMD would open one; under `archo mcp`, stdin
+		// and stdout carry the protocol (14 §1). Run it hidden; its log is read instead.
+		hideWindow(cmd)
+	}
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
@@ -768,23 +782,33 @@ func (r *steamResult) read(line string) (DownloadProgress, bool) {
 
 func errorKind(low string) string {
 	switch {
-	case strings.Contains(low, "invalid password") || strings.Contains(low, "invalidpassword"):
+	case containsAny(low, "invalid password", "invalidpassword"):
 		return "password"
-	case strings.Contains(low, "two-factor") || strings.Contains(low, "logon denied") || strings.Contains(low, "invalidauthcode") || strings.Contains(low, "invalidloginauthcode") || strings.Contains(low, "steam guard"):
+	case containsAny(low, "two-factor", "logon denied", "invalidauthcode", "invalidloginauthcode", "steam guard"):
 		return "guard"
-	case strings.Contains(low, "no subscription") || strings.Contains(low, "not own") || strings.Contains(low, "no license") || strings.Contains(low, "nosubscription"):
+	case containsAny(low, "no subscription", "not own", "no license", "nosubscription"):
 		return "ownership"
-	case strings.Contains(low, "disk") || strings.Contains(low, "space") || strings.Contains(low, "write failure"):
+	case containsAny(low, "disk", "space", "write failure"):
 		return "disk"
-	case (strings.Contains(low, "access denied") || strings.Contains(low, "accessdenied") || strings.Contains(low, "permission denied")) &&
-		(strings.Contains(low, "writ") || strings.Contains(low, "directory") || strings.Contains(low, "folder") || strings.Contains(low, "file open") || strings.Contains(low, "creat")):
+	case containsAny(low, "access denied", "accessdenied", "permission denied") &&
+		containsAny(low, "writ", "directory", "folder", "file open", "creat"):
 		return "disk"
-	case strings.Contains(low, "beta") || strings.Contains(low, "branch"):
+	case containsAny(low, "beta", "branch"):
 		return "branch"
-	case strings.Contains(low, "timeout") || strings.Contains(low, "timed out") || strings.Contains(low, "no connection") || strings.Contains(low, "noconnection") || strings.Contains(low, "network") || strings.Contains(low, "connect failed") || strings.Contains(low, "connection failed") || strings.Contains(low, "connection failure") || strings.Contains(low, "connection reset") || strings.Contains(low, "not connected") || strings.Contains(low, "failed to connect") || strings.Contains(low, "could not connect") || strings.Contains(low, "connection lost"):
+	case containsAny(low, "timeout", "timed out", "no connection", "noconnection", "network", "connect failed", "connection failed", "connection failure", "connection reset", "not connected", "failed to connect", "could not connect", "connection lost"):
 		return "network"
-	case strings.Contains(low, "failed to log in") || strings.Contains(low, "failed to login") || strings.Contains(low, "login failure") || strings.Contains(low, "account disabled"):
+	case containsAny(low, "failed to log in", "failed to login", "login failure", "account disabled"):
 		return "login"
 	}
 	return "other"
+}
+
+// containsAny reports whether s contains any of subs.
+func containsAny(s string, subs ...string) bool {
+	for _, sub := range subs {
+		if strings.Contains(s, sub) {
+			return true
+		}
+	}
+	return false
 }

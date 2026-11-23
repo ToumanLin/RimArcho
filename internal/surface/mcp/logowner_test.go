@@ -2,6 +2,7 @@ package mcp_test
 
 import (
 	"fmt"
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -24,7 +25,7 @@ func TestForeignLogCLIParity(t *testing.T) {
 	// Same game version, different game directory: version equality is not ownership.
 	e.WriteFile(path, "Mono path[0] = '"+filepath.ToSlash(filepath.Join(other, "RimWorldWin64_Data", "Managed"))+"'\n"+text)
 	runs := 0
-	e.App.AnalyzeRunner = func(string, func(string)) error { runs++; return fmt.Errorf("unexpected analysis") }
+	e.App.AnalyzeRunner = func(*app.App, func(string)) error { runs++; return fmt.Errorf("unexpected analysis") }
 	cs := connect(t, e)
 	for _, tc := range []struct {
 		name string

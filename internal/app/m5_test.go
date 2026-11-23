@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
@@ -131,10 +132,10 @@ func TestImportRimCrow(t *testing.T) {
 	rimcrowDB(t, dbPath,
 		`INSERT INTO modasset VALUES ('h1','tester.alpha','`+alpha+`','workshop',0), ('h2','tester.beta','C:\gone\Beta','workshop',0), ('h3','tester.off','`+off+`','workshop',1)`,
 		`INSERT INTO usermoddata VALUES ('Tester.Alpha','Alpha (main)','keep this one','["combat"]','#ff0000',NULL,'ia','[]'),
-			('tester.beta',NULL,NULL,'[]',NULL,NULL,'ia','[]'), ('tester.gamma','Gamma Prime',NULL,'[]',NULL,NULL,NULL,'[]'),
+			('tester.beta',NULL,NULL,'[]',NULL,NULL,'ia','["missing_dependency"]'), ('tester.gamma','Gamma Prime',NULL,'[]',NULL,NULL,NULL,'[]'),
 			('tester.missing','Ghost',NULL,'[]',NULL,NULL,NULL,'[]')`,
 		`INSERT INTO modinterlock VALUES ('ia','["tester.alpha","tester.beta"]')`,
-		`INSERT INTO groupdata VALUES ('g1','Weapons','#fff',0,1), ('g2','UI','#fff',1,1)`,
+		`INSERT INTO groupdata VALUES ('g1','Weapons','#ffffff',0,1), ('g2','UI','#3366CC',1,1)`,
 		`INSERT INTO groupmod VALUES ('g1','tester.alpha',0), ('g1','tester.beta',1), ('g2','tester.beta',0)`)
 	os.WriteFile(filepath.Join(crow, "rules", "user_rules.json"), []byte(`{"settings": {"user_mod_rules_enabled": true},
 		"mod_rules": {"tester.beta": {"loadAfter": {"tester.gamma": {"name": ["Gamma"]}}, "loadBottom": {"value": true}},
@@ -149,10 +150,10 @@ func TestImportRimCrow(t *testing.T) {
 	dry := e.MustRun("import", "rimcrow", "--db", dbPath, "--dry-run")
 	for _, want := range []string{
 		"mods: 4 with data: 3 mapped (1 by path, 2 by packageId), 1 not mapped",
-		"aliases: 1 new, 0 already set", "notes: 1 new", "tags: 4 new, 0 already present (2 groups, 3 memberships)",
+		"aliases: 1 new, 0 already set", "notes: 1 new", "tags: 6 new, 0 already present (2 groups, 3 memberships), 2 tags given a colour",
 		"rules: 4: 3 new, 0 already present, 1 skipped", "conflicts: 1", "pkg:tester.gamma  alias: RimArcho has \"My Gamma\", RimCrow \"Gamma Prime\"",
 		"pkg:tester.missing  not installed here", "tester.gamma incompatibleWith tester.nowhere  pkg:tester.nowhere not installed here",
-		"not-mapped: sign_color 1", "about-disabled: 1 folders", "Switched Off",
+		"about-disabled: 1 folders", "Switched Off",
 	} {
 		if !strings.Contains(dry, want) {
 			t.Fatalf("dry run lacks %q:\n%s", want, dry)
@@ -164,8 +165,17 @@ func TestImportRimCrow(t *testing.T) {
 	}
 	// Alpha's package has two lineages; the path picks the workshop one.
 	first := e.MustRun("import", "rimcrow", "--db", dbPath)
-	if !strings.Contains(first, "tags: 4 new") {
+	if !strings.Contains(first, "tags: 6 new") {
 		t.Fatalf("import:\n%s", first)
+	}
+	// a colour mark becomes a tag with that colour; a group keeps its colour unless it is
+	// RimCrow's default white; ignored issues become a tag (07 §6.4)
+	colors, _ := e.App.Store.TagColors()
+	if colors["rimcrow colour #ff0000"] != "#ff0000" || colors["ui"] != "#3366cc" || colors["weapons"] != "" {
+		t.Fatalf("tag colours: %v", colors)
+	}
+	if out := e.MustRun("mod", "ws:3000000003"); !strings.Contains(out, "RimCrow: ignored warnings") {
+		t.Fatalf("ignored issues tag:\n%s", out)
 	}
 	if out := e.MustRun("mod", "ws:3000000002"); !strings.Contains(out, "alias: Alpha (main) (About.xml name: Alpha)") || !strings.Contains(out, "tags: combat, Weapons") || !strings.Contains(out, "note: keep this one") {
 		t.Fatalf("alias/tags/note on the workshop Alpha:\n%s", out)
@@ -177,7 +187,7 @@ func TestImportRimCrow(t *testing.T) {
 		t.Fatalf("rules:\n%s", out)
 	}
 	again := e.MustRun("import", "rimcrow", "--db", dbPath)
-	for _, want := range []string{"aliases: 0 new, 1 already set", "tags: 0 new, 4 already present", "rules: 4: 0 new, 3 already present"} {
+	for _, want := range []string{"aliases: 0 new, 1 already set", "tags: 0 new, 6 already present", "0 tags given a colour", "rules: 4: 0 new, 3 already present"} {
 		if !strings.Contains(again, want) {
 			t.Fatalf("second import is not a no-op (%q):\n%s", want, again)
 		}
@@ -187,6 +197,50 @@ func TestImportRimCrow(t *testing.T) {
 	}
 	if ents, _ := filepath.Glob(filepath.Join(e.Home, "rimcrow-*")); len(ents) > 0 {
 		t.Fatalf("temp copies left behind: %v", ents)
+	}
+}
+
+// 07 §6.2: user rules switched off in RimCrow are skipped and counted, top / bottom and
+// pairs alike, unless they are asked for; then they come over as their own part.
+func TestImportRimCrowRulesSwitchedOff(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	e.AddWorkshop("3000000003", testkit.Sample("tester.beta", "Beta"))
+	e.WriteMod(filepath.Join(e.Game, "Mods", "Gamma"), testkit.Sample("tester.gamma", "Gamma"))
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.beta")
+	e.AddEnv(false)
+	e.MustRun("scan")
+	crow := filepath.Join(e.Root, "RimCrow", "data")
+	os.MkdirAll(filepath.Join(crow, "rules"), 0o755)
+	dbPath := filepath.Join(crow, "mod_manager.db")
+	rimcrowDB(t, dbPath)
+	os.WriteFile(filepath.Join(crow, "rules", "user_rules.json"), []byte(`{"settings": {"user_mod_rules_enabled": false},
+		"mod_rules": {"tester.beta": {"loadAfter": {"tester.gamma": {}}, "loadTop": {"value": "True"}, "loadSoon": {}}}}`), 0o644)
+	rep, err := e.App.ImportRimCrow(app.RimCrowOptions{DB: dbPath, DryRun: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !rep.RulesDisabled || rep.RulesTotal != 2 || rep.RuleNew != 0 || len(rep.RulesSkipped) != 2 || rep.NotMapped["rule loadSoon"] != 1 {
+		t.Fatalf("switched off: %+v", rep)
+	}
+	for _, s := range rep.RulesSkipped {
+		if !strings.Contains(s.Reason, "switched off in RimCrow") {
+			t.Fatalf("skip reason: %+v", s)
+		}
+	}
+	rep, err = e.App.ImportRimCrow(app.RimCrowOptions{DB: dbPath, DryRun: true, IncludeDisabledRules: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.RulesTotal != 2 || rep.RuleNew != 2 || rep.Parts[app.PartRulesOff] == nil || rep.Parts[app.PartRulesOff].New != 2 {
+		t.Fatalf("included: %+v", rep)
+	}
+	rep, err = e.App.ImportRimCrow(app.RimCrowOptions{DB: dbPath, DryRun: true, Parts: map[string]bool{app.PartRules: true}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.RulesTotal != 0 || rep.NotMapped["rule loadSoon"] != 0 {
+		t.Fatalf("part not chosen: %+v", rep)
 	}
 }
 
@@ -255,7 +309,7 @@ func TestAnalysisPerGameVersion(t *testing.T) {
 	os.WriteFile(filepath.Join(e.UserData, "Player.log"), []byte(strings.Replace(log, "RimWorld 1.6.4633 rev1261", "RimWorld 1.5.4409 rev1118", 1)), 0o644)
 	runs := 0
 	inner := e.App.AnalyzeRunner
-	e.App.AnalyzeRunner = func(env string, p func(string)) error { runs++; return inner(env, p) }
+	e.App.AnalyzeRunner = func(env *app.App, p func(string)) error { runs++; return inner(env, p) }
 	e.MustRun("problems")
 	if runs != 2 {
 		t.Fatalf("first problems: %d analysis runs, want 2 (1.6 and the log's 1.5)", runs)
@@ -269,7 +323,7 @@ func TestAnalysisPerGameVersion(t *testing.T) {
 		t.Fatalf("alternating commands re-ran the analysis: %d runs", runs)
 	}
 	if out := e.MustRun("harmony", "--target", "Verse.Pawn.Tick"); !strings.Contains(out, "4 patches from 3 mods") {
-		t.Fatalf("facts of the environment's version:\n%s", out)
+		t.Fatalf("facts of the Game Config's version:\n%s", out)
 	}
 	if out := e.MustRun("log", "--cluster", "E1"); !strings.Contains(out, "analysed: as 1.5") || !strings.Contains(out, "patch.no-match: target-inactive") {
 		t.Fatalf("the 1.5 analysis is used for the 1.5 log:\n%s", out)

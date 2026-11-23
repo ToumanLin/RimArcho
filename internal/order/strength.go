@@ -67,14 +67,18 @@ type Observed struct {
 //go:embed observed.json
 var observedJSON []byte
 
-var observed = sync.OnceValue(func() map[string]map[string]*Observed {
+// ObservedSet is a parsed observed.json.
+type ObservedSet map[string]map[string]*Observed
+
+// ParseObserved reads an observed.json file.
+func ParseObserved(b []byte) (ObservedSet, error) {
 	var raw struct {
 		Harmless []*Observed `json:"harmless"`
 		Harmful  []*Observed `json:"harmful"`
 	}
-	out := map[string]map[string]*Observed{"harmless": {}, "harmful": {}}
-	if json.Unmarshal(observedJSON, &raw) != nil {
-		return out
+	out := ObservedSet{"harmless": {}, "harmful": {}}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return out, err
 	}
 	for _, o := range raw.Harmless {
 		out["harmless"][obsKey(o.Kind, o.From, o.To)] = o
@@ -82,21 +86,41 @@ var observed = sync.OnceValue(func() map[string]map[string]*Observed {
 	for _, o := range raw.Harmful {
 		out["harmful"][obsKey(o.Kind, o.From, o.To)] = o
 	}
+	return out, nil
+}
+
+// ObservedJSON is the embedded observed.json (the 1.6 section of the embedded bundle).
+func ObservedJSON() []byte { return observedJSON }
+
+var embeddedObserved = sync.OnceValue(func() ObservedSet {
+	out, _ := ParseObserved(observedJSON)
 	return out
 })
+
+// EmbeddedObserved is the embedded 1.6 file, parsed once.
+func EmbeddedObserved() ObservedSet { return embeddedObserved() }
+
+// observed is in's corpus set (its caller's game version, 05 §4.6), else the embedded file.
+// Never process-wide: two Apps of different game versions share a process (tests, MCP).
+func (in Input) observed() ObservedSet {
+	if in.Observed != nil {
+		return in.Observed
+	}
+	return embeddedObserved()
+}
 
 func obsKey(kind, from, to string) string {
 	return kind + " " + strings.ToLower(from) + " " + strings.ToLower(to)
 }
 
-// LookupObserved returns the corpus record of a constraint and whether it was harmful
+// LookupObserved returns the corpus record of a constraint in set and whether it was harmful
 // (nil when the corpus has none).
-func LookupObserved(kind, from, to string) (o *Observed, harmful bool) {
+func LookupObserved(set ObservedSet, kind, from, to string) (o *Observed, harmful bool) {
 	k := obsKey(kind, from, to)
-	if o := observed()["harmful"][k]; o != nil {
+	if o := set["harmful"][k]; o != nil {
 		return o, true
 	}
-	return observed()["harmless"][k], false
+	return set["harmless"][k], false
 }
 
 func (o *Observed) text() string {
@@ -120,7 +144,7 @@ func Assess(in Input, e Edge) Assessment {
 	case KindOfficial:
 		return Assessment{Strong, ""}
 	}
-	if o, harmful := LookupObserved(e.C.Kind, from, to); o != nil {
+	if o, harmful := LookupObserved(in.observed(), e.C.Kind, from, to); o != nil {
 		if harmful {
 			return Assessment{Strong, o.text()}
 		}

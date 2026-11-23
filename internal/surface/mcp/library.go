@@ -41,7 +41,7 @@ func ManageLibraryArgv(in ManageLibraryIn) []string {
 }
 
 type LibraryIn struct {
-	Env     string  `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env     string  `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Search  string  `json:"search,omitempty" jsonschema:"words that must all appear in a name, package id, author, alias, tag, note, Workshop ID or folder"`
 	Include StrList `json:"include,omitempty" jsonschema:"key:value filters to keep (keys lists, tag, tags, source, location, version, state, used, updated); lists is a case-insensitive list name; location is a registered source folder path; values of one key are alternatives, different keys must all hold"`
 	Exclude StrList `json:"exclude,omitempty" jsonschema:"key:value filters to drop"`
@@ -52,7 +52,7 @@ type LibraryIn struct {
 }
 
 type ManageLibraryIn struct {
-	Env    string  `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env    string  `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Action string  `json:"action" jsonschema:"move_to_locked, remove_from_plans, unsubscribe, subscribe, resubscribe or steam_state"`
 	Refs   StrList `json:"refs" jsonschema:"the instances (#id); move_to_locked takes one"`
 	Reason string  `json:"reason,omitempty" jsonschema:"move_to_locked: why, kept in the copy's note"`

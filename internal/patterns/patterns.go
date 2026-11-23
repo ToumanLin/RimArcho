@@ -52,6 +52,10 @@ type Pattern struct {
 	Versions []string `json:"versions,omitempty"`
 	First    string   `json:"first,omitempty"` // month first / last seen
 	Last     string   `json:"last,omitempty"`
+	// LastLog is the newest supporting log (YYYY-MM-DD); MayBeFixed: Mod's Workshop item was
+	// updated after it (weekly corpus data, 05 §4.6), so the known error may be fixed.
+	LastLog    string `json:"lastLog,omitempty"`
+	MayBeFixed bool   `json:"mayBeFixed,omitempty"`
 
 	Logs      int         `json:"logs"`
 	Sessions  int         `json:"sessions"`
@@ -89,14 +93,23 @@ type Data struct {
 //go:embed patterns.json
 var dataJSON []byte
 
-// Load returns the embedded library (parsed once).
-var Load = sync.OnceValue(func() *Data {
+// Embedded returns the library built into the program (parsed once): the 1.6 section of
+// the embedded corpus bundle (internal/corpus).
+var Embedded = sync.OnceValue(func() *Data {
 	d, err := Parse(dataJSON)
 	if err != nil {
 		panic("internal/patterns: " + err.Error())
 	}
 	return d
 })
+
+// EmbeddedJSON is the embedded library file.
+func EmbeddedJSON() []byte { return dataJSON }
+
+// Load returns the embedded library. Code with an App reads its environment's choice instead
+// (app.Index.Patterns, 05 §4.6): there is no process-wide "library in use", since two Apps of
+// different game versions can share a process (tests, MCP).
+func Load() *Data { return Embedded() }
 
 // Parse reads a library file and compiles its rules.
 func Parse(b []byte) (*Data, error) {

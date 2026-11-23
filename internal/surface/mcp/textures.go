@@ -13,7 +13,7 @@ func textureTools() []tool {
 
 // TexturesIn is manage_textures.
 type TexturesIn struct {
-	Env    string  `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env    string  `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Action string  `json:"action" jsonschema:"status, optimize or clean"`
 	Refs   StrList `json:"refs,omitempty" jsonschema:"the mods (#id, pkg:…); or plan / all"`
 	Plan   bool    `json:"plan,omitempty" jsonschema:"the current plan's mods"`

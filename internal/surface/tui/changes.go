@@ -128,7 +128,7 @@ func (c *chState) build() {
 			c.rows = append(c.rows, chRow{text: "  " + r.Name + "  " + T("removed from the Workshop"), kind: chGone, gone: r, key: k})
 			if c.open[k] {
 				add("    "+T("The author deleted the Workshop page or made it private; your installed copy still works, but Steam will never update it."), chDim)
-				add("    "+T("After unsubscribing, you cannot download it again; lock this version to keep it."), chDim)
+				add("    "+T("After unsubscribing, you cannot download it again; keep this version to hold on to it."), chDim)
 			}
 		}
 	}
@@ -295,7 +295,6 @@ func (c *chState) relayoutAt(key string) {
 
 func (m *model) changesKey(s string) tea.Cmd {
 	c := &m.chg
-	page := max(m.h-bodyTop-2, 1)
 	var r *chRow
 	if c.cursor < len(c.rows) && c.rows[c.cursor].selectable() {
 		r = &c.rows[c.cursor]
@@ -305,70 +304,86 @@ func (m *model) changesKey(s string) tea.Cmd {
 	if r != nil {
 		mod, pend = r.mod, r.pend
 	}
+	if cmd, done := m.changesRowKey(s, r, mod, pend); done {
+		return cmd
+	}
+	return m.changesListKey(s, r, mod)
+}
+
+// armLock arms p to lock this version of the mod ref (a copy in the lock library).
+func (m *model) armLock(ref, name string) tea.Cmd {
+	return m.arm("p", Tf("p again locks this version of %s (a copy in the lock library)", name), func(m *model) tea.Cmd {
+		m.act(Tf("locked %s", name), "pin", ref)
+		m.reload()
+		m.loadChanges()
+		return nil
+	})
+}
+
+// changesRowKey handles the Changes keys that act on subscriptions, sources, a gone
+// copy or a pending update; done is false when s is left to changesListKey.
+func (m *model) changesRowKey(s string, r *chRow, mod *modchanges.Row, pend *view.PendingUpdate) (cmd tea.Cmd, done bool) {
+	c := &m.chg
 	switch s {
 	case "+":
-		return m.openAdd("")
+		return m.openAdd(""), true
 	case "K":
-		return m.checkSources(c.allSources())
+		return m.checkSources(c.allSources()), true
 	case "U":
 		if c.subscriptions != nil {
-			return m.updatePending(c.shownPending())
+			return m.updatePending(c.shownPending()), true
 		}
-		return nil
+		return nil, true
 	case "u":
 		if pend != nil {
-			return m.updatePending([]view.PendingUpdate{*pend})
+			return m.updatePending([]view.PendingUpdate{*pend}), true
 		}
-		return nil
+		return nil, true
 	case "delete":
 		switch {
 		case pend != nil && pend.Kind != app.LibWorkshop:
-			return m.removeSubscription(pend.Ref, pend.Name)
+			return m.removeSubscription(pend.Ref, pend.Name), true
 		case mod != nil && m.subscriptionOf(mod.ID):
-			return m.removeSubscription(mod.Ref, mod.Mod)
+			return m.removeSubscription(mod.Ref, mod.Mod), true
 		}
 		m.say(sayInfo, T("not a subscription RimArcho keeps: Steam's are unsubscribed in the mod library"))
-		return nil
+		return nil, true
 	}
 	if r != nil && r.kind == chSource && s == "enter" {
-		return m.checkSources([]string{r.src.Key})
+		return m.checkSources([]string{r.src.Key}), true
 	}
 	if r != nil && r.gone != nil {
 		g := r.gone
 		if s == "l" {
-			return m.openLibraryInstance(g.ID)
+			return m.openLibraryInstance(g.ID), true
 		}
 		if s == "p" {
-			return m.arm("p", Tf("p again locks this version of %s (a copy in the lock library)", g.Name), func(m *model) tea.Cmd {
-				m.act(Tf("locked %s", g.Name), "pin", g.Ref)
-				m.reload()
-				m.loadChanges()
-				return nil
-			})
+			return m.armLock(g.Ref, g.Name), true
 		}
 	}
 	if s == "l" {
 		if pend != nil {
-			return m.openLibraryInstance(pend.ID)
+			return m.openLibraryInstance(pend.ID), true
 		}
 		if mod != nil && mod.Present {
-			return m.openLibraryInstance(mod.ID)
+			return m.openLibraryInstance(mod.ID), true
 		}
 	}
 	if pend != nil {
 		switch s {
 		case "p":
-			ref, name := pend.Ref, pend.Name
-			return m.arm("p", Tf("p again locks this version of %s (a copy in the lock library)", name), func(m *model) tea.Cmd {
-				m.act(Tf("locked %s", name), "pin", ref)
-				m.reload()
-				m.loadChanges()
-				return nil
-			})
+			return m.armLock(pend.Ref, pend.Name), true
 		case "ctrl+w":
-			return m.openSource(pend)
+			return m.openSource(pend), true
 		}
 	}
+	return nil, false
+}
+
+// changesListKey handles the Changes keys that move, open or act on the row's mod.
+func (m *model) changesListKey(s string, r *chRow, mod *modchanges.Row) tea.Cmd {
+	c := &m.chg
+	page := max(m.h-bodyTop-2, 1)
 	switch s {
 	case "1", "2", "3":
 		for i, row := range c.rows {
@@ -435,13 +450,7 @@ func (m *model) changesKey(s string) tea.Cmd {
 		}
 	case "p":
 		if has(mod, modchanges.ActLock) {
-			ref, name := mod.Ref, mod.Mod
-			return m.arm("p", Tf("p again locks this version of %s (a copy in the lock library)", name), func(m *model) tea.Cmd {
-				m.act(Tf("locked %s", name), "pin", ref)
-				m.reload()
-				m.loadChanges()
-				return nil
-			})
+			return m.armLock(mod.Ref, mod.Mod)
 		}
 	}
 	return nil
@@ -548,14 +557,14 @@ func (m *model) changesPairs() [][2]string {
 	case r.kind == chSource:
 		pairs = append(pairs, [2]string{"enter", T("check this source")})
 	case r.kind == chGone:
-		pairs = append(pairs, [2]string{"enter", T("open")}, [2]string{"p", T("lock this version")}, [2]string{"l", T("show in the mod library")})
+		pairs = append(pairs, [2]string{"enter", T("open")}, [2]string{"p", T("keep this version")}, [2]string{"l", T("show in the mod library")})
 	case r.kind == chPending:
 		later = append(later, [2]string{"l", T("show in the mod library")})
 		pairs = append(pairs, [2]string{"u", T("update subscription")})
 		if r.pend.Kind != app.LibWorkshop {
 			pairs = append(pairs, [2]string{"Del", T("remove subscription")})
 		}
-		later = append(later, [2]string{"p", T("lock this version first")})
+		later = append(later, [2]string{"p", T("keep this version first")})
 		if r.pend.Opens != "" {
 			later = append(later, [2]string{"ctrl+w", T("open the source page")})
 		}

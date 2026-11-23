@@ -91,10 +91,19 @@ func (a *App) overlapping(root string, skip func(*source.Source) bool) (*source.
 }
 
 // FolderAdd adds a shared mod folder. There is one Workshop folder: naming another one
-// moves it (re-bound as in 03 §4.2). A folder already known is left as it is.
+// moves it (re-bound as in 03 §4.2). A folder already known is left as it is. A SteamCMD
+// folder added this way is the player's choice: retireMirror keeps it.
 func (a *App) FolderAdd(kind source.Kind, root string) (SourceChange, error) {
+	ch, err := a.folderAdd(kind, root)
+	if err == nil && kind == source.SteamCMD && ch.Source != nil {
+		err = a.Store.SetMeta(keptKey(ch.Source), "1")
+	}
+	return ch, err
+}
+
+func (a *App) folderAdd(kind source.Kind, root string) (SourceChange, error) {
 	if !SharedKind(kind) {
-		return SourceChange{}, fmt.Errorf("a mod folder is workshop, steamcmd or extra, not %s (a game's Data/ and Mods/ come with its environment)", kind)
+		return SourceChange{}, fmt.Errorf("a mod folder is workshop, steamcmd or extra, not %s (a game's Data/ and Mods/ come with its Game Config)", kind)
 	}
 	root = strings.Trim(strings.TrimSpace(root), `"'`)
 	if root == "" {
@@ -148,7 +157,7 @@ func (a *App) FolderAdd(kind source.Kind, root string) (SourceChange, error) {
 	} else if o != nil {
 		where := "a shared folder"
 		if o.EnvID != store.Shared {
-			if e, _ := a.Store.EnvByID(o.EnvID); e != nil {
+			if e, _ := a.Store.EnvForGame(o.EnvID); e != nil {
 				where = "env:" + e.Name
 			}
 		}
@@ -191,7 +200,7 @@ func (a *App) FolderRemove(ref string) (SourceChange, error) {
 	case s == nil:
 		return SourceChange{}, fmt.Errorf("no mod folder src:%s (archo folder list)", label)
 	case s.EnvID != store.Shared:
-		return SourceChange{}, fmt.Errorf("src:%s is a game's %s folder; it comes and goes with its environment (change --game instead)", label, s.Kind)
+		return SourceChange{}, fmt.Errorf("src:%s is a game's %s folder; it comes and goes with its Game Config (change --game instead)", label, s.Kind)
 	case OwnFolder(s):
 		return SourceChange{}, fmt.Errorf("src:%s is RimArcho's own folder (%s); it is not removed", label, s.Root)
 	}
@@ -255,7 +264,10 @@ func (a *App) SharedUnread() bool {
 // not move it. Nothing happens when the folder is missing, is the Steam client's, or is
 // known already, retired included: a folder the player removed stays removed — except when
 // the player adds the game (again) or points it at this folder (explicit), which brings
-// the game's own folder back (a game removed and added again, 2026-10-25).
+// the game's own folder back (a game removed and added again, 2026-10-25). Nothing happens
+// either while the Steam client's Workshop folder is registered: SteamCMD's app_update
+// fills the game's folder with the account's subscriptions, the same items as the client's
+// (11 §3), and registering it would give every Mod a second copy.
 func (a *App) adoptGameWorkshop(e *env.Environment, explicit bool) (*SourceChange, error) {
 	w := env.GameWorkshopFor(e.GameRoot)
 	if !dirExists(w) {
@@ -265,6 +277,9 @@ func (a *App) adoptGameWorkshop(e *env.Environment, explicit bool) (*SourceChang
 		if env.PathKey(s) == env.PathKey(w) {
 			return nil, nil
 		}
+	}
+	if ws, err := a.clientWorkshop(); err != nil || ws != nil {
+		return nil, err
 	}
 	all, err := a.Store.AllSources()
 	if err != nil {
@@ -288,11 +303,66 @@ func (a *App) adoptGameWorkshop(e *env.Environment, explicit bool) (*SourceChang
 	if err != nil {
 		return nil, err
 	}
+	// Registered by RimArcho, not the player: retireMirror may take it back.
+	if err := a.Store.SetMeta(keptKey(ch.Source), ""); err != nil {
+		return nil, err
+	}
 	return &ch, nil
 }
 
-// adoptGameWorkshops runs adoptGameWorkshop for every environment: environments added
-// before RimArcho knew these folders get theirs on the next scan.
+// keptKey marks a SteamCMD folder the player added themselves (FolderAdd): retireMirror
+// leaves it registered.
+func keptKey(s *source.Source) string { return "steamcmd-kept:" + s.ID }
+
+// clientWorkshop is the Steam client's Workshop folder when it is registered and on disk
+// (its recorded status may still say missing: the scan updates it after this check).
+func (a *App) clientWorkshop() (*source.Source, error) {
+	ws, err := a.workshopFolder()
+	if err != nil || ws == nil || !dirExists(ws.Root) {
+		return nil, err
+	}
+	return ws, nil
+}
+
+// retireMirror removes a game's own Workshop folder that RimArcho registered while the
+// Steam client's Workshop folder is registered too (03 §2 item 3): its items are copies of
+// the client's. Plan lists that used a copy switch to the client's Instance of the same
+// Workshop ID first, so nothing goes missing. The files stay; a folder the player added
+// with folder add stays registered.
+func (a *App) retireMirror(e *env.Environment) error {
+	ws, err := a.clientWorkshop()
+	if err != nil || ws == nil {
+		return err
+	}
+	w := env.GameWorkshopFor(e.GameRoot)
+	if env.PathKey(w) == env.PathKey(ws.Root) {
+		return nil
+	}
+	shared, err := a.Store.SharedSources()
+	if err != nil {
+		return err
+	}
+	for _, s := range shared {
+		if s.Kind != source.SteamCMD || s.Status == source.StatusRetired || env.PathKey(s.Root) != env.PathKey(w) || a.Store.Meta(keptKey(s)) != "" {
+			continue
+		}
+		m, err := a.Store.SameItemInstances(s.ID, ws.ID)
+		if err != nil {
+			return err
+		}
+		if err := a.Store.SwitchListInstances(m); err != nil {
+			return err
+		}
+		if _, err := a.FolderRemove(s.Ref()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// adoptGameWorkshops runs adoptGameWorkshop and retireMirror for every environment:
+// environments added before RimArcho knew these folders get theirs on the next scan, and
+// a folder registered before the Steam client's Workshop folder was known is taken back.
 func (a *App) adoptGameWorkshops() error {
 	envs, err := a.Store.Envs()
 	if err != nil {
@@ -300,6 +370,9 @@ func (a *App) adoptGameWorkshops() error {
 	}
 	for _, e := range envs {
 		if _, err := a.adoptGameWorkshop(e, false); err != nil {
+			return err
+		}
+		if err := a.retireMirror(e); err != nil {
 			return err
 		}
 	}

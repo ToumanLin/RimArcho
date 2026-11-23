@@ -18,7 +18,7 @@ function launchContext(live = null) {
   const calls = [];
   const context = createContext({ el, keyCaps: (k) => el("kbd", "", k), T: (s) => s, Tf: (s, ...a) => s.replace(/%[ds]/g, () => a.shift()),
     S: { live, busy: {} }, launching: 0, arrived: false, note: () => null,
-    running: () => !!(live && live.running), launch: () => calls.push('launch'), save: () => calls.push('save'),
+    running: () => !!(live && (live.running || live.blocked)), launch: () => calls.push('launch'), save: () => calls.push('save'),
     step: (n, cls) => el('section', 'hm-step ' + cls) });
   runInContext(part('function canSave(', '// save writes') + part('function launchStep(', '// problemOf:') + part('function ramShown(', '// showMemory') +
     '\nglobalThis.launchStep = launchStep;', context);
@@ -49,4 +49,32 @@ test('nothing to save, another row, or the game running: no Save', () => {
     const s = context.launchStep(f);
     assert.ok(!all(s).some((n) => n.className === 'hm-save'), JSON.stringify([f, live]));
   }
+});
+
+
+test('Launch names the actual owner and never offers a clean verdict for another or unknown config', () => {
+  for (const live of [
+    { running: true, owner: 'Game Config A is running', errors: 2 },
+    { blocked: 'Game Config A is running' },
+    { blocked: 'installation Synthetic running, Game Config unknown' },
+  ]) {
+    const { context } = launchContext(live);
+    const nodes = all(context.launchStep(plan));
+    const go = nodes.find((n) => n.className.split(' ')[0] === 'hm-go');
+    assert.equal(go.disabled, true);
+    assert.equal(nodes.find((n) => n.className === 'title').textContent, live.blocked || live.owner);
+    assert.ok(!nodes.some((n) => n.className === 'hm-save'));
+    if (live.blocked) assert.ok(!nodes.some((n) => /no errors|unsaved/.test(n.textContent)));
+  }
+});
+
+test('Home reports a missing last-run log with its path instead of no errors', () => {
+  const { context } = launchContext();
+  context.data = { missingLog: "the last run's log was not found: C:/Synthetic/own/Player.log" };
+  context.actLine = (label, text) => el('div', label, text);
+  context.ui = { go() {} };
+  runInContext(part('function activity()', 'function actLine(') + '\nglobalThis.activity = activity;', context);
+  const texts = all(context.activity()).map((n) => n.textContent);
+  assert.ok(texts.includes(context.data.missingLog));
+  assert.ok(!texts.some((s) => /no errors/.test(s)));
 });

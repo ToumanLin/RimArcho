@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -8,6 +10,8 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -35,6 +39,25 @@ type exchange struct {
 	follow bool
 	seq    uint64
 	envID  string // game that owns the checked new-list preview
+	// settings: the Mod settings the last previewed list carries, kept after its import
+	// so the player can apply them (07 §7.3)
+	settings *app.PackSettings
+}
+
+// ImportSettings is "apply settings" after an import (07 §7.3): mods are package IDs (none:
+// all), replace also replaces files that are here (each to the recycle bin first); dryRun
+// is the per-Mod preview.
+func (s *API) ImportSettings(mods []string, replace, dryRun bool) (*app.ListSettingsPlan, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.x.settings.Empty() {
+		return nil, errors.New(view.T("the list carries no Mod settings"))
+	}
+	p, err := s.a.ApplyListSettings(s.x.settings, mods, replace, dryRun)
+	if err != nil {
+		return nil, errors.New(view.Humanize(nil, err.Error()))
+	}
+	return p, nil
 }
 
 // ImportFollow says whether applying the previewed collection makes the list follow it.
@@ -54,13 +77,29 @@ type Exchange struct {
 	Dialogs bool                `json:"dialogs"`
 	Dir     string              `json:"dir"`
 	Formats []view.ExportFormat `json:"formats"`
+	// Game is the current Game Config's ModsConfig.xml: the Import page's "the game's
+	// current list" card (16 §2.18); nil when it has none.
+	Game *GameList `json:"game,omitempty"`
+}
+
+// GameList is the game's own ModsConfig.xml and how many Mods it enables.
+type GameList struct {
+	Path string `json:"path"`
+	Mods int    `json:"mods"`
 }
 
 // ExchangeInfo supplies file and clipboard capabilities for the sub-pages (16 §2.17).
 func (s *API) ExchangeInfo() *Exchange {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return &Exchange{Dialogs: s.x.native != nil, Dir: view.DefaultExportDir(), Formats: view.ExportFormats(s.a)}
+	x := &Exchange{Dialogs: s.x.native != nil, Dir: view.DefaultExportDir(), Formats: view.ExportFormats(s.a)}
+	if e, err := s.a.Env(); err == nil && e != nil {
+		path := env.ModsConfigPath(e.UserDataRoot)
+		if mc, err := env.ReadModsConfig(path); err == nil {
+			x.Game = &GameList{Path: path, Mods: len(mc.ActiveMods)}
+		}
+	}
+	return x
 }
 
 // PickFolder shows the folder dialog (the guide's game folder, the settings page's folders),
@@ -93,12 +132,33 @@ func (s *API) PickProgram() (string, error) {
 	return s.x.native.openFile(view.T("choose a program"), nil)
 }
 
+// PickUpdateZip chooses a RimArcho release zip the player downloaded in the browser (the
+// manual update, 17 §5.1); "" when it was cancelled.
+func (s *API) PickUpdateZip() (string, error) {
+	if s.x.native == nil {
+		return "", errors.New(view.T("no file dialog here; use the desktop window"))
+	}
+	return s.x.native.openFile(view.T("choose the downloaded RimArcho zip"), [][2]string{{"Zip (*.zip)", "*.zip"}})
+}
+
 // PickImportFile shows the open dialog; "" when it was cancelled or there is none.
 func (s *API) PickImportFile() (string, error) {
 	if s.x.native == nil {
 		return "", nil
 	}
 	return s.x.native.openFile(view.T("import a mod list"), listFilters)
+}
+
+// PickAnyImport is the Import page's one file dialog: lists, saves, packs and other
+// managers' data (16 §2.18); "" when it was cancelled or there is no window.
+func (s *API) PickAnyImport() (string, error) {
+	if s.x.native == nil {
+		return "", nil
+	}
+	return s.x.native.openFile(view.T("import"), [][2]string{
+		{"Lists, saves, packs, manager data (*.xml;*.rml;*.json;*.txt;*.rws;*.archopack;*.db)", "*.xml;*.rml;*.json;*.txt;*.rws;*.archopack;*.db"},
+		{"All files (*.*)", "*.*"},
+	})
 }
 
 // PickPackFile selects an archive for the guide; cancellation leaves the guide unchanged.
@@ -151,7 +211,7 @@ func (s *API) ImportPreview(kind, src string) (*view.ImportPreview, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.x.imp = imp
+	s.x.imp, s.x.settings = imp, imp.List.Settings
 	s.x.follow = imp.Collection != nil // ticked by default (16 §2.17)
 	return p, nil
 }

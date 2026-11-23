@@ -9,8 +9,8 @@ import (
 
 // LastChanged maps each instance of an environment to the start of the newest scan that
 // recorded a change for it (Mod library's "last changed" sort, 16 §2.9). Optional IDs restrict the lookup.
-func (s *Store) LastChanged(envID string, instances ...string) (map[string]time.Time, error) {
-	where, args := libraryInstances(envID, instances)
+func (s *Store) LastChanged(gameID string, instances ...string) (map[string]time.Time, error) {
+	where, args := libraryInstances(gameID, instances)
 	rows, err := s.DB.Query(`SELECT c.instance_id, max(s.started_at) FROM change_event c JOIN scan s ON s.id=c.scan_id
 		JOIN instance i ON i.id=c.instance_id WHERE `+where+` GROUP BY c.instance_id`, args...)
 	if err != nil {
@@ -35,7 +35,7 @@ func (s *Store) LastChanged(envID string, instances ...string) (map[string]time.
 func (s *Store) RelocateInstance(id, sourceID, rel, realPath string) error {
 	// It belongs where its new source does (a copy moved into the lock library is shared, 03 §2).
 	_, err := s.DB.Exec(`UPDATE instance SET source_id=?, rel_path=?, real_path=?,
-		environment_id=coalesce((SELECT environment_id FROM source WHERE id=?), environment_id) WHERE id=?`, sourceID, rel, realPath, sourceID, id)
+		game_id=coalesce((SELECT game_id FROM source WHERE id=?), game_id) WHERE id=?`, sourceID, rel, realPath, sourceID, id)
 	return err
 }
 
@@ -56,8 +56,8 @@ type CopyNote struct {
 }
 
 // CopyNotes are the notes of an environment's instances, optionally restricted to IDs.
-func (s *Store) CopyNotes(envID string, instances ...string) (map[string]*CopyNote, error) {
-	where, args := libraryInstances(envID, instances)
+func (s *Store) CopyNotes(gameID string, instances ...string) (map[string]*CopyNote, error) {
+	where, args := libraryInstances(gameID, instances)
 	rows, err := s.DB.Query(`SELECT n.instance_id, n.text, n.made, n.updated_at FROM instance_note n
 		JOIN instance i ON i.id=n.instance_id WHERE `+where, args...)
 	if err != nil {
@@ -125,9 +125,9 @@ func (s *Store) Languages(snapID int64) ([]string, error) {
 
 // With no IDs the inventory reads all instances; copy details restrict indexed history
 // and note lookups to their lineage.
-func libraryInstances(envID string, instances []string) (string, []any) {
-	where := "i.environment_id IN ('', ?)"
-	args := []any{envID}
+func libraryInstances(gameID string, instances []string) (string, []any) {
+	where := "i.game_id IN ('', ?)"
+	args := []any{gameID}
 	if len(instances) > 0 {
 		where += " AND i.id IN (" + strings.TrimSuffix(strings.Repeat("?,", len(instances)), ",") + ")"
 		for _, id := range instances {

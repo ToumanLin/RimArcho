@@ -401,9 +401,21 @@ func (a *App) OpenPlanName() string {
 	return a.PlanName
 }
 
+// followCurrent drops the session's opened list once it is the environment's current
+// one (07 §1.3): however it became current (set current, a save or launch from its editor,
+// `archo plan use` or MCP in another process), the window then shows the current list
+// and follows a later switch of it, wherever made. A list the player opened while
+// another one is current stays open.
+func (a *App) followCurrent(envID string) {
+	if a.OpenPlan != 0 && a.OpenPlan == a.Store.CurrentPlanID(envID) {
+		a.OpenPlan = 0
+	}
+}
+
 // planFor is the plan this session works on in an environment: the opened one when it
 // belongs there, else the current one (first falling back to the first plan).
 func (a *App) planFor(envID string) (*store.Plan, error) {
+	a.followCurrent(envID)
 	if a.OpenPlan != 0 {
 		if p, err := a.Store.PlanByID(a.OpenPlan); err != nil {
 			return nil, err

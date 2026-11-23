@@ -101,6 +101,31 @@ func TestExtract(t *testing.T) {
 	}
 }
 
+func TestExtractRejectsCorruptEntry(t *testing.T) {
+	for _, name := range []string{"README.md", ".", "monitor\\"} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			data := makeZip(t, append(programEntries(), zipEntry{name: name, data: "CRC test payload"}))
+			at := bytes.Index(data, []byte("CRC test payload"))
+			if at < 0 {
+				t.Fatal("missing stored payload")
+			}
+			data[at] ^= 1
+			path := filepath.Join(root, "corrupt.zip")
+			if err := os.WriteFile(path, data, 0600); err != nil {
+				t.Fatal(err)
+			}
+			stage := filepath.Join(root, "new")
+			if err := Extract(path, stage); !errors.Is(err, zip.ErrChecksum) {
+				t.Fatalf("corrupt entry accepted: %v", err)
+			}
+			if _, err := os.Stat(stage); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("failed extraction retained staging: %v", err)
+			}
+		})
+	}
+}
+
 func TestExtractRejectsUnsafeArchives(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
@@ -114,7 +139,8 @@ func TestExtractRejectsUnsafeArchives(t *testing.T) {
 		{"drive", []zipEntry{{name: `C:\evil`, data: "bad"}}, "unsafe zip path"},
 		{"drive relative", []zipEntry{{name: `C:evil`, data: "bad"}}, "unsafe zip path"},
 		{"unc", []zipEntry{{name: `\\host\evil`, data: "bad"}}, "unsafe zip path"},
-		{"unknown", []zipEntry{{name: "evil.exe", data: "bad"}}, "unexpected top-level"},
+		{"hidden", []zipEntry{{name: ".archo-update/swap.json", data: "bad"}}, "unsafe top-level"},
+		{"device", []zipEntry{{name: "con.txt", data: "bad"}}, "unsafe top-level"},
 		{"symlink", []zipEntry{{name: "monitor/link", data: "outside", mode: os.ModeSymlink | 0o777}}, "symlink"},
 		{"large file", []zipEntry{{name: "monitor/large", size: maxDownload + 1}}, "exceeds 200 mb"},
 		{"large total", []zipEntry{{name: "monitor/a", size: 180 << 20}, {name: "monitor/b", size: 180 << 20}, {name: "monitor/c", size: 180 << 20}}, "exceeds 500 mb"},
@@ -183,4 +209,22 @@ func equalTrees(a, b map[string]string) bool {
 		}
 	}
 	return true
+}
+
+// A top-level entry no earlier release had is accepted, so a release may add one without
+// a stepping-stone release (17 §5.1); the Agent bundle keeps its fixed list.
+func TestExtractAcceptsNewTopLevelEntry(t *testing.T) {
+	root := t.TempDir()
+	entries := append(programEntries(), zipEntry{name: "tools/helper.txt", data: "new"})
+	dir := filepath.Join(root, "stage")
+	if err := Extract(writeZip(t, root, entries), dir); err != nil {
+		t.Fatal(err)
+	}
+	if b, err := os.ReadFile(filepath.Join(dir, "tools", "helper.txt")); err != nil || string(b) != "new" {
+		t.Fatal(string(b), err)
+	}
+	err := ExtractLayout(writeZip(t, root, entries), filepath.Join(root, "fixed"), Layout{Files: Files})
+	if err == nil || !strings.Contains(err.Error(), "unexpected top-level") {
+		t.Fatal("fixed layout accepted an unknown entry:", err)
+	}
 }

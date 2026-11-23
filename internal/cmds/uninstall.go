@@ -17,10 +17,10 @@ func init() {
 			{Name: "dry-run", Help: "show the plan (the default)"},
 			{Name: "yes", Help: "run it: refused while a game or another RimArcho runs"},
 			{Name: "keep-locked", Help: "move the lock library's copies into a game's Mods/ as ordinary mods (default: recycle bin)"},
-			{Name: "locked-to", Value: "<env>", Help: "the environment whose Mods/ gets them (default: the current one)"},
+			{Name: "locked-to", Value: "<env>", Help: "the Game Config whose Mods/ gets them (default: the current one)"},
 			{Name: "remove-packs", Help: "packs to the recycle bin (default: kept, moved out of the data folder)"},
 			{Name: "packs-to", Value: "<dir>", Help: "where kept packs go (default: Documents\\RimArcho packs)"},
-			{Name: "remove-saves", Help: "the environments' own save folders to the recycle bin (default: moved out)"},
+			{Name: "remove-saves", Help: "the Game Configs' own save folders to the recycle bin (default: moved out)"},
 			{Name: "saves-to", Value: "<dir>", Help: "where they go (default: Documents\\RimArcho saves)"},
 			{Name: "remove-games", Help: "game folders downloaded with SteamCMD to the recycle bin (default: kept)"},
 			{Name: "restore-modsconfig-backup", Help: "put ModsConfig.xml.rimarcho.bak back instead of cleaning the current list"},
@@ -104,12 +104,15 @@ func uninstallCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	title := "uninstalled: RimArcho's folders and program are deleted once this command ends"
+	if p.AtOnce {
+		title = "uninstalled: RimArcho's folders and program are deleted"
+	}
 	if failed > 0 {
 		title = fmt.Sprintf("uninstall stopped short: %d failed; the data folder stays, so this can run again", failed)
 	}
 	d, root := render.New(title)
 	UninstallOutline(root, p, a.Bool("all"), true)
-	if failed == 0 {
+	if failed == 0 && !p.AtOnce {
 		root.KV("left over", "anything that could not be deleted is listed in "+p.Log)
 	}
 	return d, nil
@@ -117,8 +120,8 @@ func uninstallCmd(c *Ctx, a *Args) (*render.Doc, error) {
 
 // unVerb names what happens to an item.
 var unVerb = map[string]string{
-	"forget-accounts": "forget",
-	app.DoUnlink:      "unlink", app.DoClean: "clean", app.DoRestore: "restore", app.DoTrash: "recycle bin", app.DoMove: "move",
+	"forget-accounts": "forget", "forget-agent-key": "forget",
+	app.DoUnlink: "unlink", app.DoClean: "clean", app.DoRestore: "restore", app.DoTrash: "recycle bin", app.DoMove: "move",
 	app.DoKeep: "keep", app.DoDelete: "delete", app.DoLater: "after exit", app.DoLeave: "left alone",
 }
 
@@ -132,6 +135,10 @@ func UninstallStepText(p *app.UninstallPlan, s *app.UninstallStep) string {
 	if b := s.Bytes(); b > 0 {
 		size = ", " + render.Size(b)
 	}
+	later := "once RimArcho has closed, "
+	if p.AtOnce {
+		later = ""
+	}
 	var parts []string
 	// add adds a part when some item does do; {n} is the count with the word.
 	add := func(do, word, f string) {
@@ -142,11 +149,27 @@ func UninstallStepText(p *app.UninstallPlan, s *app.UninstallStep) string {
 	switch s.Key {
 	case app.UnAccounts:
 		parts = append(parts, "forget account sessions before removing tools or data; external SteamCMD caches stay untouched")
+		if count["forget-agent-key"] > 0 {
+			parts = append(parts, "remove the Archo Agent API key from Windows Credential Manager")
+		}
 	case app.UnLinks:
 		add(app.DoUnlink, "link", "delete {n} in the games' Mods/ (never their targets)")
-		add(app.DoLeave, "folder", "{n} named like one but not a link: left alone")
+		// Left alone are folders that only carry the prefix and links not provably this
+		// home's (another home's sharing the game, 02 §2): name each kind for what it is.
+		folders := 0
+		for _, it := range s.Items {
+			if it.Do == app.DoLeave && it.Note == app.NotALinkNote {
+				folders++
+			}
+		}
+		if n := count[app.DoLeave] - folders; n > 0 {
+			parts = append(parts, render.Plural(n, "link")+" not proven to be this home's (another RimArcho's, or unhealthy): left alone")
+		}
+		if folders > 0 {
+			parts = append(parts, render.Plural(folders, "folder")+" named like one but not a link: left alone")
+		}
 	case app.UnModsConfig:
-		add(app.DoClean, "user data folder", "keep the ModsConfig.xml list of {n} without Archo Monitor and the mods only reached through a removed link; remove RimArcho's backup")
+		add(app.DoClean, "user data folder", "keep the ModsConfig.xml list of {n} without Archo Monitor and the mods only reached through a removed link; remove RimArcho's backups of the list and of Mod settings (the settings stay)")
 		add(app.DoRestore, "user data folder", "put the ModsConfig.xml backup back in {n}")
 	case app.UnLocked:
 		add(app.DoTrash, "lock library copy", "{n} to the recycle bin"+size+" (--keep-locked: into a game's Mods/)")
@@ -168,20 +191,24 @@ func UninstallStepText(p *app.UninstallPlan, s *app.UninstallStep) string {
 		add(app.DoDelete, "folder", "delete the SteamCMD RimArcho downloaded"+size)
 		add(app.DoLeave, "folder", "left alone")
 	case app.UnData:
-		add(app.DoLater, "folder", "once RimArcho has closed, delete its data: database, settings, caches, the Steam runtime folder ({n})"+size)
+		add(app.DoLater, "folder", later+"delete its data: database, settings, caches, the Steam runtime folder ({n})"+size)
 		add(app.DoLeave, "folder", "{n} kept")
 	case app.UnSource:
 		add(app.DoDelete, "folder", "delete the generated source library ({n}); it can be recreated"+size)
 	case app.UnProgram:
-		add(app.DoLater, "folder", "once RimArcho has closed, delete the program")
+		add(app.DoLater, "folder", later+"delete the program")
 		add(app.DoLeave, "folder", "the program stays")
 	}
 	return strings.Join(parts, "; ")
 }
 
 // UninstallItemText is one item: what happens, the path, where it goes, why.
-func UninstallItemText(it *app.UninstallItem) string {
-	s := fmt.Sprintf("%-11s %s", unVerb[it.Do], it.Path)
+func UninstallItemText(p *app.UninstallPlan, it *app.UninstallItem) string {
+	verb := unVerb[it.Do]
+	if it.Do == app.DoLater && p.AtOnce {
+		verb = unVerb[app.DoDelete]
+	}
+	s := fmt.Sprintf("%-11s %s", verb, it.Path)
 	if it.To != "" {
 		s += " → " + it.To
 	}
@@ -205,14 +232,14 @@ func UninstallOutline(n *render.Node, p *app.UninstallPlan, all, done bool) {
 	for _, s := range p.Steps {
 		sec := n.Add(s.Key + ": " + UninstallStepText(p, s))
 		for _, it := range s.Items {
-			l := UninstallItemText(it)
+			l := UninstallItemText(p, it)
 			switch {
 			case !done:
 			case it.Err != "":
 				l = "FAILED " + l + "  error: " + it.Err
 			case it.Done:
 				l = "done   " + l
-			case it.Do == app.DoLater:
+			case it.Do == app.DoLater && !p.AtOnce:
 				l = "later  " + l
 			default:
 				l = "       " + l

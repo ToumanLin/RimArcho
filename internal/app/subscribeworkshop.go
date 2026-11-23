@@ -176,6 +176,24 @@ func (a *App) downloadWorkshop(ids []string, root string, dryRun bool) (result *
 	return a.downloadWorkshopGroup(ids, root, account, dryRun, true)
 }
 
+// workshopDownload is one downloadWorkshopGroup run: where SteamCMD downloads, where the
+// items land and how they are registered, and what has happened so far.
+type workshopDownload struct {
+	a                *App
+	ids              []string
+	op               *SubscribeOp
+	root             string // the content root the items land in
+	base             string // SteamCMD's force_install_dir
+	relocate         bool   // download into staging, then replace the item at its original location
+	existing         bool   // an existing source is updated
+	checkDir         string
+	registrationRoot string
+	activeSource     bool // the content root is a registered, active source
+	errs             []error
+	changed          bool
+	settled          map[string]bool
+}
+
 func (a *App) downloadWorkshopGroup(ids []string, root, account string, dryRun, refresh bool, transfer ...*workshopTransfer) (result *SubscribeOp, downloadErr error) {
 	if err := a.refuseSubscriptionGameRunning(); err != nil {
 		return nil, err
@@ -189,60 +207,25 @@ func (a *App) downloadWorkshopGroup(ids []string, root, account string, dryRun, 
 		return nil, fmt.Errorf("install SteamCMD in Settings; Workshop pages: %s", strings.Join(urls, " "))
 	}
 	var err error
-	base := a.SteamCMDModsDir()
-	relocate := false
-	existing := root != ""
-	if root == "" {
-		root = a.steamCMDContentRoot()
-	} else {
-		base = filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(root))))
-		// folder add steamcmd also accepts content roots with an arbitrary name.
-		// Download those into staging, then replace the item at its original location.
-		if !samePath(root, filepath.Join(base, "steamapps", "workshop", "content", env.WorkshopAppID)) {
-			relocate = true
-			base = filepath.Join(a.SteamCMDModsDir(), ".archo-tmp-download")
-		}
-	}
-	checkDir := base
-	if existing && !relocate {
-		// A game's own SteamCMD content source lives beside Data/ and Mods/.
-		// The download changes workshop content, not those sibling sources.
-		checkDir = root
-	}
-	if err := a.checkRoots(checkDir); err != nil {
+	d := &workshopDownload{a: a, ids: ids, root: root}
+	d.resolveDirs()
+	if err := a.checkRoots(d.checkDir); err != nil {
 		return nil, err
 	}
-	ss, err := a.Store.AllSources()
-	if err != nil {
+	if err := d.checkSources(); err != nil {
 		return nil, err
-	}
-	registrationRoot, activeSource := root, false
-	for _, s := range ss {
-		if s.Kind == source.SteamCMD && samePath(root, s.Root) {
-			registrationRoot = s.Root
-			activeSource = activeSource || s.Status != source.StatusRetired
-			continue
-		}
-		if s.Status == source.StatusRetired {
-			continue
-		}
-		if directoriesOverlap(checkDir, s.Root) {
-			return nil, fmt.Errorf("SteamCMD download directory overlaps src:%s (%s)", s.Label, s.Root)
-		}
-	}
-	if directoriesOverlap(checkDir, a.SubscribedDir()) {
-		return nil, fmt.Errorf("SteamCMD download directory overlaps subscriptions")
 	}
 	op := &SubscribeOp{Action: "workshop", DryRun: dryRun}
+	d.op = op
 	for _, id := range ids {
-		op.Items = append(op.Items, SubscribeItem{Name: "Workshop " + id, Folder: filepath.Join(root, id), Record: &subscribe.Record{Kind: "steamcmd", WorkshopID: id}, Result: "would download with SteamCMD"})
+		op.Items = append(op.Items, SubscribeItem{Name: "Workshop " + id, Folder: filepath.Join(d.root, id), Record: &subscribe.Record{Kind: "steamcmd", WorkshopID: id}, Result: "would download with SteamCMD"})
 	}
 	if a.SteamCMDSignsOutSteam(account) {
 		op.Notes = append(op.Notes, fmt.Sprintf(SteamSignOutNote, account))
 	}
 	var incoming *LinkLifecyclePlan
-	if existing {
-		incoming, err = a.PlanIncomingLinks(root, root)
+	if d.existing {
+		incoming, err = a.PlanIncomingLinks(d.root, d.root)
 		if err != nil {
 			return nil, err
 		}
@@ -253,20 +236,21 @@ func (a *App) downloadWorkshopGroup(ids []string, root, account string, dryRun, 
 	if dryRun {
 		return op, nil
 	}
-	if relocate {
+	if d.relocate {
 		if err := os.MkdirAll(a.SteamCMDModsDir(), 0o755); err != nil {
 			return nil, err
 		}
-		base, err = os.MkdirTemp(a.SteamCMDModsDir(), ".archo-tmp-")
+		d.base, err = os.MkdirTemp(a.SteamCMDModsDir(), ".archo-tmp-")
 		if err != nil {
 			return nil, err
 		}
-		defer os.RemoveAll(base)
+		defer os.RemoveAll(d.base)
 	}
-	if err := os.MkdirAll(base, 0o755); err != nil {
+	if err := os.MkdirAll(d.base, 0o755); err != nil {
 		return nil, err
 	}
-	if incoming != nil && !relocate {
+	lifecycle := incoming != nil && !d.relocate
+	if lifecycle {
 		if err := a.beginLinkLifecycle(incoming); err != nil {
 			for i := range op.Items {
 				op.Items[i].Result = "failed: " + err.Error()
@@ -276,59 +260,85 @@ func (a *App) downloadWorkshopGroup(ids []string, root, account string, dryRun, 
 	}
 	finished := false
 	defer func() {
-		if incoming != nil && !relocate && !finished {
+		if lifecycle && !finished {
 			downloadErr = a.abortLinkLifecycle(incoming, downloadErr)
 		}
 	}()
-	var errs []error
-	changed := false
-	// settle finishes one item: its record is written as soon as SteamCMD confirms it, so
-	// a long run reports each Mod when it is done instead of all of them at the end.
-	w := workshopObserver(transfer)
-	settled := map[string]bool{}
-	settle := func(i int, outcome workshopOutcome) {
-		id, it := ids[i], &op.Items[i]
-		settled[id] = true
-		defer func() {
-			if w.settled != nil {
-				w.settled(*it)
-			}
-		}()
-		if !outcome.confirmed {
-			why := outcome.why()
-			it.Result = "failed: " + why
-			it.FailureKind, it.Permanent = outcome.kind, workshopPermanent(outcome.kind)
-			errs = append(errs, fmt.Errorf("SteamCMD item %s: %s; %s", id, why, workshopURL(id)))
-			return
-		}
-		if relocate {
-			downloaded := filepath.Join(base, "steamapps", "workshop", "content", env.WorkshopAppID, id)
-			if err := a.replaceWorkshopImport(downloaded, it.Folder); err != nil {
-				it.Result = "failed: " + err.Error()
-				errs = append(errs, err)
-				return
-			}
-		}
-		if source.AboutState(it.Folder) != source.AboutPresent {
-			it.Result = "failed: no About/About.xml"
-			errs = append(errs, fmt.Errorf("SteamCMD item %s has no About/About.xml at %s", id, it.Folder))
-			return
-		}
-		now := a.Now()
-		it.Record.Installed, it.Record.InstalledAt = now.Format(time.RFC3339), now
-		if err := subscribe.Write(it.Folder, it.Record); err != nil {
-			it.Result = "failed: " + err.Error()
-			errs = append(errs, err)
-			return
-		}
-		delete(a.subscriptionCache, it.Folder)
-		delete(a.subscriptionCache, realOrAbs(it.Folder))
-		delete(a.subscriptionCache, filepath.Join(registrationRoot, id))
-		it.To, it.Result = it.Record.Installed, "downloaded with SteamCMD"
-		changed = true
+	d.run(exe, account, transfer)
+	if err := d.register(refresh); err != nil {
+		return op, err
 	}
-	index := make(map[string]int, len(ids))
-	for i, id := range ids {
+	if err := errors.Join(d.errs...); err != nil {
+		return op, err
+	}
+	if lifecycle {
+		finished = true
+		if err := a.finishLinkLifecycle(incoming); err != nil {
+			return op, err
+		}
+	}
+	return op, nil
+}
+
+// resolveDirs works out where SteamCMD downloads (base), the content root and the folder
+// whose overlaps are checked.
+func (d *workshopDownload) resolveDirs() {
+	a := d.a
+	d.base = a.SteamCMDModsDir()
+	d.existing = d.root != ""
+	if d.root == "" {
+		d.root = a.steamCMDContentRoot()
+	} else {
+		d.base = filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(d.root))))
+		// folder add steamcmd also accepts content roots with an arbitrary name.
+		// Download those into staging, then replace the item at its original location.
+		if !samePath(d.root, filepath.Join(d.base, "steamapps", "workshop", "content", env.WorkshopAppID)) {
+			d.relocate = true
+			d.base = filepath.Join(a.SteamCMDModsDir(), ".archo-tmp-download")
+		}
+	}
+	d.checkDir = d.base
+	if d.existing && !d.relocate {
+		// A game's own SteamCMD content source lives beside Data/ and Mods/.
+		// The download changes workshop content, not those sibling sources.
+		d.checkDir = d.root
+	}
+}
+
+// checkSources finds the source the content root is registered as, and refuses a download
+// directory that overlaps another source or the subscriptions.
+func (d *workshopDownload) checkSources() error {
+	ss, err := d.a.Store.AllSources()
+	if err != nil {
+		return err
+	}
+	d.registrationRoot = d.root
+	for _, s := range ss {
+		if s.Kind == source.SteamCMD && samePath(d.root, s.Root) {
+			d.registrationRoot = s.Root
+			d.activeSource = d.activeSource || s.Status != source.StatusRetired
+			continue
+		}
+		if s.Status == source.StatusRetired {
+			continue
+		}
+		if directoriesOverlap(d.checkDir, s.Root) {
+			return fmt.Errorf("SteamCMD download directory overlaps src:%s (%s)", s.Label, s.Root)
+		}
+	}
+	if directoriesOverlap(d.checkDir, d.a.SubscribedDir()) {
+		return fmt.Errorf("SteamCMD download directory overlaps subscriptions")
+	}
+	return nil
+}
+
+// run downloads the items with SteamCMD and settles each: as soon as SteamCMD confirms
+// it, or with its outcome once the run ends.
+func (d *workshopDownload) run(exe, account string, transfer []*workshopTransfer) {
+	w := workshopObserver(transfer)
+	d.settled = map[string]bool{}
+	index := make(map[string]int, len(d.ids))
+	for i, id := range d.ids {
 		index[id] = i
 	}
 	before := w.confirmed
@@ -336,42 +346,84 @@ func (a *App) downloadWorkshopGroup(ids []string, root, account string, dryRun, 
 		if before != nil {
 			before(id)
 		}
-		if i, ok := index[id]; ok && !settled[id] {
-			settle(i, workshopOutcome{confirmed: true})
+		if i, ok := index[id]; ok && !d.settled[id] {
+			d.settle(w, i, workshopOutcome{confirmed: true})
 		}
 	}
-	outcomes, runErr := a.runWorkshopBatches(exe, base, account, ids, w)
+	outcomes, runErr := d.a.runWorkshopBatches(exe, d.base, account, d.ids, w)
 	w.confirmed = before
 	if runErr != nil {
-		errs = append(errs, runErr)
+		d.errs = append(d.errs, runErr)
 	}
-	for i, id := range ids {
-		if !settled[id] {
-			settle(i, outcomes[id])
+	for i, id := range d.ids {
+		if !d.settled[id] {
+			d.settle(w, i, outcomes[id])
 		}
 	}
-	if changed {
-		if !activeSource {
-			if _, err := a.FolderAdd(source.SteamCMD, registrationRoot); err != nil {
-				return op, errors.Join(append(errs, err)...)
-			}
+}
+
+// settle finishes one item: its record is written as soon as SteamCMD confirms it, so a
+// long run reports each Mod when it is done instead of all of them at the end.
+func (d *workshopDownload) settle(w *workshopTransfer, i int, outcome workshopOutcome) {
+	a := d.a
+	id, it := d.ids[i], &d.op.Items[i]
+	d.settled[id] = true
+	defer func() {
+		if w.settled != nil {
+			w.settled(*it)
 		}
-		if refresh {
-			if err := a.refreshWorkshop(op); err != nil {
-				return op, errors.Join(append(errs, err)...)
-			}
+	}()
+	if !outcome.confirmed {
+		why := outcome.why()
+		it.Result = "failed: " + why
+		it.FailureKind, it.Permanent = outcome.kind, workshopPermanent(outcome.kind)
+		d.errs = append(d.errs, fmt.Errorf("SteamCMD item %s: %s; %s", id, why, workshopURL(id)))
+		return
+	}
+	if d.relocate {
+		downloaded := filepath.Join(d.base, "steamapps", "workshop", "content", env.WorkshopAppID, id)
+		if err := a.replaceWorkshopImport(downloaded, it.Folder); err != nil {
+			it.Result = "failed: " + err.Error()
+			d.errs = append(d.errs, err)
+			return
 		}
 	}
-	if err := errors.Join(errs...); err != nil {
-		return op, err
+	if source.AboutState(it.Folder) != source.AboutPresent {
+		it.Result = "failed: no About/About.xml"
+		d.errs = append(d.errs, fmt.Errorf("SteamCMD item %s has no About/About.xml at %s", id, it.Folder))
+		return
 	}
-	if incoming != nil && !relocate {
-		finished = true
-		if err := a.finishLinkLifecycle(incoming); err != nil {
-			return op, err
+	now := a.Now()
+	it.Record.Installed, it.Record.InstalledAt = now.Format(time.RFC3339), now
+	if err := subscribe.Write(it.Folder, it.Record); err != nil {
+		it.Result = "failed: " + err.Error()
+		d.errs = append(d.errs, err)
+		return
+	}
+	delete(a.subscriptionCache, it.Folder)
+	delete(a.subscriptionCache, realOrAbs(it.Folder))
+	delete(a.subscriptionCache, filepath.Join(d.registrationRoot, id))
+	it.To, it.Result = it.Record.Installed, "downloaded with SteamCMD"
+	d.changed = true
+}
+
+// register adds the content root as a source when it is not one yet and refreshes the
+// Workshop view, once something changed. An error comes joined with the item failures.
+func (d *workshopDownload) register(refresh bool) error {
+	if !d.changed {
+		return nil
+	}
+	if !d.activeSource {
+		if _, err := d.a.FolderAdd(source.SteamCMD, d.registrationRoot); err != nil {
+			return errors.Join(append(d.errs, err)...)
 		}
 	}
-	return op, nil
+	if refresh {
+		if err := d.a.refreshWorkshop(d.op); err != nil {
+			return errors.Join(append(d.errs, err)...)
+		}
+	}
+	return nil
 }
 
 func (a *App) refreshWorkshop(op *SubscribeOp) error {
@@ -426,7 +478,7 @@ func (a *App) runWorkshopSteamCMD(exe string, args []string, console bool, trans
 	if w.ctx.Err() != nil {
 		return "", w.ctx.Err()
 	}
-	log := filepath.Join(filepath.Dir(exe), "logs", "console_log.txt")
+	log := steamCMDConsoleLog(exe)
 	var off int64
 	if st, err := os.Stat(log); err == nil {
 		off = st.Size()

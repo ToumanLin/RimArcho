@@ -240,7 +240,8 @@ Product file at -minlogs 25 (2026-10-24): the 4.2 MB file was too big to embed. 
 with -minlogs 25 (sessions >= 5 unchanged), exported from that run:
   $E/patterns-min25.exe -parsed $E/hugslogs/parsed.jsonl -results $E/results-v5.jsonl -minlogs 25 -out $E/patterns-v5-min25.json
   go run ./spikes/patterns -export internal/patterns/patterns.json -dataset $E/patterns-v5-min25.json
-  (E = D:/Game/RimModManager_Upgrade/corpus-expand)
+  (E = D:/Game/RimModManager_Upgrade/corpus-kb/expand-v5, was corpus-expand; results-v5.jsonl and
+  hugslogs/parsed.jsonl were removed there to save space, see its README.md to regenerate)
   internal/patterns/patterns.json  4.2 MB -> 1.86 MB; mod-specific 9,305 -> 3,947 (716 mods, was 1,186).
   Checked: the 46 generic rules and the header are identical; the 3,947 are exactly the old entries
   with >= 25 logs, each unchanged. spikes/patterns/patterns-v0.json stays the -minlogs 10 research

@@ -1,178 +1,247 @@
 English | [&#31616;&#20307;&#20013;&#25991;](README.zh-CN.md)
 
+<div align="center">
+
+<img src="docs/assets/readme/archo_ponder.gif" width="200" alt="Archo, RimArcho's mascot, drawn in crayon">
+
 # RimArcho
 
-<img src="docs/assets/portrait_fixed_1.svg" width="96" alt="RimArcho icon: Archo chan" align="center">
+**A clean, fast, lightweight RimWorld launcher and Mod manager.**<br>
+Less fussing with Mods, less digging through errors, more playing.
 
-A one-stop RimWorld launcher that understands its players. Pick your mods, put them in order, check
-that the game will run, launch it, and find out why when something breaks, all in one place. It is
-built for players with hundreds of mods, and for the AI assistants that work alongside them.
+[![Latest release](https://img.shields.io/github/v/release/ToumanLin/RimArcho?label=release&color=a5b4fc)](https://github.com/ToumanLin/RimArcho/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/ToumanLin/RimArcho/total?color=6fd99b)](https://github.com/ToumanLin/RimArcho/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/ToumanLin/RimArcho/ci.yml?branch=master&label=CI)](https://github.com/ToumanLin/RimArcho/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/ToumanLin/RimArcho?color=blue)](LICENSE)
+[![Go version](https://img.shields.io/github/go-mod/go-version/ToumanLin/RimArcho?logo=go)](go.mod)
+<br>
+[![Platform: Windows | Linux (experimental)](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20(experimental)-0078d4)](#install)
+[![RimWorld 1.6 | 1.7](https://img.shields.io/badge/RimWorld-1.6%20%7C%201.7-c8a24a)](https://rimworldgame.com/)
+[![Languages: English, Simplified Chinese, Japanese](https://img.shields.io/badge/languages-English%20%7C%20%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87%20%7C%20%E6%97%A5%E6%9C%AC%E8%AA%9E-555)](internal/l10ndata/locale)
+[![MCP: 47 tools](https://img.shields.io/badge/MCP-47%20tools-7c6cf0)](#ai-agents-and-mcp)
+[![Discord](https://img.shields.io/badge/Discord-join-5865f2?logo=discord&logoColor=white)](https://discord.gg/HF2GVyurQs)
+[![GitHub stars](https://img.shields.io/github/stars/ToumanLin/RimArcho?style=flat&color=eed75e)](https://github.com/ToumanLin/RimArcho/stargazers)
 
-RimArcho sets out to answer three questions:
+[Download](https://github.com/ToumanLin/RimArcho/releases/latest) ·
+[User guide](UserGuide/user-guide.md) ·
+[Changelog](CHANGELOG.md) ·
+[Discord](https://discord.gg/HF2GVyurQs)
 
-1. **What am I playing, and will it run?** This is what version 1.0 answers.
-2. **What haven't I played yet?** Planned: reading your saves to find the mods and content you have
-   never touched.
-3. **What's worth playing?** Further out: packs that players share with each other, and suggestions
-   from an AI assistant based on what you haven't played yet.
+</div>
 
-Everything works without AI. AI assistants are its second kind of user: the built-in AI workbench
-and outside agents (through MCP) get the same facts and the same actions as you, and follow the same
-rules. Their changes can be undone, and nothing is written to the game until you confirm. (The
-built-in workbench is planned for 1.1; outside agents can connect today, see below.)
+![RimArcho's start page: pick a game, pick a list, launch](docs/assets/readme/en/01-home.webp)
 
-One program gives you a desktop window (`RimArcho.exe`), a terminal UI, a scriptable CLI and an MCP
-server (`archo.exe`). The window and the terminal UI are two faces of the same Go code: they show the
-same lists, details and "needs attention" items and run the same actions. The CLI and MCP print the
-same plain-text outlines, and every reference in them (`#id`, `pkg:`, `p:…`, `log:E3`) can be pasted
-into another command.
+I've played RimWorld for 1,600 hours, and I suspect many of you are like me: you sit down to play,
+and most of the evening goes into sorting the Mod list, relaunching and chasing errors. RimArcho
+exists to give that time back. It is free and open source under the MIT license.
 
-What it knows about your installation:
+## Contents
 
-- **Identity.** Every mod folder (Workshop, local `Mods/`, SteamCMD, extra folders) is an instance.
-  Copies of one mod form a lineage. Changes between scans are recorded: updated, moved, copied,
-  reappeared, gone.
-- **Loadout.** It edits a workspace copy of the enabled list. Every edit can be undone, sorting
-  explains its constraints, and nothing reaches the game until you `save` (a backup is taken and the
-  file is replaced atomically).
-- **Problems.** It checks dependencies, incompatibilities and load order. It merges and inherits Defs
-  the way the game does and simulates PatchOperations, so a failure comes with a reason
-  (`target-inactive`, `stale-name`, `node-absent`…). It reads Harmony patches straight from the mods'
-  assemblies.
-- **Logs.** It attributes Player.log errors to mods. Each mod gets a role (source, patcher,
-  dependency or mentioned) together with the evidence, the file and line, and the next step.
-- **Code.** It decompiles assemblies on demand with ilspycmd and caches the result per DLL hash.
+- [Highlights](#highlights)
+- [A check-up before you launch](#a-check-up-before-you-launch)
+- [Lists and games](#lists-and-games)
+- [Mod library](#mod-library)
+- [Saves](#saves)
+- [Archo Monitor](#archo-monitor)
+- [AI agents and MCP](#ai-agents-and-mcp)
+- [Install](#install)
+- [Privacy and safety](#privacy-and-safety)
+- [FAQ](#faq)
+- [Links](#links)
 
-Requested actions write game files: `save` writes ModsConfig.xml and `copy-local` creates a new
-folder in `Mods/`. When you enable a mod
-from a SteamCMD or extra folder, `save` also links it into `Mods/` as `_Archo_<source>_<folder>` (a
-junction, no admin rights needed) and removes that link once you disable it. It only creates and
-deletes links with that prefix and never writes into their targets. Its own data lives in
-`%APPDATA%\RimArcho\`.
+## Highlights
 
-Switching environments also prepares missing links needed by the destination's mod list
-before scanning it: shared mods such as Archo Monitor, and local mods from the previous
-environment. Local links use `_Archo_env_<instance>` and stay installed across plan changes.
-Existing local copies are kept; switching does not write ModsConfig.xml.
+- **Light** — With 6,574 Mod copies and 601 Mods enabled: about 100 MB at rest, under 250 MB after visiting every page, about 47 MB in the terminal UI, 0.2–1.1 % of one CPU core at rest. Leave it open while you play.
+- **Built on real data** — Sorting and conflict checks were iterated on 40,326 error logs shared by players and 5,143 downloaded Mods.
+- **Will it run?** Dependencies, load order, patches, Harmony patches, memory and your last save are checked before the game starts.
+- **Readable logs** — Errors are grouped, rated by how much they matter and pinned on the Mod behind them.
+- **Lists and games** — Several lists, several game installs (1.6 and 1.7 side by side) sharing one set of Mods, full undo history.
+- **Three faces, one program** — A desktop window, a terminal UI, a scriptable CLI and an MCP server for AI agents, all showing the same facts.
+- **Bring your data** — Import lists, rules and data from RimSort, RimCrow and RimPy.
+
+<p align="center"><img src="docs/assets/readme/en/13-performance.webp" width="720" alt="Measured memory and CPU use"></p>
+
+## A check-up before you launch
+
+**Can it run** looks at your list before the game does:
+
+- **Sorting.** RimArcho's own sorting algorithm, grown from the shared logs, and it explains each
+  constraint it follows. It also tells you which Mods tend to fail together and suggests disabling one.
+- **Static checks.** Missing and inactive dependencies, incompatibilities, load order. Defs are merged
+  and inherited the way the game does and PatchOperations are simulated, so a failed patch comes with
+  a reason. Harmony patches are read straight from the Mods' assemblies (DLLs). This can't catch
+  conflicts that only appear while the game runs, but it finds many problems in advance.
+- **Your save.** RimArcho reads which Mods your last save uses and compares them with the current
+  list, so you know whether it will still load after you change the list.
+- **Memory.** It estimates the RAM and VRAM your list needs and warns you if your computer can't
+  handle it, instead of crashing after a 20-minute load.
+
+![Can it run: what breaks the game, what is worth knowing, and the last run's errors](docs/assets/readme/en/02-can-it-run.webp)
+
+**Game log.** RimArcho reads the log the game writes while you play and sums up what went wrong,
+so you don't get lost in ten thousand lines. Based on the 40,326 logs, every kind of error gets a
+severity: most of the red and yellow text can safely be ignored, and the errors that need attention
+are picked out for you, each with the Mod behind it, the evidence and what to try first.
+
+![Game log with Archo Monitor's entries and the log analysis](docs/assets/readme/en/04-game-log.webp)
+
+## Lists and games
+
+Keep several lists, and let several game installs share one set of downloaded Mods. RimArcho links
+Mods into each game (directory junctions on Windows, symbolic links on Linux), so one copy of a Mod
+works in every install, and RimWorld 1.6 and 1.7 can live side by side. It can also download other
+game versions with SteamCMD.
+
+![Adding a game: one you have, or a version downloaded with SteamCMD](docs/assets/readme/en/07-games.webp)
+
+Lists can follow a Steam collection and catch up when it changes. List history records every
+change, so you can roll back at any time. **Lock version** copies the Mod you're using into a locked
+copy, so Steam's automatic updates can't overwrite it.
+
+![All lists: a list that follows three Steam collections](docs/assets/readme/en/06-list-follow.webp)
+
+## Mod library
+
+RimArcho shows what each Mod update changed: no more staring at "Updating RimWorld: Steam Workshop"
+and wondering which Mod it was.
+
+![Updates: what changed in each Mod, and Mods removed from the Workshop](docs/assets/readme/en/08-updates.webp)
+
+The details page shows the Steam Workshop description instead of an About.xml most authors never
+fill in, every copy of the Mod and the lists that use it.
+
+![Mod details: Workshop description, copies, lists and fields](docs/assets/readme/en/09-details.webp)
+
+- Add Mods from Steam Workshop, GitHub and LoversLab links, and they update when the Mods do.
+- Texture optimisation uses [todds](https://github.com/joseasoler/todds) to convert the PNGs in your
+  Mods to DDS, lowering the game's memory use. The PNGs stay, and RimArcho can take the DDS files back.
+- Search the files of every Mod, and change Mod settings without starting the game.
+
+## Saves
+
+Saves are grouped into colonies, so no more staring at "New Arrival 43" with no idea what it is.
+Colony grouping understands the RimSaves file names. For each save RimArcho reads which Mods it uses
+and tells you whether removing one loses content and whether the save still loads.
+
+## Archo Monitor
+
+<img src="docs/assets/release-post/workshop-preview.gif" width="400" align="right" alt="Archo Monitor's preview: Archo watches the log and finds the Mod behind an error">
+
+Archo Monitor is RimArcho's in-game companion Mod, bundled with every release and added to your
+lists for you. It records what `Player.log` cannot say: the XML file and Def being loaded when an
+error happens, which Mods own the code and Harmony patches on the stack, and how many errors came
+after the game stopped logging. RimArcho reads its log to show evidence for each problem.
+
+It changes nothing in the game, can be added or removed at any time and costs next to nothing. It
+works without RimArcho too: **Errors by Mod…** in its Mod settings lists this session's errors
+grouped by Mod. RimWorld 1.5, 1.6 and 1.7; needs Harmony.
+
+<br clear="right">
+
+## AI agents and MCP
+
+Everything works without AI. AI agents are RimArcho's second kind of user: through MCP they get the
+same facts and the same actions as you, and follow the same rules. Nothing is written to the game
+until a list is saved or launched, and edits can be undone. A built-in AI agent is on the way.
+
+**To set it up, give this README to your AI agent** (Codex, Claude Code, Pi Agent, DeepSeek Harness…)
+and it can install everything itself, following [Install](#install) and
+[Connecting an agent](#connecting-an-agent-archo-mcp).
+
+The MCP server has 47 tools with progressive disclosure (30 served by default): read Mods, Defs,
+patches, Harmony patches, logs, Mod settings, saves and C# source; edit, save and launch lists; and
+test runs that start the game by themselves. RimArcho also ships the
+[RimWorld Probe skill](skills/rimworld-probe/SKILL.md), which lets an agent build small test Mods,
+run them in the game and check what a behaviour actually does.
+
+**Archo MCP troubleshooting test.** An A/B test in Pi Agent with DeepSeek V4.1 Flash, on a real
+RimWorld 1.6 with 35 real Mods and 5 kinds of common faults injected. The agent has to find the Mod
+at fault and submit a fix; a run passes only when every new error is gone after the game restarts.
+Each fault ran 3 times per group, 15 minutes per run.
+
+| Fault | With Archo MCP | Without |
+| --- | --- | --- |
+| Misspelled XML class name | 3/3 · 1.3M tokens | 3/3 · 3.0M |
+| Patch conflicts with load order | 3/3 · 2.9M | 2/3 · 1.6M |
+| Harmony patch target method missing (DLL must be rebuilt) | 3/3 · 2.3M | 2/3 · 3.3M |
+| Missing dependency | 3/3 · 2.4M | 1/3 · 4.4M |
+| Error points at an innocent Mod | 3/3 · 2.3M | 2/3 · 2.6M |
+| **Total** | **15/15** · average 2.3M | 10/15 · average 3.0M |
+
+Archo MCP makes the agent better at finding and fixing errors, with fewer tokens: about $0.003 per fix.
+
+<p align="center"><img src="docs/assets/readme/en/14-mcp-ab.webp" width="720" alt="Archo MCP troubleshooting test results"></p>
 
 ## Install
 
-1. Download `archo-<version>-windows-amd64.zip` and unzip it anywhere, for example `C:\Tools\RimArcho\`.
-2. Optionally, add that folder to `PATH`.
-3. Optionally, install ilspycmd, which `archo source` uses for C# code. It needs the .NET SDK:
-   ```
-   dotnet tool install --global ilspycmd
-   ```
-   RimArcho never installs it for you; it tells you when it is missing.
+### Requirements
 
-The executables are not code-signed. The first time you run `RimArcho.exe` or `archo.exe`, Windows
-SmartScreen may say "Windows protected your PC": choose **More info**, then **Run anyway**. You can
-check a download against the source by building it yourself (below).
+| Platform | Needs |
+|---|---|
+| Windows | Windows 10 or 11, 64-bit. The window needs Microsoft Edge WebView2, which both already have. |
+| Linux (experimental) | `archo` (terminal UI, CLI, MCP) needs nothing installed. The window, `rimarcho`, needs GTK 3 and WebKitGTK 4.1 (Ubuntu 22.04, Debian 12, Fedora 40 or newer). Native, Proton and Flatpak Steam games are found. |
+| RimWorld | 1.6 and 1.7 (Steam, SteamCMD or DRM-free copies). |
+| Optional | [ilspycmd](https://github.com/icsharpcode/ILSpy) (needs the .NET SDK) to read Mods' C# code; RimArcho never installs it for you. |
+
+### Windows
+
+1. Download `archo-<version>-windows-amd64.zip` from
+   [GitHub Releases](https://github.com/ToumanLin/RimArcho/releases/latest) (or, if GitHub is
+   unreachable, from [Lanzou](https://rimarcho.lanzn.com/b01i608qja), password `ctot`).
+2. **New users:** unzip it into any folder, for example `C:\Tools\RimArcho\`, and double-click
+   `RimArcho.exe`. A first-run guide finds your games, reads your Mods once and offers to bring your
+   lists over from the game, RimSort, RimCrow or RimPy.
+3. **Existing users:** RimArcho updates itself (Settings › About, or `archo update`). By hand, replace
+   your old `RimArcho.exe` and `archo.exe` with the new ones.
+4. Optional: add the folder to `PATH` to type `archo` in any terminal.
+
+The executables are not code-signed, so the first time you run one Windows may say "Windows
+protected your PC": choose **More info**, then **Run anyway**. Each release has a `.sha256`
+checksum, and you can build it yourself from this source (below).
 
 ### Linux (experimental)
 
-From 1.0.9 each release also has `archo-<version>-linux-amd64.tar.gz`: `archo` only, with the
-terminal UI, CLI and MCP. There is no window. It finds native, Proton and Flatpak Steam games, but
-it has been tested only with synthetic data, not yet with a real game on Linux, so expect bugs and
-keep a backup of your saves and Mod lists. Extract it anywhere and run `./archo`. RimArcho does not
-update itself on Linux; `archo update` shows the new version and how to install it. Texture
-optimisation needs a native `todds` on `PATH`. Please report problems on GitHub.
+Download `archo-<version>-linux-amd64.tar.gz`, extract it anywhere and run `./archo` (terminal UI)
+or `./rimarcho` (window). Linux support is new and still being tested, so expect rough edges and
+keep a backup of your saves and Mod lists. RimArcho does not update itself
+on Linux; `archo update` shows the new version and how to install it. Texture optimisation needs a
+native `todds` on `PATH`. Please report problems on GitHub.
 
-To build from source (Go 1.27+), run `go build -o archo.exe ./cmd/archo`, or
-`pwsh scripts/release.ps1 -Version x.y.z` for a release zip with the version stamped in.
+### Build from source
 
-## First run
+Go 1.27 or newer: `go build -o archo.exe ./cmd/archo`, or `pwsh scripts/release.ps1 -Version x.y.z`
+for a release zip with the version stamped in. Architecture and specifications are in
+[docs/](docs/README.md).
+
+### First run from the command line
 
 ```
 archo env detect                 # finds the game, the user data folder and the Workshop folder
-archo env add main --detected    # registers them as environment "main"
-archo scan                       # reads every mod folder (incremental afterwards)
+archo env add main --detected    # registers them as Game Config "main"
+archo scan                       # reads every Mod folder (incremental afterwards)
+archo status                     # overview: Mods, the list, problem counts
+archo problems                   # what is wrong, most severe first
+archo log                        # attribute the newest Player.log
 ```
 
-Then double-click `RimArcho.exe` for the window, or run `archo` for the terminal UI (in the
-terminal you start it from; a double click opens Windows' default terminal). `archo gui` opens the
-window from a terminal. The window needs Microsoft Edge WebView2, which Windows 10 and 11 already have.
+Then double-click `RimArcho.exe` for the window, or run `archo` for the terminal UI. `archo help`
+lists every command; `archo <command> --help` shows its flags.
 
-Useful next steps:
+### Connecting an agent (`archo mcp`)
 
-```
-archo status                       # overview: mods, Loadout, problem counts
-archo problems                     # what is wrong, most severe first
-archo log                          # attribute the newest Player.log
-archo import rimcrow --db "D:\Game\RimModManager\data\mod_manager.db" --dry-run   # coming from RimCrow
-```
-
-`archo help` lists every command. `archo <command> --help` shows its flags.
-
-## Keys (window and terminal)
-
-Both interfaces follow one rule set: **the arrows only move** (the cursor, the focus, the scroll)
-and never change anything; **keys that change things act at once** on the selection (or the row
-under the cursor) and `u` undoes them. The top line always says where you are.
-
-| Keys | |
-|---|---|
-| `↑/↓`, `←/→`, `1`–`4` | move the cursor; go to Disabled, Enabled, Staging, details |
-| `PgUp/PgDn` | scroll the details from anywhere |
-| `shift+↑/↓`, `ctrl+space` | select a range; select or unselect one |
-| `space` | enable (where the load order wants it) / disable / put back from staging |
-| `t`, `T` | stage (or put back); put everything back |
-| `m`, `J` / `K` | move to a position or after a mod; move down / up |
-| `#` | tags |
-| `enter`, `o` | full details; the Workshop page |
-| `S` / `w` / `L` | sort / save to the game / launch (each shows a preview first) |
-| `u` / `ctrl+r` | undo / redo (the window also takes `ctrl+z` / `ctrl+y`) |
-| `/` | search the list: words, `tag:`, `author:`, `type:`, `has:`, `-not` |
-| `!`, `c` | needs attention; recent changes |
-| `R`, `A`, `E` | rescan; check the files again; switch environment |
-| `ctrl+k`, `?` | command palette; all keys |
-
-The filter bar in the plan editor and mod library includes **Location**: the registered
-source folder (for example, the game's `Mods/`, Workshop, or an individual SteamCMD or extra
-folder). Pick several locations to include any of them, or exclude a location with a right
-click. Locations combine with the other filter groups. Search also accepts
-`location:"D:\Steam Library\steamapps\common\RimWorld\Mods"`; the CLI uses
-`archo library --include 'location:D:\Steam Library\steamapps\common\RimWorld\Mods'`.
-
-In the window, the mouse does the same: click, `shift`/`ctrl`+click, double-click to enable or
-disable, drag between lists (enable, disable, stage) or within Enabled (reorder), right-click for
-what you can do with the mod. The language follows the system; change it with
-`archo config set ui.lang zh|en|auto`.
-
-Settings lists every registered game, Workshop, SteamCMD and other mod directory, together with
-RimArcho's lock library and packs directory. Each entry shows its actual path, including default
-locations. **Locate** reconnects a folder you moved yourself; **Move to…** moves it to a new path.
-Mod identities, tags and lists stay attached to the directory. A destination already in use is
-never overwritten. For moves across drives, move the folder with your file manager and use Locate.
-
-RimArcho checks these directories at every start. If one is missing or changed, it asks for its
-new location; you can skip the prompt and return through Settings or **Can it run**. Directory
-issues appear there as warnings. CLI users can run `archo folder check`, then
-`archo folder set <directory-id> <new-directory>` or `archo folder move <directory-id> <new-directory>`.
-
-## Connecting an agent (`archo mcp`)
-
-`archo mcp` serves the RimArcho tools over stdio. By default it serves the core tools an agent
-needs to diagnose and fix a Mod list: reading Mods, Defs, Patches, Harmony patches, the log and
-C# source; editing, saving and launching the plan; test runs; locking versions; rules and ignored
-problems. `archo mcp --tools all` also serves the player's management tools: packs,
-subscriptions, library actions, texture optimisation, the memory estimate, maintenance, identity
-answers, hidden Mods, link repair, tags and notes, and the uninstall preview. Add `--tools all`
-to the command only when you want the agent to do those too; every tool costs context on each
-turn.
-
-Each tool returns exactly what the matching CLI command prints. The tool descriptions and the server
-instructions explain the diagnosis workflow, and the `guide` tool gives each tool's full reference,
-so the agent needs no extra skill. Read-only tools are annotated `readOnlyHint`, which lets the
-client auto-approve them; tools that write game or Mod files are annotated `destructiveHint`.
+`archo mcp` serves the RimArcho tools over stdio. By default it serves the core tools an agent needs
+to diagnose and fix a Mod list. `archo mcp --tools all` adds the player's management tools (packs,
+subscriptions, library actions, textures, the memory estimate, maintenance, identity, hidden Mods,
+links, tags and notes, the uninstall preview); add it only when you want the agent to do those too,
+since every tool costs context on each turn. Each tool returns exactly what the matching CLI command
+prints; read-only tools are annotated `readOnlyHint`, tools that write game or Mod files
+`destructiveHint`.
 
 **Claude Code**, from a terminal:
 
 ```
 claude mcp add rimarcho -- C:\Tools\RimArcho\archo.exe mcp
 ```
-
-With the management tools: `claude mcp add rimarcho -- C:\Tools\RimArcho\archo.exe mcp --tools all`.
 
 Or in a project's `.mcp.json`:
 
@@ -192,24 +261,133 @@ command = 'C:\Tools\RimArcho\archo.exe'
 args = ["mcp"]
 ```
 
-In `.mcp.json` and `config.toml`, `"args": ["mcp", "--tools", "all"]` serves the management tools too.
+`"args": ["mcp", "--tools", "all"]` serves the management tools too. Then ask, for example: "My log
+has `Patch operation … failed` errors, which Mod is wrong?" or paste a stack trace. A tool call can
+pass `env` to use another Game Config and `game_version` to analyse as another game version. The
+`guide` tool gives each tool's full reference, so the agent needs no extra skill.
 
-Then ask, for example: "My log has `Patch operation … failed` errors, which mod is wrong?" or
-paste a stack trace. To use another environment, a tool call can pass `env`. To analyse as another
-game version, it can pass `game_version`.
+<details>
+<summary><b>Keys (window and terminal)</b></summary>
 
-## Where things are
+Both interfaces follow one rule set: **the arrows only move** and never change anything; **keys that
+change things act at once** on the selection and `u` undoes them.
 
-| | |
+| Keys | |
 |---|---|
-| RimArcho data | `%APPDATA%\RimArcho\` (database, Loadout history, decompile cache) |
-| Decompiled code | `%APPDATA%\RimArcho\cache\source\<dll hash>\` |
-| Game file it writes | `<user data>\Config\ModsConfig.xml`, only on `save`; the previous file is kept next to it as a backup |
+| `↑/↓`, `←/→`, `1`–`4` | move the cursor; go to Disabled, Enabled, Staging, details |
+| `shift+↑/↓`, `ctrl+space` | select a range; select or unselect one |
+| `space` | enable / disable / put back from staging |
+| `t`, `T` | stage (or put back); put everything back |
+| `m`, `J` / `K` | move to a position or after a Mod; move down / up |
+| `enter`, `o` | full details; the Workshop page |
+| `S` / `w` / `L` | sort / save to the game / launch (each shows a preview first) |
+| `u` / `ctrl+r` | undo / redo (the window also takes `ctrl+z` / `ctrl+y`) |
+| `/` | search: words, `tag:`, `author:`, `type:`, `has:`, `location:`, `-not` |
+| `ctrl+k`, `?` | command palette; all keys |
 
-## Licence
+In the window, the mouse does the same: click, `shift`/`ctrl`+click, double-click to enable or
+disable, drag between lists or within Enabled, right-click for what you can do with the Mod.
 
-See the repository.
+</details>
+
+## Privacy and safety
+
+RimArcho is built to respect your files. The full list of what it writes, and how uninstall
+reverses each write, is in [02 · File writes and uninstall](docs/specs/02-file-writes-and-uninstall.md).
+
+**What it touches**
+
+- **`ModsConfig.xml`**, only when you save or launch a list. The previous file is kept next to it as a
+  backup and the new one replaces it atomically.
+- **Links in the game's `Mods/` folder**, named `_Archo_…`, to Mods from SteamCMD, extra folders and
+  the bundled Archo Monitor. It creates and removes only links with that prefix and never writes into
+  their targets.
+- **Things you ask for:** a locked copy of a Mod, DDS textures next to the PNGs, a Mod settings value
+  (after a `.rimarcho.bak` copy of the file), save renames and copies.
+- **Its own data:** `%APPDATA%\RimArcho\` (database, list history, caches) and the managed folder
+  `%LOCALAPPDATA%\RimArcho\` (SteamCMD, tools, downloaded Mods), or the XDG folders on Linux.
+
+**What it never does**
+
+- No telemetry. Network access is limited to what you start and, if automatic checks are on,
+  checking for updates (RimArcho, Mods, community data) and fetching Workshop descriptions; each can be
+  turned off.
+- It never asks for, stores or passes on passwords or Steam Guard codes: SteamCMD signs in only in
+  its own window, LoversLab only in the site's own page.
+- It never permanently deletes your content: removed Mods, saves, packs and settings files go to the
+  Recycle Bin, and every list edit can be undone.
+- An AI agent's changes reach the game only when a list is saved or launched, as yours do, and agents
+  are told to ask you before anything that writes.
+- Feedback reports are sent only when you press send, and you see their content first.
+
+**Uninstall** (Settings, or `archo uninstall`) shows what it will remove, takes away its links and
+data, and leaves your game, Mods and saves as they were.
+
+## FAQ
+
+<details>
+<summary><b>Windows says "Windows protected your PC".</b></summary>
+
+The executables are not code-signed. Choose **More info**, then **Run anyway**. You can compare the
+download with its `.sha256` file or build it yourself from source.
+</details>
+
+<details>
+<summary><b>Do I have to give up RimSort, RimCrow or RimPy?</b></summary>
+
+No. The first-run guide (and `archo import`) reads their lists, rules and data and shows what will be
+imported before anything changes. RimArcho never writes into their files.
+</details>
+
+<details>
+<summary><b>Will it break my saves or my Mod list?</b></summary>
+
+Nothing reaches the game until you save or launch a list, and every edit can be undone from the list's
+history. Can it run tells you whether your last save still loads with the list you are about to play.
+</details>
+
+<details>
+<summary><b>Can I run RimWorld 1.6 and 1.7 at the same time?</b></summary>
+
+Yes. Add each install as its own Game Config (or download another version with SteamCMD); they share
+one set of downloaded Mods, each with its own lists.
+</details>
+
+<details>
+<summary><b>Does it need AI?</b></summary>
+
+No. Every feature works without AI. MCP is there for players who want an agent to help diagnose and
+fix a Mod list.
+</details>
+
+<details>
+<summary><b>Why does a Mod called Archo Monitor appear in my list?</b></summary>
+
+It is RimArcho's in-game companion (see [Archo Monitor](#archo-monitor)). It records evidence for
+errors and changes nothing in the game. Settings › Game log › "add Archo Monitor to lists" turns
+off adding it, and you can remove it from any list.
+</details>
+
+<details>
+<summary><b>Where are my files?</b></summary>
+
+| What | Where |
+|---|---|
+| RimArcho data | `%APPDATA%\RimArcho\` (database, list history, decompile cache) |
+| Managed folder | `%LOCALAPPDATA%\RimArcho\` (SteamCMD, tools, downloaded Mods; can be moved) |
+| Game file it writes | `<user data>\Config\ModsConfig.xml`, only when you save or launch; a backup is kept next to it |
+</details>
+
+## Links
+
+- [Releases](https://github.com/ToumanLin/RimArcho/releases) · [Lanzou mirror](https://rimarcho.lanzn.com/b01i608qja) (password `ctot`)
+- [User guide](UserGuide/user-guide.md) ([Simplified Chinese](UserGuide/user-guide.zh-CN.md))
+- [Changelog](CHANGELOG.md)
+- [Discord](https://discord.gg/HF2GVyurQs) · [Issues](https://github.com/ToumanLin/RimArcho/issues)
+- [Design and specifications](docs/README.md)
+
+If you find RimArcho useful, a star on GitHub helps more players find it. Thank you!
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+[MIT](LICENSE) © Touman Lin. RimArcho is a fan-made tool and is not affiliated with Ludeon Studios.

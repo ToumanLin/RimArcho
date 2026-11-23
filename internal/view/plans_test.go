@@ -234,7 +234,7 @@ func TestHomePerPlan(t *testing.T) {
 	for _, r := range h.Rows {
 		order = append(order, r.Name+"="+r.State)
 	}
-	want := "Beta=not checked yet,Pack=checked when created,default=not checked yet,Alpha=1 problems break the game,Zeta=not checked yet"
+	want := "Beta=not checked yet,Pack=checked when created,default=not checked yet,Alpha=1 problem breaks the game,Zeta=not checked yet"
 	if strings.Join(order, ",") != want {
 		t.Fatalf("order\n got %v\nwant %s", order, want)
 	}
@@ -325,6 +325,6 @@ func TestNavCapsAndCounts(t *testing.T) {
 		t.Fatalf("sidebar packs %v", got)
 	}
 	if few := view.Nav(0, rows[:2], packs[:2])[1]; few.Items[0].Kids[0].Label != "all lists" || len(few.Items[1].Kids) != 2 {
-		t.Fatalf("few: %+v", few.Items[1:3])
+		t.Fatalf("few: %+v", few.Items[0:2])
 	}
 }

@@ -1,6 +1,6 @@
 package app
 
-// RimArcho updating itself (17 §5.1): the "self" check reads Workshop or GitHub;
+// RimArcho updating itself (17 §5.1): the "self" check reads release metadata;
 // installing waits for the player's confirmation, downloads and verifies the release zip,
 // waits until no other RimArcho runs from the program folder, swaps the files and checks
 // the new program before the surface restarts it. The data folder is never touched.
@@ -20,13 +20,16 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/buildinfo"
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/netcfg"
+	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/selfupdate"
+	"github.com/ToumanLin/RimArcho/internal/updatechannel"
 )
 
 // UpdateDirName is the folder inside the program folder that holds the download, the
 // unpacked new files and the old files moved aside; on the program's volume so the swap
 // is renames only (17 §5.1, 02 §1).
-const UpdateDirName = ".archo-update"
+const UpdateDirName = selfupdate.UpdateDir
 
 // UpdatedFromEnv carries the pid of the process that installed an update to the program it
 // restarted: the new one waits for it to exit before removing the old files.
@@ -34,11 +37,13 @@ const UpdatedFromEnv = "RIMARCHO_UPDATED_FROM"
 
 // SelfUpdate is meta "self-update": the newest release the last check found.
 type SelfUpdate struct {
-	Source   string              `json:"source,omitempty"`
-	Fallback string              `json:"fallback,omitempty"`
-	Checked  time.Time           `json:"checked"`
-	Release  *selfupdate.Release `json:"release,omitempty"`
-	State    string              `json:"state"`
+	Source   string                       `json:"source,omitempty"`
+	Fallback string                       `json:"fallback,omitempty"`
+	Checked  time.Time                    `json:"checked"`
+	Release  *selfupdate.Release          `json:"release,omitempty"`
+	State    string                       `json:"state"`
+	Sources  []updatechannel.SourceResult `json:"sources"`
+	Manual   string                       `json:"manual,omitempty"` // Version whose automatic download failed.
 }
 
 // SelfVersionNow is the running version ("dev" for a plain go build).
@@ -99,28 +104,59 @@ func (a *App) CheckSelfUpdate(ctx context.Context) (int, string, error) {
 	s := a.SelfUpdateInfo()
 	var r *selfupdate.Release
 	var err error
-	source, fallback := "GitHub", ""
-	if runtime.GOOS == "windows" && a.Store.Meta("cfg:updates.source") != "github" && !selfPrerelease(cur) && updateWorkshopItem() != "" {
-		r, err = a.workshopSelfRelease(ctx)
+	source := "GitHub"
+	s.Sources = nil
+	if runtime.GOOS == "windows" && a.Store.Meta("cfg:updates.source") != "github" && !selfPrerelease(cur) {
+		var report updatechannel.Report
+		// GitHub's release metadata never comes through an automatic mirror (17 §2.2).
+		report, err = updatechannel.Check(netcfg.WithoutAutoMirror(ctx), updatechannel.Options{
+			GitHub: *a.selfClient(), HTTP: a.HTTP, SteamAPI: a.SteamAPI, Lanzou: a.selfLanzou(),
+		})
+		s.Sources = report.Sources
 		if err == nil {
-			source = "Workshop"
-		} else {
-			fallback = err.Error()
+			var names []string
+			for _, result := range report.Sources {
+				if result.Status == "ok" && result.Version == report.Version {
+					names = append(names, map[string]string{"github": "GitHub", "monitor": "Monitor", "lanzou": "Lanzou"}[result.Source])
+				}
+			}
+			source = strings.Join(names, ", ")
+			r = mirrorSelfRelease(report.Version)
+			if report.GitHub != nil && report.GitHub.Version == report.Version {
+				r = report.GitHub
+				// Keep GitHub's metadata even if its assets are incomplete; the
+				// exact version may still be installable from Lanzou (17 §5.1).
+				if r.Installable() != nil {
+					r.Mirror = true
+					if r.Zip.Name == "" {
+						r.Zip.Name = selfupdate.ZipName(r.Version, "windows", "amd64")
+					}
+				}
+			}
 		}
-	}
-	if r == nil {
-		r, err = a.selfClient().Latest(ctx, selfPrerelease(cur))
+	} else {
+		r, err = a.selfClient().Latest(netcfg.WithoutAutoMirror(ctx), selfPrerelease(cur))
+		result := updatechannel.SourceResult{Source: "github", Status: "ok"}
+		if err != nil {
+			result.Status, result.Error = "failed", "GitHub release lookup failed"
+		} else {
+			result.Version, result.HasChecksum = r.Version, r.Sum.URL != ""
+		}
+		s.Sources = []updatechannel.SourceResult{result}
 	}
 	s.Checked = a.Now().UTC()
 	switch {
 	case errors.Is(err, selfupdate.ErrNoRelease):
 		s.Release, s.State, err = nil, "no release published yet", nil
-		s.Source, s.Fallback = source, fallback
+		s.Source, s.Fallback = source, ""
 	case err != nil:
 		s.State = "check unavailable offline" // the last known release stays
 	default:
 		s.Release, s.State = r, "up to date"
-		s.Source, s.Fallback = source, fallback
+		s.Source, s.Fallback = source, ""
+		if s.Manual != "" && selfupdate.Newer(s.Manual, r.Version) {
+			s.Manual = ""
+		}
 		if selfupdate.Newer(cur, r.Version) {
 			s.State = "new version available"
 		}
@@ -187,6 +223,32 @@ var ErrUpdateBusy = errors.New("another RimArcho is already installing the updat
 // new archo must then report the new version, or the old files are put back. The caller
 // restarts the program; the data folder is not touched.
 func (a *App) InstallSelfUpdate(ctx context.Context, step func(SelfUpdateStep)) (*SelfUpdateResult, error) {
+	return a.installSelfUpdate(ctx, "", step)
+}
+
+// InstallSelfUpdateFrom stages a player-picked ZIP without changing the original.
+// It shares the automatic install's lock, journal, checks and rollback (17 §5.1).
+func (a *App) InstallSelfUpdateFrom(ctx context.Context, zipPath string, step func(SelfUpdateStep)) (*SelfUpdateResult, error) {
+	if strings.TrimSpace(zipPath) == "" {
+		return nil, errors.New("choose a release ZIP")
+	}
+	return a.installSelfUpdate(ctx, zipPath, step)
+}
+
+func (a *App) installSelfUpdate(ctx context.Context, picked string, step func(SelfUpdateStep)) (res *SelfUpdateResult, err error) {
+	// The operation log (13 §1.3) records the attempt once a release was chosen: refused
+	// while nothing changed, failed or rolled back after the files began to change.
+	var o *opRun
+	defer func() {
+		if o == nil && err != nil && a.Ops != nil && !errors.Is(err, ErrUpdateBusy) {
+			o = a.opStart(false, func() oplog.Row { return oplog.Row{Op: oplog.UpdateApply, Subject: "RimArcho " + a.SelfVersionNow()} })
+		}
+		detail := ""
+		if res != nil {
+			detail = res.From + " → " + res.To
+		}
+		o.end(err, detail)
+	}()
 	if !SelfUpdateSupported() {
 		return nil, errors.New("update RimArcho manually: " + a.SelfUpdateInstructions())
 	}
@@ -206,9 +268,22 @@ func (a *App) InstallSelfUpdate(ctx context.Context, step func(SelfUpdateStep)) 
 		return nil, errors.New("a development build is not updated; build or download a release")
 	}
 	r := a.SelfUpdatePending()
+	if picked != "" {
+		version := manualSelfVersion(filepath.Base(picked))
+		if version == "" && r != nil {
+			version = r.Version
+		}
+		if !selfupdate.Newer(cur, version) {
+			return nil, fmt.Errorf("the selected ZIP must name a version newer than RimArcho %s; check for updates if its filename has no version", cur)
+		}
+		r = mirrorSelfRelease(version)
+	}
 	if r == nil {
 		return nil, fmt.Errorf("RimArcho %s is the newest version known; check for updates first", cur)
 	}
+	o = a.opStart(false, func() oplog.Row {
+		return oplog.Row{Op: oplog.UpdateApply, Subject: "RimArcho " + r.Version, Target: picked}
+	})
 	if err := r.Installable(); err != nil {
 		return nil, fmt.Errorf("%w; download it from %s", err, r.Page)
 	}
@@ -233,9 +308,14 @@ func (a *App) InstallSelfUpdate(ctx context.Context, step func(SelfUpdateStep)) 
 		return &SelfUpdateResult{From: cur, To: done, Program: program}, nil
 	}
 
-	zip, err := a.downloadSelfUpdate(ctx, r, filepath.Join(dir, "download"), step)
+	var zip string
+	if picked != "" {
+		zip, err = a.stageSelfUpdate(ctx, r.Version, picked, filepath.Join(dir, "download"), step)
+	} else {
+		zip, err = a.downloadSelfUpdate(ctx, r, filepath.Join(dir, "download"), step)
+	}
 	if err != nil {
-		if errors.Is(err, selfupdate.ErrChecksum) {
+		if errors.Is(err, selfupdate.ErrChecksum) && !errors.Is(err, ErrSelfDownloadManual) {
 			return nil, fmt.Errorf("the downloaded RimArcho %s does not match its checksum; nothing was changed", r.Version)
 		}
 		return nil, fmt.Errorf("download failed; nothing was changed: %w", err)
@@ -278,14 +358,18 @@ func (a *App) InstallSelfUpdate(ctx context.Context, step func(SelfUpdateStep)) 
 	swapping.Add(1)
 	defer swapping.Done()
 	step(SelfUpdateStep{Phase: "replace"})
+	o.begin()
+	o.row.Target = program
 	old := filepath.Join(dir, fmt.Sprintf("old-%s-%d", cur, time.Now().UnixNano()))
-	swap, err := selfupdate.ApplyRecorded(program, stage, old, journal, r.Version)
+	swap, err := selfupdate.ApplyRelease(program, stage, old, journal, r.Version)
 	if err != nil {
 		return nil, fmt.Errorf("could not replace the program files; RimArcho %s is unchanged: %w", cur, err)
 	}
 	step(SelfUpdateStep{Phase: "check"})
 	if err := a.checkNewProgram(program, r.Version); err != nil {
-		if rb := swap.Rollback(); rb != nil {
+		rb := swap.Rollback()
+		a.logRollback(program, cur, r.Version, err, rb)
+		if rb != nil {
 			return nil, fmt.Errorf("the new program did not start (%s), and putting RimArcho %s back failed: %w; the old files are in %s, and the next start tries again", err.Error(), cur, rb, old)
 		}
 		return nil, fmt.Errorf("the new program did not start, so RimArcho %s was put back: %w", cur, err)
@@ -298,7 +382,7 @@ func (a *App) InstallSelfUpdate(ctx context.Context, step func(SelfUpdateStep)) 
 	return &SelfUpdateResult{From: cur, To: r.Version, Program: program}, nil
 }
 
-// swapJournalName is the swap's record in the update folder (selfupdate.ApplyRecorded):
+// swapJournalName is the swap's record in the update folder (selfupdate.ApplyRelease):
 // present only while program files are being replaced or put back.
 const swapJournalName = "swap.json"
 
@@ -316,6 +400,10 @@ func (a *App) checkNewProgram(program, want string) error {
 }
 
 func (a *App) recordSelfInstalled(version string) {
+	info := a.SelfUpdateInfo()
+	info.Manual = ""
+	b, _ := json.Marshal(info)
+	_ = a.Store.SetMeta("self-update", string(b))
 	s := a.AutomaticStatus("self")
 	if s.Kind != "" && !s.Checked.IsZero() {
 		s.Pending, s.State = 0, "installed "+version
@@ -350,7 +438,9 @@ func (a *App) resumeSelfSwap(program, dir string) (done string, err error) {
 			return swap.Version, nil
 		}
 	}
-	if rb := swap.Rollback(); rb != nil {
+	rb := swap.Rollback()
+	a.logRollback(program, "", swap.Version, err, rb)
+	if rb != nil {
 		return "", errors.Join(err, rb)
 	}
 	os.RemoveAll(swap.Stage)

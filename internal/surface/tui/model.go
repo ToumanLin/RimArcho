@@ -59,12 +59,15 @@ const (
 
 // panel is a secondary screen: command output to read, or a chooser.
 type panel struct {
-	title   string
-	lines   []string
-	off     int
-	choices []string // chooser values (env names)
-	choice  int
-	onPick  func(m *model, value string) tea.Cmd
+	title         string
+	lines         []string
+	off           int
+	choiceLabels  map[string]string
+	choiceCurrent map[int]bool
+	choiceHeads   map[int]string // a faint heading above choice i, not a choice (the Game Config picker's installations)
+	choices       []string       // chooser values (env names)
+	choice        int
+	onPick        func(m *model, value string) tea.Cmd
 	// onPickAt: enter on choice i, for choices whose labels may repeat (H's steps)
 	onPickAt func(m *model, i int) tea.Cmd
 	// onDelete: d / delete on a choice (the environment chooser's remove game, 16 §2.14)
@@ -99,6 +102,10 @@ const (
 )
 
 type model struct {
+	// fbSeed: the answers each template starts with in the feedback panel, from the Can it
+	// run item W reported (16 §2.4): its ID, and its Mod when the item rests on data
+	fbSeed map[string]map[string]string
+
 	opts Options
 	app  *app.App
 	w, h int
@@ -219,12 +226,15 @@ func New(o Options) tea.Model {
 	return &model{opts: o, app: o.App, w: 120, h: 30, focus: cActive, marked: map[string]bool{}}
 }
 
-// MemoryLimit is the Go heap soft cap of the TUI process (16 §3.5 T5: idle ≤ 80 MB with
-// ≥ 15 MB headroom). The GC works harder near the cap instead of growing the heap.
-const MemoryLimit = 40 << 20
+// MemoryLimit is the Go heap soft cap of the TUI process: only a ceiling against runaway
+// growth, as the window's (17 §7.3). Idle memory (16 §3.5 T5: ≤ 80 MB) comes from GOGC 50
+// and the idle FreeOSMemory, not from the cap: at 40 MiB a list of 1,292 enabled Mods held
+// about 42 MB live, above the cap, and the idle TUI ran a collection every 20 ms, a whole
+// core busy with nothing on screen changing (VM 2026-11-23).
+const MemoryLimit = 256 << 20
 
 // TuneProcess applies the TUI process's memory settings (M3 measurements in
-// 17 §7.3): a soft heap cap, GOGC 50, and a 256 KiB SQLite page cache on the
+// 17 §7.3): a soft heap ceiling, GOGC 50, and a 256 KiB SQLite page cache on the
 // single connection (the default 2 MB stays resident in modernc's allocator).
 func TuneProcess(a *app.App) {
 	debug.SetMemoryLimit(MemoryLimit)
@@ -310,13 +320,15 @@ type detailMsg struct {
 func (m *model) Init() tea.Cmd {
 	m.reload()
 	m.problemCounts()
+	// The operation log's retention (13 §1.3) runs beside the first frame, off the UI loop.
+	prune := func() tea.Msg { m.app.PruneOps(); return nil }
 	if m.promptDirectories() {
-		return liveNext()
+		return tea.Batch(liveNext(), prune)
 	}
 	if m.opts.ScanOnStart && m.loadErr == nil && m.neverScanned() {
-		return tea.Batch(m.startScan(), liveNext())
+		return tea.Batch(m.startScan(), liveNext(), prune)
 	}
-	return liveNext()
+	return tea.Batch(liveNext(), prune)
 }
 
 func (m *model) neverScanned() bool {
@@ -324,7 +336,7 @@ func (m *model) neverScanned() bool {
 	if err != nil {
 		return false
 	}
-	sc, _, _ := m.app.LastScan(e.ID)
+	sc, _, _ := m.app.LastScan(e.GameID)
 	return sc == nil
 }
 
@@ -421,10 +433,29 @@ func (m *model) loadDetail() tea.Cmd {
 		return nil
 	}
 	ref := it.ref
-	return func() tea.Msg {
-		out, _ := cmds.Execute(m.app, []string{"mod", ref})
-		return detailMsg{ref: ref, lines: strings.Split(strings.TrimRight(out, "\n"), "\n")}
+	// On its own session (16 §3.1 rule 9), not m.app, which the screen goroutine changes
+	// meanwhile (removing a Game Config clears EnvName).
+	return m.bg(func(a *app.App) func(*model) tea.Cmd {
+		out, _ := cmds.Execute(a, []string{"mod", ref})
+		msg := detailMsg{ref: ref, lines: strings.Split(strings.TrimRight(out, "\n"), "\n")}
+		return func(m *model) tea.Cmd { m.onDetailLines(msg); return nil }
+	})
+}
+
+// onDetailLines shows a Mod's technical details if the cursor is still on it.
+func (m *model) onDetailLines(msg detailMsg) {
+	if it := m.current(); it != nil && it.ref == msg.ref {
+		m.detailRef, m.detail = msg.ref, msg.lines
 	}
+}
+
+// onDetailData stores a Mod's loaded details (clearing the fetching note) and schedules the
+// Workshop fetch.
+func (m *model) onDetailData(d *detailData) tea.Cmd {
+	if m.status == T("fetching the Workshop page…") {
+		m.status, m.sayKind = "", sayNone
+	}
+	return m.onData(d)
 }
 
 func (m *model) startScan() tea.Cmd {

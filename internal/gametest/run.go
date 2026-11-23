@@ -74,21 +74,8 @@ type Result struct {
 // error; cancellation returns ctx.Err(). Invalid options and setup failures return no
 // result. Start failures return both.
 func Run(ctx context.Context, o Options) (result *Result, runErr error) {
-	if o.Timeout < 0 || o.Settle < 0 || o.MapQuiet < 0 || o.Ticks < 0 {
-		return nil, fmt.Errorf("gametest: durations and ticks must not be negative")
-	}
-	if o.Save != "" && (o.Map || o.Probe) {
-		return nil, fmt.Errorf("gametest: a save run loads the save, not a test map")
-	}
-	if o.Ticks > 0 && o.Probe {
-		return nil, fmt.Errorf("gametest: a probe run ends at the probe's last line, not after ticks")
-	}
-	for _, arg := range o.ExtraArgs {
-		key, _, _ := strings.Cut(strings.ToLower(strings.TrimLeft(arg, "-/")), "=")
-		switch key {
-		case "savedatafolder", "logfile", "nofilelog", "quicktest", "probequit":
-			return nil, fmt.Errorf("gametest: extra argument %q overrides a managed option", arg)
-		}
+	if err := validateOptions(o); err != nil {
+		return nil, err
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -106,6 +93,72 @@ func Run(ctx context.Context, o Options) (result *Result, runErr error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	applyDefaults(&o)
+	if err := prepareData(o); err != nil {
+		return nil, err
+	}
+	g := &gameRun{o: o, knowledge: filepath.Join(o.DataDir, "Config", "Knowledge.xml"),
+		saves: filepath.Join(o.DataDir, "Saves"), logPath: filepath.Join(o.RunDir, "Player.log")}
+	g.logFile, err = os.Create(g.logPath)
+	if err != nil {
+		return nil, fmt.Errorf("gametest: create log %q: %w", g.logPath, err)
+	}
+	defer func() {
+		if g.logFile != nil {
+			runErr = errors.Join(runErr, g.logFile.Close())
+		}
+	}()
+	g.stdout, err = os.Create(filepath.Join(o.RunDir, "stdout.log"))
+	if err != nil {
+		return nil, fmt.Errorf("gametest: create stdout capture: %w", err)
+	}
+	defer func() { runErr = errors.Join(runErr, g.stdout.Close()) }()
+	if err := g.buildCommand(); err != nil {
+		return nil, err
+	}
+	g.launch = o.Now()
+	g.result = &Result{Status: "start-failed", LogPath: g.logPath, Args: g.args, Exe: g.exe, Waylith: g.waylith}
+	g.tail = logTail{probe: o.Probe}
+	defer func() {
+		if err := g.saveResult(); err != nil {
+			runErr = errors.Join(runErr, fmt.Errorf("gametest: save result: %w", err))
+		}
+	}()
+	if err := g.attachLog(); err != nil {
+		return g.result, err
+	}
+	if err := o.Start(g.cmd); err != nil {
+		return g.result, fmt.Errorf("gametest: start %q: %w", g.exe, err)
+	}
+	g.done = make(chan error, 1)
+	go func() { g.done <- g.cmd.Wait() }()
+	g.sample()
+	return g.result, g.wait(ctx)
+}
+
+// validateOptions rejects negative durations, contradictory modes and extra arguments that override managed ones.
+func validateOptions(o Options) error {
+	if o.Timeout < 0 || o.Settle < 0 || o.MapQuiet < 0 || o.Ticks < 0 {
+		return fmt.Errorf("gametest: durations and ticks must not be negative")
+	}
+	if o.Save != "" && (o.Map || o.Probe) {
+		return fmt.Errorf("gametest: a save run loads the save, not a test map")
+	}
+	if o.Ticks > 0 && o.Probe {
+		return fmt.Errorf("gametest: a probe run ends at the probe's last line, not after ticks")
+	}
+	for _, arg := range o.ExtraArgs {
+		key, _, _ := strings.Cut(strings.ToLower(strings.TrimLeft(arg, "-/")), "=")
+		switch key {
+		case "savedatafolder", "logfile", "nofilelog", "quicktest", "probequit":
+			return fmt.Errorf("gametest: extra argument %q overrides a managed option", arg)
+		}
+	}
+	return nil
+}
+
+// applyDefaults fills zero options with their defaults; a probe run implies a test map.
+func applyDefaults(o *Options) {
 	if o.Now == nil {
 		o.Now = time.Now
 	}
@@ -130,50 +183,61 @@ func Run(ctx context.Context, o Options) (result *Result, runErr error) {
 	if o.GameVersion == "" {
 		o.GameVersion = env.ReadGameVersion(o.GameRoot)
 	}
+}
+
+// prepareData creates the data and run folders, resets preferences and saves, and removes the old menu marker.
+func prepareData(o Options) error {
 	for _, dir := range []string{filepath.Join(o.DataDir, "Config"), o.RunDir} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return nil, fmt.Errorf("gametest: create %q: %w", dir, err)
+			return fmt.Errorf("gametest: create %q: %w", dir, err)
 		}
 	}
 	if err := resetPreferences(o.DataDir); err != nil {
-		return nil, err
+		return err
 	}
-	saves := filepath.Join(o.DataDir, "Saves")
-	if err := prepareSaves(saves, o.Save); err != nil {
-		return nil, err
+	if err := prepareSaves(filepath.Join(o.DataDir, "Saves"), o.Save); err != nil {
+		return err
 	}
 	if o.Save != "" || o.Ticks > 0 {
 		// Dev mode loads Saves/autostart.rws at startup; a test map needs no dev mode.
 		if err := writeRunPreferences(o.DataDir, o.Save != "", o.Ticks); err != nil {
-			return nil, err
+			return err
 		}
 	}
 	knowledge := filepath.Join(o.DataDir, "Config", "Knowledge.xml")
 	if err := os.Remove(knowledge); err != nil && !os.IsNotExist(err) {
-		return nil, fmt.Errorf("gametest: remove old marker %q: %w", knowledge, err)
+		return fmt.Errorf("gametest: remove old marker %q: %w", knowledge, err)
 	}
-	logPath := filepath.Join(o.RunDir, "Player.log")
-	logFile, err := os.Create(logPath)
-	if err != nil {
-		return nil, fmt.Errorf("gametest: create log %q: %w", logPath, err)
-	}
-	defer func() {
-		if logFile != nil {
-			runErr = errors.Join(runErr, logFile.Close())
-		}
-	}()
-	stdout, err := os.Create(filepath.Join(o.RunDir, "stdout.log"))
-	if err != nil {
-		return nil, fmt.Errorf("gametest: create stdout capture: %w", err)
-	}
-	defer func() { runErr = errors.Join(runErr, stdout.Close()) }()
+	return nil
+}
 
+// gameRun is the state of one started game: its command, captures, log tail and result.
+type gameRun struct {
+	o                         Options
+	knowledge, saves, logPath string
+	logFile, stdout           *os.File
+	exe                       string
+	args                      []string
+	waylith                   bool
+	cmd                       *exec.Cmd
+	console                   *consoleLog
+	done                      chan error
+	launch                    time.Time
+	menuAt, menuSeen, probeAt time.Time
+	tail                      logTail
+	played                    autosave
+	result                    *Result
+}
+
+// buildCommand builds the game command with the managed arguments and the stdout capture.
+func (g *gameRun) buildCommand() error {
+	o := g.o
 	exe, waylith := executable(o)
 	args := []string{"-savedatafolder=" + o.DataDir}
 	if waylith {
 		args = append(args, "-NoFileLog")
 	} else {
-		args = append(args, "-logfile", logPath, "-popupwindow")
+		args = append(args, "-logfile", g.logPath, "-popupwindow")
 	}
 	if o.Map {
 		args = append(args, "quicktest")
@@ -185,188 +249,217 @@ func Run(ctx context.Context, o Options) (result *Result, runErr error) {
 	cmd := exec.Command(exe, args...)
 	cmd.Dir = o.GameRoot
 	detach(cmd)
+	if waylith {
+		if err := utf8Console(cmd, o.RunDir); err != nil {
+			return err
+		}
+	}
 	// Bound output draining if a child inherits the capture pipe.
 	cmd.WaitDelay = time.Second
-	cmd.Stdout, cmd.Stderr = stdout, stdout
-	launch := o.Now()
-	result = &Result{Status: "start-failed", LogPath: logPath, Args: args, Exe: exe, Waylith: waylith}
-	var menuAt, menuSeen, probeAt time.Time
-	tail := logTail{probe: o.Probe}
-	defer func() {
-		end := o.Now()
-		result.TotalSeconds = end.Sub(launch).Seconds()
-		result.Phase = "loading"
-		switch {
-		case !tail.saveAt.IsZero():
-			result.Phase = "save"
-		case !tail.newAt.IsZero():
-			result.Phase = "new"
-		case !menuSeen.IsZero():
-			result.Phase = "menu"
-		}
-		marker := tail.newAt
-		if o.Save != "" {
-			marker = tail.saveAt
-		}
-		if !marker.IsZero() {
-			result.MapSeconds = end.Sub(marker).Seconds()
-		}
-		if result.Status == "timeout" || result.Status == "exited" {
-			result.LastLine = tail.last
-		}
-		b, err := json.MarshalIndent(result, "", "  ")
-		if err == nil {
-			err = os.WriteFile(filepath.Join(o.RunDir, "result.json"), append(b, '\n'), 0o644)
-		}
+	cmd.Stdout, cmd.Stderr = g.stdout, g.stdout
+	g.exe, g.args, g.waylith, g.cmd = exe, args, waylith, cmd
+	return nil
+}
+
+// attachLog tees 1.7's console into Player.log, or closes the log file for Unity to write itself.
+func (g *gameRun) attachLog() error {
+	if g.waylith {
+		var err error
+		g.console, err = newConsoleLog(g.logFile, g.o.GameVersion, g.launch)
 		if err != nil {
-			runErr = errors.Join(runErr, fmt.Errorf("gametest: save result: %w", err))
+			return err
 		}
-	}()
-	var console *consoleLog
-	if waylith {
-		console, err = newConsoleLog(logFile, o.GameVersion, launch)
-		if err != nil {
-			return result, err
-		}
-		output := io.MultiWriter(stdout, console)
-		cmd.Stdout, cmd.Stderr = output, output
-	} else {
-		// Unity opens its own log handle; do not keep a competing writer open.
-		err := logFile.Close()
-		logFile = nil
-		if err != nil {
-			return result, err
-		}
+		output := io.MultiWriter(g.stdout, g.console)
+		g.cmd.Stdout, g.cmd.Stderr = output, output
+		return nil
 	}
-	if err := o.Start(cmd); err != nil {
-		return result, fmt.Errorf("gametest: start %q: %w", exe, err)
+	// Unity opens its own log handle; do not keep a competing writer open.
+	err := g.logFile.Close()
+	g.logFile = nil
+	return err
+}
+
+// saveResult fills the timing, phase and last line and writes result.json.
+func (g *gameRun) saveResult() error {
+	result, tail := g.result, &g.tail
+	end := g.o.Now()
+	result.TotalSeconds = end.Sub(g.launch).Seconds()
+	result.Phase = "loading"
+	switch {
+	case !tail.saveAt.IsZero():
+		result.Phase = "save"
+	case !tail.newAt.IsZero():
+		result.Phase = "new"
+	case !g.menuSeen.IsZero():
+		result.Phase = "menu"
 	}
-	done := make(chan error, 1)
-	go func() { done <- cmd.Wait() }()
-	sample := func() {
-		result.PeakMemoryMB = max(result.PeakMemoryMB, peakMemoryMB(cmd.Process.Pid))
+	marker := tail.newAt
+	if g.o.Save != "" {
+		marker = tail.saveAt
 	}
-	sample()
-	finish := func(waitErr error) error {
-		if console != nil {
-			waitErr = errors.Join(waitErr, console.flush())
-		}
-		if cmd.ProcessState != nil {
-			code := cmd.ProcessState.ExitCode()
-			result.ExitCode = &code
-		}
-		return waitErr
+	if !marker.IsZero() {
+		result.MapSeconds = end.Sub(marker).Seconds()
 	}
-	stop := func() error {
-		sample()
-		killErr := cmd.Process.Kill()
-		if errors.Is(killErr, os.ErrProcessDone) {
-			killErr = nil
-		}
-		waitErr := <-done
-		var exitErr *exec.ExitError
-		if errors.As(waitErr, &exitErr) {
-			waitErr = nil
-		}
-		return errors.Join(killErr, finish(waitErr))
+	if result.Status == "timeout" || result.Status == "exited" {
+		result.LastLine = tail.last
 	}
-	result.Status = "timeout"
-	deadline := time.NewTimer(o.Timeout)
+	b, err := json.MarshalIndent(result, "", "  ")
+	if err == nil {
+		err = os.WriteFile(filepath.Join(g.o.RunDir, "result.json"), append(b, '\n'), 0o644)
+	}
+	return err
+}
+
+// sample records the game's peak memory so far.
+func (g *gameRun) sample() {
+	g.result.PeakMemoryMB = max(g.result.PeakMemoryMB, peakMemoryMB(g.cmd.Process.Pid))
+}
+
+// finish flushes the console log and records the exit code of a reaped game.
+func (g *gameRun) finish(waitErr error) error {
+	if g.console != nil {
+		waitErr = errors.Join(waitErr, g.console.flush())
+	}
+	if g.cmd.ProcessState != nil {
+		code := g.cmd.ProcessState.ExitCode()
+		g.result.ExitCode = &code
+	}
+	return waitErr
+}
+
+// stop kills and reaps the game.
+func (g *gameRun) stop() error {
+	g.sample()
+	killErr := g.cmd.Process.Kill()
+	if errors.Is(killErr, os.ErrProcessDone) {
+		killErr = nil
+	}
+	waitErr := <-g.done
+	var exitErr *exec.ExitError
+	if errors.As(waitErr, &exitErr) {
+		waitErr = nil
+	}
+	return errors.Join(killErr, g.finish(waitErr))
+}
+
+// seeMenu notes when this run wrote Knowledge.xml (in every mode, for Phase).
+func (g *gameRun) seeMenu(now time.Time) error {
+	if !g.menuSeen.IsZero() {
+		return nil
+	}
+	st, err := os.Stat(g.knowledge)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if err == nil && !st.IsDir() && !st.ModTime().Before(g.launch) {
+		g.menuSeen = now
+	}
+	return nil
+}
+
+// probeEnded marks the run "probe" once the probe's last line is in the log.
+func (g *gameRun) probeEnded(now time.Time) bool {
+	if g.probeAt.IsZero() && g.tail.probeEnd != "" {
+		g.probeAt = now
+		g.result.Status = "probe"
+		g.result.LoadSeconds = now.Sub(g.launch).Seconds()
+	}
+	return !g.probeAt.IsZero()
+}
+
+// arrival is the status a quiet map or save, or the first autosave, arrives at.
+func (g *gameRun) arrival() string {
+	if g.o.Save != "" {
+		return "save"
+	}
+	return "map"
+}
+
+// wait polls the log until the run arrives, times out, is cancelled or the game exits.
+func (g *gameRun) wait(ctx context.Context) error {
+	g.result.Status = "timeout"
+	deadline := time.NewTimer(g.o.Timeout)
 	defer deadline.Stop()
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
-	// seeMenu notes when this run wrote Knowledge.xml (in every mode, for Phase).
-	seeMenu := func(now time.Time) error {
-		if !menuSeen.IsZero() {
-			return nil
-		}
-		st, err := os.Stat(knowledge)
-		if err != nil && !os.IsNotExist(err) {
-			return err
-		}
-		if err == nil && !st.IsDir() && !st.ModTime().Before(launch) {
-			menuSeen = now
-		}
-		return nil
-	}
-	// probeEnded marks the run "probe" once the probe's last line is in the log.
-	probeEnded := func(now time.Time) bool {
-		if probeAt.IsZero() && tail.probeEnd != "" {
-			probeAt = now
-			result.Status = "probe"
-			result.LoadSeconds = now.Sub(launch).Seconds()
-		}
-		return !probeAt.IsZero()
-	}
-	// The status a quiet map or save, or the first autosave, arrives at.
-	arrival := "map"
-	if o.Save != "" {
-		arrival = "save"
-	}
-	var played autosave
 	for {
 		select {
 		case <-ctx.Done():
-			return result, errors.Join(ctx.Err(), stop())
-		case err := <-done:
-			var exitErr *exec.ExitError
-			if errors.As(err, &exitErr) {
-				err = nil
-			}
-			err = finish(err) // flushes the 1.7 console log before the last read
-			now := o.Now()
-			err = errors.Join(err, tail.read(logPath, now), seeMenu(now))
-			result.Status = "exited"
-			// A probe quits right after its last line, often before the next sample.
-			if o.Probe && probeEnded(now) {
-				result.Status = "probe"
-			}
-			return result, errors.Join(ctx.Err(), err)
+			return errors.Join(ctx.Err(), g.stop())
+		case err := <-g.done:
+			err = g.exited(err)
+			return errors.Join(ctx.Err(), err)
 		case <-deadline.C:
-			return result, errors.Join(ctx.Err(), stop())
+			return errors.Join(ctx.Err(), g.stop())
 		case <-ticker.C:
-			sample()
-			now := o.Now()
-			if err := errors.Join(tail.read(logPath, now), seeMenu(now)); err != nil {
-				return result, errors.Join(err, stop())
+			g.sample()
+			now := g.o.Now()
+			if err := errors.Join(g.tail.read(g.logPath, now), g.seeMenu(now)); err != nil {
+				return errors.Join(err, g.stop())
 			}
-			switch {
-			case o.Probe:
-				if probeEnded(now) && now.Sub(probeAt) >= o.Settle {
-					return result, errors.Join(ctx.Err(), stop())
-				}
-			case o.Ticks > 0:
-				done, err := played.check(saves, launch, now)
-				if err != nil {
-					return result, errors.Join(err, stop())
-				}
-				if done {
-					result.Status, result.TicksReached = arrival, o.Ticks
-					result.LoadSeconds = now.Sub(launch).Seconds()
-					return result, errors.Join(ctx.Err(), stop())
-				}
-			case o.Map || o.Save != "":
-				marker := tail.newAt
-				if o.Save != "" {
-					marker = tail.saveAt
-				}
-				if !marker.IsZero() && now.Sub(tail.lastWrite) >= o.MapQuiet {
-					result.Status = arrival
-					result.LoadSeconds = now.Sub(launch).Seconds()
-					return result, errors.Join(ctx.Err(), stop())
-				}
-			default:
-				if menuAt.IsZero() && !menuSeen.IsZero() {
-					menuAt = now
-					result.LoadSeconds = now.Sub(launch).Seconds()
-				}
-				if !menuAt.IsZero() && now.Sub(menuAt) >= o.Settle {
-					result.Status = "menu"
-					return result, errors.Join(ctx.Err(), stop())
-				}
+			arrived, err := g.arrived(now)
+			if err != nil {
+				return errors.Join(err, g.stop())
+			}
+			if arrived {
+				return errors.Join(ctx.Err(), g.stop())
 			}
 		}
 	}
+}
+
+// exited reaps a game that ended by itself, reads its last log lines and sets the status.
+func (g *gameRun) exited(err error) error {
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		err = nil
+	}
+	err = g.finish(err) // flushes the 1.7 console log before the last read
+	now := g.o.Now()
+	err = errors.Join(err, g.tail.read(g.logPath, now), g.seeMenu(now))
+	g.result.Status = "exited"
+	// A probe quits right after its last line, often before the next sample.
+	if g.o.Probe && g.probeEnded(now) {
+		g.result.Status = "probe"
+	}
+	return err
+}
+
+// arrived reports whether the run reached its goal at now, setting the status and load time.
+func (g *gameRun) arrived(now time.Time) (bool, error) {
+	o, result := g.o, g.result
+	switch {
+	case o.Probe:
+		return g.probeEnded(now) && now.Sub(g.probeAt) >= o.Settle, nil
+	case o.Ticks > 0:
+		done, err := g.played.check(g.saves, g.launch, now)
+		if err != nil || !done {
+			return false, err
+		}
+		result.Status, result.TicksReached = g.arrival(), o.Ticks
+		result.LoadSeconds = now.Sub(g.launch).Seconds()
+		return true, nil
+	case o.Map || o.Save != "":
+		marker := g.tail.newAt
+		if o.Save != "" {
+			marker = g.tail.saveAt
+		}
+		if !marker.IsZero() && now.Sub(g.tail.lastWrite) >= o.MapQuiet {
+			result.Status = g.arrival()
+			result.LoadSeconds = now.Sub(g.launch).Seconds()
+			return true, nil
+		}
+	default:
+		if g.menuAt.IsZero() && !g.menuSeen.IsZero() {
+			g.menuAt = now
+			result.LoadSeconds = now.Sub(g.launch).Seconds()
+		}
+		if !g.menuAt.IsZero() && now.Sub(g.menuAt) >= o.Settle {
+			result.Status = "menu"
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 const (

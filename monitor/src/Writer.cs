@@ -24,6 +24,19 @@ namespace ArchoMonitor
         internal long Total;
         internal int Pending;
         internal bool Dirty;
+        internal long AtStop; // Total when the game last stopped logging (ErrorWindow)
+        internal bool Limit;  // the game's own "Reached max messages limit" warning
+    }
+
+    // EntryView is what the error window reads of one entry (ErrorSummary), copied under the lock.
+    internal struct EntryView
+    {
+        internal string Id;
+        internal int Level;
+        internal string Message;
+        internal Context Ctx;
+        internal long Total;
+        internal long After; // occurrences since the game stopped logging; 0 before it did
     }
 
     // Writer owns ArchoMonitor.log: rotation, the dedupe tables, buffered writes and the flush
@@ -42,7 +55,11 @@ namespace ArchoMonitor
         static long bytes;
         static bool full, closed;
         static string phase = "loading";
-        static int failures, distinct;
+        static int failures, distinct, resets;
+        static bool stopped;
+        static DateTime stoppedAt;
+        // The warning Verse.Log writes once when it stops logging (StopLoggingAtMessageCount).
+        internal const string LimitText = "Reached max messages limit. Stopping logging to avoid spam.";
         static readonly Dictionary<string, Entry>[] exact = { new Dictionary<string, Entry>(), new Dictionary<string, Entry>(), new Dictionary<string, Entry>() };
         static readonly Dictionary<string, Entry> byPrint = new Dictionary<string, Entry>();
         static readonly List<Entry> dirty = new List<Entry>();
@@ -102,7 +119,45 @@ namespace ArchoMonitor
                     return false;
                 }
                 Count(e);
+                if (e.Limit)
+                {
+                    Stop();
+                }
                 return true;
+            }
+        }
+
+        // Stop: the game stopped logging (again, after the log was cleared). What each entry has
+        // counted so far is kept, so the window can show what came after. Once per stop.
+        static void Stop()
+        {
+            stopped = true;
+            stoppedAt = DateTime.Now;
+            foreach (var e in byPrint.Values)
+            {
+                e.AtStop = e.Total;
+            }
+        }
+
+        // View copies every entry for the error window (ErrorWindow); it runs only while the
+        // window is open, never on the logging path.
+        internal static void View(List<EntryView> into, out bool gameStopped, out DateTime at, out bool fileFull, out int dropped)
+        {
+            into.Clear();
+            lock (sync)
+            {
+                foreach (var e in byPrint.Values)
+                {
+                    if (e.Limit)
+                    {
+                        continue;
+                    }
+                    into.Add(new EntryView { Id = e.Id, Level = e.Level, Message = e.Message, Ctx = e.Ctx, Total = e.Total, After = stopped ? e.Total - e.AtStop : 0 });
+                }
+                gameStopped = stopped;
+                at = stoppedAt;
+                fileFull = full;
+                dropped = resets;
             }
         }
 
@@ -136,6 +191,7 @@ namespace ArchoMonitor
                 }
                 if (byPrint.Count >= MaxEntries)
                 {
+                    resets++;
                     FlushDirty(true);
                     byPrint.Clear();
                     foreach (var d in exact)
@@ -144,7 +200,12 @@ namespace ArchoMonitor
                     }
                 }
                 e = new Entry { Id = Normalize.Hash8(fp), Level = level, Message = ctx.Message, Ctx = ctx, Total = 1 };
+                e.Limit = level == ArchoMonitor.Level.Warning && ctx.Message == LimitText;
                 byPrint[fp] = e;
+                if (e.Limit)
+                {
+                    Stop();
+                }
                 Remember(level, text, e);
                 distinct++;
                 WriteLine(EntryLine(e, 1, ctx.Details));
@@ -292,13 +353,14 @@ namespace ArchoMonitor
 
         // WriteSettingsWindow writes what a settings window drew when it opened (19 §2): one
         // line, kind settings-window, with context.window naming the Mod's settings file and the
-        // controls in drawing order.
+        // controls in drawing order, and fileHash: the file as the window opened (FileHash).
         internal static void WriteSettingsWindow(SettingsFile f, IList<SettingsControl> controls)
         {
             var j = new Json().Head(DateTime.Now, "INFO", "[Archo Monitor] settings window " + f.Title);
             j.Str("details", "").Num("count", 1);
             j.Raw("context").Open().Raw("window").Open().Str("packageId", f.PackageId).Str("folder", f.Folder).Str("class", f.Class)
                 .Str("file", f.File).Str("title", f.Title).Bool("full", controls.Count < SettingsWindow.MaxControls);
+            if (f.Hash != null) j.Str("fileHash", f.Hash);
             j.Raw("controls").Arr();
             foreach (var c in controls)
             {
@@ -337,6 +399,7 @@ namespace ArchoMonitor
                     if (!string.IsNullOrEmpty(h.Description)) j.Str("description", h.Description);
                     j.Str("value", h.Value).Str("default", h.Default).Str("type", h.Type);
                     if (h.Hidden) j.Bool("hidden", true);
+                    if (h.Unsaved) j.Bool("unsaved", true);
                     if (h.Choices != null) j.List("choices", h.Choices);
                     j.Close();
                 }

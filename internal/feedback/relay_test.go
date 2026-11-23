@@ -31,13 +31,13 @@ func TestSend(t *testing.T) {
 			w.WriteHeader(http.StatusBadGateway)
 			fmt.Fprint(w, `not json`)
 		default:
-			fmt.Fprint(w, `{"number":42,"url":"https://github.com/ToumanLin/RimArcho/issues/42"}`)
+			fmt.Fprint(w, `{"number":42,"url":"https://github.com/ToumanLin/RimArcho/issues/42","token":"tok42"}`)
 		}
 	}))
 	defer srv.Close()
 
 	s, err := Send(context.Background(), srv.URL+"/report", "RimArcho/test", Report{Title: "t", Body: "b", Contact: "c"})
-	if err != nil || s.Number != 42 || !strings.HasSuffix(s.URL, "/issues/42") {
+	if err != nil || s.Number != 42 || s.Token != "tok42" || !strings.HasSuffix(s.URL, "/issues/42") {
 		t.Fatalf("sent: %+v %v", s, err)
 	}
 	if got != (Report{Title: "t", Body: "b", Contact: "c"}) || agent != "RimArcho/test" {

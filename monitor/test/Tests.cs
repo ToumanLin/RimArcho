@@ -41,6 +41,10 @@ static class Tests
         Check(Mods.Frame("  at Foo.Bar..ctor ()", out t, out m) && t == "Foo.Bar" && m == ".ctor", "frame ctor " + t + " " + m);
         Check(Mods.Frame("  at Foo.Bar`1[T].Baz[U] ()", out t, out m) && t == "Foo.Bar`1", "frame generic " + t + " " + m);
 
+        // QuotedDef: the Def a texture error names.
+        Check(Enrich.QuotedDef("Could not load Texture2D at 'Things/X' for def 'MyThing' in any active texture path.", out var qd) && qd == "MyThing", "quoted def: " + qd);
+        Check(!Enrich.QuotedDef("for def '' x", out _) && !Enrich.QuotedDef("no def here", out _), "no quoted def");
+
         // Writer: rotation, first line with details, a count line, the exit line.
         string dir = Path.Combine(Path.GetTempPath(), "archo-monitor-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
@@ -68,22 +72,67 @@ static class Tests
             new SettingsFile { PackageId = "a.mod", Folder = "!ArchoPack_x_1", Class = "AMod", File = "Mod__ArchoPack_x_1_AMod.xml", Title = "A \"quoted\"", Stored = true },
             new SettingsFile { PackageId = "b.mod", Folder = "2", Class = "BMod", File = "Mod_2_BMod.xml", Title = "", Stored = true },
         });
-        Writer.WriteSettingsWindow(new SettingsFile { PackageId = "a.mod", Folder = "A", Class = "AMod", File = "Mod_A_AMod.xml", Title = "A" },
+        Writer.WriteSettingsWindow(new SettingsFile { PackageId = "a.mod", Folder = "A", Class = "AMod", File = "Mod_A_AMod.xml", Title = "A", Hash = "sha256:ab" },
             new System.Collections.Generic.List<SettingsControl> {
                 new SettingsControl { Kind = "label", Label = "General" },
                 new SettingsControl { Kind = "checkbox", Label = "Raids", Value = "False" },
                 new SettingsControl { Kind = "slider", Label = "Scale", Value = "0.75", Min = "0", Max = "2" },
             });
+        // Recording a window: a text field drawn with null text (Alpha Animals' search box,
+        // 1.0.9 VM round) records "" and does not throw into the Mod's window.
+        var drawn = SettingsWindow.Recorded(() =>
+        {
+            SettingsWindow.Add("label", "Search:", ""); SettingsWindow.Leave();
+            SettingsWindow.Add("text", "", null); SettingsWindow.Leave();
+            SettingsWindow.Add("checkbox", null, "True", null, null); SettingsWindow.Leave();
+        });
+        Check(drawn != null && drawn.Count == 2, "null text recorded: " + (drawn == null ? "dropped" : drawn.Count.ToString()));
+        Check(drawn != null && drawn[0].Kind == "text" && drawn[0].Label == "Search:" && drawn[0].Value == "", "null text takes its label");
+        Check(drawn != null && drawn[1].Label == "" && drawn[1].Value == "True" && drawn[1].Min == "", "null label and range");
         Writer.WriteHugsLib(new System.Collections.Generic.List<HugsLibPack> {
             new HugsLibPack { Id = "APack", PackageId = "a.mod", Folder = "A", Title = "A mod", Handles = new System.Collections.Generic.List<HugsLibHandle> {
                 new HugsLibHandle { Name = "raids", Title = "Raids", Description = "More raids", Value = "True", Default = "False", Type = "Boolean" },
                 new HugsLibHandle { Name = "seen", Value = "3", Default = "0", Type = "Int32", Hidden = true },
+                new HugsLibHandle { Name = "news", Title = "Show news", Value = "False", Default = "False", Type = "Boolean", Unsaved = true },
                 new HugsLibHandle { Name = "mode", Title = "Mode", Value = "Hard", Default = "Normal", Type = "Mode", Choices = new[] { "Easy", "Normal", "Hard" } },
             } },
         });
+        // Error window (19 §9): the view, what came after the game stopped logging, grouping.
+        var views = new System.Collections.Generic.List<EntryView>();
+        Writer.View(views, out bool stopped0, out _, out _, out _);
+        Check(!stopped0 && views.Count == 1 && views[0].After == 0, "view before the limit: " + views.Count);
+        long before = views[0].Total;
+        Writer.Add(Level.Warning, Writer.LimitText, new Context { Message = Writer.LimitText });
+        Writer.Seen(Level.Error, text);
+        Writer.Seen(Level.Error, text);
+        var c3 = new Context { Message = "Exception ticking Pawn", Inferred = "TickException" };
+        c3.AddMod("brrainz.harmony", "xml"); // infrastructure: filed elsewhere when another Mod is named
+        c3.AddMod("c.mod", "stack");
+        Writer.Add(Level.Error, "Exception ticking Pawn", c3);
+        Writer.Add(Level.Warning, "a warning", new Context { Message = "a warning" });
+        Writer.View(views, out bool stopped1, out _, out _, out _);
+        Check(stopped1 && views.Count == 3, "view after the limit leaves out the limit line: " + views.Count);
+        EntryView va = default, vc = default;
+        foreach (var v in views)
+        {
+            if (v.Message == c.Message) va = v;
+            if (v.Message == c3.Message) vc = v;
+        }
+        Check(va.Total == before + 2 && va.After == 2, "after the limit: " + va.Total + " " + va.After);
+        Check(vc.Total == 1 && vc.After == 1, "new after the limit: " + vc.After);
+        var groups = ErrorSummary.Build(views, false, id => id.ToUpperInvariant());
+        Check(groups.Count == 2 && groups[0].Id == "a.mod" && groups[0].Name == "A.MOD" && groups[1].Id == "c.mod", "groups by Mod: " + groups.Count);
+        Check(groups[0].Kinds.Count == 1 && groups[0].Kinds[0].Key == "DefConfigError" && groups[0].Kinds[0].Value == va.Total, "kinds by occurrences");
+        Check(groups[0].After == 2 && groups[1].Kinds[0].Key == "TickException", "group after and kind");
+        var others = ErrorSummary.Others(vc.Ctx, "c.mod");
+        Check(others.Count == 1 && others[0].Key == "brrainz.harmony" && others[0].Value == "xml", "other Mods on the entry");
+        var withWarnings = ErrorSummary.Build(views, true, null);
+        Check(withWarnings.Count == 3 && withWarnings[2].Id == "" && withWarnings[2].Kinds[0].Key == "Warning", "warnings without a Mod last");
+        string copy = ErrorSummary.CopyText(va, null);
+        Check(copy.Contains("mod: a.mod — xml") && copy.Contains(@"file: D:\Mods\A\Defs\X.xml") && copy.Contains("def: Foo") && copy.Contains("Foo.Bar.Baz") && copy.Contains("2 after the game stopped logging"), "copy text: " + copy);
         Writer.Close();
         var lines = File.ReadAllLines(Path.Combine(dir, "ArchoMonitor.log"));
-        Check(lines.Length == 10, "10 lines, got " + lines.Length);
+        Check(lines.Length == 14, "14 lines, got " + lines.Length);
         var first = JsonDocument.Parse(lines[0]).RootElement;
         Check(first.GetProperty("message").GetString() == c.Message, "message round trip");
         Check(first.GetProperty("count").GetInt32() == 1 && first.GetProperty("total").GetInt32() == 1, "first count");
@@ -118,17 +167,24 @@ static class Tests
         var win = window.GetProperty("context").GetProperty("window");
         var controls = win.GetProperty("controls");
         Check(win.GetProperty("class").GetString() == "AMod" && win.GetProperty("full").GetBoolean() && controls.GetArrayLength() == 3, "window record");
+        Check(win.GetProperty("fileHash").GetString() == "sha256:ab", "window file hash");
         Check(!controls[0].TryGetProperty("value", out _) && controls[0].GetProperty("label").GetString() == "General", "a label has no value");
         Check(controls[2].GetProperty("kind").GetString() == "slider" && controls[2].GetProperty("value").GetString() == "0.75" && controls[2].GetProperty("max").GetString() == "2", "slider range");
+        // FileHash: the settings file as the window opened
+        var cfg = Path.Combine(dir, "Mod_A_AMod.xml");
+        File.WriteAllText(cfg, "abc");
+        Check(SettingsWindow.FileHash(cfg) == "sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "file hash: " + SettingsWindow.FileHash(cfg));
+        Check(SettingsWindow.FileHash(Path.Combine(dir, "missing.xml")) == "none" && SettingsWindow.FileHash("") == null, "no file, unknown path");
         var hugs = JsonDocument.Parse(lines[8]).RootElement;
         Check(hugs.GetProperty("kind").GetString() == "hugslib", "hugslib line: " + lines[8]);
         var pack = hugs.GetProperty("context").GetProperty("hugslib")[0];
         var handles = pack.GetProperty("settings");
-        Check(pack.GetProperty("id").GetString() == "APack" && pack.GetProperty("packageId").GetString() == "a.mod" && pack.GetProperty("full").GetBoolean() && handles.GetArrayLength() == 3, "hugslib pack");
+        Check(pack.GetProperty("id").GetString() == "APack" && pack.GetProperty("packageId").GetString() == "a.mod" && pack.GetProperty("full").GetBoolean() && handles.GetArrayLength() == 4, "hugslib pack");
         Check(handles[0].GetProperty("title").GetString() == "Raids" && handles[0].GetProperty("default").GetString() == "False" && !handles[0].TryGetProperty("hidden", out _), "hugslib setting");
         Check(!handles[1].TryGetProperty("title", out _) && handles[1].GetProperty("hidden").GetBoolean() && handles[1].GetProperty("type").GetString() == "Int32", "hidden hugslib setting");
-        Check(!handles[0].TryGetProperty("choices", out _) && handles[2].GetProperty("choices").GetArrayLength() == 3 && handles[2].GetProperty("choices")[2].GetString() == "Hard", "enum choices");
-        var exit = JsonDocument.Parse(lines[9]).RootElement;
+        Check(handles[2].GetProperty("unsaved").GetBoolean() && !handles[0].TryGetProperty("unsaved", out _), "unsaved hugslib setting");
+        Check(!handles[0].TryGetProperty("choices", out _) && handles[3].GetProperty("choices").GetArrayLength() == 3 && handles[3].GetProperty("choices")[2].GetString() == "Hard", "enum choices");
+        var exit = JsonDocument.Parse(lines[lines.Length - 1]).RootElement;
         Check(exit.GetProperty("kind").GetString() == "exit", "exit line");
         Directory.Delete(dir, true);
 

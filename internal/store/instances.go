@@ -158,12 +158,12 @@ var (
 // Mods returns every Instance an environment sees (live and tombstones): those of the shared
 // mod folders and those of its own Data/ and Mods/ (03 §2). Declarations are
 // loaded on demand by Mod.Decl (see LoadDecls for a batch).
-func (s *Store) Mods(envID string) ([]*Mod, error) { return s.mods(envID, modColsLite) }
+func (s *Store) Mods(gameID string) ([]*Mod, error) { return s.mods(gameID, modColsLite) }
 
 // UninstallMods reads only the inputs needed to clean ModsConfig.xml. It always queries
 // the current database; full snapshot metadata and declarations are not needed here.
-func (s *Store) UninstallMods(envID string) ([]*Mod, error) {
-	rows, err := s.DB.Query(`SELECT i.status, s.kind, i.rel_path, coalesce(n.package_id, '')`+modFrom+` WHERE i.environment_id IN ('', ?)`, envID)
+func (s *Store) UninstallMods(gameID string) ([]*Mod, error) {
+	rows, err := s.DB.Query(`SELECT i.status, s.kind, i.rel_path, coalesce(n.package_id, '')`+modFrom+` WHERE i.game_id IN ('', ?)`, gameID)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +180,7 @@ func (s *Store) UninstallMods(envID string) ([]*Mod, error) {
 }
 
 // ModsFull is Mods with declarations included.
-func (s *Store) ModsFull(envID string) ([]*Mod, error) { return s.mods(envID, modColsFull) }
+func (s *Store) ModsFull(gameID string) ([]*Mod, error) { return s.mods(gameID, modColsFull) }
 
 // LinkMod contains only ownership evidence; a full Mod retains hundreds of unused
 // bytes per row in every page's link cache.
@@ -192,7 +192,7 @@ type LinkMod struct {
 func (s *Store) LinkMods() ([]*LinkMod, error) {
 	rows, err := s.DB.Query(`SELECT i.id, s.label, i.rel_path, i.real_path, i.status FROM instance i
 		JOIN source s ON s.id = i.source_id
-		WHERE i.environment_id='' OR i.environment_id IN (SELECT id FROM environment) ORDER BY i.id`)
+		WHERE i.game_id='' OR i.game_id IN (SELECT id FROM game) ORDER BY i.id`)
 	if err != nil {
 		return nil, err
 	}
@@ -208,8 +208,8 @@ func (s *Store) LinkMods() ([]*LinkMod, error) {
 	return out, rows.Err()
 }
 
-func (s *Store) mods(envID, cols string) ([]*Mod, error) {
-	rows, err := s.DB.Query(`SELECT `+cols+modFrom+` WHERE i.environment_id IN ('', ?) ORDER BY i.id`, envID)
+func (s *Store) mods(gameID, cols string) ([]*Mod, error) {
+	rows, err := s.DB.Query(`SELECT `+cols+modFrom+` WHERE i.game_id IN ('', ?) ORDER BY i.id`, gameID)
 	if err != nil {
 		return nil, err
 	}
@@ -295,15 +295,15 @@ func (s *Store) Aliases(instanceID string) ([]Alias, error) {
 }
 
 // AliasCount counts alias rows per instance in an environment.
-func (s *Store) AliasCount(envID string) (int, error) {
+func (s *Store) AliasCount(gameID string) (int, error) {
 	var n int
-	err := s.DB.QueryRow(`SELECT count(*) FROM instance_alias a JOIN instance i ON i.id=a.instance_id WHERE i.environment_id IN ('', ?)`, envID).Scan(&n)
+	err := s.DB.QueryRow(`SELECT count(*) FROM instance_alias a JOIN instance i ON i.id=a.instance_id WHERE i.game_id IN ('', ?)`, gameID).Scan(&n)
 	return n, err
 }
 
 // Known loads every Instance of an environment in the shape reconciliation needs.
-func (s *Store) Known(envID string) ([]*identity.Known, error) {
-	mods, err := s.ModsFull(envID)
+func (s *Store) Known(gameID string) ([]*identity.Known, error) {
+	mods, err := s.ModsFull(gameID)
 	if err != nil {
 		return nil, err
 	}
@@ -327,7 +327,7 @@ func (s *Store) Known(envID string) ([]*identity.Known, error) {
 }
 
 // LineageIDs returns the set of lineage IDs (lineages are shared by every environment).
-func (s *Store) LineageIDs(envID string) (map[string]bool, error) {
+func (s *Store) LineageIDs(gameID string) (map[string]bool, error) {
 	rows, err := s.DB.Query(`SELECT id FROM lineage`)
 	if err != nil {
 		return nil, err
@@ -368,9 +368,9 @@ func semanticSet(db questionReader, snapshotID int64) (scan.SemanticSet, error) 
 }
 
 // CurrentHashes returns the current snapshot hash of every Instance, keyed by location.
-func (s *Store) CurrentHashes(envID string) (map[string]scan.Hash, error) {
+func (s *Store) CurrentHashes(gameID string) (map[string]scan.Hash, error) {
 	rows, err := s.DB.Query(`SELECT i.source_id, i.rel_path, n.snapshot_hash FROM instance i
-		JOIN snapshot n ON n.id = i.current_snapshot_id WHERE i.environment_id IN ('', ?)`, envID)
+		JOIN snapshot n ON n.id = i.current_snapshot_id WHERE i.game_id IN ('', ?)`, gameID)
 	if err != nil {
 		return nil, err
 	}
@@ -391,9 +391,9 @@ func (s *Store) CurrentHashes(envID string) (map[string]scan.Hash, error) {
 
 // CurrentFiles loads the current semantic files (the only ones with hashes to reuse) of all
 // Instances of an environment, keyed by location (scan.LocKey) and lower-cased file path.
-func (s *Store) CurrentFiles(envID string) (map[string]map[string]scan.File, error) {
+func (s *Store) CurrentFiles(gameID string) (map[string]map[string]scan.File, error) {
 	rows, err := s.DB.Query(`SELECT i.source_id, i.rel_path, f.rel_path, f.size, f.mtime, f.hash FROM instance i
-		JOIN snapshot_file f ON f.snapshot_id = i.current_snapshot_id WHERE i.environment_id IN ('', ?) AND f.hash IS NOT NULL`, envID)
+		JOIN snapshot_file f ON f.snapshot_id = i.current_snapshot_id WHERE i.game_id IN ('', ?) AND f.hash IS NOT NULL`, gameID)
 	if err != nil {
 		return nil, err
 	}

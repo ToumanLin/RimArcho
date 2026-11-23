@@ -6,11 +6,12 @@
 ## 1. Domain model
 
 ```
-Environment (one game directory: version, launch method, saves—shared default or separate; a game directory belongs to only one environment)
-  ├─ Source (owned by this game: official Data / local Mods)
-  ├─ Plan (an ordered Instance list, with undo stack, version history and staging; multiple per environment)
-  ├─ Pack (a fixed artifact compiled from a plan, with its own save directory)
-  └─ Launch (one launch: which plan or pack, when, what was enabled)
+Game installation (directory and version; several environments with distinct data roots, 03 §6)
+  ├─ Source (owned by this installation: official Data / local Mods)
+  └─ Environment (user data directory, launch settings and current plan)
+       └─ Launch (one launch: which plan or pack, when, what was enabled)
+Plan (global ordered Instance list, with undo stack, version history and staging)
+  └─ Pack (a fixed artifact compiled from a plan, with its own save directory)
 Mod folders (Sources shared across all environments: Workshop / SteamCMD / other directories / Archo Monitor / lock library)
 Source
   └─ Instance (one Mod on disk, with an ID assigned by RimArcho; the same Instance across all environments for shared folders)
@@ -25,7 +26,7 @@ Save (one save: colony, enabled Mods at the time, referenced Defs)
 
 - Plan entries point to Instance, not packageId: players choose "this copy".
 - A locked version is not a new concept; it is another Instance in the same Lineage (04 §3, 07 §5).
-- One record per Mod: Workshop, SteamCMD and similar folders are shared by all games, so their Instances, Lineages and player-authored data are not split by environment. An environment owns only its `Data`, `Mods`, plans, launch records and deployment links (03 §2).
+- One record per Mod: Workshop, SteamCMD and similar folders are shared by all games, so their Instances, Lineages and player-authored data are not split by environment. Installation inventory is separate from environment play context; plans are global. Ownership: 03 §2 and §6.1.
 - ModsConfig.xml is a projection of a plan, not a source of truth. Write it only when launching a plan or writing to the game (07 §4, 09 §2).
 
 ## 2. Module layers and delivery

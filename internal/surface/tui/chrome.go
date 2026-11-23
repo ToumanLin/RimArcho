@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -128,7 +129,7 @@ func (m *model) topBar() string {
 	at, _ := m.navAt()
 	items := m.navItems()
 	need := m.needCount()
-	envText := T("no game")
+	envText := T("no Game Config")
 	if m.envName != "" {
 		envText = m.envName
 		if mm := env.MajorMinor(m.gameVer); mm != "" {
@@ -144,7 +145,9 @@ func (m *model) topBar() string {
 		b.WriteString("  ")
 		hits = hits[:0]
 		for i, it := range items {
-			n := i + 1
+			// its own shift digit: Mod library's texture optimisation has 7, so the
+			// Game Config entry after it is 8, not its place in the row (VM 2026-11-23)
+			n := navDigit(it.Key)
 			digit := itoa(n)
 			badge := ""
 			if it.ID == view.PageNeeds && need > 0 {
@@ -238,11 +241,28 @@ func (m *model) contextLeft(w int) (string, int, int) {
 		}
 		return plain(m.needsHead(), sText)
 	}
-	if at <= 0 || at > len(m.navItems()) {
+	it := navEntry(m.navItems(), at)
+	if it == nil {
 		return "", 0, 2
 	}
-	s, n := m.subTabs(m.navItems()[at-1].Kids, sub, w)
+	s, n := m.subTabs(it.Kids, sub, w)
 	return s, n, 1
+}
+
+// navDigit is the n of a "shift+n" key (0 for none).
+func navDigit(key string) int {
+	n, _ := strconv.Atoi(strings.TrimPrefix(key, "shift+"))
+	return n
+}
+
+// navEntry is the row's entry whose shift digit is n.
+func navEntry(items []view.NavItem, n int) *view.NavItem {
+	for i := range items {
+		if navDigit(items[i].Key) == n {
+			return &items[i]
+		}
+	}
+	return nil
 }
 
 // subTabs draws sub-entries as switches: the open one bold on the row tint; the list the
@@ -350,7 +370,7 @@ func (m *model) needsActions() [][2]string {
 	if n := view.AutoFixCount(m.prob.base); n > 0 {
 		ps = append(ps, [2]string{"F", Tf("fix %d automatically", n)})
 	}
-	return append(ps, [2]string{"A", T("check the files again")}, [2]string{"l", T("choose a log")})
+	return append(ps, [2]string{"A", T("check again")}, [2]string{"l", T("choose a log")})
 }
 
 // needsLayout places Can it run's conclusion and page actions: both in the context row when

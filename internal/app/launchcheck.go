@@ -24,8 +24,13 @@ type LaunchCheck struct {
 	NoInfo bool
 }
 
-// LaunchChecks in the order they are shown: most predictive first (observed / chance).
+// LaunchChecks in the order they are shown: certain first, then most predictive (observed /
+// chance).
 var LaunchChecks = []LaunchCheck{
+	// Certain rather than measured: the game drops the whole list (VM 2026-11-23).
+	{Code: CodeCoreMissing,
+		Why:  "without Core the game resets its mod list when it starts and loads Core alone: none of the enabled mods load",
+		Many: func(int, int) string { return "Core is not in the list" }},
 	{Code: "patch.no-match",
 		Why: "patches that find nothing usually fail with red errors: such mods were error sources in 37% of logs (4.5% by chance)",
 		Many: func(n, mods int) string {

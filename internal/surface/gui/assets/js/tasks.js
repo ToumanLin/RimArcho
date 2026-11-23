@@ -5,7 +5,7 @@
 // sidebar's foot line and ctrl+j bring them back here. "tasks" events say the record
 // changed; a lane task that ended also brings its result for the status line.
 import { progress } from "./feedbacksemantics.js";
-import { pathContent } from "./fields.js";
+import { pathContent, copy as copyText } from "./fields.js";
 import { factText, S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { beginPageRead, page, act as pageAct, area } from "./screens.js";
 import { createBar } from "./filterbar.js";
@@ -14,6 +14,9 @@ import { icon } from "./icons.js";
 import { still } from "./motion.js";
 import { createTable, mergeColumns } from "./datatable.js";
 import { wireSeparator } from "./separator.js";
+import { pickClick } from "./select.js";
+import { archoSpot, ARCHO_PAGE } from "./archo.js";
+import * as ops from "./oplog.js";
 
 const COLS_KEY = "ui.gui.tasks.items.columns";
 const SIDE_KEY = "ui.gui.tasks.side";
@@ -41,18 +44,27 @@ const X = {
   sort: "state", dir: 1,
   bar: null,
   from: null,         // the page ctrl+j came from (again goes back)
+  view: "tasks",      // "tasks", or "ops": What RimArcho did (oplog.js)
 };
 let ui = null;
 let els = null;
 
 export function initTasks(u) { ui = u; }
 
-// ---- the sidebar's foot line (16 §2.1): always there, where it is; it says more while
-// something runs, waits or failed ----
+// ---- the sidebar's foot line (16 §2.1): always there once the window has its first page,
+// where it is; it says more while something runs, waits or failed ----
+// footShown: the start-up is over (showFoot). Until then the line stays hidden, so it does not
+// stand alone in an empty sidebar while the rest of the window loads (2026-11-18).
+let footShown = false;
+export function showFoot() {
+  if (footShown) return;
+  footShown = true;
+  refreshFoot();
+}
 export function foot(p) {
   const b = $("#tasks-line");
   if (!b) return;
-  b.hidden = false;
+  b.hidden = !footShown;
   b.classList.toggle("on", S.screen === "tasks");
   const busy = !!(p && (p.running || p.queued));
   const sig = p ? [p.foot, p.pct, p.unseen, p.running, p.queued].join("|") : "";
@@ -77,6 +89,7 @@ export async function relang() {
   if (b) b.dataset.sig = "";
   if (S.screen !== "tasks") return refreshFoot();
   els = null;
+  opsBox = null;
   await load();
 }
 
@@ -87,12 +100,32 @@ export async function refreshFoot() {
 // event: the record changed; a lane task that ended says so on the status line.
 export async function event(ev) {
   if (ev && ev.ended) {
-    say(ev.ended.ok ? "ok" : "fail", ev.ended.text + (ev.ended.ok || S.screen === "tasks" ? "" : ", ctrl+j"));
+    // a task that failed elsewhere says so in a few words, with a link to why (16 §2.16);
+    // the whole result is the status line's hover
+    if (!ev.ended.ok && S.screen !== "tasks") {
+      say("fail", ev.ended.kind === "subscribe" ? T("The download didn't finish.") : ev.ended.text, { label: T("see why"), run: toggle });
+      $("#status").title = ev.ended.text;
+    } else say(ev.ended.ok ? "ok" : "fail", ev.ended.text);
+    if (ev.ended.ok && (ev.ended.kind === "subscribe" || ev.ended.kind === "subscription-from")) offerAdd(ev.ended.id);
     document.dispatchEvent(new CustomEvent("task-ended", { detail: ev.ended }));
   }
   if (S.screen === "tasks") return load();
   refreshFoot();
 }
+
+// offerAdd: after a download, its Mods that the current list lacks, with "add to <list>" on
+// the status line (16 §2.9). A Steam download shows up only after the next scan: with nothing
+// found yet, the task waits for one scan (scanned) and is asked once more.
+let addWaiting = "";
+async function offerAdd(id) {
+  let o = null;
+  try { o = await api.DownloadedToAdd(id); } catch { return; }
+  if (!o?.refs?.length) { addWaiting = addWaiting === id ? "" : id; return; }
+  addWaiting = "";
+  const what = o.names.length === 1 ? o.names[0] : Tf("%d mods", o.names.length);
+  say("ok", Tf("%s is ready", what), { label: Tf("add to %s", o.list || T("the list")), run: () => ui.edited(() => api.AddDownloaded(o.refs), true) });
+}
+export function scanned() { if (addWaiting) offerAdd(addWaiting); }
 
 // toggle: ctrl+j opens the page, and from it goes back where it came from. X.from belongs
 // to the visit ctrl+j opened; on a visit opened another way it goes back in the page history.
@@ -106,7 +139,8 @@ export function toggle() {
 }
 
 export async function open() {
-  if (S.screen !== "tasks") { X.focus = "list"; if (!byKey) X.from = null; }
+  // coming from another page shows the tasks again, not What RimArcho did
+  if (S.screen !== "tasks") { X.focus = "list"; X.view = "tasks"; opsBox = null; if (!byKey) X.from = null; }
   const read = beginPageRead("tasks", { retry: open });
   await load(read);
   api.TasksSeen().then(refreshFoot).catch(() => {});
@@ -114,6 +148,7 @@ export async function open() {
 
 async function load(read = null) {
   if (!read && S.screen !== "tasks") return;
+  if (X.view === "ops") return loadOps(read);
   read ||= beginPageRead("tasks", { retry: () => load() });
   let p, saved;
   try {
@@ -204,7 +239,8 @@ function build() {
   const sc = $("#screen");
   sc.innerHTML = "";
   const w = page("fill tasks", "",
-    pageAct(T("take the done ones off the record"), "ok", () => run("clear", []), "C"));
+    pageAct(T("What RimArcho did"), "log", () => showOps(), "W"),
+    pageAct(T("clear finished"), "ok", () => run("clear", []), "C"));
   const root = el("div", "tk");
   const side = el("div", "fcol tk-side");
   const list = el("section", "area tk-list");
@@ -380,11 +416,18 @@ function mini(r, label) {
   m.append(i);
   return taskProgress(m, r, label);
 }
+// iconWord: done and failed are their ✓ and ✕ alone (V11, 16 §7 principle 9); the word stays
+// for assistive technology and as the tooltip. Other states keep their word.
+function iconWord(s, word, iconOnly) {
+  if (!iconOnly) { s.append(word); return; }
+  s.append(el("span", "vis-hidden", word));
+  s.title = word;
+}
 function stateWord(r) {
   const s = el("span", "stw s-" + r.state);
   const mk = { done: icon.ok, fail: icon.err, part: icon.warn }[r.state];
   if (mk) { const k = el("span", "mk"); k.innerHTML = mk; s.append(k); }
-  s.append(r.stateText);
+  iconWord(s, r.stateText, r.state === "done" || r.state === "fail");
   return s;
 }
 const current = () => (X.page ? X.page.rows.find((r) => r.id === X.cur) : null);
@@ -439,7 +482,8 @@ function drawSum() {
   box.append(acts);
   const facts = el("div", "facts");
   const fact = (k, v) => { if (!v) return; const s = el("span", "", k); s.append(el("b", " word-facts", v)); facts.append(s); };
-  fact(T("queue"), r.laneText + "  " + r.laneNote);
+  fact(T("queue"), r.laneText);
+  if (r.laneNote && facts.lastChild) facts.lastChild.title = r.laneNote; // how the queue works: on hover
   fact(T("started"), r.time);
   fact(T("took"), r.dur);
   box.append(facts);
@@ -453,6 +497,11 @@ function itemRows() {
   if (d) list.sort((a, b) => d.cmp(a, b) * X.dir * d.dir || a.name.localeCompare(b.name));
   return list;
 }
+// taskFace: Archo's expression for the selected task (16 §7.1 "Placements")
+function taskFace(r) {
+  if (!r) return "sleepy";
+  return { run: "think", queue: "think", done: "thumbsup", fail: "cry", part: "skeptic" }[r.state] || "neutral";
+}
 function drawItems() {
   const r = current();
   const has = !!(r && r.items && r.items.length);
@@ -461,6 +510,11 @@ function drawItems() {
   if (has) els.ihead.append(el("span", "r word-facts", r.counts));
   els.iscroll.hidden = !has;
   els.none.hidden = has;
+  // Archo stands in the empty detail (16 §7.1 "Placements"); a list of items fills it
+  const spot = archoSpot("tasks", { size: ARCHO_PAGE, calm: ["sleepy", "neutral", "ponder", "wink", "yum"] });
+  const face = taskFace(r);
+  // calm: nothing selected, a task done or stopped; running, failed or partly done hold
+  if (has) spot.slot.remove(); else spot.stand(els.items, face, ["sleepy", "thumbsup", "neutral"].includes(face));
   if (!has) {
     factText(els.none, r ? [r.noItems, r.line] : []);
     if (r) {
@@ -498,7 +552,7 @@ function itemState(it) {
   const s = el("span", "stw s-" + map[it.state]);
   const mk = { ok: icon.ok, fail: icon.err }[it.state];
   if (mk) { const k = el("span", "mk"); k.innerHTML = mk; s.append(k); }
-  s.append(it.stateText);
+  iconWord(s, it.stateText, !!mk);
   // a Steam download in progress: its bytes as a bar (got / downloadSize)
   if (it.state === "run" && it.downloadSize > 0) {
     const pct = Math.max(0, Math.min(100, (100 * (it.got || 0)) / it.downloadSize));
@@ -525,7 +579,7 @@ function wireItems() {
     X.icur = +r.dataset.i;
     drawItems();
   });
-  els.ibody.addEventListener("contextmenu", (e) => {
+  els.ibody.addEventListener("contextmenu", (e) => { // keys: Menu, shift+F10 (itemsKey)
     const r = e.target.closest(".tk-irow");
     if (!r) return;
     e.preventDefault();
@@ -548,7 +602,7 @@ function itemMenu(x, y, keys) {
   pop.menu(x, y, acts, keys, { name: it.name, opener: els.iscroll });
 }
 function copy(text) {
-  navigator.clipboard.writeText(text).then(() => say("ok", Tf("copied %s", text))).catch(() => {});
+  copyText(text).then((ok) => { if (ok) say("ok", Tf("copied %s", text)); });
 }
 function toLibrary(name) {
   document.dispatchEvent(new CustomEvent("library-search", { detail: name || "" }));
@@ -560,15 +614,14 @@ function wireList(rows) {
     const r = e.target.closest(".tk-row");
     if (!r || e.button !== 0) return;
     const id = r.dataset.id;
-    if (e.ctrlKey) X.sel.has(id) ? X.sel.delete(id) : X.sel.add(id);
-    else if (e.shiftKey && X.cur) {
-      const ids = shown().map((x) => x.id), a = ids.indexOf(X.cur), b = ids.indexOf(id);
-      ids.slice(Math.min(a, b), Math.max(a, b) + 1).forEach((x) => X.sel.add(x));
-    }
+    // as the editor's lists (16 §3.4): click selects only this task, ctrl toggles, shift ranges
+    const ids = shown().map((x) => x.id), one = (j) => (ids[j] ? [ids[j]] : []);
+    const anchor = pickClick(X.sel, e, { at: ids.indexOf(id), cursor: ids.indexOf(X.cur), anchor: ids.indexOf(X.anchor), one, range: one });
+    X.anchor = ids[anchor] ?? null;
     moveTo(id);
   });
-  rows.addEventListener("dblclick", (e) => { if (e.target.closest(".tk-row")) focusItems(); });
-  rows.addEventListener("contextmenu", (e) => {
+  rows.addEventListener("dblclick", (e) => { if (e.target.closest(".tk-row")) focusItems(); }); // keys: 3 focuses the items
+  rows.addEventListener("contextmenu", (e) => { // keys: Menu, shift+F10
     const r = e.target.closest(".tk-row");
     e.preventDefault();
     if (!r) return;
@@ -615,9 +668,43 @@ async function run(act, rows, ref = "") {
   load();
 }
 
+// ---- What RimArcho did (16 §2.16): the operation log in place of the tasks ----
+let opsBox = null;
+function showOps() {
+  X.view = "ops";
+  els = null;
+  ops.reset();
+  opsBox = null;
+  return loadOps();
+}
+function backToTasks() {
+  X.view = "tasks";
+  ops.reset();
+  opsBox = null;
+  load();
+}
+async function loadOps(read = null) {
+  if (!opsBox || !document.body.contains(opsBox)) {
+    const sc = $("#screen");
+    sc.innerHTML = "";
+    opsBox = page("fill tasks ops-view", "");
+    sc.append(opsBox);
+    ops.reset();
+  }
+  await ops.load(opsBox, backToTasks, read);
+  ui.renderHints();
+  ui.renderWhere();
+}
+
 // ---- keys (16 §2.16): the page's own; the rest are the shell's ----
 export function key(e) {
   const k = e.key, ctrl = e.ctrlKey || e.metaKey;
+  if (X.view === "ops") {
+    if (k === "W") { e.preventDefault(); return backToTasks(); }
+    if (ops.key(e)) { ui.renderWhere(); return; }
+    return;
+  }
+  if (k === "W" && !ctrl) { e.preventDefault(); return showOps(); }
   if (!X.page || !els) return;
   const done = () => e.preventDefault();
   if (k === "/" || (ctrl && k === "f")) { done(); return X.bar.focus(); }
@@ -641,7 +728,13 @@ export function key(e) {
   const page = Math.max(1, Math.floor(els.rows.clientHeight / 46) - 1);
   const go = (j) => {
     j = Math.max(0, Math.min(ids.length - 1, j));
-    if (e.shiftKey && X.cur) { X.sel.add(X.cur); X.sel.add(ids[j]); }
+    // shift extends a range from the anchor, as in the editor's lists (16 §3.4)
+    if (e.shiftKey && X.cur && i >= 0) {
+      let a = ids.indexOf(X.anchor);
+      if (a < 0) { a = i; X.anchor = X.cur; }
+      X.sel.clear();
+      ids.slice(Math.min(a, j), Math.max(a, j) + 1).forEach((x) => X.sel.add(x));
+    } else if (!e.shiftKey) X.anchor = null;
     done();
     moveTo(ids[j]);
   };
@@ -685,6 +778,7 @@ function itemsKey(e, done, menuKey) {
 
 // ---- the shell's lines ----
 export function where() {
+  if (X.view === "ops") return ops.where();
   if (!X.page) return "";
   const list = shown(), i = list.findIndex((r) => r.id === X.cur);
   if (X.focus === "items") {
@@ -697,6 +791,7 @@ export function where() {
   return s;
 }
 export function hintList() {
+  if (X.view === "ops") return ops.hintList();
   if (X.bar && X.bar.open) return [{ key: "←→↑↓", label: T("pick a value") }, { key: "enter", label: T("only these") }, { key: "x", label: T("leave out") }, { key: "esc", label: T("close") }];
   if (X.focus === "items") return [{ key: "↑↓", label: T("move") }, { key: "←", label: T("back to the tasks") }, { key: "o", label: T("see it in the mod library") }, { key: "s", label: T("sort and columns") }, { key: "?", label: T("all keys") }];
   const r = current();

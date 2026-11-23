@@ -24,6 +24,7 @@ namespace ArchoMonitor
         internal string Value, Default; // as HugsLib writes them (ToString)
         internal string Type;  // the value type's simple name
         internal bool Hidden;  // never shown in the dialog
+        internal bool Unsaved; // never written to the file (a button in the dialog, such as HugsLib's "show all news")
         internal string[] Choices; // an enum's names; null otherwise
     }
 
@@ -93,6 +94,7 @@ namespace ArchoMonitor
                                 Type = type?.Name ?? "",
                                 Choices = Choices(type),
                                 Hidden = Prop(h, "NeverVisible") is bool b && b,
+                                Unsaved = Prop(h, "Unsaved") is bool u && u,
                             });
                         }
                     }

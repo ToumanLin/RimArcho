@@ -13,46 +13,63 @@ import (
 
 func init() {
 	register(&Command{Name: "update", Summary: "check for a newer RimArcho and show update options; the data folder is not touched (17 §5.1)",
-		Flags: []Flag{{Name: "check", Help: "only check and show what installing would do; nothing is downloaded"}}, MaxArgs: 0, Run: updateCmd})
+		Flags: []Flag{{Name: "check", Help: "only check and show what installing would do; nothing is downloaded"},
+			{Name: "from", Value: "<zip>", Help: "install a release ZIP you downloaded; the original file is kept"}}, MaxArgs: 0, Run: updateCmd})
 }
 
-// updateCmd checks first in both forms; installing replaces this program's files once no
+// updateCmd checks before automatic installation; --from also works offline. It replaces files once no
 // other RimArcho runs from its folder and leaves restarting to the player.
 func updateCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	ctx := c.Context
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	c.App.CleanSelfUpdate()
+	picked := a.Str("from")
+	if picked != "" && a.Bool("check") {
+		return nil, fmt.Errorf("--from and --check cannot be used together")
+	}
 	cur := c.App.SelfVersionNow()
-	// Record the check as the automatic one does, so status and the window agree.
-	ran, err := c.App.RunAutomaticNow(ctx, "self")
-	if !ran && err == nil { // another window is recording a check right now
-		_, _, err = c.App.CheckSelfUpdate(ctx)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("cannot check for updates: %w", err)
-	}
-	info := c.App.SelfUpdateInfo()
-	r := c.App.SelfUpdatePending()
-	if a.Bool("check") || r == nil || !app.SelfUpdateSupported() {
-		d, root := render.New("RimArcho " + cur)
-		updateFacts(c, root, info, r)
-		if r != nil && app.SelfUpdateSupported() {
-			d.AddNext("archo update")
+	if picked == "" {
+		c.App.CleanSelfUpdate()
+		// Record the check as the automatic one does, so status and the window agree.
+		ran, err := c.App.RunAutomaticNow(ctx, "self")
+		if !ran && err == nil { // another window is recording a check right now
+			_, _, err = c.App.CheckSelfUpdate(ctx)
 		}
-		return d, nil
-	}
-	if Progress != nil {
-		Progress(fmt.Sprintf("progress: downloading RimArcho %s (%s)", r.Version, updateSize(r)))
+		if err != nil && !a.Bool("check") {
+			return nil, fmt.Errorf("cannot check for updates: %w", err)
+		}
+		info := c.App.SelfUpdateInfo()
+		if err != nil {
+			info.State = "check unavailable offline"
+		}
+		r := c.App.SelfUpdatePending()
+		if a.Bool("check") || r == nil || !app.SelfUpdateSupported() {
+			d, root := render.New("RimArcho " + cur)
+			updateFacts(c, root, info, r)
+			if r != nil && app.SelfUpdateSupported() {
+				d.AddNext("archo update")
+			}
+			return d, nil
+		}
+		if Progress != nil {
+			Progress(fmt.Sprintf("progress: downloading RimArcho %s (%s)", r.Version, updateSize(r)))
+		}
 	}
 	waited := false
-	res, err := c.App.InstallSelfUpdate(ctx, func(s app.SelfUpdateStep) {
+	step := func(s app.SelfUpdateStep) {
 		if s.Phase == "wait" && !waited && Progress != nil {
 			waited = true
 			Progress("progress: waiting for " + othersText(s.Others) + " to close (Ctrl+C stops; nothing is changed until then)")
 		}
-	})
+	}
+	var res *app.SelfUpdateResult
+	var err error
+	if picked != "" {
+		res, err = c.App.InstallSelfUpdateFrom(ctx, picked, step)
+	} else {
+		res, err = c.App.InstallSelfUpdate(ctx, step)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -64,11 +81,31 @@ func updateCmd(c *Ctx, a *Args) (*render.Doc, error) {
 }
 
 func updateFacts(c *Ctx, root *render.Node, info app.SelfUpdate, r *selfupdate.Release) {
+	if len(info.Sources) > 0 {
+		sources := root.Section("sources")
+		for _, source := range info.Sources {
+			value := source.Status
+			switch source.Status {
+			case "ok":
+				value += " " + source.Version
+			case "unconfigured":
+				value = "not configured"
+			default:
+				if source.Error != "" {
+					value += ": " + source.Error
+				}
+			}
+			sources.KV(source.Source, value)
+		}
+	}
 	if info.Source != "" {
 		root.KV("source", info.Source)
 	}
 	if info.Fallback != "" {
 		root.KV("fallback", info.Fallback)
+	}
+	if info.Manual != "" {
+		root.KV("manual", app.SelfUpdateManualInstructions(info.Manual))
 	}
 	if r == nil {
 		if info.State == "development build" {
@@ -95,6 +132,9 @@ func updateFacts(c *Ctx, root *render.Node, info app.SelfUpdate, r *selfupdate.R
 		latest += " (" + r.Published.In(c.App.Loc).Format("2006-01-02") + ")"
 	}
 	root.KV("latest", latest)
+	if info.State == "check unavailable offline" {
+		root.KV("check", info.State)
+	}
 	root.KV("checked", c.App.FormatTime(info.Checked))
 	if !app.SelfUpdateSupported() {
 		root.KV("update", "available")
@@ -111,7 +151,8 @@ func updateFacts(c *Ctx, root *render.Node, info app.SelfUpdate, r *selfupdate.R
 		return
 	}
 	root.KV("update", "available")
-	root.KV("download", fmt.Sprintf("%s, %s, checked against %s", r.Zip.Name, updateSize(r), r.Sum.Name))
+	root.KV("download", fmt.Sprintf("%s, %s", r.Zip.Name, updateSize(r)))
+	root.KV("integrity", "GitHub SHA-256 when available; ZIP CRC32 and program startup check")
 	if program, err := c.App.SelfProgramDir(); err == nil {
 		root.KV("replaces", strings.Join(selfupdate.Files, ", ")+" in "+program)
 		root.KV("keeps", "the data folder "+c.App.Home)

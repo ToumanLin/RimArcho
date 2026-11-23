@@ -1,6 +1,8 @@
 package app
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -44,20 +46,46 @@ type ModSettingsFile struct {
 	// Kind is "" for a Config file and SettingsKindHugsLib for a HugsLib pack: Class is then
 	// the pack's identifier, File and Path HugsLib's settings file, Exists whether the file
 	// stores the pack, and Title its entry in HugsLib's dialog.
-	Kind   string
-	Class  string    // the Mod class: the file name's last part
-	Title  string    // the settings window's title, from Archo Monitor ("" unknown)
-	File   string    // name in Config/
-	Path   string    // full path
-	Exists bool      // false: the Mod uses its defaults (nothing changed yet)
-	Size   int64     // bytes, when it exists
-	Seen   time.Time // when Archo Monitor last recorded it (zero: never)
+	Kind     string
+	Class    string    // the Mod class: the file name's last part
+	Title    string    // the settings window's title, from Archo Monitor ("" unknown)
+	File     string    // name in Config/
+	Path     string    // full path
+	Exists   bool      // false: the Mod uses its defaults (nothing changed yet)
+	Size     int64     // bytes, when it exists
+	Modified time.Time // when the file was last written, when it exists
+	Seen     time.Time // when Archo Monitor last recorded it (zero: never)
 	// Window is what the settings window drew when the player last opened it (Archo Monitor);
 	// nil when never seen.
 	Window *SeenSettingsWindow
 	// HugsLib is Archo Monitor's record of a HugsLib pack (titles, defaults); nil when never
 	// recorded.
 	HugsLib *SeenHugsLibPack
+}
+
+// WindowOutdated: a value may have changed since the settings window was recorded, so the
+// window's values may be out of date (16 §2.9). Closing the window writes the file again
+// (Dialog_ModSettings.PreClose → Mod.WriteSettings), so its time says nothing; Archo
+// Monitor records the file's hash as the window opened, and the file is compared with it. A
+// file the game rewrites with the same values has the same bytes. Without a recorded hash,
+// with no file as the window opened, or with no file now, it is false.
+func (f *ModSettingsFile) WindowOutdated() bool {
+	if f.Window == nil || !f.Exists {
+		return false
+	}
+	switch h := f.Window.FileHash; {
+	case h == "" || h == "none":
+		// no hash, or no file as the window opened: closing the window writes the file
+		// whether or not a value changed, so a file that appeared since proves nothing
+		return false
+	default:
+		b, err := os.ReadFile(f.Path)
+		if err != nil {
+			return false
+		}
+		sum := sha256.Sum256(b)
+		return !strings.EqualFold(h, "sha256:"+hex.EncodeToString(sum[:]))
+	}
 }
 
 // Key names f among its Mod's files: the Mod class, or "hugslib:" and the pack's identifier.
@@ -252,7 +280,7 @@ func (a *App) ModSettings() (*ModSettingsList, error) {
 	}
 	root := st.Ix.Env.UserDataRoot
 	if root == "" {
-		return nil, errors.New("the environment has no user data directory; set one with archo env set --user-data <dir>")
+		return nil, errors.New("the Game Config has no user data directory; set one with archo env set --user-data <dir>")
 	}
 	out := &ModSettingsList{Plan: PlanRef(st.Plan), Config: filepath.Join(root, "Config")}
 	var listed []string
@@ -282,9 +310,9 @@ func (a *App) ModSettingsOf(m *store.Mod) (*ModSettingsMod, error) {
 		return nil, err
 	}
 	if ix.Env.UserDataRoot == "" {
-		return nil, errors.New("the environment has no user data directory; set one with archo env set --user-data <dir>")
+		return nil, errors.New("the Game Config has no user data directory; set one with archo env set --user-data <dir>")
 	}
-	aliases, err := a.Store.AllAliases(ix.Env.ID)
+	aliases, err := a.Store.AllAliases(ix.Env.GameID)
 	if err != nil {
 		return nil, err
 	}
@@ -385,7 +413,7 @@ func (r *settingsReader) of(m *store.Mod, folder string) ModSettingsMod {
 		f := byClass[k]
 		f.Path = filepath.Join(r.cfg, f.File)
 		if fi, err := os.Stat(f.Path); err == nil && fi.Mode().IsRegular() {
-			f.Exists, f.Size = true, fi.Size()
+			f.Exists, f.Size, f.Modified = true, fi.Size(), fi.ModTime()
 		}
 		sm.Files = append(sm.Files, *f)
 	}

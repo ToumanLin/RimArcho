@@ -49,7 +49,9 @@ func export(datasetPath, outPath string) error {
 	for _, r := range rules {
 		p := byID["g:"+r.ID]
 		if p == nil {
-			return fmt.Errorf("dataset has no pattern g:%s", r.ID)
+			// No log of this window matched the rule (a young game version's few weeks): the
+			// matcher still needs every rule in order, with zero counts.
+			p = &Pattern{}
 		}
 		out.Clusters += p.Clusters
 		out.Rules = append(out.Rules, &patterns.Pattern{ID: "g:" + r.ID, Class: r.Class, Match: r.Match, Fallback: r.Fallback,
@@ -68,7 +70,7 @@ func export(datasetPath, outPath string) error {
 			kind = "g:" + p.Rule.ID
 		}
 		out.Mod = append(out.Mod, &patterns.Pattern{ID: p.ID, Class: p.Class, Template: p.Template, Mod: p.Mod, Kind: kind,
-			Versions: p.Versions, First: p.First, Last: p.Last, Logs: p.Logs, Sessions: p.Sessions, NClusters: p.Clusters, Res: res(p.Res)})
+			Versions: p.Versions, First: p.First, Last: p.Last, LastLog: p.LastLog, Logs: p.Logs, Sessions: p.Sessions, NClusters: p.Clusters, Res: res(p.Res)})
 	}
 	// One pattern per line, as patterns-v0.json: readable diffs between dataset versions.
 	var sb strings.Builder

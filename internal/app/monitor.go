@@ -280,6 +280,7 @@ type MonitorResult struct {
 	Copied     bool   // a new version folder was assembled
 	Replaced   bool   // a pre-release folder with other content was replaced
 	Deferred   string // why a replacement waits
+	Corpus     string // corpus data refreshed in place to this week (19 §6)
 	Registered bool   // the environment's src:monitor was added
 	Scanned    bool
 	Merged     int // monitor instances folded into the newest one's lineage
@@ -337,10 +338,15 @@ func (a *App) ScanWithMonitor(o ScanOptions) (*ScanReport, *MonitorResult, error
 // read is the monitor source's ID when its folder must be read before finishMonitor.
 func (a *App) prepareMonitor(r *MonitorResult, dryRun bool) (read string, err error) {
 	r.Bundled, r.Tried = a.FindMonitor()
-	b := r.Bundled
-	if b == nil {
+	if r.Bundled == nil {
 		return "", nil
 	}
+	return a.prepareMonitorFrom(r, r.Bundled, dryRun)
+}
+
+// prepareMonitorFrom is prepareMonitor for a given Monitor folder: the bundled one, or one
+// SteamCMD downloaded anonymously (monitorfetch.go).
+func (a *App) prepareMonitorFrom(r *MonitorResult, b *MonitorBundled, dryRun bool) (read string, err error) {
 	ix, err := a.Index()
 	if err != nil {
 		return "", err
@@ -422,13 +428,24 @@ func (a *App) finishMonitor(r *MonitorResult) error {
 
 // installMonitor copies the bundled monitor into its version folder; changed reports a copy.
 func (a *App) installMonitor(r *MonitorResult, b *MonitorBundled, dryRun bool) (bool, error) {
-	want, err := treeDigest(b.Dir)
+	want, err := treeDigestSkip(b.Dir, corpusOnly)
 	if err != nil {
 		return false, fmt.Errorf("reading the bundled monitor %s: %w", b.Dir, err)
 	}
 	if _, err := os.Stat(r.Target); err == nil {
-		have, err := treeDigest(r.Target)
+		have, err := treeDigestSkip(r.Target, corpusOnly)
 		if err == nil && have == want {
+			// Same Monitor; its corpus data may be newer (data updates keep modVersion).
+			if readCorpusData(b.Dir) > readCorpusData(r.Target) {
+				r.Corpus = readCorpusData(b.Dir)
+				if dryRun {
+					return false, nil
+				}
+				if _, err := refreshMonitorCorpus(b.Dir, r.Target); err != nil {
+					return false, fmt.Errorf("updating the corpus data of %s: %w", r.Target, err)
+				}
+				a.forgetCorpus()
+			}
 			return false, nil
 		}
 		if !strings.ContainsAny(b.Version, "-+") {
@@ -467,8 +484,10 @@ func (a *App) installMonitor(r *MonitorResult, b *MonitorBundled, dryRun bool) (
 			return false, err
 		}
 		os.RemoveAll(old) // RimArcho's own product (19 §6)
+		a.forgetCorpus()
 		return true, nil
 	}
+	a.forgetCorpus()
 	return true, os.Rename(tmp, r.Target)
 }
 
@@ -680,16 +699,26 @@ func noLinks(fs string) bool {
 }
 
 // treeDigest fingerprints a folder: every file's relative path, size and SHA-256.
-func treeDigest(root string) (string, error) {
+func treeDigest(root string) (string, error) { return treeDigestSkip(root, nil) }
+
+// treeDigestSkip is treeDigest leaving out the relative paths skip reports (a Monitor's
+// corpus data, 19 §6).
+func treeDigestSkip(root string, skip func(rel string) bool) (string, error) {
 	h := sha256.New()
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
+		rel, _ := filepath.Rel(root, p)
+		if skip != nil && rel != "." && skip(rel) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
 		if d.IsDir() {
 			return nil
 		}
-		rel, _ := filepath.Rel(root, p)
 		f, err := os.Open(p)
 		if err != nil {
 			return err

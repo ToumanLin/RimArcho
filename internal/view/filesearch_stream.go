@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -252,6 +253,8 @@ func (r *FileSearchRun) Fail(err error) {
 	r.status.Error = err.Error()
 }
 
+// search finds the pattern in the files of the copies the mods field picks, then, when C#
+// is asked for, in their decompiled assemblies.
 func (r *FileSearchRun) search(ctx context.Context, a *app.App, q FileSearchReq) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -273,32 +276,8 @@ func (r *FileSearchRun) search(ctx context.Context, a *app.App, q FileSearchReq)
 		return err
 	}
 	st := lib.St
-	var mods []*store.Mod
-	labels := map[string]string{}
-	var core string
-	for _, group := range result.Matches {
-		for _, i := range group.Shown {
-			if i.Mod == nil || i.Missing() {
-				continue
-			}
-			mods = append(mods, i.Mod)
-			labels[i.Mod.ID] = libLabel(i)
-			if strings.EqualFold(i.Mod.PackageID, "ludeon.rimworld") {
-				core = i.Mod.ID
-			}
-		}
-	}
-	if code && q.Game && core == "" {
-		for _, group := range lib.Lineages {
-			for _, i := range group.Instances {
-				if i.Mod != nil && strings.EqualFold(i.Mod.PackageID, "ludeon.rimworld") {
-					core = i.Mod.ID
-					mods = append(mods, i.Mod)
-					labels[core] = libLabel(i)
-				}
-			}
-		}
-	}
+	sc := fileSearchScopeOf(lib, result, code && q.Game)
+	mods := sc.mods
 	r.mu.Lock()
 	r.status.Total = len(mods)
 	r.mu.Unlock()
@@ -314,6 +293,7 @@ func (r *FileSearchRun) search(ctx context.Context, a *app.App, q FileSearchReq)
 	if err != nil {
 		return err
 	}
+	cs := &codeSearch{r: r, ctx: ctx, st: st, o: &o, expression: expression, core: sc.core, labels: sc.labels}
 	for _, m := range mods {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -324,20 +304,7 @@ func (r *FileSearchRun) search(ctx context.Context, a *app.App, q FileSearchReq)
 			}
 			continue
 		}
-		if err := a.Store.LoadDecls([]*store.Mod{m}); err != nil {
-			return err
-		}
-		root := st.Ix.ModDir(m)
-		o.FS = newSearchFS(root)
-		input := modsearch.Mod{Ref: m.ID, PackageID: m.PackageID, Name: m.DisplayName(), Root: root, LoadFoldersXML: m.Decl().LoadFolders}
-		err := modsearch.Stream(ctx, []modsearch.Mod{input}, o, func(_ modsearch.Mod, f modsearch.FileResult) error {
-			file := FileSearchFile{Rel: f.Rel, Path: filepath.Join(root, filepath.FromSlash(f.Rel)), Lines: []FileSearchLine{}}
-			for _, h := range f.Matches {
-				file.Lines = append(file.Lines, FileSearchLine{Line: h.Line, Text: h.Text, Parts: searchLineParts(h.Text, expression)})
-			}
-			return r.add(m.ID, m.DisplayName(), labels[m.ID], file)
-		}, nil, r.note)
-		if err != nil {
+		if err := cs.searchMod(a, m); err != nil {
 			return err
 		}
 		if !code {
@@ -345,79 +312,159 @@ func (r *FileSearchRun) search(ctx context.Context, a *app.App, q FileSearchReq)
 		}
 	}
 	if code {
-		game := core != "" || q.Game
-		// Core is only complete after Assembly-CSharp, not its empty Mod folder.
-		finished := func(id string) {
-			if id == core && game {
-				return
-			}
-			if strings.HasPrefix(id, "game:") && core != "" {
-				id = core
-			}
-			r.finished(id)
-		}
-		decompiled, err := a.SourceProjects(ctx, st, mods, game, func(d *app.SourceDLL) error {
-			// First decompilation may have just created the library root.
-			o.FS = newSearchFS(a.SourceDir())
-			return filepath.WalkDir(d.Dir, func(path string, entry fs.DirEntry, walkErr error) error {
-				if ctx.Err() != nil {
-					return ctx.Err()
-				}
-				if walkErr != nil {
-					r.note(walkErr.Error())
-					return nil
-				}
-				if entry.IsDir() {
-					return nil
-				}
-				if !strings.EqualFold(filepath.Ext(path), ".cs") {
-					return nil
-				}
-				hits, err := modsearch.TextFile(ctx, path, o)
-				if err != nil {
-					if ctx.Err() != nil {
-						return ctx.Err()
-					}
-					r.note(err.Error())
-					return nil
-				}
-				if len(hits) == 0 {
-					return nil
-				}
-				rel, _ := filepath.Rel(d.Dir, path)
-				file := FileSearchFile{Rel: filepath.ToSlash(filepath.Join(strings.TrimSuffix(filepath.Base(d.File), ".dll"), rel)), Path: path, Lines: []FileSearchLine{}}
-				for _, h := range hits {
-					file.Lines = append(file.Lines, FileSearchLine{Line: h.Line, Text: h.Text, Parts: searchLineParts(h.Text, expression)})
-				}
-				for _, id := range d.Shared {
-					if strings.HasPrefix(id, "game:") && core != "" {
-						id = core
-					}
-					name, copy := T("Core"), labels[id]
-					if m := st.Ix.ByID[id]; m != nil {
-						name = m.DisplayName()
-					}
-					if err := r.add(id, name, copy, file); err != nil {
-						return err
-					}
-				}
-				return nil
-			})
-		}, finished, r.note)
-		if decompiled > 0 {
-			r.mu.Lock()
-			if len(r.status.Notes) == 8 {
-				r.status.Notes = r.status.Notes[:7]
-			}
-			r.status.Notes = append(r.status.Notes, Tf("assemblies decompiled now: %d; they stay in the source library", decompiled))
-			r.mu.Unlock()
-		}
-		if err != nil {
+		if err := cs.searchCode(a, mods, sc.core != "" || q.Game); err != nil {
 			return err
-		}
-		for _, m := range mods {
-			r.finished(m.ID)
 		}
 	}
 	return ctx.Err()
+}
+
+// fileSearchScope is what a file search reads: the copies shown, and Core's, found among
+// every copy when the game's own code is asked for and the mods field left it out.
+type fileSearchScope struct {
+	mods   []*store.Mod
+	labels map[string]string
+	core   string // Core's instance id
+}
+
+// fileSearchScopeOf collects the scope of a search.
+func fileSearchScopeOf(lib *app.Library, result *app.LibResult, gameCode bool) fileSearchScope {
+	sc := fileSearchScope{labels: map[string]string{}}
+	for _, group := range result.Matches {
+		for _, i := range group.Shown {
+			if i.Mod == nil || i.Missing() {
+				continue
+			}
+			sc.mods = append(sc.mods, i.Mod)
+			sc.labels[i.Mod.ID] = libLabel(i)
+			if strings.EqualFold(i.Mod.PackageID, "ludeon.rimworld") {
+				sc.core = i.Mod.ID
+			}
+		}
+	}
+	if gameCode && sc.core == "" {
+		for _, group := range lib.Lineages {
+			for _, i := range group.Instances {
+				if i.Mod != nil && strings.EqualFold(i.Mod.PackageID, "ludeon.rimworld") {
+					sc.core = i.Mod.ID
+					sc.mods = append(sc.mods, i.Mod)
+					sc.labels[sc.core] = libLabel(i)
+				}
+			}
+		}
+	}
+	return sc
+}
+
+// codeSearch is one search's state shared by its per-mod and its C# passes.
+type codeSearch struct {
+	r          *FileSearchRun
+	ctx        context.Context
+	st         *app.LoadoutState
+	o          *modsearch.Options
+	expression *regexp.Regexp
+	core       string
+	labels     map[string]string
+}
+
+// searchMod searches one copy's files.
+func (cs *codeSearch) searchMod(a *app.App, m *store.Mod) error {
+	if err := a.Store.LoadDecls([]*store.Mod{m}); err != nil {
+		return err
+	}
+	root := cs.st.Ix.ModDir(m)
+	cs.o.FS = newSearchFS(root)
+	input := modsearch.Mod{Ref: m.ID, PackageID: m.PackageID, Name: m.DisplayName(), Root: root, LoadFoldersXML: m.Decl().LoadFolders}
+	return modsearch.Stream(cs.ctx, []modsearch.Mod{input}, *cs.o, func(_ modsearch.Mod, f modsearch.FileResult) error {
+		file := FileSearchFile{Rel: f.Rel, Path: filepath.Join(root, filepath.FromSlash(f.Rel)), Lines: []FileSearchLine{}}
+		for _, h := range f.Matches {
+			file.Lines = append(file.Lines, FileSearchLine{Line: h.Line, Text: h.Text, Parts: searchLineParts(h.Text, cs.expression)})
+		}
+		return cs.r.add(m.ID, m.DisplayName(), cs.labels[m.ID], file)
+	}, nil, cs.r.note)
+}
+
+// searchCode searches the copies' decompiled assemblies, and the game's when game is set.
+func (cs *codeSearch) searchCode(a *app.App, mods []*store.Mod, game bool) error {
+	r, core := cs.r, cs.core
+	// Core is only complete after Assembly-CSharp, not its empty Mod folder.
+	finished := func(id string) {
+		if id == core && game {
+			return
+		}
+		if strings.HasPrefix(id, "game:") && core != "" {
+			id = core
+		}
+		r.finished(id)
+	}
+	decompiled, err := a.SourceProjects(cs.ctx, cs.st, mods, game, func(d *app.SourceDLL) error {
+		// First decompilation may have just created the library root.
+		cs.o.FS = newSearchFS(a.SourceDir())
+		return filepath.WalkDir(d.Dir, func(path string, entry fs.DirEntry, walkErr error) error {
+			return cs.sourceFile(d, path, entry, walkErr)
+		})
+	}, finished, r.note)
+	if decompiled > 0 {
+		r.mu.Lock()
+		if len(r.status.Notes) == 8 {
+			r.status.Notes = r.status.Notes[:7]
+		}
+		r.status.Notes = append(r.status.Notes, Tf("assemblies decompiled now: %d; they stay in the source library", decompiled))
+		r.mu.Unlock()
+	}
+	if err != nil {
+		return err
+	}
+	for _, m := range mods {
+		r.finished(m.ID)
+	}
+	return nil
+}
+
+// sourceFile searches one file of a decompiled assembly, its matches shown under every
+// mod that ships the assembly.
+func (cs *codeSearch) sourceFile(d *app.SourceDLL, path string, entry fs.DirEntry, walkErr error) error {
+	ctx, r := cs.ctx, cs.r
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if walkErr != nil {
+		r.note(walkErr.Error())
+		return nil
+	}
+	if entry.IsDir() {
+		return nil
+	}
+	if !strings.EqualFold(filepath.Ext(path), ".cs") {
+		return nil
+	}
+	hits, err := modsearch.TextFile(ctx, path, *cs.o)
+	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		r.note(err.Error())
+		return nil
+	}
+	if len(hits) == 0 {
+		return nil
+	}
+	rel, _ := filepath.Rel(d.Dir, path)
+	file := FileSearchFile{Rel: filepath.ToSlash(filepath.Join(strings.TrimSuffix(filepath.Base(d.File), ".dll"), rel)), Path: path, Lines: []FileSearchLine{}}
+	for _, h := range hits {
+		file.Lines = append(file.Lines, FileSearchLine{Line: h.Line, Text: h.Text, Parts: searchLineParts(h.Text, cs.expression)})
+	}
+	for _, id := range d.Shared {
+		if strings.HasPrefix(id, "game:") && cs.core != "" {
+			id = cs.core
+		}
+		name, copy := T("Core"), cs.labels[id]
+		if m := cs.st.Ix.ByID[id]; m != nil {
+			name = m.DisplayName()
+		}
+		if err := r.add(id, name, copy, file); err != nil {
+			return err
+		}
+	}
+	return nil
 }

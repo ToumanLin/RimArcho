@@ -1,8 +1,8 @@
 // The window's shell (16 §2.1, §2.2): the sidebar grouped by the player's questions, the
-// top bar (collapse, breadcrumb, environment chip, the page's actions) and, at the
+// top bar (collapse, breadcrumb, the page's actions) and, at the
 // sidebar's foot, the environment and the running game. What it lists comes from
 // view.Nav and view.NavPath through API.Shell.
-import { factText, S, $, el, api, T, Tf } from "./state.js";
+import { S, $, el, api, T, Tf } from "./state.js";
 import { icon } from "./icons.js";
 import { liveCount, seg, setSeg, syncPageAccessibility } from "./screens.js";
 import { bump, slideNav, places, slideFrom } from "./motion.js";
@@ -27,9 +27,9 @@ export function initShell(u) {
   const t = $("#navtoggle");
   t.innerHTML = icon.sidebar;
   t.onclick = () => toggleNav();
-  $("#env").onclick = () => ui.go("env");
   $("#nav-settings").onclick = () => ui.go("settings");
   $("#tasks-line").onclick = () => ui.go("tasks");
+  $("#nav-feedback").onclick = () => ui.go("feedback");
   $("#side").addEventListener("keydown", navKey);
   wireSideSplit();
   // the layout from the last run first (a copy in localStorage), so the window does not
@@ -46,12 +46,16 @@ export function initShell(u) {
 
 // toggleNav moves the navigation between the side and the top, and remembers it. The change
 // is a view transition (the entries move to their new places) unless motion is reduced.
+// viewTransitions: only Chromium (WebView2) animates the move. WebKitGTK 2.52 crashes its
+// UI process (SIGSEGV in GTK's main loop) on this view transition (16 §8.2).
+const viewTransitions = /Chrome\//.test(globalThis.navigator?.userAgent || "");
+
 export function toggleNav() {
   layout = layout === "side" ? "top" : "side";
   api.SetSetting(NAV_KEY, layout === "top" ? "top" : "").catch(() => {});
   try { localStorage.setItem("setting:" + NAV_KEY, layout === "top" ? "top" : ""); } catch { /* storage can be off */ }
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches || document.documentElement.dataset.motion === "reduced";
-  if (document.startViewTransition && !still) document.startViewTransition(() => applyNav());
+  if (viewTransitions && document.startViewTransition && !still) document.startViewTransition(() => applyNav());
   else applyNav();
 }
 
@@ -111,7 +115,7 @@ function kidMenu(b, keys) {
 
 function planMenuButton(b, id) {
   pop.menuOpener(b);
-  b.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); ui.planMenu(id, e.clientX, e.clientY, b, e.button === 0); };
+  b.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); ui.planMenu(id, e.clientX, e.clientY, b, e.button === 0); }; // keys: Menu, shift+F10 on the button (below)
   b.addEventListener("keydown", e => {
     if (e.key !== "ContextMenu" && !(e.key === "F10" && e.shiftKey)) return;
     e.preventDefault(); e.stopPropagation(); const r = b.getBoundingClientRect();
@@ -184,11 +188,13 @@ export function current() {
   if (S.screen === "packs" && S.packFocus) return "pack:" + S.packFocus;
   // a list's export: under Manage lists, or under the list when the editor opened it (16 §2.17)
   if (S.screen === "plan-export" && S.planExport) return S.planExport.from === "editor" ? "plan:" + S.planExport.id : "plans";
-  if (S.screen === "plan-import") return "plans"; // 16 §2.17
+  if (S.screen === "plan-import") return "import"; // Library > Import (16 §2.18)
   // uninstall RimArcho is under settings
-  if (S.screen === "uninstall" || S.screen === "uninstall-progress" || S.screen === "feedback") return "settings";
+  if (S.screen === "uninstall" || S.screen === "uninstall-progress") return "settings";
   // adding an environment belongs to the environment page
   if (S.screen === "guide" && S.guideFrom === "env") return "env";
+  // the first-run guide's preview belongs to settings, where it is opened
+  if (S.screen === "guide" && S.guideFrom === "preview") return "settings";
   return S.screen;
 }
 
@@ -210,7 +216,7 @@ function inGameMark(isInGame) {
   return m;
 }
 
-const ICONS = { home: "home", needs: "needs", plan: "plan", packs: "packs", saves: "saves", textures: "textures", env: "env", library: "library", log: "log" };
+const ICONS = { home: "home", needs: "needs", plan: "plan", packs: "packs", saves: "saves", review: "review", textures: "textures", env: "env", library: "library", log: "log", import: "import" };
 
 // The entry whose sub-entries were open when the sidebar was last drawn: a redraw starts
 // from it, so the sub-entries open and close with a transition (16 §7.1).
@@ -293,6 +299,20 @@ function renderSide() {
   const set = $("#nav-settings");
   set.classList.toggle("on", cur === "settings");
   if (cur === "settings") set.setAttribute("aria-current", "page"); else set.removeAttribute("aria-current");
+  const fb = $("#nav-feedback");
+  fb.classList.toggle("on", cur === "feedback");
+  if (cur === "feedback") fb.setAttribute("aria-current", "page"); else fb.removeAttribute("aria-current");
+  if (!fb.querySelector(".ic")) {
+    const ic = el("span", "ic");
+    ic.innerHTML = icon.feedback;
+    fb.prepend(ic);
+  }
+  $(".lbl", fb).textContent = T("feedback");
+  // a reply from the developer the player has not seen yet (16 §2.14 My reports)
+  let dot = fb.querySelector(".reply-dot");
+  if (S.feedbackUnseen && !dot) fb.append(dot = el("span", "reply-dot"));
+  else if (!S.feedbackUnseen && dot) dot.remove();
+  fb.title = S.feedbackUnseen ? T("feedback") + T("; ") + T("new reply") : T("feedback");
   const tl = $("#tasks-line");
   if (tl) {
     tl.classList.toggle("on", cur === "tasks");
@@ -322,7 +342,7 @@ function kidList(it, kids, cur, hl) {
     kb.dataset.id = k.id;
     if (k.id === cur) kb.setAttribute("aria-current", "page");
     kb.append(el("span", "lbl", k.label));
-    kb.title = k.label;
+    kb.title = k.label + (k.key ? T("; ") + k.key.replace("shift", "Shift") : "");
     const g = inGameMark(k.inGame);
     if (g) kb.append(g);
     // a plan's "an outside version has not been loaded" (07 §4.3)
@@ -343,21 +363,24 @@ export function crumbs() {
   const sh = S.shell;
   const cur = current();
   let out = (sh && sh.crumbs && sh.crumbs[cur]) || [];
-  if (S.screen === "guide") out = (S.guideFrom === "env" ? out : []).concat([{ label: S.guideFrom === "env" ? T("add a game") : T("getting started"), id: "guide" }]);
+  if (S.screen === "guide") {
+    const from = S.guideFrom, label = from === "env" ? T("Add Game Config") : from === "preview" ? T("first-run guide (preview)") : T("getting started");
+    out = (from === "env" || from === "preview" ? out : []).concat([{ label, id: "guide" }]);
+  }
   if (S.screen === "full" && S.fullName) out = out.concat([{ label: S.fullName, id: "full" }]);
   if (S.screen === "uninstall" || S.screen === "uninstall-progress") out = out.concat([{ label: T("uninstall RimArcho"), id: "uninstall" }]);
-  if (S.screen === "feedback") out = out.concat([{ label: T("feedback"), id: "feedback" }]);
+  // Feedback is its own sidebar row since 2026-11-18 (16 §2.1); the template or My reports
+  // shown is its second level, as a list is the editor's (16 §2.2)
+  if (S.screen === "feedback") out = [{ label: T("feedback"), id: "feedback" }].concat(S.feedbackCrumb ? [{ label: S.feedbackCrumb, id: "feedback" }] : []);
   if (S.screen === "build") out = out.concat([{ label: T("create a pack"), id: "build" }]);
   if (S.screen === "plan-export" && S.planExport) out = ((sh && sh.crumbs && sh.crumbs["plan:" + S.planExport.id]) || []).concat([{ label: T("export"), id: "plan-export" }]);
-  if (S.screen === "plan-import") out = out.slice(0, -1).concat([{ label: T("import"), id: "plan-import" }]);
   if (S.screen === "plans" && S.listCreating) out = out.concat([{ label: T("new list"), id: "plan:new" }]);
   return out;
 }
 
-// renderCrumbs: the breadcrumb names the page (there is no other title), and the chip
-// beside it says what the page is about: the environment, and on Can it run the plan too.
-// The home page spans every environment, and Mod library (All and Updates) every copy on the
-// machine: no chip there.
+// renderCrumbs: the breadcrumb names the page (there is no other title). The top bar has no
+// Game Config chip since 2026-11-18 (16 §2.2): Launch's 01 column and the Game Config
+// entry in the sidebar name and switch it.
 function namePage() {
   const nav = $("#crumbs");
   for (const old of document.querySelectorAll("#page-title")) old.removeAttribute("id");
@@ -369,14 +392,7 @@ function namePage() {
 }
 
 function renderCrumbs() {
-  const env = $("#env");
   const sh = S.shell;
-  let chip = (sh && sh.env) || "";
-  if (S.screen === "needs" && sh && sh.plan) chip = sh.plan.name + "  " + chip;
-  factText(env, chip);
-  env.hidden = !chip || !S.screen || S.screen === "home" || S.screen === "guide" || S.screen === "library" || S.screen === "changes" || S.screen === "subscribe" || S.screen === "uninstall" || S.screen === "uninstall-progress" || S.screen === "textures" || S.screen === "tasks";
-  env.title = T("game") + T("; ") + "E";
-  env.classList.toggle("on", S.screen === "env");
   const nav = $("#crumbs");
   nav.setAttribute("aria-label", T("breadcrumbs"));
   let cs = crumbs();

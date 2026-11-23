@@ -11,17 +11,18 @@ const pending = new Map();
 let actionGuard = () => "";
 export function setEnvironmentGuard(fn) { actionGuard = fn; }
 const writesGame = new Set([
-  "ApplyManagerImport",
-  "CompleteDependencies", "ReplaceRecommended", "UseInstalled",
+  "ApplyManagerImport", "ApplyManagerImportProfiles", "StartMigration",
+  "CompleteDependencies", "ApplySortStep",
   "Run", "RunAnyway", "RunMoving", "RunCLI", "Toggle", "Stage", "Unstage", "StageAll", "RestoreAll",
   "MoveBy", "MoveShown", "Place", "Swap", "Undo", "Redo", "HistoryGo", "RunOp", "DoAction",
   "CreatePlan", "ImportApplyTo", "UsePlan", "OpenPlan", "NewPlan", "RenamePlan", "RemovePlan", "ImportApply", "ImportAsPlan", "ImportAsPlanPreview", "ImportFollow",
   "PlanSync", "PlanFollow", "PlanFollowMode", "PlanUnfollow", "PlanVersionsSet", "SetModNote", "SetTag",
   "RenameTag", "MergeTags", "DeleteTags", "SetTagNote", "PinTag",
-  "LibraryDo", "LibrarySetNote", "Subscribe", "SubscriptionFrom", "CheckSubscriptionSource", "WorkshopUpdate", "Scan", "Analyze", "RemoveEnv", "ApplySetting", "AddMonitor",
-  "PackLaunch", "PackBuild", "PackRemove", "PackRemoveUnfinished", "TexturesRun", "TexturesClean", "CreditAnswer", "CompleteDependencies", "ReplaceRecommended",
-  // Saves (16 §2.11): fixes edit the save's list, the file actions change its folder
-  "SaveFix", "SaveNewList", "SaveRename", "ColonyRename", "SaveCopy", "SaveTrash",
+  "LibraryDo", "LibrarySetNote", "SaveReviewMark", "Subscribe", "SubscriptionFrom", "CheckSubscriptionSource", "WorkshopUpdate", "Scan", "Analyze", "RemoveEnv", "ApplySetting", "AddMonitor",
+  "PackLaunch", "PackBuild", "PackRemove", "ImportSettings", "PackRemoveUnfinished", "TexturesRun", "TexturesClean", "CreditAnswer",
+  // Saves (16 §2.11): fixes edit the save's list, the file actions change its folder;
+  // SaveChoose and SaveCopyTo act for the current Game Config
+  "SaveFix", "SaveNewList", "SaveRename", "ColonyRename", "SaveCopy", "SaveCopyTo", "SaveChoose", "SaveTrash",
 ]);
 on("environment", (result) => {
   const p = pending.get(result.request);

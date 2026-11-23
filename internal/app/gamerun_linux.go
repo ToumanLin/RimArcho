@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 )
 
 func gameProcesses() []*GameRun { return gameProcessesAt("/proc") }
@@ -18,13 +17,7 @@ func gameProcessesAt(proc string) []*GameRun {
 	if err != nil {
 		return nil
 	}
-	var boot int64
-	stat, _ := os.ReadFile(filepath.Join(proc, "stat"))
-	for _, line := range strings.Split(string(stat), "\n") {
-		if s, ok := strings.CutPrefix(line, "btime "); ok {
-			boot, _ = strconv.ParseInt(s, 10, 64)
-		}
-	}
+	boot := procBoot(proc)
 	var out []*GameRun
 	for _, entry := range entries {
 		pid, err := strconv.Atoi(entry.Name())
@@ -71,17 +64,7 @@ func gameProcessesAt(proc string) []*GameRun {
 				r.SaveData = p
 			}
 		}
-		stat, _ := os.ReadFile(filepath.Join(dir, "stat"))
-		// comm may contain spaces and ')'; starttime is field 22, after it.
-		if i := strings.LastIndexByte(string(stat), ')'); i >= 0 && boot > 0 {
-			fields := strings.Fields(string(stat)[i+1:])
-			if len(fields) > 19 {
-				if ticks, err := strconv.ParseInt(fields[19], 10, 64); err == nil {
-					// Linux exposes USER_HZ=100 on the supported amd64 platform.
-					r.Started = time.Unix(boot+ticks/100, (ticks%100)*int64(time.Second)/100)
-				}
-			}
-		}
+		r.Started = procStarted(dir, boot)
 		out = append(out, r)
 	}
 	return out
@@ -111,4 +94,29 @@ func winePath(p, procDir string) string {
 		return filepath.Join(cwd, p)
 	}
 	return ""
+}
+
+// steamClientRunning reports whether the Steam client runs (09 §2 "Without Steam").
+func steamClientRunning() bool { return steamRunningAt("/proc") }
+
+// steamRunningAt also accepts a synthetic proc tree: a process whose executable is named
+// steam (native, Flatpak and the steam.sh-started client alike).
+func steamRunningAt(proc string) bool {
+	entries, err := os.ReadDir(proc)
+	if err != nil {
+		return true // unknown: keep launching through Steam
+	}
+	for _, entry := range entries {
+		if _, err := strconv.Atoi(entry.Name()); err != nil {
+			continue
+		}
+		exe, err := os.Readlink(filepath.Join(proc, entry.Name(), "exe"))
+		if err != nil {
+			continue
+		}
+		if filepath.Base(strings.TrimSuffix(exe, " (deleted)")) == "steam" {
+			return true
+		}
+	}
+	return false
 }

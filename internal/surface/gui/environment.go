@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -285,7 +287,7 @@ func (s *API) workspaceRead(request, seq uint64) (*EnvironmentResult, bool) {
 		result.Error = err.Error()
 		return result, false
 	}
-	c, _ := reader.cachedNeedsLocked()
+	c := reader.needsCache[reader.needsScopeLocked()] // its snapshot only: the save below computes the key
 	release()
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -310,11 +312,16 @@ func (s *API) workspaceRead(request, seq uint64) (*EnvironmentResult, bool) {
 	s.board, s.boardAt = reader.board, reader.boardAt
 	result.Board.Stamp = s.a.Store.ChangeKey()
 	result.Board.Scanning, result.Board.Analyzing = s.busy["scan"], s.busy["analyze"]
+	cacheKey := ""
 	if c != nil {
-		s.saveNeedsLocked(c.ps, c.n, c.eager)
+		if saved := s.saveNeedsLocked(c.ps, c.n, c.eager); saved != nil {
+			cacheKey = saved.key
+		}
 		result.Board.Problems = view.ProblemsOf(c.n)
 	}
-	_, cacheKey := s.cachedNeedsLocked()
+	if cacheKey == "" {
+		_, cacheKey = s.cachedNeedsLocked()
+	}
 	saved := *result
 	s.workspace = &workspaceSnapshot{key: cacheKey, state: s.inventoryKey(), result: &saved, boardAt: reader.boardAt}
 	return result, false

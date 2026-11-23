@@ -23,6 +23,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/machine"
+	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
 	"github.com/ToumanLin/RimArcho/internal/surface/mcp"
@@ -33,18 +34,7 @@ import (
 // Run executes argv (without the program name) and returns the exit code.
 func Run(argv []string, stdout, stderr io.Writer) int {
 	if len(argv) >= 2 && argv[0] == "account" && argv[1] == "login-check" {
-		if len(argv) != 3 || argv[2] != "loverslab" {
-			fmt.Fprintln(stderr, "usage: archo account login-check loverslab")
-			return cmds.ExitUsage
-		}
-		log, err := accounts.LoginCheck()
-		fmt.Fprintln(stdout, "Login helper log:", log)
-		if err != nil {
-			fmt.Fprintln(stderr, err)
-			return cmds.ExitError
-		}
-		fmt.Fprintln(stdout, "WebView2 window check completed")
-		return cmds.ExitOK
+		return loginCheck(argv, stdout, stderr)
 	}
 
 	if len(argv) >= 1 && argv[0] == "steam-worker" {
@@ -105,6 +95,39 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	}
 	defer ap.Close()
 	ap.EnvName, ap.PlanName = envName, openPlan
+	// The operation log's origin (13 §1.3): one per process; a parent's wins.
+	switch {
+	case (len(rest) == 0 && buildinfo.GUI == "1") || (len(rest) == 1 && rest[0] == "gui"):
+		ap.SetOrigin(oplog.GUI)
+	case tuiMode:
+		ap.SetOrigin(oplog.TUI)
+	case serveMCP:
+		ap.SetOrigin(oplog.MCP)
+	default:
+		ap.SetOrigin(oplog.CLI)
+	}
+	return runOpened(ap, argv, rest, serveMCP, group, stdout, stderr)
+}
+
+// loginCheck is `archo account login-check loverslab`: it runs before any data folder is
+// opened.
+func loginCheck(argv []string, stdout, stderr io.Writer) int {
+	if len(argv) != 3 || argv[2] != "loverslab" {
+		fmt.Fprintln(stderr, "usage: archo account login-check loverslab")
+		return cmds.ExitUsage
+	}
+	log, err := accounts.LoginCheck()
+	fmt.Fprintln(stdout, "Login helper log:", log)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return cmds.ExitError
+	}
+	fmt.Fprintln(stdout, "WebView2 window check completed")
+	return cmds.ExitOK
+}
+
+// runOpened runs the window, the TUI, the MCP server or one command on the opened app.
+func runOpened(ap *app.App, argv, rest []string, serveMCP bool, group mcp.Group, stdout, stderr io.Writer) int {
 	interactive := len(rest) == 0 || len(rest) == 1 && (rest[0] == "gui" || rest[0] == "tui")
 	if interactive {
 		// What an update left in the program folder (17 §5.1); never delays the first paint.
@@ -127,22 +150,7 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 		}
 	}
 	if len(rest) == 0 || (len(rest) == 1 && rest[0] == "tui") {
-		// No command, or `archo tui`: run the TUI in the current terminal.
-		// Scans run as a child process of this executable.
-		if !terminalDrawsTUI() {
-			return noTUI(ap, stderr)
-		}
-		err := tui.Run(tui.Options{App: ap, ScanOnStart: true})
-		var restart *tui.Restart
-		if errors.As(err, &restart) {
-			ap.Close() // the new version may upgrade the database
-			return restartTUI(restart.Exe, argv, stderr)
-		}
-		if err != nil {
-			fmt.Fprintln(stderr, "error:", err)
-			return cmds.ExitError
-		}
-		return cmds.ExitOK
+		return runTerminalTUI(ap, argv, stderr)
 	}
 	cmds.Progress = func(line string) { fmt.Fprintln(stderr, line) }
 	cmds.Stream = func(line string) { fmt.Fprintln(stdout, line) }
@@ -171,6 +179,25 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	return code
 }
 
+// runTerminalTUI is no command, or `archo tui`: the TUI in the current terminal. Scans
+// run as a child process of this executable.
+func runTerminalTUI(ap *app.App, argv []string, stderr io.Writer) int {
+	if !terminalDrawsTUI() {
+		return noTUI(ap, stderr)
+	}
+	err := tui.Run(tui.Options{App: ap, ScanOnStart: true})
+	var restart *tui.Restart
+	if errors.As(err, &restart) {
+		ap.Close() // the new version may upgrade the database
+		return restartTUI(restart.Exe, argv, stderr)
+	}
+	if err != nil {
+		fmt.Fprintln(stderr, "error:", err)
+		return cmds.ExitError
+	}
+	return cmds.ExitOK
+}
+
 // restartTUI runs the updated archo in this terminal with the same arguments and returns
 // its exit code (17 §5.1). Windows cannot replace a running process, so this one waits; the
 // new one leaves the old program file for the next start to remove.
@@ -195,6 +222,7 @@ var (
 	underWine         = machine.Wine
 	terminalDrawsTUI  = machine.TerminalDrawsTUI
 	ownConsole        = machine.OwnConsole
+	hasDisplay        = func() bool { return os.Getenv("DISPLAY") != "" || os.Getenv("WAYLAND_DISPLAY") != "" }
 )
 
 // windowUnavailable is why the window cannot open on this machine; its text is complete.
@@ -206,6 +234,10 @@ func (e *windowUnavailable) Error() string { return e.text }
 // WebView2 runtime Wails creates no window and only logs, so the process would run unseen.
 // Under Wine an installed WebView2 is given its chance.
 func guiPreflight() error {
+	if runtime.GOOS == "linux" && !hasDisplay() {
+		// GTK aborts without a display; say where the same manager is instead.
+		return &windowUnavailable{view.T("RimArcho's window needs a graphical desktop, and none was found (DISPLAY and WAYLAND_DISPLAY are not set).\n\nIn a terminal, use archo instead: the same manager as a text interface.")}
+	}
 	if runtime.GOOS != "windows" || webView2Installed() {
 		return nil
 	}
@@ -220,6 +252,10 @@ func windowFailureText(err error) string {
 	var u *windowUnavailable
 	if errors.As(err, &u) {
 		return u.text
+	}
+	var g interface{ Unavailable() bool } // the window package's own refusal (an old WebKitGTK)
+	if errors.As(err, &g) && g.Unavailable() {
+		return err.Error()
 	}
 	return view.Tf("RimArcho could not open its window:\n%s", err.Error())
 }

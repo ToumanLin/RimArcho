@@ -1,9 +1,7 @@
-// Package workshoppublish assembles the maintainer's Workshop item (17 §5.1).
+// Package workshoppublish assembles the maintainer's Archo Monitor Workshop item (17 §5.1).
 package workshoppublish
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -16,7 +14,6 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/scan"
-	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 )
 
 var stableVersion = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
@@ -29,13 +26,40 @@ func ValidateVersion(version string) error {
 	return nil
 }
 
+// RetiredItem is the RimArcho program item Steam removed (17 §5.1): never published to again.
+const RetiredItem uint64 = 3835688284
+
+// ErrRetiredItem: the ID files still name the retired item. The maintainer passes --item with
+// the Archo Monitor item, or --new-item to create it once (17 §5.1, bootstrap).
+var ErrRetiredItem = errors.New("monitor/About/PublishedFileId.txt names the retired RimArcho item 3835688284; pass --item <Archo Monitor item ID>, or --new-item to create the Archo Monitor item")
+
+// Title is the item's title in every language.
+const Title = "Archo Monitor"
+
+// Description and DescriptionZh are the item's English and Simplified Chinese
+// descriptions in the repository, Steam BBCode; publish uses them without --description
+// and --description-zh and adds the version line (17 §5.1).
+const (
+	Description   = "UserGuide/monitor-item.steam.txt"
+	DescriptionZh = "UserGuide/monitor-item.zh-CN.steam.txt"
+)
+
+// PreviewAsset is the Workshop page's preview (an animated GIF) in the repository.
+const PreviewAsset = "docs/assets/release-post/workshop-preview.gif"
+
 // Item describes the assembled folder and the source file that remembers its ID.
 // Tags are the item's Workshop tags: Mod and the game versions Monitor supports, the
 // tags RimWorld's own uploader sets.
 type Item struct {
-	Folder, Preview, ZipName, IDFile string
+	Folder, Preview, Monitor, IDFile string
 	ID                               uint64
 	Tags                             []string
+}
+
+// Options: ID publishes to that item; New ignores the ID files and creates an item.
+type Options struct {
+	ID  uint64
+	New bool
 }
 
 var gameVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+$`)
@@ -61,36 +85,23 @@ func Tags(folder string) ([]string, error) {
 	return tags, nil
 }
 
-// Assemble copies a built Monitor and the matching release assets from a repository
-// root. Each run uses a fresh folder, so a previous release cannot leave extra files.
-// About.xml stays Monitor's; the item title RimArcho is set by the worker.
-func Assemble(root, version string, id uint64) (*Item, error) {
+// Assemble copies a built Archo Monitor, and nothing else, into a fresh folder under dist/
+// (17 §5.1 Upload): the item is a Mod, never a program. Each run uses a fresh folder, so a
+// previous release cannot leave extra files. About.xml stays Monitor's.
+func Assemble(root, version string, o Options) (*Item, error) {
 	if err := ValidateVersion(version); err != nil {
 		return nil, err
+	}
+	if o.ID == RetiredItem {
+		return nil, errors.New("3835688284 is the retired RimArcho item; publish to the Archo Monitor item")
 	}
 	root, err := filepath.Abs(root)
 	if err != nil {
 		return nil, err
 	}
-	name := selfupdate.ZipName(version, "windows", "amd64")
-	zip := filepath.Join(root, "dist", name)
-	if fi, err := regular(zip); err != nil {
-		return nil, err
-	} else if fi.Size() > 200<<20 {
-		return nil, errors.New("release zip exceeds 200 MB")
-	}
-	sum := zip + ".sha256"
-	b, err := readSmall(sum, 64<<10)
-	if err != nil {
-		return nil, err
-	}
-	want, err := selfupdate.ParseSum(b, name)
-	if err != nil {
-		return nil, err
-	}
 	var monitor string
 	for _, p := range []string{
-		filepath.Join(root, "dist", strings.TrimSuffix(name, ".zip"), "monitor", "ArchoMonitor"),
+		filepath.Join(root, "dist", "archo-"+version+"-windows-amd64", "monitor", "ArchoMonitor"),
 		filepath.Join(root, "monitor", "ArchoMonitor"),
 		filepath.Join(root, "monitor", "out", "ArchoMonitor"),
 	} {
@@ -133,19 +144,24 @@ func Assemble(root, version string, id uint64) (*Item, error) {
 		return nil, fmt.Errorf("%s must be smaller than 1 MB", PreviewAsset)
 	}
 	idFile := filepath.Join(root, "monitor", "About", "PublishedFileId.txt")
-	if id == 0 {
-		id, err = ReadID(idFile)
-		if err != nil {
-			return nil, err
+	id := o.ID
+	if !o.New {
+		for _, f := range []string{idFile, filepath.Join(monitor, "About", "PublishedFileId.txt")} {
+			if id != 0 {
+				break
+			}
+			if id, err = ReadID(f); err != nil {
+				return nil, err
+			}
 		}
-	}
-	if id == 0 {
-		id, err = ReadID(filepath.Join(monitor, "About", "PublishedFileId.txt"))
-		if err != nil {
-			return nil, err
+		if id == RetiredItem {
+			return nil, ErrRetiredItem
 		}
 	}
 	// Unique staging folders avoid deleting an earlier dry run or following its links.
+	if err := os.MkdirAll(filepath.Join(root, "dist"), 0o755); err != nil {
+		return nil, err
+	}
 	folder, err := os.MkdirTemp(filepath.Join(root, "dist"), "workshop-"+version+"-")
 	if err != nil {
 		return nil, err
@@ -159,22 +175,17 @@ func Assemble(root, version string, id uint64) (*Item, error) {
 	if err := copyTree(monitor, folder); err != nil {
 		return nil, err
 	}
-	if err := copyDocs(root, folder); err != nil {
+	// The staged ID file is always the item being published, never a copied old one.
+	staged := filepath.Join(folder, "About", "PublishedFileId.txt")
+	if err := os.Remove(staged); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
 	if id != 0 {
-		if err := WriteID(filepath.Join(folder, "About", "PublishedFileId.txt"), id); err != nil {
+		if err := WriteID(staged, id); err != nil {
 			return nil, err
 		}
 	}
-	hash := sha256.New()
-	if err := copyRegular(zip, filepath.Join(folder, name), hash); err != nil {
-		return nil, err
-	}
-	if hex.EncodeToString(hash.Sum(nil)) != want {
-		return nil, errors.New("release zip does not match its checksum")
-	}
-	if err := os.WriteFile(filepath.Join(folder, name+".sha256"), b, 0o644); err != nil {
+	if err := CheckContent(folder); err != nil {
 		return nil, err
 	}
 	if asset != "" {
@@ -183,45 +194,39 @@ func Assemble(root, version string, id uint64) (*Item, error) {
 		preview = filepath.Join(folder, "About", "Preview.png")
 	}
 	ok = true
-	return &Item{Folder: folder, Preview: preview, ZipName: name, IDFile: idFile, ID: id, Tags: tags}, nil
+	return &Item{Folder: folder, Preview: preview, Monitor: monitor, IDFile: idFile, ID: id, Tags: tags}, nil
 }
 
-// Description and DescriptionZh are the item's English and Simplified Chinese
-// descriptions in the repository, Steam BBCode; publish uses them without --description
-// and --description-zh.
-const (
-	Description   = "UserGuide/release-post.steam.txt"
-	DescriptionZh = "UserGuide/release-post.zh-CN.steam.txt"
-)
-
-// PreviewAsset is the Workshop page's preview (an animated GIF) in the repository.
-const PreviewAsset = "docs/assets/release-post/workshop-preview.gif"
-
-// Docs are the reading files the item carries beside the zip. The zip stays the GitHub
-// release byte for byte: updaters before 1.0.5 reject top-level entries they do not know,
-// and no updater accepts UserGuide/. RimWorld ignores these files, since LoadFolders.xml
-// loads only the Mod folders.
-var Docs = []string{"README.md", "README.zh-CN.md", "UserGuide/user-guide.md", "UserGuide/user-guide.zh-CN.md"}
-
-// copyDocs copies Docs and the agent skills (skills/) from the repository root, keeping
-// their paths so the READMEs' and guides' links between them still work.
-func copyDocs(root, folder string) error {
-	for _, p := range Docs {
-		to := filepath.Join(folder, filepath.FromSlash(p))
-		if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
+// CheckContent refuses a folder that holds anything but a Mod: a program (.exe), an archive
+// or checksum (.zip, .sha256, .tar.gz, .gz), or a .dll outside a game version's Assemblies
+// folder. Steam removed item 3835688284 for carrying a program (17 §5.1).
+func CheckContent(folder string) error {
+	var bad []string
+	err := filepath.WalkDir(folder, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
 			return err
 		}
-		if err := copyRegular(filepath.Join(root, filepath.FromSlash(p)), to, nil); err != nil {
+		rel, err := filepath.Rel(folder, path)
+		if err != nil {
 			return err
 		}
-	}
-	// A skill template built locally leaves bin/ and obj/; never publish build output.
-	to := filepath.Join(folder, "skills")
-	if err := copyTreeSkipping(filepath.Join(root, "skills"), to, map[string]bool{"bin": true, "obj": true, "node_modules": true}); err != nil {
+		rel = filepath.ToSlash(rel)
+		name := strings.ToLower(d.Name())
+		switch {
+		case strings.HasSuffix(name, ".exe"), strings.HasSuffix(name, ".zip"), strings.HasSuffix(name, ".sha256"), strings.HasSuffix(name, ".gz"):
+			bad = append(bad, rel)
+		case strings.HasSuffix(name, ".dll"):
+			if parts := strings.Split(rel, "/"); len(parts) != 3 || !gameVersion.MatchString(parts[0]) || parts[1] != "Assemblies" {
+				bad = append(bad, rel)
+			}
+		}
+		return nil
+	})
+	if err != nil {
 		return err
 	}
-	if found, _ := filepath.Glob(filepath.Join(to, "*", "SKILL.md")); len(found) == 0 {
-		return errors.New("skills/ has no <skill>/SKILL.md")
+	if len(bad) > 0 {
+		return fmt.Errorf("the Workshop item may hold only the Archo Monitor Mod, but the staging folder has %s", strings.Join(bad, ", "))
 	}
 	return nil
 }
@@ -235,7 +240,7 @@ func ReadID(path string) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	s := strings.TrimSpace(strings.TrimPrefix(string(b), "\uFEFF"))
+	s := strings.TrimSpace(strings.TrimPrefix(string(b), string(rune(0xFEFF))))
 	if s == "" {
 		return 0, nil
 	}
@@ -285,7 +290,7 @@ func readSmall(path string, limit int64) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
-func copyRegular(src, dst string, hash io.Writer) error {
+func copyRegular(src, dst string) error {
 	if _, err := regular(src); err != nil {
 		return err
 	}
@@ -298,24 +303,15 @@ func copyRegular(src, dst string, hash io.Writer) error {
 	if err != nil {
 		return err
 	}
-	w := io.Writer(out)
-	if hash != nil {
-		w = io.MultiWriter(out, hash)
-	}
-	_, err = io.Copy(w, in)
+	_, err = io.Copy(out, in)
 	return errors.Join(err, out.Close())
 }
 
-func copyTree(src, dst string) error { return copyTreeSkipping(src, dst, nil) }
-
-// copyTreeSkipping copies regular files, leaving out directories with a skipped name.
-func copyTreeSkipping(src, dst string, skip map[string]bool) error {
+// copyTree copies regular files and refuses links.
+func copyTree(src, dst string) error {
 	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
-		}
-		if d.IsDir() && path != src && skip[d.Name()] {
-			return filepath.SkipDir
 		}
 		rel, err := filepath.Rel(src, path)
 		if err != nil {
@@ -328,6 +324,6 @@ func copyTreeSkipping(src, dst string, skip map[string]bool) error {
 		if d.IsDir() {
 			return os.MkdirAll(to, 0o755)
 		}
-		return copyRegular(path, to, nil)
+		return copyRegular(path, to)
 	})
 }

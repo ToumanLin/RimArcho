@@ -176,7 +176,12 @@ func (a *App) SaveFolders() ([]*SaveFolder, error) {
 // ListSaves reads every save's head (cached by path, size and mtime), groups them into
 // colonies and matches each to a list. The heads of new or changed files are read in
 // parallel; an unchanged library costs one directory listing and a stat per save.
-func (a *App) ListSaves() (*SaveList, error) {
+func (a *App) ListSaves() (*SaveList, error) { return a.ListSavesProgress(nil) }
+
+// ListSavesProgress is ListSaves telling progress how far the heads are (done of total
+// saves; unchanged ones count at once), for the Saves page's first listing (16 §2.11).
+// progress may be nil; it is called from several goroutines, never at the same time.
+func (a *App) ListSavesProgress(progress func(done, total int)) (*SaveList, error) {
 	folders, err := a.SaveFolders()
 	if err != nil {
 		return nil, err
@@ -203,7 +208,7 @@ func (a *App) ListSaves() (*SaveList, error) {
 			saves = append(saves, s)
 		}
 	}
-	a.readHeads(saves)
+	a.readHeads(saves, progress)
 	if err := a.attachSummaries(saves); err != nil {
 		return nil, err
 	}
@@ -487,7 +492,7 @@ type cachedHead struct {
 }
 
 // readHeads fills each save's head, size and mtime, reading changed files in parallel.
-func (a *App) readHeads(saves []*Save) {
+func (a *App) readHeads(saves []*Save, progress func(done, total int)) {
 	now := a.Now()
 	c := &a.saveHeads
 	c.mu.Lock()
@@ -511,6 +516,18 @@ func (a *App) readHeads(saves []*Save) {
 	}
 	c.mu.Unlock()
 
+	var told sync.Mutex
+	done := len(saves) - len(todo)
+	tell := func(more int) {
+		if progress == nil {
+			return
+		}
+		told.Lock()
+		defer told.Unlock()
+		done += more
+		progress(done, len(saves))
+	}
+	tell(0)
 	work := make(chan *Save)
 	var wg sync.WaitGroup
 	for range min(8, len(todo)) {
@@ -525,6 +542,7 @@ func (a *App) readHeads(saves []*Save) {
 				s.Head = h
 				if changed {
 					s.Writing = true
+					tell(1)
 					continue // read again next time
 				}
 				if f.Size != 0 || err == nil {
@@ -533,6 +551,7 @@ func (a *App) readHeads(saves []*Save) {
 				c.mu.Lock()
 				c.m[s.Path] = cachedHead{file: f, head: h, err: s.HeadErr}
 				c.mu.Unlock()
+				tell(1)
 			}
 		}()
 	}
@@ -734,7 +753,7 @@ func (m *saveMatcher) match(s *Save) {
 		for _, e := range f.Envs {
 			ids = append(ids, e.ID)
 		}
-		if r, err := m.a.Store.LaunchRecordBefore(ids, s.ModTime); err == nil && r != nil && r.Pack() == "" && m.plans[r.PlanID] != nil {
+		if r, err := m.a.Store.LaunchRecordBefore(ids, s.ModTime); err == nil && r != nil && r.Pack() == "" && m.plans[r.PlanID] != nil && (r.UserDataRoot == "" || samePath(r.UserDataRoot, filepath.Dir(f.Dir))) {
 			s.Plan, s.Match, s.Env = m.plans[r.PlanID], MatchLaunch, m.envFor(f, r.EnvID)
 			return
 		}

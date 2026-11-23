@@ -495,3 +495,17 @@ func TestGoldenMemory(t *testing.T) {
 		cmd("plan", "cost"),
 	})
 }
+
+func TestGoldenGameConfigLists(t *testing.T) {
+	e := testkit.New(t)
+	e.AddEnv(false)
+	e.MustRun("scan")
+	runGolden(t, "gameconfig_lists", e, []step{
+		cmd("env", "add", "shared", "--like", "main"),
+		cmd("plan", "list"),
+		cmd("env", "add", "fresh", "--like", "main", "--new-list"),
+		cmd("env", "add", "selected", "--like", "main", "--list", "fresh"),
+		cmd("env", "use", "selected"),
+		cmd("plan", "list"),
+	})
+}

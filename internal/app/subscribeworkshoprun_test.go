@@ -203,3 +203,30 @@ func TestWorkshopPreparationErrorRetained(t *testing.T) {
 		t.Fatalf("start reason lost: %+v", r)
 	}
 }
+
+// errorKind sorts SteamCMD's output into the failure kinds a player can act on; the first
+// kind that matches wins, and access denied is a disk failure only beside a write.
+func TestErrorKindTable(t *testing.T) {
+	t.Parallel()
+	for low, want := range map[string]string{
+		"error: invalid password":         "password",
+		"failed (invalidloginauthcode)":   "guard",
+		"steam guard code required":       "guard",
+		"no subscription":                 "ownership",
+		"not enough disk space":           "disk",
+		"write failure":                   "disk",
+		"access denied writing file":      "disk",
+		"access denied":                   "other",
+		"invalid beta branch":             "branch",
+		"connection reset by peer":        "network",
+		"timed out":                       "network",
+		"login failure":                   "login",
+		"invalid password and timed out":  "password",
+		"failed to log in: no connection": "network",
+		"something else entirely":         "other",
+	} {
+		if got := errorKind(low); got != want {
+			t.Errorf("errorKind(%q) = %q, want %q", low, got, want)
+		}
+	}
+}

@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -191,8 +193,8 @@ func TestNeedsIncrementalKeepsContentThroughEnableUndo(t *testing.T) {
 func TestNeedsBackgroundCannotPublishAnOlderEdit(t *testing.T) {
 	t.Parallel()
 	e, s, _ := fixture(t)
-	e.App.AnalyzeRunner = func(string, func(string)) error { return errors.New("fixture: analysis intentionally unavailable") }
-	s.emit = func(string, any) {}
+	e.App.AnalyzeRunner = func(*app.App, func(string)) error { return errors.New("fixture: analysis intentionally unavailable") }
+	s.setEmit(func(string, any) {})
 	b := s.Board()
 	a, _ := b.St.Ix.ResolveOne("pkg:tester.a")
 	if _, err := s.Toggle(int(view.Active), []string{a.ID}, nil); err != nil {

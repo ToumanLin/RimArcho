@@ -25,7 +25,7 @@ func TestArchoMotionSettingsRow(t *testing.T) {
 					}
 					found++
 					labels := []string{view.T("off"), view.T("still"), view.T("animated")}
-					hover := view.T("Archo's figure while pages load and in the first-run guide; still uses no GPU")
+					hover := view.T("Archo's figure while pages load and in the first-run guide; still shows one picture per expression")
 					if group.Title != view.T("interface") || item.Label != view.T("Archo animation") ||
 						item.Value != value || item.Edit != "segments" || item.Hover != hover ||
 						!slices.Equal(item.Choices, []string{"off", "still", "live"}) ||
@@ -36,7 +36,7 @@ func TestArchoMotionSettingsRow(t *testing.T) {
 						t.Fatal("Archo motion must follow GPU acceleration")
 					}
 					if lang == "zh" {
-						for _, key := range []string{"Archo animation", "still", "animated", "Archo's figure while pages load and in the first-run guide; still uses no GPU"} {
+						for _, key := range []string{"Archo animation", "still", "animated", "Archo's figure while pages load and in the first-run guide; still shows one picture per expression"} {
 							if view.T(key) == key {
 								t.Errorf("missing translation: %s", key)
 							}

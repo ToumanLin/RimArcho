@@ -1,0 +1,4 @@
+{
+  "This build has no window; the text interface (archo) has the same features.": "このビルドにはGUIがありません。テキスト画面（archo）でも同じ機能を使用できます。",
+  "RimArcho's window needs a graphical desktop, and none was found (DISPLAY and WAYLAND_DISPLAY are not set).\n\nIn a terminal, use archo instead: the same manager as a text interface.": "RimArcho のウィンドウにはグラフィカルなデスクトップが必要ですが、見つかりませんでした（DISPLAY と WAYLAND_DISPLAY が未設定です）。\n\n端末では代わりに archo を使ってください。同じマネージャーのテキスト画面です。"
+}

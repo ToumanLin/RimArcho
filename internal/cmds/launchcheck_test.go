@@ -89,3 +89,29 @@ func TestLaunchChecksDirectories(t *testing.T) {
 		}
 	}
 }
+
+// One problem reads "1 problem" (VM round 2A 2026-11-23: "before you play: 1 problems").
+func TestLaunchChecksOneProblem(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	e.WriteMod(filepath.Join(e.Game, "Mods", "Lib"), testkit.Sample("tester.lib", "Lib"))
+	e.WriteFile(filepath.Join(e.Game, "Mods", "Alpha", "About", "About.xml"), `<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <packageId>tester.alpha</packageId>
+  <name>Alpha</name>
+  <supportedVersions><li>1.6</li></supportedVersions>
+  <modDependencies><li><packageId>tester.lib</packageId><displayName>Lib</displayName></li></modDependencies>
+</ModMetaData>
+`)
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.alpha")
+	e.WriteFile(filepath.Join(e.Steam, "steam.exe"), "")
+	e.AddEnv(false)
+	e.MustRun("scan")
+	out, code := e.Run("launch", "--dry-run")
+	if code != 0 {
+		t.Fatalf("launch blocked: %s", out)
+	}
+	if !strings.Contains(out, "before you play: 1 problem that often causes errors") {
+		t.Errorf("want \"1 problem that often causes\" in:\n%s", out)
+	}
+}

@@ -73,70 +73,17 @@ func (s *Store) Maintain(ctx context.Context, o MaintenanceOptions) (r Maintenan
 		return r, err
 	}
 	defer c.ExecContext(context.Background(), "ROLLBACK")
-	var last string
-	err = c.QueryRowContext(ctx, "SELECT value FROM meta WHERE key=?", MaintenanceLastKey).Scan(&last)
-	if err != nil && err != sql.ErrNoRows {
+	last, skip, err := maintenanceDue(ctx, c, o)
+	if err != nil || skip {
+		r.Skipped = skip
 		return r, err
 	}
-	if o.Automatic {
-		if t, e := time.Parse(time.RFC3339, last); e == nil && o.Now.Before(t.Add(MaintenanceInterval)) {
-			r.Skipped = true
-			return r, nil
-		}
-	}
-	err = nil
-	var lease string
-	if err = c.QueryRowContext(ctx, "SELECT value FROM meta WHERE key=?", maintenanceLeaseKey).Scan(&lease); err != nil && err != sql.ErrNoRows {
-		return r, err
-	}
-	// The lease names its process: one killed mid-VACUUM no longer holds it.
-	at, owner, _ := strings.Cut(lease, " ")
-	if t, e := time.Parse(time.RFC3339, at); e == nil && o.Now.Before(t.Add(15*time.Minute)) && leaseOwnerAlive(owner) {
-		return r, ErrMaintenanceBusy
-	}
-	err = nil
 	r.Before = databaseBytes(s.Path)
 	// 1. Prune file lists, retaining whole snapshots used for identity and recent
 	// updates. The candidate selector must match questionEvidence exactly.
-	_, err = c.ExecContext(ctx, `CREATE TEMP TABLE maintenance_keep(id INTEGER PRIMARY KEY);
-		INSERT OR IGNORE INTO maintenance_keep SELECT current_snapshot_id FROM instance WHERE current_snapshot_id IS NOT NULL;
-		INSERT OR IGNORE INTO maintenance_keep SELECT observation_snapshot_id FROM identity_question WHERE status='open';
-		INSERT OR IGNORE INTO maintenance_keep SELECT
-		 (SELECT n.id FROM snapshot n WHERE n.instance_id=q.candidate_instance_id AND n.scan_id<=q.scan_id AND n.id<>q.observation_snapshot_id ORDER BY n.scan_id DESC,n.id DESC LIMIT 1)
-		 FROM identity_question q WHERE q.status='open' AND EXISTS(SELECT 1 FROM snapshot n WHERE n.instance_id=q.candidate_instance_id AND n.scan_id<=q.scan_id AND n.id<>q.observation_snapshot_id);`)
-	if err != nil {
+	if done, err := pruneFileLists(ctx, c, o.DryRun, &r); err != nil || done {
 		return r, err
 	}
-	_, err = c.ExecContext(ctx, `INSERT OR IGNORE INTO maintenance_keep
-		SELECT before_snapshot FROM (SELECT before_snapshot, row_number() OVER(PARTITION BY instance_id ORDER BY scan_id DESC,id DESC) AS n FROM change_event WHERE kind='updated') WHERE n<=? AND before_snapshot IS NOT NULL
-		UNION SELECT after_snapshot FROM (SELECT after_snapshot, row_number() OVER(PARTITION BY instance_id ORDER BY scan_id DESC,id DESC) AS n FROM change_event WHERE kind='updated') WHERE n<=? AND after_snapshot IS NOT NULL`, MaintenanceUpdates, MaintenanceUpdates)
-	if err != nil {
-		return r, err
-	}
-	// A manifest is its rows and its block (04 §4); Files counts the files either lists.
-	const obsolete = `snapshot_id NOT IN (SELECT id FROM maintenance_keep)`
-	var listedFiles int64
-	if err = c.QueryRowContext(ctx, `SELECT coalesce(sum(n),0) FROM snapshot_list WHERE `+obsolete).Scan(&listedFiles); err != nil {
-		return r, err
-	}
-	if o.DryRun {
-		err = c.QueryRowContext(ctx, `SELECT count(*) FROM snapshot_file WHERE `+obsolete).Scan(&r.Files)
-		r.Files += listedFiles
-		r.After = r.Before
-		return r, err
-	}
-	if _, err = c.ExecContext(ctx, `DELETE FROM snapshot_list WHERE `+obsolete); err != nil {
-		return r, err
-	}
-	res, err := c.ExecContext(ctx, `DELETE FROM snapshot_file WHERE `+obsolete)
-	if err != nil {
-		return r, err
-	}
-	r.Files, err = res.RowsAffected()
-	if err != nil {
-		return r, err
-	}
-	r.Files += listedFiles
 	// 2. Version views no game needs and the fact sets nothing references (05 §3).
 	if err = pruneFactsOn(ctx, c, o.Now); err != nil {
 		return r, err
@@ -168,35 +115,9 @@ func (s *Store) Maintain(ctx context.Context, o MaintenanceOptions) (r Maintenan
 		_ = maintenanceCheckpoint(cleanup, c)
 		r.After = databaseBytes(s.Path)
 	}()
-	var pages, free, pageSize int64
-	for _, x := range []struct {
-		q string
-		p *int64
-	}{{"PRAGMA page_count", &pages}, {"PRAGMA freelist_count", &free}, {"PRAGMA page_size", &pageSize}} {
-		if err = c.QueryRowContext(ctx, x.q).Scan(x.p); err != nil {
-			return r, err
-		}
-	}
 	// 4. Rebuild only when worthwhile automatically; explicit compact always does.
-	if !o.Automatic || free*pageSize >= 16<<20 || (free*pageSize >= 1<<20 && free*5 >= pages) {
-		// SQLite may need a temporary database AND a full WAL concurrently.
-		need := 2*pages*pageSize + 64<<20
-		short := o.FreeSpace == nil || o.FreeSpace(s.Path) < need
-		switch {
-		case short && !o.Automatic:
-			return r, &NeedSpaceError{Need: need}
-		case short:
-			// Automatic: skip reclamation and complete, so it waits the interval instead of
-			// pruning again at every start.
-		default:
-			if err = maintenanceCheckpoint(ctx, c); err != nil {
-				return r, err
-			}
-			if _, err = c.ExecContext(ctx, "VACUUM"); err != nil {
-				return r, err
-			}
-			r.Vacuumed = true
-		}
+	if r.Vacuumed, err = s.reclaim(ctx, c, o); err != nil {
+		return r, err
 	}
 	// 5. Checkpoint reports busy as a result column, not as an SQLite error.
 	if err = maintenanceCheckpoint(ctx, c); err != nil {
@@ -212,6 +133,110 @@ func (s *Store) Maintain(ctx context.Context, o MaintenanceOptions) (r Maintenan
 	err = maintenanceCheckpoint(ctx, c)
 	r.After = databaseBytes(s.Path)
 	return r, err
+}
+
+// maintenanceDue reads when maintenance last completed; skip is set when an automatic run
+// comes within the interval. Another live process's recent lease is ErrMaintenanceBusy.
+func maintenanceDue(ctx context.Context, c *sql.Conn, o MaintenanceOptions) (last string, skip bool, err error) {
+	err = c.QueryRowContext(ctx, "SELECT value FROM meta WHERE key=?", MaintenanceLastKey).Scan(&last)
+	if err != nil && err != sql.ErrNoRows {
+		return last, false, err
+	}
+	if o.Automatic {
+		if t, e := time.Parse(time.RFC3339, last); e == nil && o.Now.Before(t.Add(MaintenanceInterval)) {
+			return last, true, nil
+		}
+	}
+	var lease string
+	if err = c.QueryRowContext(ctx, "SELECT value FROM meta WHERE key=?", maintenanceLeaseKey).Scan(&lease); err != nil && err != sql.ErrNoRows {
+		return last, false, err
+	}
+	// The lease names its process: one killed mid-VACUUM no longer holds it.
+	at, owner, _ := strings.Cut(lease, " ")
+	if t, e := time.Parse(time.RFC3339, at); e == nil && o.Now.Before(t.Add(15*time.Minute)) && leaseOwnerAlive(owner) {
+		return last, false, ErrMaintenanceBusy
+	}
+	return last, false, nil
+}
+
+// pruneFileLists deletes the file lists of the snapshots nothing keeps, counting their
+// files in r; a dry run only counts them, sets r.After and reports done.
+func pruneFileLists(ctx context.Context, c *sql.Conn, dryRun bool, r *MaintenanceResult) (done bool, err error) {
+	_, err = c.ExecContext(ctx, `CREATE TEMP TABLE maintenance_keep(id INTEGER PRIMARY KEY);
+		INSERT OR IGNORE INTO maintenance_keep SELECT current_snapshot_id FROM instance WHERE current_snapshot_id IS NOT NULL;
+		INSERT OR IGNORE INTO maintenance_keep SELECT observation_snapshot_id FROM identity_question WHERE status='open';
+		INSERT OR IGNORE INTO maintenance_keep SELECT
+		 (SELECT n.id FROM snapshot n WHERE n.instance_id=q.candidate_instance_id AND n.scan_id<=q.scan_id AND n.id<>q.observation_snapshot_id ORDER BY n.scan_id DESC,n.id DESC LIMIT 1)
+		 FROM identity_question q WHERE q.status='open' AND EXISTS(SELECT 1 FROM snapshot n WHERE n.instance_id=q.candidate_instance_id AND n.scan_id<=q.scan_id AND n.id<>q.observation_snapshot_id);`)
+	if err != nil {
+		return false, err
+	}
+	_, err = c.ExecContext(ctx, `INSERT OR IGNORE INTO maintenance_keep
+		SELECT before_snapshot FROM (SELECT before_snapshot, row_number() OVER(PARTITION BY instance_id ORDER BY scan_id DESC,id DESC) AS n FROM change_event WHERE kind='updated') WHERE n<=? AND before_snapshot IS NOT NULL
+		UNION SELECT after_snapshot FROM (SELECT after_snapshot, row_number() OVER(PARTITION BY instance_id ORDER BY scan_id DESC,id DESC) AS n FROM change_event WHERE kind='updated') WHERE n<=? AND after_snapshot IS NOT NULL`, MaintenanceUpdates, MaintenanceUpdates)
+	if err != nil {
+		return false, err
+	}
+	// A manifest is its rows and its block (04 §4); Files counts the files either lists.
+	const obsolete = `snapshot_id NOT IN (SELECT id FROM maintenance_keep)`
+	var listedFiles int64
+	if err = c.QueryRowContext(ctx, `SELECT coalesce(sum(n),0) FROM snapshot_list WHERE `+obsolete).Scan(&listedFiles); err != nil {
+		return false, err
+	}
+	if dryRun {
+		err = c.QueryRowContext(ctx, `SELECT count(*) FROM snapshot_file WHERE `+obsolete).Scan(&r.Files)
+		r.Files += listedFiles
+		r.After = r.Before
+		return true, err
+	}
+	if _, err = c.ExecContext(ctx, `DELETE FROM snapshot_list WHERE `+obsolete); err != nil {
+		return false, err
+	}
+	res, err := c.ExecContext(ctx, `DELETE FROM snapshot_file WHERE `+obsolete)
+	if err != nil {
+		return false, err
+	}
+	r.Files, err = res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	r.Files += listedFiles
+	return false, nil
+}
+
+// reclaim runs VACUUM when worthwhile, or always for an explicit compact, given the disk
+// space it may need; it reports whether it ran.
+func (s *Store) reclaim(ctx context.Context, c *sql.Conn, o MaintenanceOptions) (bool, error) {
+	var pages, free, pageSize int64
+	for _, x := range []struct {
+		q string
+		p *int64
+	}{{"PRAGMA page_count", &pages}, {"PRAGMA freelist_count", &free}, {"PRAGMA page_size", &pageSize}} {
+		if err := c.QueryRowContext(ctx, x.q).Scan(x.p); err != nil {
+			return false, err
+		}
+	}
+	if o.Automatic && free*pageSize < 16<<20 && (free*pageSize < 1<<20 || free*5 < pages) {
+		return false, nil
+	}
+	// SQLite may need a temporary database AND a full WAL concurrently.
+	need := 2*pages*pageSize + 64<<20
+	short := o.FreeSpace == nil || o.FreeSpace(s.Path) < need
+	switch {
+	case short && !o.Automatic:
+		return false, &NeedSpaceError{Need: need}
+	case short:
+		// Automatic: skip reclamation and complete, so it waits the interval instead of
+		// pruning again at every start.
+		return false, nil
+	}
+	if err := maintenanceCheckpoint(ctx, c); err != nil {
+		return false, err
+	}
+	if _, err := c.ExecContext(ctx, "VACUUM"); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // leaseOwnerAlive reports whether the process that wrote a lease may still run; a lease

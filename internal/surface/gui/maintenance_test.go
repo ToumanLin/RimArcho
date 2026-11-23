@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -52,13 +54,27 @@ func TestMaintenanceWaitsForGUIIdle(t *testing.T) {
 func TestMaintenanceYieldsAndPageDoesNotWait(t *testing.T) {
 	e, api, _ := fixture(t)
 	testkit.MaintenanceHistory(t, e.App.Store, "old", 20, 1000, 220)
-	entered, release := make(chan struct{}), make(chan struct{})
+	entered, release, yielded := make(chan struct{}), make(chan struct{}), make(chan struct{}, 1)
+	api.maintenanceYield = func() { yielded <- struct{}{} }
 	e.App.FreeSpace = func(string) int64 { close(entered); <-release; return 1 << 40 }
 	done := make(chan struct{})
 	go func() { api.maintenanceCycle(context.Background()); close(done) }()
+	// On failure, unblock the worker parked in FreeSpace and wait for it before the store
+	// and the temp dir go (cleanups run last-registered first).
+	var released bool
+	t.Cleanup(func() {
+		if !released {
+			close(release)
+		}
+		<-done
+	})
+	// Pruning the history before VACUUM is slow under -race on a starved runner: the
+	// bound is only against a hang. A cycle that ends without reaching VACUUM fails at once.
 	select {
 	case <-entered:
-	case <-time.After(5 * time.Second):
+	case <-done:
+		t.Fatal("maintenance ended without reaching vacuum")
+	case <-time.After(time.Minute):
 		t.Fatal("maintenance did not reach vacuum")
 	}
 	// A page blocked by maintenance would wait until release, which comes only after
@@ -71,17 +87,21 @@ func TestMaintenanceYieldsAndPageDoesNotWait(t *testing.T) {
 			t.Fatal(msg)
 		}
 	case <-time.After(10 * time.Second):
-		close(release)
 		t.Fatal("maintenance blocked page")
 	}
 	id := api.tasks.Begin("test", "foreground", nil)
 	defer api.tasks.Finish(id, app.TaskDone, "")
 	// The worker is paused before VACUUM while the idle monitor cancels it.
-	time.Sleep(250 * time.Millisecond)
+	select {
+	case <-yielded:
+	case <-time.After(time.Minute):
+		t.Fatal("the idle monitor did not cancel for the foreground task")
+	}
+	released = true
 	close(release)
 	select {
 	case <-done:
-	case <-time.After(3 * time.Second):
+	case <-time.After(time.Minute):
 		t.Fatal("did not yield")
 	}
 	if e.App.Store.Meta(store.MaintenanceLastKey) != "" {

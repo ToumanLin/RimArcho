@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -25,6 +26,7 @@ const (
 	verdictKept    = "kept"
 	dropGone       = "gone"                 // raw URL 404: the gist was deleted
 	dropDuplicate  = "duplicate-content"    // same bytes as a log already kept
+	dropSampled    = "sampled-out-1.6"      // a 1.6 log outside the weekly sample (-share-16)
 	dropVersion    = "version-out-of-scope" // not 1.6 or 1.7
 	dropNoProblems = "no-problems"          // 1.6 without a single problem cluster
 	dropTooShort   = "too-short"            // fewer than minLogLines log lines: upload cut off or junk
@@ -369,6 +371,20 @@ func even(dir, from, until string, perMonth, workers, maxKept int) error {
 // fetchJudge downloads the entries, judges each, stores kept logs in raw/ and records every
 // verdict in the index. It stops dispatching once limit logs are kept (0 = no limit). It
 // returns kept logs per month.
+// share16 keeps this share of the 1.6 logs, chosen by id so a rerun keeps the same ones
+// and the sample spreads over the whole period (the weekly corpus run: every 1.7 log, about
+// 1,000 1.6 logs a week). 0 or 1 keeps all.
+var share16 float64
+
+func sampled16(id string) bool {
+	if share16 <= 0 || share16 >= 1 {
+		return true
+	}
+	h := fnv.New32a()
+	h.Write([]byte(id))
+	return float64(h.Sum32()%10000) < share16*10000
+}
+
 func fetchJudge(dir string, ix *index, seen map[string]bool, todo []indexEntry, workers, limit int) (map[string]int, error) {
 	ch := make(chan indexEntry)
 	var mu sync.Mutex
@@ -405,6 +421,9 @@ func fetchJudge(dir string, ix *index, seen map[string]bool, todo []indexEntry, 
 					e.Verdict, e.MM, e.Hash = verdict, mm, hash
 					if verdict == verdictKept && seen[hash] {
 						e.Verdict = dropDuplicate
+					}
+					if e.Verdict == verdictKept && e.MM == "1.6" && !sampled16(e.ID) {
+						e.Verdict = dropSampled
 					}
 					e.Fetched = now
 					if e.Verdict == verdictKept && limit > 0 && keptN >= limit {

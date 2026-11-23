@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -25,10 +26,10 @@ func init() { lipgloss.SetColorProfile(termenv.Ascii) }
 
 // fixture: Core, Harmony, A (depends on Harmony), B, a CJK-named mod, and a ModsConfig.xml
 // listing Core, A, Harmony (A before its dependency, so sort has work to do).
-func fixture(t *testing.T) (*testkit.Env, *int) {
+func fixture(t *testing.T) (*testkit.Env, *atomic.Int32) {
 	e := fixtureFiles(t)
 	e.MustRun("scan")
-	scans := new(int)
+	scans := new(atomic.Int32) // written on the TUI's goroutines, read by the test
 	return e, scans
 }
 
@@ -47,17 +48,24 @@ func fixtureFiles(t *testing.T) *testkit.Env {
 	return e
 }
 
-func start(t *testing.T, e *testkit.Env, scans *int, w, h int) *teatest.TestModel {
+func start(t *testing.T, e *testkit.Env, scans *atomic.Int32, w, h int) *teatest.TestModel {
 	// The stand-ins below run on the TUI's goroutines and can outlive the test's last key;
 	// wait for them before the temp dir is removed (cleanups run last-registered first).
 	var running sync.WaitGroup
 	t.Cleanup(running.Wait)
-	opts := Options{App: e.App, Scan: func(string) (string, error) {
+	opts := Options{App: e.App, Scan: func(env string) (string, error) {
 		running.Add(1)
 		defer running.Done()
-		*scans++
-		// Stand-in for the child process: the same command, run by the test.
-		out, _ := cmds.Execute(e.App, []string{"scan"})
+		scans.Add(1)
+		// Stand-in for the child process: the same command on an App of its own, as the
+		// child has; the TUI goes on using e.App meanwhile.
+		a2, err := e.ChildApp()
+		if err != nil {
+			return "", err
+		}
+		defer a2.Close()
+		a2.EnvName = env // the child's --env, which main turns into EnvName
+		out, _ := cmds.Execute(a2, []string{"scan"})
 		return out, nil
 	}, Analyze: func(env string, progress func(string)) error {
 		running.Add(1)
@@ -264,8 +272,8 @@ func TestEnableMoveSortSaveUndo(t *testing.T) {
 	keys(tm, "L")
 	waitFor(t, tm, "the game is starting")
 	m := finish(t, tm)
-	if len(e.Launched) != 1 || m.unsaved != 0 || *scans != 0 {
-		t.Fatalf("launched %v, unsaved %d, scans %d", e.Launched, m.unsaved, *scans)
+	if len(e.Launched) != 1 || m.unsaved != 0 || scans.Load() != 0 {
+		t.Fatalf("launched %v, unsaved %d, scans %d", e.Launched, m.unsaved, scans.Load())
 	}
 }
 
@@ -279,7 +287,7 @@ func TestRescanRunsOutOfProcessAndCommandLine(t *testing.T) {
 	keys(tm, ":", "scan", "enter") // the command line also routes scans to the child
 	// The second scan prints the same sentence, which the renderer does not send again: wait
 	// for the child-process hook instead.
-	for deadline := time.Now().Add(20 * time.Second); *scans < 2 && time.Now().Before(deadline); {
+	for deadline := time.Now().Add(20 * time.Second); scans.Load() < 2 && time.Now().Before(deadline); {
 		time.Sleep(20 * time.Millisecond)
 	}
 	keys(tm, ":", "list --active", "enter")
@@ -289,8 +297,8 @@ func TestRescanRunsOutOfProcessAndCommandLine(t *testing.T) {
 	waitAll(t, tm, "updates", "the last scan", "nothing changed")
 	keys(tm, "esc")
 	m := finish(t, tm)
-	if *scans != 2 || m.tab != tabList {
-		t.Fatalf("scans via the child-process hook: %d, screen %d", *scans, m.tab)
+	if scans.Load() != 2 || m.tab != tabList {
+		t.Fatalf("scans via the child-process hook: %d, screen %d", scans.Load(), m.tab)
 	}
 }
 
@@ -552,7 +560,7 @@ func TestEnvRemoveFromChooser(t *testing.T) {
 		t.Fatalf("env %q", m.envName)
 	}
 	if envs, _ := e.App.Store.Envs(); len(envs) != 1 {
-		t.Fatalf("%d environments", len(envs))
+		t.Fatalf("%d Game Configs", len(envs))
 	}
 }
 
@@ -666,7 +674,7 @@ func TestNeedsView(t *testing.T) {
 	if m.prob.cursor < 0 {
 		t.Fatalf("items: %q", needItems(fm3))
 	}
-	m.needsKey(" ")
+	pressNeed(m, " ")
 	if !strings.Contains(activeNames(t, e), "Harmony") {
 		t.Fatal("space did not enable Harmony")
 	}
@@ -718,7 +726,7 @@ func TestChangesView(t *testing.T) {
 		t.Fatalf("items: %q", needItems(m))
 	}
 	m.prob.cursor = i
-	m.needsKey("I")
+	pressNeed(m, "I")
 	st, _ := e.App.Loadout()
 	if st.WS.Conflict != 0 || !strings.Contains(m.status, "ignored") {
 		t.Fatalf("I did not dismiss the conflict: %q", m.status)
@@ -735,7 +743,7 @@ func TestNeedsLogs(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
-	scans := new(int)
+	scans := new(atomic.Int32) // written on the TUI's goroutines, read by the test
 	tm := start(t, e, scans, 160, 50)
 	keys(tm, "@")
 	waitAnalyzed(t, tm, "last run")

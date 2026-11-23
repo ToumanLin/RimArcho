@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -28,7 +30,9 @@ func TestSortDependencyAPI(t *testing.T) {
 			t.Fatalf("JSON lacks %s: %s", field, raw)
 		}
 	}
+	api.mu.Lock()
 	before, _ := e.App.Loadout()
+	api.mu.Unlock()
 	r, err := api.CompleteDependencies()
 	if err != nil || !r.Undo || len(r.Enabled) != 1 || len(r.MissingDependencies) != 0 || len(r.WorkshopIDs) != 0 {
 		t.Fatalf("complete: %+v %v", r, err)
@@ -40,7 +44,9 @@ func TestSortDependencyAPI(t *testing.T) {
 	if _, err := api.Undo(); err != nil {
 		t.Fatal(err)
 	}
+	api.mu.Lock()
 	after, _ := e.App.Loadout()
+	api.mu.Unlock()
 	if !after.List.Equal(before.List) {
 		t.Fatal("undo did not restore pre-completion state")
 	}
@@ -105,8 +111,10 @@ func TestReplaceRecommendedAPI(t *testing.T) {
 	if err != nil || len(out.Replacements) != 1 {
 		t.Fatal(out, err)
 	}
+	api.mu.Lock()
 	before, _ := e.App.Loadout()
-	r, err := api.ReplaceRecommended([]string{out.Replacements[0].Original.Ref})
+	api.mu.Unlock()
+	r, err := api.ApplySortStep(view.StepReplace)
 	if err != nil || !r.Undo {
 		t.Fatal(r, err)
 	}

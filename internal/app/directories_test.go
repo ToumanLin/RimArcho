@@ -573,3 +573,18 @@ func TestFolderRemoveDropsPendingRebind(t *testing.T) {
 		}
 	}
 }
+
+// A new home keeps packs and the source library in RimArcho's local folder, not in the data
+// directory (17 §3).
+func TestNewHomeDataFoldersAreLocal(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	for name, dir := range map[string]string{"packs": e.App.PacksDir(), "source": e.App.SourceDir()} {
+		if want := filepath.Join(e.App.LocalDir(), name); dir != want {
+			t.Fatalf("%s at %s, want %s", name, dir, want)
+		}
+		if source.Within(dir, e.App.Home) {
+			t.Fatalf("%s is inside the data directory: %s", name, dir)
+		}
+	}
+}

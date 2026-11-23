@@ -41,6 +41,8 @@ func SubscribeArgv(r SubscribeRequest) ([]string, error) {
 		if r.From != "" {
 			args = append(args, "--from", r.From)
 		}
+	case "local":
+		args = append(args, r.From)
 	case "workshop":
 		args = append(args, strings.Fields(r.URL)...)
 		if r.SteamCMD {

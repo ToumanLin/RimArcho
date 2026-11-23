@@ -136,6 +136,12 @@ func packFolders(p *Pack) (map[string]PackEntry, error) {
 	if err := checkPackName(p.Name); err != nil {
 		return nil, err
 	}
+	if p.Revision < 0 {
+		return nil, fmt.Errorf("pack has revision %d", p.Revision)
+	}
+	if err := p.Settings.check(); err != nil {
+		return nil, err
+	}
 	folders := map[string]PackEntry{}
 	used := map[string]bool{}
 	for _, e := range p.Entries {
@@ -401,10 +407,13 @@ func scanPackArchive(ar *packArchive, dst string) ([]PackProblem, error) {
 	if err != nil {
 		return nil, err
 	}
-	seen := map[string]bool{"pack.json": true}
-	kinds := map[string]bool{"pack.json": false} // includes implicit parent directories
-	present := map[string]bool{}
-	records := map[string][]copyFileDigest{}
+	sc := &archiveScan{
+		folders: folders,
+		seen:    map[string]bool{"pack.json": true},
+		kinds:   map[string]bool{"pack.json": false},
+		present: map[string]bool{},
+		records: map[string][]copyFileDigest{},
+	}
 	for {
 		e, err := ar.next()
 		if err == io.EOF {
@@ -413,87 +422,8 @@ func scanPackArchive(ar *packArchive, dst string) ([]PackProblem, error) {
 		if err != nil {
 			return nil, err
 		}
-		n, err := archivePath(e.name)
-		if err != nil {
+		if err := sc.entry(e, dst); err != nil {
 			return nil, err
-		}
-		parts := strings.SplitN(n, "/", 3)
-		if len(parts) < 2 || parts[0] != "mods" {
-			return nil, fmt.Errorf("%s: path is not allowed in a pack", e.name)
-		}
-		if _, ok := folders[parts[1]]; !ok {
-			return nil, fmt.Errorf("%s: mod folder is not in pack.json", e.name)
-		}
-		if len(parts) == 2 && !e.dir {
-			return nil, fmt.Errorf("%s: carried folder must be a directory", e.name)
-		}
-		if e.size < 0 || e.size > packFileLimit {
-			return nil, fmt.Errorf("%s: file exceeds 4 GB", e.name)
-		}
-		if e.dir && e.size != 0 {
-			return nil, fmt.Errorf("%s: directory has file content", e.name)
-		}
-		key := strings.ToLower(n)
-		if seen[key] {
-			return nil, fmt.Errorf("%s: duplicate archive path", e.name)
-		}
-		if dir, exists := kinds[key]; exists && (!dir || !e.dir) {
-			return nil, fmt.Errorf("%s: conflicting archive path", e.name)
-		}
-		seen[key], kinds[key] = true, e.dir
-		for parent := path.Dir(key); parent != "."; parent = path.Dir(parent) {
-			if dir, exists := kinds[parent]; exists && !dir {
-				return nil, fmt.Errorf("%s: parent is a file", e.name)
-			}
-			kinds[parent] = true
-		}
-		present[parts[1]] = true
-		var out *os.File
-		if dst != "" {
-			file := filepath.Join(dst, filepath.FromSlash(n))
-			if !within(dst, file) {
-				return nil, fmt.Errorf("unsafe path in the pack: %s", e.name)
-			}
-			if e.dir {
-				err = os.MkdirAll(file, 0o755)
-			} else {
-				err = os.MkdirAll(filepath.Dir(file), 0o755)
-				if err == nil {
-					out, err = os.OpenFile(file, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
-				}
-			}
-			if err != nil {
-				return nil, fmt.Errorf("%s: %w", e.name, err)
-			}
-		}
-		if e.dir {
-			continue
-		}
-		h := sha256.New()
-		var w io.Writer = h
-		if out != nil {
-			w = io.MultiWriter(h, out)
-		}
-		nbytes, err := io.Copy(w, io.LimitReader(e.r, packFileLimit+1))
-		if out != nil {
-			if cerr := out.Close(); err == nil {
-				err = cerr
-			}
-		}
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", e.name, err)
-		}
-		if nbytes > packFileLimit || nbytes != e.size {
-			return nil, fmt.Errorf("%s: file size differs or exceeds 4 GB", e.name)
-		}
-		if dst != "" && !e.modified.IsZero() {
-			file := filepath.Join(dst, filepath.FromSlash(n))
-			if err := os.Chtimes(file, e.modified, e.modified); err != nil {
-				return nil, err
-			}
-		}
-		if !copyMetadata(parts[2]) {
-			records[parts[1]] = append(records[parts[1]], copyFileDigest{parts[2], nbytes, hex.EncodeToString(h.Sum(nil))})
 		}
 	}
 	var problems []PackProblem
@@ -502,10 +432,10 @@ func scanPackArchive(ar *packArchive, dst string) ([]PackProblem, error) {
 			continue
 		}
 		why := ""
-		if !present[e.Folder] {
+		if !sc.present[e.Folder] {
 			why = "carried folder is missing"
 		} else if ar.p.Format >= 2 {
-			n, sum := digestFiles(records[e.Folder])
+			n, sum := digestFiles(sc.records[e.Folder])
 			why = digestProblem(e, n, sum)
 		}
 		if why != "" {
@@ -513,6 +443,123 @@ func scanPackArchive(ar *packArchive, dst string) ([]PackProblem, error) {
 		}
 	}
 	return problems, nil
+}
+
+// archiveScan is what scanPackArchive has seen of an archive so far.
+type archiveScan struct {
+	folders map[string]PackEntry
+	seen    map[string]bool
+	kinds   map[string]bool // path → is a directory; includes implicit parent directories
+	present map[string]bool // carried folders with an entry
+	records map[string][]copyFileDigest
+}
+
+// entry checks one archive entry against the whitelist, extracts it into dst (unless dst
+// is "") and records its file's size and hash.
+func (sc *archiveScan) entry(e *packArchiveEntry, dst string) error {
+	n, err := archivePath(e.name)
+	if err != nil {
+		return err
+	}
+	parts := strings.SplitN(n, "/", 3)
+	if err := sc.check(e, n, parts); err != nil {
+		return err
+	}
+	var out *os.File
+	if dst != "" {
+		if out, err = createArchiveEntry(e, dst, n); err != nil {
+			return err
+		}
+	}
+	if e.dir {
+		return nil
+	}
+	h := sha256.New()
+	var w io.Writer = h
+	if out != nil {
+		w = io.MultiWriter(h, out)
+	}
+	nbytes, err := io.Copy(w, io.LimitReader(e.r, packFileLimit+1))
+	if out != nil {
+		if cerr := out.Close(); err == nil {
+			err = cerr
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("%s: %w", e.name, err)
+	}
+	if nbytes > packFileLimit || nbytes != e.size {
+		return fmt.Errorf("%s: file size differs or exceeds 4 GB", e.name)
+	}
+	if dst != "" && !e.modified.IsZero() {
+		file := filepath.Join(dst, filepath.FromSlash(n))
+		if err := os.Chtimes(file, e.modified, e.modified); err != nil {
+			return err
+		}
+	}
+	if !copyMetadata(parts[2]) {
+		sc.records[parts[1]] = append(sc.records[parts[1]], copyFileDigest{parts[2], nbytes, hex.EncodeToString(h.Sum(nil))})
+	}
+	return nil
+}
+
+// check refuses an entry outside the carried folders, too large, duplicated or in conflict
+// with another entry's kind, and records its path.
+func (sc *archiveScan) check(e *packArchiveEntry, n string, parts []string) error {
+	if len(parts) < 2 || parts[0] != "mods" {
+		return fmt.Errorf("%s: path is not allowed in a pack", e.name)
+	}
+	if _, ok := sc.folders[parts[1]]; !ok {
+		return fmt.Errorf("%s: mod folder is not in pack.json", e.name)
+	}
+	if len(parts) == 2 && !e.dir {
+		return fmt.Errorf("%s: carried folder must be a directory", e.name)
+	}
+	if e.size < 0 || e.size > packFileLimit {
+		return fmt.Errorf("%s: file exceeds 4 GB", e.name)
+	}
+	if e.dir && e.size != 0 {
+		return fmt.Errorf("%s: directory has file content", e.name)
+	}
+	key := strings.ToLower(n)
+	if sc.seen[key] {
+		return fmt.Errorf("%s: duplicate archive path", e.name)
+	}
+	if dir, exists := sc.kinds[key]; exists && (!dir || !e.dir) {
+		return fmt.Errorf("%s: conflicting archive path", e.name)
+	}
+	sc.seen[key], sc.kinds[key] = true, e.dir
+	for parent := path.Dir(key); parent != "."; parent = path.Dir(parent) {
+		if dir, exists := sc.kinds[parent]; exists && !dir {
+			return fmt.Errorf("%s: parent is a file", e.name)
+		}
+		sc.kinds[parent] = true
+	}
+	sc.present[parts[1]] = true
+	return nil
+}
+
+// createArchiveEntry makes an entry's directory, or creates its file (never over one),
+// under dst; it returns the file to write (nil for a directory).
+func createArchiveEntry(e *packArchiveEntry, dst, n string) (*os.File, error) {
+	file := filepath.Join(dst, filepath.FromSlash(n))
+	if !within(dst, file) {
+		return nil, fmt.Errorf("unsafe path in the pack: %s", e.name)
+	}
+	var out *os.File
+	var err error
+	if e.dir {
+		err = os.MkdirAll(file, 0o755)
+	} else {
+		err = os.MkdirAll(filepath.Dir(file), 0o755)
+		if err == nil {
+			out, err = os.OpenFile(file, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+		}
+	}
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", e.name, err)
+	}
+	return out, nil
 }
 
 // VerifyPackFile verifies the archive without extracting it or changing the store.
@@ -526,22 +573,54 @@ func (a *App) VerifyPackFile(file string) (*Pack, []PackProblem, error) {
 	return ar.p, problems, err
 }
 
-func (a *App) importPackArchive(file string) (*PackMatch, error) {
+func (a *App) importPackArchive(file string, update bool) (*PackMatch, error) {
 	ar, err := openPackArchive(file)
 	if err != nil {
 		return nil, err
 	}
 	defer ar.close()
-	return a.extractPackArchive(ar)
+	return a.extractPackArchive(ar, update)
 }
 
-func (a *App) extractPackArchive(ar *packArchive) (*PackMatch, error) {
-	p := ar.p
-	dir := a.packPath(p.Name)
-	if _, err := os.Lstat(dir); err == nil {
-		return nil, fmt.Errorf("pack %q exists; remove it first", p.Name)
-	} else if !os.IsNotExist(err) {
+// PackUpdateOf says whether a pack file is a newer revision of a pack the player has
+// (nil: it is not), reading only its manifest.
+func (a *App) PackUpdateOf(file string) (*PackUpdate, error) {
+	ar, err := openPackArchive(file)
+	if err != nil {
 		return nil, err
+	}
+	defer ar.close()
+	name, old := a.packByID(ar.p.ID)
+	if old == nil || ar.p.Rev() <= old.Rev() {
+		return nil, nil
+	}
+	return &PackUpdate{Name: name, From: old.Rev(), To: ar.p.Rev(), Diff: diffPacks(old, ar.p)}, nil
+}
+
+func (a *App) extractPackArchive(ar *packArchive, update bool) (*PackMatch, error) {
+	p := ar.p
+	target := p.Name
+	var up *PackUpdate
+	if name, old := a.packByID(p.ID); old != nil {
+		if p.Rev() <= old.Rev() {
+			return nil, fmt.Errorf("pack %q already is revision %d of this pack (the file is revision %d); nothing to update", name, old.Rev(), p.Rev())
+		}
+		up = &PackUpdate{Name: name, From: old.Rev(), To: p.Rev(), Diff: diffPacks(old, p)}
+		if !update {
+			return &PackMatch{Pack: p, Update: up}, nil
+		}
+		if err := a.checkNoGame(); err != nil {
+			return nil, err
+		}
+		target = name
+	}
+	dir := a.packPath(target)
+	if up == nil {
+		if _, err := os.Lstat(dir); err == nil {
+			return nil, fmt.Errorf("pack %q exists; remove it first", p.Name)
+		} else if !os.IsNotExist(err) {
+			return nil, err
+		}
 	}
 	tmp := dir + TmpSuffix
 	if b := ReadBuildProgress(tmp); b != nil && b.Running() {
@@ -586,11 +665,19 @@ func (a *App) extractPackArchive(ar *packArchive) (*PackMatch, error) {
 	if err := a.Store.SetMeta(directoryKey("packs"), a.PacksDir()); err != nil {
 		return nil, err
 	}
-	if err := os.Rename(tmp, dir); err != nil {
+	if up != nil {
+		if err := renamePackManifest(tmp, target, p); err != nil {
+			return nil, err
+		}
+		if err := a.replacePackContent(target, tmp); err != nil {
+			return nil, err
+		}
+		up.Applied = true
+	} else if err := os.Rename(tmp, dir); err != nil {
 		return nil, err
 	}
 	e, _ := a.Env() // importing on a new installation can precede choosing a game
-	return &PackMatch{Pack: p, Dir: dir, Verified: p.Format >= 2, Check: a.CheckPack(p, e, problems)}, nil
+	return &PackMatch{Pack: p, Dir: dir, Verified: p.Format >= 2, Check: a.CheckPack(p, e, problems), Update: up}, nil
 }
 
 func (a *App) exportPackArchive(name, file string, p *Pack) (int64, error) {
@@ -598,6 +685,48 @@ func (a *App) exportPackArchive(name, file string, p *Pack) (int64, error) {
 		return 0, err
 	}
 	root := a.packPath(name)
+	if err := upgradePackManifest(root, p); err != nil {
+		return 0, err
+	}
+	problems, err := verifyPackDir(p, root)
+	if err != nil {
+		return 0, err
+	}
+	if len(problems) > 0 {
+		return 0, packProblemsError(problems)
+	}
+	f, err := os.OpenFile(file+".part", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+	if err != nil {
+		return 0, err
+	}
+	defer os.Remove(file + ".part")
+	if err := writePackArchive(f, root, p); err != nil {
+		return 0, err
+	}
+	if _, err := os.Lstat(file); err == nil {
+		return 0, fmt.Errorf("%s exists; nothing is overwritten", file)
+	} else if !os.IsNotExist(err) {
+		return 0, err
+	}
+	if err := os.Rename(file+".part", file); err != nil {
+		return 0, err
+	}
+	fi, err := os.Stat(file)
+	if err != nil {
+		return 0, err
+	}
+	return fi.Size(), nil
+}
+
+// upgradePackManifest brings an older pack's pack.json up to date before it is shared:
+// digests (format 1) and an id (before format 3) are written back, so every file it is
+// shared as can be updated later (10 §4).
+func upgradePackManifest(root string, p *Pack) error {
+	if p.Format < PackFormat || p.ID == "" {
+		if p.ID == "" {
+			p.ID, p.Revision = newPackID(), p.Rev()
+		}
+	}
 	if p.Format == 1 {
 		var problems []PackProblem
 		for i := range p.Entries {
@@ -613,17 +742,19 @@ func (a *App) exportPackArchive(name, file string, p *Pack) (int64, error) {
 			e.Files, e.SHA256 = n, sum
 		}
 		if len(problems) > 0 {
-			return 0, packProblemsError(problems)
+			return packProblemsError(problems)
 		}
+	}
+	if p.Format < PackFormat || p.ID != "" && !manifestHasID(root) {
 		p.Format = PackFormat
 		b, err := json.MarshalIndent(p, "", "  ")
 		if err != nil {
-			return 0, err
+			return err
 		}
 		manifest := filepath.Join(root, "pack.json")
 		out, err := os.CreateTemp(root, "pack.json-*.part")
 		if err != nil {
-			return 0, err
+			return err
 		}
 		defer os.Remove(out.Name())
 		_, err = out.Write(append(b, '\n'))
@@ -631,66 +762,28 @@ func (a *App) exportPackArchive(name, file string, p *Pack) (int64, error) {
 			err = cerr
 		}
 		if err != nil {
-			return 0, err
+			return err
 		}
 		if err := os.Rename(out.Name(), manifest); err != nil {
-			return 0, err
+			return err
 		}
 	}
-	problems, err := verifyPackDir(p, root)
-	if err != nil {
-		return 0, err
-	}
-	if len(problems) > 0 {
-		return 0, packProblemsError(problems)
-	}
-	f, err := os.OpenFile(file+".part", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
-	if err != nil {
-		return 0, err
-	}
-	defer os.Remove(file + ".part")
+	return nil
+}
+
+// writePackArchive writes the pack's pack.json and carried folders to f as a
+// zstd-compressed tar, and closes f.
+func writePackArchive(f *os.File, root string, p *Pack) error {
 	zw, err := zstd.NewWriter(f, zstd.WithEncoderLevel(zstd.SpeedBetterCompression), zstd.WithWindowSize(8<<20), zstd.WithEncoderConcurrency(1))
 	if err != nil {
 		f.Close()
-		return 0, err
+		return err
 	}
 	tw := tar.NewWriter(zw)
-	writeFile := func(file, rel string, fi fs.FileInfo) error {
-		if !fi.IsDir() && !fi.Mode().IsRegular() {
-			return fmt.Errorf("%s: only directories and regular files are allowed", rel)
-		}
-		if fi.Size() > packFileLimit && !fi.IsDir() {
-			return fmt.Errorf("%s: file exceeds 4 GB", rel)
-		}
-		if _, err := archivePath(rel); err != nil {
-			return err
-		}
-		h, err := tar.FileInfoHeader(fi, "")
-		if err != nil {
-			return err
-		}
-		h.Name, h.Format = rel, tar.FormatPAX
-		if err := tw.WriteHeader(h); err != nil {
-			return err
-		}
-		if fi.IsDir() {
-			return nil
-		}
-		in, err := os.Open(file)
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(tw, in)
-		cerr := in.Close()
-		if err != nil {
-			return err
-		}
-		return cerr
-	}
 	manifest := filepath.Join(root, "pack.json")
 	fi, err := os.Lstat(manifest)
 	if err == nil {
-		err = writeFile(manifest, "pack.json", fi)
+		err = writeTarFile(tw, manifest, "pack.json", fi)
 	}
 	var folders []string
 	for _, e := range p.Entries {
@@ -716,7 +809,7 @@ func (a *App) exportPackArchive(name, file string, p *Pack) (int64, error) {
 			if err != nil {
 				return err
 			}
-			return writeFile(file, filepath.ToSlash(rel), fi)
+			return writeTarFile(tw, file, filepath.ToSlash(rel), fi)
 		})
 	}
 	if cerr := tw.Close(); err == nil {
@@ -728,20 +821,51 @@ func (a *App) exportPackArchive(name, file string, p *Pack) (int64, error) {
 	if cerr := f.Close(); err == nil {
 		err = cerr
 	}
+	return err
+}
+
+// writeTarFile writes one directory or regular file to the pack archive as rel.
+func writeTarFile(tw *tar.Writer, file, rel string, fi fs.FileInfo) error {
+	if !fi.IsDir() && !fi.Mode().IsRegular() {
+		return fmt.Errorf("%s: only directories and regular files are allowed", rel)
+	}
+	if fi.Size() > packFileLimit && !fi.IsDir() {
+		return fmt.Errorf("%s: file exceeds 4 GB", rel)
+	}
+	if _, err := archivePath(rel); err != nil {
+		return err
+	}
+	h, err := tar.FileInfoHeader(fi, "")
 	if err != nil {
-		return 0, err
+		return err
 	}
-	if _, err := os.Lstat(file); err == nil {
-		return 0, fmt.Errorf("%s exists; nothing is overwritten", file)
-	} else if !os.IsNotExist(err) {
-		return 0, err
+	h.Name, h.Format = rel, tar.FormatPAX
+	if err := tw.WriteHeader(h); err != nil {
+		return err
 	}
-	if err := os.Rename(file+".part", file); err != nil {
-		return 0, err
+	if fi.IsDir() {
+		return nil
 	}
-	fi, err = os.Stat(file)
+	in, err := os.Open(file)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	return fi.Size(), nil
+	_, err = io.Copy(tw, in)
+	cerr := in.Close()
+	if err != nil {
+		return err
+	}
+	return cerr
+}
+
+// manifestHasID: dir's pack.json on disk has an id (ReadPack's copy may have been given one).
+func manifestHasID(dir string) bool {
+	b, err := os.ReadFile(filepath.Join(dir, "pack.json"))
+	if err != nil {
+		return false
+	}
+	var q struct {
+		ID string `json:"id"`
+	}
+	return json.Unmarshal(b, &q) == nil && q.ID != ""
 }

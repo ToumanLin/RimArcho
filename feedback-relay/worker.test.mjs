@@ -87,7 +87,9 @@ test("a report becomes an issue; the IP and the contact stay out of it", async (
   const e = env(), gh = github();
   const r = await send(e, gh, { title: "Crash on load", body: "It crashed @someone\n\n---\nRimArcho 0.9.0", contact: "me#1234" });
   assert.equal(r.status, 200);
-  assert.deepEqual(r.data, { number: 41, url: "https://github.com/ToumanLin/RimArcho/issues/41" });
+  assert.equal(r.data.number, 41);
+  assert.equal(r.data.url, "https://github.com/ToumanLin/RimArcho/issues/41");
+  assert.match(r.data.token, /^[A-Za-z0-9_-]{32}$/);
 
   const issue = gh.calls.find((c) => c.url.endsWith("/issues"));
   assert.equal(issue.auth, "Bearer ghs_test");
@@ -99,6 +101,9 @@ test("a report becomes an issue; the IP and the contact stay out of it", async (
   assert.ok(!sent.includes("203.0.113.9") && !sent.includes("me#1234"), "no IP or contact goes to GitHub");
   assert.ok(![...e.COUNTS.m.keys(), ...e.COUNTS.m.values()].some((s) => s.includes("203.0.113.9")), "KV holds only a hash of the IP");
   assert.equal(e.COUNTS.m.get("contact:41"), "me#1234");
+  assert.ok(!sent.includes(r.data.token), "the reply token stays out of GitHub");
+  assert.ok(![...e.COUNTS.m.values()].includes(r.data.token), "KV holds only the token's keyed hash");
+  assert.ok(e.COUNTS.m.has("reply:41"));
 
   // the App's JWT signs the two token calls and verifies with the App's public key
   const [jwt] = gh.calls.filter((c) => !c.url.endsWith("/issues")).map((c) => c.auth.slice(7));
@@ -144,7 +149,7 @@ test("one report a minute, a daily cap per sender and for everyone", async () =>
   assert.deepEqual(gate3.storage.m.get("s"), { last: 0, prev: 0, n: 0 });
 
   // the KV counter is per day; the gates clean up two days after their first report
-  assert.deepEqual([...e.COUNTS.m.keys()], ["all:2026-10-31"]);
+  assert.deepEqual([...e.COUNTS.m.keys()].filter((k) => !k.startsWith("reply:")), ["all:2026-10-31"]);
   const [gate1] = e.GATE.objects.values();
   assert.equal(gate1.storage.alarm, NOW + 2 * 86400e3);
   await gate1.alarm();
@@ -220,4 +225,209 @@ test("the downloaded PKCS#1 key, a PKCS#8 key and a one-line key all sign", asyn
     assert.equal(JSON.parse(Buffer.from(p, "base64url")).iss, "Iv23liTEST");
   }
   assert.equal(pkcs8(keys.privateKey)[0], 0x30);
+});
+
+// statusGitHub adds the issue and its comments to the fake GitHub.
+function statusGitHub({ state = "open", comments = [], issueStatus = 200 } = {}) {
+  const base = github();
+  const fn = async (url, init) => {
+    if (/\/issues\/41$/.test(url)) {
+      base.calls.push({ url, method: init.method });
+      return new Response(JSON.stringify({ number: 41, state, closed_at: state === "closed" ? "2026-11-01T00:00:00Z" : null }), { status: issueStatus });
+    }
+    if (/\/issues\/41\/comments/.test(url)) {
+      base.calls.push({ url, method: init.method });
+      return new Response(JSON.stringify(comments), { status: 200 });
+    }
+    return base.fn(url, init);
+  };
+  return { fn, calls: base.calls };
+}
+
+async function ask(e, gh, n, t, { ip = "203.0.113.9", agent = "RimArcho/1.1.0", at = NOW } = {}) {
+  const req = new Request(`https://relay.example/status/${n}?t=${encodeURIComponent(t)}`, { headers: { "user-agent": agent, "cf-connecting-ip": ip } });
+  const res = await handle(req, e, { fetch: gh.fn, now: () => at });
+  return { status: res.status, data: await res.json() };
+}
+
+test("status: the sender reads the state and only the owner's comments", async () => {
+  forgetToken();
+  const comments = [
+    { body: "Thanks, fixed in 1.1.1", created_at: "2026-11-02T00:00:00Z", author_association: "OWNER", user: { login: "x" } },
+    { body: "me too", created_at: "2026-11-02T01:00:00Z", author_association: "NONE" },
+    { body: "<b>collab</b>", created_at: "2026-11-02T02:00:00Z", author_association: "COLLABORATOR" },
+  ];
+  const e = env(), gh = statusGitHub({ state: "closed", comments });
+  const { data } = await send(e, gh, { title: "a", body: "x" });
+  const r = await ask(e, gh, 41, data.token);
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.data, { state: "closed", closed_at: "2026-11-01T00:00:00Z", replies: [{ body: "Thanks, fixed in 1.1.1", created_at: "2026-11-02T00:00:00Z" }] });
+});
+
+test("status: a wrong token is 404 like a missing issue, and asks nothing of GitHub", async () => {
+  forgetToken();
+  const e = env(), gh = statusGitHub();
+  const { data } = await send(e, gh, { title: "a", body: "x" });
+  const before = gh.calls.length;
+  const wrong = { status: 404, data: { error: "not_found" } };
+  assert.deepEqual(await ask(e, gh, 41, "A".repeat(32)), wrong);
+  assert.deepEqual(await ask(e, gh, 42, data.token), wrong, "another issue's number");
+  assert.deepEqual(await ask(e, gh, 41, ""), wrong);
+  assert.deepEqual(await ask(e, gh, "abc", data.token), wrong);
+  assert.equal(gh.calls.length, before);
+  assert.deepEqual(await ask(e, gh, 41, data.token, { agent: "curl/8" }), { status: 403, data: { error: "client" } });
+  // GitHub lost the issue (deleted): 404 too
+  const gone = statusGitHub({ issueStatus: 404 });
+  assert.deepEqual(await ask(e, gone, 41, data.token), wrong);
+});
+
+test("status: a per-sender hourly limit, looser than reports", async () => {
+  forgetToken();
+  const e = env({ STATUS_PER_HOUR: "3" }), gh = statusGitHub();
+  const { data } = await send(e, gh, { title: "a", body: "x" });
+  for (let i = 0; i < 3; i++) assert.equal((await ask(e, gh, 41, data.token)).status, 200);
+  assert.deepEqual(await ask(e, gh, 41, data.token), { status: 429, data: { error: "slow_down" } });
+  assert.equal((await ask(e, gh, 41, data.token, { ip: "198.51.100.5" })).status, 200, "another sender");
+  assert.equal((await ask(e, gh, 41, data.token, { at: NOW + 3600e3 })).status, 200, "the next hour");
+});
+
+// a GitHub with open feature requests, comments and labels that may not exist
+function hub({ missing = [], failAfter = Infinity } = {}) {
+  const calls = [];
+  let number = 40, comment = 900, made = 0;
+  const issues = [
+    { number: 7, title: "Sort the list by size", html_url: "https://github.com/ToumanLin/RimArcho/issues/7", reactions: { "+1": 3 } },
+    { number: 8, title: "A pull request", html_url: "x", pull_request: {} },
+    { number: 9, title: "Export as a collection", html_url: "https://github.com/ToumanLin/RimArcho/issues/9", reactions: {} },
+  ];
+  const fn = async (url, init) => {
+    const body = init.body ? JSON.parse(init.body) : null;
+    calls.push({ url, method: init.method, body });
+    const json = (status, data) => new Response(JSON.stringify(data), { status });
+    if (url.endsWith("/installation")) return json(200, { id: 77 });
+    if (url.endsWith("/access_tokens")) return json(201, { token: "ghs_test", expires_at: new Date(NOW + 3600e3).toISOString() });
+    if (url.endsWith("/repos/ToumanLin/RimArcho/issues") && init.method === "POST") {
+      if ((body.labels || []).some((l) => missing.includes(l))) return json(422, { message: "Validation Failed" });
+      if (made >= failAfter) return json(500, {});
+      made++;
+      number++;
+      return json(201, { number, html_url: `https://github.com/ToumanLin/RimArcho/issues/${number}` });
+    }
+    if (url.includes("/issues?state=open&labels=enhancement")) return json(200, issues);
+    if (/\/issues\/\d+\/comments$/.test(url) && init.method === "POST") return json(201, { id: ++comment });
+    if (/\/issues\/comments\/\d+$/.test(url) && init.method === "PATCH") return json(200, {});
+    return json(404, {});
+  };
+  return { fn, calls };
+}
+
+const created = (gh) => gh.calls.filter((c) => c.method === "POST" && c.url.endsWith("/issues")).map((c) => c.body.labels);
+
+test("a report's kind becomes a label, files lost adds priority; missing labels fall back step by step", async () => {
+  forgetToken();
+  let gh = hub();
+  assert.equal((await send(env(), gh, { title: "a", body: "x", kind: "bug", priority: true })).status, 200);
+  assert.deepEqual(created(gh), [["feedback", "bug", "priority"]]);
+  gh = hub();
+  await send(env(), gh, { title: "a", body: "x", kind: "feature", priority: true }, { ip: "192.0.2.50" });
+  assert.deepEqual(created(gh), [["feedback", "enhancement"]], "priority is for bugs only");
+  gh = hub();
+  await send(env(), gh, { title: "a", body: "x", kind: "made-up" }, { ip: "192.0.2.51" });
+  assert.deepEqual(created(gh), [["feedback"]], "an unknown kind adds nothing");
+
+  // diagnosis does not exist yet: LABEL still goes on
+  gh = hub({ missing: ["diagnosis", "priority"] });
+  assert.equal((await send(env(), gh, { title: "a", body: "x", kind: "diagnosis" }, { ip: "192.0.2.52" })).status, 200);
+  assert.deepEqual(created(gh), [["feedback", "diagnosis"], ["feedback"]]);
+  // a bug keeps GitHub's own label when priority is missing
+  gh = hub({ missing: ["priority"] });
+  assert.equal((await send(env(), gh, { title: "a", body: "x", kind: "bug", priority: true }, { ip: "192.0.2.54" })).status, 200);
+  assert.deepEqual(created(gh), [["feedback", "bug", "priority"], ["feedback", "bug"]]);
+  gh = hub({ missing: ["feedback", "data"] });
+  assert.equal((await send(env(), gh, { title: "a", body: "x", kind: "data" }, { ip: "192.0.2.53" })).status, 200);
+  assert.deepEqual(created(gh), [["feedback", "data"], ["feedback"], undefined]);
+});
+
+test("a split send files each problem as its own issue: one minute, each counts for the day", async () => {
+  forgetToken();
+  const e = env({ PER_IP_DAY: "3" }), gh = hub();
+  const r = await send(e, gh, { reports: [{ title: "one", body: "x", kind: "bug" }, { title: "two", body: "y", kind: "feature" }], contact: "me#1" });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.data.issues.map((i) => i.number), [41, 42]);
+  assert.equal(r.data.number, 41, "the first one also at the top, for older RimArcho");
+  assert.ok(r.data.issues.every((i) => /^[A-Za-z0-9_-]{32}$/.test(i.token)) && r.data.issues[0].token !== r.data.issues[1].token);
+  assert.deepEqual(created(gh), [["feedback", "bug"], ["feedback", "enhancement"]]);
+  assert.equal(e.COUNTS.m.get("contact:41"), "me#1");
+  assert.equal(e.COUNTS.m.get("contact:42"), "me#1");
+  assert.equal(e.COUNTS.m.get("all:2026-10-31"), "2");
+  // two of three used: a split of two more is over the sender's day, one more is not
+  assert.deepEqual(await send(e, gh, { reports: [{ title: "a", body: "x" }, { title: "b", body: "x" }] }, { at: NOW + 61e3 }), { status: 429, data: { error: "ip_daily" } });
+  assert.equal((await send(e, gh, { title: "c", body: "x" }, { at: NOW + 62e3 })).status, 200);
+
+  // too many, none, or one empty: refused whole
+  for (const reports of [[1, 2, 3, 4].map((i) => ({ title: String(i), body: "x" })), []]) {
+    assert.deepEqual(await send(env(), hub(), { reports }, { ip: "192.0.2.60" }), { status: 400, data: { error: "bad_json" } });
+  }
+  assert.deepEqual(await send(env(), hub(), { reports: [{ title: "a", body: "x" }, { title: "", body: "" }] }, { ip: "192.0.2.61" }), { status: 400, data: { error: "empty" } });
+});
+
+test("a split send GitHub fails partway returns what was filed and gives the rest back", async () => {
+  forgetToken();
+  const e = env({ PER_IP_DAY: "3" });
+  const r = await send(e, hub({ failAfter: 1 }), { reports: [{ title: "one", body: "x" }, { title: "two", body: "y" }] });
+  assert.equal(r.status, 502);
+  assert.equal(r.data.error, "github");
+  assert.deepEqual(r.data.issues.map((i) => i.number), [41]);
+  assert.equal(e.COUNTS.m.get("all:2026-10-31"), "1");
+  const [gate] = e.GATE.objects.values();
+  assert.equal(gate.storage.m.get("s").n, 1, "only the filed one counts for the sender");
+  assert.deepEqual(await send(e, hub(), { title: "two", body: "y" }, { at: NOW + 5e3 }), { status: 429, data: { error: "slow_down" } }, "something was filed: the minute stays");
+});
+
+test("requests: the open feature requests with their +1s, no pull requests, kept ten minutes", async () => {
+  forgetToken();
+  const e = env(), gh = hub();
+  const get = () => handle(post(null, { method: "GET", path: "/requests" }), e, { fetch: gh.fn, now: () => NOW }).then(async (r) => ({ status: r.status, data: await r.json() }));
+  const r = await get();
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.data.requests, [
+    { number: 7, title: "Sort the list by size", url: "https://github.com/ToumanLin/RimArcho/issues/7", plus: 3 },
+    { number: 9, title: "Export as a collection", url: "https://github.com/ToumanLin/RimArcho/issues/9", plus: 0 },
+  ]);
+  await get();
+  assert.equal(gh.calls.filter((c) => c.url.includes("labels=enhancement")).length, 1, "the second read comes from KV");
+  const other = await handle(post(null, { method: "GET", path: "/requests", agent: "curl/8" }), e, { fetch: gh.fn, now: () => NOW });
+  assert.equal(other.status, 403);
+});
+
+test("plus: a +1 for an open request, once a day per sender, written in one App comment", async () => {
+  forgetToken();
+  const e = env(), gh = hub();
+  const plus = (n, opts = {}) => handle(post({}, { path: "/plus/" + n, ...opts }), e, { fetch: gh.fn, now: () => NOW }).then(async (r) => ({ status: r.status, data: await r.json() }));
+  assert.deepEqual(await plus(7), { status: 200, data: { plus: 4 } });
+  assert.deepEqual(await plus(7), { status: 200, data: { plus: 4 } }, "the same sender again: counted once");
+  assert.deepEqual(await plus(7, { ip: "192.0.2.70" }), { status: 200, data: { plus: 5 } });
+  assert.equal(e.COUNTS.m.get("plus:7"), "2");
+  assert.equal(gh.calls.filter((c) => c.url.endsWith("/issues/7/comments")).length, 1);
+  const patches = gh.calls.filter((c) => c.method === "PATCH");
+  assert.equal(patches.length, 1);
+  assert.match(patches[0].body.body, /^\+2 from RimArcho players/);
+  assert.ok(!JSON.stringify(gh.calls).includes("192.0.2.70"), "no IP reaches GitHub");
+  assert.deepEqual(await plus(8), { status: 404, data: { error: "not_found" } }, "a pull request is not a request");
+  assert.deepEqual(await plus(12345), { status: 404, data: { error: "not_found" } });
+  // the list read afterwards includes the relayed +1s
+  const r = await handle(post(null, { method: "GET", path: "/requests" }), e, { fetch: gh.fn, now: () => NOW });
+  assert.equal((await r.json()).requests[0].plus, 5);
+
+  // PLUS_PER_DAY a day per sender
+  const many = env();
+  await many.COUNTS.put("plusday:" + "seed", "0");
+  const gh2 = hub();
+  // 20 distinct +1s use the day up; issues are only 7 and 9, so count them by forging the counter
+  const r1 = await handle(post({}, { path: "/plus/7", ip: "192.0.2.80" }), many, { fetch: gh2.fn, now: () => NOW });
+  assert.equal(r1.status, 200);
+  const key = [...many.COUNTS.m.keys()].find((k) => k.startsWith("plusday:") && k !== "plusday:seed");
+  await many.COUNTS.put(key, "20");
+  const r2 = await handle(post({}, { path: "/plus/9", ip: "192.0.2.80" }), many, { fetch: gh2.fn, now: () => NOW });
+  assert.deepEqual({ status: r2.status, data: await r2.json() }, { status: 429, data: { error: "slow_down" } });
 });

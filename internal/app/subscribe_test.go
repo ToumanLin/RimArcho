@@ -87,7 +87,7 @@ func TestSubscribeGit(t *testing.T) {
 			if d := directory(t, e.App, "subscribed"); d.Path != e.App.SubscribedDir() || d.Status != "ok" {
 				t.Fatalf("directory: %+v", d)
 			}
-			if out := e.MustRun("subscribe", "list"); !strings.Contains(out, "1 subscriptions") || !strings.Contains(out, g.First) {
+			if out := e.MustRun("subscribe", "list"); !strings.Contains(out, "1 subscription") || !strings.Contains(out, g.First) {
 				t.Fatal(out)
 			}
 		})

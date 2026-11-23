@@ -5,7 +5,7 @@ import { choiceControl } from "./choices.js";
 // follows (07 §7.6) and how to share it (export, pack). The export is a sub-page of its own
 // (Library / Lists / <list> / export). Editing what a list holds stays in the editor (16 §2.5).
 // Data: API.PlanManage (view.BuildPlanManage), API.PlanExport (view.BuildPlanExport).
-import { pathContent, copyablePath, editablePath } from "./fields.js";
+import { pathContent, copyablePath, editablePath, copy as copyText } from "./fields.js";
 import { S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { openScreen, page, button, act, area, seg, beginPageRead } from "./screens.js";
 import { icon } from "./icons.js";
@@ -13,6 +13,7 @@ import * as pop from "./popups.js";
 import * as plans from "./plans.js";
 import { wireSeparator } from "./separator.js";
 import * as motion from "./motion.js";
+import { memBars } from "./membar.js";
 import { showImportSummary, showImportContents, getAll, workshopIDs } from "./exchange.js";
 
 let ui = null;
@@ -28,7 +29,7 @@ function syncGame() {
   M.env = game(); M.sourceSeq++; M.importSeq++;
   if (M.draft) { M.draft.loading = false; M.draft.importing = false; }
 }
-const X = { data: null, id: 0, from: "plans", format: "", info: null };
+const X = { data: null, id: 0, from: "plans", format: "", info: null, settings: false };
 const FORMAT_KEY = "ui.gui.export.format";
 const C = { seq: 0, page: null, slot: null, progress: null };
 
@@ -138,7 +139,7 @@ function listCard(d) {
       b.append(use);
     }
     b.onclick = () => pick(r.id);
-    b.ondblclick = () => ui.go(r.page);
+    b.ondblclick = () => ui.go(r.page); // keys: enter edits the picked list
     box.append(b);
   }
   card.append(box);
@@ -167,7 +168,7 @@ function detailCard(p) {
   else {
     const h = el("h2", "pm-title", p.name);
     h.title = T("double-click to rename");
-    h.ondblclick = () => startRename(p.id);
+    h.ondblclick = () => startRename(p.id); // keys: F2
     n.append(h);
   }
   if (p.mark) { const m = el("span", "adot"); m.title = p.mark; n.append(m); }
@@ -507,7 +508,7 @@ function newForm() {
 // a file reads it at once; pasted text is read with preview (links go to Steam or Rentry).
 function inlineImport(draft, active, updateButtons) {
   const box = el("div", "pm-inline-import"), imp = draft.import;
-  box.append(el("div", "pm-note", T("bring in a list from RimSort, RimCrow, RimWorld or another RimArcho, a save, a share code or a Steam collection; you see which mods you have before anything is created")));
+  box.append(el("div", "pm-note", T("bring in a list from RimSort, RimCrow, RimPy, RimWorld or another RimArcho, a save, a share code or a Steam collection; you see which mods you have before anything is created")));
   // the file: one button, then its name; the path is never typed
   const drop = el("div", "pm-drop");
   const file = el("input"); file.type = "file"; file.hidden = true; file.accept = ".xml,.rml,.json,.txt,.rws";
@@ -526,7 +527,7 @@ function inlineImport(draft, active, updateButtons) {
   box.append(drop);
   box.append(el("div", "pm-or", T("or paste")));
   const text = el("textarea", "xc-text"); text.value = imp.text; text.spellcheck = false;
-  text.placeholder = T("a share code (RC-…), a Steam Workshop collection link, a Rentry link, or a list copied from RimSort or RimCrow");
+  text.placeholder = T("a share code (RC-…), a Steam Workshop collection link, a Rentry link, or a list copied from RimSort, RimCrow or RimPy");
   text.setAttribute("aria-label", T("paste"));
   box.append(text);
   const status = el("div", "pm-note", draft.importing ? T("reading the list…") : ""); status.setAttribute("role", draft.importing ? "progressbar" : "status");
@@ -537,7 +538,7 @@ function inlineImport(draft, active, updateButtons) {
   };
   reading(status.textContent);
   const error = el("div", "plan-why", imp.error || ""); error.setAttribute("role", "alert"); fieldError(text, error); fieldError(pickBtn, error);
-  const preview = el("div", "pm-inline-preview");
+  const preview = el("div", "pm-inline-preview settings xc-res");
   box.append(status, error, preview);
   function invalidate() {
     M.importSeq++; draft.importing = false; imp.preview = null; imp.error = "";
@@ -642,9 +643,9 @@ function costSection(p) {
     const pending = el("div", "skel");
     progress(pending, s.querySelector(".pm-sub"));
     pending.setAttribute("aria-busy", "true");
-    // as tall as an estimate (the last one shown, else its usual four lines), so the
-    // estimate arriving does not push the sections below it down
-    pending.append(el("span", "bar"), el("span", "bar"), el("span", "bar"), el("span", "bar"));
+    // as tall as an estimate (the last one shown, else its two bars and "what is counted"),
+    // so the estimate arriving does not move the sections below it
+    pending.append(el("span", "bar"), el("span", "bar"), el("span", "bar"));
     if (C.height) s.style.minHeight = C.height + "px";
     C.progress = el("div", "muted pm-note", C.page?.progress || "");
     C.progress.setAttribute("aria-live", "polite");
@@ -699,8 +700,13 @@ function showCost(p, id) {
   s.replaceChildren(el("div", "pm-sub", T("Loaded memory (estimate)")));
   s.style.minHeight = "";
   if (p.error) { s.append(el("div", "muted pm-note", p.error)); return; }
-  s.append(el("div", "word-facts", p.summary), el("div", "muted pm-note", p.detail));
-  if (p.loadingBudget) s.append(el("div", "muted pm-note", p.loadingBudget));
+  // the summary, the game / Mods split and the loading budget drawn (16 §7 principle 9);
+  // the bars are named by those sentences
+  if (p.bars?.length) s.append(memBars(p.bars));
+  else {
+    s.append(el("div", "word-facts", p.summary), el("div", "muted pm-note", p.detail));
+    if (p.loadingBudget) s.append(el("div", "muted pm-note", p.loadingBudget));
+  }
   const details = el("details"), summary = el("summary", "muted pm-note", T("what is counted"));
   details.open = M.open.has("cost:" + id);
   details.ontoggle = () => { if (details.open) M.open.add("cost:" + id); else M.open.delete("cost:" + id); };
@@ -950,7 +956,7 @@ export function hintList() {
 // exportOf opens the export of list id; from is where esc goes back to: "plans" (this
 // page) or "editor" (the plan editor's e).
 export async function exportOf(id, from = "plans") {
-  X.id = id; X.from = from;
+  X.id = id; X.from = from; X.settings = false;
   S.planExport = { id, from };
   return exportPage();
 }
@@ -958,12 +964,16 @@ export async function exportOf(id, from = "plans") {
 export const exportPlan = () => X.id;
 export const exportFrom = () => X.from;
 
+// FRIEND: the export formats for a friend (16 §2.17): a RimArcho list and the share code.
+const FRIEND = ["archo", "rimcrow"];
+const shownFormats = () => [...X.data.formats.filter((f) => FRIEND.includes(f.id)), ...X.data.formats.filter((f) => !FRIEND.includes(f.id))];
+
 async function exportPage() {
   const read = beginPageRead("plan-export");
   if (!X.format) X.format = await api.Setting(FORMAT_KEY).catch(() => "") || "";
   if (!read.current()) return;
   let d, info;
-  try { [d, info] = await Promise.all([api.PlanExport(X.id, X.format), X.info ? X.info : api.ExchangeInfo()]); } catch (e) { read.fail(e); return; }
+  try { [d, info] = await Promise.all([api.PlanExport(X.id, X.format, !!X.settings), X.info ? X.info : api.ExchangeInfo()]); } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
   X.data = d; X.info = info; X.format = d.format;
   drawExport();
@@ -980,25 +990,37 @@ function drawExport() {
   const w = page("plans pm-export", d.lead, button(T("cancel"), "esc", back));
   const grid = el("div", "pm-x");
   const left = el("section", "card pad");
-  left.append(el("div", "pm-sub", T("format")));
+  // two groups (16 §2.17): for a friend (a RimArcho list, a share code, a pack with the files),
+  // then the formats of other managers and the game; one list, so the arrows go through both
   const list = el("div", "fmts");
-  d.formats.forEach((f, i) => {
+  const friend = (f) => FRIEND.includes(f.id);
+  const fmtButton = (f, i) => {
     const b = el("button", "fmt" + (f.id === d.format ? " on" : ""));
     b.setAttribute("aria-pressed", String(f.id === d.format));
     b.append(el("span", "rd"));
     const nm = el("span", "nm", f.name);
     if (i === 0) nm.append(el("small", "", T("recommended")));
     b.append(nm, el("span", "ext", extOf(f)), el("span", "ds", f.desc));
+    b.dataset.id = f.id;
     b.onclick = () => choose(f.id);
-    list.append(b);
-  });
+    return b;
+  };
+  list.append(el("div", "pm-sub", T("for a friend")));
+  d.formats.forEach((f, i) => { if (friend(f)) list.append(fmtButton(f, i)); });
+  const pack = button(T("a pack, with the Mod files…"), "", () => ui.go("packs"), "link");
+  list.append(pack, el("div", "pm-sub", T("for another manager")));
+  d.formats.forEach((f, i) => { if (!friend(f)) list.append(fmtButton(f, i)); });
   left.append(list);
   area(left, null, () => { const on = left.querySelector(".fmt.on"); if (on) on.focus({ preventScroll: true }); });
 
   const right = el("section", "card pad");
   const h = el("div", "pm-sub");
   h.append(el("span", "", T("content")), el("span", "r word-facts", d.facts));
+  // the file itself is for the curious: folded under "show the file" (16 §2.17)
   const pre = el("pre", "prev", d.text);
+  pre.hidden = !X.showFile;
+  const show = button(X.showFile ? T("hide the file") : T("show the file"), "", () => { X.showFile = !X.showFile; drawExport(); }, "link");
+  show.setAttribute("aria-expanded", String(!!X.showFile));
   const out = el("div", "xc-out");
   const acts = el("div", "acts-row");
   const f = fmtOf();
@@ -1011,7 +1033,17 @@ function drawExport() {
     s.classList.add("primary");
     acts.append(s, button(T("copy"), "", () => copy(out)));
   }
-  right.append(h, pre, acts, out);
+  right.append(h);
+  // a RimArcho list may carry the list's Mod settings (07 §7.3); off by default
+  if (f.id === "archo") {
+    const lb = el("label", "xc-check");
+    const cb = el("input"); cb.type = "checkbox"; cb.checked = !!d.settings;
+    cb.onchange = () => setSettings(cb.checked);
+    const note = d.settings ? Tf("settings of %d mods", d.settingsMods) : T("they choose whether to apply them");
+    lb.append(cb, el("span", "", T("include Mod settings")), el("span", "xc-hint", note));
+    right.append(lb);
+  }
+  right.append(acts, out, show, pre);
   area(right, null);
   grid.append(left, right);
   w.append(grid);
@@ -1019,13 +1051,22 @@ function drawExport() {
   ui.renderHints();
 }
 
+async function setSettings(on) {
+  X.settings = on;
+  let d;
+  try { d = await api.PlanExport(X.id, X.format, on); } catch (e) { return say("fail", errText(e)); }
+  if (S.screen !== "plan-export" || X.settings !== on) return;
+  X.data = d;
+  drawExport();
+}
+
 async function choose(id) {
   if (id === X.format) return;
   X.format = id;
-  document.querySelectorAll("#screen .fmt").forEach((b, i) => { const on = X.data.formats[i].id === id; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
+  document.querySelectorAll("#screen .fmt").forEach((b) => { const on = b.dataset.id === id; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
   api.SetSetting(FORMAT_KEY, id).catch(() => {});
   let d;
-  try { d = await api.PlanExport(X.id, id); } catch (e) { return say("fail", errText(e)); }
+  try { d = await api.PlanExport(X.id, id, !!X.settings); } catch (e) { return say("fail", errText(e)); }
   if (S.screen !== "plan-export" || X.format !== id) return;
   X.data = d;
   drawExport();
@@ -1044,7 +1085,7 @@ function result(out, ok, text, paths = []) { pathContent(out, text, paths); out.
 async function save(out) {
   const f = fmtOf();
   const write = async (path, overwrite) => {
-    try { result(out, true, await api.PlanExportSave(X.id, f.id, path, overwrite), [path]); } catch (e) { result(out, false, errText(e)); }
+    try { result(out, true, await api.PlanExportSave(X.id, f.id, path, overwrite, !!X.settings), [path]); } catch (e) { result(out, false, errText(e)); }
   };
   if (X.info && X.info.dialogs) {
     let path = "";
@@ -1058,9 +1099,9 @@ async function save(out) {
 
 async function copy(out) {
   let c;
-  try { c = await api.PlanExportCopy(X.id, X.format); } catch (e) { return result(out, false, errText(e)); }
+  try { c = await api.PlanExportCopy(X.id, X.format, !!X.settings); } catch (e) { return result(out, false, errText(e)); }
   let ok = c.copied;
-  if (!ok && navigator.clipboard) { try { await navigator.clipboard.writeText(c.text); ok = true; } catch { /* shown below */ } }
+  if (!ok) ok = await copyText(c.text);
   if (ok) return result(out, true, c.line);
   out.className = "xc-out";
   out.textContent = T("copy it from here:");
@@ -1075,7 +1116,7 @@ function exportKey(e) {
   if (!X.data) return;
   if (k === "ArrowDown" || k === "ArrowUp" || k === "j" || k === "k") {
     e.preventDefault();
-    const fs = X.data.formats;
+    const fs = shownFormats(); // in the order the two groups show them
     const i = fs.findIndex((f) => f.id === X.format); // the one picked, before its text is in
     const j = Math.max(0, Math.min(fs.length - 1, i + (k === "ArrowDown" || k === "j" ? 1 : -1)));
     return choose(fs[j].id);

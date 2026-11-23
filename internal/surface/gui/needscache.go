@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -5,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -34,35 +37,74 @@ func fileNeedsStamp(path string) string {
 	return fmt.Sprintf("%s:%d:%d", path, f.Size(), f.ModTime().UnixNano())
 }
 func (s *API) needsKeyLocked() (scope, key, index, list string) {
+	return s.needsKeyOfLocked(nil)
+}
+
+// needsKeyOfLocked is needsKeyLocked with the game links already read, or nil to read
+// them now.
+func (s *API) needsKeyOfLocked(read []*app.GameLink) (scope, key, index, list string) {
 	st, _ := s.a.Loadout()
 	if st == nil {
 		return
 	}
-	scope = fmt.Sprintf("%s|%d|%s|%s", st.Ix.Env.ID, st.Plan.ID, st.GameMM(), view.Lang())
+	scope = s.needsScopeLocked()
 	index = s.a.Store.IndexKey()
 	list = app.ListFingerprint(st.List)
 	cur, prev := s.a.LogPaths(st)
 	// Links are outside SQLite. Probe them even on a hit; a removed junction target
 	// must not hide behind a scan or database version.
-	links, err := s.a.InspectGameLinks()
+	links, err := read, error(nil)
+	if links == nil {
+		links, err = s.a.InspectGameLinks()
+	}
 	b, _ := json.Marshal(links)
 	lh := sha256.Sum256(b)
 	dirs, _ := s.a.ManagedDirectories()
 	db, _ := json.Marshal(dirs)
 	dh := sha256.Sum256(db)
+	// The save Can it run checks (12 §4.8): a chosen colony's newest save changes when a
+	// save is written into its folder; the choice itself is in the store's change key.
+	if cs := s.a.SaveChoiceStamp(st.Ix.Env.ID); cs != "" {
+		dh = sha256.Sum256([]byte(string(dh[:]) + cs))
+	}
 	key = fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%x|%v", scope, s.a.Store.ChangeKey(), list, s.a.AnalysisKey(st, ""), fileNeedsStamp(cur), fileNeedsStamp(prev), fileNeedsStamp(s.a.ProblemLog(st)), lh, err) + fmt.Sprintf("|%x", dh)
 	return
 }
+
+// needsScopeLocked is the scope part of needsKeyLocked, which needs no look at the disk.
+func (s *API) needsScopeLocked() string {
+	st, _ := s.a.Loadout()
+	if st == nil {
+		return ""
+	}
+	return fmt.Sprintf("%s|%d|%s|%s", st.Ix.Env.ID, st.Plan.ID, st.GameMM(), view.Lang())
+}
+
 func (s *API) cachedNeedsLocked() (*needsSnapshot, string) {
 	scope, key, _, _ := s.needsKeyLocked()
 	return s.needsCache[scope], key
 }
 func (s *API) saveNeedsLocked(ps *app.ProblemSet, n *view.Needs, eager bool) *needsSnapshot {
+	return s.saveNeedsOfLocked(ps, n, eager, false)
+}
+
+// saveFreshNeedsLocked is saveNeedsLocked for a ProblemSet that Problems has just read: its
+// game links are the ones the key describes, so they are not read a third time (one look
+// takes 0.1-0.25 s with a few hundred links, and the launch page saves at every start).
+func (s *API) saveFreshNeedsLocked(ps *app.ProblemSet, n *view.Needs, eager bool) *needsSnapshot {
+	return s.saveNeedsOfLocked(ps, n, eager, true)
+}
+
+func (s *API) saveNeedsOfLocked(ps *app.ProblemSet, n *view.Needs, eager, fresh bool) *needsSnapshot {
 	if ps == nil {
 		return nil
 	}
 	*n = *view.RebindNeedsLinks(s.a, n, ps.GameLinks)
-	scope, key, index, list := s.needsKeyLocked()
+	var read []*app.GameLink
+	if fresh && ps.GameLinks != nil {
+		read = ps.GameLinks
+	}
+	scope, key, index, list := s.needsKeyOfLocked(read)
 	if scope == "" {
 		return nil
 	}
@@ -102,9 +144,12 @@ func (s *API) saveNeedsLocked(ps *app.ProblemSet, n *view.Needs, eager bool) *ne
 }
 
 // needsWorkLocked reports whether background work will replace the shown findings: a
-// refresh of the list's problems or a content analysis. Only then is `updating` true
-// (16 §8.7): a cache-only read, a stale or a never-run analysis alone is not work.
-func (s *API) needsWorkLocked() bool { return s.needsRefreshing || s.busy["analyze"] }
+// refresh of the list's problems, a content analysis, or one about to start by itself
+// (analyzeTimer, 16 §8.9). Only then is `updating` true (16 §8.7): a cache-only read, a
+// stale or a never-run analysis alone is not work.
+func (s *API) needsWorkLocked() bool {
+	return s.needsRefreshing || s.busy["analyze"] || s.analyzeTimer != nil
+}
 
 // problemsNowLocked is the summary of n with `updating` as of now.
 func (s *API) problemsNowLocked(n *view.Needs) *view.ListProblems {
@@ -118,7 +163,6 @@ func (s *API) ListProblems() *view.ListProblems {
 	return view.ProblemsOf(s.Needs())
 }
 func (s *API) editProblemsLocked() *view.ListProblems {
-	s.needsWanted = true
 	scope, _, index, list := s.needsKeyLocked()
 	previous := s.needsCache[scope]
 	if previous != nil && previous.index == index {
@@ -151,21 +195,21 @@ func (s *API) refreshNeedsLocked(c *needsSnapshot) {
 	if c == nil || s.needsClosed || s.needsRefreshing || s.tasks == nil {
 		return
 	}
-	if c.eager {
-		if _, key := s.cachedNeedsLocked(); key == c.key {
-			return
-		}
+	_, diskKey := s.cachedNeedsLocked()
+	if c.eager && diskKey == c.key {
+		return
 	}
 	expected := s.inventoryKey()
-	_, diskKey := s.cachedNeedsLocked()
 	r, err := s.readInventorySession()
 	if err != nil {
 		return
 	}
 	s.needsRefreshing = true
 	s.needsJobs.Add(1)
+	s.needsActive.Add(1)
 	go func() {
 		defer s.needsJobs.Done()
+		defer s.needsActive.Add(-1)
 		defer r.Close()
 		r.LazyLog, r.LogCacheOnly = false, false
 		ps, err := r.Problems(false, nil)
@@ -189,10 +233,8 @@ func (s *API) refreshNeedsLocked(c *needsSnapshot) {
 		}
 		var event *view.ListProblems
 		if n != nil {
-			s.saveNeedsLocked(ps, n, true)
-			if s.needsWanted && (n.Stale || n.Never) && !s.busy["analyze"] {
-				s.startAnalyze()
-			}
+			s.saveFreshNeedsLocked(ps, n, true)
+			s.autoAnalyzeLocked(n, true)
 			event = s.problemsNowLocked(n)
 		} else {
 			copy := *c.n
@@ -208,4 +250,83 @@ func (s *API) refreshNeedsLocked(c *needsSnapshot) {
 		s.mu.Unlock()
 		s.send("list-problems", event)
 	}()
+}
+
+// autoAnalyzeLocked keeps the shown findings current, the automatic part of 16 §8.9:
+// wherever a list's findings are read (Can it run, the editor's problems, Launch) and its
+// files' check is stale or never ran, a check follows by itself. Edits settle first: each
+// call puts the start analyzeSettle later (analyzeSoonLocked), so a run of edits ends in
+// one check of the final list. Entering a page (settle false) starts it at once. s.mu is
+// held; n is what was just read (nil: analyzeSettled reads the state itself).
+func (s *API) autoAnalyzeLocked(n *view.Needs, settle bool) bool {
+	if s.needsClosed || n != nil && (n.Error != "" || !(n.Stale || n.Never)) {
+		return false
+	}
+	d := time.Duration(0)
+	if settle {
+		d = s.analyzeSettle
+		if d == 0 {
+			d = analyzeSettle
+		}
+	}
+	s.analyzeSoonLocked(d)
+	return true
+}
+
+// analyzeSettle: how long after the last edit the automatic check starts.
+const analyzeSettle = 2 * time.Second
+
+// analyzeSoonLocked (re)arms the one pending automatic check d from now; s.mu is held.
+func (s *API) analyzeSoonLocked(d time.Duration) {
+	if s.analyzeTimer != nil {
+		s.analyzeTimer.Stop()
+	}
+	s.analyzeTimer = time.AfterFunc(d, s.analyzeSettled) // not scheduled: an edit settle (16 §8.9), once per edit run
+}
+
+// analyzeSettled starts the automatic check if the open list still needs one. The newest
+// state wins: a check already running is left to end (it writes its result only at the
+// end) and one more follows it for the list as it is then (analyzeAfter). The same inputs
+// (scope and app.AnalysisKey) start by themselves once a session: a check that failed or
+// left them stale waits for check again, so nothing loops.
+func (s *API) analyzeSettled() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.analyzeTimer = nil
+	if s.needsClosed {
+		return
+	}
+	if s.busy["analyze"] {
+		s.analyzeAfter = true
+		return
+	}
+	started := false
+	defer func() {
+		// not needed after all: the findings shown as updating are the current ones
+		if !started && !s.needsWorkLocked() {
+			if c, _ := s.cachedNeedsLocked(); c != nil {
+				ev := s.problemsNowLocked(c.n)
+				go s.send("list-problems", ev)
+			}
+		}
+	}()
+	st, err := s.a.Loadout()
+	if err != nil || st == nil {
+		return
+	}
+	if as, err := s.a.Analysis(st); err != nil || as.Run != nil && as.Fresh {
+		return
+	}
+	key := s.needsScopeLocked() + "|" + s.a.AnalysisKey(st, "")
+	if s.autoAnalyzed[key] || key == s.analyzedKey {
+		return
+	}
+	if !s.startAnalyze() {
+		return
+	}
+	started = true
+	if s.autoAnalyzed == nil {
+		s.autoAnalyzed = map[string]bool{}
+	}
+	s.autoAnalyzed[key] = true
 }

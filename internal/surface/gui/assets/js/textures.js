@@ -6,6 +6,7 @@ import { choiceControl } from "./choices.js";
 // Reading every PNG takes a while, so the page opens with only the encoder and the mods:
 // count the textures reads them, and changing a choice never does (the last count stays, marked old).
 import { progress } from "./feedbacksemantics.js";
+import { shrinkBar } from "./membar.js";
 import { pathContent } from "./fields.js";
 import { factText, S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { beginPageRead, pageLoading, page, button } from "./screens.js";
@@ -200,11 +201,14 @@ function draw(measurements = false) {
   setRow(est, T("scale"), T("scaling shrinks them further; never below 128 px, masks stay full size"),
     select("scale", I.scales, I.labels, X.scale, (v) => { X.scale = Number(v); draw(); }));
   const facts = [...(p?.estFacts || [])];
+  // video memory before and after as a bar named by its sentence (V7), not a second line
+  const vram = p?.vram && !p.loading && facts.length > 1 ? (facts.splice(1, 1), p.vram) : null;
   if (p?.upToDate) facts.push(Tf("%d up to date", p.upToDate));
   if (p?.leftAlone) facts.push(Tf("%d left alone (a DDS of the mod's own, or another format of the same name)", p.leftAlone));
   const estimate = slot(setRow(est, T("convert"), p && !p.loading ? facts : null, p?.loading ? pending() : null), "estimate");
   estimate.hidden = !p;
-  setRow(est, "", T("the PNGs stay; RimArcho writes a .dds next to each and can take them all back"));
+  if (vram) estimate.querySelector(".l").append(shrinkBar(vram));
+  setRow(est, "", T("You can undo it: the PNGs stay.")).title = T("the PNGs stay; RimArcho writes a .dds next to each and can take them all back");
   w.append(est);
   w.append(slot(foot(I, p), "foot"));
 
@@ -297,7 +301,7 @@ function foot(I, p) {
   }
   let note = "";
   if (!X.loading) {
-    if (!p) note = T("not counted yet: “count the textures” reads every PNG to show what is there and what converting saves");
+    if (!p) note = T("Count first to see what converting saves.");
     else if (X.old) note = T("the textures changed since this count; “count the textures” counts again");
     else if (!counted()) note = T("the choices changed since this count; “count the textures” counts again");
   }
@@ -314,7 +318,7 @@ function foot(I, p) {
 
 function convert() {
   const lines = counted() ? [...(X.page.estFacts || [])] : [T("not counted yet: only new or changed PNGs are converted, those already done are skipped")];
-  lines.push(T("the PNGs stay; RimArcho writes a .dds next to each and can take them all back"));
+  lines.push(T("You can undo it: the PNGs stay."));
   pop.confirm(T("convert textures to DDS"), lines, T("convert"), async () => {
     X.ended = false;
     let text;

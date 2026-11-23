@@ -1,6 +1,6 @@
 # 01 · Scope and status
 
-> Status: 1.0.0 was released on 2026-11-02, 1.0.5 and 1.0.6 on 2026-11-07, 1.0.7 and 1.0.8 on 2026-11-08, 1.0.9 on 2026-11-10 (`CHANGELOG.md`). What each version includes and excludes, and what is still open.
+> Status: 1.0.0 was released on 2026-11-02, 1.0.5 and 1.0.6 on 2026-11-07, 1.0.7 and 1.0.8 on 2026-11-08, 1.0.9 on 2026-11-10, 1.1.0 on 2026-11-23 (`CHANGELOG.md`). What each version includes and excludes, and what is still open.
 > Basis: 00 (positioning, three questions, principles), 00a (architecture). Each feature's own specification governs its details.
 
 ## 1. Version scope
@@ -73,8 +73,10 @@ Listed by who can do what; status refers to the current code.
 ### 4.1 Open work
 
 - **1.1**: extracting the Defs a save references and mapping them back to the Mods that provide them (12 §1.4, §1.5); the content catalog (12 §2, draft); unused content and its page (12 §3, 16 §2.11); built-in Archo (15). Later versions: §1.
+- **Environments sharing a game installation** (03 §6, decided 2026-11-11): four phases, each ending green. 1) **Implemented:** split the store into game installation and environment, keeping IDs, with no visible change for existing players. 2) **Implemented at CLI/MCP/core level:** several environments per installation: add with copy or empty, same-installation switch without scan or link work, run and log attribution by user data folder, SteamCMD handoff per user data folder, test-run journals and compatible pack visibility. 3) **Implemented:** Game Config terminology, flat switchers, per-config creation/settings/removal, and RimCrow profile import. Legacy aliases have a one-time same-folder notice only (03 §6.5). 4) VM: where Player.log goes with `-savedatafolder` on 1.6 and 1.7, launches of two environments of one game, packs, test runs, the upgrade. Estimate and test list: research 2026-11-11_environments-share-a-game §9.
 - **Defects not yet fixed**: those found in the 1.0.1 VM round are listed under "Open items" in research 2026-11-05_release-1.0.1-vm-round. One needs a decision: a test run compares with the newest Player.log even when that log came from an unrelated, older list (20 §2); either compare only with a log of the same plan, or say how old the log is.
-- Work not yet decided is tracked in `ToDo.md` and docs/research/, not here.
+- **Operation log, the rest of the writes** (13 §1.3): Mod settings writes, resets and copies; packs (build, update, remove, import); the lock library (move, lock, rename, unhide); environments, folders and plan removal; game and tool downloads, texture optimisation; Workshop subscribe; `config set` for keys that change files or network behaviour (keys only, never secrets).
+- Work not yet decided is tracked on the workspace ToDo board (`../todo-board/board.json`, project `rimarcho`; `ToDo.md` points there) and in docs/research/, not here.
 
 ### 4.2 Implemented, not yet validated
 
@@ -89,7 +91,7 @@ Validated by the player on 2026-11-10 and removed from this table: SteamCMD game
 | TUI | Use the editor, Mod library and change history keys in a real terminal (Windows Terminal) | Player or agent |
 | Cold-cache scan | Measure the first scan after a reboot; target ≤ 60 seconds | Player after reboot |
 | Missing WebView2 | Double-click `RimArcho.exe` in a VM without WebView2 | Player or VM |
-| Pack Player.log location | Where the game writes its log when launched with `-savedatafolder` (10 §3) | Player enters game |
+| Pack Player.log location | Verify explicit log redirection and previous-log rotation (03 §6.3, 10 §3), including Waylith ignoring `-logfile` | Player enters game |
 | Real community data download | `archo data update` against the real sources (about 50 MB) | Player |
 | DDS textures | Optimized textures and slimmed packs look right in the game, in 1.6 and 1.7 (10 §2; research dds-texture-optimization §6) | Player enters game |
 | GUI accessibility | Narrator; the A13 branches that need real files, the network or a launch; A17 on the remaining pages (16 §11) | Player or agent |

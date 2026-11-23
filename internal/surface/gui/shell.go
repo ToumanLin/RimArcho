@@ -1,6 +1,9 @@
+//go:build windows || cgo
+
 package gui
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -8,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/perftrace"
@@ -130,6 +134,17 @@ func (s *API) shellLocked(n *view.Needs) *Shell {
 
 // Home is the home page (16 §2.3).
 func (s *API) Home() *view.Home {
+	v, _ := join(&s.flight, "Home", func() (*view.Home, error) { return s.homeRead(), nil })
+	if v != nil && v.Error == "" {
+		// Launch's warnings come from the stored check: keep it current (16 §8.9)
+		s.mu.Lock()
+		s.autoAnalyzeLocked(nil, false)
+		s.mu.Unlock()
+	}
+	return v
+}
+
+func (s *API) homeRead() *view.Home {
 	defer perftrace.Span("Home")()
 	s.logRead.mu.Lock()
 	defer s.logRead.mu.Unlock()
@@ -155,8 +170,14 @@ func (s *API) Home() *view.Home {
 		return &view.Home{Featured: -1, Error: "could not read the current list"}
 	}
 	// The last run's line reads Player.log when it is newer than the one read last (06
-	// §2.3): the page loads, or the window comes back into focus, after a game.
+	// §2.3): the page loads, or the window comes back into focus, after a game. It reads it
+	// again when the stored report no longer matches (a later analysis, a Mod change, a new
+	// build): otherwise the line said "not checked yet" until Can it run was opened (VM
+	// 2026-11-22).
 	_, newer := r.NewLog(st)
+	if !newer {
+		newer = logReportMissing(r, st)
+	}
 	if !newer {
 		release, err := r.Store.ReadSnapshot()
 		if err != nil {
@@ -184,6 +205,21 @@ func (s *API) Home() *view.Home {
 	view.AddOtherEnvs(r, h, st.Ix.Env.ID)
 	view.PickFeatured(h, r.Store.Meta(view.FeaturedKey), st.Ix.Env.Name, st.Plan.ID)
 	return h
+}
+
+// logReportMissing: the current list's problem log has no stored report for the present
+// analysis and Mods, so a cache-only read leaves the last run pending.
+func logReportMissing(r *app.App, st *app.LoadoutState) bool {
+	path := r.ProblemLog(st)
+	if path == "" || !fileExists(path) {
+		// Player.log is gone (deleted, or the selected one was): Can it run reads
+		// Player-prev.log instead (06 §4), and so does the last game line (VM 2026-11-23:
+		// it showed nothing).
+		cur, prev := r.LogPaths(st)
+		return cur == "" && prev != ""
+	}
+	_, err := r.CachedLog(path)
+	return errors.Is(err, app.ErrLogNotCached)
 }
 
 // ---- plans (07 §1.3, 16 §2.5) ----
@@ -484,7 +520,28 @@ func scanLine(out string) string {
 
 // PackImport unpacks a pack file (.archopack) into the packs folder (pack import, 08
 // §5.4). A RimArcho list goes through the import preview like any other list.
-func (s *API) PackImport(path string) (string, error) {
+func (s *API) PackImport(path string) (string, error) { return s.packImport(path, false) }
+
+// PackUpdateOffer is what importing a newer revision of a pack the player has would change
+// (10 §4): nil when the file is not one. Asked before the import starts.
+func (s *API) PackUpdateOffer(path string) (*view.PackUpdateOffer, error) {
+	r, err := s.detachedReader()
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	path = strings.Trim(strings.TrimSpace(path), `"'`)
+	if !app.IsPackZip(path) {
+		return nil, nil
+	}
+	u, err := r.PackUpdateOf(path)
+	if err != nil || u == nil {
+		return nil, nil // the import itself reports what is wrong with the file
+	}
+	return view.PackUpdateOfferOf(u), nil
+}
+
+func (s *API) packImport(path string, update bool) (string, error) {
 	r, err := s.detachedReader()
 	if err != nil {
 		return "", err
@@ -495,7 +552,7 @@ func (s *API) PackImport(path string) (string, error) {
 		return "", errors.New(view.Tf("%s is not a pack (.archopack)", path))
 	}
 	defer s.subRevision.Add(1)
-	m, err := r.ImportPack(path, false)
+	m, err := r.ImportPackWith(path, app.PackImport{Update: update})
 	s.invalidateInventory()
 	if err != nil {
 		return "", errors.New(view.Humanize(nil, err.Error()))
@@ -539,19 +596,15 @@ func (s *API) GuideDownloadInfo() *DownloadInfo {
 	return d
 }
 
-// gamesFolder suggests where a downloaded game goes: <drive>\Games next to the games there
-// are (not inside a Steam library), else the system drive's.
+// gamesFolder suggests where a downloaded game goes: next to the games there are (not
+// inside a Steam library), else the system drive's (app.GamesFolder).
 func gamesFolder(a *app.App) string {
 	envs, _ := a.Store.Envs()
+	roots := make([]string, 0, len(envs))
 	for _, e := range envs {
-		if v := filepath.VolumeName(e.GameRoot); v != "" {
-			return v + `\Games`
-		}
+		roots = append(roots, e.GameRoot)
 	}
-	if v := os.Getenv("SystemDrive"); v != "" {
-		return v + `\Games`
-	}
-	return filepath.Join(os.Getenv("HOME"), "Games")
+	return app.GamesFolder(roots)
 }
 
 // GuideInstallSteamCMD queues the confirmed download and returns its task ID (16 §2.15).
@@ -616,4 +669,105 @@ func (s *API) GuideDownload(branch, dir, account, name string) (bool, error) {
 		s.send("download", end)
 	}()
 	return true, nil
+}
+
+// CopyPlan is what copying a game would do (03 §3.5), for the guide's copy way.
+type CopyPlan struct {
+	Dir      string `json:"dir"`
+	Name     string `json:"name"`
+	Bytes    int64  `json:"bytes"`
+	ModBytes int64  `json:"modBytes"`
+	Free     int64  `json:"free"`
+	Low      bool   `json:"low"` // not enough room for the copy
+}
+
+// GuideCopyPlan checks a copy of the game from into dir (empty: <games folder>\RimWorld
+// <from>-copy) and says how much it copies; nothing is written.
+func (s *API) GuideCopyPlan(from, dir, name string, mods bool) (*CopyPlan, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if strings.TrimSpace(dir) == "" {
+		// the folder follows the name the copy gets: after a first copy "<from>-copy-2", not
+		// the first copy's folder (VM round 2A 2026-11-23)
+		base := name
+		if base == "" {
+			base = s.a.FreeEnvName(from + "-copy")
+		}
+		dir = filepath.Join(gamesFolder(s.a), "RimWorld "+base)
+	}
+	p, err := s.a.PlanGameCopy(app.CopyGameSpec{From: from, Dir: dir, Name: name, Mods: mods})
+	if err != nil {
+		return &CopyPlan{Dir: dir, Name: name, Free: app.DiskFree(dir)}, errors.New(view.Humanize(nil, err.Error()))
+	}
+	return &CopyPlan{Dir: p.Dir, Name: p.Name, Bytes: p.Bytes, ModBytes: p.ModBytes, Free: p.Free, Low: p.Free >= 0 && p.Free < p.Bytes}, nil
+}
+
+// GuideCopy copies the game and returns at once; "copy" events carry the bytes copied and
+// the end (with the environment added). It is a background task the player can stop; a
+// stopped or failed copy leaves nothing (03 §3.5).
+func (s *API) GuideCopy(from, dir, name string, mods, ownSaves bool) (bool, error) {
+	s.mu.Lock()
+	if s.busy["copy"] {
+		s.mu.Unlock()
+		return false, nil
+	}
+	spec := app.CopyGameSpec{From: from, Dir: dir, Name: name, Mods: mods, OwnSaves: ownSaves}
+	if _, err := s.a.PlanGameCopy(spec); err != nil {
+		s.mu.Unlock()
+		return false, errors.New(view.Humanize(nil, err.Error()))
+	}
+	s.busy["copy"] = true
+	s.mu.Unlock()
+	ctx, cancel := context.WithCancel(context.Background())
+	task := s.beginSelf(view.TaskCopyGame, from, func() error { cancel(); return nil })
+	go func() {
+		defer cancel()
+		var r *app.SourceChangeEnv
+		reader, err := s.detachedReader()
+		if reader != nil {
+			defer reader.Close()
+		}
+		if err == nil {
+			last := time.Time{}
+			r, err = reader.CopyGame(ctx, spec, func(p app.CopyGameProgress) {
+				if now := time.Now(); now.Sub(last) >= 100*time.Millisecond || p.Bytes == p.Total {
+					last = now
+					s.tasks.Update(task, func(t *app.Task) {
+						if p.Total > 0 {
+							t.Frac = float64(p.Bytes) / float64(p.Total)
+						}
+					})
+					s.send("copy", p)
+				}
+			})
+		}
+		end := map[string]any{"end": true}
+		s.mu.Lock()
+		if err == nil {
+			err = s.a.Store.SetCurrentEnv(r.Env.ID)
+			s.a.EnvName = r.Env.Name
+		}
+		// GuideScan owns link preparation and the first scan (16 §8.4).
+		s.busy["copy"], s.board, s.needs = false, nil, nil
+		s.mu.Unlock()
+		switch {
+		case errors.Is(err, app.ErrCopyStopped):
+			end["ok"], end["error"] = false, view.T("the copy was stopped")
+			s.tasks.Finish(task, app.TaskStopped, view.T("the copy was stopped"))
+		case err != nil:
+			msg := view.Humanize(nil, err.Error())
+			end["ok"], end["error"] = false, msg
+			s.tasks.Finish(task, app.TaskFailed, msg)
+		default:
+			end["ok"], end["env"] = true, r.Env.Name
+			s.endSelf(task, nil, r.Env.Name)
+		}
+		s.send("copy", end)
+	}()
+	return true, nil
+}
+
+func fileExists(p string) bool {
+	fi, err := os.Stat(p)
+	return err == nil && !fi.IsDir()
 }

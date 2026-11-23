@@ -100,24 +100,39 @@ func (s *Store) SetModsConfigState(envID string, st *ModsConfigState) error {
 // LaunchRecord is one game launch (09 §1): a plan's (PlanID set) or a pack's (method
 // "pack:<name>", no plan).
 type LaunchRecord struct {
-	ID          int64
-	EnvID       string
-	PlanID      int64 // 0 for packs and launches recorded before plans existed
-	Started     time.Time
-	Method      string // steam | direct | pack:<name>
-	Command     string
-	Fingerprint string // the enabled list's fingerprint
-	VersionN    int    // the plan's version v<n> that was launched (0 when unknown)
+	ID           int64
+	EnvID        string
+	GameID       string
+	UserDataRoot string
+	EnvName      string
+	PlanID       int64 // 0 for packs and launches recorded before plans existed
+	Started      time.Time
+	Method       string // steam | direct | pack:<name>
+	Command      string
+	Fingerprint  string // the enabled list's fingerprint
+	VersionN     int    // the plan's version v<n> that was launched (0 when unknown)
 }
 
 // AddLaunchRecord stores a launch and sets its ID.
 func (s *Store) AddLaunchRecord(r *LaunchRecord) error {
+	if r.GameID == "" || r.EnvName == "" {
+		if e, err := s.EnvByID(r.EnvID); err != nil {
+			return err
+		} else if e != nil {
+			if r.GameID == "" {
+				r.GameID = e.GameID
+			}
+			if r.EnvName == "" {
+				r.EnvName = e.Name
+			}
+		}
+	}
 	var plan any
 	if r.PlanID != 0 {
 		plan = r.PlanID
 	}
-	res, err := s.DB.Exec(`INSERT INTO launch(environment_id, started_at, method, command, plan_id, fingerprint, version_n) VALUES(?,?,?,?,?,?,?)`,
-		r.EnvID, r.Started.Unix(), r.Method, r.Command, plan, r.Fingerprint, r.VersionN)
+	res, err := s.DB.Exec(`INSERT INTO launch(environment_id, started_at, method, command, plan_id, fingerprint, version_n, game_id, user_data_root, env_name) VALUES(?,?,?,?,?,?,?,?,?,?)`,
+		r.EnvID, r.Started.Unix(), r.Method, r.Command, plan, r.Fingerprint, r.VersionN, r.GameID, r.UserDataRoot, r.EnvName)
 	if err != nil {
 		return err
 	}
@@ -142,7 +157,7 @@ func (s *Store) Launches(envID string, limit int) ([]*LaunchRecord, error) {
 	if limit <= 0 {
 		limit = -1
 	}
-	rows, err := s.DB.Query(`SELECT id, environment_id, coalesce(plan_id, 0), started_at, method, command, fingerprint, version_n FROM launch
+	rows, err := s.DB.Query(`SELECT id, environment_id, coalesce(plan_id, 0), started_at, method, command, fingerprint, version_n, game_id, user_data_root, env_name FROM launch
 		WHERE environment_id=? ORDER BY started_at DESC, id DESC LIMIT ?`, envID, limit)
 	if err != nil {
 		return nil, err
@@ -152,7 +167,7 @@ func (s *Store) Launches(envID string, limit int) ([]*LaunchRecord, error) {
 	for rows.Next() {
 		var r LaunchRecord
 		var at int64
-		if err := rows.Scan(&r.ID, &r.EnvID, &r.PlanID, &at, &r.Method, &r.Command, &r.Fingerprint, &r.VersionN); err != nil {
+		if err := rows.Scan(&r.ID, &r.EnvID, &r.PlanID, &at, &r.Method, &r.Command, &r.Fingerprint, &r.VersionN, &r.GameID, &r.UserDataRoot, &r.EnvName); err != nil {
 			return nil, err
 		}
 		r.Started = time.Unix(at, 0).UTC()
@@ -179,4 +194,14 @@ func (s *Store) LastPlanLaunch(planID int64) time.Time {
 		return time.Time{}
 	}
 	return time.Unix(t.Int64, 0).UTC()
+}
+
+// Old launches have no trustworthy captured root; leave it unknown on upgrade.
+func upgradeLaunchContext(tx *sql.Tx, report func(done, total int64)) error {
+	_, err := tx.Exec(`ALTER TABLE launch ADD COLUMN game_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE launch ADD COLUMN user_data_root TEXT NOT NULL DEFAULT '';
+ALTER TABLE launch ADD COLUMN env_name TEXT NOT NULL DEFAULT '';
+UPDATE launch SET game_id=coalesce((SELECT game_id FROM environment WHERE id=launch.environment_id),''),
+env_name=coalesce((SELECT name FROM environment WHERE id=launch.environment_id),'');`)
+	return err
 }

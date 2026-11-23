@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -223,6 +225,9 @@ func (s *API) Close() {
 	s.mu.Lock()
 	s.creditClosed = true
 	s.needsClosed = true
+	if s.analyzeTimer != nil {
+		s.analyzeTimer.Stop()
+	}
 	if s.creditCancel != nil {
 		s.creditCancel()
 	}

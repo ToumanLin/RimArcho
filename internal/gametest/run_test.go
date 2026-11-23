@@ -1,6 +1,7 @@
 package gametest
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -61,7 +62,14 @@ func testOptions(t *testing.T, mode string, waylith bool) Options {
 		if _, err := os.Stat(filepath.Join(o.DataDir, "Config", "Knowledge.xml")); !os.IsNotExist(err) {
 			t.Errorf("old knowledge marker not removed: %v", err)
 		}
-		cmd.Env = append(os.Environ(), "RIMARCHO_GAME_HELPER="+mode,
+		hook := filepath.Join(o.RunDir, consoleHookName)
+		if hasHook := slices.Contains(cmd.Environ(), "DOTNET_STARTUP_HOOKS="+hook); hasHook != waylith {
+			t.Errorf("UTF-8 console hook in environment: %t, want %t", hasHook, waylith)
+		}
+		if b, err := os.ReadFile(hook); waylith && (err != nil || !bytes.Equal(b, consoleHook)) {
+			t.Errorf("console hook file: %v", err)
+		}
+		cmd.Env = append(cmd.Environ(), "RIMARCHO_GAME_HELPER="+mode,
 			"RIMARCHO_HELPER_DATA="+o.DataDir, "RIMARCHO_HELPER_LOG="+filepath.Join(o.RunDir, "Player.log"),
 			fmt.Sprintf("RIMARCHO_HELPER_WAYLITH=%t", waylith))
 		cmd.Path = testExe
@@ -283,6 +291,9 @@ func TestRunTimeoutLastLine(t *testing.T) {
 }
 
 func TestRunProbe(t *testing.T) {
+	if raceBuild {
+		t.Skip("the helper child exits 1 instead of its own code in a race build (open, 17 §4 \"Concurrency\")")
+	}
 	for _, tc := range []struct {
 		mode    string
 		waylith bool
@@ -343,6 +354,39 @@ func TestProbeLine(t *testing.T) {
 		if _, ok := ProbeLine(line); ok {
 			t.Errorf("%q read as a probe line", line)
 		}
+	}
+}
+
+// Invalid options return no result and start nothing.
+func TestRunRejectsInvalidOptions(t *testing.T) {
+	for name, tc := range map[string]struct {
+		edit func(*Options)
+		want string
+	}{
+		"negative timeout":  {func(o *Options) { o.Timeout = -1 }, "must not be negative"},
+		"negative settle":   {func(o *Options) { o.Settle = -1 }, "must not be negative"},
+		"negative quiet":    {func(o *Options) { o.MapQuiet = -1 }, "must not be negative"},
+		"negative ticks":    {func(o *Options) { o.Ticks = -1 }, "must not be negative"},
+		"save with probe":   {func(o *Options) { o.Save, o.Probe = "x.rws", true }, "not a test map"},
+		"ticks with probe":  {func(o *Options) { o.Ticks, o.Probe = 10, true }, "not after ticks"},
+		"managed logfile":   {func(o *Options) { o.ExtraArgs = []string{"/LogFile=x"} }, "managed option"},
+		"managed quicktest": {func(o *Options) { o.ExtraArgs = []string{"--quicktest"} }, "managed option"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			o := testOptions(t, "idle", false)
+			o.Start = func(*exec.Cmd) error { t.Fatal("started"); return nil }
+			tc.edit(&o)
+			r, err := Run(context.Background(), o)
+			if r != nil || err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("result %+v, error %v, want %q", r, err, tc.want)
+			}
+		})
+	}
+	o := testOptions(t, "idle", false)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if r, err := Run(ctx, o); r != nil || !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled before start: %+v, %v", r, err)
 	}
 }
 

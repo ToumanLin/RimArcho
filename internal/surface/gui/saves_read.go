@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -31,6 +33,10 @@ func (s *API) savePlay(r *app.App, sv *app.Save, d *view.SaveDetail, asked uint6
 	f, err := s.factsOf(r, sv)
 	if err != nil {
 		d.PlayNote = view.Humanize(nil, err.Error())
+		return
+	}
+	if f == nil && sv.Head == nil && sv.HeadErr != "" { // its start could not be read: neither can the rest
+		d.PlayNote = view.Tf("the save could not be read: %s", view.Humanize(nil, sv.HeadErr))
 		return
 	}
 	if f == nil {
@@ -207,6 +213,9 @@ func (s *API) startSavesIndex(l *app.SaveList, first string, visit uint64) {
 				// "n/m" makes the status line a progress bar (16 §11 A11)
 				text := view.Tf("reading the saves %d/%d  %s", done, total, name)
 				s.tasks.Update(task, func(t *app.Task) { t.Phase, t.Done, t.Total = text, done, total })
+				st.mu.Lock()
+				st.lineRead, st.lineTotal = done, total
+				st.mu.Unlock()
 				s.savesNews([]string{ref}, text, false)
 			}
 		}
@@ -245,7 +254,11 @@ func (s *API) startSavesIndex(l *app.SaveList, first string, visit uint64) {
 			ev.Text = view.Tf("read %d saves; %d could not be read: %s", read-failed, failed, why)
 			s.endSelf(task, nil, ev.Text)
 		default:
-			ev.Text = view.Tf("read %d saves", read)
+			if read == 1 {
+				ev.Text = view.T("read 1 save")
+			} else {
+				ev.Text = view.Tf("read %d saves", read)
+			}
 			s.endSelf(task, nil, ev.Text)
 		}
 		s.savesFlush(ev)
@@ -323,8 +336,12 @@ func (s *API) savesFlush(end *SavesReadEvent) {
 		ev = &SavesReadEvent{}
 	}
 	ev.Refs, ev.Line, st.fresh, st.line = st.fresh, st.line, nil, ""
+	if ev.Line != "" {
+		ev.Read, ev.Total = st.lineRead, st.lineTotal
+	}
 	if end != nil {
-		ev.Line = ""
+		ev.Line, ev.Read, ev.Total = "", 0, 0
+		st.lineRead, st.lineTotal = 0, 0
 	}
 	relist := st.dirty && (end != nil || time.Since(st.listed) >= savesListEvery)
 	onPage, closed := st.list != nil, st.closed
@@ -344,7 +361,7 @@ func (s *API) savesFlush(end *SavesReadEvent) {
 	}
 	st.mu.Lock()
 	if ticket < st.lastSent { // a newer event went first: this line is old news
-		ev.Line = ""
+		ev.Line, ev.Read, ev.Total = "", 0, 0
 	} else {
 		st.lastSent = ticket
 	}

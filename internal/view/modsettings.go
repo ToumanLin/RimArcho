@@ -94,6 +94,9 @@ type ModSettingsDetail struct {
 	Editable bool         `json:"editable"`
 	Values   []SettingRow `json:"values"`
 	Notes    []string     `json:"notes"`
+	// About is how the values work (a missing value is at its default; edits wait for the
+	// game to close): the GUI keeps it behind an ⓘ (16 §2.9).
+	About []string `json:"about,omitempty"`
 	// Window is what the game's settings window drew when the player last opened it (Archo
 	// Monitor, 19 §2); nil when never seen.
 	Window *SettingsWindowView `json:"window,omitempty"`
@@ -101,8 +104,12 @@ type ModSettingsDetail struct {
 
 // SettingsWindowView is a settings window as Archo Monitor saw it.
 type SettingsWindowView struct {
-	Seen     string      `json:"seen"` // the date it was seen
-	Full     bool        `json:"full"` // false: the window drew more than Monitor keeps
+	Seen string `json:"seen"` // the date it was seen
+	Full bool   `json:"full"` // false: the window drew more than Monitor keeps
+	// Older: the file differs from the file as the window opened (a value changed in that
+	// opening or here; app.ModSettingsFile.WindowOutdated), so the window's values may be
+	// out of date.
+	Older    bool        `json:"older"`
 	Controls []WindowRow `json:"controls"`
 }
 
@@ -157,6 +164,7 @@ func ModSettingsFileDetail(sm *app.ModSettingsMod, class string) *ModSettingsDet
 	}
 	if f.Window != nil {
 		d.Window = windowView(f.Window)
+		d.Window.Older = f.WindowOutdated()
 	}
 	if !f.Exists {
 		d.Notes = []string{T("no file yet: the Mod uses its defaults until its settings are changed in the game")}
@@ -178,7 +186,7 @@ func ModSettingsFileDetail(sm *app.ModSettingsMod, class string) *ModSettingsDet
 	if len(sc.Values) == 0 {
 		d.Notes = append(d.Notes, T("the file stores no value: every value is at its default"))
 	} else {
-		d.Notes = append(d.Notes, T("a value missing from the file is at its default"))
+		d.About = append(d.About, T("a value missing from the file is at its default"))
 	}
 	if !sc.Simple {
 		d.Notes = append(d.Notes, T("lists, dictionaries and nested values are shown as counts"))
@@ -186,7 +194,7 @@ func ModSettingsFileDetail(sm *app.ModSettingsMod, class string) *ModSettingsDet
 	if d.Window != nil {
 		d.Notes = append(d.Notes, T("the window part shows the game's window as it was when you last opened it"))
 	}
-	d.Notes = append(d.Notes, T("on/off, numbers and text change here while the game is closed; the file is backed up first"))
+	d.About = append(d.About, T("on/off, numbers and text change here while the game is closed; the file is backed up first"))
 	return d
 }
 
@@ -219,8 +227,8 @@ func hugsLibDetail(d *ModSettingsDetail, f *app.ModSettingsFile) {
 	case len(sc.Values) == 0:
 		d.Notes = append(d.Notes, T("HugsLib stores no value of this Mod: every value is at its default"))
 	default:
-		d.Notes = append(d.Notes, T("a value missing from the file is at its default"),
-			T("with Archo Monitor, the game's next start adds every setting's title and default"))
+		d.About = append(d.About, T("a value missing from the file is at its default"))
+		d.Notes = append(d.Notes, T("with Archo Monitor, the game's next start adds every setting's title and default"))
 	}
 	if hidden > 0 {
 		d.Notes = append(d.Notes, Tf("%d settings the Mod keeps out of its window are not shown", hidden))
@@ -251,6 +259,8 @@ func SettingErrorText(e *app.SettingInputError) string {
 		return T("the Mod has no settings file yet: change a setting in the game once")
 	case "running":
 		return T("the game is running: close it first, or change the value in the game")
+	case "defaults":
+		return T("the Mod has no settings file: it already uses its defaults")
 	}
 	return e.Error()
 }
@@ -277,6 +287,12 @@ func windowView(w *app.SeenSettingsWindow) *SettingsWindowView {
 		v.Controls = append(v.Controls, WindowRow{Kind: c.Kind, Label: c.Label, Text: WindowText(c)})
 	}
 	return v
+}
+
+// WindowLabel is a label the game drew without its own trailing colon ("Search:"), for
+// surfaces that add one after it.
+func WindowLabel(s string) string {
+	return strings.TrimRight(strings.TrimSpace(s), ":\uff1a ")
 }
 
 // WindowText is a control's value as shown: on/off, a chosen choice, a slider's value and
@@ -329,4 +345,119 @@ func SettingText(v app.SettingValue) string {
 	default:
 		return Tf("nested, %d fields", v.Items)
 	}
+}
+
+// ConfigFilesPage is the Mod settings page's other views (16 §2.9 "All files"): every file
+// in the Config folder and where it stands.
+type ConfigFilesPage struct {
+	Config string          `json:"config"`
+	Rows   []ConfigFileRow `json:"rows"`
+	Locked string          `json:"locked,omitempty"` // why nothing can move now (a game runs)
+}
+
+// ConfigFileRow is one file of the Config folder.
+type ConfigFileRow struct {
+	Key        string `json:"key"` // the file name: unique in the folder
+	Name       string `json:"name"`
+	Status     string `json:"status"` // app.ConfigFile*
+	State      string `json:"state"`  // Status as shown
+	Mod        string `json:"mod"`    // "—" unknown
+	Instance   string `json:"instance,omitempty"`
+	Bytes      int64  `json:"bytes"`
+	Size       string `json:"size"`
+	Modified   string `json:"modified"`
+	ModifiedAt int64  `json:"modifiedAt"` // Unix seconds, for sorting
+	Recyclable bool   `json:"recyclable"`
+}
+
+// ConfigStatusText is how a file's place reads (16 §2.9).
+func ConfigStatusText(s string) string {
+	switch s {
+	case app.ConfigFileListed:
+		return T("this list")
+	case app.ConfigFileUnlisted:
+		return T("not in this list")
+	case app.ConfigFileOrphan:
+		return T("not installed")
+	}
+	return T("game file")
+}
+
+// ConfigFileRows makes the page's rows from app.ModSettingsFiles.
+func ConfigFileRows(cf *app.ConfigFiles) *ConfigFilesPage {
+	p := &ConfigFilesPage{Config: cf.Config, Rows: []ConfigFileRow{}}
+	for _, f := range cf.Files {
+		mod := f.Mod
+		if mod == "" {
+			mod = "—"
+		}
+		p.Rows = append(p.Rows, ConfigFileRow{Key: f.File, Name: f.File, Status: f.Status, State: ConfigStatusText(f.Status),
+			Mod: mod, Instance: f.Instance, Bytes: f.Size, Size: SizeText(f.Size),
+			Modified: f.Modified.Local().Format("2006-01-02 15:04"), ModifiedAt: f.Modified.Unix(), Recyclable: f.Recyclable()})
+	}
+	return p
+}
+
+// SettingsRecycleText is the status line after files went to the recycle bin.
+func SettingsRecycleText(r *app.SettingsRecycle) string {
+	s := Tf("moved %d settings files to the recycle bin", len(r.Files))
+	if len(r.Files) == 1 {
+		s = Tf("moved %d settings file to the recycle bin", 1)
+	}
+	for _, f := range r.Failed {
+		s += "; " + Tf("%s not moved: %s", f.File, f.Err)
+	}
+	return s
+}
+
+// SettingsCopyView is "copy settings from…"'s preview or result (16 §2.9).
+type SettingsCopyView struct {
+	From    string   `json:"from"`
+	Lines   []string `json:"lines"`
+	Copies  int      `json:"copies"`  // files to copy (new or replacing)
+	Replace int      `json:"replace"` // of them, replacing a file here
+	Message string   `json:"message"`
+}
+
+// SettingsCopyLines describes a SettingsCopyPlan, one line per file.
+func SettingsCopyLines(p *app.SettingsCopyPlan) *SettingsCopyView {
+	v := &SettingsCopyView{From: p.From, Lines: []string{}}
+	failed := 0
+	for _, c := range p.Copies {
+		var note string
+		switch {
+		case c.Err != "":
+			note = Tf("failed: %s", c.Err)
+			failed++
+		case c.Same:
+			note = T("already the same")
+		case c.Replace:
+			note = T("replaces the file here (it goes to the recycle bin first)")
+			v.Copies++
+			v.Replace++
+		default:
+			note = T("new")
+			v.Copies++
+		}
+		v.Lines = append(v.Lines, c.Mod+": "+c.From+" → "+c.To+"  "+note)
+	}
+	if len(p.Copies) == 0 {
+		v.Lines = append(v.Lines, Tf("%s has no settings file for these Mods", p.From))
+	}
+	switch {
+	case p.DryRun && v.Copies == 1:
+		v.Message = Tf("%d file to copy from %s, %d replacing a file here", v.Copies, p.From, v.Replace)
+	case p.DryRun:
+		v.Message = Tf("%d files to copy from %s, %d replacing a file here", v.Copies, p.From, v.Replace)
+	case v.Copies == 1:
+		v.Message = Tf("copied %d settings file from %s", v.Copies, p.From)
+	default:
+		v.Message = Tf("copied %d settings files from %s", v.Copies, p.From)
+	}
+	if !p.DryRun {
+		if failed > 0 {
+			v.Message += "; " + Tf("%d failed", failed)
+		}
+	}
+	return v
 }

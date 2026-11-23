@@ -31,10 +31,19 @@ import (
 // construction, come with their error in at least 25–30% of the matching logs.
 
 // knownFindings adds the corpus findings for the enabled mods.
-func (a *App) knownFindings(active []*store.Mod, activeByPkg, installed map[string][]*store.Mod, add func(*finding.Finding)) {
-	data := known.Get()
+func (a *App) knownFindings(data *known.Data, active []*store.Mod, activeByPkg, installed map[string][]*store.Mod, add func(*finding.Finding)) {
 	if len(data.Prereqs) == 0 && len(data.Combos) == 0 {
 		return
+	}
+	// each corpus evidence says the month of the data it came from (corpusRef)
+	ref, add0 := corpusRef(data), add
+	add = func(f *finding.Finding) {
+		for i := range f.Evidence {
+			if f.Evidence[i].Ref == "log corpus" {
+				f.Evidence[i].Ref = ref
+			}
+		}
+		add0(f)
 	}
 	inst := finding.Inst
 	pkgOf := func(m *store.Mod) string { return strings.TrimSuffix(strings.ToLower(m.PackageID), "_steam") }
@@ -63,11 +72,13 @@ func (a *App) knownFindings(active []*store.Mod, activeByPkg, installed map[stri
 					add(comboFinding(m, nil, c))
 				}
 			default:
-				add(&finding.Finding{Code: "mod.known-error", Severity: finding.Info, Confidence: finding.Likely, Key: c.Templates[0],
+				added := &finding.Finding{Code: "mod.known-error", Severity: finding.Info, Confidence: finding.Likely, Key: c.Templates[0],
 					Subjects: []string{inst(m.ID)},
 					Claim: fmt.Sprintf("%s logs a known error in %.0f%% of the shared logs that enable it: %s",
 						inst(m.ID), 100*c.Rate(), short(c.Templates[0])),
-					Evidence: comboEvidence(c, m, nil)})
+					Evidence: comboEvidence(c, m, nil)}
+				mayBeFixed(added, c.Seen, c.Mods[0])
+				add(added)
 			}
 		}
 	}
@@ -126,7 +137,19 @@ func observedMissing(a *App, m *store.Mod, pr *known.Prereq, cands []*store.Mod)
 		ev = append(ev, finding.Evidence{Source: finding.Community, Ref: "log corpus", Text: t})
 	}
 	f.Evidence = ev
+	mayBeFixed(f, pr.Seen, pr.Mod)
 	return f
+}
+
+// mayBeFixed lowers an entry whose Mod was updated on the Workshop after its last shared log
+// (05 §4.6): information, possible, and the reason in the evidence.
+func mayBeFixed(f *finding.Finding, s known.Seen, pkg string) {
+	if !s.MayBeFixed {
+		return
+	}
+	f.Severity, f.Confidence = finding.Info, finding.Possible
+	f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Community, Ref: "log corpus",
+		Text: fmt.Sprintf("may be fixed: pkg:%s was updated on the Workshop after the last shared log with this error (%s)", pkg, s.LastLog)})
 }
 
 func comboFinding(m, o *store.Mod, c *known.Combo) *finding.Finding {
@@ -149,6 +172,7 @@ func comboFinding(m, o *store.Mod, c *known.Combo) *finding.Finding {
 		f.Suggestions = []string{"archo mod " + inst(m.ID)}
 	}
 	f.Evidence = comboEvidence(c, m, o)
+	mayBeFixed(f, c.Seen, c.Mods[0])
 	return f
 }
 
@@ -235,4 +259,14 @@ func short(s string) string {
 		return string(r[:160]) + "…"
 	}
 	return s
+}
+
+// corpusRef is the evidence Ref of a corpus finding: "log corpus", and the month its data
+// covers up to ("log corpus to 2026-10"), so the interfaces label the chip with the data the
+// finding came from rather than any process-wide choice (16 §2.4).
+func corpusRef(d *known.Data) string {
+	if d == nil || d.Cutoff == "" {
+		return "log corpus"
+	}
+	return "log corpus to " + d.Cutoff
 }

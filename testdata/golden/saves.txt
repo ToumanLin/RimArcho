@@ -62,6 +62,7 @@ sv:<Tundra 2.rws> Tundra 2  [loads, but content will be lost]
   game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
   list: plan:default (saved after a launch of it)
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Tundra 2.rws
+  saves of: env:main
   saved: 2026-10-01 09:30, 573 B
   read: in full
   play: day 1 (2nd of Aprimay, 5500)
@@ -92,6 +93,7 @@ sv:<Tundra 2.rws> Tundra 2  [loads, but content will be lost]
   game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
   list: plan:default (saved after a launch of it)
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Tundra 2.rws
+  saves of: env:main
   saved: 2026-10-01 09:30, 573 B
   read: in full
   play: day 1 (2nd of Aprimay, 5500)
@@ -123,6 +125,7 @@ sv:<Broken.rws> Broken  [will not load cleanly]
   game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
   list: plan:default (saved after a launch of it)
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Broken.rws
+  saves of: env:main
   saved: 2026-10-01 09:50, 425 B
   read: stopped at line 11, byte 425: the file ends inside a tag (the facts below are from before that point)
   play: day 1 (2nd of Aprimay, 5500)
@@ -143,6 +146,7 @@ sv:<Ashfall#§#Landing.rws> Landing  [loads with the list]
   game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
   list: plan:default (same Mods as one of its versions)
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Ashfall#§#Landing.rws
+  saves of: env:main
   saved: 2026-10-01 07:00, 487 B
   read: in full
   play: day 1 (2nd of Aprimay, 5500)
@@ -185,6 +189,7 @@ sv:<Tundra 2.rws> Tundra 2  [loads, but content will be lost]
   game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
   list: plan:default (saved after a launch of it)
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Tundra 2.rws
+  saves of: env:main
   saved: 2026-10-01 09:30, 573 B
   read: in full
   play: day 1 (2nd of Aprimay, 5500)
@@ -233,7 +238,7 @@ next:
 $ archo saves fix Tundra --launch
 sv:<Tundra.rws> Tundra: nothing to fix in plan:default
   launch: started RimWorld via direct with plan:default
-  command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe "-savedatafolder=$ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios"
+  command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe
 
 $ archo saves fix Broken
 sv:<Broken.rws> Broken: nothing to fix in plan:default
@@ -283,7 +288,7 @@ moved to the recycle bin: 1 save, 425 B
 
 $ archo saves show Tundra
 Tundra matches 2 saves; pick one
-  sv:<pack:Tundra.rws>  Tundra/Tundra  $ROOT/ArchoHome/packs/P1/userdata/Saves/Tundra.rws
+  sv:<pack:Tundra.rws>  Tundra/Tundra  $ROOT/LocalAppData/RimArcho/packs/P1/userdata/Saves/Tundra.rws
   sv:<Tundra.rws>  Tundra/Tundra  $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Tundra.rws
 next:
   archo saves show sv:<pack:Tundra.rws>
@@ -292,9 +297,9 @@ next:
 
 $ archo saves list --colony Tundra
 saves: 4 saves in 2 colonies (colony Tundra)
-  Tundra  1 save, latest 2026-10-01 09:55
+  Tundra  1 save, latest 2026-10-01 09:55  [saves of pack P1]
     sv:<pack:Tundra.rws>  Tundra      2026-10-01 09:55  meta only  pack P1                   loads, but content will be lost
-  Tundra  3 saves, latest 2026-10-01 09:40
+  Tundra  3 saves, latest 2026-10-01 09:40  [saves of env:main]
     sv:<Autosave-1.rws>  Autosave-1  2026-10-01 09:40  meta only  plan:default (launch)     loads, but content will be lost
     sv:<Tundra 2.rws>  Tundra 2    2026-10-01 09:30  day 1      plan:default (launch)     loads, but content will be lost
     sv:<Tundra.rws>  Tundra      2026-10-01 08:00  meta only  plan:default (same-mods)  loads with the list
@@ -303,13 +308,13 @@ next:
   archo saves show sv:<pack:Tundra.rws>
 
 $ archo saves fix sv:<pack:Tundra.rws>
-error: Tundra is a save of pack P1; a pack's list does not change (loadout import $ROOT/ArchoHome/packs/P1/userdata/Saves/Tundra.rws --new makes a list from it)
+error: Tundra is a save of pack P1; a pack's list does not change (loadout import $ROOT/LocalAppData/RimArcho/packs/P1/userdata/Saves/Tundra.rws --new makes a list from it)
 [exit 1]
 
 $ archo saves list
 saves: 1 save in 1 colony (env:old)
-  Outpost  1 save, latest 2026-10-01 06:00  [matches no list]
-    sv:<Outpost.rws>  Outpost  2026-10-01 06:00  meta only  no list  loads, but content will be lost
+  Outpost  1 save, latest 2026-10-01 06:00
+    sv:<Outpost.rws>  Outpost  2026-10-01 06:00  meta only  plan:old (same-mods)  loads, but content will be lost
   note: 1 save is meta only: only the head is read, so no in-game day yet; archo saves index reads them in full
 next:
   archo saves show sv:<Outpost.rws>
@@ -318,21 +323,16 @@ $ archo saves show Outpost
 sv:<Outpost.rws> Outpost  [loads, but content will be lost]
   colony: Outpost (1 save)
   game: 1.6.4633 rev1261, env:old runs 1.5.4409 rev1118
-  list: none (matches no list or pack)
+  list: plan:old (same Mods as one of its versions)
   file: $ROOT/ArchoHome/userdata/old/Saves/Outpost.rws
+  saves of: env:old (Steam Cloud does not sync this folder)
   saved: 2026-10-01 06:00, 385 B
   read: in full
   play: day 1 (2nd of Aprimay, 5500)
     colonists: unknown: no player faction found in the save
-  can it load: 2 items
+  can it load: 1 item
     warning game-version  1.6.4633 rev1261 → 1.5.4409 rev1118
       consequence: the game converts it on load
-    info no-list
-      consequence: nothing to compare its Mods with
-      fix: Make a list from this save (archo loadout import $ROOT/ArchoHome/userdata/old/Saves/Outpost.rws --new Outpost)
-  quick fix: Make a list from this save (archo loadout import $ROOT/ArchoHome/userdata/old/Saves/Outpost.rws --new Outpost)
-  mods: 1 Mod in the save
+  mods: 1 Mod in the save, the same as the list
     (the whole list: archo saves show sv:<Outpost.rws> --mods)
-next:
-  archo loadout import $ROOT/ArchoHome/userdata/old/Saves/Outpost.rws --new Outpost
 

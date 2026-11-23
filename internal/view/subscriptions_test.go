@@ -202,6 +202,60 @@ func TestSubscriptionSourceStates(t *testing.T) {
 	}
 }
 
+// The summary under Updates counts only the sources the page lists (those with Mods): checks
+// of empty sources said "checked 3 sources" while the one listed read "not checked yet".
+func TestSourceSummaryCountsListedSources(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	e.AddWorkshop("1001", testkit.Sample("test.listed", "Listed"))
+	e.AddEnv(true)
+	e.MustRun("scan")
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := view.BuildSubscriptions(e.App, st, modchanges.Opts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stamp := func(key string) {
+		t.Helper()
+		b, _ := json.Marshal(app.SourceCheck{At: e.Now(), Result: "check complete"})
+		if err := e.App.Store.SetMeta(key, string(b)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	listed, empty := "", 0
+	for _, s := range p.Sources {
+		switch {
+		case s.Key == app.LibLocal:
+		case s.Count > 0 && listed == "":
+			listed = s.Key
+		case s.Count == 0:
+			empty++
+			stamp("subscriptions:check:shared:" + s.Key)
+			stamp("subscriptions:check:" + st.Ix.Env.Name + ":" + s.Key)
+		}
+	}
+	if listed == "" || empty == 0 {
+		t.Fatalf("fixture needs a source with Mods and an empty one: %+v", p.Sources)
+	}
+	if p, err = view.BuildSubscriptions(e.App, st, modchanges.Opts{}); err != nil {
+		t.Fatal(err)
+	}
+	if p.Summary.Line != view.T("sources not checked yet") {
+		t.Fatalf("empty sources counted: %q", p.Summary.Line)
+	}
+	stamp("subscriptions:check:shared:" + listed)
+	stamp("subscriptions:check:" + st.Ix.Env.Name + ":" + listed)
+	if p, err = view.BuildSubscriptions(e.App, st, modchanges.Opts{}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(p.Summary.Line, "checked 1 source, ") {
+		t.Fatalf("listed source not counted: %q", p.Summary.Line)
+	}
+}
+
 func TestWorkshopFailureReasonsAndGrouping(t *testing.T) {
 	view.SetLang("zh")
 	defer view.SetLang("en")

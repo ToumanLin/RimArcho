@@ -64,7 +64,7 @@ func identityList(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
-	qs, err := c.App.Store.Questions(ix.Env.ID, a.Bool("all"))
+	qs, err := c.App.Store.Questions(ix.Env.GameID, a.Bool("all"))
 	if err != nil {
 		return nil, err
 	}

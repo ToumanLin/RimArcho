@@ -173,6 +173,10 @@ func TestDependencyRuleMeets(t *testing.T) {
 		}
 		e.MustRun("rule", "add", "replaces", "pkg:tester.new", b, "--note", "continued")
 		checkStandIn(t, e, app.StandInRule)
+		// archo mod says what meets the dependency, as the window's details do (VM 2026-11-10).
+		if out := e.MustRun("mod", "pkg:tester.translation"); !strings.Contains(out, "pkg:tester.old met by ") || !strings.Contains(out, "New (your replaces rule)") {
+			t.Fatalf("archo mod of the translation:\n%s", out)
+		}
 	}
 	e := standInSetup(t)
 	scanNow(t, e)

@@ -20,8 +20,10 @@ The domain/UI distinction follows [03 §1](specs/03-environments-and-sources.md#
 | 共用来源 | shared source |  | A source shared across game environments. |
 | 官方来源 | official source | official | The game's Data directory containing Core and DLC. |
 | 后补订阅 | subscribe after downloading |  | Download with SteamCMD now, subscribe through Steam later to credit authors (11 §1); distinguish subscribing from downloading. |
-| 环境 | environment | game | An Environment owns one game directory and its save configuration. |
-| 环境来源 | environment source |  | An official or local source belonging to one environment. |
+| 游戏配置 | environment | Game Config | A play context selecting a game installation, user data directory and current plan; Japanese UI: ゲーム構成. The interface says Game Config everywhere (the sidebar, Launch's 01 column, the switcher, Saves, Mod settings); its page explains it in one line. Not game: the player decided to keep the name (2026-11-19, D2 reversed). |
+| 游戏本体 | game installation | internal only | One physical installed game; not a player-facing layer. |
+| 游戏目录 | game folder | | The installation directory; Japanese: ゲームフォルダー. |
+| 环境来源 | environment source |  | An official or local source belonging to one game installation. |
 | 快照 | snapshot |  | Metadata and content fingerprints from one scan of an instance. |
 | 来源 | source | mod folders; source | A registered Mod root directory; filters use its source role. |
 | 来源重新绑定 | source rebinding |  | Change the root path while preserving source identity. |
@@ -30,7 +32,7 @@ The domain/UI distinction follows [03 §1](specs/03-environments-and-sources.md#
 | 内容集合 | content set |  | Identical effective content may share one stored fact set. |
 | 内容指纹 | content fingerprint |  |  |
 | 谱系 | lineage | copies of the same mod | A Lineage groups versions and copies of the same Mod. |
-| 扫描 | scan |  |  |
+| 扫描 | scan | rescan | The interface has two verbs: rescan (`重新扫描`, re-read the Mod folders) and check again (`重新检查`, check the list's problems); not scan again, read the mods or check the files again. |
 | 身份合并 | identity merge |  |  |
 | 实例 | instance | this one; another copy | An Instance identifies one physical Mod directory. |
 | 锁定库 | lock library |  | The shared directory holding locked versions. |
@@ -60,7 +62,7 @@ The domain/UI distinction follows [03 §1](specs/03-environments-and-sources.md#
 | 分享码 | share code |  |  |
 | 更新锁定版本 | update the locked version |  | The previous locked copy is retained. |
 | 跟上合集 | sync with a collection | catch up with the collection | Keep sync as the command name. |
-| 跟着合集 | follow a collection | follow a Steam collection |  |
+| 跟着合集 | follow a collection | follow a Steam collection | zh UI uses `跟着` on the heading and the button alike, never `关联`. |
 | 工作区 | workspace |  | A storage or code term; avoid it in UI quotations. |
 | 规则来源 | rule source |  |  |
 | 环路 | cycle |  | A cycle in the load-order constraint graph. |
@@ -68,7 +70,7 @@ The domain/UI distinction follows [03 §1](specs/03-environments-and-sources.md#
 | 交接 | handoff |  | 07 §2; SteamCMD credit replacement |
 | 交接锁 | handoff lock |  | Coordinates replacement and launch. |
 | 加载顺序 | load order |  |  |
-| 解除锁定 | unpin | unlock | Keep unpin as the command name. |
+| 解除锁定 | unpin | stop keeping this version | Keep unpin as the command name; zh UI `不再保留这个版本`. |
 | 可选依赖 | optional dependency |  |  |
 | 列表 | list |  | The player's name for a plan; preserve the UI wording in quotations. |
 | 强连通分量 | strongly connected component |  |  |
@@ -82,7 +84,7 @@ The domain/UI distinction follows [03 §1](specs/03-environments-and-sources.md#
 | 上游 | upstream |  | Use the source's actual name when quoting the UI. |
 | 社区规则 | community rule |  |  |
 | 锁定版本 | locked version |  | A separate instance in the same lineage. |
-| 锁定这个版本 | pin | lock this version | Keep pin as the command name. |
+| 锁定这个版本 | pin | keep this version | Keep pin as the command name; zh UI `保留这个版本`, ja `このバージョンを残す`. |
 | 替代规则 | replacement rule |  |  |
 | 停用 | disable |  | Disable an entry without deleting its files. |
 | 拓扑排序 | topological sort |  |  |

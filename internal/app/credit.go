@@ -132,23 +132,17 @@ func (a *App) CreditStep(replace func(store.CreditItem) (string, error), callbac
 	if replace == nil {
 		replace = a.ReplaceCreditItem
 	}
-	var hooks CreditCallbacks
+	c := &creditRun{a: a, replace: replace}
 	if len(callbacks) > 0 {
-		hooks = callbacks[0]
+		c.hooks = callbacks[0]
 	}
-	stop := func() bool { return hooks.Stopped != nil && hooks.Stopped() }
-	progress := func(it store.CreditItem) {
-		if hooks.Progress != nil {
-			hooks.Progress(it)
-		}
-	}
-	ctx := hooks.Context
-	if ctx == nil {
-		ctx = context.Background()
+	c.ctx = c.hooks.Context
+	if c.ctx == nil {
+		c.ctx = context.Background()
 	}
 	processed := 0
 	for _, it := range items {
-		if stop() {
+		if c.stop() {
 			return nil
 		}
 		if it.Terminal() || it.NextAttempt > a.Now().Unix() {
@@ -164,124 +158,182 @@ func (a *App) CreditStep(replace func(store.CreditItem) (string, error), callbac
 		} else if g != nil {
 			return nil
 		}
-		progress(it)
-		// Refresh shared confirmation even after this item's subscribed checkpoint:
-		// another batch may have completed the same physical handoff since the last pass.
-		peer, err := a.Store.CreditPeer(it)
-		if err != nil {
+		c.progress(it)
+		halt, err := c.step(&it)
+		if err != nil || halt {
 			return err
-		}
-		if peer != nil {
-			changed := false
-			if it.State == "pending" {
-				it.State, it.Result, changed = "subscribed", "waiting for Steam installation", true
-				if peer.State == "failed" {
-					it.State, it.Result = "failed", peer.Result
-				}
-			}
-			if peer.InstanceID == it.InstanceID && peer.State == "done" && peer.TargetID != "" {
-				old, err := a.Store.Mod(it.InstanceID)
-				if err != nil {
-					return err
-				}
-				if old == nil || old.Status != identity.Live {
-					it.State, it.Result, it.TargetID, it.NextAttempt, changed = "done", "already replaced with Workshop", peer.TargetID, 0, true
-				}
-			}
-			if changed {
-				if err := a.Store.SaveCreditItem(it); err != nil {
-					return err
-				}
-				progress(it)
-				if it.Terminal() {
-					continue
-				}
-			}
-		}
-		if it.State == "pending" {
-			rep, callErr := a.runSteamContext(ctx, steamworks.Subscribe, []string{it.WorkshopID})
-			result := "unconfirmed"
-			if callErr == nil {
-				for _, r := range rep.Items {
-					if strconv.FormatUint(r.ID, 10) == it.WorkshopID {
-						result = r.Result
-					}
-				}
-			}
-			switch {
-			case callErr != nil:
-				creditRetry(&it, a.Now(), callErr.Error())
-			case result == "ok":
-				it.State, it.Result, it.NextAttempt = "subscribed", "waiting for Steam installation", 0
-			case creditPermanent(result):
-				it.State, it.Result = "failed", result+"; SteamCMD copy retained; "+workshopURL(it.WorkshopID)
-			default:
-				creditRetry(&it, a.Now(), result)
-			}
-			if err := a.Store.SaveCreditItem(it); err != nil {
-				return err
-			}
-			progress(it)
-			if stop() || errors.Is(callErr, ErrSteamUnavailable) {
-				return nil
-			}
-			if it.State != "subscribed" {
-				continue
-			}
-		}
-		if it.State == "subscribed" || it.State == "switching" {
-			rep, callErr := a.runSteamContext(ctx, steamworks.State, []string{it.WorkshopID})
-			ready := false
-			if callErr == nil {
-				for _, r := range rep.Items {
-					if strconv.FormatUint(r.ID, 10) == it.WorkshopID {
-						ready = creditInstalled(r.State)
-					}
-				}
-			}
-			if callErr != nil {
-				creditRetry(&it, a.Now(), callErr.Error())
-			} else if !ready {
-				it.Result = "waiting for Steam installation"
-				it.NextAttempt = a.Now().Add(30 * time.Second).Unix()
-			} else {
-				result, e := replace(it)
-				// ReplaceCreditItem journals target and deployments before any plan edits.
-				// Reload that checkpoint before saving a retry, including after partial failure.
-				saved, e2 := a.Store.CreditItems(it.BatchID)
-				if e2 != nil {
-					return e2
-				}
-				for _, x := range saved {
-					if x.WorkshopID == it.WorkshopID {
-						it = x
-						break
-					}
-				}
-				if e != nil {
-					var wait CreditWait
-					if errors.As(e, &wait) {
-						it.NextAttempt, it.Result = a.Now().Add(5*time.Second).Unix(), e.Error()
-					} else {
-						creditRetry(&it, a.Now(), e.Error())
-					}
-				} else {
-					it.State, it.Result, it.NextAttempt = "done", result, 0
-					if strings.HasPrefix(result, "retained:") {
-						it.State = "retained"
-					}
-				}
-			}
-			if err := a.Store.SaveCreditItem(it); err != nil {
-				return err
-			}
-			progress(it)
-			if errors.Is(callErr, ErrSteamUnavailable) {
-				return nil
-			}
 		}
 	}
 	return a.Store.FinishCreditBatches()
+}
+
+// creditRun is one CreditStep pass.
+type creditRun struct {
+	a       *App
+	ctx     context.Context
+	hooks   CreditCallbacks
+	replace func(store.CreditItem) (string, error)
+}
+
+// stop reports whether the caller asked to stop.
+func (c *creditRun) stop() bool { return c.hooks.Stopped != nil && c.hooks.Stopped() }
+
+// progress reports an item's new state.
+func (c *creditRun) progress(it store.CreditItem) {
+	if c.hooks.Progress != nil {
+		c.hooks.Progress(it)
+	}
+}
+
+// step takes one item as far as it goes now: a peer's outcome, the subscribe, then the
+// replacement once Steam has installed it. halt ends the pass.
+func (c *creditRun) step(it *store.CreditItem) (halt bool, err error) {
+	done, err := c.takePeer(it)
+	if err != nil || done {
+		return false, err
+	}
+	if it.State == "pending" {
+		var next bool
+		if halt, next, err = c.subscribe(it); err != nil || halt || !next {
+			return halt, err
+		}
+	}
+	if it.State == "subscribed" || it.State == "switching" {
+		return c.install(it)
+	}
+	return false, nil
+}
+
+// takePeer takes over what another batch's item for the same Workshop copy reached.
+// Shared confirmation is refreshed even after this item's subscribed checkpoint: another
+// batch may have completed the same physical handoff since the last pass. done: the item
+// is finished.
+func (c *creditRun) takePeer(it *store.CreditItem) (done bool, err error) {
+	a := c.a
+	peer, err := a.Store.CreditPeer(*it)
+	if err != nil {
+		return false, err
+	}
+	if peer == nil {
+		return false, nil
+	}
+	changed := false
+	if it.State == "pending" {
+		it.State, it.Result, changed = "subscribed", "waiting for Steam installation", true
+		if peer.State == "failed" {
+			it.State, it.Result = "failed", peer.Result
+		}
+	}
+	if peer.InstanceID == it.InstanceID && peer.State == "done" && peer.TargetID != "" {
+		old, err := a.Store.Mod(it.InstanceID)
+		if err != nil {
+			return false, err
+		}
+		if old == nil || old.Status != identity.Live {
+			it.State, it.Result, it.TargetID, it.NextAttempt, changed = "done", "already replaced with Workshop", peer.TargetID, 0, true
+		}
+	}
+	if !changed {
+		return false, nil
+	}
+	if err := a.Store.SaveCreditItem(*it); err != nil {
+		return false, err
+	}
+	c.progress(*it)
+	return it.Terminal(), nil
+}
+
+// subscribe subscribes to a pending item. halt ends the pass; next: the item is subscribed
+// and goes on to the install check.
+func (c *creditRun) subscribe(it *store.CreditItem) (halt, next bool, err error) {
+	a := c.a
+	rep, callErr := a.runSteamContext(c.ctx, steamworks.Subscribe, []string{it.WorkshopID})
+	result := "unconfirmed"
+	if callErr == nil {
+		for _, r := range rep.Items {
+			if strconv.FormatUint(r.ID, 10) == it.WorkshopID {
+				result = r.Result
+			}
+		}
+	}
+	switch {
+	case callErr != nil:
+		creditRetry(it, a.Now(), callErr.Error())
+	case result == "ok":
+		it.State, it.Result, it.NextAttempt = "subscribed", "waiting for Steam installation", 0
+	case creditPermanent(result):
+		it.State, it.Result = "failed", result+"; SteamCMD copy retained; "+workshopURL(it.WorkshopID)
+	default:
+		creditRetry(it, a.Now(), result)
+	}
+	if err := a.Store.SaveCreditItem(*it); err != nil {
+		return false, false, err
+	}
+	c.progress(*it)
+	if c.stop() || errors.Is(callErr, ErrSteamUnavailable) {
+		return true, false, nil
+	}
+	return false, it.State == "subscribed", nil
+}
+
+// install replaces a subscribed item once Steam has installed it. halt ends the pass.
+func (c *creditRun) install(it *store.CreditItem) (halt bool, err error) {
+	a := c.a
+	rep, callErr := a.runSteamContext(c.ctx, steamworks.State, []string{it.WorkshopID})
+	ready := false
+	if callErr == nil {
+		for _, r := range rep.Items {
+			if strconv.FormatUint(r.ID, 10) == it.WorkshopID {
+				ready = creditInstalled(r.State)
+			}
+		}
+	}
+	if callErr != nil {
+		creditRetry(it, a.Now(), callErr.Error())
+	} else if !ready {
+		it.Result = "waiting for Steam installation"
+		it.NextAttempt = a.Now().Add(30 * time.Second).Unix()
+	} else if err := c.replaceItem(it); err != nil {
+		return false, err
+	}
+	if err := a.Store.SaveCreditItem(*it); err != nil {
+		return false, err
+	}
+	c.progress(*it)
+	return errors.Is(callErr, ErrSteamUnavailable), nil
+}
+
+// replaceItem replaces an installed item's SteamCMD copy with the Workshop one and records
+// the outcome in it.
+func (c *creditRun) replaceItem(it *store.CreditItem) error {
+	a := c.a
+	result, e := c.replace(*it)
+	// ReplaceCreditItem journals target and deployments before any plan edits.
+	// Reload that checkpoint before saving a retry, including after partial failure.
+	saved, e2 := a.Store.CreditItems(it.BatchID)
+	if e2 != nil {
+		return e2
+	}
+	for _, x := range saved {
+		if x.WorkshopID == it.WorkshopID {
+			*it = x
+			break
+		}
+	}
+	if e != nil {
+		var wait CreditWait
+		if errors.As(e, &wait) {
+			it.NextAttempt, it.Result = a.Now().Add(5*time.Second).Unix(), e.Error()
+		} else {
+			creditRetry(it, a.Now(), e.Error())
+		}
+	} else {
+		it.State, it.Result, it.NextAttempt = "done", result, 0
+		if strings.HasPrefix(result, "retained:") {
+			it.State = "retained"
+		}
+	}
+	return nil
 }
 
 func creditInstalled(state uint32) bool {

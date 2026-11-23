@@ -178,8 +178,8 @@ func TestLogPageNoMonitor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Monitor != nil || !strings.Contains(p.NoMonitor, "not installed") || p.AddMonitor {
-		t.Fatalf("monitor %v, note %q %v", p.Monitor != nil, p.NoMonitor, p.AddMonitor)
+	if p.Monitor != nil || p.NoMonitor == "" || !p.InstallMonitor || p.AddMonitor {
+		t.Fatalf("monitor %v, note %q install %v add %v", p.Monitor != nil, p.NoMonitor, p.InstallMonitor, p.AddMonitor)
 	}
 }
 

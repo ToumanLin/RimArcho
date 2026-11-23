@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -83,7 +85,7 @@ func (s *API) startUninstall(options app.UninstallOptions) (err error) {
 	}
 	s.uninstall.mu.Lock()
 	for _, step := range p.Steps {
-		s.uninstall.status.Steps = append(s.uninstall.status.Steps, UninstallProgressStep{Key: step.Key, Title: view.UninstallTitle(step.Key)})
+		s.uninstall.status.Steps = append(s.uninstall.status.Steps, UninstallProgressStep{Key: step.Key, Title: view.UninstallTitle(step.Key), Later: !p.AtOnce && (step.Key == app.UnData || step.Key == app.UnProgram)})
 	}
 	s.uninstall.mu.Unlock()
 	if s.uninstall.shutdownBlock != nil {
@@ -177,6 +179,7 @@ type uninstallState struct {
 type UninstallProgressStep struct {
 	Key   string `json:"key"`
 	Title string `json:"title"`
+	Later bool   `json:"later,omitempty"` // runs after RimArcho has closed (Windows)
 }
 
 type UninstallStatus struct {

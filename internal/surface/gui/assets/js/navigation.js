@@ -22,6 +22,7 @@ import * as tasksPage from "./tasks.js";
 import * as fileSearch from "./filesearch.js";
 import * as modSettings from "./modsettings.js";
 import * as savesPage from "./saves.js";
+import * as reviewPage from "./review.js";
 
 let ui;
 // The displayed shell can still name the previous plan while OpenPlan is in flight:
@@ -45,6 +46,11 @@ export async function go(id, entry = null) {
     planManage.restoreHistory({ creating: false, selected: planManage.selected() });
   }
   if (id === "plan:new") return plans.newPlan();
+  // "guide:preview": the first-run guide as a new player sees it, writing nothing (16 §2.15)
+  let guideFrom = null;
+  if (id === "guide:preview") { id = "guide"; guideFrom = "preview"; }
+  // "guide:copy": Add Game Config on its "copy a game folder" way (03 §3.5)
+  if (id === "guide:copy") { id = "guide"; S.guideWay = 2; }
   // "save:<ref>": Saves with that save selected
   let save = "";
   if (id.startsWith("save:")) { save = id.slice(5); id = "saves"; }
@@ -54,12 +60,12 @@ export async function go(id, entry = null) {
   if (id !== "plans") planManage.abandon();
   if (id !== "build") S.buildFrom = null;
   if (id !== "plan-export") S.planExport = null;
-  await openPage(id, plan, entry, save);
+  await openPage(id, plan, entry, save, guideFrom);
   // a page already shown is redrawn in place: its sub-entry and breadcrumb follow too
   ui.renderWhere();
 }
 
-export async function openPage(id, plan = null, entry = null, save = "") {
+export async function openPage(id, plan = null, entry = null, save = "", guideFrom = null) {
   if (S.packFocus) return packsPage.pack(S.packFocus);
   switch (id) {
     case "plan":
@@ -69,6 +75,7 @@ export async function openPage(id, plan = null, entry = null, save = "") {
           const p = openingPlan = openingPlan.catch(() => {}).then(() => api.OpenPlan(plan));
           try { await p; } finally { if (openingPlan === p) requestedPlan = null; }
           if (!read.current()) return false;
+          S.bar?.forget(); // the filter bar searches Not enabled and Enabled (16 §2.5)
           S.cols.forEach((c, k) => {
             c.query = ""; c.cursor = 0; c.sel.clear(); c.searching = false;
             const input = $(`.area[data-area="${k}"] .search input`);
@@ -81,7 +88,7 @@ export async function openPage(id, plan = null, entry = null, save = "") {
     case "needs": return scr.needs();
     case "packs": return packsPage.list();
     case "plans": return planManage.open();
-    case "plan-import": return exchange();
+    case "plan-import": case "import": return exchange();
     case "plan-export": return planManage.exportOf(entry?.planExport?.id || planManage.exportPlan(), entry?.planExport?.from || planManage.exportFrom());
     case "build": return packsPage.build();
     case "env": return scr.environment();
@@ -97,7 +104,8 @@ export async function openPage(id, plan = null, entry = null, save = "") {
     case "search": return fileSearch.open();
     case "mod-settings": return modSettings.open();
     case "saves": return savesPage.open(save);
-    case "guide": return entry ? guide.resume() : guide.start(S.board && S.board.envs && S.board.envs.length ? "env" : "first");
+    case "review": return reviewPage.open();
+    case "guide": return entry ? guide.resume() : guide.start(guideFrom || (S.board && S.board.envs && S.board.envs.length ? "env" : "first"));
   }
 }
 

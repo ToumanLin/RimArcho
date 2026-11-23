@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -30,7 +32,7 @@ func TestBackgroundEndsNameTheirJob(t *testing.T) {
 		}
 	}
 	api.PackRunner = func(string) error { return errors.New("disk full") }
-	if _, err := api.PackBuild("named", 0); err != nil {
+	if _, err := api.PackBuild("named", 0, false, false); err != nil {
 		t.Fatal(err)
 	}
 	ev := wait("pack ", `"done":true`)

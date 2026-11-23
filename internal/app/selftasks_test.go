@@ -91,3 +91,106 @@ func TestSelfTasksCancelAndClose(t *testing.T) {
 		}
 	}
 }
+
+// 16 §8.9: repeated requests while one runs give one waiting task, not a line of them.
+func TestSelfTasksJoinAWaitingTwin(t *testing.T) {
+	t.Parallel()
+	ts := OpenTasks("")
+	defer ts.Close()
+	started, release := make(chan struct{}), make(chan struct{})
+	var runs sync.WaitGroup
+	runs.Add(2)
+	count := 0
+	var mu sync.Mutex
+	run := func(string) (string, error) {
+		mu.Lock()
+		count++
+		first := count == 1
+		mu.Unlock()
+		if first {
+			close(started)
+			<-release
+		}
+		runs.Done()
+		return "checked", nil
+	}
+	req := Task{Kind: "source-check", Obj: "RimArcho", Args: []string{"source-check", "workshop"}}
+	first := ts.EnqueueSelf(req, run)
+	<-started
+	var queued []string
+	for i := 0; i < 10; i++ {
+		queued = append(queued, ts.EnqueueSelf(req, run).ID)
+	}
+	for _, id := range queued[1:] {
+		if id != queued[0] || id == first.ID {
+			t.Fatalf("clicks queued %v after %s", queued, first.ID)
+		}
+	}
+	other := req
+	other.Args = []string{"source-check", "git"}
+	if ts.EnqueueSelf(other, func(string) (string, error) { return "", nil }).ID == queued[0] {
+		t.Fatal("another source joined the workshop check")
+	}
+	close(release)
+	runs.Wait()
+	waitEnded(t, ts, queued[0])
+	mu.Lock()
+	defer mu.Unlock()
+	if count != 2 {
+		t.Fatalf("11 requests ran %d times, want 2", count)
+	}
+}
+
+// 16 §8.9: work that repeats by itself keeps one row: a finished copy of the same kind and
+// object gives its row to the next run; failures and other objects stay.
+func TestBeginOnceKeepsOneRow(t *testing.T) {
+	t.Parallel()
+	ts := OpenTasks(filepath.Join(t.TempDir(), "tasks.json"))
+	defer ts.Close()
+	a := ts.BeginOnce("analyze", "Main", nil)
+	ts.Finish(a, TaskDone, "analysis done")
+	other := ts.BeginOnce("analyze", "Other", nil)
+	ts.Finish(other, TaskDone, "analysis done")
+	failed := ts.BeginOnce("analyze", "Main", nil)
+	ts.Finish(failed, TaskFailed, "no disk")
+	last := ts.BeginOnce("analyze", "Main", nil)
+	ts.Finish(last, TaskDone, "analysis done")
+	var ids []string
+	for _, task := range ts.List() {
+		ids = append(ids, task.ID)
+	}
+	want := map[string]bool{last: true, failed: true, other: true}
+	if len(ids) != 3 {
+		t.Fatalf("rows %v, want the last Main, the failed Main and Other", ids)
+	}
+	for _, id := range ids {
+		if !want[id] {
+			t.Fatalf("row %s should have given way (rows %v)", id, ids)
+		}
+	}
+}
+
+// An earlier window's finished check gives its row too: one row across launches.
+func TestBeginOnceReplacesAnEarlierWindowsRow(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "tasks.json")
+	first := OpenTasks(path)
+	first.Finish(first.BeginOnce("analyze", "Main", nil), TaskDone, "analysis done")
+	first.Close()
+	second := OpenTasks(path)
+	defer second.Close()
+	if n := len(second.List()); n != 1 {
+		t.Fatalf("the new window reads %d rows, want the earlier check", n)
+	}
+	id := second.BeginOnce("analyze", "Main", nil)
+	second.Finish(id, TaskDone, "analysis done")
+	rows := second.List()
+	if len(rows) != 1 || rows[0].ID != id {
+		t.Fatalf("rows %+v, want only the new check", rows)
+	}
+	third := OpenTasks(path)
+	defer third.Close()
+	if rows := third.List(); len(rows) != 1 || rows[0].ID != id {
+		t.Fatalf("the record keeps %+v, want only the new check", rows)
+	}
+}

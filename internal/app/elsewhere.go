@@ -14,7 +14,7 @@ import (
 // game's Mods/. A mod this game already sees at the same folder (an earlier link, read as
 // this game's own) is not added twice.
 func (a *App) withElsewhere(e *env.Environment, mods []*store.Mod, srcs []*source.Source) ([]*store.Mod, []*source.Source, error) {
-	other, err := a.Store.ElsewhereMods(e.ID)
+	other, err := a.Store.ElsewhereMods(e.GameID)
 	if err != nil || len(other) == 0 {
 		return mods, srcs, err
 	}
@@ -28,17 +28,17 @@ func (a *App) withElsewhere(e *env.Environment, mods []*store.Mod, srcs []*sourc
 	if err != nil {
 		return nil, nil, err
 	}
-	envs, err := a.Store.Envs()
+	games, err := a.Store.Games()
 	if err != nil {
 		return nil, nil, err
 	}
 	names := map[string]string{}
-	for _, x := range envs {
-		names[x.ID] = x.Name
+	for _, g := range games {
+		names[g.ID] = g.Name
 	}
 	bySource := map[string]*source.Source{}
 	for _, s := range all {
-		if s.Kind == source.Local && s.EnvID != e.ID && s.EnvID != store.Shared && s.Status == source.StatusOK && names[s.EnvID] != "" {
+		if s.Kind == source.Local && s.EnvID != e.GameID && s.EnvID != store.Shared && s.Status == source.StatusOK && names[s.EnvID] != "" {
 			c := *s
 			c.Kind, c.Label = source.Elsewhere, "local-"+names[s.EnvID]
 			bySource[s.ID] = &c

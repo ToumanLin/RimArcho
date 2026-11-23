@@ -3,18 +3,23 @@
 -- Index-generation triggers are installed separately on each open (indexkey.go).
 
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE game(
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, game_root TEXT NOT NULL,
+  game_root_key TEXT NOT NULL, game_version TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL);
+CREATE INDEX game_root_key ON game(game_root_key);
 CREATE TABLE environment(
-  id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, game_root TEXT NOT NULL,
-  user_data_root TEXT NOT NULL DEFAULT '', game_version TEXT NOT NULL DEFAULT '',
-  launch TEXT NOT NULL DEFAULT 'direct', created_at INTEGER NOT NULL, current_plan INTEGER NOT NULL DEFAULT 0);
+  id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, game_id TEXT NOT NULL REFERENCES game(id),
+  user_data_root TEXT NOT NULL DEFAULT '', launch TEXT NOT NULL DEFAULT 'direct',
+  created_at INTEGER NOT NULL, current_plan INTEGER NOT NULL DEFAULT 0);
+CREATE INDEX environment_game ON environment(game_id);
 CREATE TABLE lineage(
   id TEXT PRIMARY KEY, environment_id TEXT NOT NULL, primary_instance_id TEXT, created_at INTEGER NOT NULL);
 CREATE TABLE instance(
-  id TEXT PRIMARY KEY, environment_id TEXT NOT NULL, lineage_id TEXT NOT NULL,
+  id TEXT PRIMARY KEY, game_id TEXT NOT NULL, lineage_id TEXT NOT NULL,
   lineage_basis TEXT NOT NULL DEFAULT '', source_id TEXT NOT NULL, rel_path TEXT NOT NULL,
   real_path TEXT NOT NULL DEFAULT '', status TEXT NOT NULL, residue INTEGER NOT NULL DEFAULT 0,
   current_snapshot_id INTEGER, first_seen INTEGER NOT NULL, last_seen INTEGER NOT NULL, tombstone_at INTEGER, unloadable TEXT NOT NULL DEFAULT '');
-CREATE INDEX instance_env ON instance(environment_id);
+CREATE INDEX instance_env ON instance(game_id);
 CREATE INDEX instance_lineage ON instance(lineage_id);
 CREATE TABLE instance_alias(
   instance_id TEXT NOT NULL, source_id TEXT NOT NULL, rel_path TEXT NOT NULL, real_path TEXT NOT NULL,
@@ -32,7 +37,7 @@ CREATE TABLE snapshot_file(
   snapshot_id INTEGER NOT NULL, rel_path TEXT NOT NULL, size INTEGER NOT NULL, mtime INTEGER NOT NULL, hash BLOB,
   PRIMARY KEY(snapshot_id, rel_path)) WITHOUT ROWID;
 CREATE TABLE scan(
-  id INTEGER PRIMARY KEY, environment_id TEXT NOT NULL, started_at INTEGER NOT NULL, finished_at INTEGER,
+  id INTEGER PRIMARY KEY, game_id TEXT NOT NULL, started_at INTEGER NOT NULL, finished_at INTEGER,
   full INTEGER NOT NULL DEFAULT 0, stats TEXT NOT NULL DEFAULT '{}');
 CREATE TABLE change_event(
   id INTEGER PRIMARY KEY, scan_id INTEGER NOT NULL, instance_id TEXT NOT NULL, kind TEXT NOT NULL,
@@ -40,18 +45,18 @@ CREATE TABLE change_event(
 CREATE INDEX change_event_instance ON change_event(instance_id);
 CREATE INDEX change_event_scan ON change_event(scan_id);
 CREATE TABLE identity_question(
-  id INTEGER PRIMARY KEY, environment_id TEXT NOT NULL, scan_id INTEGER NOT NULL, instance_id TEXT NOT NULL,
+  id INTEGER PRIMARY KEY, game_id TEXT NOT NULL, scan_id INTEGER NOT NULL, instance_id TEXT NOT NULL,
   observation_snapshot_id INTEGER NOT NULL, candidate_instance_id TEXT NOT NULL, score REAL NOT NULL,
   status TEXT NOT NULL DEFAULT 'open', resolution TEXT NOT NULL DEFAULT '', resolved_at INTEGER, summary TEXT NOT NULL DEFAULT '');
 CREATE TABLE user_rule(
   id INTEGER PRIMARY KEY, environment_id TEXT NOT NULL, kind TEXT NOT NULL, a_lineage TEXT NOT NULL DEFAULT '',
   b_lineage TEXT NOT NULL DEFAULT '', target TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL);
 CREATE TABLE launch(
-  id INTEGER PRIMARY KEY, environment_id TEXT NOT NULL, started_at INTEGER NOT NULL, method TEXT NOT NULL, command TEXT NOT NULL, plan_id INTEGER, fingerprint TEXT NOT NULL DEFAULT '', version_n INTEGER NOT NULL DEFAULT 0);
+  id INTEGER PRIMARY KEY, environment_id TEXT NOT NULL, started_at INTEGER NOT NULL, method TEXT NOT NULL, command TEXT NOT NULL, plan_id INTEGER, fingerprint TEXT NOT NULL DEFAULT '', version_n INTEGER NOT NULL DEFAULT 0, game_id TEXT NOT NULL DEFAULT '', user_data_root TEXT NOT NULL DEFAULT '', env_name TEXT NOT NULL DEFAULT '');
 CREATE TABLE analysis(
-  id INTEGER PRIMARY KEY, environment_id TEXT NOT NULL, run_key TEXT NOT NULL, game_mm TEXT NOT NULL,
+  id INTEGER PRIMARY KEY, game_id TEXT NOT NULL, run_key TEXT NOT NULL, game_mm TEXT NOT NULL,
   version INTEGER NOT NULL, started_at INTEGER NOT NULL, finished_at INTEGER NOT NULL, stats TEXT NOT NULL DEFAULT '{}', set_key TEXT NOT NULL DEFAULT '');
-CREATE INDEX analysis_env ON analysis(environment_id, id);
+CREATE INDEX analysis_env ON analysis(game_id, id);
 CREATE TABLE patch_fact(
   analysis_id INTEGER NOT NULL, instance_id TEXT NOT NULL, seq INTEGER NOT NULL, file TEXT NOT NULL, line INTEGER NOT NULL,
   class TEXT NOT NULL, xpath TEXT NOT NULL DEFAULT '', descr TEXT NOT NULL, result TEXT NOT NULL, hits INTEGER NOT NULL,
@@ -100,15 +105,15 @@ CREATE TABLE "modsconfig_state"(
   user_data_root TEXT PRIMARY KEY, written_hash BLOB, seen_hash BLOB, written_at INTEGER,
   writer_plan INTEGER, writer_version INTEGER NOT NULL DEFAULT 0, writer_env TEXT NOT NULL DEFAULT '');
 CREATE INDEX launch_env ON launch(environment_id, started_at);
-CREATE INDEX analysis_slot ON analysis(environment_id, game_mm, set_key, id);
+CREATE INDEX analysis_slot ON analysis(game_id, game_mm, set_key, id);
 CREATE TABLE instance_note(
   instance_id TEXT PRIMARY KEY, text TEXT NOT NULL DEFAULT '', made TEXT NOT NULL DEFAULT '',
   updated_at INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE id_alias(old_id TEXT PRIMARY KEY, new_id TEXT NOT NULL, kind TEXT NOT NULL);
 CREATE TABLE "source"(
-  id TEXT PRIMARY KEY, environment_id TEXT NOT NULL,
+  id TEXT PRIMARY KEY, game_id TEXT NOT NULL,
   kind TEXT NOT NULL, label TEXT NOT NULL, root TEXT NOT NULL, status TEXT NOT NULL,
-  pending_root TEXT NOT NULL DEFAULT '', UNIQUE(environment_id, label));
+  pending_root TEXT NOT NULL DEFAULT '', UNIQUE(game_id, label));
 CREATE TABLE texture_file(
   path_key TEXT PRIMARY KEY, path TEXT NOT NULL, instance_id TEXT NOT NULL, mod_dir TEXT NOT NULL,
   rel TEXT NOT NULL, src_size INTEGER NOT NULL DEFAULT 0, src_mtime INTEGER NOT NULL DEFAULT 0,
@@ -152,12 +157,13 @@ CREATE TABLE credit_session(
 CREATE TABLE credit_deployment(
  batch_id INTEGER NOT NULL, workshop_id TEXT NOT NULL, environment_id TEXT NOT NULL,
  plan_id INTEGER NOT NULL, done INTEGER NOT NULL DEFAULT 0,
- PRIMARY KEY(batch_id, workshop_id, environment_id),
+ game_id TEXT NOT NULL, user_data_root TEXT NOT NULL, root_key TEXT NOT NULL, env_name TEXT NOT NULL,
+ PRIMARY KEY(batch_id, workshop_id, root_key),
  FOREIGN KEY(batch_id, workshop_id) REFERENCES credit_item(batch_id, workshop_id));
 CREATE TABLE version_mute(
   package_id TEXT NOT NULL, game_mm TEXT NOT NULL,
   PRIMARY KEY(package_id, game_mm));
-CREATE INDEX identity_question_open ON identity_question(status, environment_id);
+CREATE INDEX identity_question_open ON identity_question(status, game_id);
 CREATE TABLE fact_set(
  id INTEGER PRIMARY KEY, instance_id TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('def','dll')),
  content_key TEXT NOT NULL, files TEXT NOT NULL DEFAULT '[]', def_content_version INTEGER NOT NULL DEFAULT 0, UNIQUE(instance_id,kind,content_key));
@@ -200,11 +206,11 @@ CREATE INDEX type_fact_lookup ON type_fact(type_name,set_id);
 CREATE INDEX harmony_fact_set ON harmony_fact(set_id);
 CREATE INDEX harmony_id_set ON harmony_id(set_id);
 CREATE INDEX harmony_id_lookup ON harmony_id(id,set_id);
--- The game's own managed assemblies per environment and the type names they define (05 §5.3).
+-- The game's own managed assemblies per installation and the type names they define (05 §5.3).
 CREATE TABLE game_assembly(
- id INTEGER PRIMARY KEY, environment_id TEXT NOT NULL, file TEXT NOT NULL, game_mm TEXT NOT NULL,
+ id INTEGER PRIMARY KEY, game_id TEXT NOT NULL, file TEXT NOT NULL, game_mm TEXT NOT NULL,
  path TEXT NOT NULL, size INTEGER NOT NULL, mtime INTEGER NOT NULL, reader INTEGER NOT NULL,
- types INTEGER NOT NULL DEFAULT 0, error TEXT NOT NULL DEFAULT '', UNIQUE(environment_id,file));
+ types INTEGER NOT NULL DEFAULT 0, error TEXT NOT NULL DEFAULT '', UNIQUE(game_id,file));
 CREATE TABLE game_type(
  assembly_id INTEGER NOT NULL REFERENCES game_assembly(id) ON DELETE CASCADE,
  type_name TEXT NOT NULL COLLATE NOCASE, ns TEXT NOT NULL, name TEXT NOT NULL);

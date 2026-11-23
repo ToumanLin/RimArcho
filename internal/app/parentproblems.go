@@ -90,11 +90,37 @@ func (a *App) ParentHelp(ps *ProblemSet, p *Problem) (*ParentHelp, error) {
 			active[dependencyPackage(mod.PackageID)] = true
 		}
 	}
-	isActive := func(pkg string) bool { return active[dependencyPackage(pkg)] }
-	// Absence of an error only counts for a fully attributed log of this list.
+	h.Quiet = parentQuiet(ps, m)
+	fx := &parentFixes{h: h, seen: map[string]bool{}}
+	if err := a.enableFixes(ps, fx, active); err != nil {
+		return nil, err
+	}
+	if err := a.candidateFixes(st, m, fx, active, installed); err != nil {
+		return nil, err
+	}
+	ws := m.WorkshopID()
+	if ws == "" {
+		if w, ok := a.WorkshopFor(m.PackageID); ok {
+			ws = w.WorkshopID
+		}
+	}
+	u := ""
+	if ws != "" {
+		u = "https://steamcommunity.com/sharedfiles/filedetails/?id=" + ws
+	}
+	fx.add(ParentFix{Kind: "requirements", Name: m.DisplayName(), URL: u})
+	h.dropCandidates()
+	h.sortFixes()
+	return h, nil
+}
+
+// parentQuiet tells whether a fully attributed, current log of this list shows no error or
+// warning naming m: absence of an error only counts then.
+func parentQuiet(ps *ProblemSet, m *store.Mod) bool {
+	quiet := false
 	for _, run := range ps.Logs {
 		if !run.Stale() && !run.Pending {
-			h.Quiet = true
+			quiet = true
 			break
 		}
 	}
@@ -107,21 +133,36 @@ func (a *App) ParentHelp(ps *ProblemSet, p *Problem) (*ParentHelp, error) {
 		}
 		for _, s := range q.Subjects {
 			if finding.InstID(s) == m.ID {
-				h.Quiet = false
+				quiet = false
 			}
 		}
 	}
-	seen := map[string]bool{}
-	add := func(f ParentFix) {
-		key := f.Kind + "|" + f.Ref + "|" + f.URL
-		if f.Kind == "enable" {
-			key += "|" + f.Parent
-		}
-		if !seen[key] {
-			seen[key] = true
-			h.Fixes = append(h.Fixes, f)
-		}
+	return quiet
+}
+
+// parentFixes collects a ParentHelp's fixes without duplicates.
+type parentFixes struct {
+	h    *ParentHelp
+	seen map[string]bool
+}
+
+// add appends f unless an equal fix is there already.
+func (fx *parentFixes) add(f ParentFix) {
+	key := f.Kind + "|" + f.Ref + "|" + f.URL
+	if f.Kind == "enable" {
+		key += "|" + f.Parent
 	}
+	if !fx.seen[key] {
+		fx.seen[key] = true
+		fx.h.Fixes = append(fx.h.Fixes, f)
+	}
+}
+
+// enableFixes offers the installed, disabled Mods whose stored facts define a missing
+// parent and that would load it once enabled.
+func (a *App) enableFixes(ps *ProblemSet, fx *parentFixes, active map[string]bool) error {
+	st, h := ps.State, fx.h
+	isActive := func(pkg string) bool { return active[dependencyPackage(pkg)] }
 	names := map[string]bool{}
 	fresh := ps.Analysis != nil && ps.Analysis.Fresh
 	h.CacheIncomplete = !fresh
@@ -132,7 +173,7 @@ func (a *App) ParentHelp(ps *ProblemSet, p *Problem) (*ParentHelp, error) {
 		names[part.Parent] = true
 		defs, err := a.Store.DefsNamed(part.Parent, true)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		for _, d := range defs {
 			mod := st.Ix.ByID[d.Instance]
@@ -147,9 +188,16 @@ func (a *App) ParentHelp(ps *ProblemSet, p *Problem) (*ParentHelp, error) {
 			if !sameWhenEnabled || !d.Loaded(afterEnable) {
 				continue
 			}
-			add(ParentFix{Kind: "enable", Ref: st.Ix.Ref(mod.ID), Name: mod.DisplayName(), Parent: part.Parent, Basis: "provider"})
+			fx.add(ParentFix{Kind: "enable", Ref: st.Ix.Ref(mod.ID), Name: mod.DisplayName(), Parent: part.Parent, Basis: "provider"})
 		}
 	}
+	return nil
+}
+
+// candidateFixes offers the packages m declares or mentions that are neither active nor
+// installed, to subscribe to or search for. These are references, not proof that the
+// package supplies the missing template.
+func (a *App) candidateFixes(st *LoadoutState, m *store.Mod, fx *parentFixes, active, installed map[string]bool) error {
 	decl := m.Decl()
 	candidates := map[string]scanDep{}
 	basis := map[string]string{}
@@ -173,10 +221,9 @@ func (a *App) ParentHelp(ps *ProblemSet, p *Problem) (*ParentHelp, error) {
 	for _, pkg := range after {
 		put(pkg, pkg, "", "loadAfter")
 	}
-	// These are references, not proof that the package supplies the missing template.
 	defs, err := a.Store.DefsOf(m.ID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, d := range defs {
 		for _, pkg := range strings.FieldsFunc(d.MayRequire+","+d.MayRequireAny, func(r rune) bool { return r == ',' || r == ';' }) {
@@ -198,25 +245,12 @@ func (a *App) ParentHelp(ps *ProblemSet, p *Problem) (*ParentHelp, error) {
 			name = pkg
 		}
 		if ws != "" {
-			add(ParentFix{Kind: "subscribe", Ref: ws, Name: name, URL: "https://steamcommunity.com/sharedfiles/filedetails/?id=" + ws, Basis: basis[pkg]})
+			fx.add(ParentFix{Kind: "subscribe", Ref: ws, Name: name, URL: "https://steamcommunity.com/sharedfiles/filedetails/?id=" + ws, Basis: basis[pkg]})
 		} else {
-			add(ParentFix{Kind: "search", Ref: pkg, Name: name, Basis: basis[pkg]})
+			fx.add(ParentFix{Kind: "search", Ref: pkg, Name: name, Basis: basis[pkg]})
 		}
 	}
-	ws := m.WorkshopID()
-	if ws == "" {
-		if w, ok := a.WorkshopFor(m.PackageID); ok {
-			ws = w.WorkshopID
-		}
-	}
-	u := ""
-	if ws != "" {
-		u = "https://steamcommunity.com/sharedfiles/filedetails/?id=" + ws
-	}
-	add(ParentFix{Kind: "requirements", Name: m.DisplayName(), URL: u})
-	h.dropCandidates()
-	h.sortFixes()
-	return h, nil
+	return nil
 }
 
 // parentIndex compares a mod's stored Name facts with what it would load: current means

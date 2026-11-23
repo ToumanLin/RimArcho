@@ -1,6 +1,8 @@
 package view
 
 import (
+	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -34,6 +36,9 @@ const (
 	FieldDeps      = "deps"
 	FieldConflicts = "conflicts"
 	FieldSettings  = "settings" // the Mod's settings files; the act opens Mod library › Mod settings
+	// FieldLinked is another manager's link that brings the Mod into the game (RimCrow
+	// `_Link_<id>`): not a copy, so a line of the Mod's details (04 §5, 16 §2.9)
+	FieldLinked = "linked"
 )
 
 // Field acts: what the row's button does.
@@ -42,6 +47,7 @@ const (
 	ActURL    = "url"    // open the page
 	ActSteam  = "steam"  // Steam client page
 	ActTags   = "tags"   // edit (the tag bar)
+	ActLinked = "linked" // open the folder holding Target's link and say whose it is (OpLinked)
 	// ActSettings opens Mod library › Mod settings at Target's files (16 §2.9)
 	ActSettings = "settings"
 )
@@ -81,6 +87,10 @@ func ModFields(a *app.App, st *app.LoadoutState, mod *store.Mod, d *DetailData) 
 	fs := headFields(st, mod)
 	if a != nil {
 		fs = appendSubscriptionFields(fs, a.SubscriptionOf(mod))
+	}
+	// The size of the files the last scan read, as on Mod library's detail (same rule as app.Library).
+	if mod.SnapID != 0 && (mod.FileCount > 0 || mod.TotalSize > 0) {
+		fs = append(fs, Field{Kind: FieldSize, Label: T("size"), Value: render.Size(mod.TotalSize)})
 	}
 	fs = append(fs, Field{Kind: FieldTags, Label: T("tags"), Value: strings.Join(mod.Tags, "  "), List: mod.Tags, Act: ActTags, ActAt: T("edit")})
 	if mod.Alias != "" {
@@ -213,8 +223,53 @@ func LibFields(a *app.App, lib *app.Library, i *app.LibInstance, d *DetailData) 
 		add(FieldPlayed, T("last played"), LongDate(i.Played), nil)
 	}
 	add(FieldTextures, T("textures"), TextureField(i), nil)
+	fs = append(fs, LinkedFields(lib, i)...)
 	if i.Mod != nil {
 		fs = append(fs, tailFields(a, st, i.Mod, d)...)
+	}
+	return fs
+}
+
+// LinkedFields are the other managers' links that bring i's Mod into the game: the ones
+// folded out of its copies (LibLineage.Linked) and i itself when it is one. Each says who
+// made it and offers to show where it is; RimArcho never removes it (09 §3).
+func LinkedFields(lib *app.Library, i *app.LibInstance) []Field {
+	var links []*app.LibInstance
+	if i.Link != "" {
+		links = append(links, i)
+	}
+	if i.Mod != nil {
+		for _, l := range lib.Lineages {
+			if slices.Contains(l.All(), i) {
+				for _, x := range l.Linked {
+					if x != i {
+						links = append(links, x)
+					}
+				}
+				break
+			}
+		}
+	}
+	var fs []Field
+	for _, x := range links {
+		if x.Mod == nil {
+			continue
+		}
+		who := x.LinkedBy
+		if who == "" {
+			who = T("another tool")
+		}
+		// the lists load the link, not the copy beside it: say where it is used
+		v := who + "  " + filepath.Base(x.Link)
+		if x != i && len(x.UsedIn) > 0 {
+			var uses []string
+			for _, u := range x.UsedIn {
+				uses = append(uses, libUseText(u.Value()))
+			}
+			v += "  " + T("used in") + " " + strings.Join(uses, "  ")
+		}
+		fs = append(fs, Field{Kind: FieldLinked, Label: T("linked into the game"), Value: v,
+			Extra: "→ " + x.Path, Act: ActLinked, ActAt: T("show where it is"), Target: x.Mod.ID})
 	}
 	return fs
 }
@@ -222,8 +277,8 @@ func LibFields(a *app.App, lib *app.Library, i *app.LibInstance, d *DetailData) 
 // LongDate is a localized date with the year, such as Oct 21, 2026.
 func LongDate(t time.Time) string {
 	t = t.Local()
-	if Lang() == "zh" {
-		return t.Format(localeExtra("zh", "@date.long"))
+	if layout, ok := localeFormat("@date.long"); ok {
+		return t.Format(layout)
 	}
 	return t.Format("Jan 2, 2006")
 }

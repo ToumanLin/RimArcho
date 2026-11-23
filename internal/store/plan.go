@@ -102,7 +102,7 @@ func (s *Store) PlanByName(name string) (*Plan, error) {
 // environment's game version now (07 §1.6).
 func (s *Store) CreatePlan(envID, name string, at time.Time) (*Plan, error) {
 	res, err := s.DB.Exec(`INSERT INTO plan(environment_id, name, created_at, updated_at, created_game)
-		VALUES(?,?,?,?, coalesce((SELECT game_version FROM environment WHERE id=?), ''))`, envID, name, at.Unix(), at.Unix(), envID)
+		VALUES(?,?,?,?, coalesce((SELECT g.game_version FROM environment e JOIN game g ON g.id=e.game_id WHERE e.id=?), ''))`, envID, name, at.Unix(), at.Unix(), envID)
 	if err != nil {
 		return nil, err
 	}

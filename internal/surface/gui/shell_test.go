@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -175,7 +177,7 @@ func TestPlansInWindow(t *testing.T) {
 	}
 	// The palette goes to the other plans.
 	var plans []string
-	for _, p := range api.Palette("") {
+	for _, p := range api.Palette("", "", nil) {
 		if p.Kind == view.PalPlan {
 			plans = append(plans, p.Name)
 		}
@@ -234,7 +236,10 @@ func TestOpenListKeepsCurrent(t *testing.T) {
 	if sh := api.Shell(); sh.Plan.Name != "Empty" || !sh.Plans[0].Current || sh.Plans[0].ID != def.ID {
 		t.Fatalf("opening changed the current list: %+v", sh.Plans)
 	}
-	// Writing the open list to the game chooses it.
+	// Writing the open list to the game chooses it. First let the automatic check that the
+	// Launch page started end: on a starved CI runner its analysis write overlapped this save
+	// past busy_timeout (SQLITE_BUSY), which is not what this test is about.
+	settle(api)
 	before := e.ReadModsConfig()
 	if o, err := api.Run(view.ListSave); err != nil || len(o.Refused) > 0 {
 		t.Fatalf("save %+v %v", o, err)
@@ -261,4 +266,58 @@ func TestScanMeter(t *testing.T) {
 			t.Fatalf("fractions %v, want %v", got, want)
 		}
 	}
+}
+
+// A list switch made outside the window (`archo plan use`, MCP) moves the window when its
+// open list was the current one, however it became current; a list the player opened while
+// another is current stays (07 §1.3, 16 §2.5). Can it run checks the open list.
+func TestOpenListFollowsOutsideSwitch(t *testing.T) {
+	t.Parallel()
+	e, api, _ := fixture(t)
+	d, err := api.NewPlan("r11", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r11 := view.PlanOfPage(d.Page)
+	def := api.Shell().Plans[0]
+	if !def.Current || def.ID == r11 {
+		t.Fatalf("default is current: %+v", api.Shell().Plans)
+	}
+	use := func(name string) {
+		t.Helper()
+		child, err := e.ChildApp()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer child.Store.Close()
+		if out, code := cmds.Execute(child, []string{"plan", "use", name}); code != 0 {
+			t.Fatalf("plan use %s: %s", name, out)
+		}
+	}
+	checks := func(want int64, current bool) {
+		t.Helper()
+		sh := api.Shell()
+		if n := api.Needs(); n.Plan != want || sh.Plan == nil || sh.Plan.ID != want || (sh.Current == nil) != current {
+			t.Fatalf("Can it run checks %d, the window shows %+v (current %+v); want %d, current %v", n.Plan, sh.Plan, sh.Current, want, current)
+		}
+	}
+	// Followed: the window shows the current list (opened from the sidebar or not).
+	if _, err := api.OpenPlan(def.ID); err != nil {
+		t.Fatal(err)
+	}
+	checks(def.ID, true)
+	use("r11")
+	checks(r11, true)
+	// The player opens default while r11 is current: it stays open over a switch.
+	if _, err := api.OpenPlan(def.ID); err != nil {
+		t.Fatal(err)
+	}
+	checks(def.ID, false)
+	use("r11")
+	checks(def.ID, false)
+	// Once the open list becomes current outside the window, the window follows from then on.
+	use("default")
+	checks(def.ID, true)
+	use("r11")
+	checks(r11, true)
 }

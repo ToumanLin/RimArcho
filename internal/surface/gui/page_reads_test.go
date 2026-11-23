@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -74,7 +76,7 @@ func TestHomeAndNeedsReadersLeaveNavigationResponsive(t *testing.T) {
 		t.Run(page, func(t *testing.T) {
 			e, api, _ := fixture(t)
 			e.App.LazyLog, e.App.LogCacheOnly = true, true
-			e.App.AnalyzeRunner = func(string, func(string)) error { return errors.New("fixture") }
+			e.App.AnalyzeRunner = func(*app.App, func(string)) error { return errors.New("fixture") }
 			if _, err := api.LogPage(""); err != nil {
 				t.Fatal(err)
 			}
@@ -120,20 +122,27 @@ func TestHomeAndNeedsReadersLeaveNavigationResponsive(t *testing.T) {
 
 func TestBackgroundLookupUsesOnlyPublishedEnvironment(t *testing.T) {
 	t.Parallel()
-	_, api, _ := fixture(t)
+	e, api, _ := fixture(t)
 	st := api.Board().St
-	api.bgsEnv = st.Ix.Env.ID
+	api.bgsGame = bgGame(st.Ix.Env)
 	api.bgs = []app.Background{{Key: "fixture", Src: "fixture.png"}}
 	if b := api.bgFind("fixture"); b == nil {
 		t.Fatal("published background missing")
 	}
+	// Another Game Config of the same game shows the same list: it is kept per game
+	// installation, so switching configs does not read the backgrounds again.
+	e.MustRun("env", "add", "sibling", "--like", "main")
+	if b := api.bgFind("fixture"); b == nil {
+		t.Fatal("a Game Config of the same game lost the published backgrounds")
+	}
+	e.MustRun("env", "use", "main")
 	// A stale board must not rebuild another environment's image allow-list during an
 	// image request. No folder discovery should occur in bgFind.
-	api.bgsEnv = "another environment"
+	api.bgsGame = "another game"
 	if b := api.bgFind("fixture"); b != nil {
-		t.Fatal("background from previous environment was served")
+		t.Fatal("background from previous Game Config was served")
 	}
-	if api.bgsEnv != "another environment" {
+	if api.bgsGame != "another game" {
 		t.Fatal("image lookup triggered background discovery")
 	}
 }

@@ -41,6 +41,9 @@ type MissingMod struct {
 	SortMod
 	Installed bool `json:"installed"`
 	CanEnable bool `json:"canEnable"`
+	// Downloading: Steam has the Workshop item subscribed or is downloading it, but its
+	// folder is not complete yet (04 §1.6); it takes its place once a scan reads it.
+	Downloading bool `json:"downloading,omitempty"`
 }
 
 // MissingMods preserves imported provenance, then consults stored lineage instances
@@ -53,9 +56,15 @@ func (a *App) MissingMods(st *LoadoutState) []MissingMod {
 	}
 	var out []MissingMod
 	seen := map[string]int{}
+	var pending map[string]bool
 	for _, e := range st.List {
 		if e.Missing == "" {
 			continue
+		}
+		if pending == nil {
+			if pending = a.WorkshopPending(); pending == nil {
+				pending = map[string]bool{}
+			}
 		}
 		p := dependencyPackage(e.Missing)
 		item := MissingMod{SortMod: SortMod{Name: e.Name, PackageID: p, WorkshopID: numericWorkshopID(e.WorkshopID)}}
@@ -89,6 +98,7 @@ func (a *App) MissingMods(st *LoadoutState) []MissingMod {
 		if order.IsOfficial(p) {
 			item.WorkshopID = ""
 		}
+		item.Downloading = !item.Installed && item.WorkshopID != "" && pending[item.WorkshopID]
 		if item.Name == "" {
 			item.Name = p
 		}
@@ -99,6 +109,7 @@ func (a *App) MissingMods(st *LoadoutState) []MissingMod {
 			if out[i].WorkshopID == "" {
 				out[i].WorkshopID = item.WorkshopID
 			}
+			out[i].Downloading = out[i].Downloading || item.Downloading
 			continue
 		}
 		seen[p] = len(out)
@@ -149,6 +160,24 @@ func (a *App) replacementFor(st *LoadoutState, m *store.Mod) *Replacement {
 	return r
 }
 
+// ignoredReplacements: the player ignored this Mod's mod.replaced finding (05 §4.2), so the
+// window after Sort does not suggest the replacement again until the Mod changes.
+func (a *App) ignoredReplacements(st *LoadoutState) func(m *store.Mod, r *Replacement) bool {
+	type key struct{ lin, ws string }
+	snap := map[key]int64{}
+	if gs, err := a.Store.Ignores(st.Ix.Env.ID); err == nil {
+		for _, g := range gs {
+			if g.Code == "mod.replaced" {
+				snap[key{g.LineageID, g.Key}] = g.SnapshotID
+			}
+		}
+	}
+	return func(m *store.Mod, r *Replacement) bool {
+		s, ok := snap[key{m.LineageID, r.NewWorkshopID}]
+		return ok && s == m.SnapID
+	}
+}
+
 func replacementCandidate(st *LoadoutState, old *store.Mod, r *Replacement) *store.Mod {
 	var fallback, blocked *store.Mod
 	for _, m := range st.Ix.Mods {
@@ -185,6 +214,7 @@ func replacementCandidate(st *LoadoutState, old *store.Mod, r *Replacement) *sto
 func (a *App) ReplacementSuggestions(st *LoadoutState) []ReplacementSuggestion {
 	var out []ReplacementSuggestion
 	seen := map[string]bool{}
+	ignored := a.ignoredReplacements(st)
 	for _, e := range st.List {
 		m := st.Ix.ByID[e.Instance]
 		if m == nil || seen[m.ID] {
@@ -192,7 +222,7 @@ func (a *App) ReplacementSuggestions(st *LoadoutState) []ReplacementSuggestion {
 		}
 		seen[m.ID] = true
 		r := a.replacementFor(st, m)
-		if r == nil {
+		if r == nil || ignored(m, r) {
 			continue
 		}
 		target := SortMod{Name: r.NewName, PackageID: dependencyPackage(r.NewPackageID), WorkshopID: numericWorkshopID(r.NewWorkshopID)}
@@ -221,7 +251,16 @@ func (a *App) ReplacementSuggestions(st *LoadoutState) []ReplacementSuggestion {
 // ReplaceRecommended revalidates recommendations against the open plan. All requested
 // originals are replaced in one edit, retaining positions and avoiding duplicate targets.
 func (a *App) ReplaceRecommended(refs []string) (*EditResult, error) {
-	return a.edit("replace recommended mods", func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
+	return a.replaceRecommended(refs, false)
+}
+
+// PreviewReplaceRecommended is ReplaceRecommended without storing the edit.
+func (a *App) PreviewReplaceRecommended(refs []string) (*EditResult, error) {
+	return a.replaceRecommended(refs, true)
+}
+
+func (a *App) replaceRecommended(refs []string, dry bool) (*EditResult, error) {
+	return a.editOrPreview(dry, "replace recommended mods", func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
 		targets := map[string]*store.Mod{}
 		for _, ref := range refs {
 			old, err := st.Ix.ResolveOne(ref)
@@ -331,6 +370,20 @@ func sortCycles(st *LoadoutState, in order.Input, r order.Result) []SortCycle {
 }
 
 // SortNotices is the shared after-sort payload for GUI and CLI, including dry runs.
+// CurrentSortNotices are the notices for the open plan as it is now, without sorting: what
+// the steps after a sort read again after each step (16 §6.1). Cycles need a sort and are left out.
+func (a *App) CurrentSortNotices() (*LoadoutState, SortNotices, error) {
+	st, err := a.Loadout()
+	if err != nil {
+		return nil, SortNotices{}, err
+	}
+	deps, err := a.MissingDependencies(st)
+	if err != nil {
+		return nil, SortNotices{}, err
+	}
+	return st, SortNotices{MissingDependencies: deps, MissingMods: a.MissingMods(st), Replacements: a.ReplacementSuggestions(st)}, nil
+}
+
 type SortNotices struct {
 	MissingDependencies []MissingDependency     `json:"missingDependencies,omitempty"`
 	MissingMods         []MissingMod            `json:"missingMods,omitempty"`

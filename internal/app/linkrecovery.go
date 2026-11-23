@@ -157,37 +157,56 @@ func (a *App) applyLinkRecoveries(p *LinkRepairPlan) error {
 			unlocks = append(unlocks, unlock)
 			locked[l.Mods] = true
 		}
-		r := l.recovery
-		if current[r.row.ID] != r.row {
-			return fmt.Errorf("recovery changed since preview: %s", l.Path)
-		}
-		if a.probe()(l.Game) != nil {
-			return fmt.Errorf("affected game is running: %s", l.Game)
-		}
-		if r.target != "" {
-			state, _ := source.ProbeTarget(r.target)
-			if state != source.TargetPresent {
-				return fmt.Errorf("recovery target is unavailable: %s", r.target)
-			}
-		}
-		if r.absent {
-			path := r.path
-			if path == "" {
-				path = filepath.Join(r.row.Mods, r.row.Name)
-			}
-			if _, err := os.Lstat(path); !os.IsNotExist(err) {
-				return fmt.Errorf("recovery path changed: %s", path)
-			}
-		} else if err := source.VerifyLink(r.snapshot); err != nil {
+		if err := a.verifyRecovery(l, current); err != nil {
 			return err
 		}
-		seen[r.row.Operation]++
+		seen[l.recovery.row.Operation]++
 	}
 	for op, n := range counts {
 		if _, ok := operations[op]; ok && seen[op] != n {
 			return fmt.Errorf("operation affects other games; use links repair --all: %s", op)
 		}
 	}
+	if err := a.finishRecoveries(selected); err != nil {
+		return err
+	}
+	a.modsCopies = nil
+	return nil
+}
+
+// verifyRecovery checks that recovery entry l is as the preview saw it (current holds the
+// ledger rows now), its game is not running and its target and path are as expected.
+func (a *App) verifyRecovery(l *GameLink, current map[int64]store.ManagedLink) error {
+	r := l.recovery
+	if current[r.row.ID] != r.row {
+		return fmt.Errorf("recovery changed since preview: %s", l.Path)
+	}
+	if a.probe()(l.Game) != nil {
+		return fmt.Errorf("affected game is running: %s", l.Game)
+	}
+	if r.target != "" {
+		state, _ := source.ProbeTarget(r.target)
+		if state != source.TargetPresent {
+			return fmt.Errorf("recovery target is unavailable: %s", r.target)
+		}
+	}
+	if r.absent {
+		path := r.path
+		if path == "" {
+			path = filepath.Join(r.row.Mods, r.row.Name)
+		}
+		if _, err := os.Lstat(path); !os.IsNotExist(err) {
+			return fmt.Errorf("recovery path changed: %s", path)
+		}
+	} else if err := source.VerifyLink(r.snapshot); err != nil {
+		return err
+	}
+	return nil
+}
+
+// finishRecoveries updates the records of completed moves once per operation, marks them
+// records-updated, recreates the links to recover and records each entry's phase.
+func (a *App) finishRecoveries(selected []*GameLink) error {
 	updated := map[string]bool{}
 	for _, l := range selected {
 		r := l.recovery
@@ -226,7 +245,6 @@ func (a *App) applyLinkRecoveries(p *LinkRepairPlan) error {
 			return err
 		}
 	}
-	a.modsCopies = nil
 	return nil
 }
 

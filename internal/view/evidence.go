@@ -6,7 +6,6 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/finding"
-	"github.com/ToumanLin/RimArcho/internal/known"
 )
 
 // Can it run's sections and evidence (16 §2.4): the items are shown in sections, and each says
@@ -71,12 +70,26 @@ type Evidence struct {
 }
 
 func evidence(kind, source string) *Evidence {
-	e := &Evidence{Kind: kind, Label: T(evidenceLabels[kind]), Source: source}
-	if kind == EvCorpus {
-		e.Cutoff = known.Get().Cutoff
-		if e.Cutoff != "" {
-			e.Label = Tf("%s (up to %s)", e.Label, e.Cutoff)
+	return &Evidence{Kind: kind, Label: T(evidenceLabels[kind]), Source: source}
+}
+
+// withCutoff labels a shared-logs chip with the month its data covers up to. The month comes
+// with the finding (app corpusRef: "log corpus to 2026-10"), from its own environment's
+// corpus data, never from a process-wide choice.
+func withCutoff(e *Evidence, p *app.Problem) *Evidence {
+	for _, ev := range p.Evidence {
+		if c, ok := strings.CutPrefix(ev.Ref, "log corpus to "); ok {
+			return cutoffChip(e, c)
 		}
+	}
+	return e
+}
+
+// cutoffChip adds the month a shared-logs chip's data covers up to ("" leaves it as is).
+func cutoffChip(e *Evidence, month string) *Evidence {
+	if month != "" {
+		e.Cutoff = month
+		e.Label = Tf("%s (up to %s)", e.Label, month)
 	}
 	return e
 }
@@ -139,6 +152,8 @@ func evidenceFor(p *app.Problem) *Evidence {
 		return evidence(EvDeclared, T("the mods' load-order requirements"))
 	case "official.order":
 		return evidence(EvInferred, T("the game loads Core and the DLCs first"))
+	case app.CodeCoreMissing:
+		return evidence(EvInferred, T("the game needs Core in the list"))
 	case "pkg.duplicate-active":
 		return evidence(EvInferred, T("two folders have the same package id"))
 	case "entry.missing":
@@ -182,7 +197,9 @@ var (
 )
 
 // corpusEvidence is the community logs chip: what share of the shared logs showed the error.
-func corpusEvidence(p *app.Problem) *Evidence {
+func corpusEvidence(p *app.Problem) *Evidence { return withCutoff(corpusShare(p), p) }
+
+func corpusShare(p *app.Problem) *Evidence {
 	share := func(a, b string) string {
 		x, y := atoi(a), atoi(b)
 		if y == 0 {

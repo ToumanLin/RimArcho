@@ -12,10 +12,17 @@ export const icon = {
   err: svg('<circle cx="8" cy="8" r="6"/><path d="M5.8 5.8l4.4 4.4M10.2 5.8l-4.4 4.4"/>', "err"),
   warn: svg('<path d="M8 2.2l6.2 11H1.8z"/><path d="M8 6.6v3M8 11.4v.2"/>', "warn"),
   hint: svg('<circle cx="8" cy="8" r="6"/><path d="M8 7v4M8 4.6v.2"/>', "hint"),
+  // only the game's version is not declared (view.StatusVersion, 16 §5): quiet, not a warning
+  vers: svg('<circle cx="8" cy="8" r="5.8"/><path d="M8 4.9V8l2.1 1.5"/>', "vers"),
   log: svg('<rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5 6h6M5 8.5h6M5 11h3.5"/>', "log"),
   unloadable: svg('<circle cx="8" cy="8" r="5.6" stroke-dasharray="2.2 2"/>', "dim"),
   rescan: svg('<path d="M13.2 8a5.2 5.2 0 1 1-1.6-3.8"/><path d="M13.4 2.6v2.8h-2.8"/>'),
   ok: svg('<path d="M3.2 8.4l3 3 6.6-6.8"/>', "ok"),
+  // What RimArcho did (16 §2.16): the operation log's icons and its refused mark
+  bin: svg('<path d="M3 4.4h10M6.2 4.4V2.8h3.6v1.6M4.3 4.4l.7 8.8h6l.7-8.8M6.8 6.8v4.4M9.2 6.8v4.4"/>'),
+  link: svg('<path d="M6.8 9.2a2.6 2.6 0 0 0 3.7 0l2-2a2.6 2.6 0 0 0-3.7-3.7l-.9.9"/><path d="M9.2 6.8a2.6 2.6 0 0 0-3.7 0l-2 2a2.6 2.6 0 0 0 3.7 3.7l.9-.9"/>'),
+  unlink: svg('<path d="M9.6 4.4l.6-.6a2.6 2.6 0 0 1 3.7 3.7l-.6.6M6.4 11.6l-.6.6a2.6 2.6 0 0 1-3.7-3.7l.6-.6M2.6 2.6l10.8 10.8"/>'),
+  refused: svg('<circle cx="8" cy="8" r="5.8"/><path d="M3.9 12.1l8.2-8.2"/>', "refused"),
   // the sidebar (16 §2.1)
   sidebar: svg('<rect x="2" y="2.8" width="12" height="10.4" rx="2"/><path d="M6.2 2.8v10.4"/>'),
   home: svg('<path d="M2.6 7.4L8 2.8l5.4 4.6"/><path d="M4.2 6.2v6.8h7.6V6.2"/>'),
@@ -24,13 +31,23 @@ export const icon = {
   packs: svg('<path d="M2.4 5L8 2.4 13.6 5v6L8 13.6 2.4 11z"/><path d="M2.4 5L8 7.6 13.6 5M8 7.6v6"/>'),
   // Saves (16 §2.11): a save file
   saves: svg('<path d="M3 2.6h7.8l2.6 2.6v8.2H2.6V3z"/><path d="M5.2 2.6v3.2h5V2.6M5 13.4V9.2h6v4.2"/>'),
+  // Play review (16 §2.11): looking back over a playthrough
+  review: svg('<path d="M2.6 8a5.4 5.4 0 1 0 1.6-3.8"/><path d="M2.4 2.4v2.4h2.4M8 5v3.2l2.2 1.4"/>'),
   search: svg('<circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2l3.2 3.2"/>'),
   env: svg('<rect x="2" y="2.8" width="12" height="8.4" rx="1.6"/><path d="M5.6 13.6h4.8M8 11.2v2.4"/>'),
   library: svg('<rect x="2.4" y="2.6" width="3" height="10.8" rx=".8"/><rect x="6.5" y="2.6" width="3" height="10.8" rx=".8"/><path d="M11 3.4l2.6-.6 1.4 10-2.6.6z"/>'),
   log: svg('<path d="M4 1.8h5.2L12.4 5v9.2H4z"/><path d="M9 1.8V5h3.4M6 8h4.4M6 10.6h4.4"/>'),
+  // a speech bubble: the sidebar's Feedback row (16 §2.1)
+  // a flag: report a diagnosis or its data as wrong (16 §2.4, js/reportmark.js)
+  report: svg('<path d="M3.8 14V2.4"/><path d="M3.8 2.8h8.4l-1.9 2.9 1.9 2.9H3.8"/>'),
+  feedback: svg('<path d="M2.5 3.5h11v7.2h-6.2l-3 2.4v-2.4h-1.8z"/><path d="M5.2 6.2h5.6M5.2 8.2h3.6"/>'),
   settings: svg('<path d="M5.60 3.84L6.76 3.36L6.69 1.84L9.31 1.84L9.24 3.36L10.40 3.84L10.40 3.84L11.39 4.61L12.68 3.78L13.99 6.05L12.64 6.76L12.80 8.00L12.80 8.00L12.64 9.24L13.99 9.95L12.68 12.22L11.39 11.39L10.40 12.16L10.40 12.16L9.24 12.64L9.31 14.16L6.69 14.16L6.76 12.64L5.60 12.16L5.60 12.16L4.61 11.39L3.32 12.22L2.01 9.95L3.36 9.24L3.20 8.00L3.20 8.00L3.36 6.76L2.01 6.05L3.32 3.78L4.61 4.61L5.60 3.84Z"/><circle cx="8" cy="8" r="2.1"/>'),
   play: svg('<path d="M5 3.2v9.6L12.6 8z"/>', "fill"),
   plus: svg('<path d="M8 3v10M3 8h10"/>'),
+  // the steps after a sort (16 §6.1): sort, replace, undo
+  order: svg('<path d="M5 13V3M2.8 5.2L5 3l2.2 2.2M11 3v10M8.8 10.8L11 13l2.2-2.2"/>'),
+  swap: svg('<path d="M3 5.5h9.5M10 3l2.5 2.5L10 8M13 10.5H3.5M6 8l-2.5 2.5L6 13"/>'),
+  undo: svg('<path d="M5.5 3.6L2.8 6.3 5.5 9"/><path d="M3 6.3h6.2a3.4 3.4 0 0 1 0 6.8H6.4"/>'),
   // Background tasks: stacked bars, the work in a queue
   tasks: svg('<path d="M3 4.5h10M3 8h10M3 11.5h6"/>'),
   chev: svg('<path d="M6 4l4 4-4 4"/>'),
@@ -43,15 +60,19 @@ export const icon = {
   // the list management page (16 §2.17)
   import: svg('<path d="M8 2.4v7.2M5.2 6.8L8 9.6l2.8-2.8"/><path d="M2.8 10.4v2.2h10.4v-2.2"/>'),
   export: svg('<path d="M8 9.6V2.4M5.2 5.2L8 2.4l2.8 2.8"/><path d="M2.8 10.4v2.2h10.4v-2.2"/>'),
+  // the list editor's head (16 §2.5): rename, and import / export (both ways through a tray)
+  edit: svg('<path d="M10.6 2.8l2.6 2.6-7.4 7.4H3.2v-2.6z"/><path d="M9.2 4.2l2.6 2.6"/>'),
+  io: svg('<path d="M5.6 9.2V2.6M3.6 4.6l2-2 2 2M10.4 2.6v6.6M8.4 7.2l2 2 2-2"/><path d="M2.6 11.2v2.2h10.8v-2.2"/>'),
   more: svg('<circle cx="3.6" cy="8" r=".9"/><circle cx="8" cy="8" r=".9"/><circle cx="12.4" cy="8" r=".9"/>', "fill"),
   ext: svg('<path d="M9.4 2.6h4v4M13.2 2.8L7.6 8.4"/><path d="M11.8 9.6v3.6H2.8V4.2h3.6"/>'),
 };
 
 export function sourceIcon(kind) { return icon[kind] || icon.local; }
 
-// statusIcon: view.Status* (none, unloadable, warn, log, err).
+// statusIcon: view.Status* (none, unloadable, warn, log, err; hint -1, version -2).
 export function statusIcon(s) {
   if (s === -1) return icon.hint;
+  if (s === -2) return icon.vers;
   return ["", icon.unloadable, icon.warn, icon.log, icon.err][s] || "";
 }
 

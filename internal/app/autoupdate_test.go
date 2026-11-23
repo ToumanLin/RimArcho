@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -26,29 +27,30 @@ import (
 func TestAutomaticLoopStartupIntervalAndCancellation(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
-		calls := 0
-		go app.AutomaticLoop(ctx, func(context.Context) { calls++ })
+		var n atomic.Int32
+		calls := func() int32 { return n.Load() }
+		go app.AutomaticLoop(ctx, func(context.Context) { n.Add(1) })
 		time.Sleep(19 * time.Second)
 		synctest.Wait()
-		if calls != 0 {
+		if calls() != 0 {
 			t.Fatal("startup check blocked first paint")
 		}
 		time.Sleep(time.Second)
 		synctest.Wait()
-		if calls != 1 {
-			t.Fatal(calls)
+		if calls() != 1 {
+			t.Fatal(calls())
 		}
 		time.Sleep(time.Minute)
 		synctest.Wait()
-		if calls != 2 {
-			t.Fatal(calls)
+		if calls() != 2 {
+			t.Fatal(calls())
 		}
 		cancel()
 		synctest.Wait()
 		time.Sleep(time.Hour)
 		synctest.Wait()
-		if calls != 2 {
-			t.Fatal("resident checks after close", calls)
+		if calls() != 2 {
+			t.Fatal("resident checks after close", calls())
 		}
 	})
 }

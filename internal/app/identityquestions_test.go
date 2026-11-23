@@ -114,7 +114,7 @@ func TestIdentityQuestionsRecheckStored(t *testing.T) {
 			var answered int64
 			for n := 0; n < 67; n++ {
 				m := one(t, e, fmt.Sprintf("New %02d", n))
-				r, err := e.App.Store.DB.Exec(`INSERT INTO identity_question(environment_id,scan_id,instance_id,observation_snapshot_id,candidate_instance_id,score)
+				r, err := e.App.Store.DB.Exec(`INSERT INTO identity_question(game_id,scan_id,instance_id,observation_snapshot_id,candidate_instance_id,score)
 			VALUES(?,?,?,?,?,1)`, mustEnv(t, e), sid, m.ID, m.SnapID, old.ID)
 				if err != nil {
 					t.Fatal(err)

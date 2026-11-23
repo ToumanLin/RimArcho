@@ -28,6 +28,7 @@ const (
 
 type palItem struct {
 	kind  palKind
+	id    string // a command's ID (view.Commands)
 	name  string // shown
 	alias string // English alias of a command
 	match string // matches but is not shown: a command's ID
@@ -111,6 +112,16 @@ func (m *model) palRunOf(id string) func(m *model) tea.Cmd {
 		return func(m *model) tea.Cmd { return m.choosePlan() }
 	case "new-plan":
 		return func(m *model) tea.Cmd { return m.newPlan() }
+	}
+	return m.palRunMore(id)
+}
+
+// palRunMore is palRunOf for the palette entries from "restore-all" on.
+func (m *model) palRunMore(id string) func(m *model) tea.Cmd {
+	list := func(key string) func(m *model) tea.Cmd {
+		return func(m *model) tea.Cmd { m.tab = tabList; return m.listKey(key) }
+	}
+	switch id {
 	case "restore-all":
 		return list("T")
 	case "stage-all":
@@ -141,98 +152,12 @@ func (m *model) palRunOf(id string) func(m *model) tea.Cmd {
 		return func(m *model) tea.Cmd { m.showTasks(); return nil }
 	case "packs":
 		// The packs as text (10); build and play them with the commands shown.
-		return func(m *model) tea.Cmd {
-			var b strings.Builder
-			rows, others, err := view.PackRows(m.app)
-			if err != nil {
-				b.WriteString(err.Error() + "\n")
-			}
-			if others > 0 {
-				b.WriteString(Tf("%d packs belong to other games (archo pack list)", others) + "\n\n")
-			}
-			// Builds running (the window's, the CLI's) or cut short.
-			if un, err := view.UnfinishedRows(m.app); err == nil {
-				for _, u := range un {
-					if u.Running {
-						fmt.Fprintf(&b, "%s\n  %s\n  : archo pack stop %q\n\n", Tf("creating pack %s", u.Name), u.Facts, u.Name)
-					} else {
-						fmt.Fprintf(&b, "⚠ %s\n  %s\n  : archo pack build %q\n  : archo pack remove %q --unfinished\n\n", u.Name, u.Facts, u.Name, u.Name)
-					}
-				}
-			}
-			for _, r := range rows {
-				fmt.Fprintf(&b, "%s\n  %s, %s\n  : archo pack launch %q\n\n", r.Name, r.Facts, r.Played, r.Name)
-			}
-			if len(rows) == 0 {
-				b.WriteString(T("no packs yet: a pack fixes the current list — every mod as it is now, without the files of other game versions — and plays with its own saves") + "\n\n")
-			}
-			b.WriteString(": archo pack build <name>\n")
-			m.openPanel(T("packs"), b.String())
-			m.panel.wrap = true // prose: it wraps (16 §9.1)
-			return nil
-		}
+		return func(m *model) tea.Cmd { return m.packsPanel() }
 	case "settings":
 		// The settings page as text (16 §2.14); each value says the command that changes it.
-		return func(m *model) tea.Cmd {
-			var b strings.Builder
-			groups := view.SettingsPage(m.app, m.st)
-			groups = slices.Insert(groups, 1, view.EnvGroups(m.app, m.st)...)
-			for _, g := range groups {
-				b.WriteString(g.Title + "\n")
-				if g.Note != "" {
-					fmt.Fprintf(&b, "  %s\n", g.Note)
-				}
-				for _, it := range g.Items {
-					value := it.Value
-					if it.URL != "" {
-						value = it.URL
-					}
-					for i, choice := range it.Choices {
-						if choice == value && i < len(it.ChoiceLabels) {
-							value = it.ChoiceLabels[i]
-							break
-						}
-					}
-					fmt.Fprintf(&b, "  %s: %s", it.Label, value)
-					if it.ValueNote != "" {
-						fmt.Fprintf(&b, "  %s", it.ValueNote)
-					}
-					b.WriteString("\n")
-					for _, link := range it.Links {
-						fmt.Fprintf(&b, "    %s: %s\n", link.Label, link.URL)
-					}
-					if it.Note != "" {
-						fmt.Fprintf(&b, "    %s\n", it.Note)
-					}
-					if len(it.Argv) > 0 {
-						fmt.Fprintf(&b, "    : archo %s\n", strings.Join(it.Argv, " "))
-					}
-					if len(it.MoveArgv) > 0 {
-						fmt.Fprintf(&b, "    : archo %s\n", strings.Join(it.MoveArgv, " "))
-					}
-					for _, a := range it.Actions {
-						if a.Argv[0] == "import-managers" {
-							fmt.Fprintf(&b, "    %s  : archo gui\n", a.Label)
-							continue
-						}
-						if a.Argv[0] == "feedback" { // a panel, not a command (16 §2.14)
-							fmt.Fprintf(&b, "    %s  ctrl+k %s\n", a.Label, T("feedback"))
-							continue
-						}
-						argv := strings.Join(a.Argv, " ")
-						if a.Argv[len(a.Argv)-1] == "" {
-							argv += strconv.Quote("")
-						}
-						fmt.Fprintf(&b, "    %s  : archo %s\n", a.Label, argv)
-					}
-				}
-				b.WriteString("\n")
-			}
-			m.openPanel(T("settings"), b.String())
-			return nil
-		}
+		return func(m *model) tea.Cmd { return m.settingsTextPanel() }
 	case "feedback":
-		return func(m *model) tea.Cmd { return m.feedbackPanel(view.FeedbackOptions{}) }
+		return func(m *model) tea.Cmd { m.fbSeed = nil; return m.feedbackPanel(view.FeedbackProblem{}) }
 	case "uninstall":
 		return func(m *model) tea.Cmd { return m.uninstallPanel() }
 	case "update":
@@ -247,11 +172,104 @@ func (m *model) palRunOf(id string) func(m *model) tea.Cmd {
 	return func(m *model) tea.Cmd { return nil }
 }
 
+// packsPanel shows the packs as text (10); build and play them with the commands shown.
+func (m *model) packsPanel() tea.Cmd {
+	var b strings.Builder
+	rows, others, err := view.PackRows(m.app)
+	if err != nil {
+		b.WriteString(err.Error() + "\n")
+	}
+	if others > 0 {
+		b.WriteString(Tf("%d packs belong to other games (archo pack list)", others) + "\n\n")
+	}
+	// Builds running (the window's, the CLI's) or cut short.
+	if un, err := view.UnfinishedRows(m.app); err == nil {
+		for _, u := range un {
+			if u.Running {
+				fmt.Fprintf(&b, "%s\n  %s\n  : archo pack stop %q\n\n", Tf("creating pack %s", u.Name), u.Facts, u.Name)
+			} else {
+				fmt.Fprintf(&b, "⚠ %s\n  %s\n  : archo pack build %q\n  : archo pack remove %q --unfinished\n\n", u.Name, u.Facts, u.Name, u.Name)
+			}
+		}
+	}
+	for _, r := range rows {
+		fmt.Fprintf(&b, "%s\n  %s, %s\n  : archo pack launch %q\n\n", r.Name, r.Facts, r.Played, r.Name)
+	}
+	if len(rows) == 0 {
+		b.WriteString(T("no packs yet: a pack fixes the current list — every mod as it is now, without the files of other game versions — and plays with its own saves") + "\n\n")
+	}
+	b.WriteString(": archo pack build <name>\n")
+	m.openPanel(T("packs"), b.String())
+	m.panel.wrap = true // prose: it wraps (16 §9.1)
+	return nil
+}
+
+// settingsTextPanel shows the settings page as text (16 §2.14); each value says the
+// command that changes it.
+func (m *model) settingsTextPanel() tea.Cmd {
+	var b strings.Builder
+	groups := view.SettingsPage(m.app, m.st)
+	groups = slices.Insert(groups, 1, view.EnvGroups(m.app, m.st)...)
+	for _, g := range groups {
+		b.WriteString(g.Title + "\n")
+		if g.Note != "" {
+			fmt.Fprintf(&b, "  %s\n", g.Note)
+		}
+		for _, it := range g.Items {
+			value := it.Value
+			if it.URL != "" {
+				value = it.URL
+			}
+			for i, choice := range it.Choices {
+				if choice == value && i < len(it.ChoiceLabels) {
+					value = it.ChoiceLabels[i]
+					break
+				}
+			}
+			fmt.Fprintf(&b, "  %s: %s", it.Label, value)
+			if it.ValueNote != "" {
+				fmt.Fprintf(&b, "  %s", it.ValueNote)
+			}
+			b.WriteString("\n")
+			for _, link := range it.Links {
+				fmt.Fprintf(&b, "    %s: %s\n", link.Label, link.URL)
+			}
+			if it.Note != "" {
+				fmt.Fprintf(&b, "    %s\n", it.Note)
+			}
+			if len(it.Argv) > 0 {
+				fmt.Fprintf(&b, "    : archo %s\n", strings.Join(it.Argv, " "))
+			}
+			if len(it.MoveArgv) > 0 {
+				fmt.Fprintf(&b, "    : archo %s\n", strings.Join(it.MoveArgv, " "))
+			}
+			for _, a := range it.Actions {
+				if a.Argv[0] == "import-managers" || a.Argv[0] == "guide-preview" {
+					fmt.Fprintf(&b, "    %s  : archo gui\n", a.Label)
+					continue
+				}
+				if a.Argv[0] == "feedback" { // a panel, not a command (16 §2.14)
+					fmt.Fprintf(&b, "    %s  ctrl+k %s\n", a.Label, T("feedback"))
+					continue
+				}
+				argv := strings.Join(a.Argv, " ")
+				if a.Argv[len(a.Argv)-1] == "" {
+					argv += strconv.Quote("")
+				}
+				fmt.Fprintf(&b, "    %s  : archo %s\n", a.Label, argv)
+			}
+		}
+		b.WriteString("\n")
+	}
+	m.openPanel(T("settings"), b.String())
+	return nil
+}
+
 // palCommands: every command of the main screen.
 func (m *model) palCommands() []palItem {
 	var out []palItem
 	for _, e := range view.CommandEntries() {
-		out = append(out, palItem{kind: palCommand, name: e.Name, alias: e.Alias, match: e.Match, desc: e.Desc, run: m.palRun(e.ID)})
+		out = append(out, palItem{kind: palCommand, id: e.ID, name: e.Name, alias: e.Alias, match: e.Match, desc: e.Desc, run: m.palRun(e.ID)})
 	}
 	return out
 }
@@ -259,13 +277,14 @@ func (m *model) palCommands() []palItem {
 // palAll: commands, then the other environments, then every mod.
 func (m *model) palAll() []palItem {
 	out := m.palCommands()
-	if envs, err := m.app.Store.Envs(); err == nil {
+	if envs := view.EnvironmentRows(m.app, ""); len(envs) > 0 {
 		for _, e := range envs {
-			if e.Name == m.envName {
-				continue
-			}
 			name := e.Name
-			out = append(out, palItem{kind: palEnv, name: Tf("switch to %s", name), alias: name, desc: "env", run: func(m *model) tea.Cmd {
+			label := Tf("switch to %s", name) + "  " + e.Installation
+			if name == m.envName {
+				label = name + "  " + e.Installation + "  " + T("current")
+			}
+			out = append(out, palItem{kind: palEnv, name: label, alias: name, run: func(m *model) tea.Cmd {
 				m.app.EnvName = ""
 				if m.act(Tf("switched to %s", name), "env", "use", name) {
 					for k := range m.cols {
@@ -308,13 +327,23 @@ func palScore(q string, it palItem) int {
 func (m *model) palFilter() {
 	p := m.pal
 	all := m.palAll()
+	// a command's entry carries its ID, so the screen's own commands come first (16 §3.5),
+	// as in the window; the rest carry their index
 	entries := make([]view.PalEntry, len(all))
+	cmdAt := map[string]int{}
 	for i, it := range all {
-		entries[i] = view.PalEntry{Kind: int(it.kind), ID: strconv.Itoa(i), Name: it.name, Alias: it.alias, Match: it.match, Desc: it.desc}
+		id := strconv.Itoa(i)
+		if it.kind == palCommand && it.id != "" {
+			id, cmdAt[it.id] = it.id, i
+		}
+		entries[i] = view.PalEntry{Kind: int(it.kind), ID: id, Name: it.name, Alias: it.alias, Match: it.match, Desc: it.desc}
 	}
 	p.results = p.results[:0]
-	for _, e := range view.PalRank(p.query, entries) {
-		n, _ := strconv.Atoi(e.ID)
+	for _, e := range view.PalRankPage(p.query, m.pageName(), entries) {
+		n, ok := cmdAt[e.ID]
+		if !ok || e.Kind != int(palCommand) {
+			n, _ = strconv.Atoi(e.ID)
+		}
 		it := all[n]
 		it.score = e.Score
 		p.results = append(p.results, it)
@@ -375,7 +404,7 @@ func (m *model) paletteLines(n int) []string {
 	// the input's cursor is the filter bar's ▌ (one cursor style, 16 §7)
 	out := []string{"  " + sAccent.Render(markPrompt+" ") + sText.Render(p.query) + sDimS.Render(fit("▌", max(w-4-width.StringWidth(p.query), 1))), ""}
 	// commands are what the palette is for and carry no tag; a Mod, game or list says so
-	kinds := map[palKind]string{palMod: "Mod", palEnv: T("game"), palPlan: T("list")}
+	kinds := map[palKind]string{palMod: "Mod", palEnv: T("Game Config"), palPlan: T("list")}
 	rows := max(n-len(out), 1)
 	off := max(0, p.sel-rows+1)
 	for i := off; i < len(p.results) && len(out) < n; i++ {
@@ -383,6 +412,7 @@ func (m *model) paletteLines(n int) []string {
 		tag := kinds[it.kind]
 		tw := width.StringWidth(tag)
 		name := it.name
+
 		if it.kind == palCommand && it.alias != "" && it.alias != it.name {
 			name += "  " + sDimS.Render(it.alias)
 		}

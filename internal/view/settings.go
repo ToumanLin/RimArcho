@@ -2,9 +2,11 @@ package view
 
 import (
 	"fmt"
+	"github.com/ToumanLin/RimArcho/internal/env"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/buildinfo"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/netcfg"
@@ -44,6 +46,10 @@ type SettingItem struct {
 	URL     string          `json:"url,omitempty"`
 	Links   []CommunityLink `json:"links,omitempty"`
 	Actions []SettingAction `json:"actions,omitempty"`
+	// Disk: the folder's drive, free of total, for the GUI's meter (16 §7 principle 9)
+	Disk *DiskMeter `json:"disk,omitempty"`
+	// Rel: a Folders row's folder under its fold's root (FolderFold), shown in its place.
+	Rel string `json:"rel,omitempty"`
 	// Details fold under the row (16 §3.1 rule 7): RimArcho's release notes.
 	Details *SettingDetails `json:"details,omitempty"`
 }
@@ -63,15 +69,25 @@ type SettingAction struct {
 	Confirm string   `json:"confirm,omitempty"`
 	Task    string   `json:"task,omitempty"`
 	Pending string   `json:"pending,omitempty"`
+	// URL opens a web page instead of running Argv; Note sits beside the button and Copy is
+	// what its copy icon copies (the manual RimArcho update's share and password, 17 §5.1).
+	URL  string `json:"url,omitempty"`
+	Note string `json:"note,omitempty"`
+	Copy string `json:"copy,omitempty"`
+	// Pick "zip": the player chooses a downloaded file, whose path replaces {} in Argv.
+	Pick string `json:"pick,omitempty"`
 }
 
 // SettingTask identifies commands that queue after confirmation (16 §2.14, 16 §2.16).
 func SettingTask(argv []string) string {
 	if len(argv) > 0 && argv[0] == "update" {
-		if len(argv) == 1 {
+		if len(argv) == 1 || len(argv) == 3 && argv[1] == "--from" && argv[2] != "" {
 			return TaskSelfUpdate
 		}
-		return TaskSelfCheck
+		if len(argv) == 2 && argv[1] == "--check" {
+			return TaskSelfCheck
+		}
+		return ""
 	}
 	if len(argv) == 3 && argv[0] == "deps" {
 		if argv[1] == "remove" {
@@ -83,6 +99,9 @@ func SettingTask(argv []string) string {
 	}
 	if len(argv) > 0 && argv[0] == "gc" {
 		return TaskGC
+	}
+	if len(argv) == 2 && argv[0] == "agent" && argv[1] == "install" && buildinfo.AgentOn() {
+		return TaskAgentInstall
 	}
 	if len(argv) < 2 {
 		return ""
@@ -109,7 +128,7 @@ func TaskPending(kind string) string {
 		return T("removing…")
 	case TaskData:
 		return T("updating…")
-	case TaskSelfUpdate:
+	case TaskSelfUpdate, TaskAgentInstall:
 		return T("installing…")
 	case TaskSelfCheck:
 		return T("checking…")
@@ -128,22 +147,39 @@ type SettingGroup struct {
 	// Note is said once under the heading instead of on every row.
 	Note  string        `json:"note,omitempty"`
 	Items []SettingItem `json:"items"`
+	// Folds group Folders' directory rows by root in the GUI (16 §2.14); rows in no fold
+	// (adding a folder) follow them.
+	Folds []FolderFold `json:"folds,omitempty"`
 }
 
 // EnvRow is an environment on the environment page.
 type EnvRow struct {
-	Name    string `json:"name"`
-	Path    string `json:"path"`
-	Game    string `json:"game"` // "1.6.4633  D:\…\RimWorld"
-	Current bool   `json:"current"`
+	Installation string `json:"installation"`
+	GameID       string `json:"gameID"`
+	Name         string `json:"name"`
+	Path         string `json:"path"`
+	Game         string `json:"game"`            // "1.6.4633  D:\…\RimWorld"
+	Build        string `json:"build,omitempty"` // "Proton" (ProtonBadge), also in Installation
+	Current      bool   `json:"current"`
 }
 
 // EnvPage is the environment page: the environments, and the current one's game folder,
 // version, launch and saves (what belongs to one game, 03 §2; the mod folders every game
 // shares are on the settings page).
 type EnvPage struct {
-	Envs   []EnvRow       `json:"envs"`
-	Groups []SettingGroup `json:"groups"`
+	Envs    []EnvRow       `json:"envs"`
+	Groups  []SettingGroup `json:"groups"`
+	Notices []string       `json:"notices,omitempty"`
+}
+
+// AliasNoticeText is the shared-game-folder notice while the player has not acknowledged it
+// (app.AliasNotice), or "".
+func AliasNoticeText(a *app.App) string {
+	names := a.AliasNotice()
+	if len(names) == 0 {
+		return ""
+	}
+	return Tf("these two Game Configs use the same game folder: %s", strings.Join(names, ", "))
 }
 
 // BuildEnvPage builds the environment page.
@@ -153,11 +189,11 @@ func BuildEnvPage(a *app.App, st *app.LoadoutState) *EnvPage {
 	if st != nil {
 		cur = st.Ix.Env.ID
 	}
-	if envs, err := a.Store.Envs(); err == nil {
-		for _, e := range envs {
-			p.Envs = append(p.Envs, EnvRow{Name: e.Name, Game: e.GameVersion + "  " + e.GameRoot, Path: e.GameRoot, Current: e.ID == cur})
-		}
+	p.Envs = EnvironmentRows(a, cur)
+	if text := AliasNoticeText(a); text != "" {
+		p.Notices = []string{text}
 	}
+
 	return p
 }
 
@@ -171,21 +207,26 @@ func EnvGroups(a *app.App, st *app.LoadoutState) []SettingGroup {
 	if version == "" {
 		version = T("unknown")
 	}
-	saves := SettingItem{Label: T("saves"), Value: a.Saves(e), Edit: "choice", Choices: []string{app.SavesShared, app.SavesOwn},
-		ChoiceLabels: []string{T("shared (the game's default folder)"), T("its own")}, Argv: []string{"env", "set", e.Name, "--saves", "{}"}, Note: e.UserDataRoot, NotePaths: []string{e.UserDataRoot}}
-	if saves.Value == app.SavesCustom {
-		saves.Choices = append([]string{app.SavesCustom}, saves.Choices...)
-		saves.ChoiceLabels = append([]string{T("a folder you chose")}, saves.ChoiceLabels...)
+	if b := ProtonBadge(e.GameRoot); b != "" {
+		version += "  " + b
 	}
-	return []SettingGroup{{Title: T("this game"), Items: []SettingItem{
-		{Label: T("game folder"), Value: e.GameRoot, ValuePath: true, Edit: "path", Argv: []string{"env", "set", e.Name, "--game", "{}"},
-			Note: T("RimArcho checks that the mods are still the same before it moves them over")},
-		{Key: "game.version", Label: T("game version"), Value: version},
-		{Label: T("start the game through"), Value: e.Launch, Edit: "choice", Choices: []string{"steam", "direct"},
-			ChoiceLabels: []string{"Steam", T("the game's own exe")}, Argv: []string{"env", "set", e.Name, "--launch", "{}"}},
-		saves,
-		{Label: T("extra arguments"), Value: a.LaunchArgs(e.ID), Edit: "text", Argv: []string{"env", "set", e.Name, "--launch-args", "{}"},
-			Note: T("for example -popupwindow")},
+	current := ""
+	if p, _ := a.Store.CurrentPlan(e.ID); p != nil {
+		current = p.Name
+	}
+	return []SettingGroup{{Title: T("Game Config"), Items: []SettingItem{
+		{Key: "environment.name", Label: T("name"), Value: e.Name, Edit: "text", Argv: []string{"env", "set", e.Name, "--name", "{}"}},
+		{Label: T("game folder"), Value: e.GameRoot, ValuePath: true, Note: version, Edit: "path", Argv: []string{"env", "set", e.Name, "--game", "{}"}},
+		// shared / own / a folder the player chooses (custom: the page asks for the folder,
+		// then runs env set --user-data); the folder itself is the note
+		{Key: "environment.saves", Label: T("saves folder"), Value: a.Saves(e), Edit: "choice",
+			Choices:      []string{app.SavesShared, app.SavesOwn, app.SavesCustom},
+			ChoiceLabels: []string{T("shared (the game's default folder)"), T("own folder in RimArcho"), T("a folder you choose")},
+			Argv:         []string{"env", "set", e.Name, "--saves", "{}"}, Note: e.UserDataRoot, NotePaths: []string{e.UserDataRoot}},
+		{Key: "environment.list", Label: T("Mod list"), Value: current},
+		{Label: T("start the game through"), Value: e.Launch, Edit: "choice", Choices: []string{"steam", "direct"}, ChoiceLabels: []string{"Steam", T("the game's own exe")}, Argv: []string{"env", "set", e.Name, "--launch", "{}"}},
+		{Label: T("extra arguments"), Value: app.DisplayLaunchArgs(a.LaunchArgs(e.ID)), Edit: "text", Argv: []string{"env", "set", e.Name, "--launch-args", "{}"}},
+		{Key: "environment.remove", Label: T("remove Game Config"), Actions: []SettingAction{{Label: T("remove Game Config"), Argv: []string{"env", "remove", e.Name}}}},
 	}}}
 }
 
@@ -265,6 +306,10 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		{Label: T("language"), Value: cmds.Setting(a, "ui.lang"), Edit: "choice", Choices: languageChoices(), ChoiceLabels: languageLabels(), Argv: []string{"config", "set", "ui.lang", "{}"}},
 		{Label: T("day/night theme"), Value: cmds.Setting(a, "ui.theme"), Edit: "segments", Choices: cmds.SettingChoices("ui.theme"),
 			ChoiceLabels: []string{T("follow system"), T("light"), T("dark")}, Argv: []string{"config", "set", "ui.theme", "{}"}},
+		{Label: T("interface size"), Value: cmds.Setting(a, "ui.zoom"), Edit: "segments", Choices: cmds.SettingChoices("ui.zoom"),
+			ChoiceLabels: []string{"100%", "110%", "125%", "150%"},
+			Hover:        T("makes text and controls larger together; for 2K and 4K screens at 100% Windows scaling"),
+			Argv:         []string{"config", "set", "ui.zoom", "{}"}},
 		{Label: T("accent colour"), Value: cmds.Setting(a, "ui.accent"), Edit: "swatches", Choices: cmds.SettingChoices("ui.accent"),
 			ChoiceLabels: []string{T("default"), T("indigo"), T("blue"), T("cyan"), T("teal"), T("green"), T("grass"), T("orange"), T("amber"), T("red"), T("crimson"), T("pink"), T("plum"), T("purple"), T("violet"), T("iris")},
 			Custom:       T("custom…"),
@@ -274,12 +319,15 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		gpu,
 		{Label: T("Archo animation"), Value: cmds.Setting(a, "ui.archo.motion"), Edit: "segments",
 			Choices: []string{"off", "still", "live"}, ChoiceLabels: []string{T("off"), T("still"), T("animated")},
-			Hover: T("Archo's figure while pages load and in the first-run guide; still uses no GPU"),
+			Hover: T("Archo's figure while pages load and in the first-run guide; still shows one picture per expression"),
 			Argv:  []string{"config", "set", "ui.archo.motion", "{}"}},
 		{Label: T("motion"), Value: cmds.Setting(a, "ui.motion"), Edit: "segments", Choices: cmds.SettingChoices("ui.motion"),
 			ChoiceLabels: []string{T("follow system"), T("reduced")},
 			Hover:        T("reduced keeps the window still: the sidebar, lists, pages and status line change without sliding or fading; follow system uses the Windows animation setting"),
 			Argv:         []string{"config", "set", "ui.motion", "{}"}},
+		// the first run, shown again without writing anything (16 §2.15)
+		{Key: "guide.preview", Label: T("first-run guide"), Note: T("nothing you choose is saved"),
+			Actions: []SettingAction{{Label: T("preview…"), Argv: []string{"guide-preview"}}}},
 	}}, AccountGroup(a), AutomaticGroup(a)}
 
 	// RimArcho's folders, each with relocation controls, then adding a mod folder.
@@ -305,7 +353,11 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	} else {
 		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon}})
 	}
-	out = append(out, NetworkGroup(a), DependencyGroup(a))
+	out = append(out, NetworkGroup(a))
+	if g, ok := AgentGroup(a); ok {
+		out = append(out, g)
+	}
+	out = append(out, DependencyGroup(a))
 
 	data := SettingGroup{Title: T("community data")}
 	status := a.DataStatus()
@@ -341,7 +393,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 			{Label: T("compact"), Argv: []string{"db", "vacuum"}},
 			{Label: T("remove old tombstones"), Argv: []string{"gc"}, Confirm: T("mods gone for longer than the tombstone time are forgotten")},
 		}},
-		{Key: "import.managers", Label: T("import from RimSort or RimCrow"), Actions: []SettingAction{{Label: T("import…"), Argv: []string{"import-managers"}}}},
+		{Key: "import.managers", Label: T("import from RimSort, RimCrow or RimPy"), Actions: []SettingAction{{Label: T("import…"), Argv: []string{"import-managers"}}}},
 	}}
 	for _, c := range a.Caches() {
 		storage.Items = append(storage.Items, SettingItem{Label: T(c.Desc), Value: Tf("%s  %d items", SizeText(c.Bytes), c.Files),
@@ -369,27 +421,60 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	return out
 }
 
-// NetworkGroup: the proxy and the GitHub mirror for RimArcho's own downloads (17 §2.2).
-// The window's Workshop pages follow the Windows system proxy on their own.
+// NetworkGroup: the proxy and the GitHub mirror for RimArcho's own downloads (17 §2.2),
+// each with the route its last request actually took. The window's Workshop pages follow
+// the Windows system proxy on their own.
 func NetworkGroup(a *app.App) SettingGroup {
 	proxy := cmds.Setting(a, "network.proxy")
-	via := netcfg.Describe("https://github.com/")
-	now := T("direct")
-	if via != "direct" {
-		now = Tf("through %s", via)
+	var now string
+	if u, ok := netcfg.LastUsed(false); ok {
+		now = Tf("last: %s", RouteText(u.Route))
+	} else if via := netcfg.Describe("https://github.com/"); via == "direct" {
+		now = Tf("now: %s", T("direct"))
+	} else {
+		now = Tf("now: %s", Tf("through %s", via))
 	}
 	mirror := cmds.Setting(a, "network.github_mirror")
 	mv := mirror
-	if mv == "" {
-		mv = T("none: GitHub directly")
+	switch mirror {
+	case "auto":
+		mv = T("automatic")
+	case "off":
+		mv = T("off")
+	}
+	var mnow string
+	if u, ok := netcfg.LastUsed(true); ok {
+		mnow = Tf("last GitHub request: %s", RouteText(u.Route))
+	}
+	var hosts []string
+	for _, m := range netcfg.AutoMirrors {
+		hosts = append(hosts, netcfg.MirrorHost(m))
 	}
 	return SettingGroup{Title: T("network"), Items: []SettingItem{
 		{Label: T("proxy"), Value: proxy, Edit: "text", Argv: []string{"config", "set", "network.proxy", "{}"},
-			ValueNote: Tf("now: %s", now),
-			Note:      T("system follows the Windows proxy (Clash, v2rayN in system proxy mode); off goes direct; or a proxy such as http://127.0.0.1:7890 or socks5://127.0.0.1:7891")},
+			ValueNote: now,
+			Hover:     T("system follows the Windows proxy (Clash, v2rayN) and goes direct when it is not running; Steam goes direct first, so game accelerators keep working; off goes direct only; or a proxy such as http://127.0.0.1:7890 or socks5://127.0.0.1:7891")},
 		{Label: T("GitHub mirror"), Value: mv, EditValue: &mirror, Edit: "text", Argv: []string{"config", "set", "network.github_mirror", "{}"},
-			Note: T("tried before GitHub for community data, updates and todds, e.g. https://gh-proxy.org/; empty goes to GitHub directly. Use one you trust: updates come through it")},
+			ValueNote: mnow,
+			Hover:     Tf("automatic tries GitHub first, then %s; off never uses a mirror; or one mirror tried first, such as https://gh-proxy.org/. RimArcho's own updates are checked against GitHub's checksum, never one from an automatic mirror", strings.Join(hosts, ", "))},
+		{Key: "feedback.replies", Label: T("check for replies to my reports"), Value: cmds.Setting(a, "feedback.replies"), Edit: "choice", Choices: []string{"on", "off"}, ChoiceLabels: []string{T("on"), T("off")},
+			Argv: []string{"config", "set", "feedback.replies", "{}"},
+			Note: T("asks the feedback relay when RimArcho starts and when Feedback opens; nothing else is sent")},
 	}}
+}
+
+// RouteText is a route as netcfg names it (direct, proxy host:port, mirror host) in the
+// display language.
+func RouteText(route string) string {
+	switch {
+	case route == "direct":
+		return T("direct")
+	case strings.HasPrefix(route, "proxy "):
+		return Tf("through proxy %s", strings.TrimPrefix(route, "proxy "))
+	case strings.HasPrefix(route, "mirror "):
+		return Tf("through mirror %s", strings.TrimPrefix(route, "mirror "))
+	}
+	return route
 }
 
 // SettingCommand checks that argv is one of the settings page's commands (the interfaces
@@ -409,8 +494,45 @@ func SettingCommand(argv []string) error {
 	if argv[0] == "gc" {
 		return nil
 	}
-	if argv[0] == "update" && (len(argv) == 1 || len(argv) == 2 && argv[1] == "--check") {
+	// Archo Agent (15 §7), in a build that offers it; the key has its own call (API.SetAgentKey),
+	// never a command line
+	if buildinfo.AgentOn() && (len(argv) == 2 && argv[0] == "agent" && (argv[1] == "install" || argv[1] == "remove") ||
+		len(argv) == 3 && argv[0] == "agent" && argv[1] == "run" && argv[2] == "--window") {
+		return nil
+	}
+	if argv[0] == "update" && (len(argv) == 1 || len(argv) == 2 && argv[1] == "--check" || len(argv) == 3 && argv[1] == "--from" && argv[2] != "") {
 		return nil
 	}
 	return fmt.Errorf("not a settings command: %s", strings.Join(argv, " "))
+}
+
+// EnvironmentRows returns flat config metadata without loading any inventories.
+func EnvironmentRows(a *app.App, current string) []EnvRow {
+	es, err := a.Store.Envs()
+	if err != nil {
+		return nil
+	}
+	var out []EnvRow
+	for _, e := range es {
+		title := "RimWorld"
+		if v := env.MajorMinor(e.GameVersion); v != "" {
+			title += " " + v
+		}
+		build := ProtonBadge(e.GameRoot)
+		if build != "" {
+			title += "  " + build
+		}
+		out = append(out, EnvRow{Name: e.Name, GameID: e.GameID, Installation: title, Path: e.GameRoot, Game: e.GameVersion + "  " + e.GameRoot, Build: build, Current: e.ID == current})
+	}
+	return out
+}
+
+// ProtonBadge is "Proton" for a Windows game that Steam runs through Proton (the layout
+// of 03 §3.2), else "": the badge the guide, the Game Config page and the switchers show
+// beside an install (16 §2.8, §2.15). Only a Linux Steam library has that layout.
+func ProtonBadge(gameRoot string) string {
+	if gameRoot != "" && env.IsProtonGame(gameRoot) {
+		return "Proton"
+	}
+	return ""
 }

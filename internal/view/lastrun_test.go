@@ -81,8 +81,33 @@ func TestLastRunSummary(t *testing.T) {
 	if n.Title != "Alpha — 5 errors, 8 warnings" || n.Why != "missing textures ×8 (纹理/Empty); missing references ×3; 2 other messages; source not confirmed" {
 		t.Fatalf("mixed: %+v", n)
 	}
+	// the GUI's count bar (16 §7 principle 9): the kinds the sentence names, the rest as
+	// "other", the total of all, and the sentence as its name
+	if c := n.Counts; c == nil || c.N != 13 || len(c.Parts) != 3 || c.Parts[0] != (BarCount{"texture-missing", 8}) || c.Parts[2] != (BarCount{"other", 2}) || c.Text != n.Why {
+		t.Fatalf("counts: %+v", n.Counts)
+	}
 	n = lastRunNeed("unknown source", ps, "", false)
 	if n.Actions[0].Cluster != "" || strings.Contains(n.Why, "source not confirmed") {
 		t.Fatalf("unattributed: %+v", n)
+	}
+}
+
+// The Launch page's "last game  N errors" adds up the errors the last-run items name; it
+// said "2 errors" for two items holding 69 (VM 2026-11-22, 16 §2.1).
+func TestLastRunErrorsAddsTheItemsErrors(t *testing.T) {
+	defer SetLang("en")
+	SetLang("en")
+	many := lastRunNeed("SSR", []*app.Problem{
+		runProblem("xml-load", finding.Error, "log:E5 x60: XML error", finding.Likely),
+		runProblem("xref-missing", finding.Error, "log:E6 x8: Could not resolve cross-reference", finding.Likely),
+		runProblem("texture-missing", finding.Warning, "log:E7 x30: Could not load Texture2D at 'a'", finding.Likely),
+	}, "", true)
+	one := lastRunNeed("unknown source", []*app.Problem{runProblem("exception", finding.Error, "log:E1 x1: boom", finding.Possible)}, "", false)
+	warned := lastRunNeed("Beta", []*app.Problem{runProblem("texture-missing", finding.Warning, "log:E9 x4: Could not load Texture2D at 'b'", finding.Likely)}, "", true)
+	stale := one
+	stale.Counted = false
+	n := &Needs{Items: []Need{many, one, warned, stale}}
+	if got := LastRunErrors(n); got != 69 {
+		t.Fatalf("LastRunErrors = %d, want 69 (68 + 1; warnings and the uncounted stale log add none)", got)
 	}
 }

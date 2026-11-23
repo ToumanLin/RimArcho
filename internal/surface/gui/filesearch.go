@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -29,12 +31,15 @@ func (s *API) fileSearchLibrary() (*app.Library, error) {
 }
 
 func (s *API) FileSearchInfo() (*view.FileSearchInfo, error) {
-	lib, err := s.fileSearchLibrary()
-	if err != nil {
-		return nil, err
-	}
-	return view.BuildFileSearchInfo(lib, "", true)
+	return join(&s.flight, "FileSearchInfo", func() (*view.FileSearchInfo, error) {
+		lib, err := s.fileSearchLibrary()
+		if err != nil {
+			return nil, err
+		}
+		return view.BuildFileSearchInfo(lib, "", true)
+	})
 }
+
 func (s *API) FileSearchFilters(query string) (*view.FileSearchInfo, error) {
 	lib, err := s.fileSearchLibrary()
 	if err != nil {

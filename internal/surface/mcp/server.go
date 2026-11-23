@@ -114,6 +114,11 @@ func ClipOutput(out string) string {
 }
 
 func (s *Server) run(ctx context.Context, req *sdk.CallToolRequest, env string, argv []string) (*sdk.CallToolResult, any, error) {
+	// An argv builder that refuses the arguments returns its message as the only word (unknown,
+	// for example); no command name has a space, so say it as the refusal it is.
+	if len(argv) == 1 && strings.ContainsRune(argv[0], ' ') {
+		return &sdk.CallToolResult{Content: []sdk.Content{&sdk.TextContent{Text: "error: " + argv[0] + "\n"}}, IsError: true}, nil, nil
+	}
 	ctx, stop := heartbeat(ctx, req)
 	out, code := s.executeContext(ctx, env, argv)
 	stop()
@@ -268,12 +273,12 @@ type GuideIn struct {
 }
 
 type StatusIn struct {
-	Env  string `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env  string `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Show string `json:"show,omitempty" jsonschema:"overview (default), envs, folders (the shared mod folders), settings, data (community data), db or cache"`
 }
 
 type FindIn struct {
-	Env    string `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env    string `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Query  string `json:"query,omitempty" jsonschema:"words to match against name, packageId, author, workshop id or folder; empty lists mods"`
 	Active bool   `json:"active,omitempty" jsonschema:"list the enabled mods in load order (ignored with query)"`
 	Filter string `json:"filter,omitempty" jsonschema:"list filter: source:<label|kind> status:live|tombstone|all residue unloadable copies pkg:<id> ws:<id> or words"`
@@ -281,22 +286,54 @@ type FindIn struct {
 }
 
 type RefIn struct {
-	Env string `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env string `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Ref string `json:"ref" jsonschema:"a mod reference: #<id>, L#<lineage>, pkg:<packageId>, ws:<workshopId> or src:<label>"`
 }
 
 // ModSettingsSetIn is set_mod_settings: archo mod-settings set (16 §2.9 "Mod settings").
 type ModSettingsSetIn struct {
-	Env    string            `json:"env,omitempty" jsonschema:"environment (default: current)"`
-	Ref    string            `json:"ref" jsonschema:"the mod: #<id>, L#<lineage>, pkg:<packageId>, ws:<workshopId>"`
-	File   string            `json:"file,omitempty" jsonschema:"which settings when the Mod has several: its Mod class or hugslib:<pack>, as get_mod_settings names them"`
-	Set    map[string]string `json:"set,omitempty" jsonschema:"setting name (or HugsLib title) → new value: on/off, a number, one line of text, a HugsLib choice"`
-	Reset  StrList           `json:"reset,omitempty" jsonschema:"settings whose stored value is removed: the Mod uses its default"`
+	Env    string            `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
+	Ref    string            `json:"ref,omitempty" jsonschema:"the mod (#id, pkg:…)"`
+	File   string            `json:"file,omitempty" jsonschema:"file key when the Mod has several"`
+	Set    map[string]string `json:"set,omitempty" jsonschema:"name (or HugsLib title) → value"`
+	Reset  StrList           `json:"reset,omitempty" jsonschema:"names back to their default"`
 	DryRun bool              `json:"dry_run,omitempty" jsonschema:"check and show the change without writing"`
+	// The Config folder's files (16 §2.9): recycle, reset, copy_from.
+	Action  string  `json:"action,omitempty" jsonschema:"set, recycle, reset, copy_from, apply"`
+	Files   StrList `json:"files,omitempty" jsonschema:"recycle: Mod_*.xml or orphans"`
+	From    string  `json:"from,omitempty" jsonschema:"copy_from: a Game Config; apply: list file"`
+	Refs    StrList `json:"refs,omitempty" jsonschema:"copy_from: mods; apply: packages"`
+	Replace bool    `json:"replace,omitempty" jsonschema:"apply: replace files"`
 }
 
 // ModSettingsSetArgv maps set_mod_settings to its command (set pairs in name order).
 func ModSettingsSetArgv(in ModSettingsSetIn) []string {
+	switch in.Action {
+	case "", "set":
+	case "recycle":
+		b := argv("mod-settings", "recycle")
+		orphans := false
+		for _, f := range in.Files {
+			if f == "orphans" {
+				orphans = true
+			} else {
+				b.a = append(b.a, f)
+			}
+		}
+		return b.flag("orphans", orphans).flag("dry-run", in.DryRun).a
+	case "reset":
+		return argv("mod-settings", "reset", in.Ref).flag("dry-run", in.DryRun).a
+	case "copy_from":
+		b := argv("mod-settings", "copy-from", in.From)
+		b.a = append(b.a, in.Refs...)
+		return b.flag("dry-run", in.DryRun).a
+	case "apply":
+		b := argv("mod-settings", "apply", in.From)
+		b.a = append(b.a, in.Refs...)
+		return b.flag("replace", in.Replace).flag("dry-run", in.DryRun).a
+	default:
+		return unknown("set_mod_settings", in.Action)
+	}
 	b := argv("mod-settings", "set", in.Ref)
 	names := make([]string, 0, len(in.Set))
 	for k := range in.Set {
@@ -314,46 +351,48 @@ func ModSettingsSetArgv(in ModSettingsSetIn) []string {
 
 // ModSettingsIn is get_mod_settings: archo mod-settings (16 §2.9 "Mod settings").
 type ModSettingsIn struct {
-	Env string `json:"env,omitempty" jsonschema:"environment (default: current)"`
-	Ref string `json:"ref,omitempty" jsonschema:"a mod reference (#<id>, L#<lineage>, pkg:<packageId>, ws:<workshopId>): its stored values; empty lists the current list's Mods that have settings"`
+	Env string `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
+	Ref string `json:"ref,omitempty" jsonschema:"a mod (#id, pkg:…): its stored values; empty: the list's Mods with settings"`
 	All bool   `json:"all,omitempty" jsonschema:"no truncation"`
+	// Files lists the Config folder instead (mod-settings files).
+	Files string `json:"files,omitempty" jsonschema:"all|listed|unlisted|orphans|game: Config files instead"`
 }
 
 type DefIn struct {
-	Env         string `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env         string `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Def         string `json:"def,omitempty" jsonschema:"Type/defName (ThingDef/Gun_Revolver), Type@Name for abstract parents, def:… or a bare defName"`
 	Mod         string `json:"mod,omitempty" jsonschema:"list the defs of this mod instead (#id, pkg:…)"`
 	All         bool   `json:"all,omitempty"`
-	GameVersion string `json:"game_version,omitempty" jsonschema:"another game major.minor than the environment's, e.g. 1.6"`
+	GameVersion string `json:"game_version,omitempty" jsonschema:"another game major.minor than the Game Config's, e.g. 1.6"`
 }
 
 type PatchesIn struct {
-	Env         string `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env         string `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Mod         string `json:"mod,omitempty" jsonschema:"only this mod's operations (#id, pkg:…)"`
 	Target      string `json:"target,omitempty" jsonschema:"Type/defName of a touched def; a bare defName also finds operations nested in FindMod/Sequence; or part of an XPath"`
 	Failed      bool   `json:"failed,omitempty" jsonschema:"only operations that matched nothing (patch.no-match), with reasons"`
 	All         bool   `json:"all,omitempty"`
-	GameVersion string `json:"game_version,omitempty" jsonschema:"another game major.minor than the environment's, e.g. 1.6"`
+	GameVersion string `json:"game_version,omitempty" jsonschema:"another game major.minor than the Game Config's, e.g. 1.6"`
 }
 
 type HarmonyIn struct {
-	Env         string `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env         string `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Mod         string `json:"mod,omitempty" jsonschema:"this mod's assemblies and patches (#id, pkg:…)"`
 	Target      string `json:"target,omitempty" jsonschema:"patched method, e.g. Verse.Pawn.Tick; partial names search"`
 	Shared      bool   `json:"shared,omitempty" jsonschema:"methods patched by several mods (with mod: those involving it)"`
 	All         bool   `json:"all,omitempty"`
-	GameVersion string `json:"game_version,omitempty" jsonschema:"another game major.minor than the environment's, e.g. 1.6"`
+	GameVersion string `json:"game_version,omitempty" jsonschema:"another game major.minor than the Game Config's, e.g. 1.6"`
 }
 
 type WhyIn struct {
-	Env         string `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env         string `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	A           string `json:"a" jsonschema:"first mod reference"`
 	B           string `json:"b" jsonschema:"second mod reference"`
-	GameVersion string `json:"game_version,omitempty" jsonschema:"another game major.minor than the environment's, e.g. 1.6"`
+	GameVersion string `json:"game_version,omitempty" jsonschema:"another game major.minor than the Game Config's, e.g. 1.6"`
 }
 
 type ProblemsIn struct {
-	Env         string `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env         string `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Subject     string `json:"subject,omitempty" jsonschema:"only problems involving this mod"`
 	Code        string `json:"code,omitempty" jsonschema:"code or prefix: dep, order, patch.no-match, harmony, log …"`
 	Severity    string `json:"severity,omitempty" jsonschema:"exactly this severity: error, warning or info"`
@@ -362,13 +401,53 @@ type ProblemsIn struct {
 	All         bool   `json:"all,omitempty" jsonschema:"no truncation and no folding; include def.override / patch.contested"`
 	Detail      bool   `json:"detail,omitempty" jsonschema:"evidence and fix commands for every problem"`
 	Ignored     bool   `json:"ignored,omitempty" jsonschema:"list the problems the player ignored"`
-	GameVersion string `json:"game_version,omitempty" jsonschema:"another game major.minor than the environment's, e.g. 1.6"`
+	GameVersion string `json:"game_version,omitempty" jsonschema:"another game major.minor than the Game Config's, e.g. 1.6"`
 
 	IncludeMuted bool `json:"include_muted,omitempty" jsonschema:"also show ignored version warnings, marked ignored"`
 }
 
+type OpsIn struct {
+	Since  string `json:"since,omitempty" jsonschema:"<n>h, <n>d or YYYY-MM-DD"`
+	Op     string `json:"op,omitempty" jsonschema:"an op code or family (save, link, update)"`
+	Failed bool   `json:"failed,omitempty" jsonschema:"only failed, refused, partial"`
+	All    bool   `json:"all,omitempty"`
+}
+
+// FeedbackIn drafts a report from one of the Feedback page's templates (16 §2.14).
+type FeedbackIn struct {
+	Kind    string            `json:"kind,omitempty" jsonschema:"feature, bug, diagnosis, data or other; empty lists the templates and their questions"`
+	Title   string            `json:"title,omitempty"`
+	Answers map[string]string `json:"answers,omitempty" jsonschema:"the template's questions by key, e.g. {did, expected, actual}; files: yes"`
+	Attach  StrList           `json:"attach,omitempty" jsonschema:"more attachments: mods, paths, log, ops, problems"`
+}
+
+// FeedbackArgv is archo feedback with the answers as flags, in the template's order.
+func FeedbackArgv(in FeedbackIn) []string {
+	b := argv("feedback")
+	if in.Kind == "" {
+		return b.a
+	}
+	b = b.pos(in.Kind).str("title", in.Title)
+	keys := make([]string, 0, len(in.Answers))
+	for k := range in.Answers {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		if k == "files" {
+			b = b.flag("files", in.Answers[k] == "yes" || in.Answers[k] == "true")
+			continue
+		}
+		b = b.str(k, in.Answers[k])
+	}
+	if len(in.Attach) > 0 {
+		b = b.str("attach", strings.Join(in.Attach, ","))
+	}
+	return b.a
+}
+
 type ChangesIn struct {
-	Env     string `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env     string `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Ref     string `json:"ref,omitempty" jsonschema:"one mod's history"`
 	Library bool   `json:"library,omitempty" jsonschema:"every mod, not only the current plan's"`
 	Since   string `json:"since,omitempty" jsonschema:"scan:<n>, <days>d or YYYY-MM-DD"`
@@ -376,19 +455,19 @@ type ChangesIn struct {
 }
 
 type LogIn struct {
-	Env         string `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env         string `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Cluster     string `json:"cluster,omitempty" jsonschema:"one cluster in full (E3 or log:E3): frames, Harmony lines, attribution, next steps"`
 	Text        string `json:"text,omitempty" jsonschema:"analyse this pasted log excerpt or stack trace instead of Player.log"`
 	File        string `json:"file,omitempty" jsonschema:"another log file path"`
 	Prev        bool   `json:"prev,omitempty" jsonschema:"Player-prev.log (the run before the last)"`
 	All         bool   `json:"all,omitempty" jsonschema:"include informational clusters"`
 	Since       string `json:"since,omitempty" jsonschema:"the cursor an earlier analyze_log call returned: only clusters new or grown after it (poll a running game)"`
-	GameVersion string `json:"game_version,omitempty" jsonschema:"another game major.minor than the environment's, e.g. 1.6"`
+	GameVersion string `json:"game_version,omitempty" jsonschema:"another game major.minor than the Game Config's, e.g. 1.6"`
 	Pattern     string `json:"pattern,omitempty" jsonschema:"explain an error pattern instead (pattern:g:xref.def from a cluster; list = all kinds): causes, route, fixes, how often public logs show it"`
 }
 
 type FilesIn struct {
-	Env           string  `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env           string  `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Pattern       string  `json:"pattern" jsonschema:"text, defName, or Go regular expression to find"`
 	Mod           string  `json:"mod,omitempty" jsonschema:"one mod reference; pkg: prefers its enabled copy"`
 	Mods          StrList `json:"mods,omitempty" jsonschema:"mod references to search, including inactive copies"`
@@ -406,7 +485,7 @@ type FilesIn struct {
 	Limit         int     `json:"limit,omitempty" jsonschema:"rows per page (default 40)"`
 	PerFile       int     `json:"per_file,omitempty" jsonschema:"matching lines kept per file before paging (default 5)"`
 	All           bool    `json:"all,omitempty" jsonschema:"remove paging; per-file cap and 24 KB output cap still apply"`
-	GameVersion   string  `json:"game_version,omitempty" jsonschema:"game major.minor to resolve, e.g. 1.6 (default: environment)"`
+	GameVersion   string  `json:"game_version,omitempty" jsonschema:"game major.minor to resolve, e.g. 1.6 (default: Game Config)"`
 }
 
 // FilesArgv translates search options into the same flags used by the CLI.
@@ -438,7 +517,7 @@ func FilesArgv(in FilesIn) []string {
 
 type SourceIn struct {
 	Game   bool    `json:"game,omitempty" jsonschema:"game code (with search: also searched)"`
-	Env    string  `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env    string  `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Ref    string  `json:"ref,omitempty" jsonschema:"a mod, #id or pkg:…"`
 	Type   string  `json:"type,omitempty" jsonschema:"full type name (callers: Ns.Type.Method)"`
 	Member string  `json:"member,omitempty" jsonschema:"with type: one member, with line numbers"`
@@ -453,7 +532,7 @@ type SourceIn struct {
 }
 
 type EditIn struct {
-	Env     string  `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env     string  `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Action  string  `json:"action" jsonschema:"enable, disable, move, swap, sort, undo, redo, checkout, stage, unstage, restore or ignore_external"`
 	Refs    StrList `json:"refs,omitempty" jsonschema:"mods to enable/disable; for move and swap the first is the mod (swap: optional second = the instance to use)"`
 	At      int     `json:"at,omitempty" jsonschema:"enable at / move to this 1-based position"`
@@ -466,7 +545,7 @@ type EditIn struct {
 }
 
 type DescribeIn struct {
-	Env     string `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env     string `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Ref     string `json:"ref" jsonschema:"a mod reference (#id, pkg:…, ws:…)"`
 	Source  string `json:"source,omitempty" jsonschema:"auto (default), about, workshop or both"`
 	Refresh bool   `json:"refresh,omitempty" jsonschema:"fetch the Workshop page again"`
@@ -474,8 +553,8 @@ type DescribeIn struct {
 }
 
 type PlayerIn struct {
-	Env    string  `json:"env,omitempty" jsonschema:"environment (default: current)"`
-	Action string  `json:"action" jsonschema:"tag_add, tag_remove, tag_order, alias, note, copy_note (one copy's own); on every mod: tag_rename, tag_merge, tag_delete, tag_note, tag_color"`
+	Env    string  `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
+	Action string  `json:"action" jsonschema:"tag_add, tag_remove, tag_order, alias, note, copy_note (one copy), functional; on every mod: tag_rename, tag_merge, tag_delete, tag_note, tag_color"`
 	Refs   StrList `json:"refs,omitempty" jsonschema:"the mods (tag_add / tag_remove: one or more; others: one)"`
 	Tags   StrList `json:"tags,omitempty" jsonschema:"the tags (tag_rename, tag_note: one)"`
 	Text   string  `json:"text,omitempty" jsonschema:"alias, note, copy_note, tag_note: text, empty clears it; tag_rename: new name; tag_merge: target; tag_color: colour name or #rrggbb"`
@@ -483,13 +562,13 @@ type PlayerIn struct {
 }
 
 type SaveIn struct {
-	Env            string `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env            string `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	DryRun         bool   `json:"dry_run,omitempty" jsonschema:"show what would be written without writing"`
 	MoveDuplicates bool   `json:"move_duplicates,omitempty" jsonschema:"first move plain Mods/ folders holding another version of a mod RimArcho links into the lock library (the refusal names them; show the dry run first)"`
 }
 
 type RuleIn struct {
-	Env    string `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env    string `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Action string `json:"action,omitempty" jsonschema:"add (default), list or remove"`
 	Rule   string `json:"rule,omitempty" jsonschema:"remove: the rule ref r:<n> from action=list"`
 	Kind   string `json:"kind,omitempty" jsonschema:"add: after, before, incompatible, attach, replaces (A B; B may be pkg:<id>), top, bottom (A) or ignore (target)"`
@@ -500,7 +579,7 @@ type RuleIn struct {
 }
 
 type PinIn struct {
-	Env           string `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env           string `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Ref           string `json:"ref" jsonschema:"the mod to lock (#id, pkg:…); with update: the locked copy or its upstream"`
 	Name          string `json:"name,omitempty" jsonschema:"folder name under Mods/ (default <folder>_local; update picks a free one)"`
 	Git           bool   `json:"git,omitempty" jsonschema:"make the copy a git repository with a baseline commit, so edits can be diffed"`
@@ -511,7 +590,7 @@ type PinIn struct {
 }
 
 type UnpinIn struct {
-	Env    string `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Env    string `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Ref    string `json:"ref" jsonschema:"the locked copy or its upstream (#id, pkg:…)"`
 	DryRun bool   `json:"dry_run,omitempty" jsonschema:"show what would change"`
 }
@@ -519,10 +598,10 @@ type UnpinIn struct {
 // UninstallIn is preview_uninstall: the player's answers, as archo uninstall's flags.
 type UninstallIn struct {
 	KeepLocked    bool   `json:"keep_locked,omitempty" jsonschema:"move the lock library's copies into a game's Mods/ as ordinary mods (default: recycle bin)"`
-	LockedTo      string `json:"locked_to,omitempty" jsonschema:"the environment whose Mods/ gets them (default: the current one)"`
+	LockedTo      string `json:"locked_to,omitempty" jsonschema:"the Game Config whose Mods/ gets them (default: the current one)"`
 	RemovePacks   bool   `json:"remove_packs,omitempty" jsonschema:"packs to the recycle bin (default: kept)"`
 	PacksTo       string `json:"packs_to,omitempty" jsonschema:"where kept packs inside the data folder go (default: Documents/RimArcho packs)"`
-	RemoveSaves   bool   `json:"remove_saves,omitempty" jsonschema:"the environments' own save folders to the recycle bin (default: moved out)"`
+	RemoveSaves   bool   `json:"remove_saves,omitempty" jsonschema:"the Game Configs' own save folders to the recycle bin (default: moved out)"`
 	SavesTo       string `json:"saves_to,omitempty" jsonschema:"where they are moved (default: Documents/RimArcho saves)"`
 	RemoveGames   bool   `json:"remove_games,omitempty" jsonschema:"game folders downloaded with SteamCMD to the recycle bin (default: kept)"`
 	RestoreBackup bool   `json:"restore_modsconfig_backup,omitempty" jsonschema:"put ModsConfig.xml.rimarcho.bak back instead of cleaning the current list"`
@@ -550,6 +629,13 @@ func toolList() []tool {
 		}),
 		reg("get_mod", true, false, descMod, func(in RefIn) []string { return []string{"mod", in.Ref} }),
 		reg("get_mod_settings", true, false, descModSettings, func(in ModSettingsIn) []string {
+			if in.Files != "" {
+				f := in.Files
+				if f == "all" {
+					f = ""
+				}
+				return argv("mod-settings", "files").str("filter", f).flag("all", in.All).a
+			}
 			return argv("mod-settings").pos(in.Ref).flag("all", in.All).a
 		}),
 		reg("get_description", true, false, descDescribe, func(in DescribeIn) []string {
@@ -571,6 +657,9 @@ func toolList() []tool {
 		reg("list_changes", true, false, descChanges, func(in ChangesIn) []string {
 			return argv("changes").pos(in.Ref).flag("library", in.Library).str("since", in.Since).flag("all", in.All).a
 		}),
+		reg("list_operations", true, false, descOps, func(in OpsIn) []string {
+			return argv("ops").str("since", in.Since).str("op", in.Op).flag("failed", in.Failed).flag("all", in.All).a
+		}),
 		reg("analyze_log", true, false, descLog, func(in LogIn) []string {
 			if in.Pattern != "" {
 				return argv("pattern").pos(in.Pattern).a
@@ -591,6 +680,7 @@ func toolList() []tool {
 			return argv("pin", in.Ref).str("name", in.Name).flag("git", in.Git).flag("update", in.Update).flag("move-to-library", in.MoveToLibrary).str("reason", in.Reason).flag("dry-run", in.DryRun).a
 		}),
 		reg("preview_uninstall", true, false, descUninstall, UninstallArgv).allOnly(),
+		reg("draft_feedback", true, false, descFeedback, FeedbackArgv).allOnly(),
 		reg("unpin_mod", false, false, descUnpin, func(in UnpinIn) []string { return argv("unpin", in.Ref).flag("dry-run", in.DryRun).a }),
 	}
 }
@@ -770,6 +860,14 @@ func PlayerArgv(in PlayerIn) []string {
 			return []string{in.Action, first, "--clear"}
 		}
 		return []string{in.Action, first, in.Text}
+	case "functional":
+		switch in.Text {
+		case "":
+			return []string{"functional", first, "--clear"}
+		case "not functional", "not":
+			return []string{"functional", first, "--not"}
+		}
+		return []string{"functional", first}
 	case "copy_note":
 		if in.Text == "" {
 			return []string{"note", first, "--copy", "--clear"}

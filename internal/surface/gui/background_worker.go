@@ -1,3 +1,5 @@
+//go:build windows || cgo
+
 package gui
 
 import (
@@ -10,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/menubg"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
@@ -39,25 +42,33 @@ func (s *API) prepareBackgrounds(fresh bool) {
 	if err != nil || s.bgRead.closed {
 		return
 	}
-	base := e.ID + "|" + menubg.InventoryStamp(e.GameRoot) + "|" + view.Lang()
-	if !fresh && s.bgRead.key == base {
-		return
-	}
+	// The menu art is per game installation, not per Game Config: it comes from the game
+	// folder, which the configs of one installation share, so switching between them keeps
+	// the list shown (16 §2.14). The fallback previews come from the Game Config's own Mods
+	// (BackgroundTargets), so they are part of the job's key: a sibling with other Mods
+	// gets its own job (the extracted art is cached on disk and read again cheaply).
+	game := bgGame(e)
+	base := game + "|" + menubg.InventoryStamp(e.GameRoot) + "|" + view.Lang()
 	var targets []app.BackgroundTarget
-	if ix, err := s.a.Index(); err == nil {
+	ix, ixErr := s.a.Index()
+	if ixErr == nil {
 		targets = s.a.BackgroundTargets(ix)
 	}
 	key := base + fmt.Sprintf("|%v", targets)
+	// an unreadable index keeps the job shown rather than starting one without previews
+	if !fresh && s.bgRead.key == base && (ixErr != nil || s.bgRead.active == key) {
+		return
+	}
 	if s.bgRead.jobs == nil {
 		s.bgRead.jobs = map[string]*backgroundResult{}
 		s.bgRead.ctx, s.bgRead.cancel = context.WithCancel(context.Background())
 	}
 	job := s.bgRead.jobs[key]
-	if s.bgRead.key != base || s.bgsEnv != e.ID {
+	if s.bgRead.key != base || s.bgsGame != game {
 		s.bgs = []app.Background{} // plain until the current game's cache is ready
 	}
 	previous := slices.Clone(s.bgs)
-	s.bgRead.key, s.bgRead.active, s.bgsEnv = base, key, e.ID
+	s.bgRead.key, s.bgRead.active, s.bgsGame = base, key, game
 	if job != nil {
 		if job.done {
 			s.bgs = job.items
@@ -68,7 +79,7 @@ func (s *API) prepareBackgrounds(fresh bool) {
 	}
 	job = &backgroundResult{}
 	s.bgRead.jobs[key] = job
-	ctx, home, game, lang := s.bgRead.ctx, s.a.Home, e.GameRoot, view.Lang()
+	ctx, home, root, lang := s.bgRead.ctx, s.a.Home, e.GameRoot, view.Lang()
 	s.bgRead.workers.Add(1)
 	go func() {
 		defer s.bgRead.workers.Done()
@@ -76,7 +87,7 @@ func (s *API) prepareBackgrounds(fresh bool) {
 			s.mu.Lock()
 			job.items, job.done = items, done
 			current, envErr := s.a.Env()
-			active := !s.bgRead.closed && ctx.Err() == nil && envErr == nil && current.ID == e.ID && current.GameRoot == game && s.bgRead.active == key
+			active := !s.bgRead.closed && ctx.Err() == nil && envErr == nil && bgGame(current) == game && current.GameRoot == root && s.bgRead.active == key
 			changed := !slices.Equal(s.bgs, items)
 			if active {
 				s.bgs = items
@@ -87,7 +98,7 @@ func (s *API) prepareBackgrounds(fresh bool) {
 			}
 		}
 		cache := filepath.Join(home, "cache", "backgrounds")
-		cached, _ := menubg.Cached(ctx, game, cache, lang)
+		cached, _ := menubg.Cached(ctx, root, cache, lang)
 		if len(cached) > 0 {
 			// Show shared art before inspecting another installation or reading mods.
 			publish(mergeMenuBackgrounds(cached, previous), false)
@@ -98,7 +109,7 @@ func (s *API) prepareBackgrounds(fresh bool) {
 				games = append(games, other.GameRoot)
 			}
 		}
-		menu, err := menubg.PrepareFrom(ctx, game, cache, lang, games)
+		menu, err := menubg.PrepareFrom(ctx, root, cache, lang, games)
 		if err != nil && ctx.Err() == nil {
 			log.Printf("menu backgrounds: %v", err)
 		}
@@ -147,4 +158,13 @@ func mergeMenuBackgrounds(menu []menubg.Item, fallbacks []app.Background) []app.
 		return 0
 	})
 	return items
+}
+
+// bgGame is the game installation whose backgrounds e shows (its ID before installations
+// were recorded apart).
+func bgGame(e *env.Environment) string {
+	if e.GameID != "" {
+		return e.GameID
+	}
+	return e.ID
 }

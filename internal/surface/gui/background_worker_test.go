@@ -1,10 +1,15 @@
+//go:build windows || cgo
+
 package gui
 
 import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"image"
+	"image/color"
 	"image/jpeg"
+	"image/png"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -16,10 +21,9 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/menubg"
+	"github.com/ToumanLin/RimArcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"github.com/ToumanLin/RimArcho/internal/view"
-	"image"
-	"image/color"
-	"image/png"
 )
 
 func menuGame(t *testing.T, game string) {
@@ -148,7 +152,7 @@ func TestMenuBackgroundSettingsAndSharedCache(t *testing.T) {
 		t.Fatal(err)
 	}
 	env.GameRoot = t.TempDir()
-	if err := e.App.Store.UpdateEnv(env); err != nil {
+	if err := e.App.Store.UpdateGame(&store.Game{ID: env.GameID, Name: env.Name, GameRoot: env.GameRoot, GameVersion: env.GameVersion}); err != nil {
 		t.Fatal(err)
 	}
 	api.HomeBackground()
@@ -281,11 +285,11 @@ func TestMenuCachedArtPublishedBeforeMissingExtraction(t *testing.T) {
 	shown, resume := make(chan struct{}), make(chan struct{})
 	var first, release sync.Once
 	t.Cleanup(func() { release.Do(func() { close(resume) }) })
-	api.emit = func(name string, _ any) {
+	api.setEmit(func(name string, _ any) {
 		if name == "backgrounds" {
 			first.Do(func() { close(shown); <-resume })
 		}
-	}
+	})
 	api.HomeBackground()
 	select {
 	case <-shown:
@@ -342,5 +346,50 @@ func TestMenuWorkerUsesOtherRegisteredGame(t *testing.T) {
 	defer api.mu.Unlock()
 	if len(api.bgs) != 2 || !strings.Contains(api.bgs[0].Src, "menu-shared-v1-") {
 		t.Fatalf("not shared extracted art: %+v", api.bgs)
+	}
+}
+
+// The worker's job key includes the Mods the previews come from: a background Mod found by
+// a scan is listed on the next launch-page read, without a Settings visit (r7 §M11 B1).
+func TestMenuBackgroundsFollowBackgroundMods(t *testing.T) {
+	t.Parallel()
+	e, api, _ := fixture(t)
+	api.HomeBackground()
+	api.bgRead.workers.Wait()
+	first := api.bgRead.active
+	dir := filepath.Join(e.Game, "Mods", "Menus")
+	e.WriteMod(dir, testkit.Sample("tester.bg", "Cool Backgrounds"))
+	wide := image.NewRGBA(image.Rect(0, 0, 1600, 900))
+	if err := os.MkdirAll(filepath.Join(dir, "Textures", "UI"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.Create(filepath.Join(dir, "Textures", "UI", "Wide.png"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := png.Encode(f, wide); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	e.MustRun("scan")
+	api.HomeBackground()
+	api.bgRead.workers.Wait()
+	if api.bgRead.active == first {
+		t.Fatal("a new background Mod did not start a new job")
+	}
+	found := false
+	for _, g := range api.Backgrounds().Groups {
+		for _, it := range g.Items {
+			found = found || strings.Contains(it.Key, "ui/wide")
+		}
+	}
+	if !found {
+		t.Fatalf("the new Mod's picture is not listed: %+v", api.Backgrounds().Groups)
+	}
+	// the same Mods again: nothing new starts
+	active := api.bgRead.active
+	api.HomeBackground()
+	if api.bgRead.active != active || len(api.bgRead.jobs) != 2 {
+		t.Fatalf("an unchanged read started a job: %d jobs", len(api.bgRead.jobs))
 	}
 }

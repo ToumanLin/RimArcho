@@ -2,7 +2,9 @@ package app
 
 import (
 	"strings"
+	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
@@ -17,6 +19,18 @@ func (a *App) ReadSession() (*App, error) {
 		return nil, err
 	}
 	b := &App{Store: s, decl: a.decl}
+	// Actions a page runs on its session are logged like any other (13 §1.3), on the
+	// session's own connection and with the process origin.
+	if a.Ops != nil {
+		b.Ops = oplog.New(s, a.Ops.Origin())
+		b.Ops.Fail = a.Ops.Fail
+		b.Ops.Now = func() time.Time {
+			if b.Now != nil {
+				return b.Now()
+			}
+			return time.Now()
+		}
+	}
 	b.ReadOptions(a)
 	s.DB.Exec("PRAGMA cache_size=-256")
 	return b, nil
@@ -39,6 +53,7 @@ func (b *App) ReadOptions(a *App) {
 	b.LazyLog, b.LogCacheOnly = a.LazyLog, a.LogCacheOnly
 	b.GameProbe, b.LockBase, b.MonitorBundle = a.GameProbe, a.LockBase, a.MonitorBundle
 	b.HTTP, b.SteamAPI = a.HTTP, a.SteamAPI
+	b.SteamSignedIn, b.SteamSignedInID = a.SteamSignedIn, a.SteamSignedInID
 	b.FindTool, b.SteamWorker, b.TrashFunc = a.FindTool, a.SteamWorker, a.TrashFunc
 	b.SteamWorkerStream = a.SteamWorkerStream
 	b.LaunchWait = a.LaunchWait
@@ -50,6 +65,7 @@ func (b *App) ReadOptions(a *App) {
 	b.UninstallExe, b.UninstallKeepBase, b.ArchoProbe = a.UninstallExe, a.UninstallKeepBase, a.ArchoProbe
 	b.UninstallLog, b.AfterExitFunc = a.UninstallLog, a.AfterExitFunc
 	b.SelfUpdateAPI, b.SelfVersion, b.SelfProgram = a.SelfUpdateAPI, a.SelfVersion, a.SelfProgram
+	b.SelfLanzou = a.SelfLanzou
 	b.SelfVersionOf, b.SelfOthers, b.SelfWaitPoll = a.SelfVersionOf, a.SelfOthers, a.SelfWaitPoll
 }
 
@@ -96,7 +112,7 @@ func (a *App) AdoptLibrary(lib *Library) {
 	ix := *st.Ix
 	ix.store = a.Store
 	st.Ix = &ix
-	st.localize = a.localizer(ix.Env.ID, st.Reg, &ix)
+	st.localize = a.localizer(ix.Env.GameID, st.Reg, &ix)
 	lib.St = &st
 }
 

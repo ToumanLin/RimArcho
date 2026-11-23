@@ -26,3 +26,29 @@ test("opening over a popup that refuses to close keeps it", async () => {
   assert.equal(S.popup.kind, "palette");
   assert.equal(closed, 1, "a dialog that may close runs its onclose");
 });
+
+// The arrows, Home and End pass over disabled choices; a disabled current choice is not
+// selected when the list opens (F19).
+test("the keys skip disabled options", async () => {
+  const app = new Element("div"), popup = new Element("div");
+  app.id = "app"; popup.id = "popup"; app.append(popup);
+  const S = {}, picked = [];
+  const pop = await loadModules("./popups.js", {
+    "./choices.js": { closeChoiceMenu() {} },
+    "./fields.js": { pathContent: n => n, copyablePath: n => n },
+    "./state.js": { S, $: s => s === "#app" ? app : s === "#popup" ? popup : app.querySelector(s), el: (t, c, x) => new Element(t, c, x), api: {}, Tf: s => s, errText: String, say() {} },
+    "./command-panel.js": { buildCommandPanel() {} },
+  }, { document: { activeElement: null }, setTimeout() {} });
+  pop.initPopups({ renderWhere() {}, renderHeads() {} });
+  const off = (name) => ({ name, disabled: true });
+  pop.choose("pick", [off("a"), "b", off("c"), "d", off("e")], (i) => picked.push(i), 0);
+  const p = S.popup, key = (k) => p.keys({ key: k, preventDefault() {} });
+  assert.equal(p.sel, 1, "the disabled current choice moves to the next enabled one");
+  key("ArrowDown"); assert.equal(p.sel, 3);
+  key("ArrowDown"); assert.equal(p.sel, 3, "no enabled option below: it stays");
+  key("ArrowUp"); assert.equal(p.sel, 1);
+  key("ArrowUp"); assert.equal(p.sel, 1);
+  key("End"); assert.equal(p.sel, 3);
+  key("Home"); assert.equal(p.sel, 1);
+  key("Enter"); assert.deepEqual(picked, [1]);
+});

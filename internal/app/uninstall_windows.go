@@ -64,9 +64,17 @@ func AfterExitScript(x AfterExit, pid int, log string) string {
 	return b.String()
 }
 
+// cleanupAtOnce: Windows cannot delete a running program or an open database, so a script
+// deletes the last two steps after RimArcho has closed (02 §1).
+const cleanupAtOnce = false
+
 // startAfterExit writes the script to the temporary folder and starts it detached and
 // without a window, outside any job this process runs in, so it outlives RimArcho.
-func startAfterExit(x AfterExit, log string) error {
+func startAfterExit(x AfterExit, log string) ([]string, error) {
+	return nil, startScript(x, log)
+}
+
+func startScript(x AfterExit, log string) error {
 	f, err := os.CreateTemp("", "RimArcho-uninstall-*.cmd")
 	if err != nil {
 		return err

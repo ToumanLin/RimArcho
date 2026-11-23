@@ -10,6 +10,7 @@ Investigations, measurements and open questions; once a report's conclusions are
 | [01-pattern-library-integration-draft.md](01-pattern-library-integration-draft.md) | Pre-integration draft of the error pattern library in MCP | Integrated (06 §5); kept as the corpus track's record |
 | [02-common-mod-authoring-error-patterns.md](02-common-mod-authoring-error-patterns.md) | The most common loading-phase errors in player logs, for Mod authors | Active (v1; runtime and save errors still to do, §5) |
 | [decisions-corpus.md](decisions-corpus.md) | Corpus P1 decisions and measurements (attribution, ordering, severity calibration) | Evidence for severities and constraint strength (05 §4.3, 08) |
+| [2026-11-21_no-match-reasons.md](2026-11-21_no-match-reasons.md) | `patch.no-match` reasons on 1,995 1.6 logs: share, observed / chance, logged FailKey | Evidence for 05 §4.4 "Player-facing use"; open: full run, `exception`, `target-missing` (§4) |
 | [mcp-eval-design.md](mcp-eval-design.md) | Design, cases and aggregate results of the Archo MCP A/B evaluation | Active |
 | [2026-11-04_mcp-transcript-review.md](2026-11-04_mcp-transcript-review.md) | Round 1 transcript review: where agents lost time with `archo mcp` | Evidence for known noise (06 §1); proposals in §7, status in round 2 §6 |
 | [2026-11-05_mcp-transcript-review-round2.md](2026-11-05_mcp-transcript-review-round2.md) | Round 2 transcript review (h1, h2, h5; Pi and dsh) | Open: proposals in §7 |
@@ -26,11 +27,14 @@ Investigations, measurements and open questions; once a report's conclusions are
 | [dds-texture-optimization.md](dds-texture-optimization.md) | How the game loads PNG and DDS textures; todds; PNG to DDS measurements | Implemented (10 §2); open: in-game visual checks (§6) and decisions (§7) |
 | [2026-10-26_page-load-time-and-optimization.md](2026-10-26_page-load-time-and-optimization.md) | Backend load times of every page on real data, with ranked optimizations | Open: P1–P3 done, P4–P8 not all done (§7) |
 | [2026-10-27_batch-operation-timing-audit.md](2026-10-27_batch-operation-timing-audit.md) | Timing of every batch action and the causes of slow previews | Open: recommendations in §8 not all done |
+| [2026-11-24_archo-animation-cpu.md](2026-11-24_archo-animation-cpu.md) | Archo's animated figure on Can it run, native window on a real GPU: animated / still / off at device scale 1.0 and 1.5, software rendering, smaller frames, 10 fps loops, a slower idle | Measured; the choice (§5) is the player's |
 
 ## Steam, SteamCMD and downloads
 
 | Document | What it is | Status |
 | --- | --- | --- |
+| [2026-11-18_steam-request-rate.md](2026-11-18_steam-request-rate.md) | Every path that talks to Steam, its request count for 1,000 Mods, and why players were rate limited | Fixes in 11 §2.1, 16 §4.3; VM check pending (§4) |
+| [2026-11-12_update-channel.md](2026-11-12_update-channel.md) | Parallel version checks, unchanged release pairs and Lanzou probes | Unwired prototype; listing-only checks and browser fallback |
 | [2026-11-05_workshop-distribution.md](2026-11-05_workshop-distribution.md) | Publishing RimArcho on the Workshop and updating from it with anonymous SteamCMD | Open (ToDo); tests in §4 |
 | [2026-10-26_steamcmd-parallel-downloads.md](2026-10-26_steamcmd-parallel-downloads.md) | Parallel and batched SteamCMD downloads, shared-library races | Batching in 11 §1; kept as evidence for the Workshop distribution research |
 | [2026-10-24_login-sessions-loverslab-steamcmd.md](2026-10-24_login-sessions-loverslab-steamcmd.md) | LoversLab and SteamCMD login sessions: mechanisms and boundaries | Implemented (11 §3, §4); kept as evidence for the Workshop distribution research |
@@ -45,6 +49,7 @@ Investigations, measurements and open questions; once a report's conclusions are
 | [2026-10-27_vm-scenarios-5-6-9.md](2026-10-27_vm-scenarios-5-6-9.md) | VM scenarios 5, 6, 9 on real data (subscribe, unsubscribe and recycle, save and launch) | Method cited by release-vm-tests.md; open: B6, B7, B10, B12–B15 (§7) |
 | [2026-10-27_vm-real-home-round-and-scenarios-7-8.md](2026-10-27_vm-real-home-round-and-scenarios-7-8.md) | Real-home random-player rounds, export/reimport, post-sort repair | Open: §5 item 3 (save says "no changes" while links are pending) |
 | [2026-10-28_vm-phase-markers.md](2026-10-28_vm-phase-markers.md) | Full real rounds with Archo Monitor phase markers on 1.6 and 1.7 | Cited by release-vm-tests.md; open: B2 (game download also fetches subscribed Workshop items), B3 (a 1.7 Vulkan crash is not shown) |
+| [2026-11-21_vm-vulkan-options.md](2026-11-21_vm-vulkan-options.md) | Faster Vulkan for 1.7 in a test VM: Dozen (no D3D12 in VMware SVGA), Hyper-V GPU-P, Sandbox, a second machine | Dozen ruled out; 12 vCPUs no faster than 4 (§5.2); open: a lavapipe frame rate (§6) |
 
 ## Other
 
@@ -54,6 +59,10 @@ Investigations, measurements and open questions; once a report's conclusions are
 | [2026-11-01_decompile-storage.md](2026-11-01_decompile-storage.md) | Where decompiled code lives: the Source library and Mod projects | A and B in 05 §5.4; open: C, Mod projects (ToDo) |
 | [2026-11-02_gui-accessibility.md](2026-11-02_gui-accessibility.md) | Screenshot-free GUI acceptance for agents: criteria, baseline, fix rounds | Criteria in 16 §11 (A1–A18); open: failing criteria (01 §4), proposed rule and open decisions |
 | [2026-11-04_save-format-fields.md](2026-11-04_save-format-fields.md) | Element paths of a save's full read (L1), from the game's `ExposeData` | Implemented (12 §1.7); open: not yet checked against real saves |
-| [2026-11-09_linux-support-plan.md](2026-11-09_linux-support-plan.md) | Linux support in phases: native CLI/TUI/MCP, GUI on WebKitGTK, `.tar.gz`/`.deb`/`.rpm`/AUR, Proton installs | Plan decided (§8); not started |
+| [2026-11-09_linux-support-plan.md](2026-11-09_linux-support-plan.md) | Linux support in phases: native CLI/TUI/MCP, GUI on WebKitGTK, `.tar.gz`/`.deb`/`.rpm`/AUR, Proton installs | Phase 1 shipped as the experimental Linux CLI/TUI/MCP in 1.0.9; continued in the 2026-11-22 module plan |
+| [2026-11-22_linux-module-plan.md](2026-11-22_linux-module-plan.md) | Linux platform inventory, a first Linux GUI build (WebKitGTK, `-tags gtk3`), modules in dependency order, the GUI track and a 1.2 milestone | Plan; decisions D7–D10 open |
 | [2026-11-09_save-content-attribution.md](2026-11-09_save-content-attribution.md) | Save Def reference forms, attribution limits, content categories and synthetic costs | Research proposal; decisions in E; exact-build and real-save checks pending in VM |
 | [2026-11-09_tui-redesign.md](2026-11-09_tui-redesign.md) | TUI looks and navigation: today's problems, a shared visual system, three top-bar options | Option A (two-row top) chosen and implemented (16 §9.6); P17 open |
+| [2026-11-11_environments-share-a-game.md](2026-11-11_environments-share-a-game.md) | Several environments (game + user data folder) on one game install, as RimCrow profiles: store split, migration, run attribution, RimCrow import | Decided (§10), specified in 03 §6; not implemented; log locations need the VM |
+| [2026-11-18_mod-config.md](2026-11-18_mod-config.md) | Mod settings files in RimWorld, what RimSort and RimCrow do, options for showing, per-config copying, export and orphan cleanup | Proposal; decisions in §5 |
+| [2026-11-18_modpacks.md](2026-11-18_modpacks.md) | Modpack levels (list, versions, settings, files), what packs cover, gaps and options | Proposal; decisions in §5 |

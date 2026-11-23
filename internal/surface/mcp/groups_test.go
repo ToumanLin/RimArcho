@@ -15,7 +15,7 @@ import (
 // coreTools is the default `archo mcp` set (14 §2): what agents use to diagnose, edit,
 // save, launch and test.
 var coreTools = []string{"guide", "status", "find_mods", "get_mod", "get_mod_settings", "get_description", "get_def", "get_patches",
-	"get_harmony", "explain_relation", "list_problems", "list_changes", "analyze_log", "search_files", "read_source",
+	"get_harmony", "explain_relation", "list_problems", "list_changes", "list_operations", "analyze_log", "search_files", "read_source",
 	"edit_loadout", "save_loadout", "launch_game", "test_run", "pin_mod", "unpin_mod", "manage_plans", "plan_history",
 	"manage_rules", "ignore_problem", "scan", "list_library", "list_saves", "get_save"}
 
@@ -42,8 +42,8 @@ func TestToolGroups(t *testing.T) {
 		t.Errorf("core tools:\n got %v\nwant %v", got, want)
 	}
 	all := listed(t, connect(t, e))
-	if len(all) != 45 || len(mcp.Tools()) != 45 {
-		t.Errorf("all: %d tools listed, table %d; want 45", len(all), len(mcp.Tools()))
+	if len(all) != 47 || len(mcp.Tools()) != 47 {
+		t.Errorf("all: %d tools listed, table %d; want 47", len(all), len(mcp.Tools()))
 	}
 	// The table, the catalog and the guide's marking agree on every tool's group.
 	for _, d := range mcp.Catalog() {
@@ -61,8 +61,8 @@ func TestToolGroups(t *testing.T) {
 			t.Errorf("%s: not served by --tools all", d.Name)
 		}
 	}
-	if len(cmds.AllOnlyTools) != 45-len(coreTools) {
-		t.Errorf("cmds.AllOnlyTools has %d tools, want %d", len(cmds.AllOnlyTools), 45-len(coreTools))
+	if len(cmds.AllOnlyTools) != 47-len(coreTools) {
+		t.Errorf("cmds.AllOnlyTools has %d tools, want %d", len(cmds.AllOnlyTools), 47-len(coreTools))
 	}
 	// A core client still calls a core tool and cannot call an all-only one.
 	cs := connectGroup(t, e, mcp.Core)

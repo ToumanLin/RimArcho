@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build !windows && !linux
 
 package app
 
@@ -7,4 +7,4 @@ import (
 	"time"
 )
 
-func logCreationTime(os.FileInfo) time.Time { return time.Time{} }
+func logCreationTime(string, os.FileInfo) time.Time { return time.Time{} }

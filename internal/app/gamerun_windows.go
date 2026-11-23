@@ -83,3 +83,8 @@ func processCommandLine(h windows.Handle) (string, bool) {
 	}
 	return "", false
 }
+
+// steamClientRunning reports whether steam.exe runs (09 §2 "Without Steam").
+func steamClientRunning() bool {
+	return len(listProcesses(func(name string) bool { return name == "steam.exe" }, false)) > 0
+}

@@ -44,10 +44,8 @@ func selfNotice(a *app.App, before, after app.AutomaticStatus) string {
 func AboutGroup(a *app.App) SettingGroup {
 	return SettingGroup{Title: T("about"), Items: []SettingItem{
 		SelfUpdateItem(a),
-		{Label: T("automatically check for updates"), Value: cmds.Setting(a, "updates.auto"), Edit: "choice", Choices: []string{"on", "off"}, ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "updates.auto", "{}"},
-			Note: T("Checks RimArcho, mods, external tools and community data while RimArcho is open.")},
-		{Label: T("feedback"), Actions: []SettingAction{{Label: T("bugs and suggestions…"), Argv: []string{"feedback"}}}},
-		{Key: "community", Label: T("community"), Links: CommunityLinks()},
+		{Label: T("automatically check for updates"), Value: cmds.Setting(a, "updates.auto"), Edit: "choice", Choices: []string{"on", "off"}, ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "updates.auto", "{}"}},
+		// the community links moved to the Feedback page (16 §2.14, 2026-11-22)
 	}}
 }
 

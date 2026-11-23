@@ -21,8 +21,13 @@ func init() {
 	register(&Command{Name: "saves show", Args: "<save>", Summary: "one save: where it belongs, can it load (each issue with its fix), how its Mods differ from the list, the playthrough", MinArgs: 1, MaxArgs: 1,
 		Flags: []Flag{{Name: "mods", Help: "the save's whole Mod list"}, {Name: "play", Help: "the whole playthrough: every colonist, event and stat"},
 			{Name: "content", Help: "content references by Mod and category, with coverage limits"},
+			{Name: "mod", Value: "<ref>", Help: "what removing this Mod costs the save, why, and which of its Mods need it (implies --content)"},
 			{Name: "current", Help: "check against the current game's current list instead of the list the save matched"},
 			{Name: "all", Help: "no truncation"}}, Run: savesShow})
+	register(&Command{Name: "saves review", Summary: "playthrough review: what the installed Mods add, by category, and how much of it the saves show", MaxArgs: 0,
+		Flags: []Flag{{Name: "colony", Value: "<name>", Help: "only this colony"}, {Name: "mod", Value: "<ref>", Help: "one Mod in full, with the names not seen"},
+			{Name: "read", Help: "first read in full the saves without a current read (minutes for a large library)"}, {Name: "progress", Help: "a progress line per save on stderr"},
+			{Name: "all", Help: "no truncation"}}, Run: savesReview})
 	register(&Command{Name: "saves fix", Args: "<save>", Summary: "the save's Mod fixes as one undoable edit of its list, then Workshop subscriptions; --launch starts it", MinArgs: 1, MaxArgs: 1,
 		Flags: []Flag{{Name: "mod", Value: "<packageId>", Multi: true, Help: "only this Mod's fix"}, {Name: "disable-added", Help: "also disable the list's Mods the save lacks"},
 			{Name: "order", Help: "put the Mods both have in the save's order"}, {Name: "launch", Help: "then save the list to the game and start it (not while subscriptions download)"},
@@ -32,7 +37,10 @@ func init() {
 		Flags: []Flag{{Name: "only", Help: "only the named saves"}, {Name: "progress", Help: "a progress line per save on stderr"}}, Run: savesIndex})
 	register(&Command{Name: "saves rename", Args: "<save> <name>", Summary: "rename a save in its folder (keeps a RimSaves folder; refused while the game runs or when the name exists)", MinArgs: 2, MaxArgs: 2, Run: savesRename})
 	register(&Command{Name: "saves rename-colony", Args: "<colony|save> [<name>]", Summary: "name a colony in RimArcho (without a name: back to its saves' name; save files and the game keep theirs)", MinArgs: 1, MaxArgs: 2, Run: savesRenameColony})
-	register(&Command{Name: "saves copy", Args: "<save>", Summary: "copy a save beside itself as <name> (copy), never overwriting", MinArgs: 1, MaxArgs: 1, Run: savesCopy})
+	register(&Command{Name: "saves copy", Args: "<save>", Summary: "copy a save beside itself as <name> (copy), never overwriting; --to-current into the current Game Config's Saves folder", MinArgs: 1, MaxArgs: 1,
+		Flags: []Flag{{Name: "to-current", Help: "copy into the current Game Config's Saves folder (only the file: no Mod, list or setting)"}}, Run: savesCopy})
+	register(&Command{Name: "saves choose", Args: "[<save|colony>]", Summary: "which save Can it run checks for the current Game Config: this save, a colony's newest save (--colony), or the last loaded (--clear); no argument shows the choice", MaxArgs: 1,
+		Flags: []Flag{{Name: "colony", Help: "the save's colony: its newest save is checked, whichever it is"}, {Name: "clear", Help: "check the save the last run loaded again"}}, Run: savesChoose})
 	yes := []Flag{{Name: "yes", Help: "do it (without it: only show the files and sizes)"},
 		{Name: "token", Value: "<token>", Help: "with --yes: the preview's token; refused when the saves changed since that preview"}}
 	register(&Command{Name: "saves backup", Args: "<save…>", Summary: "copy saves into RimArcho's backups folder (confirm with --yes)", MinArgs: 1, MaxArgs: -1, Flags: yes, Run: savesBackup})
@@ -322,42 +330,9 @@ func savesList(c *Ctx, a *Args) (*render.Doc, error) {
 		return nil, err
 	}
 	colony, attention, all := a.Str("colony"), a.Bool("attention"), a.Bool("all")
-	type row struct {
-		s   *app.Save
-		chk *app.SaveCheck
-	}
-	type group struct {
-		c    *app.Colony
-		rows []row
-	}
-	var groups []group
-	total, colonyFound := 0, colony == ""
-	for _, col := range l.Colonies {
-		if colony != "" && !strings.EqualFold(col.Name, colony) && (col.GameName == "" || !strings.EqualFold(col.GameName, colony)) {
-			continue
-		}
-		colonyFound = true
-		g := group{c: col}
-		for _, s := range col.Saves {
-			if envName != "" && !inEnv(s, envName) || pkgs != nil && !saveHasMod(s, pkgs, ws) {
-				continue
-			}
-			chk, err := c.App.CheckSave(s)
-			if err != nil {
-				return nil, err
-			}
-			if attention && chk.Level != app.LevelWarning && chk.Level != app.LevelError {
-				continue
-			}
-			g.rows = append(g.rows, row{s, chk})
-		}
-		if len(g.rows) > 0 {
-			groups = append(groups, g)
-			total += len(g.rows)
-		}
-	}
-	if !colonyFound {
-		return nil, fmt.Errorf("no colony named %s (archo saves list)", colony)
+	groups, total, err := savesListGroups(c, l, saveListFilter{envName: envName, colony: colony, attention: attention, pkgs: pkgs, ws: ws})
+	if err != nil {
+		return nil, err
 	}
 
 	head := fmt.Sprintf("saves: %s in %s", render.Plural(total, "save"), render.Plural(len(groups), "colony"))
@@ -396,13 +371,92 @@ func savesList(c *Ctx, a *Args) (*render.Doc, error) {
 	if all || colony != "" {
 		perColony = 0
 	}
-	var cells [][]string
-	type shown struct {
-		g    group
-		n    int // rows shown
-		more int
+	plan, cells := savesListPlan(c, groups, perColony, all)
+	unread := 0
+	for _, g := range groups {
+		for _, r := range g.rows {
+			if r.s.Summary == nil && !r.s.ReadFailed {
+				unread++
+			}
+		}
 	}
-	var plan []shown
+	first := savesListRows(c, a, root, groups, plan, render.Columns(cells))
+	if unread > 0 {
+		what := "1 save is"
+		if unread > 1 {
+			what = fmt.Sprintf("%d saves are", unread)
+		}
+		root.KV("note", what+" "+metaOnly+": only the head is read, so no in-game day yet; archo saves index reads them in full")
+	}
+	d.AddNext("archo saves show " + first.Ref)
+	return d, nil
+}
+
+// saveListRow is a listed save and its check.
+type saveListRow struct {
+	s   *app.Save
+	chk *app.SaveCheck
+}
+
+// saveListGroup is a colony's listed saves.
+type saveListGroup struct {
+	c    *app.Colony
+	rows []saveListRow
+}
+
+// saveListShown is how much of a colony the list shows; n < 0 is the "more colonies" row.
+type saveListShown struct {
+	g    saveListGroup
+	n    int // rows shown
+	more int
+}
+
+// saveListFilter is the filters of saves list.
+type saveListFilter struct {
+	envName, colony string
+	attention       bool
+	pkgs, ws        map[string]bool
+}
+
+// savesListGroups checks the saves the filters keep and groups them by colony; total
+// counts them.
+func savesListGroups(c *Ctx, l *app.SaveList, f saveListFilter) (groups []saveListGroup, total int, err error) {
+	colonyFound := f.colony == ""
+	for _, col := range l.Colonies {
+		if f.colony != "" && !strings.EqualFold(col.Name, f.colony) && (col.GameName == "" || !strings.EqualFold(col.GameName, f.colony)) {
+			continue
+		}
+		colonyFound = true
+		g := saveListGroup{c: col}
+		for _, s := range col.Saves {
+			if f.envName != "" && !inEnv(s, f.envName) || f.pkgs != nil && !saveHasMod(s, f.pkgs, f.ws) {
+				continue
+			}
+			chk, err := c.App.CheckSave(s)
+			if err != nil {
+				return nil, 0, err
+			}
+			if f.attention && chk.Level != app.LevelWarning && chk.Level != app.LevelError {
+				continue
+			}
+			g.rows = append(g.rows, saveListRow{s, chk})
+		}
+		if len(g.rows) > 0 {
+			groups = append(groups, g)
+			total += len(g.rows)
+		}
+	}
+	if !colonyFound {
+		return nil, 0, fmt.Errorf("no colony named %s (archo saves list)", f.colony)
+	}
+	return groups, total, nil
+}
+
+// savesListPlan decides how many saves of each colony fit the list, and returns the
+// cells of the shown saves.
+func savesListPlan(c *Ctx, groups []saveListGroup, perColony int, all bool) ([]saveListShown, [][]string) {
+	var cells [][]string
+	var plan []saveListShown
 	used := 0
 	for i, g := range groups {
 		n := len(g.rows)
@@ -419,24 +473,28 @@ func savesList(c *Ctx, a *Args) (*render.Doc, error) {
 			for _, r := range groups[i:] {
 				rest += len(r.rows)
 			}
-			plan = append(plan, shown{n: -1, more: rest})
+			plan = append(plan, saveListShown{n: -1, more: rest})
 			break
 		}
 		used += lines
-		plan = append(plan, shown{g: g, n: n, more: more})
+		plan = append(plan, saveListShown{g: g, n: n, more: more})
 		for _, r := range g.rows[:n] {
 			cells = append(cells, []string{r.s.Ref, r.s.Name, saveTime(c, r.s), dayText(r.s), saveListText(r.s), r.chk.Verdict()})
 		}
 	}
-	unread := 0
+	return plan, cells
+}
+
+// savesListRows adds the colonies and their saves as planned, and returns the save to
+// show next: the first needing attention, else the first.
+func savesListRows(c *Ctx, a *Args, root *render.Node, groups []saveListGroup, plan []saveListShown, lines []string) *app.Save {
+	// Every Game Config's saves are listed (12 §4.8): with two or more folders, each colony
+	// says whose Saves folder it is in.
+	ownerSet := map[string]bool{}
 	for _, g := range groups {
-		for _, r := range g.rows {
-			if r.s.Summary == nil && !r.s.ReadFailed {
-				unread++
-			}
-		}
+		ownerSet[folderOwner(g.c.Latest().Folder)] = true
 	}
-	lines := render.Columns(cells)
+	owners := len(ownerSet)
 	k := 0
 	var firstAttention, first *app.Save
 	for _, p := range plan {
@@ -447,6 +505,9 @@ func savesList(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		col := p.g.c
 		line := col.Name + "  " + render.Plural(len(col.Saves), "save") + ", latest " + saveTime(c, col.Latest())
+		if owners > 1 {
+			line += "  [saves of " + folderOwner(col.Latest().Folder) + "]"
+		}
 		if col.Orphan() {
 			line += "  [matches no list]"
 		}
@@ -465,18 +526,10 @@ func savesList(c *Ctx, a *Args) (*render.Doc, error) {
 			n.Addf("… %d more (archo saves list --colony %s)", p.more, quote(col.Name))
 		}
 	}
-	if unread > 0 {
-		what := "1 save is"
-		if unread > 1 {
-			what = fmt.Sprintf("%d saves are", unread)
-		}
-		root.KV("note", what+" "+metaOnly+": only the head is read, so no in-game day yet; archo saves index reads them in full")
-	}
 	if firstAttention != nil {
 		first = firstAttention
 	}
-	d.AddNext("archo saves show " + first.Ref)
-	return d, nil
+	return first
 }
 
 // listFlags repeats saves list's filters for an expansion command.
@@ -532,38 +585,20 @@ func savesShow(c *Ctx, a *Args) (*render.Doc, error) {
 		limit = 0
 	}
 	d, root := render.New(s.Ref + " " + s.Name + "  [" + chk.Verdict() + "]")
-	col := s.Colony
-	cl := col.Name + " (" + render.Plural(len(col.Saves), "save")
-	if l := col.Latest(); l.Path != s.Path {
-		cl += ", latest " + l.Name + " " + l.Ref
-	}
-	root.KV("colony", cl+")")
-	if s.Head != nil {
-		g := s.Head.GameVersion
-		if s.Env != nil {
-			g += ", env:" + s.Env.Name + " runs " + versionText(s.Env.GameVersion)
-		}
-		root.KV("game", g)
-	} else if s.Env != nil {
-		root.KV("game", "env:"+s.Env.Name+" runs "+versionText(s.Env.GameVersion))
-	}
-	root.KV("list", matchText(own))
-	if s.Current {
-		against := "no current list"
-		if s.Plan != nil {
-			against = "the current list " + app.PlanRef(s.Plan)
-		}
-		root.KV("checked against", against+" of env:"+s.Env.Name+" (--current)")
-	}
-	root.KV("file", s.Path)
-	root.KV("saved", saveTime(c, s)+", "+render.Size(s.Size))
+	savesShowAbout(c, root, s, own)
 	root.KV("read", readText(facts, s, ferr))
-	if a.Bool("content") {
+	if a.Bool("content") || a.Str("mod") != "" {
 		content, err := c.App.SaveContent(own)
 		if err != nil {
 			return nil, err
 		}
-		addSaveContent(root, content, all, showRef(own), showLines-docLines(d))
+		var pick []app.SaveNeed
+		if ref := a.Str("mod"); ref != "" && content.Read {
+			if pick, err = saveNeedsOf(c, content.Needs, ref); err != nil {
+				return nil, err
+			}
+		}
+		addSaveContent(root, content, all, showRef(own), showLines-docLines(d), pick)
 		return d, nil
 	}
 
@@ -589,6 +624,93 @@ func savesShow(c *Ctx, a *Args) (*render.Doc, error) {
 		budget = showLines
 	}
 	showMods, mods := s.Head != nil && (!play || facts == nil || a.Bool("mods")), a.Bool("mods")
+	lay := savesShowLayout(chk, showMods, mods)
+	switch {
+	case play && facts != nil:
+		// The playthrough in full: the load check shrinks to its verdict.
+		line := "yes, with the list as it is now"
+		if len(chk.Issues) > 0 {
+			line = chk.Verdict() + ": " + render.Plural(len(chk.Issues), "item")
+		}
+		root.KV("can it load", line+" (archo saves show "+showRef(s)+")")
+	case len(chk.Issues) == 0:
+		root.KV("can it load", "yes, with the list as it is now")
+	default:
+		savesShowIssues(d, root, ix, s, chk, limit, budget, lay.tail)
+	}
+	if chk.Quick != nil {
+		root.KV("quick fix", fixLine(*chk.Quick))
+	}
+
+	if showMods {
+		rows := limit
+		if budget > 0 {
+			left := budget - docLines(d) - 1 // the mods: line
+			if chk.Quick != nil {
+				left -= 2
+			}
+			if !mods && len(chk.Mods) > 0 {
+				left-- // the whole list hint
+			}
+			if lay.modRows > left {
+				left-- // … N more
+			}
+			rows = min(limit, max(left, lay.minRows))
+		}
+		addSaveMods(root, ix, chk, mods, rows, s)
+	}
+	if q := chk.Quick; q != nil && strings.HasPrefix(q.Command, "saves fix ") {
+		d.AddNext("archo " + q.Command + " --dry-run")
+	} else if q != nil {
+		d.AddNext("archo " + q.Command)
+	}
+	return d, nil
+}
+
+// savesShowAbout adds where a save is from: colony, game, list, file and folder.
+func savesShowAbout(c *Ctx, root *render.Node, s, own *app.Save) {
+	col := s.Colony
+	cl := col.Name + " (" + render.Plural(len(col.Saves), "save")
+	if l := col.Latest(); l.Path != s.Path {
+		cl += ", latest " + l.Name + " " + l.Ref
+	}
+	root.KV("colony", cl+")")
+	if s.Head != nil {
+		g := s.Head.GameVersion
+		if s.Env != nil {
+			g += ", env:" + s.Env.Name + " runs " + versionText(s.Env.GameVersion)
+		}
+		root.KV("game", g)
+	} else if s.Env != nil {
+		root.KV("game", "env:"+s.Env.Name+" runs "+versionText(s.Env.GameVersion))
+	}
+	root.KV("list", matchText(own))
+	if s.Current {
+		against := "no current list"
+		if s.Plan != nil {
+			against = "the current list " + app.PlanRef(s.Plan)
+		}
+		root.KV("checked against", against+" of env:"+s.Env.Name+" (--current)")
+	}
+	root.KV("file", s.Path)
+	where := folderOwner(own.Folder)
+	if noCloud(c.App, own.Folder) {
+		where += " (Steam Cloud does not sync this folder)"
+	}
+	root.KV("saves of", where)
+	if cur, _ := c.App.Env(); cur != nil && !own.SeenBy(cur) {
+		root.KV("not listed", "the game started with env:"+cur.Name+" does not list this save: it is in the Saves folder of "+folderOwner(own.Folder)+
+			" (copy it there: archo saves copy "+own.Ref+" --to-current)")
+	}
+	root.KV("saved", saveTime(c, s)+", "+render.Size(s.Size))
+}
+
+// savesShowRoom is the room saves show keeps for its Mod rows: how many there are, the
+// fewest it shows, and the lines kept after the load check.
+type savesShowRoom struct{ modRows, minRows, tail int }
+
+// savesShowLayout counts the Mod rows and the lines the end of saves show needs.
+func savesShowLayout(chk *app.SaveCheck, showMods, mods bool) savesShowRoom {
 	modRows := len(chk.ListOnly)
 	for _, m := range chk.Mods {
 		if mods || modMark(chk, m) != "" {
@@ -612,77 +734,44 @@ func savesShow(c *Ctx, a *Args) (*render.Doc, error) {
 			tail++
 		}
 	}
-	switch {
-	case play && facts != nil:
-		// The playthrough in full: the load check shrinks to its verdict.
-		line := "yes, with the list as it is now"
-		if len(chk.Issues) > 0 {
-			line = chk.Verdict() + ": " + render.Plural(len(chk.Issues), "item")
-		}
-		root.KV("can it load", line+" (archo saves show "+showRef(s)+")")
-	case len(chk.Issues) == 0:
-		root.KV("can it load", "yes, with the list as it is now")
-	default:
-		cn := root.KV("can it load", render.Plural(len(chk.Issues), "item"))
-		for i, is := range chk.Issues {
-			line := is.Level + " " + is.Kind
-			switch {
-			case is.Text != "":
-				line += "  " + is.Text
-			case len(is.Mods) == 1:
-				line += "  " + saveModLine(ix, s, is.Mods[0])
-			case len(is.Mods) > 1:
-				line += "  " + render.Plural(len(is.Mods), "Mod")
-			}
-			n := &render.Node{Line: line}
-			if len(is.Mods) > 1 {
-				for _, m := range is.Mods {
-					n.Add(saveModLine(ix, s, m))
-				}
-				n.Truncate(min(limit, 10), "archo saves show "+showRef(s)+" --all")
-			}
-			n.KV("consequence", consequence(is))
-			for _, f := range is.Fixes {
-				n.KV("fix", fixLine(f))
-			}
-			more := 0
-			if i < len(chk.Issues)-1 {
-				more = 1
-			}
-			if budget > 0 && i > 0 && docLines(d)+nodeLines(n)+more+tail > budget {
-				cn.Addf("… %d more (archo saves show %s --all)", len(chk.Issues)-i, showRef(s))
-				break
-			}
-			cn.Children = append(cn.Children, n)
-		}
-	}
-	if chk.Quick != nil {
-		root.KV("quick fix", fixLine(*chk.Quick))
-	}
+	return savesShowRoom{modRows: modRows, minRows: minRows, tail: tail}
+}
 
-	if showMods {
-		rows := limit
-		if budget > 0 {
-			left := budget - docLines(d) - 1 // the mods: line
-			if chk.Quick != nil {
-				left -= 2
-			}
-			if !mods && len(chk.Mods) > 0 {
-				left-- // the whole list hint
-			}
-			if modRows > left {
-				left-- // … N more
-			}
-			rows = min(limit, max(left, minRows))
+// savesShowIssues adds the load check's items, as many as fit the budget with tail
+// lines kept after them.
+func savesShowIssues(d *render.Doc, root *render.Node, ix *app.Index, s *app.Save, chk *app.SaveCheck, limit, budget, tail int) {
+	cn := root.KV("can it load", render.Plural(len(chk.Issues), "item"))
+	for i, is := range chk.Issues {
+		line := is.Level + " " + is.Kind
+		switch {
+		case is.Text != "":
+			line += "  " + is.Text
+		case len(is.Mods) == 1:
+			line += "  " + saveModLine(ix, s, is.Mods[0])
+		case len(is.Mods) > 1:
+			line += "  " + render.Plural(len(is.Mods), "Mod")
 		}
-		addSaveMods(root, ix, chk, mods, rows, s)
+		n := &render.Node{Line: line}
+		if len(is.Mods) > 1 {
+			for _, m := range is.Mods {
+				n.Add(saveModLine(ix, s, m))
+			}
+			n.Truncate(min(limit, 10), "archo saves show "+showRef(s)+" --all")
+		}
+		n.KV("consequence", consequence(is))
+		for _, f := range is.Fixes {
+			n.KV("fix", fixLine(f))
+		}
+		more := 0
+		if i < len(chk.Issues)-1 {
+			more = 1
+		}
+		if budget > 0 && i > 0 && docLines(d)+nodeLines(n)+more+tail > budget {
+			cn.Addf("… %d more (archo saves show %s --all)", len(chk.Issues)-i, showRef(s))
+			break
+		}
+		cn.Children = append(cn.Children, n)
 	}
-	if q := chk.Quick; q != nil && strings.HasPrefix(q.Command, "saves fix ") {
-		d.AddNext("archo " + q.Command + " --dry-run")
-	} else if q != nil {
-		d.AddNext("archo " + q.Command)
-	}
-	return d, nil
 }
 
 // showLines is saves show's line budget without --all (13 §3.1 rule 5).
@@ -783,68 +872,8 @@ func savesFix(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	plan := app.PlanRef(s.Plan)
 	changed := r.Changed()
-	var head string
-	switch {
-	case !changed && len(r.Waiting) > 0 && len(r.Already) > 0:
-		head = s.Ref + " " + s.Name + ": " + plan + " already loads " + modNames(r.Already) + "; " + render.Plural(len(r.Waiting), "Mod") + " still to download"
-	case !changed && len(r.Waiting) > 0:
-		head = s.Ref + " " + s.Name + ": " + plan + " already has the save's Mods; " + render.Plural(len(r.Waiting), "Mod") + " still to download"
-	case !changed && len(r.Already) > 0:
-		head = s.Ref + " " + s.Name + ": already done, " + plan + " loads " + modNames(r.Already)
-	case !changed:
-		head = s.Ref + " " + s.Name + ": nothing to fix in " + plan
-	case dry:
-		head = "dry run, nothing changed: would fix " + plan + " for " + s.Ref + " " + s.Name
-	default:
-		head = "fixed " + plan + " for " + s.Ref + " " + s.Name
-	}
-	d, root := render.New(head)
-	verb := func(done, would string) string {
-		if dry {
-			return would
-		}
-		return done
-	}
-	if len(r.Enable) > 0 {
-		n := root.Section(verb("enabled", "would enable"))
-		for _, m := range r.Enable {
-			n.Add(saveModLine(ix, s, m))
-		}
-	}
-	if len(r.Subscribe) > 0 {
-		n := root.Section(verb("added (missing until downloaded)", "would add (missing until downloaded)"))
-		for _, m := range r.Subscribe {
-			n.Add(saveModLine(ix, s, m))
-		}
-	}
-	if len(r.Waiting) > 0 {
-		n := root.Section(verb("in the list, not installed: subscribed again", "in the list, not installed: would subscribe again"))
-		for _, m := range r.Waiting {
-			n.Add(saveModLine(ix, s, m))
-		}
-	}
-	if len(r.Unresolved) > 0 {
-		n := root.Section("left out (not installed, no Workshop ID)")
-		for _, m := range r.Unresolved {
-			n.Add(saveModLine(ix, s, m))
-		}
-		n.Add("(a list from the save keeps them: archo loadout import " + quote(s.Path) + " --new " + quote(s.Colony.Name) + ")")
-	}
-	if len(r.Stuck) > 0 {
-		n := root.Section("in the list, not installed, cannot be downloaded")
-		for _, m := range r.Stuck {
-			n.Add(saveModLine(ix, s, m.SaveMod) + "  " + m.Why)
-		}
-	}
-	if len(r.Disable) > 0 {
-		n := root.Section(verb("disabled", "would disable"))
-		for _, m := range r.Disable {
-			n.Add(saveModLine(ix, s, m))
-		}
-	}
-	if r.Reordered > 0 {
-		root.KV("order", fmt.Sprintf("%s %s to the save's order", render.Plural(r.Reordered, "Mod"), verb("moved", "would move")))
-	}
+	d, root := render.New(savesFixHead(s, r, plan, dry))
+	savesFixSections(root, ix, s, r, dry)
 	current := false
 	if st := c.Loadout(); st != nil && st.Plan != nil && st.Plan.ID == s.Plan.ID {
 		current = true
@@ -862,49 +891,7 @@ func savesFix(c *Ctx, a *Args) (*render.Doc, error) {
 	var subErr error
 	gone := map[string]string{} // Workshop ID -> why it can never be downloaded (removed from the Workshop)
 	if len(ids) > 0 {
-		var op *app.SubscribeOp
-		subErr = c.App.InSaveList(s, func() error {
-			var err error
-			op, err = c.App.SubscribeWorkshop(ids, false, dry)
-			return err
-		})
-		n := root.Section("subscriptions")
-		names := map[string]string{}
-		for _, m := range append(append([]app.SaveMod{}, r.Subscribe...), r.Waiting...) {
-			names[m.SteamID] = m.Name
-		}
-		if op != nil {
-			for _, it := range op.Items {
-				id := ""
-				if it.Record != nil {
-					id = it.Record.WorkshopID
-				}
-				name := it.Name
-				if names[id] != "" {
-					name = names[id]
-				}
-				line := "ws:" + id + " " + name
-				if it.Result != "" {
-					line += "  " + it.Result
-				}
-				n.Add(line)
-				if it.Permanent && id != "" {
-					gone[id] = strings.TrimPrefix(it.Result, "failed: ")
-				}
-			}
-			for _, note := range op.Notes {
-				n.KV("note", note)
-			}
-		}
-		// Only items that can never download (removed from the Workshop) failed: not an
-		// error to retry; the save loads without them.
-		if subErr != nil && op != nil && len(gone) > 0 && allGone(op) {
-			subErr = nil
-		}
-		if subErr != nil {
-			n.KV("error", steamErr(subErr).Error())
-			c.ExitCode = ExitError
-		}
+		subErr = savesFixSubscribe(c, root, s, r, ids, dry, gone)
 	}
 
 	// The list after the fix: a save that cannot load is not launched, nor a list whose
@@ -913,12 +900,146 @@ func savesFix(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
-	broken := ""
-	var waiting []app.SaveMod
-	var stuck []app.StuckMod // missing entries no download installs: final, not waited for
+	fa := savesFixAfterState(ix, after, gone)
+	if fa.broken != "" && !changed {
+		root.KV("note", "the file itself cannot load ("+fa.broken+"); no list fix changes that (archo saves show "+showRef(s)+")")
+	}
+	if launch {
+		savesFixLaunch(c, d, root, ix, s, fa, savesFixLaunchCase{plan: plan, dry: dry, current: current, subErr: subErr, newSubs: len(ids) > 0})
+	}
+	if dry && (changed || len(ids) > 0) {
+		d.AddNext("archo " + strings.Join(fixArgv(s, a), " "))
+	} else if !dry && !launch && changed && len(ids) == 0 {
+		d.AddNext("archo saves fix " + s.Ref + " --launch --dry-run")
+	}
+	return d, nil
+}
+
+// savesFixHead is the title of saves fix: what changed, or why nothing did.
+func savesFixHead(s *app.Save, r *app.SaveFixResult, plan string, dry bool) string {
+	changed := r.Changed()
+	switch {
+	case !changed && len(r.Waiting) > 0 && len(r.Already) > 0:
+		return s.Ref + " " + s.Name + ": " + plan + " already loads " + modNames(r.Already) + "; " + render.Plural(len(r.Waiting), "Mod") + " still to download"
+	case !changed && len(r.Waiting) > 0:
+		return s.Ref + " " + s.Name + ": " + plan + " already has the save's Mods; " + render.Plural(len(r.Waiting), "Mod") + " still to download"
+	case !changed && len(r.Already) > 0:
+		return s.Ref + " " + s.Name + ": already done, " + plan + " loads " + modNames(r.Already)
+	case !changed:
+		return s.Ref + " " + s.Name + ": nothing to fix in " + plan
+	case dry:
+		return "dry run, nothing changed: would fix " + plan + " for " + s.Ref + " " + s.Name
+	default:
+		return "fixed " + plan + " for " + s.Ref + " " + s.Name
+	}
+}
+
+// savesFixSections adds what the fix did (or would do) to the list, by kind.
+func savesFixSections(root *render.Node, ix *app.Index, s *app.Save, r *app.SaveFixResult, dry bool) {
+	verb := func(done, would string) string {
+		if dry {
+			return would
+		}
+		return done
+	}
+	section := func(key string, mods []app.SaveMod) *render.Node {
+		n := root.Section(key)
+		for _, m := range mods {
+			n.Add(saveModLine(ix, s, m))
+		}
+		return n
+	}
+	if len(r.Enable) > 0 {
+		section(verb("enabled", "would enable"), r.Enable)
+	}
+	if len(r.Subscribe) > 0 {
+		section(verb("added (missing until downloaded)", "would add (missing until downloaded)"), r.Subscribe)
+	}
+	if len(r.Waiting) > 0 {
+		section(verb("in the list, not installed: subscribed again", "in the list, not installed: would subscribe again"), r.Waiting)
+	}
+	if len(r.Unresolved) > 0 {
+		n := section("left out (not installed, no Workshop ID)", r.Unresolved)
+		n.Add("(a list from the save keeps them: archo loadout import " + quote(s.Path) + " --new " + quote(s.Colony.Name) + ")")
+	}
+	if len(r.Stuck) > 0 {
+		n := root.Section("in the list, not installed, cannot be downloaded")
+		for _, m := range r.Stuck {
+			n.Add(saveModLine(ix, s, m.SaveMod) + "  " + m.Why)
+		}
+	}
+	if len(r.Disable) > 0 {
+		section(verb("disabled", "would disable"), r.Disable)
+	}
+	if r.Reordered > 0 {
+		root.KV("order", fmt.Sprintf("%s %s to the save's order", render.Plural(r.Reordered, "Mod"), verb("moved", "would move")))
+	}
+}
+
+// savesFixSubscribe subscribes the Workshop items ids in the save's list and adds the
+// subscriptions section. It records in gone the items that can never be downloaded and
+// returns the subscription error that still counts.
+func savesFixSubscribe(c *Ctx, root *render.Node, s *app.Save, r *app.SaveFixResult, ids []string, dry bool, gone map[string]string) error {
+	var op *app.SubscribeOp
+	subErr := c.App.InSaveList(s, func() error {
+		var err error
+		op, err = c.App.SubscribeWorkshop(ids, false, dry)
+		return err
+	})
+	n := root.Section("subscriptions")
+	names := map[string]string{}
+	for _, m := range append(append([]app.SaveMod{}, r.Subscribe...), r.Waiting...) {
+		names[m.SteamID] = m.Name
+	}
+	if op != nil {
+		for _, it := range op.Items {
+			id := ""
+			if it.Record != nil {
+				id = it.Record.WorkshopID
+			}
+			name := it.Name
+			if names[id] != "" {
+				name = names[id]
+			}
+			line := "ws:" + id + " " + name
+			if it.Result != "" {
+				line += "  " + it.Result
+			}
+			n.Add(line)
+			if it.Permanent && id != "" {
+				gone[id] = strings.TrimPrefix(it.Result, "failed: ")
+			}
+		}
+		for _, note := range op.Notes {
+			n.KV("note", note)
+		}
+	}
+	// Only items that can never download (removed from the Workshop) failed: not an
+	// error to retry; the save loads without them.
+	if subErr != nil && op != nil && len(gone) > 0 && allGone(op) {
+		subErr = nil
+	}
+	if subErr != nil {
+		n.KV("error", steamErr(subErr).Error())
+		c.ExitCode = ExitError
+	}
+	return subErr
+}
+
+// savesFixAfter is the save's state after the fix: why the file cannot load, and the
+// save's Mods still missing, waited for (waiting) or final (stuck).
+type savesFixAfter struct {
+	broken  string
+	waiting []app.SaveMod
+	stuck   []app.StuckMod // missing entries no download installs: final, not waited for
+}
+
+// savesFixAfterState reads the check after the fix.
+func savesFixAfterState(ix *app.Index, after *app.SaveCheck, gone map[string]string) savesFixAfter {
+	var fa savesFixAfter
 	for _, is := range after.Issues {
 		if is.Kind == app.IssueCutOff || is.Kind == app.IssueUnreadable || is.Kind == app.IssueMalformed {
-			broken = is.Kind
+			fa.broken = is.Kind
 		}
 	}
 	for _, m := range after.Mods {
@@ -930,62 +1051,64 @@ func savesFix(c *Ctx, a *Args) (*render.Doc, error) {
 			why = "ws:" + m.SteamID + " " + gone[m.SteamID]
 		}
 		if why != "" {
-			stuck = append(stuck, app.StuckMod{SaveMod: m, Why: why})
+			fa.stuck = append(fa.stuck, app.StuckMod{SaveMod: m, Why: why})
 		} else {
-			waiting = append(waiting, m)
+			fa.waiting = append(fa.waiting, m)
 		}
 	}
-	if broken != "" && !changed {
-		root.KV("note", "the file itself cannot load ("+broken+"); no list fix changes that (archo saves show "+showRef(s)+")")
-	}
-	if launch {
-		switch {
-		case subErr != nil:
-			root.KV("launch", "not started: a subscription failed")
-		case broken != "":
-			root.KV("launch", "not started: the save cannot load ("+broken+")")
-		case len(ids) > 0 && dry:
-			root.KV("launch", "would wait: the new subscriptions download first")
-		case len(waiting) > 0:
-			what := "1 Mod of the save is"
-			if len(waiting) > 1 {
-				what = fmt.Sprintf("%d Mods of the save are", len(waiting))
-			}
-			n := root.KV("launch", "not started: "+what+" not installed yet; scan when Steam has downloaded it, then fix again with --launch")
-			for _, m := range waiting {
-				n.Add(saveModLine(ix, s, m))
-			}
-			n.Truncate(10, "")
-			d.AddNext("archo scan", "archo saves fix "+s.Ref+" --launch")
-		case dry:
-			root.KV("launch", "would save "+plan+" to the game and start it")
-			stuckNote(root, ix, s, stuck)
-		default:
-			stuckNote(root, ix, s, stuck)
-			var lr *app.SaveResult
-			err := c.App.InSaveList(s, func() error {
-				var err error
-				lr, err = c.App.LaunchWith(false, false)
-				return err
-			})
-			if err != nil {
-				root.KV("launch", "not started: "+err.Error())
-				c.ExitCode = ExitError
-				break
-			}
-			root.KV("launch", "started RimWorld via "+lr.Launch.Method+" with "+plan)
-			root.KV("command", lr.Launch.Command())
-			if !current {
-				root.KV("note", plan+" is now the current plan")
-			}
+	return fa
+}
+
+// savesFixLaunchCase is what saves fix --launch decides on.
+type savesFixLaunchCase struct {
+	plan         string
+	dry, current bool
+	subErr       error
+	newSubs      bool // the fix subscribed Workshop items
+}
+
+// savesFixLaunch is saves fix --launch: start the game with the fixed list, or say why not.
+func savesFixLaunch(c *Ctx, d *render.Doc, root *render.Node, ix *app.Index, s *app.Save, fa savesFixAfter, lc savesFixLaunchCase) {
+	switch {
+	case lc.subErr != nil:
+		root.KV("launch", "not started: a subscription failed")
+	case fa.broken != "":
+		root.KV("launch", "not started: the save cannot load ("+fa.broken+")")
+	case lc.newSubs && lc.dry:
+		root.KV("launch", "would wait: the new subscriptions download first")
+	case len(fa.waiting) > 0:
+		what := "1 Mod of the save is"
+		if len(fa.waiting) > 1 {
+			what = fmt.Sprintf("%d Mods of the save are", len(fa.waiting))
+		}
+		n := root.KV("launch", "not started: "+what+" not installed yet; scan when Steam has downloaded it, then fix again with --launch")
+		for _, m := range fa.waiting {
+			n.Add(saveModLine(ix, s, m))
+		}
+		n.Truncate(10, "")
+		d.AddNext("archo scan", "archo saves fix "+s.Ref+" --launch")
+	case lc.dry:
+		root.KV("launch", "would save "+lc.plan+" to the game and start it")
+		stuckNote(root, ix, s, fa.stuck)
+	default:
+		stuckNote(root, ix, s, fa.stuck)
+		var lr *app.SaveResult
+		err := c.App.InSaveList(s, func() error {
+			var err error
+			lr, err = c.App.LaunchWith(false, false)
+			return err
+		})
+		if err != nil {
+			root.KV("launch", "not started: "+err.Error())
+			c.ExitCode = ExitError
+			return
+		}
+		root.KV("launch", "started RimWorld via "+lr.Launch.Method+" with "+lc.plan)
+		root.KV("command", lr.Launch.Command())
+		if !lc.current {
+			root.KV("note", lc.plan+" is now the current plan")
 		}
 	}
-	if dry && (changed || len(ids) > 0) {
-		d.AddNext("archo " + strings.Join(fixArgv(s, a), " "))
-	} else if !dry && !launch && changed && len(ids) == 0 {
-		d.AddNext("archo saves fix " + s.Ref + " --launch --dry-run")
-	}
-	return d, nil
 }
 
 // modNames names Mods for a status line: their names, the first 3, then how many more.
@@ -1095,6 +1218,9 @@ func savesIndex(c *Ctx, a *Args) (*render.Doc, error) {
 	if r.Writing > 0 {
 		root.KV("being written", fmt.Sprintf("%d (read on a later run)", r.Writing))
 	}
+	if r.Unreadable > 0 {
+		root.KV("could not be read", fmt.Sprintf("%d, not tried again until the file changes (archo saves show <save> says why)", r.Unreadable))
+	}
 	for _, e := range r.Errs {
 		root.KV("error", e)
 	}
@@ -1167,16 +1293,65 @@ func savesCopy(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil || amb != nil {
 		return amb, err
 	}
-	to, err := c.App.CopySave(s)
-	if err != nil {
+	var to string
+	head := "copied "
+	if a.Bool("to-current") {
+		e, err := c.App.Env()
+		if err != nil {
+			return nil, err
+		}
+		if e == nil {
+			return nil, app.ErrNoEnv
+		}
+		if to, err = c.App.CopySaveTo(s, e); err != nil {
+			return nil, err
+		}
+		head = "copied into the Saves folder of env:" + e.Name + ": "
+	} else if to, err = c.App.CopySave(s); err != nil {
 		return nil, err
 	}
 	ref := app.SaveRef(to)
 	_, name := app.SplitSaveName(fileBase(to))
-	d, root := render.New("copied " + s.Ref + " " + s.Name + " → " + ref + " " + name)
+	d, root := render.New(head + s.Ref + " " + s.Name + " → " + ref + " " + name)
 	root.KV("file", to)
 	d.AddNext("archo saves show " + ref)
 	return d, nil
+}
+
+// folderOwner names who saves in a Saves folder (12 §4.8): "pack X", the Game Configs
+// using it ("env:A, env:C"), or that none does any more.
+func folderOwner(f *app.SaveFolder) string {
+	if f == nil {
+		return "?"
+	}
+	if f.Pack != "" {
+		return "pack " + f.Pack
+	}
+	var names []string
+	for _, e := range f.Envs {
+		names = append(names, "env:"+e.Name)
+	}
+	if len(names) == 0 {
+		return "no Game Config"
+	}
+	return strings.Join(names, ", ")
+}
+
+// noCloud: Steam Cloud does not sync the folder: a pack's, or no Game Config using it keeps
+// the game's default (shared) user data.
+func noCloud(a *app.App, f *app.SaveFolder) bool {
+	if f == nil || f.Pack == "" && len(f.Envs) == 0 {
+		return false
+	}
+	if f.Pack != "" {
+		return true
+	}
+	for _, e := range f.Envs {
+		if a.Saves(e) == app.SavesShared {
+			return false
+		}
+	}
+	return true
 }
 
 // fileBase is a path's last element for both separators.
@@ -1185,6 +1360,73 @@ func fileBase(p string) string {
 		return p[i+1:]
 	}
 	return p
+}
+
+// savesChoose sets or shows the save Can it run checks for the current Game Config (12 §4.8).
+func savesChoose(c *Ctx, a *Args) (*render.Doc, error) {
+	e, err := c.App.Env()
+	if err != nil {
+		return nil, err
+	}
+	if e == nil {
+		return nil, app.ErrNoEnv
+	}
+	switch {
+	case a.Bool("clear"):
+		if err := c.App.ClearSaveChoice(e.ID); err != nil {
+			return nil, err
+		}
+		d, _ := render.New("env:" + e.Name + ": Can it run checks the save the last run loaded")
+		return d, nil
+	case len(a.Pos) == 0:
+		ch := c.App.SaveChoiceOf(e.ID)
+		if ch == nil {
+			d, _ := render.New("env:" + e.Name + ": Can it run checks the save the last run loaded (choose one: archo saves choose <save> [--colony])")
+			return d, nil
+		}
+		what := "save " + ch.Name
+		if ch.Kind == app.ChooseColony {
+			what = "the newest save of colony " + ch.Name
+		}
+		d, root := render.New("env:" + e.Name + ": Can it run checks " + what)
+		root.KV("folder", ch.Dir)
+		if ch.Path != "" {
+			root.KV("file", ch.Path)
+		}
+		d.AddNext("archo saves choose --clear")
+		return d, nil
+	}
+	colony := a.Bool("colony")
+	var s *app.Save
+	if colony { // a colony by name or key, or the colony of a save
+		l, err := c.App.ListSaves()
+		if err != nil {
+			return nil, err
+		}
+		if col, err := l.FindColony(a.Pos[0]); err == nil {
+			s = col.Latest()
+		}
+	}
+	if s == nil {
+		var amb *render.Doc
+		if s, amb, err = findSave(c, a.Pos[0]); err != nil || amb != nil {
+			return amb, err
+		}
+	}
+	ch, err := c.App.ChooseSave(e.ID, s, colony)
+	if err != nil {
+		return nil, err
+	}
+	what := "save " + s.Ref + " " + s.Name
+	if colony {
+		what = "the newest save of colony " + ch.Name + " (now " + s.Colony.Latest().Ref + " " + s.Colony.Latest().Name + ")"
+	}
+	d, root := render.New("env:" + e.Name + ": Can it run checks " + what)
+	if !s.SeenBy(e) {
+		root.KV("note", "it is in the Saves folder of "+folderOwner(s.Folder)+": the game started with env:"+e.Name+" does not list it")
+	}
+	d.AddNext("archo saves choose --clear")
+	return d, nil
 }
 
 func savesBackup(c *Ctx, a *Args) (*render.Doc, error) {
@@ -1251,7 +1493,11 @@ func saveFilesDoc(c *Ctx, head string, r *app.SaveFilesResult) *render.Doc {
 		c.ExitCode = ExitError
 	}
 	if !r.Done {
-		root.KV("confirm", "ask the player, then run it again with --yes --token "+r.Token+" (refused if the saves changed since)")
+		again := "run it again with --yes --token " + r.Token
+		if IsMCP(c.Context) {
+			again = "call it again with confirm=true token=" + r.Token
+		}
+		root.KV("confirm", "ask the player, then "+again+" (refused if the saves changed since)")
 	}
 	return d
 }

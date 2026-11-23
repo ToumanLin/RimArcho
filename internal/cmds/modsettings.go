@@ -195,7 +195,7 @@ func settingsFiles(root *render.Node, sm *app.ModSettingsMod, limit int, expand 
 			n.KV("file key", f.Key())
 		}
 		if f.Window != nil {
-			windowSection(n, f.Window, limit, expand)
+			windowSection(n, f.Window, f.WindowOutdated(), limit, expand)
 		}
 		if !f.Exists {
 			n.Add("no file: the Mod uses its defaults until its settings are changed in the game")
@@ -274,8 +274,11 @@ func hugsLibSection(root *render.Node, f *app.ModSettingsFile, limit int, expand
 
 // windowSection adds what the game's settings window drew when the player last opened it
 // (Archo Monitor): headings, and each control with its value, at most limit controls.
-func windowSection(n *render.Node, w *app.SeenSettingsWindow, limit int, expand string) {
+func windowSection(n *render.Node, w *app.SeenSettingsWindow, older bool, limit int, expand string) {
 	win := n.Section(fmt.Sprintf("the game's window (seen %s; labels as the game drew them, values as they were then)", w.Seen.Local().Format("2006-01-02")))
+	if older {
+		win.Add("changed since: the values stored in the file are the current ones")
+	}
 	at, shown := win, 0
 	for i, c := range w.Controls {
 		if limit > 0 && shown == limit {
@@ -283,7 +286,7 @@ func windowSection(n *render.Node, w *app.SeenSettingsWindow, limit int, expand 
 			break
 		}
 		if c.Kind == "label" {
-			at = win.Section(c.Label)
+			at = win.Section(bareLabel(c.Label))
 			continue
 		}
 		shown++
@@ -296,7 +299,7 @@ func windowSection(n *render.Node, w *app.SeenSettingsWindow, limit int, expand 
 
 // windowText is one control of a settings window as the CLI shows it.
 func windowText(c logs.SettingsControl) string {
-	label := c.Label
+	label := bareLabel(c.Label)
 	if label == "" {
 		label = "-"
 	}
@@ -311,6 +314,12 @@ func windowText(c logs.SettingsControl) string {
 		return fmt.Sprintf("%s: %q (text)", label, c.Value)
 	}
 	return fmt.Sprintf("%s: %s (%s)", label, c.Value, c.Kind)
+}
+
+// bareLabel is a label the game drew without its own trailing colon ("Search:"), since the
+// CLI adds one.
+func bareLabel(s string) string {
+	return strings.TrimRight(strings.TrimSpace(s), ":\uff1a ")
 }
 
 // settingText is a stored value as the CLI shows it.

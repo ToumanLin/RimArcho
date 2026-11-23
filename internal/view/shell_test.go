@@ -43,8 +43,8 @@ func TestNavAndPath(t *testing.T) {
 		t.Fatalf("plans %+v %v", plans, err)
 	}
 	g := view.Nav(n.Count, plans, []view.PackRow{{Name: "Main"}})
-	if len(g) != 2 || g[0].Title != "playing" || g[1].Title != "library" {
-		t.Fatalf("two groups, Playing and Library (16 §2.1): %+v", g)
+	if len(g) != 3 || g[0].Title != "playing" || g[1].Title != "library" || g[2].Title != "saves" {
+		t.Fatalf("three groups, Playing, Library and Saves (16 §2.1): %+v", g)
 	}
 	var ids, keys []string
 	for _, gr := range g {
@@ -52,12 +52,17 @@ func TestNavAndPath(t *testing.T) {
 			ids, keys = append(ids, it.ID), append(keys, it.Key)
 		}
 	}
-	if strings.Join(ids, ",") != "home,needs,log,plan,packs,saves,library,textures,env" {
+	if strings.Join(ids, ",") != "home,needs,log,plan,packs,library,env,import,saves,review" {
 		t.Fatalf("order %v", ids)
 	}
-	// Saves has no shift key: shift+1–8 stay the eight entries the TUI also has (16 §3.5)
-	if keys[0] != "shift+1" || keys[5] != "" || keys[6] != "shift+6" || keys[8] != "shift+8" {
+	// Saves and Import have no shift key: shift+1–8 stay the eight entries the TUI also has (16 §3.5)
+	if strings.Join(keys, ",") != "shift+1,shift+2,shift+3,shift+4,shift+5,shift+6,shift+8,,," {
 		t.Fatalf("keys %v", keys)
+	}
+	// Texture optimisation is Mod library's last sub-entry and keeps shift+7 (16 §2.1)
+	lib := g[1].Items[2]
+	if tx := lib.Kids[len(lib.Kids)-1]; lib.ID != view.PageLibrary || tx.ID != view.PageTextures || tx.Key != "shift+7" {
+		t.Fatalf("textures under Mod library: %+v", lib.Kids)
 	}
 	if g[0].Items[1].Badge != n.Count || n.Count == 0 {
 		t.Fatalf("badge %d, needs %d", g[0].Items[1].Badge, n.Count)
@@ -83,8 +88,11 @@ func TestNavAndPath(t *testing.T) {
 		"plans":       "library=plan / lists=plan / all lists=plans",
 		"needs":       "playing=home / can it run=needs",
 		"log":         "playing=home / game log=log",
+		"saves":       "saves=saves / all saves=saves",
+		"review":      "saves=saves / play review=review",
 		"changes":     "library=plan / mod library=library / updates=changes",
 		"library":     "library=plan / mod library=library / all mods=library",
+		"textures":    "library=plan / mod library=library / texture optimisation=textures",
 		"pack:Main":   "library=plan / packs=packs / Main=pack:Main",
 		"settings":    "settings=settings",
 		"nowhere":     "",
@@ -136,7 +144,7 @@ func TestBuildHome(t *testing.T) {
 	}
 	n.Never = false
 	h = view.BuildHome(e.App, b, n, plans, packs)
-	if r := h.Rows[0]; r.State != "1 problems break the game" || r.Level != view.LevelBad {
+	if r := h.Rows[0]; r.State != "1 problem breaks the game" || r.Level != view.LevelBad {
 		t.Fatalf("plan state %+v", r)
 	}
 	if r := h.Rows[2]; r.State != "checked when created" || r.Level != view.HomeOK {
@@ -157,9 +165,13 @@ func TestBuildHome(t *testing.T) {
 	e.MustRun("env", "add", "other", "--game", game)
 	other, err := e.App.Store.EnvByName("other")
 	if err != nil || other == nil {
-		t.Fatalf("other environment: %v", err)
+		t.Fatalf("other Game Config: %v", err)
 	}
-	if _, err := e.App.Store.CreatePlan(other.ID, "Other list", e.Now()); err != nil {
+	op, err := e.App.Store.CreatePlan(other.ID, "Other list", e.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.App.Store.SetCurrentPlan(other.ID, op.ID); err != nil {
 		t.Fatal(err)
 	}
 	view.AddOtherEnvs(e.App, h, b.St.Ix.Env.ID)
@@ -168,12 +180,17 @@ func TestBuildHome(t *testing.T) {
 		if r.OtherEnv {
 			found = true
 			if r.GameVersion != "1.7.4985 rev1269" || r.Env != "other  1.7" {
-				t.Fatalf("other environment version: %+v", r)
+				t.Fatalf("other Game Config version: %+v", r)
+			}
+			// each Game Config's rows say which list is its current one, so picking that
+			// game on Launch keeps its list (16 §2.3; VM round 2A 2026-11-23)
+			if r.Kind == view.RowPlan && r.Current != (r.Plan == op.ID) {
+				t.Fatalf("other Game Config's current list: %+v", r)
 			}
 		}
 	}
 	if !found {
-		t.Fatal("missing other environment rows")
+		t.Fatal("missing other Game Config rows")
 	}
 }
 
@@ -191,9 +208,10 @@ func TestFindAndAddGames(t *testing.T) {
 	if cur, err := e.App.Env(); err != nil || cur.Name != "1.6" {
 		t.Fatalf("current %v %v", cur, err)
 	}
-	// Found again: it is in use, and adding it again does nothing.
+	// Found again: it is in use (with a free name for another Game Config), and adding it
+	// again without AddConfig does nothing.
 	gs = view.FindGames(e.App)
-	if len(gs) != 1 || gs[0].Env != "1.6" || gs[0].Name != "" {
+	if len(gs) != 1 || gs[0].Env != "1.6" || gs[0].Name != "1.6-2" {
 		t.Fatalf("again %+v", gs)
 	}
 	if names, err := view.AddGames(e.App, gs); err != nil || len(names) != 0 {
@@ -205,6 +223,23 @@ func TestFindAndAddGames(t *testing.T) {
 	}
 	if _, err := view.GameAt(e.App, e.Root); err == nil {
 		t.Fatal("not a game folder was accepted")
+	}
+	// Add Game Config (16 §2.15): another config of the used game, with its own saves
+	// folder, the settings of 1.6 and a new Core and DLC list.
+	one := gs[0]
+	one.AddConfig, one.Saves, one.Like, one.NewList = true, "own", "1.6", true
+	names, err = view.CreateGames(e.App, []view.GameFound{one})
+	if err != nil || strings.Join(names, ",") != "1.6-2" {
+		t.Fatalf("add config: %v %v", names, err)
+	}
+	added, err := e.App.Store.EnvByName("1.6-2")
+	if err != nil || added == nil || added.GameRoot != e.Game || !strings.HasPrefix(added.UserDataRoot, e.Home) {
+		t.Fatalf("added config %+v %v", added, err)
+	}
+	// A custom saves folder needs its path.
+	one.Name, one.Saves = "1.6-3", "custom"
+	if _, err := view.CreateGames(e.App, []view.GameFound{one}); err == nil {
+		t.Fatal("custom saves without a folder was accepted")
 	}
 }
 
@@ -238,7 +273,7 @@ func TestAddTwoGamesOfOneVersion(t *testing.T) {
 			t.Fatalf("%v: added %v, %v", names, out, err)
 		}
 		if n := envCount(); n != 1 {
-			t.Fatalf("%v: a refused batch left %d environments", names, n)
+			t.Fatalf("%v: a refused batch left %d Game Configs", names, n)
 		}
 	}
 	out, err := view.CreateGames(e.App, []view.GameFound{*g2, *g3})
@@ -268,5 +303,23 @@ func TestPickFeatured(t *testing.T) {
 	view.PickFeatured(h, view.FeaturedValue("main", "Old", 7), "main", 8)
 	if h.Featured != 0 {
 		t.Fatalf("lapsed: %d", h.Featured)
+	}
+}
+
+func TestGameAtOwnSavesDoesNotTakeDefaultPair(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	e.MustRun("env", "add", "own", "--game", e.Game, "--saves", "own")
+	g, err := view.GameAt(e.App, e.Game)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.Env != "" || g.Name == "" {
+		t.Fatalf("default pair unavailable: %+v", g)
+	}
+	e.MustRun("env", "add", "default", "--game", e.Game, "--user-data", g.UserData)
+	g, err = view.GameAt(e.App, e.Game)
+	if err != nil || g.Env != "default" {
+		t.Fatalf("default pair not recognized: %+v %v", g, err)
 	}
 }

@@ -11,11 +11,15 @@
 #
 # Outputs go to -OutputDir (default dist/); the script never pushes or publishes.
 # -GOOS linux builds only the Linux tarball. The default builds both platforms.
+# -LinuxGUI puts rimarcho, the Linux GUI, in the tarball (17 §5): it needs cgo and GTK, so CI's
+# linux-gui job builds it. Pass the downloaded artifact's path, or "ci" to download it with gh
+# from the workflow_dispatch run of this commit (gh workflow run ci.yml -f version=<version>).
 param(
     [Parameter(Mandatory = $true)][string]$Version,
     [ValidateSet("windows", "linux")][string]$GOOS = "windows",
     [ValidateSet("amd64")][string]$GOARCH = "amd64",
     [string]$OutputDir = "dist",
+    [string]$LinuxGUI = "",
     [switch]$SkipTests
 )
 $ErrorActionPreference = "Stop"
@@ -47,6 +51,10 @@ $name = "archo-$Version-$GOOS-$GOARCH"
 $OutputDir = [IO.Path]::GetFullPath($OutputDir)
 $out = Join-Path $OutputDir $name
 if (Test-Path $out) { Remove-Item -Recurse -Force $out }
+# A rebuild of the same version (after committing) replaces the archive and its checksum too.
+foreach ($old in "$out.zip", "$out.zip.sha256", "$out.tar.gz", "$out.tar.gz.sha256") {
+    if (Test-Path -LiteralPath $old) { Remove-Item -LiteralPath $old }
+}
 New-Item -ItemType Directory -Force $out | Out-Null
 
 $pkg = "github.com/ToumanLin/RimArcho/internal/buildinfo"
@@ -80,11 +88,42 @@ try {
     Remove-Item Env:GOOS, Env:GOARCH, Env:CGO_ENABLED -ErrorAction SilentlyContinue
 }
 
+# rimarcho, the Linux GUI (16 §8.1), comes from CI: it links GTK and WebKitGTK through cgo,
+# which this script cannot build. It must be this version, built from this commit.
+function Get-LinuxGUI([string]$from) {
+    if ($from -eq "ci") {
+        $sha = (git rev-parse HEAD)
+        $runs = gh run list --workflow ci.yml --commit $sha --event workflow_dispatch --status success --limit 1 --json databaseId | ConvertFrom-Json
+        if ($LASTEXITCODE -ne 0 -or -not $runs) { throw "no successful workflow_dispatch CI run for $sha; run: gh workflow run ci.yml --ref <branch> -f version=$Version" }
+        $dir = Join-Path ([IO.Path]::GetTempPath()) "rimarcho-$Version-$($runs[0].databaseId)"
+        if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }
+        gh run download $runs[0].databaseId -n rimarcho-linux-amd64 -D $dir
+        if ($LASTEXITCODE -ne 0) { throw "gh run download failed" }
+        $from = Join-Path $dir "rimarcho"
+    }
+    if (-not (Test-Path -LiteralPath $from -PathType Leaf)) { throw "rimarcho not found: $from" }
+    $text = [Text.Encoding]::Latin1.GetString([IO.File]::ReadAllBytes($from))
+    if (-not $text.StartsWith("$([char]0x7F)ELF")) { throw "$from is not a Linux program" }
+    if (-not $text.Contains($Version)) { throw "$from does not carry version $Version (dispatch CI with -f version=$Version)" }
+    $clean = $commit -replace '-dirty$', ''
+    if ($clean -ne "unknown" -and -not $text.Contains($clean)) { throw "$from was not built from commit $clean" }
+    return $from
+}
+if ($GOOS -eq "linux" -and $LinuxGUI) {
+    $gui = Get-LinuxGUI $LinuxGUI
+    Write-Host "rimarcho (Linux GUI, from CI): $gui"
+    Copy-Item -LiteralPath $gui (Join-Path $out "rimarcho")
+} elseif ($GOOS -eq "linux") {
+    Write-Host "no -LinuxGUI: the Linux tarball has archo only, without the window (rimarcho)"
+}
+
 Copy-Item README.md, CHANGELOG.md, LICENSE $out
 
 # README.zh-CN.md and skills/ (agent skills, such as rimworld-probe) from 1.0.6 on: 1.0.0's
 # own update rejects a zip with top-level entries it does not know, and 1.0.5 knows these
-# (selfupdate.Files). Only files tracked by git go in, never local build output.
+# (selfupdate.Files). Updaters up to 1.0.x accept only selfupdate.Files, so the first release
+# after 1.0.x packs nothing else; from the next one a new top-level entry may be added here
+# directly (17 §5.1 step 3). Only files tracked by git go in, never local build output.
 if ([version]($Version -replace '[-+].*$', '') -ge [version]"1.0.6") {
     Copy-Item README.zh-CN.md $out
     $skillFiles = @(git ls-files skills)
@@ -121,5 +160,21 @@ Write-Host ("dist: {0} ({1:N0} bytes)" -f $archive, (Get-Item $archive).Length)
 Get-ChildItem -LiteralPath $out -Recurse -File | ForEach-Object { "  {0}  {1:N0}" -f $_.FullName, $_.Length }
 if ($GOOS -eq "windows" -and $env:OS -eq "Windows_NT") { & (Join-Path $out $exe) version }
 if ($GOOS -eq "windows") {
-    & $PSCommandPath -Version $Version -GOOS linux -GOARCH $GOARCH -OutputDir $OutputDir -SkipTests
+    & $PSCommandPath -Version $Version -GOOS linux -GOARCH $GOARCH -OutputDir $OutputDir -LinuxGUI $LinuxGUI -SkipTests
+    # The publishing steps (17 §5 steps 7-10), in order; this script runs none of them.
+    $root = (Get-Location).Path
+    $zip = Join-Path $OutputDir "archo-$Version-windows-amd64.zip"
+    $built = Join-Path $out "archo.exe"
+    $lanzou = "file:///" + ((Join-Path $PSScriptRoot "publish-lanzou.mjs") -replace '\\', '/')
+    Write-Host ""
+    Write-Host "built $Version; to publish (spec 17, section 5), from $root, after committing and pushing:"
+    Write-Host "  7. GitHub:   pwsh scripts/publish-github.ps1 -Version $Version -DryRun   (then without -DryRun)"
+    if ($Version -match '-') {
+        Write-Host "  prerelease: GitHub only; no Lanzou, no Workshop"
+    } else {
+        Write-Host "  8. Lanzou:   ego-browser nodejs -e `"await import('$lanzou`?zip=$($zip -replace '\\', '/')')`""
+        Write-Host "  9. Workshop: $built workshop publish --version $Version --dry-run   (then without --dry-run)"
+        Write-Host " 10. Verify:   an older build's 'archo update --check' lists github, monitor and lanzou with $Version"
+    }
+    if ($commit -match '-dirty') { Write-Host "warning: built from a dirty tree; publish-github.ps1 refuses it. Commit and rebuild." }
 }

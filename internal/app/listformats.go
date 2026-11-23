@@ -261,6 +261,9 @@ func archoList(p *Pack) *ImportedList {
 	l := newList(FormatArcho)
 	l.Lineages = map[string]string{}
 	l.Title, l.Game, l.Hashes, l.Versions = p.Name, p.Game, map[string]string{}, p.Versions
+	if p.Settings.check() == nil && !p.Settings.Empty() {
+		l.Settings = p.Settings
+	}
 	for _, pe := range p.Entries {
 		l.add(pe.PackageID, pe.Name, pe.WorkshopID)
 		l.Lineages[strings.ToLower(strings.TrimSpace(pe.PackageID))] = pe.Lineage
