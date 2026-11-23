@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func logCreationTime(fi os.FileInfo) time.Time {
+func logCreationTime(_ string, fi os.FileInfo) time.Time {
 	if data, ok := fi.Sys().(*syscall.Win32FileAttributeData); ok && data.CreationTime != (syscall.Filetime{}) {
 		return time.Unix(0, data.CreationTime.Nanoseconds())
 	}
