@@ -19,7 +19,7 @@ type term struct {
 	neg   bool
 }
 
-var queryFields = map[string]bool{"name": true, "author": true, "tag": true, "id": true, "type": true, "has": true, "version": true, "location": true, "tags": true, "source": true, "content": true, "lists": true}
+var queryFields = map[string]bool{"name": true, "author": true, "tag": true, "id": true, "type": true, "has": true, "version": true, "location": true, "tags": true, "source": true, "content": true, "lists": true, "category": true}
 
 // Query is a parsed column search.
 type Query struct{ terms []term }
@@ -170,6 +170,8 @@ func termMatch(t term, it *Item, f MatchFacts) bool {
 		return typeMatch(v, it, f)
 	case "added":
 		return slices.Contains(it.added, v)
+	case "category":
+		return it.Cat == v
 	case "has":
 		return hasMatch(v, it, f)
 	}
@@ -298,12 +300,13 @@ func TagMatch(tag, v string) bool { return app.TagMatch(tag, v) }
 func isTagSep(c byte) bool { return app.IsTagSep(c) }
 
 // queryFieldOrder is the order completion offers fields in when several share a prefix.
-var queryFieldOrder = []string{"lists", "name", "author", "tag", "id", "type", "has", "version", "location"}
+var queryFieldOrder = []string{"lists", "name", "author", "tag", "id", "type", "has", "version", "location", "category"}
 
 // queryValues are the fixed values of type: and has: (16 §3.7), in the order offered.
 var queryValues = map[string][]string{
-	"type": {"workshop", "local", "official", "copy", "git", "steamcmd", "assembly", "xml", "language"},
-	"has":  {"problem", "error", "tag", "note", "alias"},
+	"type":     {"workshop", "local", "official", "copy", "git", "steamcmd", "assembly", "xml", "language"},
+	"has":      {"problem", "error", "tag", "note", "alias"},
+	"category": app.CategoryKeys,
 }
 
 // CompleteQuery is the grey text to show after the search box's last word, which tab

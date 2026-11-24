@@ -17,6 +17,7 @@ import (
 type Mod struct {
 	// Player data of the lineage (07 §6.1), filled by the app's index.
 	Alias, Note string
+	Category    string // the player's category (app.CategoryKeys), "" for the automatic one
 	Tags        []string
 
 	ID           string

@@ -69,6 +69,18 @@ export const icon = {
 
 export function sourceIcon(kind) { return icon[kind] || icon.local; }
 
+// A Mod's category (16 §2.5, view.Item.Cat): one quiet glyph per kind (icon["cat-" + key]),
+// the name in its hover (catnames.js).
+Object.assign(icon, {
+  "cat-game": svg('<path d="M2.6 11.4l-.8-6.2 3.4 2.6L8 3.4l2.8 4.4 3.4-2.6-.8 6.2z"/><path d="M3 13.4h10"/>'),
+  "cat-library": svg('<path d="M8 2.6l5.6 2.8L8 8.2 2.4 5.4z"/><path d="M2.4 8.2L8 11l5.6-2.8M2.4 10.8L8 13.6l5.6-2.8"/>'),
+  "cat-content": svg('<path d="M8 2.4l5.2 2.6v6L8 13.6 2.8 11V5z"/><path d="M2.8 5L8 7.6 13.2 5M8 7.6v6"/>'),
+  "cat-code": svg('<path d="M5.8 3.2c-1.6 0-1.4 1.8-1.4 3S3.8 8 2.8 8c1 0 1.6.6 1.6 1.8s-.2 3 1.4 3M10.2 3.2c1.6 0 1.4 1.8 1.4 3S12.2 8 13.2 8c-1 0-1.6.6-1.6 1.8s.2 3-1.4 3"/>'),
+  "cat-patches": svg('<rect x="1.8" y="5.6" width="12.4" height="4.8" rx="2.4" transform="rotate(-45 8 8)"/><path d="M7.1 7.1h.01M8.9 8.9h.01M8.9 7.1h.01M7.1 8.9h.01"/>'),
+  "cat-translation": svg('<circle cx="8" cy="8" r="5.8"/><path d="M2.2 8h11.6M8 2.2c1.8 1.8 2.4 3.8 2.4 5.8S9.8 11.9 8 13.8C6.2 11.9 5.6 10 5.6 8S6.2 4 8 2.2"/>'),
+  "cat-textures": icon.textures,
+});
+
 // statusIcon: view.Status* (none, unloadable, warn, log, err; hint -1, version -2).
 export function statusIcon(s) {
   if (s === -1) return icon.hint;

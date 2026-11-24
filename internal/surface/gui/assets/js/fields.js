@@ -3,6 +3,8 @@
 // a row's own action opens the location, the page, or the tag bar.
 import { el, esc, api, T, errText, say } from "./state.js";
 import { icon } from "./icons.js";
+import { categoryName, CATEGORY_KEYS } from "./catnames.js";
+import { choiceControl } from "./choices.js";
 import { addressLabel } from "./address.js";
 import { tagOrderChips } from "./tagorder.js";
 import * as rt from "/wails/runtime.js";
@@ -135,6 +137,15 @@ export function fieldList(fields, acts = {}) {
         line.innerHTML = ic + `<span class="n">${esc(x.name)}</span>` + (note ? `<span class="dim">${esc(note)}</span>` : "");
         v.append(line);
       }
+    } else if (f.kind === "category") {
+      // the Mod's category (16 §2.5): its glyph and name, why in muted text, and a picker
+      // for the player's own (automatic gives it back)
+      const k = (f.list || [])[0] || "";
+      const t = el("span", "");
+      t.innerHTML = ((k && icon["cat-" + k]) || "") + esc(f.value || "—");
+      v.append(t);
+      if (f.extra) v.append(el("span", "dim", `  (${f.extra})`));
+      if (f.target) v.append(categoryPicker(f.target, (f.list || [])[1] === "player" ? k : ""));
     } else if (f.kind === "tags") {
       if (!f.list || !f.list.length) v.append(el("span", "dim", T("none")));
       else if (acts.tagOrder && f.list.length > 1 || acts.openTag) v.append(tagOrderChips(f.list, acts.tagOrder || (() => {}), "chip", acts.openTag || null));
@@ -167,6 +178,18 @@ export function fieldList(fields, acts = {}) {
     box.append(r);
   }
   return box;
+}
+
+// categoryPicker sets the player's category of Mod id (api.SetCategory); "automatic" clears it.
+function categoryPicker(id, chosen) {
+  const s = choiceControl(T("set the category"), [{ value: "", label: T("automatic") }, ...CATEGORY_KEYS.map(k => ({ value: k, label: T(categoryName(k)) }))], chosen);
+  s.classList.add("cat-pick");
+  s.onkeydown = (e) => e.stopPropagation(); // arrows pick here, not in the lists
+  s.onchange = async () => {
+    try { say("ok", await api.SetCategory(id, s.value)); } catch (e) { say("fail", errText(e)); }
+    document.dispatchEvent(new CustomEvent("tags-changed"));
+  };
+  return s;
 }
 
 const copyTimers = new WeakMap();

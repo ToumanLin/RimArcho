@@ -68,6 +68,11 @@ type Item struct {
 	Versions    []string          `json:"-"` // the game versions it supports ("1.6")
 	Location    string            `json:"-"` // the registered source root, including for linked mods
 
+	// Cat is the Mod's category (app.CategoryKeys, 16 §2.5): the row's marker and the
+	// category: filter; CatSet when the player chose it.
+	Cat    string `json:"cat,omitempty"`
+	CatSet bool   `json:"catSet,omitempty"`
+
 	Lower string `json:"-"` // sort key
 	// New: a scan first found the Mod within app.NewFor, after the game's first scan
 	// (16 §2.5); added are its added: values.
@@ -166,6 +171,7 @@ func BuildBoard(a *app.App) (*Board, error) {
 		}
 	}
 	added, newSince, now := app.Added(st), a.NewSince(st.Ix.Env.GameID), a.Now()
+	cats := st.Ix.Categories()
 	for k := range b.Cols {
 		for i := range b.Cols[k] {
 			it := &b.Cols[k][i]
@@ -175,6 +181,8 @@ func BuildBoard(a *app.App) (*Board, error) {
 				continue
 			}
 			it.New = app.IsNew(added[m.LineageID], newSince)
+			c := cats[m.ID]
+			it.Cat, it.CatSet = c.Key, c.Player
 			it.added = app.AddedValues(added[m.LineageID], it.New, now)
 			if k == int(Inactive) {
 				it.Name = names[it.Lineage]

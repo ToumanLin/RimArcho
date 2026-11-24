@@ -413,5 +413,18 @@
   "⚠ pack %s uses this copy: it still goes, and the pack launches with its own copy": "⚠ 整合包%s用到这份副本：照样执行，整合包启动时改用自带的副本",
   "linked into the game": "链入游戏",
   "another tool": "其他工具",
-  "show where it is": "显示位置"
+  "show where it is": "显示位置",
+  "game & DLC": "游戏和 DLC",
+  "code": "代码",
+  "official: the game or a DLC": "官方：游戏本体或 DLC",
+  "%d installed Mods require it, and it ships a DLL": "%d 个已安装的 Mod 需要它，且它带 DLL",
+  "a DLL and no Def files": "有 DLL，没有 Def 文件",
+  "only translations: Languages, no Defs, patches or DLL": "只有翻译：有 Languages，没有 Def、补丁和 DLL",
+  "only textures: no Defs, patches, DLL or Languages": "只有贴图：没有 Def、补丁、DLL 和 Languages",
+  "nothing to tell it by": "没有可判断的内容",
+  "set by you; automatic: %s": "你设的；自动判断：%s",
+  "%s: automatic category": "%s：改回自动类别",
+  "set the category": "设置类别",
+  "%d XML in Defs": "Defs 里 %d 个 XML",
+  "only patches: %d XML in Patches, no Defs or DLL": "只有补丁：Patches 里 %d 个 XML，没有 Def 和 DLL"
 }
