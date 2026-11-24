@@ -46,6 +46,7 @@ exists to give that time back. It is free and open source under the MIT license.
 - [AI agents and MCP](#ai-agents-and-mcp)
 - [Install](#install)
 - [Privacy and safety](#privacy-and-safety)
+- [Code signing policy](#code-signing-policy)
 - [FAQ](#faq)
 - [Links](#links)
 
@@ -195,10 +196,11 @@ Archo MCP makes the agent better at finding and fixing errors, with fewer tokens
    your old `RimArcho.exe` and `archo.exe` with the new ones.
 4. Optional: add the folder to `PATH` to type `archo` in any terminal.
 
-The executables are not code-signed, so the first time you run one Windows may say "Windows
-protected your PC": choose **More info**, then **Run anyway**. Each release has a `.sha256`
-checksum, and you can build it yourself from this source (below). If Windows says you have no
-permission even as administrator, see the FAQ ("RimArcho.exe won't start").
+Releases are code-signed once signing is set up (see [Code signing policy](#code-signing-policy)).
+The first time you run an unsigned one, Windows may say "Windows protected your PC": choose **More
+info**, then **Run anyway**. Each release has a `.sha256` checksum, and you can build it yourself
+from this source (below). If Windows says you have no permission even as administrator, see the
+FAQ ("RimArcho.exe won't start").
 
 ### Linux (experimental)
 
@@ -310,9 +312,8 @@ reverses each write, is in [02 · File writes and uninstall](docs/specs/02-file-
 
 **What it never does**
 
-- No telemetry. Network access is limited to what you start and, if automatic checks are on,
-  checking for updates (RimArcho, Mods, community data) and fetching Workshop descriptions; each can be
-  turned off.
+- No telemetry, no analytics, no crash reports. Everything that goes over the network, and how to
+  turn it off, is listed below.
 - It never asks for, stores or passes on passwords or Steam Guard codes: SteamCMD signs in only in
   its own window, LoversLab only in the site's own page.
 - It never permanently deletes your content: removed Mods, saves, packs and settings files go to the
@@ -321,16 +322,82 @@ reverses each write, is in [02 · File writes and uninstall](docs/specs/02-file-
   are told to ask you before anything that writes.
 - Feedback reports are sent only when you press send, and you see their content first.
 
+### What goes over the network
+
+RimArcho sends nothing to its author except a feedback report you send. Everything it does online is
+listed here. Most requests carry the header `RimArcho (+https://github.com/ToumanLin/RimArcho)`
+and, like any connection, your IP address. Switches are set in Settings or with
+`archo config set <key> <value>`.
+
+**By itself**, only while the window or `archo tui` is open (never the command line or
+`archo mcp`): the automatic checks, starting 20 seconds after start, each at most once a day unless
+noted. `updates.auto off` (Settings › About, "automatically check for updates") stops all of them.
+They cannot be turned off one by one; `updates.interval` only changes how often.
+
+| What | Where | What is sent | Also turned off by |
+| --- | --- | --- | --- |
+| RimArcho update check | `api.github.com`; on Windows also `api.steampowered.com` (the Archo Monitor item's description) and the Lanzou share (`rimarcho.lanzn.com`, `apifile.woozooo.com`, `developer4.lanrar.com`) | nothing of yours | `updates.source github` keeps GitHub only |
+| Mod update check | `api.steampowered.com`; the Git hosts, download pages and LoversLab pages of Mods you subscribed to there | the Workshop IDs of Mods RimArcho downloaded with SteamCMD; to LoversLab, your LoversLab session if you connected an account | — |
+| LoversLab session renewal (every 4 hours) | `www.loverslab.com` | your LoversLab session, only if you connected an account | disconnecting the account |
+| Tool versions (weekly; only tools RimArcho installed) | Valve's SteamCMD update server, `api.github.com` (todds) | nothing of yours | — |
+| Community data: sort rules, Steam database, replacements | `raw.githubusercontent.com` | nothing of yours | `data.rules.url`, `data.steamdb.url`, `data.replacements.url` set to a local file |
+| Archo Monitor update | `api.steampowered.com`, then SteamCMD signed in anonymously | nothing of yours | — |
+| Replies to feedback you sent (at window start and on the Feedback page) | the feedback relay, `rimarcho-feedback.toumanlin.workers.dev` | the report's number and its reply token | `feedback.replies off` |
+
+**When you look at or do something:**
+
+| What | Where | What is sent | Turned off by |
+| --- | --- | --- | --- |
+| A Mod's Workshop description, when you select the Mod | `api.steampowered.com` | its Workshop ID | `workshop.fetch off` |
+| Pictures in that description | the image hosts the Mod's author used | an ordinary image request | `workshop.images off` (or `workshop.fetch off`) |
+| Collections: importing one, and re-reading those your lists follow when you open All lists | `api.steampowered.com` | the collection IDs | no switch (unfollow the collection) |
+| Subscribing, downloading Mods or the game | SteamCMD and the Steam client, which talk to Valve themselves; `api.steampowered.com` | Workshop IDs; your Steam account name if you use one (the password is typed only into SteamCMD) | you start each one |
+| Installing SteamCMD, todds or a RimArcho update | Valve's SteamCMD download, GitHub (and Lanzou for updates) | nothing of yours | you start each one |
+| A feedback report | the feedback relay, which files it as a **public** GitHub issue | your text, a contact if you give one (kept out of the issue), and only the details you tick: versions, OS, enabled Mods, log errors, paths with your user name replaced | you press Send, after seeing it |
+| The open feature requests, while you write one | the feedback relay | nothing of yours | no switch |
+| Importing a Rentry list | `rentry.co` | the page ID | you start it |
+
+**How it connects.** Through the Windows proxy by default (`network.proxy`: `system`, `off` or a
+proxy URL). A GitHub request that fails is retried through public GitHub mirrors (`gh-proxy.com`,
+`ghfast.top`, `ghproxy.net`), which then see the GitHub address; RimArcho's own update metadata and
+checksums never go through them. `network.github_mirror off` stops this. After a failed request
+with no proxy set, RimArcho tries the usual proxy ports on your own PC (127.0.0.1). The Lanzou share
+is read directly, not through the proxy; RimArcho answers its simple bot check (a fixed calculation,
+no page scripts run) and, like for download pages you subscribe to, sends a browser's user agent.
+Checks of Mods subscribed from Git do not use the proxy setting. Links you open go to your browser.
+
+[Archo Monitor](#archo-monitor), the in-game Mod, has no network code: it writes its log next to
+your saves. RimArcho changes no Windows settings; it only reads the registry (the proxy settings,
+Steam's folder).
+
 **Uninstall** (Settings, or `archo uninstall`) shows what it will remove, takes away its links and
 data, and leaves your game, Mods and saves as they were.
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by
+[SignPath Foundation](https://signpath.org).
+
+- Windows releases are built from this repository by GitHub Actions
+  ([`windows-release`](.github/workflows/ci.yml)), and only those builds are sent for signing.
+  Each release is signed only after a manual approval. `archo.exe`, `RimArcho.exe` and Archo
+  Monitor's `ArchoMonitor.dll` are signed, with SignPath Foundation as the publisher. Releases from
+  before signing was set up are unsigned.
+- Committers and reviewers: [ToumanLin](https://github.com/ToumanLin)
+- Approvers: [ToumanLin](https://github.com/ToumanLin)
+- Privacy: [What goes over the network](#what-goes-over-the-network). This program will not
+  transfer any information to other networked systems unless specifically requested by the user or
+  the person installing or operating it, except the automatic checks listed there, which
+  `archo config set updates.auto off` turns off.
 
 ## FAQ
 
 <details>
 <summary><b>Windows says "Windows protected your PC".</b></summary>
 
-The executables are not code-signed. Choose **More info**, then **Run anyway**. You can compare the
-download with its `.sha256` file or build it yourself from source.
+That release is not code-signed (see [Code signing policy](#code-signing-policy)). Choose **More
+info**, then **Run anyway**. You can compare the download with its `.sha256` file or build it
+yourself from source.
 </details>
 
 <details>

@@ -75,7 +75,7 @@ The interface uses everyday words; the documentation and command line sometimes 
    dotnet tool install --global ilspycmd
    ```
 
-The programs are not code-signed. The first time, Windows SmartScreen may say "Windows protected your PC": choose **More info**, then **Run anyway**.
+Releases built and signed in CI carry a signature from SignPath Foundation (see the README's "Code signing policy"); a release built before that is not code-signed. The first time you run an unsigned one, Windows SmartScreen may say "Windows protected your PC": choose **More info**, then **Run anyway**.
 
 **Started from a Steam Workshop folder?** If you start RimArcho from inside a subscribed Workshop item, it offers **install RimArcho** into a folder of its own (default `%LOCALAPPDATA%\Programs\RimArcho`; **change…** picks another). It shows the space needed and warns when the drive has less than 10 GB free. **install and restart** copies itself there and restarts; **use here this time** keeps running from the Workshop folder with a warning, and asks again next time. RimArcho will not update itself while it runs from a Workshop folder.
 
