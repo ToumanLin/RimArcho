@@ -44,6 +44,9 @@ func platformApp(_ *app.App, o *application.Options) {
 	// The window class and Wayland app id, whatever the program file is called (archo gui
 	// in a cgo build): rimarcho.desktop's StartupWMClass matches it.
 	o.Linux.ProgramName = "rimarcho"
+	// Before GTK and WebKitGTK start: every signal handler on Go's signal stack (signals_linux.go).
+	holdChildWatch()
+	onSignalStack()
 }
 
 // platformWindow sets the main window's Linux options. It starts hidden: fitWindow sizes it
@@ -66,9 +69,12 @@ func platformStart(w *application.App, win *application.WebviewWindow) error {
 	}
 	shown := make(chan struct{})
 	w.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
+		keepSignalsOnStack(w)
 		fitWindow(w, win)
 		close(shown)
 	})
+	// WebKitGTK has started its helper processes and JavaScriptCore by the time the page runs.
+	win.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) { keepSignalsOnStack(w) })
 	go func() {
 		// not scheduled: shows the window if GTK's start event never came (a fail-safe, not polling)
 		select {
@@ -79,6 +85,14 @@ func platformStart(w *application.App, win *application.WebviewWindow) error {
 	}()
 	closeOnSignal(w, win)
 	return nil
+}
+
+// keepSignalsOnStack repeats onSignalStack once GTK and WebKitGTK are up and logs what it
+// moved: a handler there that Wails left off the signal stack.
+func keepSignalsOnStack(w *application.App) {
+	if fixed := onSignalStack(); len(fixed) > 0 {
+		w.Logger.Info("signal handlers moved to the signal stack", "signals", fixed)
+	}
 }
 
 // fitWindow sizes the window to at most 90% of the screen's work area, keeping the default

@@ -4,6 +4,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Fixed (Linux window, experimental): on systems with GLib older than 2.74, such as Ubuntu 22.04, `rimarcho` could crash with a Go runtime error ("unknown caller pc", "found pointer to free object") when a subprocess ended while the window was starting. GLib's SIGCHLD handler ran on a goroutine's small stack and overwrote memory next to it. RimArcho now installs it before WebKitGTK starts and moves every signal handler except JavaScriptCore's to Go's signal stack. The same crash broke CI's `linux-gui` test job intermittently.
+
 ## 1.1.0 — 2026-11-23
 
 - Update checks: the Archo Monitor Workshop item (3844969469) is now the third source beside GitHub and Lanzou. It is unlisted for now, so Steam does not show it to the check and its line reads "not found"; GitHub and Lanzou answer as before. Once the item is public, every 1.1.0 install starts reading it.
