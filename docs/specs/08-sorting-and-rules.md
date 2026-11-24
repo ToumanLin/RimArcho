@@ -16,7 +16,6 @@ Automatic sorting orders a plan's enabled Mods (07) so that hard constraints fro
 | `loadBefore` / `loadAfter` (including `ByVersion`), `forceLoadBefore` / `forceLoadAfter` | About.xml | Hard |
 | Community sorting rules | Community data (§2.3) | Hard |
 | User rules | Player (§2.1) | Hard; may suppress any constraint above |
-| A Mod after the one whose Defs its XML patches change | Inferred from the stored analysis (§1.6) | Weakest: used only where no other constraint orders the pair the other way |
 | Preserve current relative order where possible | Current list | Soft |
 
 - Before sorting, add the installed, loadable vanilla Core if it is absent, and Archo Monitor if it is absent and `monitor.default` is on (07 §1.5); then build the graph of the complete list. The player's DLC choices are kept. A preview does not change the workspace; the additions and the sort undo together. The result names the additions ("sorted: added Archo Monitor, 3 moved").
@@ -42,7 +41,7 @@ Automatic sorting orders a plan's enabled Mods (07) so that hard constraints fro
 2. Find strongly connected components (Tarjan). If a cycle contains both built-in official edges and "before official content" rules, remove the latter (§1.1, unsatisfiable constraints) and try again. For the remaining cycles, **suppress no constraints**: emit `order.cycle` (info, 05 §4.3.1; muted and not counted in "can it run"), list each edge with its origin, and sort the rest normally. Within a cycle, each pair of Mods is represented by its strongest constraint; pairs are kept from strongest to weakest in the abandonment order below, and a pair that would form a cycle with those kept is dropped. The members are sorted by the constraints kept, keeping the current order where possible. `archo sort` marks dropped constraints `[broken]`.
 3. Suggest one **edge to suppress** per cycle: the weakest dropped constraint (if none can be suppressed, the weakest edge in the cycle). **Abandonment order**, weak to strong:
    1. Constraint strength (§1.3, including the per-rule judgments in `observed.json`): harmless, weak, strong;
-   2. Within equal strength: community rule, `loadAfter`, `loadBefore` / `force*`, dependency, built-in official order, user rule. Inferred rules (§1.6) are weaker than all of these and never reach this step: one that would close a loop is left out before cycles are found;
+   2. Within equal strength: community rule, `loadAfter`, `loadBefore` / `force*`, dependency, built-in official order, user rule;
    3. Ties: first abandon the edge the current list already violates (From after To).
 
    User rules are never suggested; remove them with `archo rule remove`. The suppressible references are kept for the CLI. The UI adopts the sorter's choices automatically and explains the dropped requirements without counting them in "can it run" (merged into automatic sorting, 16 §5); it asks for no manual suppression and shows no error dialog. The choices apply only to this sort; they are not stored as ignore rules.
@@ -94,19 +93,19 @@ Sources: community `loadTop` / `loadBottom` (`{"value": true}`), user `top` / `b
 - `archo sort` lists each top and bottom Mod under "ends", with its source, how to suppress it and how many Mods it pulled; those pulled both ways are marked `[also pulled to the other end]`.
 - There are no RimCrow-style position weights, alphabetical tie-breaking or positions guessed from the kind of Mod (translations, textures): the corpus gives no evidence for them, and they cause too many moves on every sort.
 
-### 1.6 Rules inferred from XML patches
+### 1.6 Same patch target: shown, not sorted for
 
-Draft (implemented on a branch, not released): a first measurement on synthetic lists moved more Mods than the 5% target, see 01 §4.
+Sorting infers no order from XML patches. The game merges every enabled Mod's Defs into one document before it applies any patch (`Verse.LoadedModManager.LoadAllActiveMods`: `CombineIntoUnifiedXML`, then `ApplyPatches`, which runs each Mod's PatchOperations in load order on the merged document). So a Mod that patches another Mod's Defs finds them in either order, and an "A after B because A patches B" rule (RimStack's idea) would only move Mods. The patch analysis (05 §5.2) agrees: it finds such a patch's target in either order.
 
-A Mod whose XML PatchOperations change Defs that exactly one other enabled Mod defines prefers to load after that Mod (`App.InferredRules`, `order.Input.Inferred`). The idea comes from RimStack (ideas only, no code).
+The order decides something only when two Mods' patches act on the same node: the later Mod's change is what the game keeps. These are the `patch.contested` findings (05 §4.3): two or more enabled Mods replace or remove the same node (the Def and element path), in the analysis's own run, so a patch whose `MayRequire`, FindMod or `LoadFolders` condition was not met does not count. A Mod that only adds to a Def it shares with another names nothing.
 
-- **Source**: only the stored analysis (05 §3): the Patch facts of the list's slot, or the environment's newest run (05 §2 `PatchFact.Targets`), and the stored Def facts of the enabled Mods (`Store.DefKeysOf`). Sorting never starts an analysis. With no run stored, or one from before guarded operations were marked (`Stats.Guards`), the sort uses no inferred rules and `archo sort` says so (`inferred:` line, `SortResult.InferredNote`).
-- **Which operations count**: top-level operations that succeeded and touched 1–49 Defs (the analysis records 50 at most; more is a broad patch). Guarded operations count: FindMod or MayRequire whose Mod was active touched the Defs; ones whose condition failed touched none. A touched Def names its owner only when exactly one enabled Mod defines it, that Mod is not the patcher, and it is not Core or a DLC (official content loads first anyway). Defs the game skips (`MayRequire` of a Mod not enabled) do not count; Defs created by patches have no owner. An operation whose Defs name two different Mods names neither.
-- **Rule**: patcher after owner, counting the operations; the explanation names the Def types, most patched first: "inferred #a after #b: patches its ThingDefs, HediffDefs (12 patches)".
-- **Strength**: weakest. Inferred rules enter the graph after every other constraint (and after §1.1's "not used" checks), most patches first; one whose patcher already reaches the owner through the constraints in, a declaration, community rule, user rule or an inferred rule with more patches, is listed under "not used" (stronger rules order these the other way). So they never form or join an `order.cycle`. Their strength is weak (§1.3) and they pull along tiers like other edges (§1.5).
-- **Only the sort**: `order.violated`, the order findings and the placement of newly enabled Mods (07 §2.1) do not use them.
-- **Suppress** one with `archo rule add ignore inferred:<#patcher>:<#owner>` (§2.2).
-- **Harmony patches are not used**: two Mods patching the same method imply no order between them.
+- **Shown, never sorted for**: they add no edge to the graph (§1.2); a player who cares pins the order with an ordinary user rule (§2.1), which each note offers.
+- **Sort preview** (`archo sort` and `--dry-run`, also the GUI and TUI preview and MCP `edit_loadout action=sort`): the section "same patch target" lists each node whose winner this sort changes ("ThingDef Gun_A's statBases/MarketValue: #b wins now, #a after this sort  (keep #b: archo rule add after b a)"), at most 8, then counts the nodes whose winner stays. With no stored analysis it says so in one line (`App.PatchContests`, `ContestNoAnalysis`).
+- **Problems**: `patch.contested` stays info and hidden by default (05 §4.5). Its claim is written for the list as it is now: "#a and #b both change ThingDef Gun_A's statBases/MarketValue; the one loaded later wins: currently #b"; the fixes are the user rule that keeps the current winner and the ignore reference (`App.contestFindings`).
+- **Hide** a pair with `archo rule add ignore contested:<#a>:<#b>` (§2.2; either order): its notes leave the sort preview and the problems. A node changed by three Mods stays while any of its pairs is not hidden.
+- **Only the stored analysis**: the run of the list's slot, or the environment's newest (05 §3), read again for the list's enabled Mods and order. Sorting never starts an analysis.
+- **Not reported** (not stored): a patch that selects a node only another Mod's patch creates, and works because it loads later. When it loads earlier it fails, and `patch.no-match` reports it with the reason `target-later` (05 §4.4).
+- **Harmony patches** are not used: two Mods patching the same method imply no order between them (`harmony.shared-target`, 05 §4.3).
 
 ## 2. Rules and community data
 
@@ -146,7 +145,7 @@ User rules are global and belong to Lineages, shared by all games and plans (03 
 | `official:<#instance>` | Built-in official-order constraint on this Mod | `official:<Lineage>` |
 | `community:<pkg>:<field>:<pkg>` | Community rule, field `loadafter` or `loadbefore` | Same |
 | `community:<pkg>:loadtop`, `community:<pkg>:loadbottom` | Mod's community top/bottom tier (§1.5) | Extra trailing `:` |
-| `inferred:<#patcher>:<#owner>` | Rule inferred from XML patches (§1.6) | `inferred:<Lineage>:<Lineage>` |
+| `contested:<#a>:<#b>` | Not a constraint: hides the same-patch-target notes of one pair (§1.6) | `contested:<Lineage>:<Lineage>`, the two sorted |
 
 The printed form names the Lineage's primary Instance; the stored form names the Lineage, so a suppression survives changes of copy or package ID. Printed references work unchanged in `rule add ignore` (`TestPrintedIgnoreRefsRoundTrip`).
 
@@ -199,5 +198,5 @@ The printed form names the Lineage's primary Instance; the stored form names the
 | S14 | Translation requires an absent package; its `alternativePackageIds` entry, or the package's Use This Instead replacement, is enabled | No `dep.*` finding, nothing offered after the sort, translation sorted after the stand-in; details show the stand-in "in place of" the original; one ignore on the declared package drops the edge | Pass (`TestDependencyAlternativeMeets`, `TestDependencyReplacementMeets`, `TestDependencyStandIns`) |
 | S16 | `rule add replaces <new> pkg:<old>` (or the installed old Mod); a Mod requires `<old>` | Same as S14; `rule list` shows `pkg:<old>`; a Mod replacing its own package and a one-reference `replaces` are refused | Pass (`TestDependencyRuleMeets`) |
 | S17 | Player ignores a missing dependency (Can it run I, or `problems ignore`) | Sort offers nothing for it and completing dependencies does not enable it; the requiring Mod's update brings it back | Pass (`TestIgnoredDependencyNotOffered`) |
-| S18 | Mod A patches Defs only B defines; a Def two enabled Mods define; no analysis stored | A sorted after B with the reason; the shared Def names nobody; without a run the sort says so; a declared or user rule the other way wins without a cycle; two Mods patching each other keep the one with more patches; the printed `inferred:` reference works in `rule add ignore` | Pass (`TestSortInferredFromPatches`, `TestInferred*`) |
+| S18 | Two Mods replace the same node; a third only adds to that Def; a declared loadBefore makes the sort swap the two | The sort moves only for the declaration; the preview names the node, who wins now and after, and the user rule that keeps the current winner; the problem says who wins now; the third Mod names nothing; without a stored analysis the preview says so; `rule add ignore contested:…` hides the pair in both | Pass (`TestSamePatchTargetIsInformation`) |
 | S15 | Use This Instead replacement installed while an enabled mod requires the original | Replacement offered; after replacing, nothing missing and the requiring mod sorts after the replacement | Pass (`TestReplacementOfferedWhenRequired`) |

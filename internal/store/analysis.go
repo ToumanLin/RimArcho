@@ -119,31 +119,6 @@ func (s *Store) scanDefsWith(rows *sql.Rows, lists func(set int64) []string) ([]
 	return out, s.resolveFiles(at)
 }
 
-// DefKey is a Def's identity and load conditions, without its file or content: what the
-// sort's inferred rules need (08 §1.6).
-type DefKey struct {
-	Type, DefName, Name       string
-	MayRequire, MayRequireAny string
-}
-
-// DefKeysOf returns the Def keys of one instance's stored effective content.
-func (s *Store) DefKeysOf(instanceID string) ([]DefKey, error) {
-	rows, err := s.DB.Query(`SELECT f.def_type, f.def_name, f.name, f.may_require, f.may_require_any`+defView+` WHERE c.instance_id=? AND c.game_mm=?`, instanceID, s.MM)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []DefKey
-	for rows.Next() {
-		var k DefKey
-		if err := rows.Scan(&k.Type, &k.DefName, &k.Name, &k.MayRequire, &k.MayRequireAny); err != nil {
-			return nil, err
-		}
-		out = append(out, k)
-	}
-	return out, rows.Err()
-}
-
 // DefsOf returns the Def facts of one instance, in file order.
 func (s *Store) DefsOf(instanceID string) ([]analyze.DefFact, error) {
 	rows, err := s.DB.Query(`SELECT `+defCols+defView+` WHERE c.instance_id=? AND c.game_mm=? ORDER BY f.rowid`, instanceID, s.MM)

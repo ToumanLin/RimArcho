@@ -4,7 +4,6 @@
 package order
 
 import (
-	"fmt"
 	"slices"
 	"sort"
 	"strings"
@@ -114,17 +113,6 @@ type Input struct {
 	// Observed: the log corpus's measured constraints for this game version (05 §4.6), from
 	// the caller's corpus choice; nil uses the embedded 1.6 file.
 	Observed ObservedSet
-	// Inferred: order preferences read from what the Mods' XML patches change (08 §1.6),
-	// the weakest constraints: one that would close a loop with the others is not used.
-	Inferred []Inferred
-}
-
-// Inferred says the Mod Patcher patches Defs that only Owner defines among the enabled
-// Mods, so it prefers to load after Owner (08 §1.6). Both are instance IDs.
-type Inferred struct {
-	Patcher, Owner string
-	Patches        int      // top-level PatchOperations of Patcher that touch Owner's Defs
-	DefTypes       []string // the touched Def types, most patched first
 }
 
 // Constraint kinds.
@@ -137,7 +125,6 @@ const (
 	KindForceAft   = "forceLoadAfter"
 	KindCommunity  = "community"
 	KindUser       = "user"
-	KindInferred   = "inferred" // from XML patch targets (08 §1.6)
 )
 
 // Constraint records where an edge came from, for cycle reports and `ignore` rules.
@@ -148,8 +135,6 @@ type Constraint struct {
 	Target string // the packageId named by the declaration
 	Ref    string // ignore reference (stored form)
 	RuleID int64
-	// Inferred: the patch counts behind a KindInferred edge (index into Input.Inferred).
-	Inferred int
 }
 
 // Edge says node From must load before node To.
@@ -168,8 +153,7 @@ type Cycle struct {
 
 // kindRank orders constraint kinds by how readily a cycle gives them up (08 §1.2): community
 // rules, loadAfter, the other About.xml load rules, dependencies, the official order, user
-// rules. Inferred rules give up before all of them (they never enter a cycle: Sort leaves
-// out one that would close a loop).
+// rules.
 func kindRank(k string) int {
 	switch k {
 	case KindCommunity:
@@ -187,12 +171,8 @@ func kindRank(k string) int {
 }
 
 // giveKey ranks an edge for giving up inside a cycle: lower gives first. Corpus strength
-// (Assess) first, then the kind, then an edge the current order already breaks. An
-// inferred rule is weaker than every other kind.
+// (Assess) first, then the kind, then an edge the current order already breaks.
 func giveKey(in Input, e Edge) int {
-	if e.C.Kind == KindInferred {
-		return -1
-	}
 	k := int(Assess(in, e).Strength)*20 + kindRank(e.C.Kind)*2
 	if e.From < e.To {
 		k++ // the current order keeps it
@@ -328,9 +308,6 @@ const (
 	// constraints keep the mod after official content (it would form a cycle with the
 	// built-in order).
 	ReasonOfficialFirst = "would put the mod before official content that other constraints keep ahead of it"
-	// ReasonInferredWeaker: an inferred rule (08 §1.6) that a stronger constraint, or the
-	// other inferred rules with more patches, order the other way.
-	ReasonInferredWeaker = "stronger rules order these the other way"
 )
 
 // Dropped is a constraint the sorter does not use, with the reason.
@@ -363,9 +340,6 @@ func PositionRef(pkg string, t Tier) string {
 // OfficialRef is the ignore reference of the built-in official order for one mod.
 func OfficialRef(lineage string) string { return "official:" + lineage }
 
-// InferredRef is the ignore reference of an inferred rule: patcher after owner, by lineage.
-func InferredRef(patcher, owner string) string { return "inferred:" + patcher + ":" + owner }
-
 func withVersion(base []string, byV map[string][]string, mm string) []string {
 	out := append([]string(nil), base...)
 	if mm != "" {
@@ -388,10 +362,6 @@ func Sort(in Input) Result {
 	}
 	attach := s.userEdges()
 	comp, members, seen := s.dropOfficialFirst()
-	if s.inferredEdges() {
-		// no new loop, so the components stay; the edge set grew
-		comp, members, seen = components(s.n, s.res.Edges)
-	}
 	nComp := len(members)
 	s.cycles(comp, members)
 	first := make([]int, nComp) // earliest current position of each component
@@ -614,76 +584,6 @@ func (s *sorter) userEdges() map[int][]int {
 		}
 	}
 	return attach
-}
-
-// inferredEdges adds the inferred rules (08 §1.6), most patches first, each only when it
-// closes no loop with the constraints already in: a declared, community or user rule (or an
-// inferred one with more patches) that orders the pair the other way wins, and the rule is
-// listed as not used. It reports whether any was added.
-func (s *sorter) inferredEdges() bool {
-	if len(s.in.Inferred) == 0 {
-		return false
-	}
-	byInst := map[string][]int{}
-	for i, nd := range s.in.Nodes {
-		if nd.Instance != "" {
-			byInst[nd.Instance] = append(byInst[nd.Instance], i)
-		}
-	}
-	idx := make([]int, len(s.in.Inferred))
-	for i := range idx {
-		idx[i] = i
-	}
-	sort.SliceStable(idx, func(a, b int) bool { return s.in.Inferred[idx[a]].Patches > s.in.Inferred[idx[b]].Patches })
-	adj := make([][]int, s.n)
-	for _, e := range s.res.Edges {
-		adj[e.From] = append(adj[e.From], e.To)
-	}
-	reaches := func(from, to int) bool {
-		seen := make([]bool, s.n)
-		seen[from] = true
-		stack := []int{from}
-		for len(stack) > 0 {
-			v := stack[len(stack)-1]
-			stack = stack[:len(stack)-1]
-			if v == to {
-				return true
-			}
-			for _, w := range adj[v] {
-				if !seen[w] {
-					seen[w] = true
-					stack = append(stack, w)
-				}
-			}
-		}
-		return false
-	}
-	added := false
-	for _, k := range idx {
-		inf := s.in.Inferred[k]
-		for _, a := range byInst[inf.Patcher] {
-			for _, b := range byInst[inf.Owner] {
-				if a == b || officialRank(s.in.Nodes[a].PackageID) >= 0 || officialRank(s.in.Nodes[b].PackageID) >= 0 {
-					continue
-				}
-				c := Constraint{Kind: KindInferred, Owner: a, Field: "patches", Target: s.in.Nodes[b].PackageID,
-					Ref: InferredRef(s.in.Nodes[a].Lineage, s.in.Nodes[b].Lineage), Inferred: k}
-				if s.ignore[c.Ref] {
-					s.res.Ignored++
-					continue
-				}
-				e := Edge{From: b, To: a, C: c}
-				if reaches(a, b) {
-					s.res.Dropped = append(s.res.Dropped, Dropped{Edge: e, Reason: ReasonInferredWeaker})
-					continue
-				}
-				s.res.Edges = append(s.res.Edges, e)
-				adj[b] = append(adj[b], a)
-				added = true
-			}
-		}
-	}
-	return added
 }
 
 // dropOfficialFirst drops each rule that puts a mod before official content in a cycle
@@ -1079,27 +979,4 @@ func tarjan(n int, adj [][]int) []int {
 		}
 	}
 	return comp
-}
-
-// InferredWhy says why an inferred edge exists, for the patcher's line: "patches its
-// ThingDefs, HediffDefs (12 patches)" (08 §1.6). "" for another kind of edge.
-func (in Input) InferredWhy(e Edge) string {
-	if e.C.Kind != KindInferred || e.C.Inferred < 0 || e.C.Inferred >= len(in.Inferred) {
-		return ""
-	}
-	inf := in.Inferred[e.C.Inferred]
-	types := inf.DefTypes
-	more := ""
-	if len(types) > 3 {
-		types, more = types[:3], fmt.Sprintf(" and %d more types", len(inf.DefTypes)-3)
-	}
-	ts := make([]string, len(types))
-	for i, t := range types {
-		ts[i] = t + "s"
-	}
-	n := "1 patch"
-	if inf.Patches != 1 {
-		n = fmt.Sprintf("%d patches", inf.Patches)
-	}
-	return fmt.Sprintf("patches its %s%s (%s)", strings.Join(ts, ", "), more, n)
 }

@@ -182,7 +182,7 @@ Uninstalled candidates come from the subject's dependency declarations (includin
 | `code` | Severity | Detection |
 | --- | --- | --- |
 | `patch.no-match` | warning | A top-level operation fails in simulation, at the layer the game logs. Emit one finding per failed top-level operation, with reasons (§4.4). |
-| `patch.contested` | info | Two or more `Mods` use `Replace` or `Remove` on the same node. The node key combines the `Def` and element path. |
+| `patch.contested` | info | Two or more `Mods` use `Replace` or `Remove` on the same node. The node key combines the `Def` and element path. The later Mod's change is the one the game keeps; sorting does not order for it (08 §1.6). The claim names who wins in the list as it is now, and the fixes are the user rule that keeps that winner and `rule add ignore contested:<#a>:<#b>`, which hides the pair (`App.contestFindings`, also after a list edit before the next check). Mods no longer enabled drop out; fewer than two left, no finding. |
 | `patch.unknown-op` | info | A custom PatchOperation cannot be simulated. Emit one finding per Mod listing its custom classes, and treat these operations as successful. |
 
 **Harmony layer**

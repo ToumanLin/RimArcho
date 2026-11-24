@@ -258,6 +258,7 @@ func (a *App) collectProblems(ps *ProblemSet) error {
 			all = append(all, f)
 		}
 		all = a.quickPatchTargets(st, ps.Analysis, all) // a stale run: follow the list (05 §4.4)
+		all = a.contestFindings(st, all)                // who wins follows the order (08 §1.6)
 	}
 	lfs, hot, run := a.logFindings(st)
 	if run != nil {
