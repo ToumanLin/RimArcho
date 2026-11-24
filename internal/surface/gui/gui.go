@@ -8,7 +8,9 @@ import (
 	"crypto/sha256"
 	"embed"
 	"fmt"
+	"io"
 	"io/fs"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -48,6 +50,7 @@ func Run(o Options) error {
 	a.LazyLog = true // the newest log is parsed when Can it run opens (as in the TUI)
 	a.LogCacheOnly = true
 	tuneProcess(a)
+	logToFile(a.Home)
 	api := newAPI(a)
 	defer api.Close()
 	api.free.on = true
@@ -234,4 +237,18 @@ func perfURL() string {
 		return "/?perf=1"
 	}
 	return "/"
+}
+
+// logToFile also sends the standard log (a task's panic and its stack, warnings) to
+// <data>/logs/gui.log: the Windows window has no console, so stderr alone loses them.
+func logToFile(home string) {
+	dir := filepath.Join(home, "logs")
+	if os.MkdirAll(dir, 0o755) != nil {
+		return
+	}
+	f, err := os.OpenFile(filepath.Join(dir, "gui.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return
+	}
+	log.SetOutput(io.MultiWriter(os.Stderr, f))
 }

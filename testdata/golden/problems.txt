@@ -188,6 +188,7 @@ $ archo mod #hnyg
   location: src:local Compat
     path: $ROOT/Steam/steamapps/common/RimWorld/Mods/Compat
   files: 2 (550 B), 2 semantic
+  category: patches (only patches: 1 XML in Patches, no Defs or DLL)
   seen: first 2026-10-01 10:00, last 2026-10-01 10:00
   changes: 1, latest discovered 2026-10-01 (archo changes hnyg)
 next:

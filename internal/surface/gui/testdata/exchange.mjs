@@ -247,7 +247,7 @@ test("a dropped folder with no manager's data in it is refused, not left silent"
   await flush();
   const res = h.screen.querySelector(".xc-preview");
   assert.equal(res.dataset.mode, "refused");
-  assert.match(res.textContent, /no RimSort, RimCrow or RimPy data/);
+  assert.match(res.textContent, /no RimSort, RimCrow, RimPy or RimStack data/);
 });
 
 test("a drop a form already took is left to it", async () => {
@@ -271,7 +271,7 @@ test("the first run does not look for managers; its row offers to, and then list
   assert.ok(look, "a button looks for them");
   look.onclick(); await flush();
   assert.equal(surveys, 1);
-  assert.match(h.screen.textContent, /No RimSort, RimCrow or RimPy data found/);
+  assert.match(h.screen.textContent, /No RimSort, RimCrow, RimPy or RimStack data found/);
 });
 
 test("outside the first run the page looks for managers at once, with no button for it", async () => {

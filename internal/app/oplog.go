@@ -147,7 +147,7 @@ func (a *App) opAdd(h *oplog.Handle, r oplog.Row) int64 {
 // began changing something, then failed or ok. A nil opRun (a dry run) records nothing.
 type opRun struct {
 	a     *App
-	row   oplog.Row
+	opRow oplog.Row // written only here and through note: o may be nil
 	h     *oplog.Handle
 	began bool
 	done  bool
@@ -159,7 +159,7 @@ func (a *App) opStart(dryRun bool, row func() oplog.Row) *opRun {
 	if dryRun || a.Ops == nil {
 		return nil
 	}
-	return &opRun{a: a, row: row()}
+	return &opRun{a: a, opRow: row()}
 }
 
 // parent writes the row now (result started), so the steps can hang under it.
@@ -168,12 +168,21 @@ func (o *opRun) parent() *oplog.Handle {
 		return nil
 	}
 	if o.h == nil {
-		o.h = o.a.Ops.Begin(o.row)
+		o.h = o.a.Ops.Begin(o.opRow)
 	}
 	return o.h
 }
 
 // begin marks the point after which a failure is "failed", not "refused".
+// note changes the row before it is written; a nil run (no operation log, a dry run) skips
+// it. Nothing outside this file touches opRow (TestArchOpRowNilSafe): 1.1.0's window update
+// panicked on o.row.Target with no log.
+func (o *opRun) note(f func(r *oplog.Row)) {
+	if o != nil {
+		f(&o.opRow)
+	}
+}
+
 func (o *opRun) begin() {
 	if o != nil {
 		o.began = true
@@ -193,8 +202,8 @@ func (o *opRun) end(err error, detail string) {
 	if o.h != nil {
 		o.h.End(result, detail)
 	} else {
-		o.row.Result, o.row.Detail = result, detail
-		o.a.Ops.Add(o.row)
+		o.opRow.Result, o.opRow.Detail = result, detail
+		o.a.Ops.Add(o.opRow)
 	}
 }
 
@@ -300,4 +309,17 @@ func (a *App) logLinkRepair(plan *LinkRepairPlan, err error) {
 	if err != nil {
 		a.Ops.Add(oplog.Row{Op: oplog.LinkRemove, Subject: "link repair", Result: opResult(err, len(plan.Removed) == 0), Detail: err.Error()})
 	}
+}
+
+// logLaunchCopy records a copy or a failure as a save.backup row of its own.
+func (a *App) logLaunchCopy(r *LaunchCopyResult, envID, name string) {
+	if a.Ops == nil {
+		return
+	}
+	detail := "automatic, before launch"
+	if r.Pruned > 0 {
+		detail += fmt.Sprintf("; deleted %s", plural(r.Pruned, "older automatic copy"))
+	}
+	a.Ops.Add(oplog.Row{Op: oplog.SaveBackup, EnvID: envID, Subject: name, Target: r.Dir,
+		Result: opResult(r.Err, false), Detail: joinDetail(detail, errText(r.Err))})
 }

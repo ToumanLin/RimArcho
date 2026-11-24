@@ -62,6 +62,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     pin <ref>                                 lock a mod: copy it into the lock library (origin marker) and use the copy in the current plan
     copy-local <ref>                          alias of pin
     import rimcrow                            import RimCrow profiles, aliases, notes, groups (as tags) and user rules; repeatable
+    import rimstack                           import RimStack's notes, tags, ignored warnings (as a tag), Loaders/Last categories (as top/bottom rules) and load-order rules; repeatable
     alias <ref> [<name>]                      set the name RimArcho shows for a mod (all its copies)
     note <ref> [<text>]                       attach a plain-text note to a mod (all its copies), or with --copy to this copy only
     tag add|remove <ref> <tag…> | list | rename <tag> <new> | merge <tag…> --into <tag> | delete <tag…> | note <tag> [<text>] | color <tag> <colour> | order <ref> <tag…>  tags for filtering (list --filter tag:<tag>); rename, merge, delete, note and color apply to the tag on every mod; color marks its mods in the lists (blue, cyan, teal, grass, orange, pink, plum, violet, #rrggbb or none); order sets a mod's tag order (its first tag's colour marks it)
@@ -81,7 +82,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     gc                                        remove expired tombstones and superseded snapshots
     feedback [<kind>]                         report templates; with a kind, draft a report: its text and GitHub link (nothing is sent)
     config get [<key>]                        show settings
-    config set <key> <value>                  change a setting (local.dir: unused managed-folder root; updates.source: auto|github; updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris or a #rrggbb colour; ui.icons: compat|nerd; ui.mouse: on|off; ui.tui.theme: auto|dark|light; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; ui.archo.motion: off|still|live; ui.motion: auto|reduced; ui.zoom: 100|110|125|150 (the window's interface size in percent); tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; network.proxy: system|off|a proxy URL; network.github_mirror: auto|off or a mirror prefix such as https://gh-proxy.org/)
+    config set <key> <value>                  change a setting (local.dir: unused managed-folder root; updates.source: auto|github; updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris or a #rrggbb colour; ui.icons: compat|nerd; ui.mouse: on|off; ui.tui.theme: auto|dark|light; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; ui.archo.motion: off|still|live; ui.motion: auto|reduced; ui.zoom: 100|110|125|150 (the window's interface size in percent); tags.pinned: comma-separated tags; monitor.default: on|off; saves.launch_copy: on|off (copy the newest save before each launch); monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; network.proxy: system|off|a proxy URL; network.github_mirror: auto|off or a mirror prefix such as https://gh-proxy.org/)
     guide [<topic>]                           the agent guide behind the MCP tools: a workflow (diagnose, errors, plans, rebuild, words) or one tool's full reference
     mcp                                       serve the MCP tools over stdio (for Claude Code, Codex and other agents)
     gui                                       open the desktop window (RimArcho.exe does this on a double click)
@@ -131,6 +132,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     plan unfollow <name> <collection link|ID>  stop following a collection; the plan stays as it is
     plan sync <name> [<collection>]           catch a plan up with a collection it follows (one undoable edit; uses the network)
     functional <ref>                          mark a mod functional (interface, performance, framework, library, translation: nothing a save can show), so Play review leaves it out of never seen; --not marks it not functional, --clear lets detection decide (12 §3.3)
+    category <ref> [<category>]               show a mod's category (worked out from its files: game, library, content, code, patches, translation, textures) and why; with a category, set it for all its copies; --clear gives it back to the automatic one (16 §2.5)
     problems mute-version <mod>…              ignore version warnings for these packages in every list and game; survives updates
     problems unmute-version <mod>…            restore version warnings for these packages
     import rimsort                            import RimSort's notes, tags, colours and ignored warnings (as tags) from an instance's aux_metadata.db; repeatable
@@ -288,6 +290,7 @@ $ archo mod pkg:brrainz.harmony
     path: $ROOT/Steam/steamapps/workshop/content/294100/2009463077
   workshop: ws:2009463077, manifest 9000, updated 2026-09-21
   files: 4 (353 B), 4 semantic
+  category: code (a DLL and no Def files)
   seen: first 2026-10-01 10:00, last 2026-10-01 10:00
   changes: 1, latest discovered 2026-10-01 (archo changes 6olp)
 next:
@@ -308,6 +311,7 @@ $ archo mod ws:3000000001
     path: $ROOT/Steam/steamapps/workshop/content/294100/3000000001
   workshop: ws:3000000001, manifest 9001, updated 2026-09-21
   files: 5 (779 B), 4 semantic
+  category: content (1 XML in Defs)
   seen: first 2026-10-01 10:00, last 2026-10-01 10:00
   changes: 1, latest discovered 2026-10-01 (archo changes hnyg)
 next:
@@ -323,6 +327,7 @@ $ archo mod #xamx
   location: src:local OldMod
     path: $ROOT/Steam/steamapps/common/RimWorld/Mods/OldMod
   files: 2 (300 B), 2 semantic
+  category: content (1 XML in Defs)
   seen: first 2026-10-01 10:00, last 2026-10-01 10:00
   changes: 1, latest discovered 2026-10-01 (archo changes xamx)
 next:

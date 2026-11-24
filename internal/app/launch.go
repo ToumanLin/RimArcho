@@ -42,6 +42,9 @@ type LaunchPlan struct {
 	// launch goes through Steam): without it the game's Steamworks restarts it through
 	// Steam (09 §2, 02 §1).
 	AppID string
+	// saves is the Saves folder the game will use; its newest save is copied when the game
+	// starts (12 §4.4).
+	saves string
 }
 
 // Command renders the plan as a command line.
@@ -99,7 +102,7 @@ func (a *App) LaunchWith(dryRun, move bool) (res *SaveResult, err error) {
 	}
 	e := st.Ix.Env
 	if o != nil {
-		o.row.EnvID, o.row.Subject = e.ID, st.Plan.Name
+		o.note(func(r *oplog.Row) { r.EnvID, r.Subject = e.ID, st.Plan.Name })
 		st.op = &opWrite{h: o.parent()}
 		defer func() {
 			if st.op.wrote {
@@ -175,6 +178,9 @@ func (a *App) startGame(p *LaunchPlan) error {
 			rotated = append(rotated, r)
 		}
 	}
+	// The newest save is copied alongside the start, never before it (12 §4.4): a copy
+	// that fails or is slow does not hold the game back.
+	a.startLaunchCopy(p.saves)
 	launcher := a.Launcher
 	if launcher == nil {
 		launcher = ExecLauncher
@@ -240,6 +246,9 @@ func (a *App) gamePlan(e *env.Environment, userData string) (*LaunchPlan, error)
 		return nil, err
 	}
 	p := &LaunchPlan{Method: e.Launch, Dir: e.GameRoot}
+	if userData != "" {
+		p.saves = filepath.Join(userData, "Saves")
+	}
 	goos := a.Detect.GOOS
 	if goos == "" {
 		goos = runtime.GOOS

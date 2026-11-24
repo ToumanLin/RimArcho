@@ -57,7 +57,7 @@ exists to give that time back. It is free and open source under the MIT license.
 - **Readable logs** — Errors are grouped, rated by how much they matter and pinned on the Mod behind them.
 - **Lists and games** — Several lists, several game installs (1.6 and 1.7 side by side) sharing one set of Mods, full undo history.
 - **Three faces, one program** — A desktop window, a terminal UI, a scriptable CLI and an MCP server for AI agents, all showing the same facts.
-- **Bring your data** — Import lists, rules and data from RimSort, RimCrow and RimPy.
+- **Bring your data** — Import lists, rules and data from RimSort, RimCrow, RimPy and RimStack.
 
 <p align="center"><img src="docs/assets/readme/en/13-performance.webp" width="720" alt="Measured memory and CPU use"></p>
 
@@ -190,14 +190,15 @@ Archo MCP makes the agent better at finding and fixing errors, with fewer tokens
    unreachable, from [Lanzou](https://rimarcho.lanzn.com/b01i608qja), password `ctot`).
 2. **New users:** unzip it into any folder, for example `C:\Tools\RimArcho\`, and double-click
    `RimArcho.exe`. A first-run guide finds your games, reads your Mods once and offers to bring your
-   lists over from the game, RimSort, RimCrow or RimPy.
+   lists over from the game, RimSort, RimCrow, RimPy or RimStack.
 3. **Existing users:** RimArcho updates itself (Settings › About, or `archo update`). By hand, replace
    your old `RimArcho.exe` and `archo.exe` with the new ones.
 4. Optional: add the folder to `PATH` to type `archo` in any terminal.
 
 The executables are not code-signed, so the first time you run one Windows may say "Windows
 protected your PC": choose **More info**, then **Run anyway**. Each release has a `.sha256`
-checksum, and you can build it yourself from this source (below).
+checksum, and you can build it yourself from this source (below). If Windows says you have no
+permission even as administrator, see the FAQ ("RimArcho.exe won't start").
 
 ### Linux (experimental)
 
@@ -333,7 +334,30 @@ download with its `.sha256` file or build it yourself from source.
 </details>
 
 <details>
-<summary><b>Do I have to give up RimSort, RimCrow or RimPy?</b></summary>
+<summary><b>RimArcho.exe won't start: "no permission", even as administrator.</b></summary>
+
+RimArcho asks for no special permissions and never needs administrator rights. When an unsigned
+program that was just downloaded is blocked, Windows or your antivirus says "Windows cannot access
+the specified device, path, or file. You may not have the appropriate permissions", and running as
+administrator does not get past it. In order:
+
+1. **Extract the ZIP first.** Don't run the exe from inside the ZIP window. Before extracting,
+   right-click the ZIP, choose **Properties**, tick **Unblock** (if it is there) and choose **OK**.
+   Extract to a normal folder such as `D:\Games\RimArcho`, not `Program Files`.
+2. **Antivirus.** If your antivirus quarantined or blocked `RimArcho.exe` or `archo.exe`, restore
+   them and allow the RimArcho folder. Compare the ZIP with its `.sha256` file first if you want to
+   be sure it is ours.
+3. **Smart App Control** (Windows 11: Settings › Privacy & security › Windows Security › App & browser
+   control). When it is on, it blocks every unsigned program with no way to allow one, and Windows
+   cannot turn it back on without a reset. We are applying for free code signing so this stops
+   happening; until then, RimArcho cannot run while it is on.
+
+Still blocked? Send us the exact message (a screenshot is best) and your Windows version on
+[GitHub issues](https://github.com/ToumanLin/RimArcho/issues) or Discord.
+</details>
+
+<details>
+<summary><b>Do I have to give up RimSort, RimCrow, RimPy or RimStack?</b></summary>
 
 No. The first-run guide (and `archo import`) reads their lists, rules and data and shows what will be
 imported before anything changes. RimArcho never writes into their files.

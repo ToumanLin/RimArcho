@@ -55,7 +55,7 @@
 - **看得懂的日志**：报错按类归组、标出严重程度，并指向背后的 Mod。
 - **列表和游戏**：多个列表、多个游戏实例（1.6 和 1.7 并存）共用一套 Mod，每次改动都能撤销。
 - **一个程序，三种用法**：桌面窗口、终端界面、可写脚本的 CLI，以及给 AI agent 用的 MCP 服务，看到的是同一套事实。
-- **带上你的数据**：可从 RimSort、RimCrow 和 RimPy 导入列表、规则和数据。
+- **带上你的数据**：可从 RimSort、RimCrow、RimPy 和 RimStack 导入列表、规则和数据。
 
 <p align="center"><img src="docs/assets/readme/zh/13-performance.webp" width="720" alt="实测的内存和 CPU 占用"></p>
 
@@ -149,11 +149,11 @@ Archo MCP 让 agent 更会找错、修错，token 也用得更少：平均每个
 ### Windows
 
 1. 从 [GitHub Releases](https://github.com/ToumanLin/RimArcho/releases/latest) 下载 `archo-<版本号>-windows-amd64.zip`（GitHub 打不开时，可以从[蓝奏云](https://rimarcho.lanzn.com/b01i608qja)下载，密码 `ctot`）。
-2. **新用户：** 找个目录解压，例如 `C:\Tools\RimArcho\`，双击 `RimArcho.exe`。首次运行向导会找到你的游戏，读一遍 Mod，并提出从游戏、RimSort、RimCrow 或 RimPy 带上你的列表。
+2. **新用户：** 找个目录解压，例如 `C:\Tools\RimArcho\`，双击 `RimArcho.exe`。首次运行向导会找到你的游戏，读一遍 Mod，并提出从游戏、RimSort、RimCrow、RimPy 或 RimStack 带上你的列表。
 3. **老用户：** RimArcho 会自己更新（设置 › 关于，或 `archo update`）。手动更新的话，用新的 `RimArcho.exe` 和 `archo.exe` 替换旧的即可。
 4. 可选：把这个目录加入 `PATH`，就能在任何终端输入 `archo`。
 
-exe 没有代码签名，首次运行时 Windows 可能提示“Windows 已保护你的电脑”：选“更多信息”，再选“仍要运行”。每个版本都附带 `.sha256` 校验文件，你也可以用这份源码自己构建（见下文）。
+exe 没有代码签名，首次运行时 Windows 可能提示“Windows 已保护你的电脑”：选“更多信息”，再选“仍要运行”。每个版本都附带 `.sha256` 校验文件，你也可以用这份源码自己构建（见下文）。如果提示没有权限、用管理员运行也不行，见常见问题“RimArcho.exe 打不开”。
 
 ### Linux（实验性）
 
@@ -258,7 +258,19 @@ exe 没有代码签名。选“更多信息”，再选“仍要运行”。你�
 </details>
 
 <details>
-<summary><b>需要放弃 RimSort、RimCrow 或 RimPy 吗？</b></summary>
+<summary><b>RimArcho.exe 打不开：提示“没有权限”，用管理员运行也不行。</b></summary>
+
+RimArcho 不需要任何特殊权限，也从不需要管理员权限。刚下载的、没有代码签名的程序被拦下时，Windows 或杀毒软件会提示“Windows 无法访问指定设备、路径或文件。你可能没有适当的权限访问该项目”，用管理员运行也绕不过去。按顺序试：
+
+1. **先解压 ZIP。** 不要在压缩包窗口里直接运行 exe。解压前右键 ZIP，选“属性”，勾选“解除锁定”（如果有），点“确定”。解压到普通目录，比如 `D:\Games\RimArcho`，不要放进 `Program Files`。
+2. **杀毒软件。** 如果杀毒软件隔离或拦截了 `RimArcho.exe` 或 `archo.exe`，把它们恢复，并把 RimArcho 目录加入信任。想确认文件没被改过，可以先用 `.sha256` 文件核对 ZIP。
+3. **智能应用控制**（Windows 11：设置 › 隐私和安全性 › Windows 安全中心 › 应用和浏览器控制）。开启时它会拦下所有没有签名的程序，且无法单独放行；关掉后不重置系统就开不回来。我们正在申请免费的代码签名来解决这个问题；在那之前，开着它就无法运行 RimArcho。
+
+还是打不开？把完整提示（最好截图）和 Windows 版本发到 [GitHub issues](https://github.com/ToumanLin/RimArcho/issues) 或 Discord。
+</details>
+
+<details>
+<summary><b>需要放弃 RimSort、RimCrow、RimPy 或 RimStack 吗？</b></summary>
 
 不需要。首次运行向导（以及 `archo import`）会读取它们的列表、规则和数据，在改动任何东西之前先展示会导入什么。RimArcho 从不写入它们的文件。
 </details>

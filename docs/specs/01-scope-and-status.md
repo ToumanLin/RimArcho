@@ -1,6 +1,6 @@
 # 01 · Scope and status
 
-> Status: 1.0.0 was released on 2026-11-02, 1.0.5 and 1.0.6 on 2026-11-07, 1.0.7 and 1.0.8 on 2026-11-08, 1.0.9 on 2026-11-10, 1.1.0 and 1.1.1 on 2026-11-23 (`CHANGELOG.md`). What each version includes and excludes, and what is still open.
+> Status: 1.0.0 was released on 2026-11-02, 1.0.5 and 1.0.6 on 2026-11-07, 1.0.7 and 1.0.8 on 2026-11-08, 1.0.9 on 2026-11-10, 1.1.0 and 1.1.1 on 2026-11-23, 1.1.2 on 2026-11-24 (`CHANGELOG.md`). What each version includes and excludes, and what is still open.
 > Basis: 00 (positioning, three questions, principles), 00a (architecture). Each feature's own specification governs its details.
 
 ## 1. Version scope
@@ -33,7 +33,7 @@ Listed by who can do what; status refers to the current code.
 | Undo, or go back to an earlier version of a plan | 07 §3 | Implemented |
 | Keep identities, rules and history when the game path changes | 03 §4.2 | Implemented |
 | Lock a Mod version against Workshop updates | 07 §5 | Implemented (lock library) |
-| Import lists from RimCrow, RimSort, Steam collections and others, and export them for others | 07 §6, §7 | Implemented |
+| Import lists from RimCrow, RimSort, RimStack, Steam collections and others, and export them for others | 07 §6, §7 | Implemented |
 | Launch a plan, writing it to the game on launch | 09 §2 | Implemented |
 | Build a plan into a pack and play it with separate saves | 10 | Implemented |
 | See new errors live while the game runs | 06 §6 | Implemented |

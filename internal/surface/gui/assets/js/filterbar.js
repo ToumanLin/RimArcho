@@ -1,6 +1,6 @@
 // The filter bar (16 §2.5, §2.9): one component for the plan editor and Mod library > All.
 // One row: the query (grey completion, Tab takes it) and a "filter" toggle (also `\`).
-// Clicked conditions edit the same query. Open, it shows lists, tags, source and content:
+// Clicked conditions edit the same query. Open, it shows lists, tags, source, category and content:
 // the values most used first with their counts, then a button to expand the rest. A left
 // click (enter, space) keeps a value, a right click (x) leaves it out, again drops it; the
 // current list and game's own version are marked. The keyboard reaches all of it: `\` opens the bar with the
@@ -72,7 +72,7 @@ export function createBar(opts) {
     (data().groups || [])
       .filter((g) => g.key !== "location")
       .sort((a, b) => {
-        const order = ["files", "lists", "tag", "source", "content"];
+        const order = ["files", "lists", "tag", "source", "category", "content"];
         return (order.includes(a.key) ? order.indexOf(a.key) : 9) - (order.includes(b.key) ? order.indexOf(b.key) : 9);
       });
   // Derive completion from the active query span without changing stored conditions.
@@ -429,7 +429,7 @@ export function createBar(opts) {
     const ordered = groups();
     ordered.forEach((g) => {
       const gi = (d.groups || []).indexOf(g);
-      if (!["files", "lists", "tag", "source", "content"].includes(g.key)) {
+      if (!["files", "lists", "tag", "source", "category", "content"].includes(g.key)) {
         return;
       }
       const vals = lineOf(g);

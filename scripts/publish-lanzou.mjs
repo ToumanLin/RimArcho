@@ -101,7 +101,7 @@ async function main() {
     if (!b) return false;
     b.click();
     return true;
-  }, "开始上传");
+  }, "\u5f00\u59cb\u4e0a\u4f20");
   if (!pressed) {
     await task.handOff();
     return fail(`the console's start-upload button was not found; the browser is left open (task space ${task.spaceId})`);

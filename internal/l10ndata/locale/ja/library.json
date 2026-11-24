@@ -413,5 +413,18 @@
   "⚠ pack %s uses this copy: it still goes, and the pack launches with its own copy": "⚠ パック%sがこのコピーを使っています。処理は行われ、パックは同梱のコピーで起動します",
   "linked into the game": "ゲームへのリンク",
   "another tool": "別のツール",
-  "show where it is": "場所を表示"
+  "show where it is": "場所を表示",
+  "game & DLC": "ゲームと DLC",
+  "code": "コード",
+  "official: the game or a DLC": "公式：ゲーム本体か DLC",
+  "%d installed Mods require it, and it ships a DLL": "インストール済みの %d 個の Mod が必要とし、DLL を含む",
+  "a DLL and no Def files": "DLL あり、Def ファイルなし",
+  "only translations: Languages, no Defs, patches or DLL": "翻訳のみ：Languages あり、Def・パッチ・DLL なし",
+  "only textures: no Defs, patches, DLL or Languages": "テクスチャのみ：Def・パッチ・DLL・Languages なし",
+  "nothing to tell it by": "判断できる中身なし",
+  "set by you; automatic: %s": "あなたが設定；自動判定：%s",
+  "%s: automatic category": "%s：自動のカテゴリに戻した",
+  "set the category": "カテゴリを設定",
+  "%d XML in Defs": "Defs に XML %d 個",
+  "only patches: %d XML in Patches, no Defs or DLL": "パッチのみ：Patches に XML %d 個、Def と DLL なし"
 }

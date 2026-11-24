@@ -67,6 +67,12 @@ func (b *App) ReadOptions(a *App) {
 	b.SelfUpdateAPI, b.SelfVersion, b.SelfProgram = a.SelfUpdateAPI, a.SelfVersion, a.SelfProgram
 	b.SelfLanzou = a.SelfLanzou
 	b.SelfVersionOf, b.SelfOthers, b.SelfWaitPoll = a.SelfVersionOf, a.SelfOthers, a.SelfWaitPoll
+	// A snapshot (&App{Store: …} + ReadOptions, for a background task) logs its actions like
+	// its parent (13 §1.3); ReadSession then gives the session its own log. Without it the
+	// window's tasks wrote no operation log, and 1.1.0's update task failed on a nil run.
+	if b.Ops == nil {
+		b.Ops = a.Ops
+	}
 }
 
 // AdoptReadState transfers a finished worker's index/workspace to the GUI session,

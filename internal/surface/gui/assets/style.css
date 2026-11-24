@@ -416,6 +416,13 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .row:has(> .src) > .nw { margin-right: 0; }
 .editor-copy-head .nw { margin-left: 6px; }
 .row .s { display: flex; flex: none; width: 14px; }
+/* a Mod's category (16 §2.5): a quiet glyph before the name; the player's own a shade stronger */
+.row .cg { display: flex; flex: none; width: 13px; color: var(--faint); opacity: .8; }
+.row .cg svg.i { width: 13px; height: 13px; }
+.row .cg.set { color: var(--muted); opacity: 1; }
+.frow.category .cat-pick { margin-left: 8px; height: 22px; font-size: 12px; }
+.frow.category .v svg.i { color: var(--muted); margin-right: 4px; }
+.frow.category .v .dim { margin-left: 6px; }
 .row.dimmed .t { color: var(--faint); }
 .area.focus .row.cur { background: var(--accent-soft); }
 .area.focus .row.cur .t { color: var(--accent-11, var(--accent)); font-weight: 500; }

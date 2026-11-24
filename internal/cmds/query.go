@@ -515,6 +515,7 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 		root.KV("origin", ".rimarcho/origin.json")
 	}
 	root.KV("files", fmt.Sprintf("%d (%s), %d semantic", m.FileCount, render.Size(m.TotalSize), m.SemanticCount))
+	categoryKV(root, ix.CategoryDetail(m.ID))
 	root.KV("seen", fmt.Sprintf("first %s, last %s", c.App.FormatTime(m.FirstSeen), c.App.FormatTime(m.LastSeen)))
 	evs, err := c.App.Store.Events(store.EventFilter{EnvID: ix.Env.GameID, InstanceIDs: []string{m.ID}})
 	if err != nil {
