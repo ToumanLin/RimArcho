@@ -21,6 +21,7 @@ settings
   monitor.default: on
   network.github_mirror: auto
   network.proxy: system
+  saves.launch_copy: on
   tags.pinned: RimWorld,framework,visuals,apparel,races,weapons,buildings,furniture,QoL,balance,story,performance,language packs,testing,to delete
   ui.accent: default
   ui.archo.motion: live

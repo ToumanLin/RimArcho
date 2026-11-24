@@ -4,6 +4,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- **A copy of your newest save at every launch.** Before the game starts, RimArcho copies the newest save of the game (or pack) being launched into `backups/saves/<time>/` in its data folder, where "Back up" on the Saves page puts them. It runs beside the game's start, so launching is not slower (a 200 MB save takes about 0.1 s), and a copy that fails never stops the launch. An unchanged save is not copied again, and only the last 5 automatic copies are kept; your own backups are never deleted. Turn it off in Settings › Game log ("back up the newest save at launch") or with `archo config set saves.launch_copy off`; `archo launch` and MCP `launch_game` follow the same setting. Each copy is a `save.backup` row in the operation log (`archo ops`).
+
 ## 1.1.1 — 2026-11-23
 
 - The Archo Monitor Workshop page (English and Chinese) is rewritten in short sections, each under an animated crayon Archo header (Archo Monitor, RimArcho, AI · MCP, Download, Credits): bullets with the numbers instead of paragraphs; every fact and link is kept. The pictures are in `docs/assets/workshop-monitor/` and load from GitHub, so they appear once they are on `master`.

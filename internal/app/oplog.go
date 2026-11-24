@@ -301,3 +301,16 @@ func (a *App) logLinkRepair(plan *LinkRepairPlan, err error) {
 		a.Ops.Add(oplog.Row{Op: oplog.LinkRemove, Subject: "link repair", Result: opResult(err, len(plan.Removed) == 0), Detail: err.Error()})
 	}
 }
+
+// logLaunchCopy records a copy or a failure as a save.backup row of its own.
+func (a *App) logLaunchCopy(r *LaunchCopyResult, envID, name string) {
+	if a.Ops == nil {
+		return
+	}
+	detail := "automatic, before launch"
+	if r.Pruned > 0 {
+		detail += fmt.Sprintf("; deleted %s", plural(r.Pruned, "older automatic copy"))
+	}
+	a.Ops.Add(oplog.Row{Op: oplog.SaveBackup, EnvID: envID, Subject: name, Target: r.Dir,
+		Result: opResult(r.Err, false), Detail: joinDetail(detail, errText(r.Err))})
+}

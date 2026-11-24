@@ -75,6 +75,8 @@ type App struct {
 	Detect env.DetectOptions
 	// Launcher starts the game; nil means ExecLauncher.
 	Launcher Launcher
+	// launchCopies are automatic save copies still running (12 §4.4); Close waits.
+	launchCopies sync.WaitGroup
 	// SteamRunning reports whether the Steam client runs; nil means the process table
 	// (tests replace it). A Steam launch without it starts the game directly (09 §2).
 	SteamRunning func() bool
@@ -296,6 +298,7 @@ func OpenWith(home string, o OpenOptions) (*App, error) {
 
 // Close releases the database.
 func (a *App) Close() error {
+	a.launchCopies.Wait()
 	if a.ownDecl {
 		a.decl.close()
 	}

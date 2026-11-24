@@ -38,7 +38,7 @@ The table is `launch(environment_id, started_at, method, command, plan_id, finge
 5. **Write ModsConfig.xml** under 07 §4.1: back it up as `ModsConfig.xml.rimarcho.bak`, write a temporary file and replace it atomically, write the current game `version`, and use the `_steam` tokens. Record the file's hash and writer afterward. Then give Mods seen under a new folder their settings (§3 "Settings follow the Mod").
 6. **Record the launch** (§1). It is recorded only after the game process has started (step 8). A failed launch leaves no record, so no log is matched to a launch that never happened.
 7. **Record a plan version with the source `launch`** (07 §3). Do not record a duplicate if it is identical to the plan's latest version.
-8. **Start the game process**, without waiting for it to exit.
+8. **Start the game process**, without waiting for it to exit. Beside the start, the newest save of the Saves folder the game uses is copied into the save backups unless `saves.launch_copy` is off (12 §4.4); that copy never refuses or delays the launch.
 
 The links are handled before ModsConfig.xml is written. If a link operation fails (for example, because `Mods/` is on exFAT), the file remains unchanged instead of referring to Mods that are unavailable.
 
