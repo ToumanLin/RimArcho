@@ -154,7 +154,7 @@ Archo MCP 让 agent 更会找错、修错，token 也用得更少：平均每个
 3. **老用户：** RimArcho 会自己更新（设置 › 关于，或 `archo update`）。手动更新的话，用新的 `RimArcho.exe` 和 `archo.exe` 替换旧的即可。
 4. 可选：把这个目录加入 `PATH`，就能在任何终端输入 `archo`。
 
-签名配置好之后，发布的 exe 都带代码签名（见[代码签名政策](#代码签名政策code-signing-policy)）。首次运行没有签名的版本时，Windows 可能提示“Windows 已保护你的电脑”：选“更多信息”，再选“仍要运行”。每个版本都附带 `.sha256` 校验文件，你也可以用这份源码自己构建（见下文）。
+签名配置好之后，发布的 exe 都带代码签名（见[代码签名政策](#代码签名政策code-signing-policy)）。首次运行没有签名的版本时，Windows 可能提示“Windows 已保护你的电脑”：选“更多信息”，再选“仍要运行”。每个版本都附带 `.sha256` 校验文件，你也可以用这份源码自己构建（见下文）。如果提示没有权限、用管理员运行也不行，见常见问题“RimArcho.exe 打不开”。
 
 ### Linux（实验性）
 
@@ -298,6 +298,18 @@ Free code signing provided by [SignPath.io](https://about.signpath.io), certific
 <summary><b>Windows 提示“Windows 已保护你的电脑”。</b></summary>
 
 这个版本没有代码签名（见[代码签名政策](#代码签名政策code-signing-policy)）。选“更多信息”，再选“仍要运行”。你可以用 `.sha256` 文件核对下载，或自己从源码构建。
+</details>
+
+<details>
+<summary><b>RimArcho.exe 打不开：提示“没有权限”，用管理员运行也不行。</b></summary>
+
+RimArcho 不需要任何特殊权限，也从不需要管理员权限。刚下载的、没有代码签名的程序被拦下时，Windows 或杀毒软件会提示“Windows 无法访问指定设备、路径或文件。你可能没有适当的权限访问该项目”，用管理员运行也绕不过去。按顺序试：
+
+1. **先解压 ZIP。** 不要在压缩包窗口里直接运行 exe。解压前右键 ZIP，选“属性”，勾选“解除锁定”（如果有），点“确定”。解压到普通目录，比如 `D:\Games\RimArcho`，不要放进 `Program Files`。
+2. **杀毒软件。** 如果杀毒软件隔离或拦截了 `RimArcho.exe` 或 `archo.exe`，把它们恢复，并把 RimArcho 目录加入信任。想确认文件没被改过，可以先用 `.sha256` 文件核对 ZIP。
+3. **智能应用控制**（Windows 11：设置 › 隐私和安全性 › Windows 安全中心 › 应用和浏览器控制）。开启时它会拦下所有没有签名的程序，且无法单独放行；关掉后不重置系统就开不回来。我们正在申请免费的代码签名来解决这个问题；在那之前，开着它就无法运行 RimArcho。
+
+还是打不开？把完整提示（最好截图）和 Windows 版本发到 [GitHub issues](https://github.com/ToumanLin/RimArcho/issues) 或 Discord。
 </details>
 
 <details>

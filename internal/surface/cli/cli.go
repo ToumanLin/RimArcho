@@ -26,6 +26,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
+	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/surface/mcp"
 	"github.com/ToumanLin/RimArcho/internal/surface/tui"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -77,6 +78,21 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	// so it gets a small window; the TUI's line follows ui.lang.
 	home, err := env.AppHome()
 	if err != nil {
+		fmt.Fprintln(stderr, "error:", err)
+		if buildinfo.GUI == "1" {
+			showOpenError("RimArcho", err.Error())
+		}
+		return cmds.ExitError
+	}
+	// `archo version` needs only the folder's path: it never opens, creates or upgrades the
+	// database (17 §5: release.ps1 runs it on a fresh build, which once upgraded the
+	// maintainer's real database to an unreleased schema).
+	if len(rest) == 1 && rest[0] == "version" {
+		out, code := cmds.ExecuteContext(context.Background(), &app.App{Home: home}, rest)
+		io.WriteString(stdout, out)
+		return code
+	}
+	if err := devUpgradeRefused(home); err != nil {
 		fmt.Fprintln(stderr, "error:", err)
 		if buildinfo.GUI == "1" {
 			showOpenError("RimArcho", err.Error())
@@ -370,4 +386,27 @@ func mcpGroup(rest []string) (mcp.Group, error) {
 		return "", &cmds.UsageError{Msg: err.Error(), Cmd: c}
 	}
 	return g, nil
+}
+
+// AllowDevUpgradeEnv lets a development build upgrade the default data folder's database on
+// purpose (17 §4).
+const AllowDevUpgradeEnv = "RIMARCHO_ALLOW_DEV_UPGRADE"
+
+// devUpgradeRefused stops a development build (version "dev", not stamped by release.ps1)
+// from upgrading the database in the player's default data folder: an unreleased schema
+// locks every released RimArcho out of the player's data (released builds refuse a newer
+// schema, 04 §4). RIMARCHO_HOME (a test or VM home) and AllowDevUpgradeEnv bypass it.
+func devUpgradeRefused(home string) error {
+	if buildinfo.Version != "dev" || os.Getenv("RIMARCHO_HOME") != "" || os.Getenv(AllowDevUpgradeEnv) == "1" {
+		return nil
+	}
+	return devUpgradeCheck(filepath.Join(home, "archo.db"))
+}
+
+func devUpgradeCheck(db string) error {
+	v, err := strconv.Atoi(store.PeekMeta(db, "schema_version"))
+	if err != nil || v >= store.SchemaVersion {
+		return nil // no database yet, or nothing to upgrade
+	}
+	return fmt.Errorf("this development build would upgrade %s from schema %d to %d, which released RimArcho cannot open; set RIMARCHO_HOME to a test folder, or %s=1 to upgrade it anyway", db, v, store.SchemaVersion, AllowDevUpgradeEnv)
 }

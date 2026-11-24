@@ -222,8 +222,18 @@ if (-not $FromCI) {
 }
 Write-Host ("dist: {0} ({1:N0} bytes)" -f $archive, (Get-Item $archive).Length)
 Get-ChildItem -LiteralPath $out -Recurse -File | ForEach-Object { "  {0}  {1:N0}" -f $_.FullName, $_.Length }
+# A built program never runs against the player's real data folder (17 §4): an unreleased
+# schema would lock released RimArcho out of it.
+function Invoke-Isolated([string]$Exe, [string[]]$Arguments) {
+    $saved = $env:RIMARCHO_HOME
+    $env:RIMARCHO_HOME = Join-Path ([IO.Path]::GetTempPath()) ("rimarcho-release-" + [guid]::NewGuid().ToString("N"))
+    try { & $Exe @Arguments } finally {
+        Remove-Item -LiteralPath $env:RIMARCHO_HOME -Recurse -Force -ErrorAction SilentlyContinue
+        $env:RIMARCHO_HOME = $saved
+    }
+}
 if ($GOOS -eq "windows" -and $env:OS -eq "Windows_NT") {
-    $built = (& (Join-Path $out $exe) version | Select-Object -First 1)
+    $built = (Invoke-Isolated (Join-Path $out $exe) @("version") | Select-Object -First 1)
     Write-Host $built
     $clean = $commit -replace '-dirty$', ''
     if ($FromCI -and $built -notmatch "^archo $([regex]::Escape($Version)) \($([regex]::Escape($clean)), ") { throw "the CI build says '$built', not $Version at $clean" }
