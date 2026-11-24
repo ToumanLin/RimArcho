@@ -857,6 +857,9 @@ type SortResult struct {
 	// MonitorSkipped says why the sort did not add Archo Monitor although monitor.default
 	// is on and it is installed (no Harmony, Mods/ cannot hold links); "" otherwise.
 	MonitorSkipped string `json:"monitorSkipped,omitempty"`
+	// InferredNote says why the sort used no rules inferred from XML patches (08 §1.6): no
+	// usable analysis stored (InferredNoAnalysis, InferredOldRun); "" otherwise.
+	InferredNote string `json:"inferredNote,omitempty"`
 }
 
 // sortMonitor puts the newest installed Archo Monitor right after Harmony when
@@ -1019,12 +1022,17 @@ func (a *App) sortList(st *LoadoutState, l loadout.List) (*SortResult, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Rules inferred from XML patches (08 §1.6) order only the sort, not the order findings.
+	inferredNote := ""
+	if in.Inferred, inferredNote, err = a.InferredRules(st, l); err != nil {
+		return nil, err
+	}
 	r := order.Sort(in)
 	sorted := make(loadout.List, 0, len(l))
 	for _, i := range r.Order {
 		sorted = append(sorted, l[i])
 	}
-	out := &SortResult{Input: in, Result: r, Sorted: sorted, Changes: loadout.Diff(before, sorted, st.LineageOf), MonitorSkipped: monitorSkipped}
+	out := &SortResult{Input: in, Result: r, Sorted: sorted, Changes: loadout.Diff(before, sorted, st.LineageOf), MonitorSkipped: monitorSkipped, InferredNote: inferredNote}
 	state := *st
 	state.List = sorted
 	out.MissingDependencies, err = a.MissingDependencies(&state)
@@ -1610,9 +1618,10 @@ func (ix *Index) replacedPackage(ref string) (string, error) {
 // reference) to its stored, lineage-keyed form:
 //
 //	decl:#a3f9:loadafter:brrainz.harmony   official:#a3f9   community:<pkg>:loadafter:<pkg>
+//	inferred:#a3f9:#b7c2
 func (ix *Index) StoredConstraintRef(ref string) (string, error) {
 	parts := strings.Split(ref, ":")
-	bad := fmt.Errorf("%q is not a constraint reference (decl:<ref>:<field>:<pkg>, official:<ref> or community:<pkg>:<field>:<pkg>, as printed by archo sort)", ref)
+	bad := fmt.Errorf("%q is not a constraint reference (decl:<ref>:<field>:<pkg>, official:<ref>, community:<pkg>:<field>:<pkg> or inferred:<ref>:<ref>, as printed by archo sort)", ref)
 	switch strings.ToLower(parts[0]) {
 	case "decl":
 		if len(parts) != 4 {
@@ -1632,6 +1641,19 @@ func (ix *Index) StoredConstraintRef(ref string) (string, error) {
 			return "", err
 		}
 		return order.OfficialRef(lin), nil
+	case "inferred":
+		if len(parts) != 3 {
+			return "", bad
+		}
+		patcher, err := ix.ResolveLineage(parts[1])
+		if err != nil {
+			return "", err
+		}
+		owner, err := ix.ResolveLineage(parts[2])
+		if err != nil {
+			return "", err
+		}
+		return order.InferredRef(patcher, owner), nil
 	case "community":
 		if len(parts) == 3 && (strings.EqualFold(parts[2], "loadtop") || strings.EqualFold(parts[2], "loadbottom")) {
 			parts = append(parts, "") // community:<pkg>:loadtop (08 §1.5)
@@ -1652,6 +1674,8 @@ func (ix *Index) DisplayConstraintRef(stored string, primaryOf func(lineage stri
 		return "decl:" + primaryOf(parts[1]) + ":" + parts[2] + ":" + parts[3]
 	case parts[0] == "official" && len(parts) == 2:
 		return "official:" + primaryOf(parts[1])
+	case parts[0] == "inferred" && len(parts) == 3:
+		return "inferred:" + primaryOf(parts[1]) + ":" + primaryOf(parts[2])
 	}
 	return stored
 }

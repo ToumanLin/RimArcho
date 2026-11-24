@@ -242,6 +242,10 @@ func constraintText(st *app.LoadoutState, in order.Input, e order.Edge) (evidenc
 		return fmt.Sprintf("community pkg:%s %s pkg:%s", in.Nodes[e.C.Owner].PackageID, e.C.Field, e.C.Target), e.C.Ref
 	case order.KindUser:
 		return fmt.Sprintf("rule r:%d %s %s pkg:%s", e.C.RuleID, owner, e.C.Field, e.C.Target), fmt.Sprintf("archo rule remove r:%d", e.C.RuleID)
+	case order.KindInferred:
+		// 08 §1.6: printed with both instances, which `rule add ignore` resolves to lineages
+		other := ref(e.From)
+		return fmt.Sprintf("inferred %s after %s: %s", owner, other, in.InferredWhy(e)), "inferred:" + owner + ":" + other
 	default:
 		// The stored reference is keyed by lineage; print it with the declaring instance,
 		// which `rule add ignore` resolves back to the same lineage.
@@ -262,10 +266,11 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if a.Bool("json") {
 		b, err := json.MarshalIndent(struct {
 			app.SortNotices
-			Changes []loadout.Change `json:"changes"`
-			Sorted  loadout.List     `json:"sorted"`
-			Applied bool             `json:"applied"`
-		}{r.SortNotices, r.Changes, r.Sorted, r.Applied}, "", "  ")
+			Changes      []loadout.Change `json:"changes"`
+			Sorted       loadout.List     `json:"sorted"`
+			Applied      bool             `json:"applied"`
+			InferredNote string           `json:"inferredNote,omitempty"`
+		}{r.SortNotices, r.Changes, r.Sorted, r.Applied, r.InferredNote}, "", "  ")
 		return &render.Doc{Raw: string(b) + "\n"}, err
 	}
 	st := r.State
@@ -300,11 +305,14 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		why := root.Section("why (order constraints the list broke; strong ones go with more errors)")
 		seen := map[string]bool{}
 		for _, b := range order.Broken(r.Input, r.Result) {
-			ev, _ := constraintText(st, r.Input, b.Edge)
+			ev, ig := constraintText(st, r.Input, b.Edge)
 			if seen[ev] {
 				continue
 			}
 			seen[ev] = true
+			if b.C.Kind == order.KindInferred {
+				ev += "  (ignore: " + ig + ")" // 08 §1.6: the weakest source, the one a player may disagree with
+			}
 			why.Addf("%-8s %s", b.Strength, ev)
 		}
 		why.Truncate(12, "")
@@ -390,17 +398,39 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		nu.Truncate(12, "")
 	}
-	cs := fmt.Sprintf("%d edges, %d ignored by rules", len(r.Result.Edges), r.Result.Ignored)
-	if n := len(r.Result.Dropped); n > 0 {
-		cs += fmt.Sprintf(", %d not used", n)
-	}
-	root.KV("constraints", cs)
+	addSortSources(root, r)
 	if dry && len(r.Changes) > 0 {
 		d.AddNext("archo sort")
 	} else if !dry && len(st.Changes()) > 0 {
 		d.AddNext("archo save")
 	}
 	return d, nil
+}
+
+// addSortSources sums up the constraints the sort used, and the inferred rules (08 §1.6):
+// how many it added, or why there are none.
+func addSortSources(root *render.Node, r *app.SortResult) {
+	cs := fmt.Sprintf("%d edges, %d ignored by rules", len(r.Result.Edges), r.Result.Ignored)
+	if n := len(r.Result.Dropped); n > 0 {
+		cs += fmt.Sprintf(", %d not used", n)
+	}
+	root.KV("constraints", cs)
+	inferred := 0
+	for _, e := range r.Result.Edges {
+		if e.C.Kind == order.KindInferred {
+			inferred++
+		}
+	}
+	switch {
+	case r.InferredNote != "":
+		root.KV("inferred", r.InferredNote)
+	case inferred > 0:
+		what := "preferences"
+		if inferred == 1 {
+			what = "preference"
+		}
+		root.KV("inferred", fmt.Sprintf("%d %s from XML patches (a Mod after the one whose Defs it patches; never over another rule)", inferred, what))
+	}
 }
 
 func saveCmd(c *Ctx, a *Args) (*render.Doc, error) {
