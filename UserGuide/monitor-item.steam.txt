@@ -1,30 +1,34 @@
-[img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/en/header-01-monitor.png[/img]
-The in-game companion Mod of the RimArcho launcher. It records the game's errors and loading stages, and points each error at the Mod likely behind it.
+[img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/en/header-01-monitor.gif[/img]
+Archo Monitor is the in-game companion Mod of the RimArcho launcher. It records the game's errors and loading stages, and points each error at the Mod likely behind it.
 [list]
 [*]Changes nothing in the game.
 [*]Add or remove it at any time.
 [*]Next to no performance cost.
 [/list]
-To see what it found, get RimArcho (free, MIT). RimArcho was taken down by community moderators the last time it was on the Workshop, so only download links are given here (see Download).
+To see what it found, get RimArcho (free, MIT). The last time RimArcho was published on the Workshop it was taken down by community moderators, so only download links are given here (see below).
 
-[img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/en/header-02-rimarcho.png[/img]
-A clean, fast, lightweight RimWorld launcher and Mod manager. [strike]It has the cutest Archo-chan.[/strike]
+[img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/en/header-02-rimarcho.gif[/img]
+A clean, fast, lightweight RimWorld launcher and Mod manager: less fiddling with Mods, less reading errors, more playing. [strike]RimArcho has the cutest Archo-chan.[/strike]
 [list]
-[*][b]Light:[/b] core 47 MB of memory, peak <250 MB, ~100 MB at rest (RimSort and RimCrow: 500+ MB; 443-Mod list, 5,143 Mods installed).
-[*][b]Sort:[/b] built from 40,326 player error logs (26 GB) and 5,143 Mods. I believe it's the best in the community today.
-[*][b]Errors and conflicts:[/b] error patterns and severity counted from those logs (most red text needs no worry); Mods that often conflict in them are flagged.
-[*][b]With Archo Monitor:[/b] in-game information the outside can't see, so errors are easier to locate and debug.
+[*][b]Platforms and languages:[/b] Windows (stable) and Linux (testing); English, Chinese and Japanese.
+[*][b]Light:[/b] core 47 MB of memory, peak <250 MB, ~100 MB at rest (RimSort and RimCrow: usually 500+ MB; tested with my 450-Mod list).
+[*][b]Bring your data:[/b] import from RimSort, RimCrow and RimPy: Mod lists, aliases, notes, tags, colour marks, ignored warnings and sorting rules; nothing already there is imported twice.
+[*][b]Sorting:[/b] built from 40,326 player error logs (26 GB, updated weekly) and 5,143 Mods. I believe RimArcho's sort is the best in the community today.
+[*][b]Errors and conflicts:[/b] from those 40,326 logs I counted error patterns and rated their severity (and found most red text needs no worry); I also found Mods that often conflict, and RimArcho warns you if you enable them together.
+[*][b]Archo Monitor:[/b] in-game information the outside can't see, so errors are easier to locate and debug.
 [*][b]Saves:[/b] which Mods a save needs, and whether removing or adding one breaks it, loses content or does nothing.
-[*][b]Mod copies:[/b] make a copy and switch to it in one click; Steam won't update it.
-[*][b]Game versions:[/b] several versions and configs side by side (yes, 1.6 and 1.7 at once), download versions with SteamCMD, back up the current one (Tynan-flare protection, lol).
-[*][b]Subscriptions:[/b] GitHub and LoversLab, checked for updates.
-[*][b]Bring your data:[/b] import from RimSort, RimCrow and RimPy.
-[*][b]Archo MCP:[/b] 47 tools, from the right Mod folder and a precise error log to launching and testing the game.
-[*][b]RimWorld Probe skill:[/b] your agent launches the game, loads a save, plays and takes screenshots. No need to describe why your prisoner can't path-find: it sees it.
+[*][b]Mod copies:[/b] make a copy and switch to it in one click; Steam won't update it, so an update can't bring new errors.
+[*][b]Game versions:[/b] several game versions and configs side by side (yes, 1.6 and 1.7 at once), download versions with SteamCMD, back up the current game version in one click (Tynan-flare protection, lol).
+[*][b]Subscriptions:[/b] GitHub and LoversLab, checked for updates automatically.
 [/list]
 
-[img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/en/header-03-ai.png[/img]
-Say "something's wrong": your agent looks into it, fixes it, launches the game to check the fix, and tells you.
+[img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/en/header-03-ai.gif[/img]
+RimArcho also comes with Archo MCP and the RimWorld Probe skill:
+[list]
+[*][b]Archo MCP:[/b] 47 MCP tools, from the right Mod folder, to a precise error log, to launching the game and testing it: a complete RimWorld debugging kit.
+[*][b]RimWorld Probe skill:[/b] a probe Mod skeleton that lets your AI agent build its own Mod to control the game, so it can test the game itself. You no longer have to work out how to describe in words when and where your prisoner can't path-find.
+[/list]
+Archo MCP's goal: you say "something's wrong", and your agent looks into it, fixes it, launches the game to check the fix, and tells you.
 I built test cases from real player logs and real Mods and ran them in a VM. Pi Agent (DeepSeek 4.1 Flash) with Archo MCP vs. without: 67% → 100% correct, up to 50% fewer tokens.
 [table]
 [tr][th]Fault[/th][th]With Archo MCP[/th][th]Without[/th][/tr]
@@ -35,8 +39,9 @@ I built test cases from real player logs and real Mods and ran them in a VM. Pi 
 [tr][td]Error points at an innocent Mod[/td][td]3/3 · 2.3M[/td][td]2/3 · 2.6M[/td][/tr]
 [tr][td][b]Total[/b][/td][td][b]15/15 · average 2.3M[/b][/td][td][b]10/15 · average 3.0M[/b][/td][/tr]
 [/table]
+Every test was one-shot, with no second round of correction, which shows what Archo MCP can do on its own.
 
-[img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/en/header-04-download.png[/img]
+[img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/en/header-04-download.gif[/img]
 Download archo-<version>-windows-amd64.zip, unzip it into any folder and double-click RimArcho.exe. From then on it updates itself.
 [list]
 [*]GitHub: https://github.com/ToumanLin/RimArcho/releases/latest
@@ -46,7 +51,7 @@ Download archo-<version>-windows-amd64.zip, unzip it into any folder and double-
 [/list]
 The executables are not code-signed: if Windows says "Windows protected your PC", choose More info, then Run anyway.
 
-[img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/en/header-05-credits.png[/img]
+[img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/en/header-05-credits.gif[/img]
 The approach follows RimCrow Companion, which in turn credits:
 [list]
 [*]BetterModSort (Apache-2.0, Yan-Zero)
@@ -56,5 +61,4 @@ The approach follows RimCrow Companion, which in turn credits:
 [/list]
 Archo Monitor copies none of their code. MIT License.
 
-[img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/en/header-06-ai-use.png[/img]
-RimArcho's code is developed and tested by Claude Opus 5.5 and ChatGPT 6.1 SOL; I review the features myself.
+RimArcho's code is developed and tested by Claude Opus 5.5 and ChatGPT 6.1 SOL, and every feature is fully tested for real in a virtual machine; I review the features myself.
