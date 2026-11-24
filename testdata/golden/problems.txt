@@ -64,9 +64,11 @@ problems: 0 error, 1 warning, 1 info
       evidence: inferred ThingDef/Lib_Gun is defined by #nyh3, which is not active; the patch is not wrapped in PatchOperationFindMod, a Conditional or a MayRequire list item
       fix: archo enable nyh3
       fix: archo patches --mod hnyg
-    info patch.contested  2 mods replace or remove ThingDef/Shared_Gun/label; #iqmu Over Two runs last  (p:9789a9)
+    info patch.contested  #hnyg and #iqmu Over Two both change ThingDef Shared_Gun's label; the one loaded later wins: currently #iqmu  (p:9789a9)
       evidence: declared #hnyg Patches/Compat.xml:6 PatchOperationReplace
       evidence: declared #iqmu Patches/Label.xml:2 PatchOperationReplace
+      fix: archo rule add after iqmu hnyg
+      fix: archo rule add ignore contested:#iqmu:#hnyg
 next:
   archo enable nyh3
 
@@ -184,7 +186,7 @@ $ archo mod #hnyg
   content: defs 0, patches 2 (1 failed)
   problems: 0 error, 1 warning, 1 info
     warning patch.no-match  Patches/Compat.xml:2 Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) matched nothing (target-inactive, unguarded-optional)  (p:3d1d7c)
-    info patch.contested  2 mods replace or remove ThingDef/Shared_Gun/label; #iqmu Over Two runs last  (p:9789a9)
+    info patch.contested  #hnyg and #iqmu Over Two both change ThingDef Shared_Gun's label; the one loaded later wins: currently #iqmu  (p:9789a9)
   location: src:local Compat
     path: $ROOT/Steam/steamapps/common/RimWorld/Mods/Compat
   files: 2 (550 B), 2 semantic
