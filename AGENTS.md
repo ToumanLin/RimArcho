@@ -1,6 +1,6 @@
 # AGENTS.md
 
-RimArcho: a RimWorld launcher and Mod manager written in Go. `RimArcho.exe` is the window; `archo.exe` provides the TUI, CLI and MCP. Development branch: `dev/1.1`.
+RimArcho: a RimWorld launcher and Mod manager written in Go. `RimArcho.exe` is the window; `archo.exe` provides the TUI, CLI and MCP. Development branch: `master` (since 2026-11-24; `dev/1.1` is retired).
 This codebase is yours: what it's for and how it's built are your call, and you'll keep building on it.
 
 ## Before making changes
