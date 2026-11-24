@@ -7,6 +7,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 ## 1.1.2 — 2026-11-24
 
 - Fixed: in 1.1.0 and 1.1.1, updating RimArcho from the window always failed right after the download with "runtime error: invalid memory address or nil pointer dereference"; nothing was changed. The window's background tasks also wrote nothing to the operation log (`archo ops`). Both are fixed for updates from this version on. **On 1.1.0 or 1.1.1, update once by hand**: run `archo update` in the program folder, or download the ZIP and unzip it over the old one. A background task that crashes now writes its stack to `logs/gui.log`.
+- **A copy of your newest save at every launch.** Before the game starts, RimArcho copies the newest save of the game (or pack) being launched into `backups/saves/<time>/` in its data folder, where "Back up" on the Saves page puts them. It runs beside the game's start, so launching is not slower (a 200 MB save takes about 0.1 s), and a copy that fails never stops the launch. An unchanged save is not copied again, and only the last 5 automatic copies are kept; your own backups are never deleted. Turn it off in Settings › Game log ("back up the newest save at launch") or with `archo config set saves.launch_copy off`; `archo launch` and MCP `launch_game` follow the same setting. Each copy is a `save.backup` row in the operation log (`archo ops`).
 
 ## 1.1.1 — 2026-11-23
 

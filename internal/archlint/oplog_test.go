@@ -22,6 +22,7 @@ var opPrimitives = map[string][]string{
 	"internal/app/linkdeployment.go": {"applyLinks"},
 	"internal/app/linkhealth.go":     {"applyLinkRepair"},
 	"internal/app/saveactions.go":    {"RenameSave", "CopySave", "BackupSaves", "TrashSaves"},
+	"internal/app/savelaunchcopy.go": {"launchCopy"},
 	"internal/app/selfupdate.go":     {"installSelfUpdate", "resumeSelfSwap"},
 	"internal/app/uninstall.go":      {"Uninstall", "uninstallItem"},
 	"internal/app/launch.go":         {"LaunchWith"},
