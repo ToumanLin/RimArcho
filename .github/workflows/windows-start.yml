@@ -1,0 +1,90 @@
+# Does a published Windows release start? (17 §5) Runs the released ZIP's programs on a
+# clean Windows runner: windows-2022 (Server 2022, the Windows 10 21H2 code base) and
+# windows-2025. Started by hand for a version, or on a push to ci/windows-start-check.
+name: windows-start
+
+on:
+  workflow_dispatch:
+    inputs:
+      versions:
+        description: "Release versions to check, space separated"
+        default: "1.1.2 1.0.9"
+  push:
+    branches: [ci/windows-start-check]
+
+permissions:
+  contents: read
+
+jobs:
+  start:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check each release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSIONS: ${{ inputs.versions || '1.1.2 1.0.9' }}
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $failed = @()
+          "OS: " + (Get-CimInstance Win32_OperatingSystem | ForEach-Object { "$($_.Caption) $($_.Version) build $($_.BuildNumber)" })
+          foreach ($v in $env:VERSIONS -split '\s+' | Where-Object { $_ }) {
+            "::group::RimArcho $v"
+            $root = Join-Path $env:RUNNER_TEMP "r$v"
+            New-Item -ItemType Directory -Force $root | Out-Null
+            gh release download "v$v" --repo $env:GITHUB_REPOSITORY --pattern "archo-$v-windows-amd64.zip" --dir $root --clobber
+            $zip = Join-Path $root "archo-$v-windows-amd64.zip"
+            $dir = Join-Path $root 'app'
+            Expand-Archive $zip $dir -Force
+            # The same mark a browser download leaves, as on a player's PC.
+            Get-ChildItem $dir -Recurse -File | ForEach-Object { Set-Content -Path $_.FullName -Stream Zone.Identifier -Value "[ZoneTransfer]`r`nZoneId=3" }
+            $data = Join-Path $root 'appdata'; $local = Join-Path $root 'local'
+            New-Item -ItemType Directory -Force $data, $local | Out-Null
+            $env:APPDATA = $data; $env:LOCALAPPDATA = $local
+
+            foreach ($exe in 'archo.exe', 'RimArcho.exe') {
+              $p = Join-Path $dir $exe
+              $b = [IO.File]::ReadAllBytes($p)
+              $pe = [BitConverter]::ToInt32($b, 0x3c)
+              $opt = $pe + 24
+              $magic = [BitConverter]::ToUInt16($b, $opt)
+              $machine = [BitConverter]::ToUInt16($b, $pe + 4)
+              $osMaj = [BitConverter]::ToUInt16($b, $opt + 40); $osMin = [BitConverter]::ToUInt16($b, $opt + 42)
+              $subMaj = [BitConverter]::ToUInt16($b, $opt + 48); $subMin = [BitConverter]::ToUInt16($b, $opt + 50)
+              $subsys = [BitConverter]::ToUInt16($b, $opt + 68)
+              "{0}: {1:N0} bytes, machine 0x{2:x4}, optional header 0x{3:x3}, OS {4}.{5}, subsystem {6} version {7}.{8}" -f $exe, $b.Length, $machine, $magic, $osMaj, $osMin, $subsys, $subMaj, $subMin
+              $sig = Get-AuthenticodeSignature $p
+              "  signature: $($sig.Status)"
+            }
+
+            $out = & (Join-Path $dir 'archo.exe') version 2>&1
+            "archo.exe version -> exit $LASTEXITCODE : $out"
+            if ($LASTEXITCODE -ne 0 -or "$out" -notmatch [regex]::Escape($v)) { $failed += "$v archo.exe version" }
+
+            # Start the window the way Explorer does (ShellExecute), and see that it stays up.
+            try {
+              $proc = Start-Process -FilePath (Join-Path $dir 'RimArcho.exe') -WorkingDirectory $dir -PassThru -ErrorAction Stop
+              Start-Sleep -Seconds 12
+              if ($proc.HasExited) {
+                "RimArcho.exe exited early with code $($proc.ExitCode)"
+                $failed += "$v RimArcho.exe exited $($proc.ExitCode)"
+              } else {
+                "RimArcho.exe running after 12 s (pid $($proc.Id))"
+                Get-Process | Where-Object { $_.Path -like "$dir*" -or $_.ProcessName -eq 'msedgewebview2' } | Select-Object ProcessName, Id | Format-Table | Out-String
+              }
+            } catch {
+              "RimArcho.exe did not start: $($_.Exception.Message)"
+              $failed += "$v RimArcho.exe: $($_.Exception.Message)"
+            }
+            Get-ChildItem (Join-Path $data 'RimArcho\logs') -ErrorAction SilentlyContinue | ForEach-Object { "--- $($_.Name)"; Get-Content $_.FullName -Tail 40 }
+            Get-Process | Where-Object { $_.Path -like "$dir*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+            Get-WinEvent -LogName 'Microsoft-Windows-CodeIntegrity/Operational' -MaxEvents 10 -ErrorAction SilentlyContinue | Format-List TimeCreated, Id, Message | Out-String -Width 200
+            Get-WinEvent -FilterHashtable @{ LogName = 'Application'; Level = 2; StartTime = (Get-Date).AddMinutes(-5) } -ErrorAction SilentlyContinue | Format-List TimeCreated, ProviderName, Message | Out-String -Width 200
+            "::endgroup::"
+          }
+          if ($failed) { "FAILED:"; $failed; exit 1 }
+          "every release started"
