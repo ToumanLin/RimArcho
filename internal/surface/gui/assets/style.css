@@ -1367,6 +1367,12 @@ svg.i.fill { fill: currentColor; }
 .dl-note.err { color: var(--red); }
 .dl-state { display: flex; gap: 10px; align-items: baseline; margin-bottom: 8px; }
 .dl-state .t { font-weight: 500; }
+/* SteamCMD's password hints (11 §3, js/steamhint.js): an icon and a line each */
+.steam-hint { display: grid; gap: 4px; margin-top: 8px; color: var(--fg-2); font-size: 12px; }
+.steam-hint-row, .steam-hint-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.steam-hint-row .i, .steam-hint-head .i { flex: none; width: 16px; height: 16px; color: var(--amber); }
+.steam-hint-head { color: var(--fg); font-weight: 500; }
+.steam-hint-card { position: fixed; right: 16px; bottom: 40px; z-index: 30; max-width: 360px; margin: 0; padding: 10px 12px; background: var(--pop-bg); border: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); box-shadow: var(--shadow); animation: pop-in var(--t-enter) var(--ease); }
 .dl-line { margin-top: 8px; font: 12px var(--code); color: var(--muted); overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) { .prog .bar.busy i { animation: none; } ::view-transition-group(*) { animation: none; } }
 :root[data-motion="reduced"] .prog .bar.busy i { animation: none; } :root[data-motion="reduced"]::view-transition-group(*) { animation: none; }

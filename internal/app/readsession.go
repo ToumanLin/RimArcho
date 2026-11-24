@@ -60,7 +60,7 @@ func (b *App) ReadOptions(a *App) {
 	b.pageRepo = a.pageRepo
 	b.SteamCMDZip, b.SteamCMDNoPath = a.SteamCMDZip, a.SteamCMDNoPath
 	b.SteamCMDStart, b.SteamCMDRun, b.SteamCMDPoll = a.SteamCMDStart, a.SteamCMDRun, a.SteamCMDPoll
-	b.SteamCMDWait = a.SteamCMDWait
+	b.SteamCMDWait, b.SteamCMDSignIn = a.SteamCMDWait, a.SteamCMDSignIn
 	b.TextureEncoder, b.ToddsNoPath, b.ToddsZip = a.TextureEncoder, a.ToddsNoPath, a.ToddsZip
 	b.UninstallExe, b.UninstallKeepBase, b.ArchoProbe = a.UninstallExe, a.UninstallKeepBase, a.ArchoProbe
 	b.UninstallLog, b.AfterExitFunc = a.UninstallLog, a.AfterExitFunc

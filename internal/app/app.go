@@ -150,9 +150,12 @@ type App struct {
 	// SteamCMDZip replaces Valve's download URL, SteamCMDPoll how often its log is read,
 	// SteamCMDNoPath leaves PATH out when looking for it.
 	SteamCMDStart func(exe string, args []string, console bool) (SteamCMDProc, error)
-	SteamCMDRun   func(exe string, args []string) (string, error)
-	SteamCMDZip   string
-	SteamCMDPoll  time.Duration
+	// SteamCMDSignIn is told when a signed-in SteamCMD run that may ask for the password
+	// starts (true) and ends (false), so the surface can show the password hints (11 §3).
+	SteamCMDSignIn func(open bool)
+	SteamCMDRun    func(exe string, args []string) (string, error)
+	SteamCMDZip    string
+	SteamCMDPoll   time.Duration
 	// SteamCMDWait replaces the Workshop retry backoff in tests; nil uses time.Sleep.
 	SteamCMDWait   func(time.Duration)
 	SteamCMDNoPath bool

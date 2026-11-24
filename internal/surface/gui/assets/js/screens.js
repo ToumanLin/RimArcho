@@ -3,6 +3,7 @@
 // and settings. The pages are side by side: esc does not go from one to another (16 §3.1);
 // esc leaves only the full detail, back to the plan. A page's actions sit in the top bar.
 import { fieldError, fieldStatusError } from "./feedbacksemantics.js";
+import { steamHint } from "./steamhint.js";
 import { choiceControl } from "./choices.js";
 import { linkRows } from "./linkrows.js";
 import { copyablePath, editablePath, pathContent } from "./fields.js";
@@ -2213,8 +2214,11 @@ function renderSettingActions(right, actions, run, item) {
         input.setAttribute("aria-label", T("Steam account name"));
         input.placeholder = T("Steam account name");
         const hint = el("span", "muted", T("enter to log in, esc to cancel"));
-        const close = () => { form.remove(); b.hidden = false; b.focus(); };
+        // what the SteamCMD window will need, before it opens (11 §3)
+        const steam = a.argv[1] === "steamcmd" ? steamHint() : null;
+        const close = () => { form.remove(); steam?.remove(); b.hidden = false; b.focus(); };
         form.append(input, hint); b.hidden = true; right.append(form); input.focus(); input.select();
+        if (steam) (right.closest(".set")?.querySelector(".l") || right).append(steam);
         form.onsubmit = e => {
           e.preventDefault(); e.stopPropagation();
           const name = input.value.trim();

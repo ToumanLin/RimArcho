@@ -129,6 +129,9 @@ func (m *model) handleWork(msg tea.Msg) (cmd tea.Cmd, done bool) {
 	case automaticDoneMsg:
 		m.automaticDone(msg)
 		return nil, true
+	case steamSignInMsg:
+		m.say(sayWarn, view.SteamCMDPasswordHint())
+		return nil, true
 	case taskEndedMsg:
 		return m.taskEnded(msg.t), true
 	case bgMsg:

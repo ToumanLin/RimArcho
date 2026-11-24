@@ -379,7 +379,7 @@ func (e *DownloadError) Why() string {
 	case "ownership":
 		why = "this Steam account does not own RimWorld"
 	case "password":
-		why = "Steam did not accept the password"
+		why = SteamPasswordRefused
 	case "guard":
 		why = "Steam did not accept the Steam Guard code"
 	case "disk":
@@ -530,6 +530,8 @@ func (a *App) FetchGame(spec DownloadSpec, progress func(DownloadProgress)) (str
 		progress = func(DownloadProgress) {}
 	}
 	progress(DownloadProgress{State: "starting"})
+	end := a.steamSignIn(SteamCMDSignsIn(account))
+	defer end()
 	proc, err := a.steamCMD().start(exe, args, spec.Console)
 	if err != nil {
 		return "", fmt.Errorf("starting SteamCMD: %w", err)
@@ -549,6 +551,9 @@ func (a *App) FetchGame(spec DownloadSpec, progress func(DownloadProgress)) (str
 		}
 		for _, l := range t.lines() {
 			if p, ok := res.read(l); ok {
+				if p.State == "downloading" || p.State == "verifying" {
+					end() // signed in: the password hints are done
+				}
 				p.Line = p.State
 				progress(p)
 			}

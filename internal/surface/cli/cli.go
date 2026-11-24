@@ -170,6 +170,14 @@ func runOpened(ap *app.App, argv, rest []string, serveMCP bool, group mcp.Group,
 	}
 	cmds.Progress = func(line string) { fmt.Fprintln(stderr, line) }
 	cmds.Stream = func(line string) { fmt.Fprintln(stdout, line) }
+	if !serveMCP {
+		// Before a signed-in SteamCMD run may ask for the password (11 §3).
+		ap.SteamCMDSignIn = func(open bool) {
+			if open {
+				fmt.Fprintln(stderr, steamCMDPasswordNote())
+			}
+		}
+	}
 	if serveMCP {
 		// MCP over stdio (14): stdout carries only protocol messages.
 		if err := mcp.Run(context.Background(), ap, group); err != nil {
@@ -409,4 +417,14 @@ func devUpgradeCheck(db string) error {
 		return nil // no database yet, or nothing to upgrade
 	}
 	return fmt.Errorf("this development build would upgrade %s from schema %d to %d, which released RimArcho cannot open; set RIMARCHO_HOME to a test folder, or %s=1 to upgrade it anyway", db, v, store.SchemaVersion, AllowDevUpgradeEnv)
+}
+
+// steamCMDPasswordNote is what the CLI prints before a signed-in SteamCMD run (11 §3).
+func steamCMDPasswordNote() string {
+	var b strings.Builder
+	b.WriteString("SteamCMD asks for the password and the Steam Guard code; RimArcho does not see them.")
+	for _, h := range app.SteamCMDPasswordHints {
+		b.WriteString("\n  - " + h)
+	}
+	return b.String()
 }

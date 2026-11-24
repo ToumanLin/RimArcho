@@ -157,6 +157,8 @@ func newAPI(a *app.App) *API {
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &API{a: a, open: openURL, busy: map[string]bool{}, branchCtx: ctx, branchCancel: cancel}
 	a.LaunchWait = func(text string) { s.send("launch-wait", map[string]any{"text": view.T(text)}) }
+	// A SteamCMD window that may ask for the password opens or closes (11 §3).
+	a.SteamCMDSignIn = func(open bool) { s.send("steamcmd-signin", map[string]any{"open": open}) }
 	s.startTasks()
 	s.startCreditLocked()
 	return s

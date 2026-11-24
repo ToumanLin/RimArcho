@@ -349,6 +349,10 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		v, path := T("not installed"), s.Dir
 		if s.Newest != nil {
 			v, path = s.Newest.Version, s.Newest.Mod.RealPath
+			if s.Newest.Mod.Kind == source.Workshop {
+				// 19 §6: the subscribed copy is used and the bundled one is not copied
+				v = Tf("%s (Workshop copy)", v)
+			}
 		} else if len(s.Installed) > 0 {
 			v = s.Installed[0]
 		}

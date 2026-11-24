@@ -17,6 +17,9 @@ func subscriptionReason(it app.TaskItem, full bool) string {
 	if kind == "" && (it.Why == "the Steam client is offline" || strings.Contains(it.Why, "(code 3)")) {
 		kind = "offline"
 	}
+	if kind == "password" && full {
+		return T(app.SteamPasswordRefused)
+	}
 	if kind == "offline" {
 		if full {
 			return T("the Steam client is offline: restart Steam, then retry (SteamCMD signing in with the same account signs Steam out)")

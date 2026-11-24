@@ -201,5 +201,10 @@
   "webview interface failed": "网页接口不可用",
   "window class registration failed": "登录窗口注册失败",
   "window create failed": "登录窗口创建失败",
-  "would download with SteamCMD": "将用 SteamCMD 下载"
+  "would download with SteamCMD": "将用 SteamCMD 下载",
+  "%s (Workshop copy)": "%s（创意工坊版）",
+  "SteamCMD window": "SteamCMD 窗口",
+  "the password stays hidden while you type: type it, then press Enter": "输入密码时不会显示任何字符：照常输入，再按回车",
+  "switch the input method to English first": "先把输入法切换到英文",
+  "right-click pastes into that window": "在该窗口中右键即可粘贴"
 }

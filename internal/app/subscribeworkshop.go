@@ -496,6 +496,9 @@ func (a *App) runWorkshopSteamCMD(exe string, args []string, console bool, trans
 	if a.SteamCMDStart != nil {
 		start = a.SteamCMDStart
 	}
+	// console: a signed-in run, which may ask for the password (subscribeworkshoprun.go)
+	end := a.steamSignIn(console)
+	defer end()
 	p, err := start(exe, args, console)
 	if err != nil {
 		return "", err

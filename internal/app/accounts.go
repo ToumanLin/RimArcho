@@ -106,6 +106,7 @@ func (a *App) SteamAccountAction(action string) error {
 	if action == "login" && account == "anonymous" {
 		return errors.New("enter a Steam account name first")
 	}
+	var windowErr *DownloadError // a login failure the sign-in window logged
 	run := func(args []string, console bool) ([]string, error) {
 		log := steamCMDConsoleLog(i.Path)
 		var off int64
@@ -140,8 +141,15 @@ func (a *App) SteamAccountAction(action string) error {
 		return a.Store.SetMeta("cfg:steamcmd.account", "")
 	}
 	if action == "login" {
+		log := steamCMDConsoleLog(i.Path)
+		var off int64
+		if st, e := os.Stat(log); e == nil {
+			off = st.Size()
+		}
+		end := a.steamSignIn(true)
 		p, err := a.steamCMD().start(i.Path, []string{"+login", account}, true)
 		if err != nil {
+			end()
 			var libraries *steamCMDLibraryError
 			if errors.As(err, &libraries) {
 				return libraries
@@ -152,9 +160,18 @@ func (a *App) SteamAccountAction(action string) error {
 		// Closing the console with X can return a nonzero exit code even after
 		// authentication. The cached check below decides whether login succeeded.
 		var libraries *steamCMDLibraryError
-		if err := p.Wait(); errors.As(err, &libraries) {
+		werr := p.Wait()
+		end()
+		if errors.As(werr, &libraries) {
 			return libraries
 		}
+		// What the window said: a refused password is named with the hints (#19).
+		tail := &logTail{path: log, off: off}
+		window := steamLogin{account: account}
+		for _, line := range append(tail.lines(), tail.partial) {
+			window.read(line)
+		}
+		windowErr = window.err
 	}
 	// The cached check never receives a password and cannot prompt in the GUI process.
 	lines, runErr := run([]string{"+login", account, "+licenses_print", "+quit"}, false)
@@ -183,6 +200,9 @@ func (a *App) SteamAccountAction(action string) error {
 		state = "network error; login status unknown"
 	}
 	a.steamAccountRecord(i.Path, account, state, false)
+	if windowErr != nil && (windowErr.Kind == "password" || windowErr.Kind == "guard") {
+		return windowErr
+	}
 	return errors.New(state + "; sign in again to complete password and Steam Guard verification")
 }
 
