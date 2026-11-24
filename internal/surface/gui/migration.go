@@ -27,7 +27,7 @@ func (s *API) ImportSurvey(extra []app.ManagerImport) ([]app.MigrationManager, e
 			continue
 		}
 		if f.Manager == "" {
-			f.Manager = map[string]string{"rimcrow": "RimCrow", "rimsort-aux": "RimSort", "rimsort-rules": "RimSort"}[f.Kind]
+			f.Manager = map[string]string{"rimcrow": "RimCrow", "rimsort-aux": "RimSort", "rimsort-rules": "RimSort", "rimstack": "RimStack", "rimstack-rules": "RimStack"}[f.Kind]
 		}
 		found = append(found, f)
 	}

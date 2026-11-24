@@ -122,7 +122,7 @@ func (s *API) PickManagerImport() (string, error) {
 	if s.x.native == nil {
 		return "", nil
 	}
-	return s.x.native.openFile(view.T("import from RimSort, RimCrow or RimPy"), [][2]string{{"Manager program or data", "*.exe;*.db;*.json;*.xml;*.rml;*.txt"}, {"All files", "*.*"}})
+	return s.x.native.openFile(view.T("import from RimSort, RimCrow, RimPy or RimStack"), [][2]string{{"Manager program or data", "*.exe;*.db;*.json;*.xml;*.rml;*.txt"}, {"All files", "*.*"}})
 }
 
 type managerPreview struct {
@@ -171,6 +171,10 @@ func (s *API) managerReport(kind, path string, dry bool) (string, error) {
 		r, err = s.a.ImportRimSortAux(app.RimSortAuxOptions{DB: path, DryRun: dry, Tags: view.ManagerTags()})
 	case "rimsort-rules":
 		r, err = s.a.ImportRimSortRules(path, dry)
+	case "rimstack":
+		r, err = s.a.ImportRimStack(app.RimStackOptions{Notes: path, DryRun: dry, Tags: view.ManagerTags()})
+	case "rimstack-rules":
+		r, err = s.a.ImportRimStackRules(path, dry)
 	default:
 		return "", errors.New("choose a RimCrow database or RimSort user rules")
 	}
@@ -275,6 +279,9 @@ func (s *API) ManagerFileKind(path string) string {
 		var data map[string]json.RawMessage
 		if err == nil && len(b) <= 4<<20 && json.Unmarshal(b, &data) == nil && data["rules"] != nil && data["entries"] == nil {
 			return "rimsort-rules"
+		}
+		if k := app.RimStackFileKind(b); err == nil && k != "" {
+			return k
 		}
 	}
 	return "list"

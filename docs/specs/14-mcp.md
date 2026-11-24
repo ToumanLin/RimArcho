@@ -65,7 +65,7 @@ Annotations follow the MCP specification; the external harness decides whether t
 | `manage_hidden` | unhide and trash | false | true |
 | `check_links` | `links check [--all] --json`; see the paragraph above the table. | true | — |
 | `repair_links` | `links repair [--all] --json` with `--dry-run` (`dry_run`), or `--yes` with `confirm`, and each `include` as `--include`; see the paragraph above the table. | false | true |
-| `maintenance` | `data update`, `import rimcrow`, `db vacuum` (`action=vacuum`), and gc | false | true |
+| `maintenance` | `data update`, `import rimcrow`, `import rimstack`, `db vacuum` (`action=vacuum`), and gc | false | true |
 | `list_library` | library (search, include, exclude, sort, lineage, facets, and all) | true | — |
 | `list_saves` | `saves list` (colony, mod, attention, all), or with `review` `saves review --read` (colony, mod, all); env both selects the environment and keeps only its saves, like the CLI's global `--env` | true | — |
 | `get_save` | `saves show` (save, mods, play, content, mod, all); content selects the selected-save content report (12 §2), with the same bounded text and limits as CLI; `mod=<ref>` is `--mod`: whether that Mod can be removed (13 §4.2); the first call for a save reads it in full into RimArcho's cache (12 §1.7) | true | — |

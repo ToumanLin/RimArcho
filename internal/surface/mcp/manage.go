@@ -188,6 +188,8 @@ func MaintenanceArgv(in MaintenanceIn) []string {
 	case "import_rimcrow":
 		return argv("import", "rimcrow").str("db", in.DB).str("rules", in.Rules).flag("dry-run", in.DryRun).
 			flag("include-disabled-rules", in.IncludeDisabledRules).flag("all", in.All).a
+	case "import_rimstack":
+		return argv("import", "rimstack").str("dir", in.Dir).flag("dry-run", in.DryRun).flag("all", in.All).a
 	case "gc":
 		return argv("gc").flag("dry-run", in.DryRun).a
 	case "vacuum":
@@ -219,7 +221,7 @@ type ScanIn struct {
 type ExchangeIn struct {
 	Env    string `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Action string `json:"action" jsonschema:"export, import or collection"`
-	Format string `json:"format,omitempty" jsonschema:"export: text (default), archo (RimArcho list: each mod with its version), modsconfig, rimsort, rml, rimcrow, rimcrow-xml or workshop (Workshop links)"`
+	Format string `json:"format,omitempty" jsonschema:"export: text (default), archo (RimArcho list: each mod with its version), modsconfig, rimsort, rml, rimcrow, rimcrow-xml, rimstack (RimStack saved list), rimstack-text (RimStack's copied text) or workshop (Workshop links)"`
 	Out    string `json:"out,omitempty" jsonschema:"export: write to this new file (never overwrites); default: return the text"`
 	From   string `json:"from,omitempty" jsonschema:"import: a list file path or a RimCrow share code; collection: a Workshop collection link or ID"`
 	Import bool   `json:"import,omitempty" jsonschema:"collection: also replace the Loadout with its installed mods in order (undoable)"`
@@ -261,11 +263,12 @@ type HiddenIn struct {
 
 type MaintenanceIn struct {
 	Env                  string  `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
-	Action               string  `json:"action" jsonschema:"data_update, import_rimcrow, vacuum or gc"`
+	Action               string  `json:"action" jsonschema:"data_update, import_rimcrow, import_rimstack, vacuum or gc"`
 	Datasets             StrList `json:"datasets,omitempty" jsonschema:"data_update: rules, steamdb, replacements (default: all)"`
 	DB                   string  `json:"db,omitempty" jsonschema:"import_rimcrow: RimCrow's data\\mod_manager.db"`
 	Rules                string  `json:"rules,omitempty" jsonschema:"import_rimcrow: RimCrow's user_rules.json (default: next to the database)"`
 	IncludeDisabledRules bool    `json:"include_disabled_rules,omitempty" jsonschema:"import_rimcrow: also import rules switched off in RimCrow"`
-	All                  bool    `json:"all,omitempty" jsonschema:"import_rimcrow: no truncation"`
+	Dir                  string  `json:"dir,omitempty" jsonschema:"import_rimstack: RimStack's data folder (default: where RimStack keeps it)"`
+	All                  bool    `json:"all,omitempty" jsonschema:"import_rimcrow, import_rimstack: no truncation"`
 	DryRun               bool    `json:"dry_run,omitempty" jsonschema:"report what would happen, change nothing"`
 }

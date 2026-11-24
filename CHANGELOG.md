@@ -4,6 +4,11 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- **Move between RimArcho and RimStack.** Import finds RimStack's data (`%LOCALAPPDATA%\RimStack`; on Linux `~/.local/share/RimStack` or its Flatpak folder) and offers it as a fourth manager beside RimSort, RimCrow and RimPy, part by part: its notes, tags, ignored warnings and "works on this version" marks (as one tag, `RimStack: ignored warnings`), its Loaders and Last categories (as top and bottom rules), its load-order rules (as "before" rules), and its saved lists. RimStack's other categories, its automatic snapshots and its own caches are not imported. New CLI command `archo import rimstack [--dir <folder>] [--dry-run]`; MCP `maintenance action=import_rimstack`.
+- Lists from RimStack import anywhere a list does: its saved list files (`lists\<name>.json`), the text its "copy the load order" gives, and the pages it publishes on Rentry.co. Copied lists from RimSort and RimStack now also give the game version they were made for.
+- Export has two new formats: **RimStack** (a saved list to put in RimStack's `lists` folder, named after the list so RimStack can open it) and **RimStack text** (lines to paste into RimStack or RimSort, or to put on Rentry). CLI `archo loadout export --format rimstack|rimstack-text`; MCP `exchange_list format=rimstack|rimstack-text`.
+- Fixed: importing a Rentry.co link failed with "no mods found" for every page: Rentry now asks for an access code on `/raw`. RimArcho reads the page's text from its edit page instead.
+
 ## 1.1.1 — 2026-11-23
 
 - The Archo Monitor Workshop page (English and Chinese) is rewritten in short sections, each under an animated crayon Archo header (Archo Monitor, RimArcho, AI · MCP, Download, Credits): bullets with the numbers instead of paragraphs; every fact and link is kept. The pictures are in `docs/assets/workshop-monitor/` and load from GitHub, so they appear once they are on `master`.

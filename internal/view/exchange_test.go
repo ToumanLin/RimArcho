@@ -189,17 +189,21 @@ func TestImportLinks(t *testing.T) {
 {"publishedfileid":"2009463077","sortorder":1,"filetype":0},{"publishedfileid":"5550001","sortorder":2,"filetype":0},{"publishedfileid":"1001","sortorder":3,"filetype":0}]}]}}`))
 		case "/api":
 			w.Write([]byte(`{"response":{"publishedfiledetails":[{"publishedfileid":"3000000001","title":"My Pack"},{"publishedfileid":"5550001","title":"Not Here"}]}}`))
-		case "/rentry/abc/raw":
-			w.Write([]byte("# Mods\n1. [Beta](https://steamcommunity.com/sharedfiles/filedetails/?id=5) {packageid: tester.b}\n"))
+		case "/rentry/abc/edit":
+			// Rentry's edit page: the Markdown in the text box, escaped; the metadata box after it
+			w.Write([]byte(`<html><textarea class="x" name="text" id="id_text">
+# Mods &amp; more
+1. [Beta](https://steamcommunity.com/sharedfiles/filedetails/?id=5) {packageid: tester.b}
+</textarea><textarea name="metadata">tester.zzz</textarea></html>`))
 		default:
 			http.NotFound(w, r)
 		}
 	}))
 	t.Cleanup(srv.Close)
 	e.App.SteamAPI, e.App.SteamCollectionAPI = srv.URL+"/api", srv.URL+"/collection"
-	old := app.RentryRaw
-	app.RentryRaw = srv.URL + "/rentry/%s/raw"
-	t.Cleanup(func() { app.RentryRaw = old })
+	old := app.RentryEdit
+	app.RentryEdit = srv.URL + "/rentry/%s/edit"
+	t.Cleanup(func() { app.RentryEdit = old })
 
 	imp, err := view.ReadImport(e.App, view.ImportText, " https://steamcommunity.com/sharedfiles/filedetails/?id=3000000001 ")
 	if err != nil {

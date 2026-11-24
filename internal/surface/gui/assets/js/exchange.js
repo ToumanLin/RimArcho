@@ -185,7 +185,7 @@ function drawDo() {
       if (f && S.screen === "plan-import") importPack(f);
     }));
   const db = el("div", "xc-db");
-  db.append(doRow("db", "library", T("Import another manager's data"), T("Mod tags, colours, notes and sorting rules from RimSort, RimCrow or RimPy")));
+  db.append(doRow("db", "library", T("Import another manager's data"), T("Mod tags, colours, notes and sorting rules from RimSort, RimCrow, RimPy or RimStack")));
   managerRows(db);
   card.append(gr, list, subs, pack, db);
   markShown();
@@ -326,7 +326,7 @@ export async function dropped(d) {
 function refuse(name, why = "", cls = "") {
   const res = showResult("refused", "", T("Not imported"));
   if (!res) return;
-  const r = errorRow(name, why || T("RimArcho imports Mod lists (.xml, .rml, .json, .txt, .rws), packs (.archopack) and RimSort, RimCrow or RimPy data"));
+  const r = errorRow(name, why || T("RimArcho imports Mod lists (.xml, .rml, .json, .txt, .rws), packs (.archopack) and RimSort, RimCrow, RimPy or RimStack data"));
   if (cls) r.classList.add(cls);
   // a refusal reads at a glance: the file's name after a stop mark (an ask for the dialog: a warning)
   const mk = el("span", "xc-refuse" + (cls ? " " + cls : "")); mk.innerHTML = cls ? icon.warn : icon.err;
@@ -353,7 +353,7 @@ function managerRows(card) {
     if (!f || S.screen !== "plan-import") return;
     addManagerSource(f);
   });
-  more.title = T("RimCrow's or RimSort's .exe or folder, or one of its data files (mod_manager.db, userRules.json, a saved list); it is only read");
+  more.title = T("RimCrow's, RimSort's or RimStack's .exe or folder, or one of its data files (mod_manager.db, userRules.json, notes.json, a saved list); it is only read");
   const elsewhere = el("div", "xc-else");
   elsewhere.append(el("span", "", T("Not found? Choose its .exe")), more);
   card.append(el("div", "xc-mrows"), elsewhere);
@@ -369,7 +369,7 @@ async function addManagerSource(f) {
   const found = await api.ManagerSourcesIn(f).catch(() => null);
   if (!live(active)) return;
   if (found?.length) M.extra.push(...found);
-  else if (isExe(f)) return refuse(f.replace(/^.*[\\/]/, ""), T("no RimSort, RimCrow or RimPy data beside it"));
+  else if (isExe(f)) return refuse(f.replace(/^.*[\\/]/, ""), T("no RimSort, RimCrow, RimPy or RimStack data beside it"));
   else {
     const k = await api.ManagerFileKind(f).catch(() => "list");
     M.extra.push({ manager: k === "list" ? T("a file") : "", kind: k, path: f });
@@ -379,7 +379,7 @@ async function addManagerSource(f) {
   const norm = x => String(x || "").replace(/\\/g, "/").toLowerCase();
   const base = norm(isExe(f) ? f.replace(/[\\/][^\\/]*$/, "") : f);
   const m = M.managers?.find(m => m.groups.some(g => norm(g.path).startsWith(base)));
-  if (!m) return refuse(f.replace(/^.*[\\/]/, ""), T("no RimSort, RimCrow or RimPy data in it"));
+  if (!m) return refuse(f.replace(/^.*[\\/]/, ""), T("no RimSort, RimCrow, RimPy or RimStack data in it"));
   if (!M.shown.has(mKey(m))) showManager(m);
 }
 
@@ -398,9 +398,9 @@ async function survey() {
 }
 
 const PART = () => ({ aliases: T("aliases"), notes: T("notes"), groups: T("groups"), tags: T("tags"), colours: T("colour marks"), ignored: T("ignored warnings"),
-  rules: T("user rules"), "rules-off": T("rules switched off there"), interlocks: T("interlocks") });
+  rules: T("user rules"), "rules-off": T("rules switched off there"), interlocks: T("interlocks"), categories: T("Loaders and Last categories") });
 const BECOMES = () => ({ aliases: T("%d aliases"), notes: T("%d notes"), groups: T("%d group tags on Mods"), tags: T("%d tags on Mods"), colours: T("%d coloured tags"),
-  ignored: T("a tag on %d Mods"), rules: T("%d load-order rules"), "rules-off": T("%d load-order rules"), interlocks: T("%d attach rules") });
+  ignored: T("a tag on %d Mods"), rules: T("%d load-order rules"), "rules-off": T("%d load-order rules"), interlocks: T("%d attach rules"), categories: T("%d top or bottom rules") });
 const GROUP = () => ({ configs: T("profiles"), player: T("notes and tags"), rules: T("rules"), lists: T("saved lists") });
 
 const mKey = m => m.name;
@@ -437,7 +437,7 @@ function news(m) {
 }
 const holds = m => m.groups.filter(g => visible(g).length).map(g => GROUP()[g.kind] + (g.kind === "lists" || g.kind === "configs" ? " " + visible(g).length : "")).join(", ");
 const dayText = ms => { const d = new Date(ms), now = new Date(); return d.toDateString() === now.toDateString() ? T("today") : d.toLocaleDateString(undefined, { month: "numeric", day: "numeric" }); };
-const MARK = { RimSort: ["RS", 205], RimCrow: ["RC", 18], RimPy: ["RP", 140] };
+const MARK = { RimSort: ["RS", 205], RimCrow: ["RC", 18], RimPy: ["RP", 140], RimStack: ["RK", 45] };
 function mark(name, size = 32) {
   const [t, h] = MARK[name] || [name.slice(0, 2).toUpperCase(), 260];
   const s = el("span", "xc-mgr", t);
@@ -459,10 +459,10 @@ function drawRows() {
   rows.textContent = "";
   // the first run does not look for managers (16 §2.18): the row offers it instead of
   // saying it is looking (VM 2026-11-23: "looking for…" stayed for good)
-  if (!M.managers && !M.looking) { rows.append(button(T("look for RimSort, RimCrow and RimPy"), "", () => survey())); return; }
-  if (!M.managers) { rows.append(el("div", "xc-hint", T("looking for RimSort, RimCrow and RimPy…"))); return; }
+  if (!M.managers && !M.looking) { rows.append(button(T("look for RimSort, RimCrow, RimPy and RimStack"), "", () => survey())); return; }
+  if (!M.managers) { rows.append(el("div", "xc-hint", T("looking for RimSort, RimCrow, RimPy and RimStack…"))); return; }
   if (M.error) rows.append(el("div", "xc-note warn", M.error));
-  if (!M.managers.length) { rows.append(el("div", "xc-hint", T("No RimSort, RimCrow or RimPy data found."))); return; }
+  if (!M.managers.length) { rows.append(el("div", "xc-hint", T("No RimSort, RimCrow, RimPy or RimStack data found."))); return; }
   const rank = m => !m.imported ? 1 : news(m).length ? 0 : 2;
   for (const m of [...M.managers].sort((a, b) => rank(a) - rank(b))) {
     const ps = allParts(m), st = stateOf(ps), on = M.shown.has(mKey(m)), nws = m.imported ? news(m) : [];
@@ -675,7 +675,7 @@ async function viewPart(m, g, p) {
 }
 const RULE = () => ({ after: T("loads after %s"), before: T("loads before %s"), incompatible: T("incompatible with %s"), attach: T("attached to %s"), top: T("loads at the top"), bottom: T("loads at the bottom") });
 function itemValue(it) {
-  if (it.part === "rules" || it.part === "rules-off" || it.part === "interlocks") return Tf(RULE()[it.value] || it.value, it.with || "");
+  if (it.part === "rules" || it.part === "rules-off" || it.part === "interlocks" || it.part === "categories") return Tf(RULE()[it.value] || it.value, it.with || "");
   return it.value;
 }
 

@@ -57,7 +57,7 @@ exists to give that time back. It is free and open source under the MIT license.
 - **Readable logs** — Errors are grouped, rated by how much they matter and pinned on the Mod behind them.
 - **Lists and games** — Several lists, several game installs (1.6 and 1.7 side by side) sharing one set of Mods, full undo history.
 - **Three faces, one program** — A desktop window, a terminal UI, a scriptable CLI and an MCP server for AI agents, all showing the same facts.
-- **Bring your data** — Import lists, rules and data from RimSort, RimCrow and RimPy.
+- **Bring your data** — Import lists, rules and data from RimSort, RimCrow, RimPy and RimStack.
 
 <p align="center"><img src="docs/assets/readme/en/13-performance.webp" width="720" alt="Measured memory and CPU use"></p>
 
@@ -190,7 +190,7 @@ Archo MCP makes the agent better at finding and fixing errors, with fewer tokens
    unreachable, from [Lanzou](https://rimarcho.lanzn.com/b01i608qja), password `ctot`).
 2. **New users:** unzip it into any folder, for example `C:\Tools\RimArcho\`, and double-click
    `RimArcho.exe`. A first-run guide finds your games, reads your Mods once and offers to bring your
-   lists over from the game, RimSort, RimCrow or RimPy.
+   lists over from the game, RimSort, RimCrow, RimPy or RimStack.
 3. **Existing users:** RimArcho updates itself (Settings › About, or `archo update`). By hand, replace
    your old `RimArcho.exe` and `archo.exe` with the new ones.
 4. Optional: add the folder to `PATH` to type `archo` in any terminal.
@@ -333,7 +333,7 @@ download with its `.sha256` file or build it yourself from source.
 </details>
 
 <details>
-<summary><b>Do I have to give up RimSort, RimCrow or RimPy?</b></summary>
+<summary><b>Do I have to give up RimSort, RimCrow, RimPy or RimStack?</b></summary>
 
 No. The first-run guide (and `archo import`) reads their lists, rules and data and shows what will be
 imported before anything changes. RimArcho never writes into their files.

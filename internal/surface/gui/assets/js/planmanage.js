@@ -508,7 +508,7 @@ function newForm() {
 // a file reads it at once; pasted text is read with preview (links go to Steam or Rentry).
 function inlineImport(draft, active, updateButtons) {
   const box = el("div", "pm-inline-import"), imp = draft.import;
-  box.append(el("div", "pm-note", T("bring in a list from RimSort, RimCrow, RimPy, RimWorld or another RimArcho, a save, a share code or a Steam collection; you see which mods you have before anything is created")));
+  box.append(el("div", "pm-note", T("bring in a list from RimSort, RimCrow, RimPy, RimStack, RimWorld or another RimArcho, a save, a share code or a Steam collection; you see which mods you have before anything is created")));
   // the file: one button, then its name; the path is never typed
   const drop = el("div", "pm-drop");
   const file = el("input"); file.type = "file"; file.hidden = true; file.accept = ".xml,.rml,.json,.txt,.rws";
@@ -527,7 +527,7 @@ function inlineImport(draft, active, updateButtons) {
   box.append(drop);
   box.append(el("div", "pm-or", T("or paste")));
   const text = el("textarea", "xc-text"); text.value = imp.text; text.spellcheck = false;
-  text.placeholder = T("a share code (RC-…), a Steam Workshop collection link, a Rentry link, or a list copied from RimSort, RimCrow or RimPy");
+  text.placeholder = T("a share code (RC-…), a Steam Workshop collection link, a Rentry link, or a list copied from RimSort, RimCrow, RimPy or RimStack");
   text.setAttribute("aria-label", T("paste"));
   box.append(text);
   const status = el("div", "pm-note", draft.importing ? T("reading the list…") : ""); status.setAttribute("role", draft.importing ? "progressbar" : "status");

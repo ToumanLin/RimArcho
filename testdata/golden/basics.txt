@@ -62,6 +62,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     pin <ref>                                 lock a mod: copy it into the lock library (origin marker) and use the copy in the current plan
     copy-local <ref>                          alias of pin
     import rimcrow                            import RimCrow profiles, aliases, notes, groups (as tags) and user rules; repeatable
+    import rimstack                           import RimStack's notes, tags, ignored warnings (as a tag), Loaders/Last categories (as top/bottom rules) and load-order rules; repeatable
     alias <ref> [<name>]                      set the name RimArcho shows for a mod (all its copies)
     note <ref> [<text>]                       attach a plain-text note to a mod (all its copies), or with --copy to this copy only
     tag add|remove <ref> <tag…> | list | rename <tag> <new> | merge <tag…> --into <tag> | delete <tag…> | note <tag> [<text>] | color <tag> <colour> | order <ref> <tag…>  tags for filtering (list --filter tag:<tag>); rename, merge, delete, note and color apply to the tag on every mod; color marks its mods in the lists (blue, cyan, teal, grass, orange, pink, plum, violet, #rrggbb or none); order sets a mod's tag order (its first tag's colour marks it)
