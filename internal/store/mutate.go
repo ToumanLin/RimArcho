@@ -156,8 +156,8 @@ func (s *Store) SplitLineage(envID, instanceID, newLineageID string, now time.Ti
 		if _, err := tx.Exec(`INSERT INTO lineage(id, environment_id, primary_instance_id, created_at) VALUES(?,?,?,?)`, newLineageID, Shared, instanceID, now.Unix()); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`INSERT INTO lineage_data(environment_id, lineage_id, alias, note)
-			SELECT environment_id, ?, alias, note FROM lineage_data WHERE lineage_id=?`, newLineageID, oldLineage); err != nil {
+		if _, err := tx.Exec(`INSERT INTO lineage_data(environment_id, lineage_id, alias, note, category)
+			SELECT environment_id, ?, alias, note, category FROM lineage_data WHERE lineage_id=?`, newLineageID, oldLineage); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(`INSERT INTO lineage_tag(environment_id, lineage_id, tag, pos)

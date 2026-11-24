@@ -19,6 +19,8 @@ func init() {
 		Flags: []Flag{{Name: "clear"}, {Name: "copy", Help: "this copy's own note (Mod library), not the mod's"}}})
 	register(&Command{Name: "functional", Args: "<ref>", Summary: "mark a mod functional (interface, performance, framework, library, translation: nothing a save can show), so Play review leaves it out of never seen; --not marks it not functional, --clear lets detection decide (12 §3.3)", MinArgs: 1, MaxArgs: 1, Run: functionalCmd,
 		Flags: []Flag{{Name: "not", Help: "mark it not functional"}, {Name: "clear", Help: "remove the mark"}}})
+	register(&Command{Name: "category", Args: "<ref> [<category>]", Summary: "show a mod's category (worked out from its files: game, library, content, code, patches, translation, textures) and why; with a category, set it for all its copies; --clear gives it back to the automatic one (16 §2.5)", MinArgs: 1, MaxArgs: 2, Run: categoryCmd,
+		Flags: []Flag{{Name: "clear", Help: "use the automatic category again"}}})
 	register(&Command{Name: "tag", Args: "add|remove <ref> <tag…> | list | rename <tag> <new> | merge <tag…> --into <tag> | delete <tag…> | note <tag> [<text>] | color <tag> <colour> | order <ref> <tag…>", Summary: "tags for filtering (list --filter tag:<tag>); rename, merge, delete, note and color apply to the tag on every mod; color marks its mods in the lists (blue, cyan, teal, grass, orange, pink, plum, violet, #rrggbb or none); order sets a mod's tag order (its first tag's colour marks it)", MinArgs: 1, MaxArgs: -1, Run: tagCmd,
 		Flags: []Flag{{Name: "mod", Value: "<ref>", Multi: true, Help: "more mods to tag (add/remove)"},
 			{Name: "into", Value: "<tag>", Help: "merge: the tag the others become (new or existing)"},
@@ -107,6 +109,58 @@ func setText(c *Ctx, a *Args, what string, set func(env, lin, v string) error) (
 		root.KV("lineage", fmt.Sprintf("%s: shared by its %d instances", ix.LRef(m.LineageID), n))
 	}
 	return d, nil
+}
+
+// categoryCmd shows, sets or clears a Mod's category (16 §2.5).
+func categoryCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	set, key := a.Bool("clear"), ""
+	if len(a.Pos) == 2 {
+		if set {
+			return nil, &UsageError{Msg: "give a category or --clear, not both"}
+		}
+		set, key = true, strings.ToLower(strings.TrimSpace(a.Pos[1]))
+	}
+	m, _, err := playerTarget(c, a.Pos[0])
+	if err != nil {
+		return nil, err
+	}
+	if set {
+		if m, err = c.App.SetCategory(a.Pos[0], key); err != nil {
+			return nil, err
+		}
+	}
+	ix, err := c.App.Index()
+	if err != nil {
+		return nil, err
+	}
+	cat := ix.CategoryDetail(m.ID)
+	head := "category of " + modLabel(ix, m.ID)
+	switch {
+	case set && key == "":
+		head = "category cleared for " + modLabel(ix, m.ID)
+	case set:
+		head = "category set for " + modLabel(ix, m.ID)
+	}
+	d, root := render.New(head)
+	categoryKV(root, cat)
+	if set {
+		if n := len(ix.ByLineage[m.LineageID]); n > 1 {
+			root.KV("lineage", fmt.Sprintf("%s: shared by its %d instances", ix.LRef(m.LineageID), n))
+		}
+	}
+	return d, nil
+}
+
+// categoryKV writes a Mod's category and its reason (also mod details, 13 §4).
+func categoryKV(n *render.Node, c app.Category) {
+	switch {
+	case c.Key == "":
+		n.KV("category", "none ("+app.CategoryReason(c)+")")
+	case c.Player:
+		n.KV("category", c.Key+" (set by you; automatic: "+orNone(c.Auto)+")")
+	default:
+		n.KV("category", c.Key+" ("+app.CategoryReason(c)+")")
+	}
 }
 
 func tagCmd(c *Ctx, a *Args) (*render.Doc, error) {

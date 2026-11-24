@@ -4,6 +4,9 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- The list editor shows each Mod's category as a small glyph before its name: game & DLC, library, content, code, patches, translation or textures. RimArcho works it out from what the Mod contains, never its name: a Mod with only patch files is "patches", one with a DLL that four or more of your other Mods require is a "library", and so on. Hover the glyph for the name; the details say why ("only patches: 14 XML in Patches, no Defs or DLL"). If it is wrong, pick another category in the details; "automatic" gives it back. The filter bar has a category group, and searches take `category:patches`. Categories are only shown: sorting does not use them. Interface and performance Mods are not told apart (nothing in a Mod's files says which), so there is no such category.
+- CLI and MCP: new `archo category <ref> [<category>] [--clear]`; `archo mod` and `get_mod` show a `category` line with its reason; `set_player_data` takes `category`. The database moves to schema 44 (the player's category).
+
 ## 1.1.1 — 2026-11-23
 
 - The Archo Monitor Workshop page (English and Chinese) is rewritten in short sections, each under an animated crayon Archo header (Archo Monitor, RimArcho, AI · MCP, Download, Credits): bullets with the numbers instead of paragraphs; every fact and link is kept. The pictures are in `docs/assets/workshop-monitor/` and load from GitHub, so they appear once they are on `master`.
