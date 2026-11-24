@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   SignPath artifact configuration for RimArcho's Windows release (17 §5): paste it as the
-  project's default artifact configuration on signpath.io (scripts/signpath/README.md).
+  project's default artifact configuration on signpath.io
+  (docs/research/2026-11-24_signpath-code-signing.md).
 
   The artifact is CI's archo-windows-amd64-unsigned: the contents of
   dist/archo-<version>-windows-amd64/ that scripts/release.ps1 -StageOnly builds, at the

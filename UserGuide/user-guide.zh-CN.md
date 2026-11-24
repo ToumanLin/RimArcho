@@ -75,7 +75,7 @@ RimArcho 把 RimWorld 启动器和 Mod 管理器放在一起。选 Mod、排顺�
    dotnet tool install --global ilspycmd
    ```
 
-程序没有代码签名。首次运行时，Windows SmartScreen 可能显示“Windows protected your PC”（Windows 已保护你的电脑）：选择 **More info**（更多信息），再选 **Run anyway**（仍要运行）。
+在 CI 中构建并签名的版本带有 SignPath Foundation 的签名（见 README 的“代码签名政策”）；之前的版本没有代码签名。首次运行没有签名的版本时，Windows SmartScreen 可能显示“Windows protected your PC”（Windows 已保护你的电脑）：选择 **More info**（更多信息），再选 **Run anyway**（仍要运行）。
 
 **从 Steam 工坊文件夹启动？** 如果你从已订阅的工坊条目文件夹内启动 RimArcho，它会提示通过 **安装 RimArcho** 将程序安装到单独的文件夹（默认为 `%LOCALAPPDATA%\Programs\RimArcho`；用 **更改…** 选择其他位置）。它会显示所需空间，并在磁盘剩余空间不足 10 GB 时提醒。**安装并重启** 会把程序复制过去并重启；**本次在这里运行** 会继续从工坊文件夹运行，同时显示提醒，下次启动还会再问。从工坊文件夹运行时，RimArcho 不会自行更新。
 

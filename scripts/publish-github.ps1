@@ -69,6 +69,8 @@ if ($NotesFile) {
     $notes = ($lines[$start..($end - 1)] -join "`n").Trim()
 }
 if (-not $notes.Trim()) { throw "the release notes are empty" }
+# SignPath Foundation's terms ask for "Code signing policy" on the release pages too (17 §5).
+$notes = $notes.TrimEnd() + "`n`n---`n[Code signing policy](https://github.com/$Repo#code-signing-policy) · [Privacy: what goes over the network](https://github.com/$Repo#what-goes-over-the-network)"
 $notesPath = Join-Path ([IO.Path]::GetTempPath()) "rimarcho-notes-$Version.md"
 [IO.File]::WriteAllText($notesPath, $notes + "`n", [Text.UTF8Encoding]::new($false))
 

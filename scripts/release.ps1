@@ -17,8 +17,8 @@
 #
 # The Windows ZIP can come from CI as well (17 §5): CI's windows-release job runs this script
 # with -StageOnly (the folder, no archive), has SignPath sign the executables and Monitor's DLLs
-# once signing is set up (scripts/signpath/README.md), then runs it with -PackageOnly (archive
-# and checksum of that folder). -FromCI downloads that ZIP for HEAD instead of building it here,
+# once signing is set up (docs/research/2026-11-24_signpath-code-signing.md), then runs it
+# with -PackageOnly (archive and checksum of that folder). -FromCI downloads that ZIP for HEAD instead of building it here,
 # and implies -LinuxGUI ci. The local build stays the fallback.
 #
 #   gh workflow run ci.yml --ref <branch> -f version=1.2.0     # after pushing the release commit
@@ -106,6 +106,9 @@ function Get-WindowsFromCI {
 
 $pkg = "github.com/ToumanLin/RimArcho/internal/buildinfo"
 $ldflags = "-s -w -X $pkg.Version=$Version -X $pkg.Commit=$commit -X $pkg.Date=$date"
+# -buildvcs=false: Go would otherwise stamp a module pseudo-version derived from the nearest git
+# tag, which differs between CI's shallow clone and a local clone, so the same commit would not
+# build the same bytes. The commit is stamped above; only dev builds read the VCS stamp.
 $exe = if ($GOOS -eq "windows") { "archo.exe" } else { "archo" }
 # Windows resources (16 §8.6): the keystone icon and the version information, written as a
 # .syso next to main.go before each build (the two exes differ in their description) and
@@ -125,12 +128,12 @@ $env:CGO_ENABLED = "0"; $env:GOOS = $GOOS; $env:GOARCH = $GOARCH
 try {
     Write-Res $exe "RimArcho command line"
     Write-Host "go build $exe ($Version, $commit, $date)"
-    go build -trimpath -ldflags $ldflags -o (Join-Path $out $exe) ./cmd/archo
+    go build -trimpath -buildvcs=false -ldflags $ldflags -o (Join-Path $out $exe) ./cmd/archo
     if ($LASTEXITCODE -ne 0) { throw "build failed" }
     if ($GOOS -eq "windows") {
         Write-Res "RimArcho.exe" "RimArcho"
         Write-Host "go build RimArcho.exe (Windows GUI)"
-        go build -trimpath -ldflags "$ldflags -H windowsgui -X $pkg.GUI=1" -o (Join-Path $out "RimArcho.exe") ./cmd/archo
+        go build -trimpath -buildvcs=false -ldflags "$ldflags -H windowsgui -X $pkg.GUI=1" -o (Join-Path $out "RimArcho.exe") ./cmd/archo
         if ($LASTEXITCODE -ne 0) { throw "build failed" }
     }
 } finally {

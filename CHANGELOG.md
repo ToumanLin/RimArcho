@@ -4,6 +4,9 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- README has a new **Code signing policy** section and, under Privacy and safety, **What goes over the network**: every request RimArcho makes, what it sends and the setting that turns it off (or that there is none). The Windows release can now be built by GitHub Actions and signed for free through SignPath.io, certificate by SignPath Foundation; until that is set up, releases stay unsigned. Release notes on GitHub end with links to both sections.
+- Archo Monitor's DLL now names RimArcho as its product (file properties), as code signing requires.
+
 ## 1.1.2 — 2026-11-24
 
 - Fixed: in 1.1.0 and 1.1.1, updating RimArcho from the window always failed right after the download with "runtime error: invalid memory address or nil pointer dereference"; nothing was changed. The window's background tasks also wrote nothing to the operation log (`archo ops`). Both are fixed for updates from this version on. **On 1.1.0 or 1.1.1, update once by hand**: run `archo update` in the program folder, or download the ZIP and unzip it over the old one. A background task that crashes now writes its stack to `logs/gui.log`.

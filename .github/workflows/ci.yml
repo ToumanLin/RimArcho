@@ -171,8 +171,9 @@ jobs:
   windows-release:
     # The Windows release ZIP (17 §5), built by the same scripts/release.ps1 the maintainer runs,
     # so SignPath Foundation can sign what CI built from the public source
-    # (scripts/signpath/README.md). Only a dispatch with a version builds it; the run's other
-    # jobs are the test gate: release.ps1 -FromCI takes only a run that succeeded as a whole.
+    # (docs/research/2026-11-24_signpath-code-signing.md). Only a dispatch with a version builds
+    # it; the run's other jobs are the test gate: release.ps1 -FromCI takes only a run that
+    # succeeded as a whole.
     if: github.event_name == 'workflow_dispatch' && inputs.version != ''
     runs-on: windows-latest
     timeout-minutes: 90
@@ -215,7 +216,8 @@ jobs:
           retention-days: 7
 
       # Inert until the maintainer sets the repository variable SIGNPATH_ORGANIZATION_ID
-      # (and the others below, plus the secret SIGNPATH_API_TOKEN): scripts/signpath/README.md.
+      # (and the others below, plus the secret SIGNPATH_API_TOKEN):
+      # docs/research/2026-11-24_signpath-code-signing.md.
       # The project's default artifact configuration is scripts/signpath/artifact-configuration.xml.
       # The request waits for the approver's click on signpath.io (release-signing policy).
       - name: Sign with SignPath
