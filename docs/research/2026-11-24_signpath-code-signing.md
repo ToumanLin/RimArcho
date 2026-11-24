@@ -33,7 +33,10 @@ CI's ZIP equals a local build of the same commit (checked 2026-11-24, run 453608
 local `release.ps1` build of commit `ccef58bc43f3`, version `1.1.3-signtest1`): the three Monitor
 DLLs, docs and skills were byte-identical; the executables differed only by Go's VCS stamp (a
 module pseudo-version taken from the nearest git tag: none in CI's shallow clone). `release.ps1`
-now builds with `-buildvcs=false`; §5 has the re-check.
+now builds with `-buildvcs=false`. Re-check, run 45361915100 against a local build of commit
+`86d859d5e7ba`, version `1.1.3-signtest2`, same UTC day: all 27 files byte-identical, same ZIP
+entry names and the same ZIP size (65,106,756 bytes; only the entries' timestamps differ, so the
+ZIP's own hash does). `archo version`: `archo 1.1.3-signtest2 (86d859d5e7ba, 2026-11-24)` for both. `release.ps1 -FromCI` on that commit took the run's ZIP and `rimarcho`, checked them and built the Linux tarball; `publish-github.ps1 -DryRun` accepted the result. Signing itself is untested until SignPath is set up.
 
 ## 2. What you do once
 
@@ -161,8 +164,6 @@ installation steps.
 
 ## 5. Open
 
-- Re-run the comparison after `-buildvcs=false`: a dispatch of the branch head against a local
-  `release.ps1` build of the same commit, version and UTC day; expect every file identical.
 - Monitor's DLLs match only with the same .NET SDK feature band (CI pins `10.0.4xx`; the local SDK
   was 10.0.401).
 - The network list's gaps that have no switch (followed collections, the open feature-request
