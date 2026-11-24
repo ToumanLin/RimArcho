@@ -210,6 +210,26 @@ func (a *App) SurveyMigration(found []ManagerImport, tags ManagerTagNames) []Mig
 				g.Parts = append(g.Parts, dataPart(f, PartRules, &PartCount{rep.RuleNew, rep.RuleSame}, true))
 			}
 			m.Groups = append(m.Groups, g)
+		case "rimstack":
+			g := MigrationGroup{Kind: MigratePlayer, Path: f.Path}
+			rep, err := a.ImportRimStack(RimStackOptions{Notes: f.Path, DryRun: true, Tags: tags})
+			if err != nil {
+				g.Error = err.Error()
+			} else {
+				for _, p := range []string{PartNotes, PartTags, PartIgnored, PartCategories} {
+					g.Parts = append(g.Parts, dataPart(f, p, rep.Parts[p], true))
+				}
+			}
+			m.Groups = append(m.Groups, g)
+		case "rimstack-rules":
+			g := MigrationGroup{Kind: MigrateRules, Path: f.Path}
+			rep, err := a.ImportRimStackRules(f.Path, true)
+			if err != nil {
+				g.Error = err.Error()
+			} else {
+				g.Parts = append(g.Parts, dataPart(f, PartRules, rep.Parts[PartRules], true))
+			}
+			m.Groups = append(m.Groups, g)
 		}
 	}
 	out := make([]MigrationManager, 0, len(order))
@@ -415,6 +435,18 @@ func (a *App) MigratePart(p MigrationPick, tags ManagerTagNames) (*MigrationOutc
 		}
 		rep.part(PartRules).New, rep.part(PartRules).Same = rep.RuleNew, rep.RuleSame
 		out.Report = rep
+	case p.Source == "rimstack":
+		rep, err := a.ImportRimStack(RimStackOptions{Notes: p.Path, Parts: map[string]bool{p.Part: true}, Tags: tags})
+		if err != nil {
+			return nil, err
+		}
+		out.Report = rep
+	case p.Source == "rimstack-rules":
+		rep, err := a.ImportRimStackRules(p.Path, false)
+		if err != nil {
+			return nil, err
+		}
+		out.Report = rep
 	default:
 		return nil, fmt.Errorf("cannot bring %q over", p.Source)
 	}
@@ -480,6 +512,10 @@ func (a *App) MigrationPartView(p MigrationPick, tags ManagerTagNames) (*PartVie
 		rep, err = a.ImportRimSortAux(RimSortAuxOptions{DB: p.Path, DryRun: true, Parts: map[string]bool{p.Part: true}, Tags: tags})
 	case p.Source == "rimsort-rules":
 		rep, err = a.ImportRimSortRules(p.Path, true)
+	case p.Source == "rimstack":
+		rep, err = a.ImportRimStack(RimStackOptions{Notes: p.Path, DryRun: true, Parts: map[string]bool{p.Part: true}, Tags: tags})
+	case p.Source == "rimstack-rules":
+		rep, err = a.ImportRimStackRules(p.Path, true)
 	default:
 		return nil, fmt.Errorf("cannot read %q", p.Source)
 	}

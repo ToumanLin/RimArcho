@@ -55,7 +55,7 @@
 - **看得懂的日志**：报错按类归组、标出严重程度，并指向背后的 Mod。
 - **列表和游戏**：多个列表、多个游戏实例（1.6 和 1.7 并存）共用一套 Mod，每次改动都能撤销。
 - **一个程序，三种用法**：桌面窗口、终端界面、可写脚本的 CLI，以及给 AI agent 用的 MCP 服务，看到的是同一套事实。
-- **带上你的数据**：可从 RimSort、RimCrow 和 RimPy 导入列表、规则和数据。
+- **带上你的数据**：可从 RimSort、RimCrow、RimPy 和 RimStack 导入列表、规则和数据。
 
 <p align="center"><img src="docs/assets/readme/zh/13-performance.webp" width="720" alt="实测的内存和 CPU 占用"></p>
 
@@ -149,7 +149,7 @@ Archo MCP 让 agent 更会找错、修错，token 也用得更少：平均每个
 ### Windows
 
 1. 从 [GitHub Releases](https://github.com/ToumanLin/RimArcho/releases/latest) 下载 `archo-<版本号>-windows-amd64.zip`（GitHub 打不开时，可以从[蓝奏云](https://rimarcho.lanzn.com/b01i608qja)下载，密码 `ctot`）。
-2. **新用户：** 找个目录解压，例如 `C:\Tools\RimArcho\`，双击 `RimArcho.exe`。首次运行向导会找到你的游戏，读一遍 Mod，并提出从游戏、RimSort、RimCrow 或 RimPy 带上你的列表。
+2. **新用户：** 找个目录解压，例如 `C:\Tools\RimArcho\`，双击 `RimArcho.exe`。首次运行向导会找到你的游戏，读一遍 Mod，并提出从游戏、RimSort、RimCrow、RimPy 或 RimStack 带上你的列表。
 3. **老用户：** RimArcho 会自己更新（设置 › 关于，或 `archo update`）。手动更新的话，用新的 `RimArcho.exe` 和 `archo.exe` 替换旧的即可。
 4. 可选：把这个目录加入 `PATH`，就能在任何终端输入 `archo`。
 
@@ -258,7 +258,7 @@ exe 没有代码签名。选“更多信息”，再选“仍要运行”。你�
 </details>
 
 <details>
-<summary><b>需要放弃 RimSort、RimCrow 或 RimPy 吗？</b></summary>
+<summary><b>需要放弃 RimSort、RimCrow、RimPy 或 RimStack 吗？</b></summary>
 
 不需要。首次运行向导（以及 `archo import`）会读取它们的列表、规则和数据，在改动任何东西之前先展示会导入什么。RimArcho 从不写入它们的文件。
 </details>

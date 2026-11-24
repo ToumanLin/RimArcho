@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
@@ -105,7 +106,7 @@ func ReadImport(a *app.App, kind, src string) (*Import, error) {
 
 func checked(imp *Import) (*Import, error) {
 	if len(imp.List.Tokens) == 0 && len(imp.List.WorkshopOnly) == 0 {
-		return nil, errors.New(T("no mods found in it: a list from RimSort, RimCrow, RimPy or RimWorld, a share code, packageIds or workshop links"))
+		return nil, errors.New(T("no mods found in it: a list from RimSort, RimCrow, RimPy, RimStack or RimWorld, a share code, packageIds or workshop links"))
 	}
 	return imp, nil
 }
@@ -124,6 +125,7 @@ func FormatName(f string) string {
 		app.FormatArcho: "RimArcho list", app.FormatText: "text list", app.FormatModsConfig: "ModsConfig.xml", app.FormatSave: "save file", app.FormatRML: "RimWorld mod list (.rml)",
 		"rimcrow-modlist": "RimCrow ModList.xml", "rimcrow-json": "RimCrow JSON list", "rimcrow-share": "RimCrow share code",
 		"rimsort-json": "RimSort JSON list", "rimsort-text": "RimSort clipboard list", "rentry": "Rentry list", "collection": "Workshop collection",
+		"rimstack-list": "RimStack saved list", "rimstack-text": "RimStack copied list",
 	}[f]
 	if n == "" {
 		return f
@@ -489,6 +491,16 @@ type ExportFormat struct {
 
 // ExportFormats are the formats the export offers, for the environment's list.
 func ExportFormats(a *app.App) []ExportFormat {
+	name := ""
+	if p, err := a.CurrentPlan(); err == nil && p != nil {
+		name = p.Name
+	}
+	return ExportFormatsFor(a, name)
+}
+
+// ExportFormatsFor are the formats for the list named plan: RimStack finds a saved list by
+// a file named after it.
+func ExportFormatsFor(a *app.App, plan string) []ExportFormat {
 	base := "RimArcho"
 	if e, err := a.Env(); err == nil && e.Name != "" {
 		base += "-" + safeName(e.Name)
@@ -499,11 +511,28 @@ func ExportFormats(a *app.App) []ExportFormat {
 		{app.FormatRimSort, "RimSort", T("a ModsConfig-style XML that RimSort imports"), base + ".xml", false},
 		{app.FormatRML, T("RimWorld (.rml)"), T("the game's own saved mod list; RimCrow reads it too"), base + ".rml", false},
 		{app.FormatRimCrowXML, "RimCrow", T("RimCrow's ModList.xml"), base + "-ModList.xml", false},
+		{app.FormatRimStack, "RimStack", T("a saved list for RimStack's lists folder"), rimStackFile(plan), false},
+		{app.FormatRimStackText, T("RimStack text"), T("lines to paste in RimStack or RimSort, or put on Rentry"), base + "-RimStack.txt", true},
 		{app.FormatRimCrow, T("share code"), T("one line to paste in RimCrow or here"), base + ".txt", true},
 		{app.FormatText, T("plain text"), T("one packageId per line, with names"), base + ".txt", true},
 		{app.FormatModsConfig, "ModsConfig.xml", T("the game's file format, for copying to another computer"), "ModsConfig.xml", false},
 		{app.FormatWorkshop, T("workshop links"), T("Markdown links for subscribing by hand; reads back as workshop IDs"), base + "-workshop.md", true},
 	}
+}
+
+// rimStackFile names a RimStack list file as RimStack names its own: the list's name, each
+// character other than a letter, digit, space or -_.() made _ (07 §7.3).
+func rimStackFile(plan string) string {
+	name := strings.TrimSpace(plan)
+	if name == "" {
+		name = "RimArcho"
+	}
+	return strings.Map(func(r rune) rune {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || strings.ContainsRune(" -_.()", r) {
+			return r
+		}
+		return '_'
+	}, name) + ".json"
 }
 
 var unsafeRe = regexp.MustCompile(`[^\p{L}\p{N}._\-]+`)

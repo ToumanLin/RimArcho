@@ -95,7 +95,7 @@ func TestExportImportRoundTrip(t *testing.T) {
 	scanNow(t, e)
 	e.MustRun("disable", "pkg:gone.mod")
 	want := strings.Join(active(t, e), ", ")
-	for _, f := range []string{"text", "archo", "modsconfig", "rimsort", "rml", "rimcrow", "rimcrow-xml"} {
+	for _, f := range []string{"text", "archo", "modsconfig", "rimsort", "rml", "rimcrow", "rimcrow-xml", "rimstack", "rimstack-text"} {
 		out := filepath.Join(e.Root, "export."+f)
 		e.MustRun("loadout", "export", "--format", f, "--out", out)
 		e.MustRun("disable", "pkg:tester.a")

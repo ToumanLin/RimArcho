@@ -78,6 +78,7 @@ func manageEnv(t *testing.T) *testkit.Env {
 	t.Cleanup(srv.Close)
 	e.App.SteamAPI, e.App.SteamCollectionAPI = srv.URL+"/api", srv.URL+"/collection"
 
+	testkit.RimStackData(t, filepath.Join(e.Root, "RimStack"), map[string]testkit.RimStackNote{"tester.b": {Tags: []string{"stacked"}, Note: "from RimStack"}}, [][2]string{{"tester.a", "tester.b"}}, nil, nil)
 	crow := filepath.Join(e.Root, "RimCrow", "data")
 	os.MkdirAll(crow, 0o755)
 	db, err := sql.Open("sqlite", filepath.Join(crow, "mod_manager.db"))
@@ -147,6 +148,7 @@ func manageSteps(e *testkit.Env) []func() manageStep {
 	list := filepath.Join(e.Root, "list.txt")
 	packList := filepath.Join(e.Root, "first.archolist.json")
 	crowDB := filepath.Join(e.Root, "RimCrow", "data", "mod_manager.db")
+	stackDir := filepath.Join(e.Root, "RimStack")
 	s := func(tool string, args map[string]any, cli ...string) func() manageStep {
 		return func() manageStep { return manageStep{tool, args, cli} }
 	}
@@ -211,6 +213,8 @@ func manageSteps(e *testkit.Env) []func() manageStep {
 		s("maintenance", map[string]any{"action": "data_update", "datasets": []string{"rules"}, "dry_run": true}, "data", "update", "rules", "--dry-run"),
 		s("maintenance", map[string]any{"action": "import_rimcrow", "db": crowDB, "dry_run": true}, "import", "rimcrow", "--db", crowDB, "--dry-run"),
 		s("maintenance", map[string]any{"action": "import_rimcrow", "db": crowDB}, "import", "rimcrow", "--db", crowDB),
+		s("maintenance", map[string]any{"action": "import_rimstack", "dir": stackDir, "dry_run": true}, "import", "rimstack", "--dir", stackDir, "--dry-run"),
+		s("maintenance", map[string]any{"action": "import_rimstack", "dir": stackDir}, "import", "rimstack", "--dir", stackDir),
 		s("maintenance", map[string]any{"action": "gc", "dry_run": true}, "gc", "--dry-run"),
 		s("maintenance", map[string]any{"action": "gc"}, "gc"),
 		s("maintenance", map[string]any{"action": "vacuum", "dry_run": true}, "db", "vacuum", "--dry-run"),

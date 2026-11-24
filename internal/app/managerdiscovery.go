@@ -13,7 +13,7 @@ import (
 // ManagerImport is one read-only source offered by the migration flow.
 type ManagerImport struct {
 	Manager string `json:"manager"`
-	Kind    string `json:"kind"` // list, rimcrow, rimsort-rules, rimsort-aux
+	Kind    string `json:"kind"` // list, rimcrow, rimsort-rules, rimsort-aux, rimstack, rimstack-rules
 	Path    string `json:"path"`
 }
 
@@ -21,8 +21,9 @@ type ManagerImport struct {
 // RimPy is RimPy's data folders (AppData\LocalLow\RimPy Mod Manager): its saved lists
 // are in ModLists. GameMods are the games' Mods folders: a portable RimCrow, which keeps
 // everything beside its exe, links its Mods in as `_Link_<name>` → <install>\mods\<name>,
-// so each such link names an install folder wherever it is (07 §6.2).
-type ManagerLocations struct{ RimSort, Installs, RimPy, GameMods []string }
+// so each such link names an install folder wherever it is (07 §6.2). RimStack is RimStack's
+// data folders (notes.json, rules.json, lists).
+type ManagerLocations struct{ RimSort, Installs, RimPy, GameMods, RimStack []string }
 
 // maxListBytes bounds a file read to check that it is a Mod list.
 const maxListBytes = 4 << 20
@@ -184,6 +185,13 @@ func DiscoverManagerImports(loc ManagerLocations) []ManagerImport {
 	for _, root := range loc.RimPy {
 		lists("RimPy", filepath.Join(root, "ModLists"))
 	}
+	// RimStack's data folder: its notes, its rules and the lists it saved by name; the
+	// snapshots it keeps on its own are not offered (07 §6.6)
+	for _, root := range loc.RimStack {
+		add("RimStack", "rimstack", filepath.Join(root, "notes.json"))
+		add("RimStack", "rimstack-rules", filepath.Join(root, "rules.json"))
+		lists("RimStack", filepath.Join(root, "lists"))
+	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Manager != out[j].Manager {
 			return out[i].Manager < out[j].Manager
@@ -197,7 +205,7 @@ func DiscoverManagerImports(loc ManagerLocations) []ManagerImport {
 // Mods folders, whose RimCrow links lead to portable installs.
 func FindManagerImports(gameMods []string) []ManagerImport {
 	local, roaming := os.Getenv("LOCALAPPDATA"), os.Getenv("APPDATA")
-	loc := ManagerLocations{GameMods: gameMods}
+	loc := ManagerLocations{GameMods: gameMods, RimStack: RimStackDataDirs()}
 	if local != "" {
 		loc.RimSort = append(loc.RimSort, filepath.Join(local, "RimSort"))
 	}
@@ -234,13 +242,20 @@ func ManagerSourcesIn(path string) []ManagerImport {
 		return nil
 	}
 	dir := path
+	loc := ManagerLocations{}
 	if !st.IsDir() {
 		if !strings.EqualFold(filepath.Ext(path), ".exe") {
 			return nil
 		}
 		dir = filepath.Dir(path)
+		// RimStack keeps its data in the system's place, not beside its program
+		if strings.HasPrefix(strings.ToLower(filepath.Base(path)), "rimstack") {
+			loc.RimStack = RimStackDataDirs()
+		}
 	}
-	return DiscoverManagerImports(ManagerLocations{Installs: []string{dir}})
+	loc.Installs = []string{dir}
+	loc.RimStack = append(loc.RimStack, dir) // a RimStack data folder chosen itself
+	return DiscoverManagerImports(loc)
 }
 
 // GameModsDirs are the Mods folders of every environment's game.

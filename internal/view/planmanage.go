@@ -395,7 +395,7 @@ func BuildPlanExport(a *app.App, id int64, format string, settings bool) (*PlanE
 	if err != nil {
 		return nil, err
 	}
-	fs := ExportFormats(a)
+	fs := ExportFormatsFor(a, p.Name)
 	ok := false
 	for _, f := range fs {
 		ok = ok || f.ID == format
