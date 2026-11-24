@@ -197,7 +197,8 @@ Archo MCP makes the agent better at finding and fixing errors, with fewer tokens
 
 The executables are not code-signed, so the first time you run one Windows may say "Windows
 protected your PC": choose **More info**, then **Run anyway**. Each release has a `.sha256`
-checksum, and you can build it yourself from this source (below).
+checksum, and you can build it yourself from this source (below). If Windows says you have no
+permission even as administrator, see the FAQ ("RimArcho.exe won't start").
 
 ### Linux (experimental)
 
@@ -330,6 +331,29 @@ data, and leaves your game, Mods and saves as they were.
 
 The executables are not code-signed. Choose **More info**, then **Run anyway**. You can compare the
 download with its `.sha256` file or build it yourself from source.
+</details>
+
+<details>
+<summary><b>RimArcho.exe won't start: "no permission", even as administrator.</b></summary>
+
+RimArcho asks for no special permissions and never needs administrator rights. When an unsigned
+program that was just downloaded is blocked, Windows or your antivirus says "Windows cannot access
+the specified device, path, or file. You may not have the appropriate permissions", and running as
+administrator does not get past it. In order:
+
+1. **Extract the ZIP first.** Don't run the exe from inside the ZIP window. Before extracting,
+   right-click the ZIP, choose **Properties**, tick **Unblock** (if it is there) and choose **OK**.
+   Extract to a normal folder such as `D:\Games\RimArcho`, not `Program Files`.
+2. **Antivirus.** If your antivirus quarantined or blocked `RimArcho.exe` or `archo.exe`, restore
+   them and allow the RimArcho folder. Compare the ZIP with its `.sha256` file first if you want to
+   be sure it is ours.
+3. **Smart App Control** (Windows 11: Settings › Privacy & security › Windows Security › App & browser
+   control). When it is on, it blocks every unsigned program with no way to allow one, and Windows
+   cannot turn it back on without a reset. We are applying for free code signing so this stops
+   happening; until then, RimArcho cannot run while it is on.
+
+Still blocked? Send us the exact message (a screenshot is best) and your Windows version on
+[GitHub issues](https://github.com/ToumanLin/RimArcho/issues) or Discord.
 </details>
 
 <details>

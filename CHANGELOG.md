@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- README (English and Chinese): a FAQ entry for when RimArcho.exe won't start with "no permission" even as administrator: extract and unblock the ZIP, antivirus, and Windows 11's Smart App Control, which blocks unsigned programs.
 ## 1.1.2 — 2026-11-24
 
 - Fixed: in 1.1.0 and 1.1.1, updating RimArcho from the window always failed right after the download with "runtime error: invalid memory address or nil pointer dereference"; nothing was changed. The window's background tasks also wrote nothing to the operation log (`archo ops`). Both are fixed for updates from this version on. **On 1.1.0 or 1.1.1, update once by hand**: run `archo update` in the program folder, or download the ZIP and unzip it over the old one. A background task that crashes now writes its stack to `logs/gui.log`.
