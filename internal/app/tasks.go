@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os"
+	"runtime/debug"
 	"slices"
 	"sort"
 	"strings"
@@ -374,7 +376,7 @@ func (ts *Tasks) runSelf(kind, key string) {
 		result, err := func() (result string, err error) {
 			defer func() {
 				if r := recover(); r != nil {
-					err = fmt.Errorf("%v", r)
+					err = panicError(next.Kind, r)
 				}
 			}()
 			return run(id)
@@ -907,10 +909,17 @@ func (ts *Tasks) endLocked(t *Task) {
 func (ts *Tasks) do(kind, ref string) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("%v", r)
+			err = panicError(kind, r)
 		}
 	}()
 	return ts.Do(kind, ref)
+}
+
+// panicError is a recovered task panic as the task's error; the stack goes to the log
+// (gui.log in the window), since the task record keeps only the message.
+func panicError(kind string, r any) error {
+	log.Printf("task %s panicked: %v\n%s", kind, r, debug.Stack())
+	return fmt.Errorf("%v", r)
 }
 
 // saveLocked writes the record (taskfile.go): everything running or waiting and the newest

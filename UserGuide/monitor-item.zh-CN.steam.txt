@@ -6,6 +6,7 @@ Archo Monitor 是 RimArcho 启动器的游戏内辅助 Mod. 它记录游戏的�
 [*]几乎没有性能影响.
 [/list]
 要看到分析结果, 请下载 RimArcho (免费, MIT 开源). 上次 RimArcho 发布在工坊被社区管理员下架了, 所以这里只提供下载链接 (见下).
+[img]https://steamuserimages-a.akamaihd.net/ugc/1830159746169505364/6FEA4D465978DCEBC9815AE94D6FB6329550F442/?imw=5000&imh=5000&ima=fit&impolicy=Letterbox&imcolor=%23000000&letterbox=false[/img]
 
 [img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/zh/header-02-rimarcho.gif[/img]
 简洁高效且占用小的 RimWorld 启动器和 Mod 管理器: 少纠结 Mod, 少查报错, 多玩游戏. [strike]RimArcho 有最可爱的 Archo 酱[/strike]

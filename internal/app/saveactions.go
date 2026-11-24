@@ -536,9 +536,7 @@ func (a *App) BackupSaves(saves []*Save, yes bool, token string) (*SaveFilesResu
 		}
 		r.Dir = filepath.Join(root, fmt.Sprintf("%s-%d", stamp, n))
 	}
-	if o != nil {
-		o.row.Target = r.Dir
-	}
+	o.note(func(row *oplog.Row) { row.Target = r.Dir })
 	used := map[string]bool{}
 	r.Saves, r.Bytes = nil, 0
 	for _, s := range saves {

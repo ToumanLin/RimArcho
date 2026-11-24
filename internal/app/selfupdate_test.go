@@ -21,6 +21,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/lanzou"
+	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
@@ -499,5 +500,40 @@ func TestSelfUpdateKilledMidSwapIsSettledNextStart(t *testing.T) {
 				t.Fatal("update still offered:", pending)
 			}
 		})
+	}
+}
+
+// The window installs on a snapshot App (&App{Store: …} + ReadOptions, then ReadSession),
+// as its background tasks do. 1.1.0's snapshots had no operation log, and the install
+// panicked on it after the download (nil pointer dereference), before any file changed.
+func TestSelfUpdateInstallFromWindowSnapshot(t *testing.T) {
+	if !app.SelfUpdateSupported() {
+		t.Skip("program replacement is Windows-only (D2)")
+	}
+	t.Parallel()
+	e := testkit.New(t)
+	f := newSelfRelease(t)
+	f.use(e.App)
+	ctx := context.Background()
+	if _, err := e.App.RunAutomatic(ctx, "self", nil); err != nil {
+		t.Fatal(err)
+	}
+	snapshot := &app.App{Store: e.App.Store}
+	snapshot.ReadOptions(e.App)
+	r, err := snapshot.ReadSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	res, err := r.InstallSelfUpdate(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.To != "0.9.1" || f.files(t) != allWith("new") {
+		t.Fatal(res, f.files(t))
+	}
+	rows, err := e.App.Ops.Recent(oplog.Query{Op: oplog.UpdateApply})
+	if err != nil || len(rows) != 1 || rows[0].Target != f.program {
+		t.Fatal("the window's install is not in the operation log", rows, err)
 	}
 }

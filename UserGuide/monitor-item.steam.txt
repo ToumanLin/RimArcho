@@ -6,6 +6,7 @@ Archo Monitor is the in-game companion Mod of the RimArcho launcher. It records 
 [*]Next to no performance cost.
 [/list]
 To see what it found, get RimArcho (free, MIT). The last time RimArcho was published on the Workshop it was taken down by community moderators, so only download links are given here (see below).
+[img]https://steamuserimages-a.akamaihd.net/ugc/1830159746169505364/6FEA4D465978DCEBC9815AE94D6FB6329550F442/?imw=5000&imh=5000&ima=fit&impolicy=Letterbox&imcolor=%23000000&letterbox=false[/img]
 
 [img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/en/header-02-rimarcho.gif[/img]
 A clean, fast, lightweight RimWorld launcher and Mod manager: less fiddling with Mods, less reading errors, more playing. [strike]RimArcho has the cutest Archo-chan.[/strike]

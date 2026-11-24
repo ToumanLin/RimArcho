@@ -3,6 +3,8 @@ package archlint
 import (
 	"fmt"
 	"go/ast"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -199,4 +201,34 @@ func TestArchOpLogDetection(t *testing.T) {
 	// origin set twice outside agent.go (a reading in view is fine); ARCHO_ORIGIN spelled;
 	// resubscribe missing.
 	expect(t, "op log", got, 6)
+}
+
+// TestArchOpRowNilSafe: an action's pending row (opRun.opRow) is read and written only in
+// oplog.go, whose methods all accept a nil run; elsewhere it goes through opRun.note. A run is
+// nil whenever the App has no operation log, and 1.1.0's window update panicked on a direct
+// o.row.Target after the download (17 §5.1, 13 §1.3).
+func TestArchOpRowNilSafe(t *testing.T) {
+	t.Parallel()
+	root, _ := repoRoot(t)
+	files, err := filepath.Glob(filepath.Join(root, "internal", "app", "*.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var problems []string
+	for _, f := range files {
+		rel := filepath.ToSlash(strings.TrimPrefix(f, root+string(filepath.Separator)))
+		if rel == opLogFile || strings.HasSuffix(f, "_test.go") {
+			continue
+		}
+		b, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i, line := range strings.Split(string(b), "\n") {
+			if strings.Contains(line, ".opRow") {
+				problems = append(problems, fmt.Sprintf("13 §1.3: %s:%d uses opRun.opRow directly; use o.note(func(r *oplog.Row) {…}), which skips a nil run", rel, i+1))
+			}
+		}
+	}
+	report(t, problems)
 }

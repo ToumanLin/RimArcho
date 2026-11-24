@@ -94,9 +94,20 @@ async function main() {
   // The console's "start upload" button, escaped so source files stay free of CJK text.
   const start = "text=\u5f00\u59cb\u4e0a\u4f20";
   await page.waitForSelector(start, { timeout: 15000 });
-  await page.click(start, { label: "start Lanzou upload" });
+  // Pressed through the page: ego lite 0.6.3.17 refused page.click on this button ("not visible
+  // in the viewport") while it was on screen, when a navigation of the console had not committed.
+  const pressed = await page.evaluate((label) => {
+    const b = [...document.querySelectorAll("div.uploadBtn")].find((e) => e.textContent.trim() === label);
+    if (!b) return false;
+    b.click();
+    return true;
+  }, "\u5f00\u59cb\u4e0a\u4f20");
+  if (!pressed) {
+    await task.handOff();
+    return fail(`the console's start-upload button was not found; the browser is left open (task space ${task.spaceId})`);
+  }
 
-  const deadline = Date.now() + 10 * 60 * 1000;
+  const deadline = Date.now() + 60 * 60 * 1000; // a 62 MB ZIP took 25-36 minutes in 2026-11
   let uploaded = null;
   while (!uploaded && Date.now() < deadline) {
     await page.waitForTimeout(3000);
@@ -104,7 +115,7 @@ async function main() {
   }
   if (!uploaded) {
     await task.handOff();
-    return fail(`${name} did not appear in ${folderName} within 10 minutes; the browser is left open (task space ${task.spaceId})`);
+    return fail(`${name} did not appear in ${folderName} within 60 minutes; the browser is left open (task space ${task.spaceId})`);
   }
   console.log(`OK: uploaded ${name} (${uploaded.size}) to ${folderName}; file id ${uploaded.id}`);
   await task.finish({ keep: [] });
