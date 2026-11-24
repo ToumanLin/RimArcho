@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- `archo version` no longer opens the data folder's database (it only prints the folder's path), so it can no longer create or upgrade it. A development build refuses to upgrade the database in the default data folder to a schema released RimArcho cannot open; it names `RIMARCHO_HOME` and `RIMARCHO_ALLOW_DEV_UPGRADE=1`.
 - README (English and Chinese): a FAQ entry for when RimArcho.exe won't start with "no permission" even as administrator: extract and unblock the ZIP, antivirus, and Windows 11's Smart App Control, which blocks unsigned programs.
 ## 1.1.2 — 2026-11-24
 

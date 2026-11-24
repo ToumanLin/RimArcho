@@ -158,7 +158,17 @@ $hash = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
 [IO.File]::WriteAllText("$archive.sha256", "$hash  $archiveName`n", [Text.Encoding]::ASCII)
 Write-Host ("dist: {0} ({1:N0} bytes)" -f $archive, (Get-Item $archive).Length)
 Get-ChildItem -LiteralPath $out -Recurse -File | ForEach-Object { "  {0}  {1:N0}" -f $_.FullName, $_.Length }
-if ($GOOS -eq "windows" -and $env:OS -eq "Windows_NT") { & (Join-Path $out $exe) version }
+# A built program never runs against the player's real data folder (17 §4): an unreleased
+# schema would lock released RimArcho out of it.
+function Invoke-Isolated([string]$Exe, [string[]]$Arguments) {
+    $saved = $env:RIMARCHO_HOME
+    $env:RIMARCHO_HOME = Join-Path ([IO.Path]::GetTempPath()) ("rimarcho-release-" + [guid]::NewGuid().ToString("N"))
+    try { & $Exe @Arguments } finally {
+        Remove-Item -LiteralPath $env:RIMARCHO_HOME -Recurse -Force -ErrorAction SilentlyContinue
+        $env:RIMARCHO_HOME = $saved
+    }
+}
+if ($GOOS -eq "windows" -and $env:OS -eq "Windows_NT") { Invoke-Isolated (Join-Path $out $exe) @("version") }
 if ($GOOS -eq "windows") {
     & $PSCommandPath -Version $Version -GOOS linux -GOARCH $GOARCH -OutputDir $OutputDir -LinuxGUI $LinuxGUI -SkipTests
     # The publishing steps (17 §5 steps 7-10), in order; this script runs none of them.

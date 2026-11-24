@@ -51,7 +51,17 @@ foreach ($archive in "archo-$Version-windows-amd64.zip", "archo-$Version-linux-a
 # The Windows build must report this version and commit, not a dirty or older one.
 $exe = Join-Path $OutputDir "archo-$Version-windows-amd64\archo.exe"
 if (-not (Test-Path -LiteralPath $exe)) { throw "$exe is missing; run scripts/release.ps1 -Version $Version" }
-$built = (& $exe version | Select-Object -First 1)
+# A built program never runs against the player's real data folder (17 §4): an unreleased
+# schema would lock released RimArcho out of it.
+function Invoke-Isolated([string]$Exe, [string[]]$Arguments) {
+    $saved = $env:RIMARCHO_HOME
+    $env:RIMARCHO_HOME = Join-Path ([IO.Path]::GetTempPath()) ("rimarcho-release-" + [guid]::NewGuid().ToString("N"))
+    try { & $Exe @Arguments } finally {
+        Remove-Item -LiteralPath $env:RIMARCHO_HOME -Recurse -Force -ErrorAction SilentlyContinue
+        $env:RIMARCHO_HOME = $saved
+    }
+}
+$built = (Invoke-Isolated $exe @("version") | Select-Object -First 1)
 if ($built -notmatch "^archo $([regex]::Escape($Version)) \($short, ") { throw "the built archo.exe says '$built', not $Version at $short; rebuild with scripts/release.ps1" }
 
 # Notes: CHANGELOG.md's section for this version, or -NotesFile.
