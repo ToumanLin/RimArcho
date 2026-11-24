@@ -4,6 +4,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+## 1.1.1 — 2026-11-23
+
 - The Archo Monitor Workshop page (English and Chinese) is rewritten in short sections, each under an animated crayon Archo header (Archo Monitor, RimArcho, AI · MCP, Download, Credits): bullets with the numbers instead of paragraphs; every fact and link is kept. The pictures are in `docs/assets/workshop-monitor/` and load from GitHub, so they appear once they are on `master`.
 - The Launch page opens at once. Coming back to it from another page drew an empty page first while it read again (about 0.15 s with 13 lists on a large library, more on a slow disk); it now shows what it showed last in the same frame and updates behind it. Each read is also four times faster: the problem counts of your other lists, shown when you hover them, were worked out again on every visit and are now kept until something changes. At start the page no longer waits for those counts either; they fill in a moment later.
 
