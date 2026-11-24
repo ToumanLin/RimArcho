@@ -40,6 +40,7 @@ Archo MCP的开发目标是: 玩家只需说一句"有问题", Agent 就自己�
 [tr][td][b]合计[/b][/td][td][b]15/15 · 平均 2.3M[/b][/td][td][b]10/15 · 平均 3.0M[/b][/td][/tr]
 [/table]
 值得注意的是, 这里的测试都是One-Shot, 没有第二轮纠正环节, 因此也更能体现Archo MCP的实力.
+安装Archo MCP: 见README.MD, 或者你可直接把README.MD发送给你的Agent.
 
 [img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/zh/header-04-download.gif[/img]
 下载 archo-版本号-windows-amd64.zip, 找个目录解压, 双击 RimArcho.exe. 之后它会自己检查和安装更新.

@@ -40,6 +40,7 @@ I built test cases from real player logs and real Mods and ran them in a VM. Pi 
 [tr][td][b]Total[/b][/td][td][b]15/15 · average 2.3M[/b][/td][td][b]10/15 · average 3.0M[/b][/td][/tr]
 [/table]
 Every test was one-shot, with no second round of correction, which shows what Archo MCP can do on its own.
+Read README.MD for how to install Archo MCP, or you can simply hand README.MD to your agent.
 
 [img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/en/header-04-download.gif[/img]
 Download archo-<version>-windows-amd64.zip, unzip it into any folder and double-click RimArcho.exe. From then on it updates itself.
