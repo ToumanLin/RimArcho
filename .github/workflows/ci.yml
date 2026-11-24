@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version stamped into the rimarcho artifact (17 §5); empty builds dev"
+        description: "Release version (17 §5): stamped into rimarcho, and builds (and signs) the Windows ZIP; empty builds dev"
         required: false
         default: ""
 
@@ -15,7 +15,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # A release dispatch waits for the SignPath approval; a push to the same branch must not
+  # cancel it, so dispatches and pushes queue apart.
+  group: ci-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
@@ -163,5 +165,102 @@ jobs:
         with:
           name: rimarcho-linux-amd64
           path: rimarcho
+          if-no-files-found: error
+          retention-days: 30
+
+  windows-release:
+    # The Windows release ZIP (17 §5), built by the same scripts/release.ps1 the maintainer runs,
+    # so SignPath Foundation can sign what CI built from the public source
+    # (scripts/signpath/README.md). Only a dispatch with a version builds it; the run's other
+    # jobs are the test gate: release.ps1 -FromCI takes only a run that succeeded as a whole.
+    if: github.event_name == 'workflow_dispatch' && inputs.version != ''
+    runs-on: windows-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      actions: read # SignPath's action reads the unsigned artifact
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # Archo Monitor (monitor/build.ps1): .NET SDK 10; the game's reference assemblies come
+      # from NuGet (Krafs.Rimworld.Ref), Harmony from Lib.Harmony; neither is shipped.
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.4xx
+
+      - name: Build the release folder
+        shell: pwsh
+        run: ./scripts/release.ps1 -Version $env:VERSION -SkipTests -StageOnly
+
+      - name: Read Monitor's version
+        id: monitor
+        shell: pwsh
+        run: '"version=$((Get-Content monitor/VERSION -Raw).Trim())" >> $env:GITHUB_OUTPUT'
+
+      # SignPath signs files from a GitHub artifact of this run. The folder's contents are at
+      # the artifact's root (scripts/signpath/artifact-configuration.xml).
+      - name: Upload the unsigned folder
+        id: unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: archo-windows-amd64-unsigned
+          path: dist/archo-${{ inputs.version }}-windows-amd64/
+          if-no-files-found: error
+          retention-days: 7
+
+      # Inert until the maintainer sets the repository variable SIGNPATH_ORGANIZATION_ID
+      # (and the others below, plus the secret SIGNPATH_API_TOKEN): scripts/signpath/README.md.
+      # The project's default artifact configuration is scripts/signpath/artifact-configuration.xml.
+      # The request waits for the approver's click on signpath.io (release-signing policy).
+      - name: Sign with SignPath
+        if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: signpath/github-action-submit-signing-request@a2c5b60d9c75f073142b653c354b632eedce097b # v3.2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: signed
+          parameters: |
+            version: ${{ toJSON(inputs.version) }}
+            monitorVersion: ${{ toJSON(steps.monitor.outputs.version) }}
+
+      - name: Use the signed files
+        if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        shell: pwsh
+        run: |
+          $out = "dist/archo-$env:VERSION-windows-amd64"
+          $want = @(Get-ChildItem -LiteralPath $out -Recurse -File).Count
+          $got = @(Get-ChildItem -LiteralPath signed -Recurse -File).Count
+          if ($got -ne $want) { throw "SignPath returned $got files, the folder has $want" }
+          Remove-Item -Recurse -Force $out
+          Move-Item signed $out
+          $files = @("archo.exe", "RimArcho.exe") + @(Get-ChildItem "$out/monitor/ArchoMonitor/*/Assemblies/ArchoMonitor.dll" | ForEach-Object { $_.FullName.Substring((Resolve-Path $out).Path.Length + 1) })
+          foreach ($f in $files) {
+            $sig = Get-AuthenticodeSignature -LiteralPath (Join-Path $out $f)
+            "{0}: {1} {2}" -f $f, $sig.Status, $sig.SignerCertificate.Subject
+            if ($sig.Status -ne "Valid") { throw "$f is not validly signed" }
+          }
+
+      - name: Package
+        shell: pwsh
+        run: ./scripts/release.ps1 -Version $env:VERSION -PackageOnly
+
+      # scripts/release.ps1 -FromCI downloads this one by name.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: archo-windows-amd64
+          path: |
+            dist/archo-${{ inputs.version }}-windows-amd64.zip
+            dist/archo-${{ inputs.version }}-windows-amd64.zip.sha256
           if-no-files-found: error
           retention-days: 30

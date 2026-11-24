@@ -11,6 +11,9 @@
     <TargetFramework Condition="'$(GameVersion)' == '1.7'">net10.0</TargetFramework>
     <TargetFramework Condition="'$(GameVersion)' != '1.7'">net472</TargetFramework>
     <AssemblyName>ArchoMonitor</AssemblyName>
+    <!-- The signed release (17 §5) requires every signed file's product name to be the
+         project's: scripts/signpath/artifact-configuration.xml checks it. -->
+    <Product>RimArcho</Product>
     <RootNamespace>ArchoMonitor</RootNamespace>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
