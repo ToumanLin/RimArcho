@@ -101,7 +101,7 @@ try {
   c.close();
   result.task = task;
   const text = `${task?.line || ''} ${task?.say || ''}`;
-  say(!!task && /restarting|正在重启/.test(text) && text.includes(to), 'the task ends in "restarting"', task ? `${task.state}: ${text.trim()}` : 'no self-update task seen');
+  say(!!task && /restarting|\u6b63\u5728\u91cd\u542f/.test(text) && text.includes(to), 'the task ends in "restarting"', task ? `${task.state}: ${text.trim()}` : 'no self-update task seen');
   say(gone, 'the old window closed', 'still answering');
   // The restarted window: same DevTools port (the environment is passed on).
   try {
