@@ -20,14 +20,16 @@ type PlanCheck struct {
 	LastRunErrors int `json:"lastRunErrors,omitempty"`
 }
 
-// PlanCheckOf is plan p's PlanCheck.
+// PlanCheckOf is plan p's PlanCheck, made once per stored problem set (app.PlanSummary).
 func PlanCheckOf(a *app.App, p *store.Plan) (PlanCheck, error) {
-	ps, err := a.PlanProblems(p)
+	v, err := a.PlanSummary(p, func(ps *app.ProblemSet) any {
+		n := BuildNeeds(a, ps.State, ps)
+		return PlanCheck{PlanID: p.ID, Count: BreakCount(n), Pending: n.Never, Stale: n.Stale, LastRunErrors: LastRunErrors(n)}
+	})
 	if err != nil {
 		return PlanCheck{PlanID: p.ID}, err
 	}
-	n := BuildNeeds(a, ps.State, ps)
-	return PlanCheck{PlanID: p.ID, Count: BreakCount(n), Pending: n.Never, Stale: n.Stale, LastRunErrors: LastRunErrors(n)}, nil
+	return v.(PlanCheck), nil
 }
 
 // PlanChecks is the PlanCheck of every plan of the current environment, in plan order.

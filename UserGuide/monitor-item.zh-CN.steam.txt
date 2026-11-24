@@ -1,43 +1,35 @@
-[h1]Archo Monitor[/h1]
-这是 Archo Monitor, RimArcho 启动器的游戏内辅助 Mod. 用于监控游戏日志.
+[img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/zh/header-01-monitor.gif[/img]
+Archo Monitor 是 RimArcho 启动器的游戏内辅助 Mod. 它记录游戏的实时报错和加载阶段, 把每条报错指向可能的问题 Mod.
+[list]
+[*]不改变任何游戏内容.
+[*]随时加入, 随时移除.
+[*]几乎没有性能影响.
+[/list]
+要看到分析结果, 请下载 RimArcho (免费, MIT 开源). 上次 RimArcho 发布在工坊被社区管理员下架了, 所以这里只提供下载链接 (见下).
 
-要看到分析结果, 需要下载 RimArcho (免费且基于MIT开源). 由于上次在 Steam Workshop 分发 RimArcho 被社区管理员下架了, 所以这里只提供下载链接(见下).
+[img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/zh/header-02-rimarcho.gif[/img]
+简洁高效且占用小的 RimWorld 启动器和 Mod 管理器: 少纠结 Mod, 少查报错, 多玩游戏. [strike]RimArcho 有最可爱的 Archo 酱[/strike]
+[list]
+[*][b]多版本多语言:[/b] 目前支持Windows(稳定)和Linux(测试), 支持英语, 中文, 日语.
+[*][b]轻量:[/b] 业务部分 47MB 内存, 峰值 <250MB, GUI 日常 ~100MB (RimSort, RimCrow 普遍 500+MB, 以我的450Mods列表测试).
+[*][b]迁移:[/b] 目前支持迁移 RimSort/RimCrow/RimPy, 可导入 Mod 列表, 别名, 备注, 标签, 颜色标记, 忽略的警告, 排序规则; 已有的不重复导入.
+[*][b]排序算法:[/b] 基于 40,326 条玩家报错日志 (26GB, 且每周更新) 和 5,143 个 Mod 分析而来, 我认为RimArcho的排序算法是目前全社区最好的.
+[*][b]报错和冲突:[/b] 基于 40,326 条报错日志, 我统计了报错模式并标注严重程度 (并发现大部分红字不用太关心); 同时发现了一些高频率冲突的 Mod, 如果你一起启用了, RimArcho中会提示.
+[*][b]Archo Monitor:[/b] 拿到游戏外看不到的游戏内动态信息, 更方便定位报错和 debug.
+[*][b]存档分析:[/b] 存档需要哪些 Mod; 去除或加入 Mod 会损坏/丢失内容/无伤大雅.
+[*][b]Mod 副本:[/b] 一键创建并替换; 副本不随 Steam 自动更新, 不怕更新带来新报错.
+[*][b]多游戏版本:[/b] 管理多个游戏版本和配置 (是的, 可以同时玩 1.6 和 1.7), 通过 SteamCMD 下载其它版本, 一键备份当前游戏版本 (泰南耀斑防护, 笑).
+[*][b]订阅:[/b] 支持 GitHub 和 LoversLab, 自动检查更新.
+[/list]
 
-[h1]它做什么[/h1]
-简单来说, 记录游戏的实时报错, 游戏的加载阶段, 和将报错指向潜在错误Mod. RimArcho基于这个Archo Monitor分析游戏运行情况.
-
-Archo Monitor不改变任何游戏内容, 可以随时移除和加入, 也几乎没有性能影响.
-
-[h1]RimArcho[/h1]
-RimArcho 是一款简洁高效且占用小的 RimWorld 启动器和 Mod 管理器, 目标很简单: 少纠结Mod, 少查报错, 多玩游戏.
-
-[b]便捷迁移其它管理器数据.[/b] 当前支持 RimSort, RimCrow 和 RimPy, 勾选要带过来的内容 (Mod 列表, 别名, 备注, 标签, 颜色标记, 忽略的警告, 排序规则). 已有的内容不会重复导入.
-
-[h1]RimArcho的独到之处[/h1]
-[strike]RimArcho有最可爱的Archo酱[/strike]
-
-RimArcho的占用极小: RimArcho的业务部分只需要47MB内存, 在峰值不超过250MB, GUI运行下日常~100MB (作为比较RimSort, RimCrow普遍需要500+MB内存).
-
-RimArcho的排序算法在开发过程中, 下载了26GB的玩家错误日志共40,326条, 下载了5,143个Mod进行分析, 我认为, RimArcho的排序算法是目前全社区最好的.
-
-RimArcho 基于40,326条报错日志统计报错模式和标注严重程度, 大部分红字并不需要太过关心, 在报错日志中, 我也统计发现了部分 Mod 之间时常出现冲突, 因此RimArcho会对潜在冲突的Mod进行提醒.
-
-RimArcho + Archo Monitor 可分析游戏外拿不到的游戏内动态信息, 更方便报错定位和debug.
-
-RimArcho具有存档分析功能, 可以告诉你, 这个存档需要哪些Mod能正常加载, 如果你去除和加入Mod, 存档是否会损坏/丢失内容/无伤大雅.
-
-RimArcho 允许你创建 Mod 副本, 并一键替换. Mod副本不会随Steam自动更新, 再也不必担心自动更新带来新的报错.
-
-RimArcho支持管理多个游戏版本和配置(是的, 你可以同时玩1.6和1.7了), 内置下载不同游戏版本的功能(通过SteamCMD), 也支持对当前游戏版本进行备份(泰南耀斑防护,笑)
-
-你可添加来自GitHub和LoversLab的订阅, RimArcho会自动检查更新.
-
-RimArcho内置了Archo MCP, 提供了47个工具, 涵盖从返回正确Mod目录(找得到), 到提供清洗过的报错日志(看得准), 再到允许AI Agent启动游戏自己测试(摸得到). 目的是你只需要说一句"有问题", 你的Agent就能自己看问题, 修复, 启动游戏看问题是不是修复了, 然后告诉你.
-
-最有意思的是"启动游戏", RimArcho同时分发了RimWorld Probe SKILL, 提供了AI自动控制游戏的基础设施, 也就是说, 你的Agent不但可以启动游戏, 还能载入存档,实际进行游戏操作/截图: 比如你说囚犯无法正常寻路, 你的AI Agent不再只能听你描述, 而可以实际看到发生了什么.
-
-我基于玩家的实际报错日志和真实Mod创建测试情景并在虚拟机中测试. 在实际测试中, 接入Archo MCP的Pi Agent(接入DeepSeek 4.1 Flash)对比不接入的情况下, 正确率从67%提升至100%, 使用token花费降低, 最高降低了50%.
-
+[img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/zh/header-03-ai.gif[/img]
+RimArcho同时提供了Archo MCP和 RimWorld Probe SKILL:
+[list]
+[*][b]Archo MCP:[/b] RimArcho提供了47个MCP工具: 从提供正确的 Mod 目录, 到返回精准的报错日志, 再到启动游戏自己测试, Archo MCP提供了RimWorld debug的全套工具.
+[*][b]RimWorld Probe SKILL:[/b] RimArcho一并提供了Mod探针骨架, 允许你的AI Agent自己搭建控制游戏的探针Mod, 因此你的Agent可以自己测试游戏. 举例子来说, 你再也不用琢磨如何用语言向你的Agent描述囚犯在何时何处何地无法寻路了.
+[/list]
+Archo MCP的开发目标是: 玩家只需说一句"有问题", Agent 就自己看问题, 修复, 启动游戏验证, 然后告诉你.
+我用真实玩家报错日志和真实 Mod 做了测试情景, 在虚拟机中测试. 接入 Archo MCP 的 Pi Agent (DeepSeek 4.1 Flash) 对比不接入: 正确率 67% → 100%, token 最多省 50%.
 [table]
 [tr][th]故障[/th][th]带 Archo MCP[/th][th]不带[/th][/tr]
 [tr][td]XML 类名写错[/td][td]3/3 · 1.3M token[/td][td]3/3 · 3.0M[/td][/tr]
@@ -47,20 +39,26 @@ RimArcho内置了Archo MCP, 提供了47个工具, 涵盖从返回正确Mod目录
 [tr][td]报错指向无辜的 Mod[/td][td]3/3 · 2.3M[/td][td]2/3 · 2.6M[/td][/tr]
 [tr][td][b]合计[/b][/td][td][b]15/15 · 平均 2.3M[/b][/td][td][b]10/15 · 平均 3.0M[/b][/td][/tr]
 [/table]
+值得注意的是, 这里的测试都是One-Shot, 没有第二轮纠正环节, 因此也更能体现Archo MCP的实力.
 
-[h3]下载 RimArcho[/h3]
+[img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/zh/header-04-download.gif[/img]
+下载 archo-版本号-windows-amd64.zip, 找个目录解压, 双击 RimArcho.exe. 之后它会自己检查和安装更新.
 [list]
 [*]GitHub: https://github.com/ToumanLin/RimArcho/releases/latest
-[*]蓝奏云 (如无法访问GitHub): https://rimarcho.lanzn.com/b01i608qja 密码 ctot
+[*]蓝奏云 (无法访问 GitHub 时): https://rimarcho.lanzn.com/b01i608qja 密码 ctot
+[*]完全开源: https://github.com/ToumanLin/RimArcho
+[*]Discord (问题和建议): https://discord.gg/HF2GVyurQs
 [/list]
-下载 archo-版本号-windows-amd64.zip, 找个目录解压, 双击 RimArcho.exe. 之后 RimArcho 会自己检查和安装更新.
-exe没有代码签名, 首次运行时Windows可能提示"Windows 已保护你的电脑": 选"更多信息", 再选"仍要运行".
+exe 没有代码签名: 如果 Windows 提示"Windows 已保护你的电脑", 选"更多信息", 再选"仍要运行".
 
-本启动器代码完全开源, 地址在 https://github.com/ToumanLin/RimArcho
+[img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/zh/header-05-credits.gif[/img]
+思路沿用 RimCrow Companion, 它又致谢了:
+[list]
+[*]BetterModSort (Apache-2.0, Yan-Zero)
+[*]LogAfterDefError (MIT, emipa606)
+[*]BetterLog (MPL-2.0, bbradson)
+[*]Mod Error Checker
+[/list]
+Archo Monitor 没有复制它们的代码. MIT 许可证.
 
-有问题或建议, 欢迎加入 Discord: https://discord.gg/HF2GVyurQs
-
-致谢: 思路沿用 RimCrow Companion, 又致谢了 BetterModSort (Apache-2.0, Yan-Zero), LogAfterDefError (MIT, emipa606), BetterLog (MPL-2.0, bbradson) 和 Mod Error Checker. Archo Monitor 没有复制它们的代码. MIT 许可证.
-
-[h1]AI使用披露[/h1]
-RimArcho 的代码由 Claude Opus 5.5 和 ChatGPT 6.1 SOL 开发和测试, 由我本人进行功能Review.
+RimArcho 的代码由 Claude Opus 5.5 和 ChatGPT 6.1 SOL 开发和测试, 所有功能都实际在虚拟机中完整测试; 我本人进行功能 Review.

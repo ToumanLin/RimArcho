@@ -132,9 +132,16 @@ func (s *API) shellLocked(n *view.Needs) *Shell {
 	return out
 }
 
-// Home is the home page (16 §2.3).
-func (s *API) Home() *view.Home {
-	v, _ := join(&s.flight, "Home", func() (*view.Home, error) { return s.homeRead(), nil })
+// Home is the home page (16 §2.3), with other plans' states only when their checks are
+// already summarized (view.BuildHomeKnown): the page draws at once, and when the answer
+// says ChecksPending it asks HomeAll next.
+func (s *API) Home() *view.Home { return s.home("Home", false) }
+
+// HomeAll is Home with every plan's state, collecting the checks Home left out.
+func (s *API) HomeAll() *view.Home { return s.home("HomeAll", true) }
+
+func (s *API) home(name string, all bool) *view.Home {
+	v, _ := join(&s.flight, name, func() (*view.Home, error) { return s.homeRead(all), nil })
 	if v != nil && v.Error == "" {
 		// Launch's warnings come from the stored check: keep it current (16 §8.9)
 		s.mu.Lock()
@@ -144,7 +151,7 @@ func (s *API) Home() *view.Home {
 	return v
 }
 
-func (s *API) homeRead() *view.Home {
+func (s *API) homeRead(all bool) *view.Home {
 	defer perftrace.Span("Home")()
 	s.logRead.mu.Lock()
 	defer s.logRead.mu.Unlock()
@@ -201,7 +208,11 @@ func (s *API) homeRead() *view.Home {
 	if err != nil {
 		return &view.Home{Featured: -1, Error: err.Error()}
 	}
-	h := view.BuildHomeFromState(r, st, n, plans, packs)
+	build := view.BuildHomeKnown
+	if all {
+		build = view.BuildHomeFromState
+	}
+	h := build(r, st, n, plans, packs)
 	view.AddOtherEnvs(r, h, st.Ix.Env.ID)
 	view.PickFeatured(h, r.Store.Meta(view.FeaturedKey), st.Ix.Env.Name, st.Plan.ID)
 	return h
