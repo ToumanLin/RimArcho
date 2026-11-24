@@ -149,6 +149,59 @@ func (a *App) problems(ensure bool, progress func(string)) (*ProblemSet, error) 
 type planProblems struct {
 	key string
 	ps  *ProblemSet
+	// summary is PlanSummary's result for ps, made once per set.
+	summary    any
+	summarized bool
+}
+
+// PlanSummary is f of plan p's problem set (PlanProblems), made once for as long as that
+// set is kept: the Launch page summarizes every other plan on each read (16 §2.3), and
+// summarizing (Can it run's items) cost more than the cached set itself (18 §2).
+func (a *App) PlanSummary(p *store.Plan, f func(*ProblemSet) any) (any, error) {
+	ps, err := a.PlanProblems(p)
+	if err != nil {
+		return nil, err
+	}
+	c := a.planPS[p.ID]
+	if c == nil || c.ps != ps {
+		return f(ps), nil
+	}
+	if !c.summarized {
+		c.summary, c.summarized = f(ps), true
+	}
+	return c.summary, nil
+}
+
+// PlanSummaryKnown is PlanSummary's result when it is already made for p's present
+// problem set; known is false when making it would collect the set first. The Launch
+// page's first read shows only these (16 §2.3).
+func (a *App) PlanSummaryKnown(p *store.Plan) (summary any, known bool, err error) {
+	_, st, key, err := a.planKey(p)
+	if err != nil {
+		return nil, false, err
+	}
+	if c := a.planPS[st.Plan.ID]; key != "" && c != nil && c.key == key && c.summarized {
+		return c.summary, true, nil
+	}
+	return nil, false, nil
+}
+
+// planKey is plan p's state, the current state, and the key p's problem set is kept
+// under ("" when it cannot be kept).
+func (a *App) planKey(p *store.Plan) (cur, st *LoadoutState, key string, err error) {
+	if cur, err = a.Loadout(); err != nil {
+		return nil, nil, "", err
+	}
+	if st, err = a.PlanState(cur, p); err != nil {
+		return nil, nil, "", err
+	}
+	if a.stCache != nil && a.stCache.Ix == cur.Ix {
+		key = a.stKey + "|" + a.GameVersion + "|" + ListFingerprint(st.List)
+		if lp := a.ProblemLog(st); lp != "" {
+			key += "|" + lp + "|" + logStamp(lp)
+		}
+	}
+	return cur, st, key, nil
 }
 
 // PlanProblems is plan p's problem set from stored results only, never computing an
@@ -157,20 +210,9 @@ type planProblems struct {
 // home page counts every plan's problems with it (16 §2.3). The result is kept until the
 // database, ModsConfig.xml or the log changes.
 func (a *App) PlanProblems(p *store.Plan) (*ProblemSet, error) {
-	cur, err := a.Loadout()
+	cur, st, key, err := a.planKey(p)
 	if err != nil {
 		return nil, err
-	}
-	st, err := a.PlanState(cur, p)
-	if err != nil {
-		return nil, err
-	}
-	key := ""
-	if a.stCache != nil && a.stCache.Ix == cur.Ix {
-		key = a.stKey + "|" + a.GameVersion + "|" + ListFingerprint(st.List)
-		if lp := a.ProblemLog(st); lp != "" {
-			key += "|" + lp + "|" + logStamp(lp)
-		}
 	}
 	if c := a.planPS[st.Plan.ID]; key != "" && c != nil && c.key == key {
 		return c.ps, nil

@@ -146,6 +146,28 @@ var PlanProblems = func(a *app.App, planID int64) (count int, checked, stale boo
 	return c.Count, true, c.Stale
 }
 
+// PlanProblemsKnown is PlanProblems from a check already summarized (app.PlanSummaryKnown):
+// known is false when it would collect the plan's problems first, which the Launch page's
+// first read leaves for the read after it (16 §2.3). A variable so tests can replace it.
+var PlanProblemsKnown = func(a *app.App, planID int64) (count int, checked, stale, known bool) {
+	p, err := a.Store.PlanByID(planID)
+	if err != nil || p == nil {
+		return 0, false, false, true
+	}
+	v, ok, err := a.PlanSummaryKnown(p)
+	if err != nil {
+		return 0, false, false, true
+	}
+	if !ok {
+		return 0, false, false, false
+	}
+	c, _ := v.(PlanCheck)
+	if c.Pending {
+		return 0, false, false, true
+	}
+	return c.Count, true, c.Stale, true
+}
+
 // ---- managing (07 §1.3) ----
 
 // PlanFrom is where a new plan's list comes from: "" empty, "current", "v<n>".

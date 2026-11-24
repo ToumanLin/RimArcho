@@ -51,8 +51,18 @@ let memoryTimer = null, launchPending = false;
 let homeRun = null, homeAgain = null, homeAgainRun = null;
 let homeRunEarly = false; // the read on its way is the one started at start (readEarly)
 export function home(opts = {}) {
+  // Coming back to the page: what the last read brought is drawn in the same frame, without
+  // the page fade, and the read runs behind it; one that brings nothing new leaves it, a
+  // change redraws with the page's own motion (16 §2.3, §10). Only a session's first read
+  // waits.
+  if (S.screen !== "home" && rows().length) {
+    draw();
+    document.querySelector("#screen .page.home")?.classList.remove("enter");
+    drawnSig = sigOf(data, bg, hidden);
+    opts = { ...opts, keep: true };
+  }
   if (homeRun) {
-    homeAgain = { keep: (homeAgain ? homeAgain.keep : true) && !!opts.keep };
+    homeAgain = { keep: (homeAgain ? homeAgain.keep : true) && !!opts.keep, all: !!(homeAgain?.all || opts.all) };
     return homeAgainRun ??= homeRun.catch(() => {}).then(() => {
       const again = homeAgain;
       homeAgain = homeAgainRun = null;
@@ -80,8 +90,12 @@ export async function backgroundChanged() {
   if (S.screen !== "home" || JSON.stringify(b) === JSON.stringify(bg)) return;
   bg = b;
   setBackdrop(bg);
-  if (drawnSig) drawnSig = JSON.stringify([data, bg, hidden || ""]);
+  if (drawnSig) drawnSig = sigOf(data, bg, hidden);
 }
+
+// sigOf is what a read drew, so a read that brings nothing new is left as it is; whether
+// other lists' states were still to come (checksPending) is not part of it.
+const sigOf = (d, b, h) => JSON.stringify([{ ...d, checksPending: undefined }, b, h || ""]);
 
 // At start the window reads this page alongside Workspace's shell instead of after it
 // (main.js); the first read takes that answer.
@@ -93,10 +107,13 @@ export function readEarly() {
 // forgetEarly: the window opened another page first (the first-run guide).
 export function forgetEarly() { early = null; }
 
-async function readHome({ keep = false } = {}) {
+// all: API.HomeAll, every list's state; otherwise API.Home, which leaves out the states of
+// other lists not summarized yet (checksPending) so the page draws at once, then this
+// reads again with all (16 §2.3).
+async function readHome({ keep = false, all = false } = {}) {
   clearTimeout(homeRetryTimer);
   const read = beginPageRead("home", { keep, retry: () => home() });
-  const [homeRead, bgRead] = early || [api.Home(), api.HomeBackground()];
+  const [homeRead, bgRead] = early || [all ? api.HomeAll() : api.Home(), api.HomeBackground()];
   homeRunEarly = !!early;
   early = null;
   let next, backdrop, h;
@@ -114,9 +131,18 @@ async function readHome({ keep = false } = {}) {
     return;
   }
   homeRetries = 0;
+  if (next.checksPending) {
+    // the states left out keep what was shown until the full read brings them
+    const was = new Map(rows().map((r) => [key(r), r]));
+    for (const r of next.rows || []) {
+      const o = !r.state && !r.level && was.get(key(r));
+      if (o) { r.state = o.state; r.level = o.level; }
+    }
+    if (!all) home({ keep: true, all: true });
+  }
   // A read that brings nothing new (the window got the focus back, a scan that changed
   // nothing here) leaves the page as it is: redrawing it restarted its motion and moved it.
-  const sig = JSON.stringify([next, backdrop, h || ""]);
+  const sig = sigOf(next, backdrop, h);
   if (sig === drawnSig && S.screen === "home" && document.querySelector("#screen .page.home .hm-step")) {
     read.finish();
     refreshHomeMemory(data);

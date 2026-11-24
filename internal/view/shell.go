@@ -344,6 +344,10 @@ type Home struct {
 	// GameUpdate is the line about a game update with "back up <game> first" (16 §2.3);
 	// nil when the game neither changed since the last scan nor has a Steam update waiting.
 	GameUpdate *GameUpdateLine `json:"gameUpdate,omitempty"`
+	// ChecksPending: built with BuildHomeKnown, some other plans' rows have no state yet
+	// (their problems were not summarized); the window reads the page again in full.
+	ChecksPending bool `json:"checksPending,omitempty"`
+	known         bool // BuildHomeKnown: other plans' states only when already summarized
 }
 
 // BuildHome builds the home page: one row per plan of the environment and one per pack.
@@ -360,18 +364,26 @@ func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow)
 // BuildHomeFromState needs counts and list state, not the editor's thousands of
 // inactive rows, copy captions and search fields.
 func BuildHomeFromState(a *app.App, st *app.LoadoutState, n *Needs, plans []PlanRow, packs []PackRow) *Home {
-	return buildHome(a, st, n, plans, packs, false)
+	return buildHome(a, st, n, plans, packs, false, false)
+}
+
+// BuildHomeKnown is BuildHomeFromState with other plans' states only when their check is
+// already summarized (PlanProblemsKnown); the rest are left empty and ChecksPending set,
+// so the Launch page draws before every other plan's problems are collected (16 §2.3).
+// AddOtherEnvs follows the same choice.
+func BuildHomeKnown(a *app.App, st *app.LoadoutState, n *Needs, plans []PlanRow, packs []PackRow) *Home {
+	return buildHome(a, st, n, plans, packs, false, true)
 }
 
 // BuildLaunchFromState supplies the TUI's current-list summary, without the window's
 // other lists, version ranges, changes card or self-update line (16 §9.1).
 func BuildLaunchFromState(a *app.App, st *app.LoadoutState, n *Needs, plans []PlanRow) *Home {
-	return buildHome(a, st, n, plans, nil, true)
+	return buildHome(a, st, n, plans, nil, true, false)
 }
 
-func buildHome(a *app.App, st *app.LoadoutState, n *Needs, plans []PlanRow, packs []PackRow, launchOnly bool) *Home {
+func buildHome(a *app.App, st *app.LoadoutState, n *Needs, plans []PlanRow, packs []PackRow, launchOnly, known bool) *Home {
 	defer perftrace.Span("Home-rows")()
-	h := &Home{Featured: -1}
+	h := &Home{Featured: -1, known: known}
 	name, version := st.Ix.Env.Name, st.Ix.Env.GameVersion
 	chip, ver := EnvChip(name, version), env.MajorMinor(version)
 	active := 0
@@ -395,18 +407,16 @@ func buildHome(a *app.App, st *app.LoadoutState, n *Needs, plans []PlanRow, pack
 				}
 			}
 		}
-		k, checked, stale := 0, false, false
 		if p.Current {
 			r.Memory = BuildMemoryLaunch(a, st)
 			r.Mods = active
 			r.Facts = Tf("%d mods", active)
 			r.Unsaved = len(st.Changes())
-			k, checked, stale = BreakCount(n), !n.Never, n.Stale
+			r.State, r.Level = planState(BreakCount(n), !n.Never, n.Stale)
 			r.Links = PackLinksText(n)
 		} else {
-			k, checked, stale = PlanProblems(a, p.ID)
+			r.State, r.Level = h.otherPlanState(a, p.ID)
 		}
-		r.State, r.Level = planState(k, checked, stale)
 		h.Rows = append(h.Rows, r)
 	}
 	for _, p := range packs {
@@ -424,6 +434,20 @@ func buildHome(a *app.App, st *app.LoadoutState, n *Needs, plans []PlanRow, pack
 		}
 	}
 	return h
+}
+
+// otherPlanState is the state of a plan that is not current: from PlanProblems, or with
+// h.known only from a summarized check; without one it is left empty (ChecksPending).
+func (h *Home) otherPlanState(a *app.App, id int64) (string, string) {
+	if h.known {
+		k, checked, stale, ok := PlanProblemsKnown(a, id)
+		if !ok {
+			h.ChecksPending = true
+			return "", ""
+		}
+		return planState(k, checked, stale)
+	}
+	return planState(PlanProblems(a, id))
 }
 
 // planState is a plan row's state and level from its check. A check older than the list
@@ -459,7 +483,8 @@ func packHomeRow(p PackRow, chip, envName, gameVersion string) HomeRow {
 // AddOtherEnvs puts the other environments' plans and packs on the home page (16 §2.3):
 // it lists what you play everywhere, not only in the current environment. Lists are
 // shared by every game, so each game lists all of them. Their state comes from
-// PlanProblems like any plan that is not current; nothing is loaded or scanned.
+// PlanProblems like any plan that is not current (PlanProblemsKnown for BuildHomeKnown);
+// nothing is loaded or scanned.
 func AddOtherEnvs(a *app.App, h *Home, current string) {
 	defer perftrace.Span("Home-other-envs")()
 	envs, err := a.Store.Envs()
@@ -481,7 +506,7 @@ func AddOtherEnvs(a *app.App, h *Home, current string) {
 			if !p.LastPlayed.IsZero() {
 				r.Played = Tf("played %s", ShortDate(p.LastPlayed))
 			}
-			r.State, r.Level = planState(PlanProblems(a, p.ID))
+			r.State, r.Level = h.otherPlanState(a, p.ID)
 			h.Rows = append(h.Rows, r)
 		}
 		if packs, _, err := a.PacksOf(e); err == nil {
