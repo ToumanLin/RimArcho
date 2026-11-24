@@ -18,7 +18,8 @@ import (
 
 // Mod list formats of other tools (07 §7): RimSort (ModsConfig XML, JSON, clipboard text,
 // Rentry), RimWorld's own saved list (.rml, which RimCrow also writes), RimCrow's
-// ModList.xml, JSON and share code, and lists of workshop IDs. Detected by content.
+// ModList.xml, JSON and share code, RimStack's saved list and the text it copies or puts on
+// Rentry, and lists of workshop IDs. Detected by content.
 
 // More export formats.
 const (
@@ -30,6 +31,12 @@ const (
 	// FormatWorkshop is a list of Workshop links in Markdown (07 §7.3): for someone who
 	// subscribes by hand; it reads back as a list of workshop IDs.
 	FormatWorkshop = "workshop"
+	// FormatRimStack is RimStack's saved list ({"name", "ids"}), a file for its lists
+	// folder (07 §7.3).
+	FormatRimStack = "rimstack"
+	// FormatRimStackText is the text RimStack's "copy the load order" gives and its paste
+	// reads: a header, then name [packageId][link] per line, as RimSort copies it.
+	FormatRimStackText = "rimstack-text"
 )
 
 // ParseList reads a list in any supported format. Tokens are lower-case packageIds (with
@@ -240,6 +247,17 @@ func parseJSONList(b []byte) (*ImportedList, error) {
 			}
 			return l, nil
 		}
+		// RimStack's saved list: its name and packageIds, nothing else (07 §7.2)
+		if ids, ok := y["ids"].([]any); ok {
+			if name, ok := y["name"].(string); ok {
+				l := newList("rimstack-list")
+				l.Title = strings.TrimSpace(name)
+				for _, x := range ids {
+					item(l, x)
+				}
+				return l, nil
+			}
+		}
 		l := newList("rimsort-json")
 		l.Game = str(y["version"])
 		for _, k := range []string{"activeMods", "active_mods", "mods", "mod_list", "modList"} {
@@ -284,17 +302,39 @@ var (
 	rentryNameRe = regexp.MustCompile(`\[([^\]]+)\]\(`)
 	// mdWorkshopRe is a Markdown link to a Workshop item (the workshop export).
 	mdWorkshopRe = regexp.MustCompile(`^(?:[-*]\s+)?\[([^\]]*)\]\(https?://steamcommunity\.com/[^)\s]*[?&]id=(\d+)[^)]*\)`)
+	// gameLineRe is a copied list's header line naming the game version (RimSort, RimStack).
+	gameLineRe = regexp.MustCompile(`^RimWorld game version this list was created for:\s*(\S+)`)
+	// rentryTailRe is a line RimStack published on Rentry: a copied line followed by
+	// RimSort's {packageid: x}.
+	rentryTailRe = regexp.MustCompile(`(?i)^(.*\]\[[^\]]*\])\s*\{packageid:\s*[\w.\-]+\}\s*$`)
 )
 
 func parseTextList(s string) *ImportedList {
 	l := newList(FormatText)
-	for _, line := range strings.Split(s, "\n") {
+	byRimStack := false
+	for i, line := range strings.Split(s, "\n") {
 		line = strings.TrimSpace(strings.TrimRight(line, "\r"))
 		if line == "" {
 			continue
 		}
+		// the copied list's header (RimSort, RimStack): who made it, the game version
+		if i < 8 && strings.HasPrefix(line, "Created with RimStack") {
+			byRimStack = true
+			continue
+		}
+		if m := gameLineRe.FindStringSubmatch(line); m != nil && i < 8 {
+			l.Game = m[1]
+			continue
+		}
+		// a line RimStack put on Rentry: its copied line, then {packageid: x} for RimSort
+		if m := rentryTailRe.FindStringSubmatch(line); m != nil {
+			line = m[1]
+		}
 		if m := clipboardRe.FindStringSubmatch(line); m != nil {
 			l.Format = "rimsort-text"
+			if byRimStack {
+				l.Format = "rimstack-text"
+			}
 			ws := ""
 			if w := wsIDRe.FindStringSubmatch(m[3]); w != nil {
 				ws = w[1]
@@ -504,5 +544,41 @@ func RimCrowXML(tokens []string, ws, names map[string]string) []byte {
 		b.WriteString("  </" + part.tag + ">\n")
 	}
 	b.WriteString("</ModList>\n")
+	return []byte(b.String())
+}
+
+// RimStackList renders a list as RimStack's saved list: {"name", "ids"}, the packageIds in
+// load order as the game writes them. RimStack shows the files in its data folder's lists
+// folder by the name inside; the file's own name is the list's (07 §7.3).
+func RimStackList(name string, tokens []string) []byte {
+	if tokens == nil {
+		tokens = []string{}
+	}
+	b, _ := json.MarshalIndent(struct {
+		Name string   `json:"name"`
+		IDs  []string `json:"ids"`
+	}{strings.TrimSpace(name), tokens}, "", "  ")
+	return append(b, '\n')
+}
+
+// RimStackText renders a list as RimStack copies a load order (the same lines RimSort
+// copies): a header, then "name [packageId][link]" per Mod, the link its Workshop page or
+// "No url specified". RimStack's and RimSort's paste read it, and so does ParseList.
+func RimStackText(game string, tokens []string, ws, names map[string]string) []byte {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Created with RimArcho\nRimWorld game version this list was created for: %s\nTotal # of mods: %d\n\n", game, len(tokens))
+	for _, t := range tokens {
+		name := names[t]
+		if name == "" {
+			name = t
+		}
+		// a bracket in the name would read as the packageId's
+		name = strings.NewReplacer("[", "(", "]", ")").Replace(name)
+		link := "No url specified"
+		if w := ws[t]; w != "" {
+			link = "https://steamcommunity.com/sharedfiles/filedetails/?id=" + w
+		}
+		fmt.Fprintf(&b, "%s [%s][%s]\n", name, t, link)
+	}
 	return []byte(b.String())
 }

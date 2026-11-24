@@ -227,26 +227,8 @@ func (l *rimSortLineages) lineageOf(m *rimSortMod) (string, bool, string) {
 // applyRimSortMod brings one Mod's note, tags, colour and ignored mark over to lineage lin,
 // whose current data is cur.
 func (a *App) applyRimSortMod(opt RimSortAuxOptions, rep *RimCrowReport, envID, lin string, m *rimSortMod, cur *store.PlayerData, tags *tagImport) error {
-	if m.note != "" {
-		rep.item(PartNotes, lin, m.note, "", cur.Note != "")
-	}
-	switch {
-	case m.note == "":
-	case cur.Note == m.note:
-		rep.NoteSame++
-		rep.part(PartNotes).Same++
-	case cur.Note != "":
-		rep.part(PartNotes).Same++ // RimArcho's own note stays
-		rep.Conflicts = append(rep.Conflicts, RCItem{m.path, fmt.Sprintf("note: RimArcho has %q, RimSort %q (kept RimArcho's)", cur.Note, m.note)})
-	default:
-		rep.NoteNew++
-		rep.part(PartNotes).New++
-		cur.Note = m.note
-		if !opt.DryRun {
-			if err := a.Store.SetNote(envID, lin, m.note); err != nil {
-				return err
-			}
-		}
+	if err := a.importNote(rep, envID, lin, m.path, "RimSort", m.note, cur); err != nil {
+		return err
 	}
 	for _, t := range m.tags {
 		if err := tags.add(PartTags, lin, cur, t); err != nil {

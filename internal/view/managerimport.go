@@ -36,7 +36,12 @@ func managerImportText(r *app.RimCrowReport, profiles bool) string {
 	}
 
 	if r.NotesAndTags {
+		rules := lines[4]
 		lines = lines[1:4]
+		// RimStack's notes carry categories that become top and bottom rules
+		if r.RulesTotal > 0 {
+			lines = append(lines, rules)
+		}
 	}
 	if r.DB == "" {
 		lines = lines[4:]

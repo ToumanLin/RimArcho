@@ -36,6 +36,7 @@ sort: 2 moved (dry run; the workspace is unchanged)
     info order.cycle  #qfph #tmxx  (gives up the weakest)
       evidence: decl #qfph About.xml loadAfter pkg:tester.y  (ignore: decl:#qfph:loadafter:tester.y)  [broken]  [suggested]
       evidence: decl #tmxx About.xml loadAfter pkg:tester.x  (ignore: decl:#tmxx:loadafter:tester.x)
+  same patch target: no stored analysis of this list's Mods: same-target patches not checked (archo analyze)
   constraints: 10 edges, 0 ignored by rules
 next:
   archo rule add ignore decl:#qfph:loadafter:tester.y
@@ -63,6 +64,7 @@ sort: 3 moved (applied to the workspace; not saved)
     weak     decl #hnyg About.xml loadAfter pkg:brrainz.harmony
     weak     decl #qfph About.xml loadAfter pkg:tester.y
     harmless decl #6olp About.xml loadBefore pkg:ludeon.rimworld
+  same patch target: no stored analysis of this list's Mods: same-target patches not checked (archo analyze)
   constraints: 9 edges, 1 ignored by rules
 next:
   archo save

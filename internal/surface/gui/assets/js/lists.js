@@ -2,6 +2,7 @@
 // board has three columns: Not enabled | Enabled | details, with Staging and history folded under details.
 import { factText, S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H, slideThumb, keyCaps } from "./state.js";
 import { icon, sourceIcon, statusIcon } from "./icons.js";
+import { categoryName } from "./catnames.js";
 import { wireBadges, rowDrag } from "./badgepop.js";
 import { listGeometry, rowAt } from "./listgeometry.js";
 import { bump } from "./motion.js";
@@ -347,7 +348,9 @@ export function renderRows(k) {
     d.className = "row" + (i === c.cursor ? " cur" : "") + (c.sel.has(key(it)) ? " sel" : "") + (it.dim || it.missing ? " dimmed" : "");
     d.innerHTML = `<span class="m"></span>` + (k === 1 ? `<span class="p">${it.pos || ""}</span>` : "") +
       // no source icon in Disabled (16 §2.5): the copy shows in details and source: filters
-      (k === 0 ? "" : `<span class="k">${it.missing ? "" : sourceIcon(it.kind)}</span>`) + `<span class="t">${esc(it.name)}</span>` +
+      (k === 0 ? "" : `<span class="k">${it.missing ? "" : sourceIcon(it.kind)}</span>`) +
+      // the Mod's category (16 §2.5): a glyph, its name in the hover
+      `<span class="cg${it.catSet ? " set" : ""}"${it.cat ? ` title="${esc(T(categoryName(it.cat)))}"` : ""}>${(it.cat && icon["cat-" + it.cat]) || ""}</span>` + `<span class="t">${esc(it.name)}</span>` +
       // a Mod a scan found in the last week (16 §2.5)
       (it.new && !(k === 0 && it.copyCount > 1 && it.copyLabel) ? `<span class="nw">${esc(T("new"))}</span>` : "") +
       // what the row is short of, or which copy it is, sits on the name's line
@@ -450,7 +453,7 @@ function historyPanel() {
 
 function rowSig(k, i, it) {
   const c = S.cols[k];
-  return [key(it), it.pos, it.unsaved, it.dim, it.gone, it.canUse, (it.tags || []).join(","), it.new, i === c.cursor, c.sel.has(key(it)), rowStatus(it), it.name, it.copyLabel, it.copyCount, it.lineage].join("|");
+  return [key(it), it.pos, it.unsaved, it.dim, it.gone, it.canUse, (it.tags || []).join(","), it.new, i === c.cursor, c.sel.has(key(it)), rowStatus(it), it.name, it.copyLabel, it.copyCount, it.lineage, it.cat, it.catSet].join("|");
 }
 
 // rowStatus mirrors view.RowStatus (missing entries are errors, unloadable rows dim).

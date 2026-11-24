@@ -9,6 +9,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/finding"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/order"
 	"github.com/ToumanLin/RimArcho/internal/render"
@@ -390,6 +391,7 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		nu.Truncate(12, "")
 	}
+	addSortContests(root, st, r)
 	cs := fmt.Sprintf("%d edges, %d ignored by rules", len(r.Result.Edges), r.Result.Ignored)
 	if n := len(r.Result.Dropped); n > 0 {
 		cs += fmt.Sprintf(", %d not used", n)
@@ -401,6 +403,39 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		d.AddNext("archo save")
 	}
 	return d, nil
+}
+
+// addSortContests lists the same-target patches (08 §1.6): information, not constraints.
+// Those whose winner this sort changes come first, each with the rule that keeps the
+// current winner; the others are counted.
+func addSortContests(root *render.Node, st *app.LoadoutState, r *app.SortResult) {
+	title := "same patch target (the Mod loaded later wins; sorting does not order for it)"
+	if r.ContestNote != "" {
+		root.KV("same patch target", r.ContestNote)
+		return
+	}
+	if len(r.Contests) == 0 {
+		return
+	}
+	sec := root.Section(title)
+	same := 0
+	for _, c := range r.Contests {
+		before, after := c.Winner(r.Unsorted), c.Winner(r.Sorted)
+		if before == after {
+			same++
+			continue
+		}
+		keep := app.ContestActions(st, c, r.Unsorted)
+		line := fmt.Sprintf("%s: %s wins now, %s after this sort", app.ContestWhat(c.Node), st.Ix.Ref(before), st.Ix.Ref(after))
+		if len(keep) > 0 {
+			line += "  (keep " + st.Ix.Ref(before) + ": " + finding.Expand(keep[0], st.Ix.Ref) + ")"
+		}
+		sec.Add(line)
+	}
+	sec.Truncate(8, "archo problems --code patch.contested")
+	if same > 0 {
+		sec.Addf("%d more %s changed by several Mods; this sort keeps who wins (archo problems --code patch.contested)", same, plural(same, "node", "nodes"))
+	}
 }
 
 func saveCmd(c *Ctx, a *Args) (*render.Doc, error) {

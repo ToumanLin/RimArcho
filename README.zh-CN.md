@@ -44,6 +44,7 @@
 - [AI agent 与 MCP](#ai-agent-与-mcp)
 - [安装](#安装)
 - [隐私与安全](#隐私与安全)
+- [代码签名政策](#代码签名政策code-signing-policy)
 - [常见问题](#常见问题)
 - [链接](#链接)
 
@@ -55,7 +56,7 @@
 - **看得懂的日志**：报错按类归组、标出严重程度，并指向背后的 Mod。
 - **列表和游戏**：多个列表、多个游戏实例（1.6 和 1.7 并存）共用一套 Mod，每次改动都能撤销。
 - **一个程序，三种用法**：桌面窗口、终端界面、可写脚本的 CLI，以及给 AI agent 用的 MCP 服务，看到的是同一套事实。
-- **带上你的数据**：可从 RimSort、RimCrow 和 RimPy 导入列表、规则和数据。
+- **带上你的数据**：可从 RimSort、RimCrow、RimPy 和 RimStack 导入列表、规则和数据。
 
 <p align="center"><img src="docs/assets/readme/zh/13-performance.webp" width="720" alt="实测的内存和 CPU 占用"></p>
 
@@ -149,11 +150,11 @@ Archo MCP 让 agent 更会找错、修错，token 也用得更少：平均每个
 ### Windows
 
 1. 从 [GitHub Releases](https://github.com/ToumanLin/RimArcho/releases/latest) 下载 `archo-<版本号>-windows-amd64.zip`（GitHub 打不开时，可以从[蓝奏云](https://rimarcho.lanzn.com/b01i608qja)下载，密码 `ctot`）。
-2. **新用户：** 找个目录解压，例如 `C:\Tools\RimArcho\`，双击 `RimArcho.exe`。首次运行向导会找到你的游戏，读一遍 Mod，并提出从游戏、RimSort、RimCrow 或 RimPy 带上你的列表。
+2. **新用户：** 找个目录解压，例如 `C:\Tools\RimArcho\`，双击 `RimArcho.exe`。首次运行向导会找到你的游戏，读一遍 Mod，并提出从游戏、RimSort、RimCrow、RimPy 或 RimStack 带上你的列表。
 3. **老用户：** RimArcho 会自己更新（设置 › 关于，或 `archo update`）。手动更新的话，用新的 `RimArcho.exe` 和 `archo.exe` 替换旧的即可。
 4. 可选：把这个目录加入 `PATH`，就能在任何终端输入 `archo`。
 
-exe 没有代码签名，首次运行时 Windows 可能提示“Windows 已保护你的电脑”：选“更多信息”，再选“仍要运行”。每个版本都附带 `.sha256` 校验文件，你也可以用这份源码自己构建（见下文）。
+签名配置好之后，发布的 exe 都带代码签名（见[代码签名政策](#代码签名政策code-signing-policy)）。首次运行没有签名的版本时，Windows 可能提示“Windows 已保护你的电脑”：选“更多信息”，再选“仍要运行”。每个版本都附带 `.sha256` 校验文件，你也可以用这份源码自己构建（见下文）。如果提示没有权限、用管理员运行也不行，见常见问题“RimArcho.exe 打不开”。
 
 ### Linux（实验性）
 
@@ -241,24 +242,78 @@ RimArcho 的设计原则是尊重你的文件。它会写入的全部内容，�
 
 **它从不做什么**
 
-- 没有遥测。联网只限于你发起的操作，以及（开启自动检查时）检查更新（RimArcho、Mod、社区数据）和获取工坊介绍；这些都可以关闭。
+- 没有遥测、没有统计、没有崩溃上报。所有联网行为以及关闭方法见下文。
 - 从不索要、保存或转交密码和 Steam 令牌验证码：SteamCMD 只在它自己的窗口里登录，LoversLab 只在网站自己的页面里登录。
 - 从不永久删除你的内容：移除的 Mod、存档、整合包和设置文件都进回收站，列表的每次改动都能撤销。
 - AI agent 的改动和你的一样，只有在列表保存或启动时才会写入游戏；agent 也被要求在任何写入前先征得你的同意。
 - 反馈报告只在你点击发送时才会发出，发送前你能看到全部内容。
 
+### 哪些内容会联网
+
+除了你亲自发送的反馈报告，RimArcho 不向作者发送任何东西。它的全部联网行为都列在这里。大多数请求带有请求头 `RimArcho (+https://github.com/ToumanLin/RimArcho)`，和任何连接一样也会带上你的 IP 地址。开关在设置里，或用 `archo config set <键> <值>` 设置。
+
+**自动进行的**，只在窗口或 `archo tui` 打开时（命令行和 `archo mcp` 从不）：自动检查在启动 20 秒后开始，除注明外每项每天最多一次。`updates.auto off`（设置 › 关于，“自动检查更新”）会全部停止。它们不能逐项关闭；`updates.interval` 只改变频率。
+
+| 内容 | 发往 | 发送什么 | 另可关闭的方式 |
+| --- | --- | --- | --- |
+| RimArcho 更新检查 | `api.github.com`；Windows 上还有 `api.steampowered.com`（Archo Monitor 物品的介绍）和蓝奏云分享（`rimarcho.lanzn.com`、`apifile.woozooo.com`、`developer4.lanrar.com`） | 不含你的信息 | `updates.source github` 只用 GitHub |
+| Mod 更新检查 | `api.steampowered.com`；你从 Git、下载页、LoversLab 订阅的 Mod 所在的网站 | 用 SteamCMD 下载的 Mod 的工坊 ID；对 LoversLab，若你连接了账号，会带上你的 LoversLab 会话 | — |
+| LoversLab 会话续期（每 4 小时） | `www.loverslab.com` | 你的 LoversLab 会话，仅在你连接了账号时 | 断开账号 |
+| 工具版本（每周；只查 RimArcho 安装的工具） | Valve 的 SteamCMD 更新服务器、`api.github.com`（todds） | 不含你的信息 | — |
+| 社区数据：排序规则、Steam 数据库、替代 Mod | `raw.githubusercontent.com` | 不含你的信息 | 把 `data.rules.url`、`data.steamdb.url`、`data.replacements.url` 设为本地文件 |
+| Archo Monitor 更新 | `api.steampowered.com`，然后 SteamCMD 匿名登录 | 不含你的信息 | — |
+| 你发送过的反馈的回复（窗口启动时和打开反馈页时） | 反馈中转站 `rimarcho-feedback.toumanlin.workers.dev` | 报告编号和它的回复令牌 | `feedback.replies off` |
+
+**你查看或操作时才会进行的：**
+
+| 内容 | 发往 | 发送什么 | 关闭方式 |
+| --- | --- | --- | --- |
+| 选中 Mod 时读取它的工坊介绍 | `api.steampowered.com` | 它的工坊 ID | `workshop.fetch off` |
+| 介绍里的图片 | Mod 作者使用的图床 | 普通的图片请求 | `workshop.images off`（或 `workshop.fetch off`） |
+| 合集：导入合集，以及打开“全部列表”时重新读取列表关注的合集 | `api.steampowered.com` | 合集 ID | 没有开关（取消关注该合集） |
+| 订阅、下载 Mod 或游戏 | SteamCMD 和 Steam 客户端（它们自己连接 Valve）；`api.steampowered.com` | 工坊 ID；使用账号时的 Steam 账号名（密码只在 SteamCMD 里输入） | 每次都由你发起 |
+| 安装 SteamCMD、todds 或 RimArcho 更新 | Valve 的 SteamCMD 下载、GitHub（更新还有蓝奏云） | 不含你的信息 | 每次都由你发起 |
+| 反馈报告 | 反馈中转站，它会建成一个**公开的** GitHub issue | 你写的内容、你留的联系方式（不放进 issue），以及你勾选的信息：版本、系统、启用的 Mod、日志错误、隐去用户名的路径 | 你看过内容并点发送 |
+| 写功能建议时列出已有建议 | 反馈中转站 | 不含你的信息 | 没有开关 |
+| 导入 Rentry 列表 | `rentry.co` | 页面 ID | 由你发起 |
+
+**怎样连接。** 默认走 Windows 代理（`network.proxy`：`system`、`off` 或代理地址）。GitHub 请求失败时会改走公共 GitHub 镜像（`gh-proxy.com`、`ghfast.top`、`ghproxy.net`），镜像能看到所请求的 GitHub 地址；RimArcho 自身的更新信息和校验文件从不经过镜像。`network.github_mirror off` 可关闭。请求失败且没有设置代理时，RimArcho 会试探你本机（127.0.0.1）上常见的代理端口。蓝奏云直接连接、不走代理；RimArcho 会回答它简单的防机器人校验（固定计算，不运行网页脚本），并且和读取你订阅的下载页时一样，发送浏览器的 User-Agent。从 Git 订阅的 Mod 检查更新时不使用代理设置。你打开的链接交给你的浏览器。
+
+游戏内 Mod [Archo Monitor](#archo-monitor) 没有任何联网代码：它只把日志写在你的存档旁边。RimArcho 不修改 Windows 设置，只读取注册表（代理设置、Steam 所在目录）。
+
 **卸载**（设置里，或 `archo uninstall`）会先列出要移除的内容，再移除它的链接和数据，你的游戏、Mod 和存档保持原样。
+
+## 代码签名政策（Code signing policy）
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).（免费代码签名由 SignPath.io 提供，证书由 SignPath Foundation 颁发。）
+
+- Windows 版由 GitHub Actions 从本仓库构建（[`windows-release`](.github/workflows/ci.yml)），只有这些构建会送去签名，每个版本都要人工批准后才签名。签名的是 `archo.exe`、`RimArcho.exe` 和 Archo Monitor 的 `ArchoMonitor.dll`，发布者显示为 SignPath Foundation。签名配置好之前的版本没有签名。
+- 提交者和审核者（Committers and reviewers）：[ToumanLin](https://github.com/ToumanLin)
+- 批准者（Approvers）：[ToumanLin](https://github.com/ToumanLin)
+- 隐私：见[哪些内容会联网](#哪些内容会联网)。除了那里列出的自动检查（`archo config set updates.auto off` 可关闭），本程序不会向其他网络系统传输任何信息，除非使用者或安装、运行它的人明确要求。
 
 ## 常见问题
 
 <details>
 <summary><b>Windows 提示“Windows 已保护你的电脑”。</b></summary>
 
-exe 没有代码签名。选“更多信息”，再选“仍要运行”。你可以用 `.sha256` 文件核对下载，或自己从源码构建。
+这个版本没有代码签名（见[代码签名政策](#代码签名政策code-signing-policy)）。选“更多信息”，再选“仍要运行”。你可以用 `.sha256` 文件核对下载，或自己从源码构建。
 </details>
 
 <details>
-<summary><b>需要放弃 RimSort、RimCrow 或 RimPy 吗？</b></summary>
+<summary><b>RimArcho.exe 打不开：提示“没有权限”，用管理员运行也不行。</b></summary>
+
+RimArcho 不需要任何特殊权限，也从不需要管理员权限。刚下载的、没有代码签名的程序被拦下时，Windows 或杀毒软件会提示“Windows 无法访问指定设备、路径或文件。你可能没有适当的权限访问该项目”，用管理员运行也绕不过去。按顺序试：
+
+1. **先解压 ZIP。** 不要在压缩包窗口里直接运行 exe。解压前右键 ZIP，选“属性”，勾选“解除锁定”（如果有），点“确定”。解压到普通目录，比如 `D:\Games\RimArcho`，不要放进 `Program Files`。
+2. **杀毒软件。** 如果杀毒软件隔离或拦截了 `RimArcho.exe` 或 `archo.exe`，把它们恢复，并把 RimArcho 目录加入信任。想确认文件没被改过，可以先用 `.sha256` 文件核对 ZIP。
+3. **智能应用控制**（Windows 11：设置 › 隐私和安全性 › Windows 安全中心 › 应用和浏览器控制）。开启时它会拦下所有没有签名的程序，且无法单独放行；关掉后不重置系统就开不回来。我们正在申请免费的代码签名来解决这个问题；在那之前，开着它就无法运行 RimArcho。
+
+还是打不开？把完整提示（最好截图）和 Windows 版本发到 [GitHub issues](https://github.com/ToumanLin/RimArcho/issues) 或 Discord。
+</details>
+
+<details>
+<summary><b>需要放弃 RimSort、RimCrow、RimPy 或 RimStack 吗？</b></summary>
 
 不需要。首次运行向导（以及 `archo import`）会读取它们的列表、规则和数据，在改动任何东西之前先展示会导入什么。RimArcho 从不写入它们的文件。
 </details>

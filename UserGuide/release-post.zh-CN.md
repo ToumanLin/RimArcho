@@ -13,7 +13,7 @@
 1. 新用户: 找个目录解压, 双击 RimArcho.exe
 2. 老用户: 用新的 RimArcho.exe 和 archo.exe 替换旧的
 
-exe没有代码签名, 首次运行时Windows可能提示"Windows 已保护你的电脑": 选"更多信息", 再选"仍要运行".
+代码签名政策（Code signing policy）: 签名配置好之后, 发布版由 GitHub Actions 构建, 通过 SignPath.io 免费签名, 证书由 SignPath Foundation 颁发 (见 README 的"代码签名政策"). 首次运行没有签名的版本时, Windows可能提示"Windows 已保护你的电脑": 选"更多信息", 再选"仍要运行".
 
 ![启动页](../docs/assets/release-post/zh/01-home.png)
 

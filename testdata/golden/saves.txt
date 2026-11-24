@@ -273,7 +273,7 @@ $ archo saves backup Tundra Broken --yes
 backed up 2 saves, 912 B
   sv:<Tundra.rws>  Tundra/Tundra  487 B  $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Tundra.rws
   sv:<Broken.rws>  Broken/Broken  425 B  $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Broken.rws
-  to: $ROOT/ArchoHome/backups/saves/20261001-100000
+  to: $ROOT/ArchoHome/backups/saves/20261001-100000-2
 
 $ archo saves trash Broken
 recycle preview, nothing moved: 1 save, 425 B

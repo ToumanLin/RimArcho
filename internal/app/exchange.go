@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"os"
@@ -138,6 +139,10 @@ func (a *App) exportList(st *LoadoutState, format string, settings bool) ([]byte
 		return RimCrowXML(tokens, ws, names), nil
 	case FormatWorkshop:
 		return a.workshopLinks(st), nil
+	case FormatRimStack:
+		return RimStackList(st.Plan.Name, tokens), nil
+	case FormatRimStackText:
+		return RimStackText(game, tokens, ws, names), nil
 	case FormatRimSort:
 		format = FormatModsConfig
 	}
@@ -171,7 +176,7 @@ func (a *App) exportList(st *LoadoutState, format string, settings bool) ([]byte
 		}
 		return loadout.Render(nil, version, tokens, known)
 	}
-	return nil, fmt.Errorf("unknown format %q (archo, text, modsconfig, rimsort, rml, rimcrow, rimcrow-xml, workshop)", format)
+	return nil, fmt.Errorf("unknown format %q (archo, text, modsconfig, rimsort, rml, rimcrow, rimcrow-xml, rimstack, rimstack-text, workshop)", format)
 }
 
 // workshopLinks writes the list as Workshop links in load order, then names what is not in
@@ -451,10 +456,25 @@ func mergeEntries(st *LoadoutState, il *ImportedList, keep func(loadout.Entry) b
 	return out
 }
 
-// RentryRaw is where a Rentry page's text is read (%s is the page's id).
-var RentryRaw = "https://rentry.co/%s/raw"
+// RentryEdit is where a Rentry page's text is read (%s is the page's id): its edit page,
+// whose text box holds the page's Markdown. Rentry's /raw needs an access code and answers
+// 200 with a page that says so.
+var RentryEdit = "https://rentry.co/%s/edit"
 
-var rentryLinkRe = regexp.MustCompile(`^https?://(?:www\.)?rentry\.(?:co|org)/([A-Za-z0-9_\-]+)/?(?:raw/?)?$`)
+// rentryTextRe is the edit page's text box (name="text"; the metadata box is another).
+var rentryTextRe = regexp.MustCompile(`(?s)<textarea\b[^>]*\bname="text"[^>]*>(.*?)</textarea>`)
+
+// rentryText is the Markdown a Rentry edit page holds, unescaped; a body that is not such a
+// page is taken as the text itself.
+func rentryText(b []byte) []byte {
+	m := rentryTextRe.FindSubmatch(b)
+	if m == nil {
+		return b
+	}
+	return []byte(strings.TrimPrefix(html.UnescapeString(string(m[1])), "\n"))
+}
+
+var rentryLinkRe = regexp.MustCompile(`^https?://(?:www\.)?rentry\.(?:co|org)/([A-Za-z0-9_\-]+)/?(?:(?:raw|edit)/?)?$`)
 
 // RentryID returns the page id of a Rentry link ("" when it is not one).
 func RentryID(s string) string {
@@ -470,7 +490,7 @@ func (a *App) ReadRentry(link string) (*ImportedList, error) {
 	if id == "" {
 		return nil, fmt.Errorf("%q is not a Rentry link", link)
 	}
-	req, err := http.NewRequest("GET", fmt.Sprintf(RentryRaw, id), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf(RentryEdit, id), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -487,7 +507,7 @@ func (a *App) ReadRentry(link string) (*ImportedList, error) {
 	if err != nil {
 		return nil, err
 	}
-	l, err := ParseList(b)
+	l, err := ParseList(rentryText(b))
 	if err != nil {
 		return nil, err
 	}

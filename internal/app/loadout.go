@@ -857,6 +857,12 @@ type SortResult struct {
 	// MonitorSkipped says why the sort did not add Archo Monitor although monitor.default
 	// is on and it is installed (no Harmony, Mods/ cannot hold links); "" otherwise.
 	MonitorSkipped string `json:"monitorSkipped,omitempty"`
+	// Contests: same-target XML patches among the list's Mods (08 §1.6), information only:
+	// the sort does not order for them. ContestNote says why there are none to read
+	// (ContestNoAnalysis); "" otherwise.
+	Contests    []PatchContest `json:"-"`
+	Unsorted    loadout.List   `json:"-"` // the list sorted, with what the sort added (Core, Archo Monitor)
+	ContestNote string         `json:"contestNote,omitempty"`
 }
 
 // sortMonitor puts the newest installed Archo Monitor right after Harmony when
@@ -1020,11 +1026,16 @@ func (a *App) sortList(st *LoadoutState, l loadout.List) (*SortResult, error) {
 		return nil, err
 	}
 	r := order.Sort(in)
+	// Same-target patches (08 §1.6): shown, never sorted for.
+	contests, contestNote, err := a.PatchContests(st, l)
+	if err != nil {
+		return nil, err
+	}
 	sorted := make(loadout.List, 0, len(l))
 	for _, i := range r.Order {
 		sorted = append(sorted, l[i])
 	}
-	out := &SortResult{Input: in, Result: r, Sorted: sorted, Changes: loadout.Diff(before, sorted, st.LineageOf), MonitorSkipped: monitorSkipped}
+	out := &SortResult{Input: in, Result: r, Sorted: sorted, Changes: loadout.Diff(before, sorted, st.LineageOf), MonitorSkipped: monitorSkipped, Contests: contests, ContestNote: contestNote, Unsorted: l}
 	state := *st
 	state.List = sorted
 	out.MissingDependencies, err = a.MissingDependencies(&state)
@@ -1610,9 +1621,10 @@ func (ix *Index) replacedPackage(ref string) (string, error) {
 // reference) to its stored, lineage-keyed form:
 //
 //	decl:#a3f9:loadafter:brrainz.harmony   official:#a3f9   community:<pkg>:loadafter:<pkg>
+//	contested:#a3f9:#b7c2 (08 §1.6: hides a pair's same-target notes)
 func (ix *Index) StoredConstraintRef(ref string) (string, error) {
 	parts := strings.Split(ref, ":")
-	bad := fmt.Errorf("%q is not a constraint reference (decl:<ref>:<field>:<pkg>, official:<ref> or community:<pkg>:<field>:<pkg>, as printed by archo sort)", ref)
+	bad := fmt.Errorf("%q is not a constraint reference (decl:<ref>:<field>:<pkg>, official:<ref>, community:<pkg>:<field>:<pkg> or contested:<ref>:<ref>, as printed by archo sort or problems)", ref)
 	switch strings.ToLower(parts[0]) {
 	case "decl":
 		if len(parts) != 4 {
@@ -1632,6 +1644,22 @@ func (ix *Index) StoredConstraintRef(ref string) (string, error) {
 			return "", err
 		}
 		return order.OfficialRef(lin), nil
+	case "contested":
+		if len(parts) != 3 {
+			return "", bad
+		}
+		x, err := ix.ResolveLineage(parts[1])
+		if err != nil {
+			return "", err
+		}
+		y, err := ix.ResolveLineage(parts[2])
+		if err != nil {
+			return "", err
+		}
+		if x == y {
+			return "", fmt.Errorf("%q names one Mod twice", ref)
+		}
+		return ContestedRef(x, y), nil
 	case "community":
 		if len(parts) == 3 && (strings.EqualFold(parts[2], "loadtop") || strings.EqualFold(parts[2], "loadbottom")) {
 			parts = append(parts, "") // community:<pkg>:loadtop (08 §1.5)
@@ -1652,6 +1680,8 @@ func (ix *Index) DisplayConstraintRef(stored string, primaryOf func(lineage stri
 		return "decl:" + primaryOf(parts[1]) + ":" + parts[2] + ":" + parts[3]
 	case parts[0] == "official" && len(parts) == 2:
 		return "official:" + primaryOf(parts[1])
+	case parts[0] == "contested" && len(parts) == 3:
+		return "contested:" + primaryOf(parts[1]) + ":" + primaryOf(parts[2])
 	}
 	return stored
 }

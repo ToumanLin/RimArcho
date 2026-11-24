@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SignPath artifact configuration for RimArcho's Windows release (17 §5): paste it as the
+  project's default artifact configuration on signpath.io
+  (docs/research/2026-11-24_signpath-code-signing.md).
+
+  The artifact is CI's archo-windows-amd64-unsigned: the contents of
+  dist/archo-<version>-windows-amd64/ that scripts/release.ps1 -StageOnly builds, at the
+  artifact's root. Signed: the two executables and Archo Monitor's three DLLs. Everything else
+  (README, CHANGELOG, LICENSE, skills/, Monitor's XML and images) passes through unchanged.
+
+  Metadata (SignPath Foundation terms, "Artifact configuration"): product name RimArcho on
+  every file (scripts/winres for the exes, <Product> in monitor/ArchoMonitor.csproj for the
+  DLL); product version the release version for the exes (scripts/winres writes it as both
+  FileVersion and ProductVersion) and monitor/VERSION for the DLL (InformationalVersion).
+  CI passes both as the signing request's parameters.
+-->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="version" required="true" />
+    <parameter name="monitorVersion" required="true" />
+  </parameters>
+  <zip-file>
+    <pe-file path="archo.exe" product-name="RimArcho" product-version="${version}">
+      <authenticode-sign />
+    </pe-file>
+    <pe-file path="RimArcho.exe" product-name="RimArcho" product-version="${version}">
+      <authenticode-sign />
+    </pe-file>
+    <pe-file path="monitor/ArchoMonitor/1.5/Assemblies/ArchoMonitor.dll" product-name="RimArcho" product-version="${monitorVersion}">
+      <authenticode-sign />
+    </pe-file>
+    <pe-file path="monitor/ArchoMonitor/1.6/Assemblies/ArchoMonitor.dll" product-name="RimArcho" product-version="${monitorVersion}">
+      <authenticode-sign />
+    </pe-file>
+    <pe-file path="monitor/ArchoMonitor/1.7/Assemblies/ArchoMonitor.dll" product-name="RimArcho" product-version="${monitorVersion}">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

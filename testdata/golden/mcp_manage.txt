@@ -21,6 +21,7 @@ settings
   monitor.default: on
   network.github_mirror: auto
   network.proxy: system
+  saves.launch_copy: on
   tags.pinned: RimWorld,framework,visuals,apparel,races,weapons,buildings,furniture,QoL,balance,story,performance,language packs,testing,to delete
   ui.accent: default
   ui.archo.motion: live
@@ -369,6 +370,35 @@ next:
   archo tag list
   archo rule list
 
+> maintenance {"action":"import_rimstack","dir":"$ROOT/RimStack","dry_run":true}
+import rimstack (dry run: nothing written)
+  folder: $ROOT/RimStack (only read)
+  mods: 1 with data: 1 mapped by packageId, 0 not mapped
+  notes: 0 new, 0 already set
+  tags: 1 new, 0 already present (ignored warnings and trusted versions: one tag)
+  categories: 0 new top/bottom rules, 0 already present (Loaders = top, Last = bottom)
+  rules: 1: 1 new before rules, 0 already present, 0 skipped
+  conflicts (1):
+    tester.b  note: RimArcho has "a note", RimStack "from RimStack" (kept RimArcho's)
+next:
+  archo import rimstack --dir $ROOT/RimStack
+  archo loadout import $ROOT/RimStack/lists/<name>.json --new
+
+> maintenance {"action":"import_rimstack","dir":"$ROOT/RimStack"}
+import rimstack
+  folder: $ROOT/RimStack (only read)
+  mods: 1 with data: 1 mapped by packageId, 0 not mapped
+  notes: 0 new, 0 already set
+  tags: 1 new, 0 already present (ignored warnings and trusted versions: one tag)
+  categories: 0 new top/bottom rules, 0 already present (Loaders = top, Last = bottom)
+  rules: 1: 1 new before rules, 0 already present, 0 skipped
+  conflicts (1):
+    tester.b  note: RimArcho has "a note", RimStack "from RimStack" (kept RimArcho's)
+next:
+  archo tag list
+  archo rule list
+  archo loadout import $ROOT/RimStack/lists/<name>.json --new
+
 > maintenance {"action":"gc","dry_run":true}
 gc: would remove 0 tombstones (tombstones older than 90 days, before 2026-07-03)
   snapshots: 0 superseded (0 file rows)
@@ -381,7 +411,7 @@ gc: removed 0 tombstones (tombstones older than 90 days, before 2026-07-03)
 database maintenance: would remove 6 old file records and compact the database
 
 > maintenance {"action":"vacuum"}
-database compacted: freed 64.4 KB (now 560.0 KB)
+database compacted: freed 80.5 KB (now 560.0 KB)
 
 > edit_loadout {"action":"disable","refs":["#hnyg"]}
 workspace: 2 active, 1 change unsaved (plan:default, env:main)

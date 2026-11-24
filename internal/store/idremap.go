@@ -232,14 +232,14 @@ func mergePlayerData(tx *sql.Tx, m map[string]string) error {
 	if err := remapFunctional(tx, m); err != nil {
 		return err
 	}
-	type data struct{ alias, note string }
+	type data struct{ alias, note, category string }
 	var order []string
 	all := map[string]*data{}
-	type drow struct{ lin, alias, note string }
+	type drow struct{ lin, alias, note, category string }
 	var drows []drow
-	if err := eachRow(tx, `SELECT lineage_id, alias, note FROM lineage_data ORDER BY rowid`, func(r *sql.Rows) error {
+	if err := eachRow(tx, `SELECT lineage_id, alias, note, category FROM lineage_data ORDER BY rowid`, func(r *sql.Rows) error {
 		var x drow
-		if err := r.Scan(&x.lin, &x.alias, &x.note); err != nil {
+		if err := r.Scan(&x.lin, &x.alias, &x.note, &x.category); err != nil {
 			return err
 		}
 		drows = append(drows, x)
@@ -262,6 +262,9 @@ func mergePlayerData(tx *sql.Tx, m map[string]string) error {
 		}
 		if d.alias == "" {
 			d.alias = strings.TrimSpace(x.alias)
+		}
+		if d.category == "" {
+			d.category = x.category
 		}
 		d.note = joinText(d.note, x.note)
 	}
@@ -288,10 +291,10 @@ func mergePlayerData(tx *sql.Tx, m map[string]string) error {
 	}
 	for _, lin := range order {
 		d := all[lin]
-		if d.alias == "" && d.note == "" {
+		if d.alias == "" && d.note == "" && d.category == "" {
 			continue
 		}
-		if _, err := tx.Exec(`INSERT INTO lineage_data(environment_id, lineage_id, alias, note) VALUES('', ?, ?, ?)`, lin, d.alias, d.note); err != nil {
+		if _, err := tx.Exec(`INSERT INTO lineage_data(environment_id, lineage_id, alias, note, category) VALUES('', ?, ?, ?, ?)`, lin, d.alias, d.note, d.category); err != nil {
 			return err
 		}
 	}

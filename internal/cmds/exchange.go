@@ -11,7 +11,7 @@ import (
 
 func init() {
 	register(&Command{Name: "loadout export", Summary: "write the workspace as a list file: a RimArcho list (each mod with its version), text, ModsConfig.xml (rimsort), RimWorld's .rml, or a RimCrow share code", MaxArgs: 0, Run: loadoutExport,
-		Flags: []Flag{{Name: "format", Value: "text|archo|modsconfig|rimsort|rml|rimcrow|rimcrow-xml|workshop"}, {Name: "out", Value: "<file>", Help: "default: print to stdout"},
+		Flags: []Flag{{Name: "format", Value: "text|archo|modsconfig|rimsort|rml|rimcrow|rimcrow-xml|rimstack|rimstack-text|workshop"}, {Name: "out", Value: "<file>", Help: "default: print to stdout"},
 			{Name: "settings", Help: "a RimArcho list (--format archo) also carries the list's Mod settings, by package and settings class"}}})
 	register(&Command{Name: "loadout import", Args: "<file|share code> [<name>]", Summary: "replace the workspace with a list (RimArcho, text, ModsConfig.xml, save, .rml, RimSort, RimCrow, workshop IDs; undoable), or with --new make it a new plan",
 		MinArgs: 1, MaxArgs: 2, Flags: []Flag{{Name: "new", Help: "import as a new plan named <name> (default: the list's own name or the file name)"}}, Run: loadoutImport})
@@ -84,7 +84,7 @@ func loadoutImport(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	kind := map[string]string{app.FormatArcho: "RimArcho list", app.FormatText: "text list", app.FormatModsConfig: "ModsConfig.xml", app.FormatSave: "save", app.FormatRML: "RimWorld mod list (.rml)",
 		"rimcrow-modlist": "RimCrow ModList.xml", "rimcrow-json": "RimCrow JSON list", "rimcrow-share": "RimCrow share code", "rimsort-json": "RimSort JSON list",
-		"rimsort-text": "RimSort clipboard list", "rentry": "Rentry list"}[il.Format]
+		"rimsort-text": "RimSort clipboard list", "rentry": "Rentry list", "rimstack-list": "RimStack saved list", "rimstack-text": "RimStack copied list"}[il.Format]
 	line := fmt.Sprintf("imported %d entries from a %s", len(r.State.List), kind)
 	if il.Game != "" {
 		line += ", game " + il.Game

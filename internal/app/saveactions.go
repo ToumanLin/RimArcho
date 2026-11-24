@@ -3,9 +3,11 @@ package app
 import (
 	"crypto/sha1"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -644,4 +646,64 @@ func (a *App) TrashSaves(saves []*Save, yes bool, token string) (*SaveFilesResul
 	}
 	r.Done = true
 	return r, nil
+}
+
+// The writes of automatic save copies at launch (12 §4.4; savelaunchcopy.go).
+
+// writeLaunchCopy copies the save into a staging folder, writes the marker, then renames
+// the folder to its time name (-2, -3… when a backup has it), so a copy cut short never
+// looks like a backup.
+func writeLaunchCopy(root, stamp, save string, info launchCopyInfo, r *LaunchCopyResult) error {
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		return err
+	}
+	stage, err := os.MkdirTemp(root, launchCopyStaging+stamp+"-")
+	if err != nil {
+		return err
+	}
+	fail := func(err error) error { os.RemoveAll(stage); return err }
+	to := filepath.Join(stage, info.File)
+	if err := copyFileExcl(save, to); err != nil {
+		return fail(err)
+	}
+	os.Chtimes(to, info.ModTime, info.ModTime)
+	b, _ := json.MarshalIndent(info, "", "  ")
+	if err := os.WriteFile(filepath.Join(stage, launchCopyMarker), b, 0o644); err != nil {
+		return fail(err)
+	}
+	dir := filepath.Join(root, stamp)
+	for n := 2; ; n++ {
+		if _, err := os.Lstat(dir); errors.Is(err, os.ErrNotExist) {
+			if err := os.Rename(stage, dir); err != nil {
+				return fail(err)
+			}
+			r.Dir = dir
+			return nil
+		}
+		dir = filepath.Join(root, fmt.Sprintf("%s-%d", stamp, n))
+	}
+}
+
+// pruneLaunchCopies deletes the automatic copies beyond keep, and staging folders an
+// interrupted copy left, and returns how many copies it deleted.
+func pruneLaunchCopies(root string, keep int) int {
+	if ents, err := os.ReadDir(root); err == nil {
+		for _, de := range ents {
+			if de.IsDir() && strings.HasPrefix(de.Name(), launchCopyStaging) {
+				if fi, err := de.Info(); err == nil && time.Since(fi.ModTime()) > time.Hour {
+					os.RemoveAll(filepath.Join(root, de.Name()))
+				}
+			}
+		}
+	}
+	n := 0
+	copies := launchCopies(root)
+	for i := keep; i < len(copies); i++ {
+		if err := os.RemoveAll(copies[i].dir); err != nil {
+			log.Printf("launch: deleting an old automatic save copy: %v", err)
+			continue
+		}
+		n++
+	}
+	return n
 }

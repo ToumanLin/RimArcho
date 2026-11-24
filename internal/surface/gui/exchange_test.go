@@ -15,7 +15,7 @@ import (
 func TestExchangeAPI(t *testing.T) {
 	t.Parallel()
 	_, api, _ := fixture(t)
-	if x := api.ExchangeInfo(); x.Dialogs || len(x.Formats) != 8 || x.Formats[0].ID != "archo" {
+	if x := api.ExchangeInfo(); x.Dialogs || len(x.Formats) != 10 || x.Formats[0].ID != "archo" {
 		t.Fatalf("info: %+v", x)
 	}
 	if f, err := api.PickImportFile(); f != "" || err != nil || api.Clipboard() != "" {

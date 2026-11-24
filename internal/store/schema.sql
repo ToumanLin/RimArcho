@@ -75,6 +75,7 @@ CREATE TABLE "source_use"(
   error TEXT NOT NULL DEFAULT '', decompiled_at INTEGER NOT NULL, mode TEXT NOT NULL DEFAULT 'project', PRIMARY KEY(dll_hash, instance_id));
 CREATE TABLE lineage_data(
   environment_id TEXT NOT NULL, lineage_id TEXT NOT NULL, alias TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
+  category TEXT NOT NULL DEFAULT '',
   PRIMARY KEY(environment_id, lineage_id));
 -- pos: the tag's place among the lineage's tags (0 first); the first tag's colour marks the Mod
 CREATE TABLE "lineage_tag"(

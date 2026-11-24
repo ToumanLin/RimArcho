@@ -8,7 +8,8 @@
 #
 # Refuses: a dirty working tree, a commit GitHub does not have yet (push it first), a tag or
 # release that already exists, a missing or mismatched asset, binaries built from another
-# commit, and a CHANGELOG without the version's section. Needs gh, signed in (gh auth login).
+# commit, a stable release without a passing update rehearsal of this ZIP
+# (scripts/vm/update-rehearsal.ps1), and a CHANGELOG without the version's section. Needs gh, signed in (gh auth login).
 param(
     [Parameter(Mandatory = $true)][string]$Version,
     [string]$OutputDir = "dist",
@@ -51,8 +52,33 @@ foreach ($archive in "archo-$Version-windows-amd64.zip", "archo-$Version-linux-a
 # The Windows build must report this version and commit, not a dirty or older one.
 $exe = Join-Path $OutputDir "archo-$Version-windows-amd64\archo.exe"
 if (-not (Test-Path -LiteralPath $exe)) { throw "$exe is missing; run scripts/release.ps1 -Version $Version" }
-$built = (& $exe version | Select-Object -First 1)
+# A built program never runs against the player's real data folder (17 §4): an unreleased
+# schema would lock released RimArcho out of it.
+function Invoke-Isolated([string]$Exe, [string[]]$Arguments) {
+    $saved = $env:RIMARCHO_HOME
+    $env:RIMARCHO_HOME = Join-Path ([IO.Path]::GetTempPath()) ("rimarcho-release-" + [guid]::NewGuid().ToString("N"))
+    try { & $Exe @Arguments } finally {
+        Remove-Item -LiteralPath $env:RIMARCHO_HOME -Recurse -Force -ErrorAction SilentlyContinue
+        $env:RIMARCHO_HOME = $saved
+    }
+}
+$built = (Invoke-Isolated $exe @("version") | Select-Object -First 1)
 if ($built -notmatch "^archo $([regex]::Escape($Version)) \($short, ") { throw "the built archo.exe says '$built', not $Version at $short; rebuild with scripts/release.ps1" }
+
+# A stable release has passed the update rehearsal (17 §5): this very ZIP updated itself in
+# the VM. scripts/vm/update-rehearsal.ps1 writes the record beside the ZIP on a pass.
+if (-not $prerelease) {
+    $zip = Join-Path $OutputDir "archo-$Version-windows-amd64.zip"
+    $rec = Join-Path $OutputDir "update-rehearsal-$Version.json"
+    $again = "run: pwsh scripts/vm/update-rehearsal.ps1 -Candidate $zip"
+    if (-not (Test-Path -LiteralPath $rec)) { throw "no update rehearsal for $Version ($rec); $again" }
+    $r = Get-Content -Raw -LiteralPath $rec | ConvertFrom-Json
+    $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+    if (-not $r.passed -or $r.version -ne $Version -or $r.commit -ne $short -or $r.sha256 -ne $hash) {
+        throw "the update rehearsal record does not match this ZIP (passed $($r.passed), $($r.version) at $($r.commit)); $again"
+    }
+    Write-Host "rehearsal: passed $($r.date) ($Version -> $($r.rehearsal))"
+}
 
 # Notes: CHANGELOG.md's section for this version, or -NotesFile.
 if ($NotesFile) {
@@ -69,6 +95,8 @@ if ($NotesFile) {
     $notes = ($lines[$start..($end - 1)] -join "`n").Trim()
 }
 if (-not $notes.Trim()) { throw "the release notes are empty" }
+# SignPath Foundation's terms ask for "Code signing policy" on the release pages too (17 §5).
+$notes = $notes.TrimEnd() + "`n`n---`n[Code signing policy](https://github.com/$Repo#code-signing-policy) · [Privacy: what goes over the network](https://github.com/$Repo#what-goes-over-the-network)"
 $notesPath = Join-Path ([IO.Path]::GetTempPath()) "rimarcho-notes-$Version.md"
 [IO.File]::WriteAllText($notesPath, $notes + "`n", [Text.UTF8Encoding]::new($false))
 

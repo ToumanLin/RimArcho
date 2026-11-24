@@ -28,6 +28,10 @@ type Index struct {
 	inst, lin *ids.Shortener
 	own       map[string]*store.Mod // packageId → this game's own Mods/ copy (OwnCopy)
 	corpus    func() *corpus.Active // this environment's corpus data (Patterns, Known, Observed)
+
+	// cats are the Mods' categories, worked out on first use; copies of the index (ReadIndex)
+	// share them, as they share the Mods.
+	cats *indexCategories
 }
 
 // OwnCopy is this game's own Mods/ copy of a packageId (not a RimArcho link), or nil. A list
@@ -108,13 +112,13 @@ func (a *App) readIndex(e *env.Environment, repair bool) (*Index, error) {
 	}
 	for _, m := range mods {
 		if p := pd[m.LineageID]; p != nil {
-			m.Alias, m.Note, m.Tags = p.Alias, p.Note, slices.Clip(p.Tags)
+			m.Alias, m.Note, m.Category, m.Tags = p.Alias, p.Note, p.Category, slices.Clip(p.Tags)
 		}
 	}
 	if mods, srcs, err = a.withElsewhere(e, mods, srcs); err != nil {
 		return nil, err
 	}
-	ix := &Index{store: a.Store, Env: e, Mods: mods, ByID: map[string]*store.Mod{}, ByLineage: map[string][]*store.Mod{}, Lineages: lins, Sources: srcs,
+	ix := &Index{store: a.Store, Env: e, Mods: mods, ByID: map[string]*store.Mod{}, ByLineage: map[string][]*store.Mod{}, Lineages: lins, Sources: srcs, cats: &indexCategories{},
 		corpus: func() *corpus.Active { return a.CorpusData(e) }}
 	var iids, lids []string
 	ix.own = map[string]*store.Mod{}

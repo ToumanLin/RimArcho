@@ -342,6 +342,9 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 
 	mon := SettingItem{Label: T("add Archo Monitor to lists"), Value: cmds.Setting(a, "monitor.default"), Edit: "choice", Choices: []string{"on", "off"},
 		ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "monitor.default", "{}"}, Hover: T("new lists, and every sort")}
+	// 12 §4.4: the newest save is copied before each launch
+	saveCopy := onOff(T("back up the newest save at launch"), "saves.launch_copy")
+	saveCopy.Hover = Tf("keeps the last %d copies in backups/saves; your own backups stay", app.LaunchCopyKeep)
 	if s, err := a.MonitorState(); err == nil {
 		v, path := T("not installed"), s.Dir
 		if s.Newest != nil {
@@ -349,9 +352,9 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		} else if len(s.Installed) > 0 {
 			v = s.Installed[0]
 		}
-		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon, {Key: "monitor.installed", Label: T("Archo Monitor installed"), Value: v, Note: path, NotePaths: []string{path}}}})
+		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon, {Key: "monitor.installed", Label: T("Archo Monitor installed"), Value: v, Note: path, NotePaths: []string{path}}, saveCopy}})
 	} else {
-		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon}})
+		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon, saveCopy}})
 	}
 	out = append(out, NetworkGroup(a))
 	if g, ok := AgentGroup(a); ok {
@@ -393,7 +396,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 			{Label: T("compact"), Argv: []string{"db", "vacuum"}},
 			{Label: T("remove old tombstones"), Argv: []string{"gc"}, Confirm: T("mods gone for longer than the tombstone time are forgotten")},
 		}},
-		{Key: "import.managers", Label: T("import from RimSort, RimCrow or RimPy"), Actions: []SettingAction{{Label: T("import…"), Argv: []string{"import-managers"}}}},
+		{Key: "import.managers", Label: T("import from RimSort, RimCrow, RimPy or RimStack"), Actions: []SettingAction{{Label: T("import…"), Argv: []string{"import-managers"}}}},
 	}}
 	for _, c := range a.Caches() {
 		storage.Items = append(storage.Items, SettingItem{Label: T(c.Desc), Value: Tf("%s  %d items", SizeText(c.Bytes), c.Files),

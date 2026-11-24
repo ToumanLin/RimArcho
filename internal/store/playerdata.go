@@ -8,7 +8,9 @@ import (
 // PlayerData is what the player attached to a lineage (07 §6.1).
 type PlayerData struct {
 	Alias, Note string
-	Tags        []string
+	// Category is the player's category for the Mod (07 §6.1, 16 §2.5), "" for the automatic one.
+	Category string
+	Tags     []string
 }
 
 // PlayerDataAll returns every lineage's player data. It is global, like the lineages
@@ -21,19 +23,19 @@ func (s *Store) PlayerDataAll(envID string) (map[string]*PlayerData, error) {
 		}
 		return out[lin]
 	}
-	rows, err := s.DB.Query(`SELECT lineage_id, alias, note FROM lineage_data`)
+	rows, err := s.DB.Query(`SELECT lineage_id, alias, note, category FROM lineage_data`)
 	if err != nil {
 		return nil, err
 	}
 	for rows.Next() {
-		var lin, alias, note string
-		if err := rows.Scan(&lin, &alias, &note); err != nil {
+		var lin, alias, note, cat string
+		if err := rows.Scan(&lin, &alias, &note, &cat); err != nil {
 			rows.Close()
 			return nil, err
 		}
-		if alias != "" || note != "" {
+		if alias != "" || note != "" || cat != "" {
 			p := get(lin)
-			p.Alias, p.Note = alias, note
+			p.Alias, p.Note, p.Category = alias, note, cat
 		}
 	}
 	rows.Close()
@@ -61,6 +63,23 @@ func (s *Store) SetAlias(envID, lineage, alias string) error {
 // SetNote sets (or with "" clears) a lineage's note.
 func (s *Store) SetNote(envID, lineage, note string) error {
 	return s.setData(envID, lineage, "note", strings.TrimSpace(note))
+}
+
+// SetCategory sets (or with "" clears) the player's category of a lineage (07 §6.1). The
+// caller checks the key (app.CategoryKeys).
+func (s *Store) SetCategory(lineage, category string) error {
+	return s.setData(Shared, lineage, "category", strings.TrimSpace(category))
+}
+
+// upgradeLineageCategory adds the player's category to lineage_data (schema 44).
+// A database that already has it (a fresh schema set back to an older version) is left as it is.
+func upgradeLineageCategory(tx *sql.Tx, _ func(int64, int64)) error {
+	var n int
+	if err := tx.QueryRow(`SELECT count(*) FROM pragma_table_info('lineage_data') WHERE name='category'`).Scan(&n); err != nil || n > 0 {
+		return err
+	}
+	_, err := tx.Exec(`ALTER TABLE lineage_data ADD COLUMN category TEXT NOT NULL DEFAULT ''`)
+	return err
 }
 
 func (s *Store) setData(envID, lineage, col, v string) error {

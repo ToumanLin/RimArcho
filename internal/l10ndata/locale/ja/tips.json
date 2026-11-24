@@ -23,7 +23,7 @@
   "Create a pack to keep Mod versions fixed and play with its own saves.": "MODパックを作成するとバージョンを固定し、専用のセーブデータで遊べます。",
   "Press Shift+E on a pack's page to export its list without the Mod files.": "パック画面でShift+Eを押すと、MODファイルなしでリストだけをエクスポートできます。",
   "Use Export in All lists to copy a share code for a friend.": "「すべてのリスト」のエクスポート機能で、共有コードをコピーできます。",
-  "Import in the sidebar brings over your lists from RimSort, RimCrow or RimPy.": "サイドバーの「インポート」でRimSort・RimCrow・RimPyのリストを移行できます。",
+  "Import in the sidebar brings over your lists from RimSort, RimCrow, RimPy or RimStack.": "サイドバーの「インポート」でRimSort・RimCrow・RimPy・RimStackのリストを移行できます。",
   "Tick several detected games in the guide to add them together.": "初期設定ガイドでは複数のゲームを選択してまとめて登録できます。",
   "Choose the game's current list in the guide to start with your enabled Mods.": "初期設定ガイドでゲームの現在のリストを選ぶと、有効なMODから始められます。",
   "In the guide, open a pack file or paste a Steam Workshop collection link.": "初期設定ガイドではパックファイルやSteamワークショップのコレクションを指定できます。",

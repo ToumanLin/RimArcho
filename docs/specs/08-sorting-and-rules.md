@@ -93,6 +93,20 @@ Sources: community `loadTop` / `loadBottom` (`{"value": true}`), user `top` / `b
 - `archo sort` lists each top and bottom Mod under "ends", with its source, how to suppress it and how many Mods it pulled; those pulled both ways are marked `[also pulled to the other end]`.
 - There are no RimCrow-style position weights, alphabetical tie-breaking or positions guessed from the kind of Mod (translations, textures): the corpus gives no evidence for them, and they cause too many moves on every sort.
 
+### 1.6 Same patch target: shown, not sorted for
+
+Sorting infers no order from XML patches. The game merges every enabled Mod's Defs into one document before it applies any patch (`Verse.LoadedModManager.LoadAllActiveMods`: `CombineIntoUnifiedXML`, then `ApplyPatches`, which runs each Mod's PatchOperations in load order on the merged document). So a Mod that patches another Mod's Defs finds them in either order, and an "A after B because A patches B" rule (RimStack's idea) would only move Mods. The patch analysis (05 §5.2) agrees: it finds such a patch's target in either order.
+
+The order decides something only when two Mods' patches act on the same node: the later Mod's change is what the game keeps. These are the `patch.contested` findings (05 §4.3): two or more enabled Mods replace or remove the same node (the Def and element path), in the analysis's own run, so a patch whose `MayRequire`, FindMod or `LoadFolders` condition was not met does not count. A Mod that only adds to a Def it shares with another names nothing.
+
+- **Shown, never sorted for**: they add no edge to the graph (§1.2); a player who cares pins the order with an ordinary user rule (§2.1), which each note offers.
+- **Sort preview** (`archo sort` and `--dry-run`, also the GUI and TUI preview and MCP `edit_loadout action=sort`): the section "same patch target" lists each node whose winner this sort changes ("ThingDef Gun_A's statBases/MarketValue: #b wins now, #a after this sort  (keep #b: archo rule add after b a)"), at most 8, then counts the nodes whose winner stays. With no stored analysis it says so in one line (`App.PatchContests`, `ContestNoAnalysis`).
+- **Problems**: `patch.contested` stays info and hidden by default (05 §4.5). Its claim is written for the list as it is now: "#a and #b both change ThingDef Gun_A's statBases/MarketValue; the one loaded later wins: currently #b"; the fixes are the user rule that keeps the current winner and the ignore reference (`App.contestFindings`).
+- **Hide** a pair with `archo rule add ignore contested:<#a>:<#b>` (§2.2; either order): its notes leave the sort preview and the problems. A node changed by three Mods stays while any of its pairs is not hidden.
+- **Only the stored analysis**: the run of the list's slot, or the environment's newest (05 §3), read again for the list's enabled Mods and order. Sorting never starts an analysis.
+- **Not reported** (not stored): a patch that selects a node only another Mod's patch creates, and works because it loads later. When it loads earlier it fails, and `patch.no-match` reports it with the reason `target-later` (05 §4.4).
+- **Harmony patches** are not used: two Mods patching the same method imply no order between them (`harmony.shared-target`, 05 §4.3).
+
 ## 2. Rules and community data
 
 ### 2.1 User rules
@@ -131,6 +145,7 @@ User rules are global and belong to Lineages, shared by all games and plans (03 
 | `official:<#instance>` | Built-in official-order constraint on this Mod | `official:<Lineage>` |
 | `community:<pkg>:<field>:<pkg>` | Community rule, field `loadafter` or `loadbefore` | Same |
 | `community:<pkg>:loadtop`, `community:<pkg>:loadbottom` | Mod's community top/bottom tier (§1.5) | Extra trailing `:` |
+| `contested:<#a>:<#b>` | Not a constraint: hides the same-patch-target notes of one pair (§1.6) | `contested:<Lineage>:<Lineage>`, the two sorted |
 
 The printed form names the Lineage's primary Instance; the stored form names the Lineage, so a suppression survives changes of copy or package ID. Printed references work unchanged in `rule add ignore` (`TestPrintedIgnoreRefsRoundTrip`).
 
@@ -183,4 +198,5 @@ The printed form names the Lineage's primary Instance; the stored form names the
 | S14 | Translation requires an absent package; its `alternativePackageIds` entry, or the package's Use This Instead replacement, is enabled | No `dep.*` finding, nothing offered after the sort, translation sorted after the stand-in; details show the stand-in "in place of" the original; one ignore on the declared package drops the edge | Pass (`TestDependencyAlternativeMeets`, `TestDependencyReplacementMeets`, `TestDependencyStandIns`) |
 | S16 | `rule add replaces <new> pkg:<old>` (or the installed old Mod); a Mod requires `<old>` | Same as S14; `rule list` shows `pkg:<old>`; a Mod replacing its own package and a one-reference `replaces` are refused | Pass (`TestDependencyRuleMeets`) |
 | S17 | Player ignores a missing dependency (Can it run I, or `problems ignore`) | Sort offers nothing for it and completing dependencies does not enable it; the requiring Mod's update brings it back | Pass (`TestIgnoredDependencyNotOffered`) |
+| S18 | Two Mods replace the same node; a third only adds to that Def; a declared loadBefore makes the sort swap the two | The sort moves only for the declaration; the preview names the node, who wins now and after, and the user rule that keeps the current winner; the problem says who wins now; the third Mod names nothing; without a stored analysis the preview says so; `rule add ignore contested:…` hides the pair in both | Pass (`TestSamePatchTargetIsInformation`) |
 | S15 | Use This Instead replacement installed while an enabled mod requires the original | Replacement offered; after replacing, nothing missing and the requiring mod sorts after the replacement | Pass (`TestReplacementOfferedWhenRequired`) |

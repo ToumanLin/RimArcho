@@ -13,7 +13,7 @@ Once you subscribe, Steam downloads `archo-<version>-windows-amd64.zip` to `<Ste
 1. New users: unzip it into any folder and double-click RimArcho.exe.
 2. Existing users: replace your old RimArcho.exe and archo.exe with the new ones.
 
-The executables are not code-signed, so the first time you run one Windows may say "Windows protected your PC": choose More info, then Run anyway.
+Code signing policy: once signing is set up, releases are built by GitHub Actions and signed for free through SignPath.io, certificate by SignPath Foundation (see the README's "Code signing policy"). The first time you run an unsigned one, Windows may say "Windows protected your PC": choose More info, then Run anyway.
 
 ![Start page](../docs/assets/release-post/en/01-home.png)
 
