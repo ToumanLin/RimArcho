@@ -71,6 +71,8 @@ Launch, `import rimcrow`, gc and `identity resolve` are MCP tools too, with anno
 
 RimArcho records every action it takes on the player's files, from every surface, in one append-only log: the table `op_log` in `archo.db` (04 §4), package `internal/oplog`, owned by `App.Ops`. It answers "my Mod disappeared" or "my list changed": who did what, when, and whether it worked. It is evidence, not authority: nothing reads it to decide an action, and it never offers an undo; a row says where the item can be got back (the recycle bin, the plan's history) instead.
 
+**Every App logs.** A background task runs on a snapshot (`&App{Store: …}` + `ReadOptions`, then `ReadSession`): `ReadOptions` hands over the parent's `Ops` when the snapshot has none, and `ReadSession` gives the session its own `Ops` on its connection. A primitive still treats a nil run as "no log" (`opStart` returns nil, every `opRun` method accepts it) and never reads `o.row` without that check: 1.1.0's window snapshots had no `Ops`, and its update task panicked on `o.row.Target` (`TestSelfUpdateInstallFromWindowSnapshot`).
+
 **What is recorded.** The rows are written by the primitives that touch the disk or Steam, never by a surface, so every caller is covered. `TestArchOpLog` (`internal/archlint/oplog_test.go`, table `opPrimitives`) checks that each primitive below writes the log.
 
 | `op` | Primitive | Subject, target, detail |

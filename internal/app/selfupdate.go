@@ -359,7 +359,7 @@ func (a *App) installSelfUpdate(ctx context.Context, picked string, step func(Se
 	defer swapping.Done()
 	step(SelfUpdateStep{Phase: "replace"})
 	o.begin()
-	o.row.Target = program
+	o.note(func(r *oplog.Row) { r.Target = program })
 	old := filepath.Join(dir, fmt.Sprintf("old-%s-%d", cur, time.Now().UnixNano()))
 	swap, err := selfupdate.ApplyRelease(program, stage, old, journal, r.Version)
 	if err != nil {

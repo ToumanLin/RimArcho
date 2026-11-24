@@ -99,7 +99,7 @@ func (a *App) LaunchWith(dryRun, move bool) (res *SaveResult, err error) {
 	}
 	e := st.Ix.Env
 	if o != nil {
-		o.row.EnvID, o.row.Subject = e.ID, st.Plan.Name
+		o.note(func(r *oplog.Row) { r.EnvID, r.Subject = e.ID, st.Plan.Name })
 		st.op = &opWrite{h: o.parent()}
 		defer func() {
 			if st.op.wrote {

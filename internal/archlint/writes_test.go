@@ -120,6 +120,8 @@ func TestArchReadOnlyPackages(t *testing.T) {
 var surfaceWritesAllowed = map[string]string{
 	"internal/surface/gui/api.go (*API).Ready os.MkdirAll":                 "creates <data>/logs for gui.log, the start-up time log (02 §1)",
 	"internal/surface/gui/api.go (*API).Ready os.OpenFile":                 "appends the start-up time to <data>/logs/gui.log (02 §1)",
+	"internal/surface/gui/gui.go logToFile os.MkdirAll":                    "creates <data>/logs for gui.log, which also takes the standard log (02 §1)",
+	"internal/surface/gui/gui.go logToFile os.OpenFile":                    "appends the standard log (task panics with their stack) to <data>/logs/gui.log (02 §1)",
 	"internal/surface/gui/api.go (*API).SaveRefNums os.MkdirAll":           "creates <data>/refnums for the reference-number files (ctrl+\\)",
 	"internal/surface/gui/api.go (*API).SaveRefNums os.WriteFile":          "writes <data>/refnums/<prefix>.txt.tmp, the page's reference numbers",
 	"internal/surface/gui/api.go (*API).SaveRefNums os.Rename":             "replaces <data>/refnums/<prefix>.txt with the .tmp it wrote",
