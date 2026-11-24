@@ -168,7 +168,11 @@ if ($GOOS -eq "windows") {
     $lanzou = "file:///" + ((Join-Path $PSScriptRoot "publish-lanzou.mjs") -replace '\\', '/')
     Write-Host ""
     Write-Host "built $Version; to publish (spec 17, section 5), from $root, after committing and pushing:"
-    Write-Host "  7. GitHub:   pwsh scripts/publish-github.ps1 -Version $Version -DryRun   (then without -DryRun)"
+    if ($Version -notmatch '-') {
+        Write-Host "  before 7, the update rehearsal (must PASS; publish-github.ps1 refuses without it):"
+        Write-Host "           pwsh scripts/vm/update-rehearsal.ps1 -Candidate $zip"
+    }
+    Write-Host "  7. GitHub:  pwsh scripts/publish-github.ps1 -Version $Version -DryRun   (then without -DryRun)"
     if ($Version -match '-') {
         Write-Host "  prerelease: GitHub only; no Lanzou, no Workshop"
     } else {

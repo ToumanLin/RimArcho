@@ -86,6 +86,25 @@ Any step takes `timeout=<s>`. Parser tests: `dotnet run --project scripts/vm/dri
 
 A script that does not end with `quit` leaves the game running when its last step is done, for a test that goes on by hand or with other tools. A script of just `menu` waits for the main menu. The driver sees the menu itself, so this works with a Monitor that writes no phase markers; round-check then fails only the phase lines. The driver stays loaded until the game quits, so autosave stays off. `pwsh scripts/vm/vm.ps1 quitgame` closes the game afterwards. If such a script saved, `round.ps1` leaves the save for you to delete before the game quits. The checks after the round are a person's job: what can it run and the game log page show. Use `cdp.mjs text` and `problems.txt` for those, not screenshots.
 
+## Update rehearsal (one step, blocks a stable release)
+
+```powershell
+pwsh scripts/vm/update-rehearsal.ps1 -Candidate dist/archo-1.2.0-windows-amd64.zip
+pwsh scripts/vm/update-rehearsal.ps1 -Candidate <zip> -Reuse            # VM already up: no revert
+pwsh scripts/vm/update-rehearsal.ps1 -Candidate <zip> -Surfaces window  # one surface (no pass record)
+```
+
+The gate of 17 §5: the candidate updates itself before it is published. About 7 minutes when it passes (a TUI that never restarts adds 3), about 150 MB under `D:\RimArcho-test\update-rehearsal\<version>-<time>\` (the log, `window.json`, the TUI's screen text, the window's new `gui.log` lines, the release service's request log). The game is never started.
+
+1. Reads the candidate's version and commit from its `archo.exe` (empty data folder) and refuses a dirty build.
+2. Builds the rehearsal ZIP: the candidate's files with `archo.exe` and `RimArcho.exe` rebuilt from that commit (`git archive`, `release.ps1`'s flags and winres), stamped one patch version higher. It never goes to `dist/` and is never published.
+3. Refuses a running VM (another test may be using it; `-Reuse` takes it as it is), else reverts to `RimArcho-Baseline` and cold-boots; closes the guest's Steam; installs the candidate in three program folders under `C:\Users\Public\Documents\VM-Test\Rehearsal` (`win`, `tui`, `cli`). The home in the snapshot is shared, as for a player who updates.
+4. Serves the rehearsal ZIP as a GitHub-style release from `releaseserver.exe` (`releaseserver/`) on the guest's 127.0.0.1, and starts the candidate with `RIMARCHO_UPDATE_API` pointing at it (17 §5.1). So the update is a player's: the check (the Monitor item and Lanzou are asked as usual and name older versions), the download and its checksum, extract, replace, verify, restart. Only the API root differs. This was chosen over the window's "install from zip…": that button exists only after an automatic download failed and opens a native file dialog, and it skips the download.
+5. Window: settings, "check for updates", "install update" and its confirmation, clicked over DevTools (`update-rehearsal.mjs`); it follows the `self-update` task until the window closes, then reattaches to the restarted window. TUI: `:update`, Enter on the panel, through the real-keyboard agent. CLI: `archo update --from <rehearsal zip>`.
+6. Checks: the task ends in "restarting"; the old window closed and its process is gone; the new window reports the rehearsal version; the program folder holds it; `archo ops --op update` lists it with the program folder; after the next start (the restarted window; a window started in the TUI and CLI folders) `.archo-update\` holds only `lock` and `files.json`; the new TUI started in the same terminal, which stays open; `logs\gui.log` has no panic.
+
+Exit code = failed checks. A full pass writes `update-rehearsal-<version>.json` beside the candidate (version, commit, the ZIP's SHA-256); `scripts/publish-github.ps1` refuses a stable release without a passing record for that exact ZIP, so a rebuild after the rehearsal needs a new one.
+
 ## Looking and acting
 
 | What | Command |
