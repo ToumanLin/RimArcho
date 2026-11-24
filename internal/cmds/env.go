@@ -3,7 +3,6 @@ package cmds
 import (
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
@@ -472,9 +471,6 @@ func envDownload(c *Ctx, a *Args) (*render.Doc, error) {
 	account, err := c.App.SteamCMDAccount(a.Str("account"))
 	if err != nil {
 		return nil, err
-	}
-	if account != "anonymous" {
-		fmt.Fprintln(os.Stderr, "SteamCMD asks for the password and the Steam Guard code below; RimArcho does not see them.")
 	}
 	r, err := c.App.DownloadGame(app.DownloadSpec{Branch: a.Pos[0], Dir: a.Str("to"), Account: account, Name: a.Str("name"), Saves: a.Str("saves")}, nil)
 	if err != nil {

@@ -64,6 +64,12 @@ export const icon = {
   edit: svg('<path d="M10.6 2.8l2.6 2.6-7.4 7.4H3.2v-2.6z"/><path d="M9.2 4.2l2.6 2.6"/>'),
   io: svg('<path d="M5.6 9.2V2.6M3.6 4.6l2-2 2 2M10.4 2.6v6.6M8.4 7.2l2 2 2-2"/><path d="M2.6 11.2v2.2h10.8v-2.2"/>'),
   more: svg('<circle cx="3.6" cy="8" r=".9"/><circle cx="8" cy="8" r=".9"/><circle cx="12.4" cy="8" r=".9"/>', "fill"),
+  // SteamCMD's password hints (js/steamhint.js): a key, an eye shut, a keyboard, a mouse
+  key: svg('<circle cx="5" cy="8" r="2.6"/><path d="M7.6 8h6M11.4 8v2.2M13.6 8v1.6"/>'),
+  hidden: svg('<path d="M1.8 8s2.3-3.8 6.2-3.8S14.2 8 14.2 8s-2.3 3.8-6.2 3.8S1.8 8 1.8 8z"/><circle cx="8" cy="8" r="1.6"/><path d="M2.6 2.6l10.8 10.8"/>'),
+  keyboard: svg('<rect x="1.8" y="4" width="12.4" height="8" rx="1.4"/><path d="M4.4 6.6h.1M6.8 6.6h.1M9.2 6.6h.1M11.6 6.6h.1M5.4 9.4h5.2"/>'),
+  phone: svg('<rect x="4.4" y="1.8" width="7.2" height="12.4" rx="1.6"/><path d="M7.2 11.8h1.6"/>'),
+  mouse: svg('<rect x="4.4" y="1.8" width="7.2" height="12.4" rx="3.6"/><path d="M8 1.8v4.6M8 6.4h3.6"/><path d="M8.2 2.2h3v4h-3z" fill="currentColor" stroke="none"/>'),
   ext: svg('<path d="M9.4 2.6h4v4M13.2 2.8L7.6 8.4"/><path d="M11.8 9.6v3.6H2.8V4.2h3.6"/>'),
 };
 

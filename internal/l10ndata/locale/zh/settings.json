@@ -41,7 +41,7 @@
   "RimArcho updates": "RimArcho 更新",
   "Steam could not be reached": "连不上 Steam",
   "Steam did not accept the Steam Guard code": "Steam 没有接受这个 Steam 令牌",
-  "Steam did not accept the password": "Steam 没有接受这个密码",
+  "Steam did not accept the password. SteamCMD shows nothing while you type it: switch the input method to English, type the password (or right-click to paste it), then press Enter": "Steam 没有接受这个密码。SteamCMD 输入密码时不显示任何字符：先把输入法切换到英文，输入密码（或右键粘贴），再按回车",
   "Steam does not have this branch (any more)": "Steam 上没有（或不再有）这个分支",
   "Steam has one at %s": "Steam 里有一个：%s",
   "SteamCMD account (optional)": "SteamCMD 账户（可选）",

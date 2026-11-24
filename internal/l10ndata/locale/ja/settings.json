@@ -41,7 +41,7 @@
   "RimArcho updates": "RimArchoの更新",
   "Steam could not be reached": "Steamに接続できませんでした",
   "Steam did not accept the Steam Guard code": "Steam Guardコードが認証されませんでした",
-  "Steam did not accept the password": "パスワードが認証されませんでした",
+  "Steam did not accept the password. SteamCMD shows nothing while you type it: switch the input method to English, type the password (or right-click to paste it), then press Enter": "パスワードが認証されませんでした。SteamCMDは入力中のパスワードを表示しません。入力方式を英語に切り替え、パスワードを入力（または右クリックで貼り付け）してEnterを押してください",
   "Steam does not have this branch (any more)": "Steamにこのブランチがありません",
   "Steam has one at %s": "Steamに%sがあります",
   "SteamCMD account (optional)": "SteamCMDアカウント（任意）",

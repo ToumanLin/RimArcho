@@ -22,6 +22,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/scan"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
+	"github.com/ToumanLin/RimArcho/internal/updatechannel"
 )
 
 // Archo Monitor (19 §6, 07 §1.5): RimArcho's in-game companion mod, supplied by any
@@ -273,13 +274,16 @@ type MonitorPlanChange struct {
 
 // MonitorResult is what one check did (19 §6 "when to check").
 type MonitorResult struct {
-	DryRun     bool
-	Bundled    *MonitorBundled
-	Tried      []string
-	Target     string // the version folder
-	Copied     bool   // a new version folder was assembled
-	Replaced   bool   // a pre-release folder with other content was replaced
-	Deferred   string // why a replacement waits
+	DryRun   bool
+	Bundled  *MonitorBundled
+	Tried    []string
+	Target   string // the version folder
+	Copied   bool   // a new version folder was assembled
+	Replaced bool   // a pre-release folder with other content was replaced
+	Deferred string // why a replacement waits
+	// Workshop is the version of the Workshop-subscribed Archo Monitor used instead of the
+	// bundled one: it is the same or newer, so nothing is copied (19 §6 step 1).
+	Workshop   string
 	Corpus     string // corpus data refreshed in place to this week (19 §6)
 	Registered bool   // the environment's src:monitor was added
 	Scanned    bool
@@ -353,6 +357,12 @@ func (a *App) prepareMonitorFrom(r *MonitorResult, b *MonitorBundled, dryRun boo
 	}
 	dir := a.MonitorDir()
 	r.Target = filepath.Join(dir, monitorFolder+b.Version)
+	if v := a.workshopMonitorAtLeast(ix, b.Version); v != "" {
+		// The subscribed copy wins anyway (Workshop wins a version tie): a local copy would
+		// only be a duplicate in the library. One already installed stays (plans may use it).
+		r.Workshop = v
+		return "", nil
+	}
 	if err := a.managedRootReady("monitor", dir); err != nil {
 		r.Notes = append(r.Notes, err.Error())
 		r.Deferred = "The monitor directory is unavailable. Choose its current location before installing an update."
@@ -381,6 +391,47 @@ func (a *App) prepareMonitorFrom(r *MonitorResult, b *MonitorBundled, dryRun boo
 		return src.ID, nil
 	}
 	return "", nil
+}
+
+// workshopMonitorAtLeast is the version of a Workshop-subscribed Archo Monitor of the
+// current environment that is the same as or newer than version, or "": a scanned live
+// Instance, or the Monitor item's folder in a Workshop source not scanned yet (`archo scan`
+// checks the Monitor before it reads the folders).
+func (a *App) workshopMonitorAtLeast(ix *Index, version string) string {
+	best := ""
+	consider := func(v string) {
+		if v != "" && CompareVersions(v, version) >= 0 && (best == "" || CompareVersions(v, best) > 0) {
+			best = v
+		}
+	}
+	for _, m := range monitorInstances(ix) {
+		if m.Mod.Kind == source.Workshop {
+			consider(m.Version)
+		}
+	}
+	item := updatechannel.MonitorItem(updatechannel.Options{HTTP: a.HTTP, SteamAPI: a.SteamAPI})
+	if item == "" || strings.ContainsAny(item, `/\.`) {
+		return best
+	}
+	known := map[string]bool{} // scanned already: the Instance decides (residue, unloadable)
+	for _, m := range ix.Mods {
+		if IsMonitor(m) {
+			known[env.PathKey(m.RealPath)] = true
+		}
+	}
+	for _, s := range ix.Sources {
+		if s.Kind != source.Workshop || s.Status == source.StatusRetired {
+			continue
+		}
+		dir := filepath.Join(s.Root, item)
+		if known[env.PathKey(dir)] {
+			continue
+		}
+		if v, err := monitorVersion(dir); err == nil {
+			consider(v)
+		}
+	}
+	return best
 }
 
 // finishMonitor folds the monitor instances into one lineage and applies the newest to

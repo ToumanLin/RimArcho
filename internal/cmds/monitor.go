@@ -94,6 +94,9 @@ func MonitorLines(r *app.MonitorResult, all bool) []string {
 	var out []string
 	if r.Bundled != nil {
 		switch {
+		case r.Workshop != "":
+			// Not a change: the scan says it each time, the window does not refresh for it.
+			out = append(out, fmt.Sprintf("using the Workshop copy %s; the bundled %s is not copied", r.Workshop, r.Bundled.Version))
 		case r.Copied:
 			out = append(out, fmt.Sprintf("installed %s to %s", r.Bundled.Version, r.Target))
 		case r.Replaced:

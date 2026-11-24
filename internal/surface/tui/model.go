@@ -7,6 +7,7 @@ import (
 	"context"
 	"runtime/debug"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -244,6 +245,14 @@ func TuneProcess(a *app.App) {
 
 // Run starts the TUI on the terminal.
 func Run(o Options) error {
+	// A SteamCMD window that may ask for the password opens: say the hints (11 §3). Set
+	// before any session copies the App's options.
+	var program atomic.Pointer[tea.Program]
+	o.App.SteamCMDSignIn = func(open bool) {
+		if p := program.Load(); open && p != nil {
+			p.Send(steamSignInMsg{})
+		}
+	}
 	// Snapshot options before the model starts editing its App. Each maintenance
 	// pass owns a separate connection and releases its inventory afterwards.
 	maintenance := &app.App{Store: o.App.Store}
@@ -260,7 +269,8 @@ func Run(o Options) error {
 		opts = append(opts, tea.WithMouseCellMotion())
 	}
 	mdl := New(o).(*model)
-	program := tea.NewProgram(mdl, opts...)
+	prog := tea.NewProgram(mdl, opts...)
+	program.Store(prog)
 	go app.AutomaticLoop(ctx, func(parent context.Context) {
 		r, err := maintenance.ReadSession()
 		if err != nil {
@@ -273,11 +283,11 @@ func Run(o Options) error {
 			before := r.AutomaticStatus(kind)
 			_ = run()
 			if parent.Err() == nil {
-				program.Send(automaticDoneMsg{kind: kind, before: before, after: r.AutomaticStatus(kind)})
+				prog.Send(automaticDoneMsg{kind: kind, before: before, after: r.AutomaticStatus(kind)})
 			}
 		})
 	})
-	_, err := program.Run()
+	_, err := prog.Run()
 	// Terminal loss must not interrupt file work.
 	if run := mdl.uninstallRun; run != nil {
 		<-run.done
@@ -307,6 +317,9 @@ type scanDoneMsg struct {
 	err error
 }
 type detailTick struct{ seq int }
+
+// steamSignInMsg: a signed-in SteamCMD window opened (app.App.SteamCMDSignIn).
+type steamSignInMsg struct{}
 type automaticDoneMsg struct {
 	kind          string
 	before, after app.AutomaticStatus

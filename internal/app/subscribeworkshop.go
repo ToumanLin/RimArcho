@@ -496,9 +496,19 @@ func (a *App) runWorkshopSteamCMD(exe string, args []string, console bool, trans
 	if a.SteamCMDStart != nil {
 		start = a.SteamCMDStart
 	}
+	// console: a signed-in run, which may ask for the password (subscribeworkshoprun.go)
+	end := a.steamSignIn(console)
+	defer end()
+	shared := console && a.SteamCMDShareConsole && a.SteamCMDStart == nil
+	if shared {
+		start = startWorkshopShared // the CLI: SteamCMD in its own terminal
+	}
 	p, err := start(exe, args, console)
 	if err != nil {
 		return "", err
+	}
+	if console {
+		defer a.watchSteamPrompts(p, shared)()
 	}
 	tail := &logTail{path: log, off: off}
 	var lines []string

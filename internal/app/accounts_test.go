@@ -280,7 +280,7 @@ func TestSteamLoginAutomaticallyVerifiesOwnershipAndLogoutFallsBack(t *testing.T
 			calls := 0
 			e.App.SteamCMDStart = func(_ string, args []string, console bool) (app.SteamCMDProc, error) {
 				calls++
-				if calls == 1 && (!console || !reflect.DeepEqual(args, []string{"+login", "dummyPlayer"})) {
+				if calls == 1 && (!console || !reflect.DeepEqual(args, []string{"+login", "dummyPlayer", "+quit"})) {
 					t.Fatal(args, console)
 				}
 				if calls == 2 && (console || !reflect.DeepEqual(args, []string{"+login", "dummyPlayer", "+licenses_print", "+quit"})) {

@@ -17,6 +17,7 @@ import { editablePath, copyablePath, pathContent } from "./fields.js";
 // played out on the page only.
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { choiceControl } from "./choices.js";
+import { steamHint } from "./steamhint.js";
 import { page, button, seg, chooseLocalPath, beginPageRead } from "./screens.js";
 import { withEnvironmentSwitch } from "./environment.js";
 import { on } from "./api.js";
@@ -574,10 +575,15 @@ function download(card) {
   acc.spellcheck = false;
   acc.autocomplete = "username";
   acc.value = D.account;
-  acc.oninput = () => { D.account = acc.value.trim(); };
   who.append(el("span", "muted lbl", T("SteamCMD account (optional)")), acc);
   card.append(who);
   card.append(el("div", "dl-note", T("Anonymous by default; you can choose an account in settings or here. Enter anonymous to override a saved account. Password and Steam Guard are entered only in SteamCMD.")));
+  // a signed-in download opens SteamCMD's window for the password: what it needs (11 §3)
+  const steam = steamHint();
+  const signsIn = () => { const n = D.account || info.account || ""; return n !== "" && !/^(anonymous|\u533f\u540d)$/i.test(n); };
+  steam.hidden = !signsIn();
+  card.append(steam);
+  acc.oninput = () => { D.account = acc.value.trim(); steam.hidden = !signsIn(); };
   const start1 = button(T("download and add"), "", async () => {
     if (previewing()) return previewDownload();
     let ok;

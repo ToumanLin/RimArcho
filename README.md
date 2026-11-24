@@ -314,8 +314,10 @@ reverses each write, is in [02 · File writes and uninstall](docs/specs/02-file-
 
 - No telemetry, no analytics, no crash reports. Everything that goes over the network, and how to
   turn it off, is listed below.
-- It never asks for, stores or passes on passwords or Steam Guard codes: SteamCMD signs in only in
-  its own window, LoversLab only in the site's own page.
+- Your Steam password and Steam Guard code go only into SteamCMD's window on your PC. When SteamCMD
+  asks for them, you can give them to RimArcho, which types them into that window for you (or you
+  type them there yourself). They are never stored, logged, sent over the network or put in a
+  feedback report. LoversLab signs in only in the site's own page.
 - It never permanently deletes your content: removed Mods, saves, packs and settings files go to the
   Recycle Bin, and every list edit can be undone.
 - An AI agent's changes reach the game only when a list is saved or launched, as yours do, and agents
@@ -351,7 +353,7 @@ They cannot be turned off one by one; `updates.interval` only changes how often.
 | A Mod's Workshop description, when you select the Mod | `api.steampowered.com` | its Workshop ID | `workshop.fetch off` |
 | Pictures in that description | the image hosts the Mod's author used | an ordinary image request | `workshop.images off` (or `workshop.fetch off`) |
 | Collections: importing one, and re-reading those your lists follow when you open All lists | `api.steampowered.com` | the collection IDs | no switch (unfollow the collection) |
-| Subscribing, downloading Mods or the game | SteamCMD and the Steam client, which talk to Valve themselves; `api.steampowered.com` | Workshop IDs; your Steam account name if you use one (the password is typed only into SteamCMD) | you start each one |
+| Subscribing, downloading Mods or the game | SteamCMD and the Steam client, which talk to Valve themselves; `api.steampowered.com` | Workshop IDs; your Steam account name if you use one (the password only goes into SteamCMD's window on your PC; RimArcho sends nothing of it) | you start each one |
 | Installing SteamCMD, todds or a RimArcho update | Valve's SteamCMD download, GitHub (and Lanzou for updates) | nothing of yours | you start each one |
 | A feedback report | the feedback relay, which files it as a **public** GitHub issue | your text, a contact if you give one (kept out of the issue), and only the details you tick: versions, OS, enabled Mods, log errors, paths with your user name replaced | you press Send, after seeing it |
 | The open feature requests, while you write one | the feedback relay | nothing of yours | no switch |

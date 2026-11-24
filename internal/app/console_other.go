@@ -89,3 +89,8 @@ func (p *workshopProcess) KillTree() error {
 	}
 	return syscall.Kill(-p.Process.Pid, syscall.SIGKILL)
 }
+
+// startWorkshopShared: an interactive run already uses the caller's terminal here.
+func startWorkshopShared(exe string, args []string, _ bool) (SteamCMDProc, error) {
+	return startWorkshopCMD(exe, args, true)
+}

@@ -53,6 +53,14 @@ func createSteamProcess(exe string, args []string, flags uint32, tracked bool) (
 		return nil, err
 	}
 	startup := windows.StartupInfo{Cb: uint32(unsafe.Sizeof(windows.StartupInfo{}))}
+	if flags&windows.CREATE_NEW_CONSOLE != 0 {
+		// The window's title carries the password hints (11 §3); SteamCMD keeps it.
+		if t := consoleTitle.Load(); t != nil && *t != "" {
+			if title, err := windows.UTF16PtrFromString(*t); err == nil {
+				startup.Title = title
+			}
+		}
+	}
 	var job windows.Handle
 	if tracked {
 		job, err = windows.CreateJobObject(nil, nil)
@@ -165,4 +173,10 @@ func (p *consoleProcess) KillTree() error {
 		return os.ErrProcessDone
 	}
 	return windows.TerminateJobObject(p.job, 1)
+}
+
+// startWorkshopShared runs a signed-in Workshop download in this process's console (the CLI,
+// App.SteamCMDShareConsole), tracked like a hidden one.
+func startWorkshopShared(exe string, args []string, _ bool) (SteamCMDProc, error) {
+	return createSteamProcess(exe, args, 0, true)
 }

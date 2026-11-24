@@ -201,5 +201,19 @@
   "webview interface failed": "网页接口不可用",
   "window class registration failed": "登录窗口注册失败",
   "window create failed": "登录窗口创建失败",
-  "would download with SteamCMD": "将用 SteamCMD 下载"
+  "would download with SteamCMD": "将用 SteamCMD 下载",
+  "%s (Workshop copy)": "%s（创意工坊版）",
+  "SteamCMD window": "SteamCMD 窗口",
+  "the password stays hidden while you type: type it, then press Enter": "输入密码时不会显示任何字符：照常输入，再按回车",
+  "switch the input method to English first": "先把输入法切换到英文",
+  "right-click pastes into that window": "在该窗口中右键即可粘贴",
+  "SteamCMD is not asking for this any more": "SteamCMD 已不再需要输入这一项",
+  "Steam password": "Steam 密码",
+  "sign in": "登录",
+  "Steam Guard code": "Steam 令牌验证码",
+  "send code": "发送验证码",
+  "type it myself in the window": "我自己在窗口中输入",
+  "typed into the SteamCMD window": "已输入到 SteamCMD 窗口",
+  "type it in the SteamCMD window": "请在 SteamCMD 窗口中输入",
+  "approve the sign-in in the Steam Mobile app on your phone": "请在手机上的 Steam 应用中确认这次登录"
 }

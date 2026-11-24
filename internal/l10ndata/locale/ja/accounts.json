@@ -201,5 +201,19 @@
   "webview interface failed": "WebViewのインターフェースを初期化できません",
   "window class registration failed": "ウィンドウクラスの登録に失敗しました",
   "window create failed": "ウィンドウの作成に失敗しました",
-  "would download with SteamCMD": "SteamCMDでダウンロードします"
+  "would download with SteamCMD": "SteamCMDでダウンロードします",
+  "%s (Workshop copy)": "%s（ワークショップ版）",
+  "SteamCMD window": "SteamCMDウィンドウ",
+  "the password stays hidden while you type: type it, then press Enter": "入力中のパスワードは表示されません。そのまま入力してEnterを押してください",
+  "switch the input method to English first": "先に入力方式を英語に切り替えてください",
+  "right-click pastes into that window": "そのウィンドウでは右クリックで貼り付けできます",
+  "SteamCMD is not asking for this any more": "SteamCMDはこの入力をもう求めていません",
+  "Steam password": "Steamパスワード",
+  "sign in": "サインイン",
+  "Steam Guard code": "Steam Guardコード",
+  "send code": "コードを送信",
+  "type it myself in the window": "ウィンドウで自分で入力する",
+  "typed into the SteamCMD window": "SteamCMDウィンドウに入力しました",
+  "type it in the SteamCMD window": "SteamCMDウィンドウで入力してください",
+  "approve the sign-in in the Steam Mobile app on your phone": "スマートフォンのSteamモバイルアプリでサインインを承認してください"
 }
