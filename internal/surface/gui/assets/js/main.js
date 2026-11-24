@@ -50,7 +50,7 @@ import { wireSeparator } from "./separator.js";
 import { pickClick } from "./select.js";
 import { go, openPage, initNavigation, pageEntering, pageEntered, wireHistory, travel } from "./navigation.js";
 import { checkCredit } from "./credit.js";
-import { steamSignIn } from "./steamhint.js";
+import { steamSignIn, steamPrompt } from "./steamhint.js";
 import { initSortSteps, offerAfterSort } from "./sortsteps.js";
 import { planActions as headActions } from "./planhead.js";
 import * as problems from "./problems.js";
@@ -1520,6 +1520,8 @@ async function start() {
   on("launch-wait", (ev) => say("busy", ev.text));
   // a SteamCMD window that may ask for the password opens or closes (11 §3)
   on("steamcmd-signin", (ev) => steamSignIn(ev));
+  // SteamCMD's window asks for the password or a Steam Guard code (11 §3)
+  on("steamcmd-prompt", (ev) => steamPrompt(ev));
   // the background check of the open list finished: the problems button, the panel and the
   // row icons follow without reading the lists again; an open Can it run shows the new answer
   // (VM run 2026-10-28: after the game exited it kept the run's old time until revisited)

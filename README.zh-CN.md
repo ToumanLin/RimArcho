@@ -243,7 +243,7 @@ RimArcho 的设计原则是尊重你的文件。它会写入的全部内容，�
 **它从不做什么**
 
 - 没有遥测、没有统计、没有崩溃上报。所有联网行为以及关闭方法见下文。
-- 从不索要、保存或转交密码和 Steam 令牌验证码：SteamCMD 只在它自己的窗口里登录，LoversLab 只在网站自己的页面里登录。
+- Steam 密码和 Steam 令牌验证码只会输入到你电脑上的 SteamCMD 窗口里。SteamCMD 要求输入时，你可以交给 RimArcho 代为输入到那个窗口（也可以自己在窗口里输入）。它们从不保存、不写入日志、不经网络发送，也不会出现在反馈报告里。LoversLab 只在网站自己的页面里登录。
 - 从不永久删除你的内容：移除的 Mod、存档、整合包和设置文件都进回收站，列表的每次改动都能撤销。
 - AI agent 的改动和你的一样，只有在列表保存或启动时才会写入游戏；agent 也被要求在任何写入前先征得你的同意。
 - 反馈报告只在你点击发送时才会发出，发送前你能看到全部内容。
@@ -271,7 +271,7 @@ RimArcho 的设计原则是尊重你的文件。它会写入的全部内容，�
 | 选中 Mod 时读取它的工坊介绍 | `api.steampowered.com` | 它的工坊 ID | `workshop.fetch off` |
 | 介绍里的图片 | Mod 作者使用的图床 | 普通的图片请求 | `workshop.images off`（或 `workshop.fetch off`） |
 | 合集：导入合集，以及打开“全部列表”时重新读取列表关注的合集 | `api.steampowered.com` | 合集 ID | 没有开关（取消关注该合集） |
-| 订阅、下载 Mod 或游戏 | SteamCMD 和 Steam 客户端（它们自己连接 Valve）；`api.steampowered.com` | 工坊 ID；使用账号时的 Steam 账号名（密码只在 SteamCMD 里输入） | 每次都由你发起 |
+| 订阅、下载 Mod 或游戏 | SteamCMD 和 Steam 客户端（它们自己连接 Valve）；`api.steampowered.com` | 工坊 ID；使用账号时的 Steam 账号名（密码只输入到你电脑上的 SteamCMD 窗口，RimArcho 不发送它） | 每次都由你发起 |
 | 安装 SteamCMD、todds 或 RimArcho 更新 | Valve 的 SteamCMD 下载、GitHub（更新还有蓝奏云） | 不含你的信息 | 每次都由你发起 |
 | 反馈报告 | 反馈中转站，它会建成一个**公开的** GitHub issue | 你写的内容、你留的联系方式（不放进 issue），以及你勾选的信息：版本、系统、启用的 Mod、日志错误、隐去用户名的路径 | 你看过内容并点发送 |
 | 写功能建议时列出已有建议 | 反馈中转站 | 不含你的信息 | 没有开关 |

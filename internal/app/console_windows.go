@@ -174,3 +174,9 @@ func (p *consoleProcess) KillTree() error {
 	}
 	return windows.TerminateJobObject(p.job, 1)
 }
+
+// startWorkshopShared runs a signed-in Workshop download in this process's console (the CLI,
+// App.SteamCMDShareConsole), tracked like a hidden one.
+func startWorkshopShared(exe string, args []string, _ bool) (SteamCMDProc, error) {
+	return createSteamProcess(exe, args, 0, true)
+}

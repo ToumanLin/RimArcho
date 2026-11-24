@@ -536,6 +536,10 @@ func (a *App) FetchGame(spec DownloadSpec, progress func(DownloadProgress)) (str
 	if err != nil {
 		return "", fmt.Errorf("starting SteamCMD: %w", err)
 	}
+	if SteamCMDSignsIn(account) {
+		// spec.Console: SteamCMD's own window; else the caller's console (the CLI)
+		defer a.watchSteamPrompts(proc, !spec.Console)()
+	}
 	done := make(chan error, 1)
 	go func() { done <- proc.Wait() }()
 	t := &logTail{path: logPath, off: off}

@@ -592,7 +592,7 @@ Read the preview, then **subscribe** (`enter`). Pasting a supported address on t
 ### Accounts
 
 **settings › accounts**:
-- **SteamCMD**: **log in** / **log in again** / **log out**. You type your password and Steam Guard code only in SteamCMD's own window; RimArcho stores just the account name.
+- **SteamCMD**: **log in** / **log in again** / **log out**. When SteamCMD's window asks for your password or Steam Guard code, the card in the corner asks too: type it there and RimArcho types it into SteamCMD's window, or choose "type it myself in the window". RimArcho stores just the account name, never the password.
 - **LoversLab** (optional): logs in through a separate window; the session is stored encrypted for your Windows user and never goes into exports, packs, diagnostics or backups.
 
 Managing local games and Mods never needs a Steam account.

@@ -151,6 +151,7 @@ type API struct {
 
 	subRevision atomic.Uint64 // completed tasks may change files without a DB write
 	command     commandWorker
+	prompts     *steamPrompts // SteamCMD's password and Guard prompts (steamprompt.go)
 }
 
 func newAPI(a *app.App) *API {
@@ -159,6 +160,8 @@ func newAPI(a *app.App) *API {
 	a.LaunchWait = func(text string) { s.send("launch-wait", map[string]any{"text": view.T(text)}) }
 	// A SteamCMD window that may ask for the password opens or closes (11 §3).
 	a.SteamCMDSignIn = func(open bool) { s.send("steamcmd-signin", map[string]any{"open": open}) }
+	s.prompts = &steamPrompts{s: s}
+	a.SteamCMDPrompter = s.prompts
 	s.startTasks()
 	s.startCreditLocked()
 	return s

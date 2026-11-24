@@ -172,9 +172,24 @@ func runOpened(ap *app.App, argv, rest []string, serveMCP bool, group mcp.Group,
 	cmds.Stream = func(line string) { fmt.Fprintln(stdout, line) }
 	if !serveMCP {
 		// Before a signed-in SteamCMD run may ask for the password (11 §3).
+		// On Windows the CLI asks for the password itself when the account is not signed
+		// in, and types it into SteamCMD, which runs in this console (11 §3).
+		prompter := newCLIPrompter()
+		if prompter != nil {
+			ap.SteamCMDPrompter, ap.SteamCMDShareConsole = prompter, true
+		}
 		ap.SteamCMDSignIn = func(open bool) {
-			if open {
-				fmt.Fprintln(stderr, steamCMDPasswordNote())
+			if !open {
+				if prompter != nil {
+					prompter.wipe()
+				}
+				return
+			}
+			fmt.Fprintln(stderr, steamCMDPasswordNote())
+			if prompter != nil && !ap.SteamAccountStatus().LoggedIn {
+				prompter.ask(func() {
+					fmt.Fprint(stderr, "Steam password (hidden; RimArcho types it into SteamCMD below and keeps nothing; Enter alone: type it yourself): ")
+				})
 			}
 		}
 	}
@@ -422,7 +437,7 @@ func devUpgradeCheck(db string) error {
 // steamCMDPasswordNote is what the CLI prints before a signed-in SteamCMD run (11 §3).
 func steamCMDPasswordNote() string {
 	var b strings.Builder
-	b.WriteString("SteamCMD asks for the password and the Steam Guard code; RimArcho does not see them.")
+	b.WriteString("SteamCMD may ask for the password and the Steam Guard code.")
 	for _, h := range app.SteamCMDPasswordHints {
 		b.WriteString("\n  - " + h)
 	}
