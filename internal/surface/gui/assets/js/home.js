@@ -15,7 +15,7 @@ import { openScreen, page, changesPlan, beginPageRead } from "./screens.js";
 import { launchPack } from "./packs.js";
 import { withEnvironmentSwitch } from "./environment.js";
 import { places, slideFrom } from "./motion.js";
-import { logCleanupButtons } from "./logcleanup.js";
+import { logSizeBadge, coverageMark } from "./logcleanup.js";
 import { memoryConfirm } from "./popups.js";
 import { goSelfUpdate } from "./selfupdate.js";
 
@@ -663,27 +663,40 @@ function activity() {
   const live = running();
   const showRun = live || data.lastRun || data.missingLog;
   const errs = n => n === 1 ? T("1 error") : Tf("%d errors", n);
-  const count = data.lastRunNotice
-    ? Tf("%d errors in the analysed sections", data.lastRunErrors)
-    : data.lastRunErrors ? errs(data.lastRunErrors) : T("no errors");
+  const count = data.lastRunErrors ? errs(data.lastRunErrors) : T("no errors");
   const runText = live && S.live.blocked ? S.live.blocked
     : live ? (S.live.owner || T("the game is running")) + "  " + (S.live.errors ? errs(S.live.errors) : T("no errors yet"))
     : data.missingLog || (data.lastRunDay || data.lastRun || "") + "  " +
       (data.lastRunPending ? T("reading the log…") : count);
-  const last = actLine(T("last game"), runText + (live && S.live.logNotice ? "  " + S.live.logNotice : ""), () => ui.go("log"));
+  const last = actLine(T("last game"), runText, () => ui.go("log"));
   last.classList.add("hm-last-run");
-  if (!live && data.lastRunNotice) last.title += "\n" + data.lastRunNotice;
+  // only part of the log was read: a mark after the count says how much, the sentence in
+  // its tooltip and the line's (16 §2.3)
+  const notice = live ? S.live.logNotice : !data.missingLog && !data.lastRunPending && data.lastRunNotice;
+  if (notice) {
+    last.querySelector(".x").append(coverageMark(notice, !live && data.lastRunTrimmed, false));
+    last.title += "\n" + (!live && data.lastRunErrors ? Tf("%d errors in the analysed sections", data.lastRunErrors) + "\n" : "") + notice;
+  }
   if (!showRun) {
     last.disabled = true;
     last.setAttribute("aria-hidden", "true");
   }
-  box.append(last);
-  for (const file of data.oversizedLogs || []) {
-    box.append(logCleanupButtons(file, async () => {
+  const big = data.oversizedLogs || [];
+  if (big.length) {
+    // the size badge shares the line, before its arrow: nothing is added under it. The
+    // arrow moves out of the line's button so the badge can sit before it; it still opens
+    // the log (16 §2.3).
+    const row = el("div", "hm-last-row");
+    const go = last.querySelector(".go");
+    go.setAttribute("aria-hidden", "true");
+    go.style.visibility = showRun ? "" : "hidden";
+    go.onclick = () => last.click();
+    row.append(last, logSizeBadge(big, data.oversizedSize, async () => {
       await ui.reload();
       home({ keep: true });
-    }));
-  }
+    }), go);
+    box.append(row);
+  } else box.append(last);
   // "nothing changed" tells nothing: the line shows only with changes or before a scan
   const c = data.changes;
   if (c && (c.count || c.noScan)) {
