@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Launching from the list editor asks before saving unsaved changes to the game.
 - Can it run opens promptly when you switch pages during a Mod check, even if Launch or Game log is still loading.
 - You can keep browsing while RimArcho prepares a launch, writes the Mod list to the game, or backs up, copies, renames, or recycles saves.
 - List edits wait through brief background Mod updates while the window stays responsive. If RimArcho is preparing a launch in this window, it asks you to retry the edit after the launch.

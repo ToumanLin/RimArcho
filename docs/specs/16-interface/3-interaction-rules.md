@@ -126,7 +126,7 @@ Editor only:
 | `←→`, `1`–`4` | Change areas; tab does not switch areas |
 | `J` / `K`, `alt+J` / `alt+K` | Move down or up 1 position in Enabled, or 10 with alt; `alt+j` / `alt+k` also work. A terminal cannot distinguish shift+J from J, so alt handles 10 positions. Filtered moves cross displayed rows (§2.5) |
 | `T` | In Staging, put all staged Mods back at their original positions; elsewhere, stage all Enabled Mods. The TUI does the same |
-| `S` / `w` / `L` | Sort, save or launch the whole plan. Sorting is undoable, and previews are in the panel. In the GUI editor `L` starts the game at once, as its launch button does (§2.5); `l` stays the game log. The TUI editor's L goes to Launch with the launch button focused, and another L launches (§9.1) |
+| `S` / `w` / `L` | Sort, save or launch the whole plan. Sorting is undoable, and previews are in the panel. In the GUI editor `L` follows the launch button's flow (§2.5). The lowercase `l` opens the game log. The TUI editor's L goes to Launch with the launch button focused, and another L launches (§9.1) |
 | `i` / `e` | Import or export in the GUI; TUI i toggles technical details |
 | `R` / `A` | Rescan, or check again. In the TUI, A works in the editor and on Can it run. On Can it run the selected item's own keys come first: an item's `R` (an enabled Mod replaces it, repair the links, unhide) runs that action, not a rescan; so do its `E` and `P`. `q`, `?` and `:` stay global |
 | `c` / `C` | Open updates for all Mods, or only the cursor Mod's Lineage (§2.9) |

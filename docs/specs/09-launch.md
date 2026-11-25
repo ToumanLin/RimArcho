@@ -5,7 +5,7 @@
 
 This specification describes how RimArcho hands a plan to the game: which files it writes, which links it creates, how it launches the game, and how it detects a running game. It also covers hidden Mods, whose actions change Mod folders directly (§5); test runs are in 20, and Archo Monitor, the bundled in-game helper Mod, is in 19. Packs are in 10; Steam client calls and SteamCMD downloads are in 11.
 
-Every action that writes to disk follows 02 §1: RimArcho writes only to the locations listed there, and each write offers a preview (CLI `--dry-run`, or "preview …" in the UI command panel) and is reversible or explains why it cannot be. Each action reports what it did. Launching and writing to the game execute in one step in the CLI, TUI and GUI, without a confirmation prompt (16 §6). A refusal gives the reason and commands that can resolve it. RimArcho cannot undo hiding Mod folders or sending them to the recycle bin, so the UI asks for confirmation first (§5, 02 §3).
+Every action that writes to disk follows 02 §1: RimArcho writes only to the locations listed there, and each write offers a preview (CLI `--dry-run`, or "preview …" in the UI command panel) and is reversible or explains why it cannot be. Each action reports what it did. Launch writes the plan to the game as part of starting it (§2). For GUI editor confirmation, see 16 §2.5. A refusal gives the reason and commands that can resolve it. RimArcho cannot undo hiding Mod folders or sending them to the recycle bin, so the UI asks for confirmation first (§5, 02 §3).
 
 ## 1. Launch model
 

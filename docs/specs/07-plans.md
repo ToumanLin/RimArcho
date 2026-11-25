@@ -186,7 +186,7 @@ Each plan version `v<n>` records time, source, complete list, game-version strin
 
 Undo steps are not versions: versions are lists written to or read from the game; undo steps stay inside RimArcho.
 
-A plan's **unsaved changes** are the difference between its latest version and the workspace. This is for information and blocks nothing; launch writes the current list (09 §2).
+A plan's **unsaved changes** are the difference between its latest version and the workspace. The GUI list editor asks before launching a plan with unsaved changes (16 §2.5). Launch writes the current list to the game (09 §2).
 
 ### 3.2 Commands
 
