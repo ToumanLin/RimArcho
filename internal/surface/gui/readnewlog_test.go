@@ -179,6 +179,10 @@ func TestDeletedPlayerLogFallsBackToOwnVersion(t *testing.T) {
 	prev := filepath.Join(e.UserData, "Player-prev.log")
 	e.WriteFile(prev, "RimWorld 1.6.4633 rev1\n\n"+
 		strings.Repeat("Could not load Texture2D at 'Things/Alpha' for def 'AlphaDef'\n\n", 3))
+	// the run before the last launch (the game moved it aside when it started)
+	if err := os.Chtimes(prev, e.Now().Add(-2*time.Hour), e.Now().Add(-2*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
 	cur := filepath.Join(e.UserData, "Player.log")
 	e.WriteFile(cur, "RimWorld 1.6.4633 rev1\n\nOversized run\n\n")
 	if err := os.Truncate(cur, app.LogSizeLimit+1); err != nil {
@@ -207,8 +211,13 @@ func TestDeletedPlayerLogFallsBackToOwnVersion(t *testing.T) {
 		t.Fatalf("problem log %q, want Player-prev.log", got)
 	}
 	e.App.LazyLog = true
-	api.ReadNewLog()
-	if h := api.Home(); h.LastRun == "" && h.MissingLog == "" {
+	// as home.js does: a pending last run asks ReadNewLog, then Launch draws again
+	if h := api.Home(); h.CheckLastRun {
+		api.ReadNewLog()
+	}
+	if h := api.Home(); h.LastRunPending {
+		t.Fatalf("Launch keeps reading the log: %+v", h)
+	} else if h.LastRun == "" && h.MissingLog == "" {
 		t.Fatalf("Launch says nothing of the last run: %+v", h)
 	} else if strings.Contains(h.LastRun, "WaylithOnly") || strings.Contains(h.MissingLog, "Logs") {
 		t.Fatalf("Launch reads the 1.7 log: %+v", h)
