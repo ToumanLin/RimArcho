@@ -112,7 +112,7 @@ func (m *model) ensureProblems() tea.Cmd {
 func (m *model) checkProblems() tea.Cmd {
 	if (m.prob.stale || m.prob.never) && !m.analyzing {
 		before := m.status
-		cmd := m.startAnalyze()
+		cmd := m.startAnalyzeOf(true)
 		m.analyzeQuiet, m.status = true, before
 		return tea.Batch(cmd, m.startMemoryEstimate(false))
 	}
@@ -193,7 +193,11 @@ func (m *model) problemCounts() {
 	}
 }
 
-func (m *model) startAnalyze() tea.Cmd {
+func (m *model) startAnalyze() tea.Cmd { return m.startAnalyzeOf(false) }
+
+// startAnalyzeOf starts the analysis child; background marks the check that opening the
+// problems view starts by itself (low priority, two threads: app.SetAnalyzeBackground).
+func (m *model) startAnalyzeOf(background bool) tea.Cmd {
 	if m.analyzing || m.loadErr != nil {
 		return nil
 	}
@@ -202,7 +206,9 @@ func (m *model) startAnalyze() tea.Cmd {
 	run, name := m.opts.Analyze, m.envName
 	if run == nil {
 		home := m.app.Home
-		run = func(env string, progress func(string)) error { return app.ChildAnalyze(home, env, "", "", progress) }
+		run = func(env string, progress func(string)) error {
+			return app.ChildAnalyzeExeOf("", home, env, "", "", background, progress)
+		}
 	}
 	ch := make(chan string, 16)
 	done := make(chan error, 1)

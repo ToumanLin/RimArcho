@@ -21,7 +21,7 @@ var Progress func(string)
 
 func init() {
 	register(&Command{Name: "analyze", Summary: "rebuild the Def and Patch facts (normally run on demand as a child process)", MaxArgs: 0, Run: analyzeCmd,
-		Flags: []Flag{gameVersionFlag}})
+		Flags: []Flag{gameVersionFlag, {Name: "background", Help: "an automatic check: below normal priority, two threads"}}})
 	register(&Command{Name: "problems", Summary: "problems: declarations, Defs, Patches, Harmony and the newest log", MaxArgs: 0, Run: problemsCmd,
 		Flags: []Flag{{Name: "ref", Value: "<p:ref>", Help: "one problem: meaning, fixes and evidence"}, {Name: "subject", Value: "<ref>", Help: "only problems involving this mod"}, {Name: "code", Value: "<code>", Help: "code or prefix, e.g. dep or patch.no-match"},
 			{Name: "severity", Value: "<error|warning|info>"}, {Name: "all"}, {Name: "detail"}, {Name: "ignored"}, {Name: "include-muted", Help: "also list ignored version warnings, marked ignored"}, {Name: "no-analyze", Help: "do not rebuild a stale analysis"}, {Name: "min-severity", Value: "<error|warning|info>"}, gameVersionFlag}})
@@ -60,6 +60,9 @@ func (c *Ctx) progressCtx() func(string) {
 
 func analyzeCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	app.SetAnalyzeLimits()
+	if a.Bool("background") {
+		c.App.SetAnalyzeBackground()
+	}
 	r, err := c.App.AnalyzeContext(c.Context, func(s string) {
 		if Progress != nil {
 			Progress("progress: " + s)

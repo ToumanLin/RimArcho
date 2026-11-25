@@ -340,6 +340,11 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	}
 	out = append(out, folders)
 
+	// 16 §8.9: when the window checks a list's files by itself
+	autoCheck := SettingItem{Label: T("check files automatically"), Value: cmds.Setting(a, "analysis.auto"), Edit: "segments", Choices: cmds.SettingChoices("analysis.auto"),
+		ChoiceLabels: []string{T("after edits"), T("when saved"), T("off")},
+		Hover:        T("Can it run checks the Mods' files (the patch simulation) by itself, at low priority. After edits: 2 seconds after you stop editing; when saved: when you save the list or open Can it run or Launch; off: only check again"),
+		Argv:         []string{"config", "set", "analysis.auto", "{}"}}
 	mon := SettingItem{Label: T("add Archo Monitor to lists"), Value: cmds.Setting(a, "monitor.default"), Edit: "choice", Choices: []string{"on", "off"},
 		ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "monitor.default", "{}"}, Hover: T("new lists, and every sort")}
 	// 12 §4.4: the newest save is copied before each launch
@@ -356,9 +361,9 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		} else if len(s.Installed) > 0 {
 			v = s.Installed[0]
 		}
-		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon, {Key: "monitor.installed", Label: T("Archo Monitor installed"), Value: v, Note: path, NotePaths: []string{path}}, saveCopy}})
+		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon, {Key: "monitor.installed", Label: T("Archo Monitor installed"), Value: v, Note: path, NotePaths: []string{path}}, saveCopy, autoCheck}})
 	} else {
-		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon, saveCopy}})
+		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon, saveCopy, autoCheck}})
 	}
 	out = append(out, NetworkGroup(a))
 	if g, ok := AgentGroup(a); ok {

@@ -93,6 +93,11 @@ type App struct {
 	ScanProgress func(ScanProgress)
 	// AnalyzeExe is the archo executable the default runner starts; "" is this one.
 	AnalyzeExe string
+	// AnalyzeBackground marks an automatic check (16 §8.9): the default runner starts the
+	// child with `--background` (SetAnalyzeBackground). An AnalyzeRunner reads it on from.
+	AnalyzeBackground bool
+	// AnalyzeWorkers caps the analysis's file readers; 0 is the analyzer's default.
+	AnalyzeWorkers int
 	// SavesIndexRunner reads saves into the full-read cache (12 §1.7), the given saves
 	// first; nil means the `archo saves index` child process. Tests run it in-process.
 	SavesIndexRunner func(first []string, progress func(string)) error
