@@ -82,6 +82,10 @@ func (s *API) releaseSubscriptionsForEnvironment() {
 func (s *API) detachedReader() (*app.App, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.detachedSessionLocked()
+}
+
+func (s *API) detachedSessionLocked() (*app.App, error) {
 	if s.a.Uninstalled {
 		return nil, errors.New("RimArcho was uninstalled; account operations are disabled")
 	}
@@ -94,6 +98,42 @@ func (s *API) detachedReader() (*app.App, error) {
 	}
 	r.AnalyzeExe, r.AnalyzeWait = s.Exe, 200*time.Millisecond
 	return r, nil
+}
+
+// actionSession keeps game actions and manual save operations ordered while pages
+// continue to read. Close drains the active action and any automatic save copies.
+func (s *API) actionSession(launch bool) (*app.App, func(), error) {
+	s.actionMu.Lock()
+	s.mu.Lock()
+	if s.actionsClosed {
+		s.mu.Unlock()
+		s.actionMu.Unlock()
+		return nil, nil, errors.New(view.T("the window is closing"))
+	}
+	r, err := s.detachedSessionLocked()
+	if err == nil {
+		r.ReadIndex(s.a)
+	}
+	s.mu.Unlock()
+	if err != nil {
+		s.actionMu.Unlock()
+		return nil, nil, err
+	}
+	done := func() {
+		if launch {
+			// App.Close waits for the automatic copy. Its connection must stay
+			// open for the operation log after the launch reply has returned.
+			s.launchCopies.Add(1)
+			go func() {
+				defer s.launchCopies.Done()
+				r.Close()
+			}()
+		} else {
+			r.Close()
+		}
+		s.actionMu.Unlock()
+	}
+	return r, done, nil
 }
 
 // subscriptionSession is called with subRead.mu held. The reader owns its connection
@@ -269,6 +309,7 @@ func (s *API) Close() {
 	s.mu.Lock()
 	s.creditClosed = true
 	s.needsClosed = true
+	s.actionsClosed = true
 	if s.analyzeTimer != nil {
 		s.analyzeTimer.Stop()
 	}
@@ -276,6 +317,10 @@ func (s *API) Close() {
 		s.creditCancel()
 	}
 	s.mu.Unlock()
+	s.actionMu.Lock()
+	//lint:ignore SA2001 barrier, nothing to guard
+	s.actionMu.Unlock()
+	s.launchCopies.Wait()
 	s.needsJobs.Wait()
 	s.closeSaves() // the saves' full read: before the tasks are marked stopped and the readers go
 	// RimArcho's own update: a swap of the program files that has begun ends whole (W04).

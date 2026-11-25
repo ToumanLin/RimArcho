@@ -5,6 +5,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 ## Unreleased
 
 - Can it run opens promptly when you switch pages during a Mod check, even if Launch or Game log is still loading.
+- You can keep browsing while RimArcho prepares a launch, writes the Mod list to the game, or backs up, copies, renames, or recycles saves.
 
 ## 1.1.3 — 2026-11-24
 

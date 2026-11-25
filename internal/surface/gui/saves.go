@@ -372,16 +372,19 @@ func (s *API) SaveCopyTo(ref string) (*SaveFileReply, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	e, err := s.a.Env()
+	r, done, err := s.actionSession(false)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+	e, err := r.Env()
 	if err != nil {
 		return nil, err
 	}
 	if e == nil {
 		return nil, app.ErrNoEnv
 	}
-	to, err := s.a.CopySaveTo(sv, e)
+	to, err := r.CopySaveTo(sv, e)
 	if err != nil {
 		return nil, saveErr(err)
 	}
@@ -485,9 +488,12 @@ func (s *API) SaveRename(ref, name string) (*SaveFileReply, error) {
 	if p := view.SaveNameProblem(sv, name); p != "" {
 		return nil, errors.New(p)
 	}
-	s.mu.Lock()
-	to, err := s.a.RenameSave(sv, name)
-	s.mu.Unlock()
+	r, done, err := s.actionSession(false)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+	to, err := r.RenameSave(sv, name)
 	if err != nil {
 		return nil, saveErr(err)
 	}
@@ -535,9 +541,12 @@ func (s *API) SaveCopy(ref string) (*SaveFileReply, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.mu.Lock()
-	to, err := s.a.CopySave(sv)
-	s.mu.Unlock()
+	r, done, err := s.actionSession(false)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+	to, err := r.CopySave(sv)
 	if err != nil {
 		return nil, saveErr(err)
 	}
@@ -574,9 +583,12 @@ func (s *API) SaveBackup(refs []string, yes bool, token string) (*SaveFilesReply
 	if err != nil {
 		return nil, err
 	}
-	s.mu.Lock()
-	r, err := s.a.BackupSaves(saves, yes, token)
-	s.mu.Unlock()
+	a, done, err := s.actionSession(false)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+	r, err := a.BackupSaves(saves, yes, token)
 	if err != nil {
 		return nil, saveErr(err)
 	}
@@ -593,9 +605,12 @@ func (s *API) SaveTrash(refs []string, yes bool, token string) (*SaveFilesReply,
 	if err != nil {
 		return nil, err
 	}
-	s.mu.Lock()
-	r, err := s.a.TrashSaves(saves, yes, token)
-	s.mu.Unlock()
+	a, done, err := s.actionSession(false)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+	r, err := a.TrashSaves(saves, yes, token)
 	if err != nil {
 		return nil, saveErr(err)
 	}

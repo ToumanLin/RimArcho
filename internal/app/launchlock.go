@@ -10,6 +10,9 @@ import (
 // briefly for another holder instead of failing a read or an edit at once; launching keeps
 // its own longer wait with a notice (waitLaunch).
 func (a *App) lockLaunch() (func(), error) {
+	if a.failFastLaunch || a.launchDepth != 0 {
+		return a.tryLaunch()
+	}
 	limit := a.launchWaitLimit
 	if limit == 0 || limit > 5*time.Second {
 		limit = 5 * time.Second
@@ -23,6 +26,10 @@ func (a *App) lockLaunch() (func(), error) {
 		time.Sleep(min(20*time.Millisecond, time.Until(deadline)))
 	}
 }
+
+// FailFastLaunchLock makes guarded operations on this session try once.
+// Detached sessions have their own wait policy.
+func (a *App) FailFastLaunchLock() { a.failFastLaunch = true }
 
 // tryLaunch takes the lock if free. App sessions have one caller at a time. Nested list
 // operations reuse the lock; separate sessions and processes always acquire their own OS lock.

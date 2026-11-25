@@ -36,6 +36,9 @@ import (
 // a snapshot of the index. Only snapshotting settings/results needs the shared mu.
 type API struct {
 	mu              sync.Mutex
+	actionMu        sync.Mutex // serializes game actions and save file operations
+	actionsClosed   bool       // guarded by mu
+	launchCopies    sync.WaitGroup
 	filesMu         sync.RWMutex // scans and file jobs; never acquired by page reads/edits
 	a               *app.App
 	emitFn          atomic.Pointer[func(name string, data any)] // Wails events; unset in tests (setEmit)
@@ -159,6 +162,7 @@ type API struct {
 func newAPI(a *app.App) *API {
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &API{a: a, open: openURL, busy: map[string]bool{}, branchCtx: ctx, branchCancel: cancel}
+	a.FailFastLaunchLock()
 	a.LaunchWait = func(text string) { s.send("launch-wait", map[string]any{"text": view.T(text)}) }
 	// A SteamCMD window that may ask for the password opens or closes (11 §3).
 	a.SteamCMDSignIn = func(open bool) { s.send("steamcmd-signin", map[string]any{"open": open}) }
@@ -600,9 +604,12 @@ func (s *API) PackRemoveUnfinished(name string) (string, error) {
 // PackLaunch plays a pack. move: the player agreed to move the folders in the way into the
 // lock library first (Outcome.Moves, 10 §3).
 func (s *API) PackLaunch(name string, move bool) (*view.Outcome, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return view.LaunchPack(s.a, name, move), nil
+	r, done, err := s.actionSession(true)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+	return view.LaunchPack(r, name, move), nil
 }
 
 // PackRemove moves a pack to the recycle bin.
@@ -941,7 +948,7 @@ func (s *API) Sections(id string) ([]view.Section, error) {
 
 // Commands need the loadout, not thousands of rendered rows and problem summaries.
 func (s *API) boardState() *app.LoadoutState {
-	st, _ := s.a.Loadout()
+	st, _ := s.a.LoadoutSnapshot()
 	return st
 }
 
@@ -1075,23 +1082,20 @@ func (s *API) Swap(id string) (string, error) {
 
 // Preview is the dry run of sort, save or launch (the palette's preview…; 16 §6).
 func (s *API) Preview(what string) (*view.Preview, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	defer s.launchCurrent(what)()
-	return view.DryRun(s.a, what)
+	r, done, err := s.actionSession(false)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+	launchCurrent(r, what)
+	return view.DryRun(r, what)
 }
 
-// launchCurrent: a launch starts the current list, the one Launch shows and checks the RAM
-// for (07 §1.3), not a list only open in the window (VM 2026-11-23: Launch showed r2b and
-// started r2s, open in the editor). The editor makes its list current before it launches.
-// The returned func gives the window its open list back.
-func (s *API) launchCurrent(what string) func() {
-	if what != view.ListLaunch || s.a.OpenPlan == 0 {
-		return func() {}
+// The editor makes its list current explicitly before launching it (07 §1.3).
+func launchCurrent(r *app.App, what string) {
+	if what == view.ListLaunch {
+		r.OpenPlan, r.PlanName = 0, ""
 	}
-	open, name := s.a.OpenPlan, s.a.PlanName
-	s.a.OpenPlan, s.a.PlanName = 0, ""
-	return func() { s.a.OpenPlan, s.a.PlanName = open, name }
 }
 
 // Run does sort, save or launch at once (S, w, L; 16 §6). A refusal comes back in
@@ -1107,35 +1111,39 @@ func (s *API) RunAnyway(what string) (*view.Outcome, error) {
 }
 
 func (s *API) run(what string, ask bool) (*view.Outcome, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.needs = nil
-	s.board = nil
 	switch what {
 	case view.ListSort, view.ListSave, view.ListLaunch:
 	default:
 		return nil, fmt.Errorf("no action %s", what)
 	}
-	defer s.launchCurrent(what)()
-	var o *view.Outcome
+	run := view.Run
 	if ask {
-		o = view.RunAsking(s.a, what)
-	} else {
-		o = view.Run(s.a, what)
+		run = view.RunAsking
 	}
-	s.launchedPlan(o)
-	return o, nil
+	return s.runListAction(what, run)
 }
 
-// launchedPlan forgets a pack applied on Launch once the current plan launched (from the
-// editor, 16 §2.5, or the command panel): Launch's headline then names the plan that runs.
-func (s *API) launchedPlan(o *view.Outcome) {
-	if o == nil || o.What != view.ListLaunch || len(o.Refused) > 0 || len(o.Confirm) > 0 || len(o.Moves) > 0 {
-		return
+func (s *API) runListAction(what string, run func(*app.App, string) *view.Outcome) (*view.Outcome, error) {
+	r, done, err := s.actionSession(what == view.ListLaunch)
+	if err != nil {
+		return nil, err
 	}
-	if s.a.Store.Meta(view.FeaturedKey) != "" {
+	defer done()
+	launchCurrent(r, what)
+	featured := r.Store.Meta(view.FeaturedKey)
+	o := run(r, what)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.needs, s.board = nil, nil
+	if what == view.ListSort && o.Undo {
+		s.listEdits++
+	}
+	// A plan launch clears the applied pack it supersedes, even if the editor is open.
+	if what == view.ListLaunch && len(o.Refused)+len(o.Confirm)+len(o.Moves) == 0 &&
+		strings.HasPrefix(featured, r.EnvName+"\x1f") && s.a.Store.Meta(view.FeaturedKey) == featured {
 		_ = s.a.Store.SetMeta(view.FeaturedKey, "")
 	}
+	return o, nil
 }
 
 // LaunchDirect makes the current Game Config start the game without Steam from now on: the
@@ -1158,18 +1166,12 @@ func (s *API) LaunchDirect() error {
 // RunMoving is Run after the player agreed to move the folders in the way into the lock
 // library (Outcome.Moves, 09 §3).
 func (s *API) RunMoving(what string) (*view.Outcome, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.needs, s.board = nil, nil
 	switch what {
 	case view.ListSave, view.ListLaunch:
 	default:
 		return nil, fmt.Errorf("no action %s", what)
 	}
-	defer s.launchCurrent(what)()
-	o := view.RunMoving(s.a, what)
-	s.launchedPlan(o)
-	return o, nil
+	return s.runListAction(what, view.RunMoving)
 }
 
 // ---- tags (16 §3.8) ----
@@ -1322,7 +1324,7 @@ func (s *API) needsPage() *view.Needs {
 	if c, key := s.cachedNeedsLocked(); c != nil {
 		if c.key == key {
 			s.refreshNeedsLocked(c)
-			st, _ := s.a.Loadout()
+			st, _ := s.a.LoadoutSnapshot()
 			n := view.RefreshMemory(s.a, st, c.n)
 			if c.eager {
 				s.autoAnalyzeLocked(n, false)
@@ -1340,7 +1342,7 @@ func (s *API) needsPage() *view.Needs {
 		}
 		s.refreshNeedsLocked(c)
 		n.Updating = s.needsWorkLocked()
-		st, _ := s.a.Loadout()
+		st, _ := s.a.LoadoutSnapshot()
 		n = *view.RefreshMemory(s.a, st, &n)
 		s.mu.Unlock()
 		return &n
@@ -1375,7 +1377,7 @@ func (s *API) initialNeeds(r *app.App, expected string, sequence uint64) *view.N
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	current, _ := s.a.Loadout()
+	current, _ := s.a.LoadoutSnapshot()
 	if !sameNeedsList(ps.State, current) {
 		return n
 	}
@@ -1459,6 +1461,7 @@ func readNeedsChecked(a *app.App, withLog bool) (*view.Needs, *app.LoadoutState,
 }
 
 func (s *API) needsLocked() *view.Needs {
+	defer s.a.UseStoredWorkspace()()
 	if c, key := s.cachedNeedsLocked(); c != nil && c.key == key {
 		s.needs = c.n
 		return c.n
@@ -1526,14 +1529,17 @@ func (s *API) IdentityWhy(qid int64) (*view.IdentityPanel, error) {
 // Inspect runs a read-only command an action names (view, 16 §5) and returns its text
 // with names for #refs.
 func (s *API) Inspect(argv []string) ([]string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	r, err := s.detachedReader()
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
 	if len(argv) == 3 && argv[0] == "identity" && argv[1] == "why" {
 		qid, err := app.ParseQuestionRef(argv[2])
 		if err != nil {
 			return nil, err
 		}
-		return view.IdentityReasons(s.a, qid)
+		return view.IdentityReasons(r, qid)
 	}
 	// an outside change's "see the difference" (loadout diff [<v>] [<v>]), in the window's words
 	if len(argv) >= 2 && len(argv) <= 4 && argv[0] == "loadout" && argv[1] == "diff" {
@@ -1544,14 +1550,14 @@ func (s *API) Inspect(argv []string) ([]string, error) {
 		if len(argv) > 3 {
 			to = argv[3]
 		}
-		return view.VersionDiff(s.a, from, to)
+		return view.VersionDiff(r, from, to)
 	}
 	directoryCheck := len(argv) == 2 && argv[0] == "folder" && argv[1] == "check"
 	if len(argv) == 0 || (!directoryCheck && !inspectable[argv[0]]) {
 		return nil, fmt.Errorf("not a read-only command: %v", argv)
 	}
-	text, _ := cmds.Execute(s.a, argv)
-	st := s.boardState()
+	text, _ := cmds.Execute(r, argv)
+	st, _ := r.Loadout()
 	var out []string
 	for _, l := range strings.Split(strings.TrimRight(text, "\n"), "\n") {
 		out = append(out, view.Humanize(st, l))

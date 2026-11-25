@@ -43,7 +43,7 @@ func (s *API) needsKeyLocked() (scope, key, index, list string) {
 // needsKeyOfLocked is needsKeyLocked with the game links already read, or nil to read
 // them now.
 func (s *API) needsKeyOfLocked(read []*app.GameLink) (scope, key, index, list string) {
-	st, _ := s.a.Loadout()
+	st, _ := s.a.LoadoutSnapshot()
 	if st == nil {
 		return
 	}
@@ -73,7 +73,7 @@ func (s *API) needsKeyOfLocked(read []*app.GameLink) (scope, key, index, list st
 
 // needsScopeLocked is the scope part of needsKeyLocked, which needs no look at the disk.
 func (s *API) needsScopeLocked() string {
-	st, _ := s.a.Loadout()
+	st, _ := s.a.LoadoutSnapshot()
 	if st == nil {
 		return ""
 	}
@@ -310,7 +310,7 @@ func (s *API) analyzeSettled() {
 			}
 		}
 	}()
-	st, err := s.a.Loadout()
+	st, err := s.a.LoadoutSnapshot()
 	if err != nil || st == nil {
 		return
 	}

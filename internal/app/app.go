@@ -50,6 +50,8 @@ type App struct {
 	checkContext      context.Context // automatic worker cancellation; never shared with pages
 	dataKey           string          // community data generation read by this connection's compact indexes
 	workspaceSnapshot bool
+	storedWorkspace   bool
+	failFastLaunch    bool
 	// LaunchWait reports a launch waiting for the cross-process handoff lock.
 	LaunchWait      func(string)
 	launchDepth     int
