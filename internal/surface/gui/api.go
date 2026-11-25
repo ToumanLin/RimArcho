@@ -129,6 +129,8 @@ type API struct {
 	texCancel     context.CancelFunc
 	texMeasure    textureMeasurement
 	logRead       logReader
+	launchMu      sync.Mutex // serializes reads of the current list on Launch
+	needsRead     logReader
 	texRead       logReader
 	feedback      feedbackState
 	costMeasure   loadCostMeasurement
@@ -1307,9 +1309,15 @@ func (s *API) tagDone(t string, err error) (string, error) {
 
 // ---- Can it run (16 §5) ----
 
-// Needs builds the screen. Opening it includes the newest log (parsing it if needed) and
-// starts the files' check when it is stale, as the TUI does.
+// Needs shows stored findings and refreshes missing log findings in the background.
 func (s *API) Needs() *view.Needs {
+	v, _ := join(&s.flight, "Needs", func() (*view.Needs, error) { return s.needsPage(), nil })
+	return v
+}
+
+func (s *API) needsPage() *view.Needs {
+	s.needsRead.mu.Lock()
+	defer s.needsRead.mu.Unlock()
 	s.mu.Lock()
 	if c, key := s.cachedNeedsLocked(); c != nil {
 		if c.key == key {
@@ -1337,30 +1345,60 @@ func (s *API) Needs() *view.Needs {
 		s.mu.Unlock()
 		return &n
 	}
+	expected, sequence := s.inventoryKey(), s.needsSequence
+	r, err := s.inventorySession(&s.needsRead)
 	s.mu.Unlock()
-	s.logRead.mu.Lock()
-	defer s.logRead.mu.Unlock()
-	defer s.free.soon()
-	r, err := s.logSession()
+	defer s.needsRead.release()
 	if err != nil {
 		return &view.Needs{Status: map[string]int{}, Error: err.Error()}
 	}
-	ps, err := r.Problems(false, nil)
-	if err != nil || ps == nil || ps.State == nil {
-		return &view.Needs{Status: map[string]int{}, Error: fmt.Sprint(err)}
+	return s.initialNeeds(r, expected, sequence)
+}
+
+func (s *API) initialNeeds(r *app.App, expected string, sequence uint64) *view.Needs {
+	defer s.free.soon()
+	r.LazyLog, r.LogCacheOnly = false, true
+	release, err := r.Store.ReadSnapshot()
+	if err != nil {
+		return &view.Needs{Status: map[string]int{}, Error: err.Error()}
 	}
-	r.LazyLog, r.LogCacheOnly = false, false
-	n, st := readNeeds(r, true)
+	defer release()
+	ps, err := r.Problems(false, nil)
+	if err != nil {
+		return &view.Needs{Status: map[string]int{}, Error: err.Error()}
+	}
+	if ps.State == nil {
+		return &view.Needs{Status: map[string]int{}, Error: "could not read list problems"}
+	}
+	n := view.BuildNeeds(r, ps.State, ps)
+	release()
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	current, _ := s.a.Loadout()
-	if sameNeedsList(st, current) {
-		// The eager pass may have saved a parsed log report. Read its ProblemSet again.
-		ps, _ = r.Problems(false, nil)
-		s.saveFreshNeedsLocked(ps, n, true)
-		s.autoAnalyzeLocked(n, false)
-		n.Updating = s.needsWorkLocked()
+	if !sameNeedsList(ps.State, current) {
+		return n
 	}
+	if sequence != s.needsSequence {
+		if c := s.needsCache[s.needsScopeLocked()]; c != nil {
+			s.refreshNeedsLocked(c)
+			out := *c.n
+			out.Updating = s.needsWorkLocked()
+			return &out
+		}
+	}
+	// If a task committed during the read, keep the first drawing and refresh it
+	// as soon as the stored findings are available.
+	eager := !n.LastRunPending && s.inventoryKey() == expected
+	// The cached findings use the main loadout, whose lookups outlive this read.
+	saved := *ps
+	saved.State = current
+	c := s.saveFreshNeedsLocked(&saved, n, eager)
+	if !eager {
+		s.refreshNeedsLocked(c)
+	}
+	s.autoAnalyzeLocked(n, false)
+	n.Updating = s.needsWorkLocked()
 	return n
 }
 

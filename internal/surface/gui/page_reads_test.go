@@ -5,6 +5,8 @@ package gui
 import (
 	"context"
 	"errors"
+	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -77,11 +79,18 @@ func TestHomeAndNeedsReadersLeaveNavigationResponsive(t *testing.T) {
 			e, api, _ := fixture(t)
 			e.App.LazyLog, e.App.LogCacheOnly = true, true
 			e.App.AnalyzeRunner = func(*app.App, func(string)) error { return errors.New("fixture") }
-			if _, err := api.LogPage(""); err != nil {
+			w := &api.logRead
+			if page == "needs" {
+				w = &api.needsRead
+			}
+			api.mu.Lock()
+			r, err := api.inventorySession(w)
+			api.mu.Unlock()
+			if err != nil {
 				t.Fatal(err)
 			}
-			reader := api.logRead.a.Store.DB
-			conn, err := reader.Conn(context.Background()) // hold only the log reader's sole connection
+			reader := r.Store.DB
+			conn, err := reader.Conn(context.Background()) // hold only this page's connection
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -117,6 +126,171 @@ func TestHomeAndNeedsReadersLeaveNavigationResponsive(t *testing.T) {
 				t.Fatal("page enabled eager parsing on main App")
 			}
 		})
+	}
+}
+
+func TestNeedsDoesNotWaitForLaunchRead(t *testing.T) {
+	e, api, _ := fixture(t)
+	e.App.AnalyzeRunner = func(*app.App, func(string)) error { return errors.New("fixture") }
+	if _, err := api.HomeMemory(); err != nil {
+		t.Fatal(err)
+	}
+	reader := api.logRead.a.Store.DB
+	conn, err := reader.Conn(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	launch := make(chan *view.Home, 1)
+	needs := make(chan *view.Needs, 1)
+	defer func() {
+		conn.Close()
+		select {
+		case <-launch:
+		case <-time.After(5 * time.Second):
+			t.Error("Launch did not finish after releasing its connection")
+		}
+	}()
+	before := reader.Stats().WaitCount
+	go func() { launch <- api.Home() }()
+	deadline := time.Now().Add(5 * time.Second)
+	for reader.Stats().WaitCount == before {
+		if time.Now().After(deadline) {
+			t.Fatal("Launch did not reach its database read")
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	start := time.Now()
+	go func() { needs <- api.Needs() }()
+	select {
+	case n := <-needs:
+		t.Logf("Can it run returned after %s with Launch still blocked", time.Since(start))
+		if n.Error != "" || n.Plan == 0 {
+			t.Fatalf("Can it run did not return list findings: %+v", n)
+		}
+	case <-time.After(time.Second):
+		stacks := make([]byte, 64<<10)
+		n := runtime.Stack(stacks, true)
+		t.Errorf("Can it run still waiting after %s:\n%s", time.Since(start), stacks[:n])
+		conn.Close()
+		select {
+		case <-needs:
+			t.Logf("Can it run returned after %s once Launch was released", time.Since(start))
+		case <-time.After(5 * time.Second):
+			t.Error("Can it run did not finish after releasing Launch")
+		}
+	}
+}
+
+func TestGameLogCanReadWhileLaunchBorrowsItsConnection(t *testing.T) {
+	_, api, _ := fixture(t)
+	api.needsClosed = true
+	if _, err := api.HomeMemory(); err != nil {
+		t.Fatal(err)
+	}
+	borrowed := api.logRead.a
+	db := borrowed.Store.DB
+	conn, err := db.Conn(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	before := db.Stats().WaitCount
+	launch := make(chan *view.Home, 1)
+	go func() { launch <- api.Home() }()
+	deadline := time.Now().Add(5 * time.Second)
+	for db.Stats().WaitCount == before {
+		if time.Now().After(deadline) {
+			t.Fatal("Launch did not start reading on the borrowed connection")
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	log := make(chan error, 1)
+	go func() {
+		_, err := api.LogPage("")
+		log <- err
+	}()
+	select {
+	case err := <-log:
+		if err != nil {
+			t.Error(err)
+		}
+	case <-time.After(time.Second):
+		t.Error("Game log waited behind Launch")
+		conn.Close()
+		select {
+		case <-log:
+		case <-time.After(5 * time.Second):
+			t.Fatal("Game log did not finish after releasing Launch")
+		}
+	}
+	conn.Close()
+	select {
+	case h := <-launch:
+		if h.Error != "" {
+			t.Fatal(h.Error)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Launch did not finish")
+	}
+	if db.Stats().OpenConnections != 0 || api.logRead.a == nil || api.logRead.a == borrowed {
+		t.Fatal("Launch did not close the borrowed connection after Game log replaced it")
+	}
+}
+
+func TestNeedsReturnsWhileAnalysisHoldsWriteLock(t *testing.T) {
+	e, api, _ := fixture(t)
+	e.App.LazyLog, e.App.LogCacheOnly = true, true
+	e.RecordLaunch(e.Now().Add(-time.Minute))
+	e.WriteFile(filepath.Join(e.UserData, "Player.log"), "RimWorld 1.6.4633 rev1\n\nCould not load Texture2D at 'Things/Alpha'\n\n")
+	writer, err := e.App.ReadSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer writer.Close()
+
+	started, release := make(chan error, 1), make(chan struct{})
+	defer func() {
+		close(release)
+		api.needsJobs.Wait()
+	}()
+	analyze := e.App.AnalyzeRunner
+	e.App.AnalyzeRunner = func(a *app.App, progress func(string)) error {
+		tx, err := writer.Store.DB.Begin()
+		started <- err
+		if err != nil {
+			return err
+		}
+		<-release
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+		return analyze(a, progress)
+	}
+	if !api.Analyze() {
+		t.Fatal("did not start the check")
+	}
+	select {
+	case err := <-started:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("check did not acquire the write lock")
+	}
+	start := time.Now()
+	done := make(chan *view.Needs, 1)
+	go func() { done <- api.Needs() }()
+	select {
+	case n := <-done:
+		t.Logf("Can it run returned after %s with the analysis write lock held", time.Since(start))
+		if n.Error != "" || n.Plan == 0 || !n.Updating || !n.LastRunPending {
+			t.Fatalf("wanted stored findings and a pending log, got plan %d, updating %v, pending %v, error %q", n.Plan, n.Updating, n.LastRunPending, n.Error)
+		}
+	case <-time.After(time.Second):
+		t.Error("Can it run waited behind the analysis write lock")
 	}
 }
 

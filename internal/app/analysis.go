@@ -287,6 +287,11 @@ type pendingAnalysis struct {
 	done chan error
 }
 
+// AnalysisRunning reports whether this session's background EnsureAnalysis still runs.
+func (a *App) AnalysisRunning() bool {
+	return a.analyzing != nil && len(a.analyzing.done) == 0
+}
+
 // EnsureAnalysis brings the stored analysis up to date (05 §3: on demand), using the
 // configured runner — by default the `archo analyze` child process.
 func (a *App) EnsureAnalysis(progress func(string)) (*AnalysisState, error) {

@@ -4,6 +4,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Can it run opens promptly when you switch pages during a Mod check, even if Launch or Game log is still loading.
+
 ## 1.1.3 — 2026-11-24
 
 - Fixed (#21): RimArcho no longer copies its bundled Archo Monitor into its own Monitor folder when you subscribe to the Monitor's Workshop item with the same or a newer version; it uses the Workshop copy. `archo scan` and `archo monitor install` say "using the Workshop copy <version>; the bundled <version> is not copied", and Settings › game log shows "(Workshop copy)" after the version. A local copy installed earlier stays where it is; lists that used it move to the Workshop copy (one undoable edit). An older Workshop copy still gets the bundled one.

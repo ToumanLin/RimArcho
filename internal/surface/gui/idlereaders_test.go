@@ -60,7 +60,7 @@ func TestHomeMemoryReusesLaunchReader(t *testing.T) {
 	if warm*3 > cold {
 		t.Fatalf("an unchanged refresh allocates %d bytes, a cold read %d", warm, cold)
 	}
-	// Other pages on the same reader still see the opened list, not the launch page's.
+	// Home and HomeMemory use the same current list and estimate.
 	h := api.Home()
 	if h.Error != "" || h.Rows[0].Memory == nil || h.Rows[0].Memory.Token != first.Token {
 		t.Fatalf("home %+v", h)
@@ -70,7 +70,30 @@ func TestHomeMemoryReusesLaunchReader(t *testing.T) {
 func TestIdlePageReadersClose(t *testing.T) {
 	t.Parallel()
 	e, api, _ := fixture(t)
+	api.needsClosed = true
+	r, err := api.inventorySession(&api.needsRead)
+	if err != nil {
+		t.Fatal(err)
+	}
+	needsDB := r.Store.DB
+	first := api.Needs()
+	if first.Error != "" || first.Plan == 0 {
+		t.Fatalf("Can it run: %+v", first)
+	}
+	if api.needsRead.a != nil || needsDB.Stats().OpenConnections != 0 {
+		t.Fatal("Can it run retained its cache-miss connection")
+	}
 	api.Board()
+	if _, err := api.HomeMemory(); err != nil {
+		t.Fatal(err)
+	}
+	shared := api.logRead.a
+	if h := api.Home(); h.Error != "" {
+		t.Fatal(h.Error)
+	}
+	if _, err := api.LogPage(""); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := api.Library("", nil, ""); err != nil {
 		t.Fatal(err)
 	}
@@ -133,6 +156,19 @@ func TestIdlePageReadersClose(t *testing.T) {
 	if api.copyRead.a != nil || api.copyRead.lib != nil {
 		t.Fatal("idle copy reader kept its connection")
 	}
+
+	// After expiry, only the shared reader from the page tour remains. The
+	// Launch poll still uses that connection and a Needs cache hit opens none.
+	if _, err := api.HomeMemory(); err != nil {
+		t.Fatal(err)
+	}
+	if n := api.Needs(); n.Error != "" || n.Plan != first.Plan {
+		t.Fatalf("Can it run after expiry: %+v", n)
+	}
+	if api.logRead.a != shared || shared.Store.DB.Stats().OpenConnections != 1 || api.needsRead.a != nil {
+		t.Fatal("Launch, Game log and Can it run should retain one connection after expiry")
+	}
+	t.Log("Launch, Game log and Can it run retain one SQLite connection after readerIdle")
 
 	// The next visit reads again on new connections, with current data.
 	e.MustRun("disable", "pkg:tester.a")
