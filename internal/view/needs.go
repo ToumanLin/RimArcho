@@ -441,7 +441,13 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 	}
 	if n.LastRun == "" && st.Ix.Env.UserDataRoot != "" {
 		cur, prev := a.LogPaths(st)
-		if cur == "" && prev == "" {
+		// a log only another game version wrote is no run of this one: say the log was not
+		// found rather than leave Launch's last game line empty (release 1.1.4 VM round)
+		other := len(ps.Logs) > 0
+		for _, r := range ps.Logs {
+			other = other && r.OtherGame
+		}
+		if cur == "" && prev == "" || other {
 			path := filepath.Join(st.Ix.Env.UserDataRoot, "Player.log")
 			same := env.PathKey(a.DefaultUserData(st.Ix.Env.GameRoot)) == env.PathKey(st.Ix.Env.UserDataRoot)
 			if same {

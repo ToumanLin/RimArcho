@@ -116,3 +116,34 @@ test("the editor displays the Lineage note and the library displays the copy not
   assert.deepEqual(library.writes, [["copy note", "#test", "My copy note"]]);
   assert.equal(library.host.querySelector(".md-note .txt").textContent, "My copy note");
 });
+
+// Release 1.1.4 VM round: "add note" on a copy whose box shows RimArcho's automatic text
+// started the editor with that text, caret at its end, so the typed note ran on from it.
+test("add note starts empty with the automatic text as the hint; edit note keeps the player's text", async () => {
+  const library = await frame();
+  library.f.inst({ id: "test-id", ref: "#test", auto: "Workshop subscription, first seen Nov 21" });
+  library.host.querySelector(".md-note button").onclick();
+  let area = library.host.querySelector("textarea");
+  assert.equal(area.value, "");
+  assert.equal(area.placeholder, "Workshop subscription, first seen Nov 21");
+  area.onkeydown(key("Enter")); // nothing typed: nothing saved, the automatic text stays
+  await new Promise(setImmediate);
+  assert.deepEqual(library.writes, []);
+  assert.equal(library.host.querySelector(".md-note .txt").textContent, "Workshop subscription, first seen Nov 21");
+  library.host.querySelector(".md-note button").onclick();
+  area = library.host.querySelector("textarea");
+  area.value += "menu note R114";
+  area.onkeydown(key("Enter"));
+  await new Promise(setImmediate);
+  assert.deepEqual(library.writes, [["copy note", "#test", "menu note R114"]]);
+
+  const own = await frame();
+  own.f.inst({ id: "test-id", ref: "#test", note: "Player's note", auto: "Generated note" });
+  own.host.querySelector(".md-note button").onclick();
+  area = own.host.querySelector("textarea");
+  assert.equal(area.value, "Player's note");
+  area.value += " and more";
+  area.onkeydown(key("Enter"));
+  await new Promise(setImmediate);
+  assert.deepEqual(own.writes, [["copy note", "#test", "Player's note and more"]]);
+});

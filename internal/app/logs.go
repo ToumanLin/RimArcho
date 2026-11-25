@@ -114,7 +114,10 @@ type LogReport struct {
 
 // LogPaths returns usable current and previous logs (06 §4). Check both locations,
 // preferring this game's layout, independently: a foreign Player.log must not hide an
-// owned Player-prev.log. --game-version changes analysis, never game ownership.
+// owned Player-prev.log. --game-version changes analysis, never game ownership. A pre-1.7
+// game never writes the 1.7 (Waylith) format, so such a file in its folder is another
+// install's run even when RimArcho never launched that install (release 1.1.4 VM round:
+// a stale 1.7 Logs/Player.log stood in for a deleted 1.6 Player.log).
 func (a *App) LogPaths(st *LoadoutState) (cur, prev string) {
 	root := st.Ix.Env.UserDataRoot
 	if root == "" {
@@ -124,10 +127,11 @@ func (a *App) LogPaths(st *LoadoutState) (cur, prev string) {
 	if mm := env.MajorMinor(st.Ix.Env.GameVersion); mm != "" && !env.VersionLess(mm, "1.7") && samePath(root, a.DefaultUserData(st.Ix.Env.GameRoot)) {
 		dirs[0], dirs[1] = dirs[1], dirs[0]
 	}
+	waylith := isWaylith(st.Ix.Env)
 	pick := func(name string) string {
 		for _, dir := range dirs {
 			p := filepath.Join(dir, name)
-			if fi, err := os.Stat(p); err == nil && !fi.IsDir() && a.CheckLogOwner(st, p) == nil {
+			if fi, err := os.Stat(p); err == nil && !fi.IsDir() && (waylith || !waylithLogFile(p)) && a.CheckLogOwner(st, p) == nil {
 				return p
 			}
 		}

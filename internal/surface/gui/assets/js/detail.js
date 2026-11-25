@@ -386,7 +386,8 @@ function aliasEl(id, alias, currentName, saved) {
 }
 
 // noteEl: the player's note (16 §4.1, §2.9). The player's text, else what RimArcho wrote (grey),
-// else a place to write one; a click (or n) edits it, enter saves, shift+enter breaks the
+// else a place to write one; a click (or n) edits it (the player's text, or empty with what
+// RimArcho wrote as the hint), enter saves, shift+enter breaks the
 // line, esc leaves it as it was. o.saved() after a save, o.leave() when the editing ends;
 // o.save(text) saves another note (a tag's) in place of the copy's, o.placeholder its hint.
 export function noteEl(i, o = {}) {
@@ -413,10 +414,12 @@ export function noteEl(i, o = {}) {
     if (box.classList.contains("editing")) return;
     box.classList.add("editing");
     box.innerHTML = "";
-    const start = i.note || i.auto || "";
+    // the player's own text; RimArcho's automatic text is only the hint, so a new note does
+    // not run on from it (release 1.1.4 VM round)
+    const start = i.note || "";
     const ta = el("textarea", "lib-note-in");
     ta.value = start;
-    ta.placeholder = o.placeholder || T(o.modNote ? "a note on this mod…" : "a note on this copy…");
+    ta.placeholder = (!i.note && auto) || o.placeholder || T(o.modNote ? "a note on this mod…" : "a note on this copy…");
     ta.setAttribute("aria-label", T("note"));
     ta.rows = Math.min(6, Math.max(2, start.split("\n").length + 1));
     box.append(ta, el("div", "by", T("enter saves, esc cancels")));
