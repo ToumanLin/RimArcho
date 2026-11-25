@@ -40,6 +40,20 @@ func (a *App) ReadSession() (*App, error) {
 // files or taking the launch/edit lock. Commands still use normal ReadSession.
 func (a *App) WorkspaceSnapshot() { a.workspaceSnapshot = true }
 
+// UseStoredWorkspace keeps a group of reads on persisted workspace state.
+// The caller owns the App until it restores the previous mode.
+func (a *App) UseStoredWorkspace() func() {
+	previous := a.storedWorkspace
+	a.storedWorkspace = true
+	return func() { a.storedWorkspace = previous }
+}
+
+// LoadoutSnapshot reads the workspace without synchronizing ModsConfig.xml.
+func (a *App) LoadoutSnapshot() (*LoadoutState, error) {
+	defer a.UseStoredWorkspace()()
+	return a.Loadout()
+}
+
 // ReadOptions refreshes the invocation settings without discarding a reader's caches.
 // Neither App may be in use while its options are copied.
 func (b *App) ReadOptions(a *App) {
@@ -52,7 +66,9 @@ func (b *App) ReadOptions(a *App) {
 	b.SavesIndexRunner = a.SavesIndexRunner
 	b.LazyLog, b.LogCacheOnly = a.LazyLog, a.LogCacheOnly
 	b.GameProbe, b.LockBase, b.MonitorBundle = a.GameProbe, a.LockBase, a.MonitorBundle
+	b.Launcher, b.SteamRunning = a.Launcher, a.SteamRunning
 	b.HTTP, b.SteamAPI = a.HTTP, a.SteamAPI
+	b.SteamCollectionAPI = a.SteamCollectionAPI
 	b.SteamSignedIn, b.SteamSignedInID = a.SteamSignedIn, a.SteamSignedInID
 	b.FindTool, b.SteamWorker, b.TrashFunc = a.FindTool, a.SteamWorker, a.TrashFunc
 	b.SteamWorkerStream = a.SteamWorkerStream

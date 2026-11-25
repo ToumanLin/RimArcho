@@ -93,8 +93,11 @@ func (s *API) withPlan(id int64, keep bool, run func() error) (err error) {
 
 // CreatePlan copies the selected list, version or save and opens the resulting list (16 §2.17).
 func (s *API) CreatePlan(source int64, name, from string) (done *PlanDone, err error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	err = s.withPlan(source, true, func() error {
 		p, text, e := view.NewPlan(s.a, name, from)
 		if e != nil {
@@ -160,8 +163,11 @@ func (s *API) ImportPreviewFor(id int64, kind, src string) (*PlanImportPreview, 
 
 // Create only the import the form actually previewed, even after another page read one.
 func (s *API) ImportAsPlanPreview(name string, request uint64, follow bool) (*PlanDone, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	if request == 0 || request != s.x.seq || s.x.imp == nil {
 		return nil, errors.New(view.T("the import preview changed; preview the content again"))
 	}
@@ -178,8 +184,11 @@ func (s *API) ImportAsPlanPreview(name string, request uint64, follow bool) (*Pl
 
 // ImportApplyTo edits the selected destination in one undoable step (16 §2.17).
 func (s *API) ImportApplyTo(id int64, merge bool) (text string, err error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return "", err
+	}
+	defer release()
 	err = s.withPlan(id, true, func() error {
 		if s.x.imp == nil {
 			return errors.New(view.T("nothing to import"))

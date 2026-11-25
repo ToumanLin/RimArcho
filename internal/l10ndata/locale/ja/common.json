@@ -743,6 +743,8 @@
   "the unfinished pack %s and what it copied (%s) are deleted; your mods are not touched": "未完成のMODパック「%s」とコピーされたファイル（%s）を削除します。元のMODには影響しません",
   "the whole library": "MODライブラリ全体",
   "the window is closing": "ウィンドウを終了しています",
+  "RimArcho is preparing a launch. Try editing the list again after the launch finishes.": "RimArcho はゲームの起動を準備しています。起動が完了してからリストの編集をやり直してください。",
+  "the open list or Game Config changed. Review the list and try again.": "開いているリストまたはゲーム設定が変更されました。リストを確認してからやり直してください。",
   "this answer cannot be undone with u": "この回答はuでは取り消せません",
   "this copy is already listed independently or is no longer available": "このコピーはすでに独立して表示されているか、利用できなくなっています",
   "this list": "このリスト",

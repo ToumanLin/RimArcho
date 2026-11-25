@@ -59,8 +59,11 @@ func (s *API) BarFilter(search string, filters []string, groups bool) (*view.Bar
 // MoveShown is J / K while the bar filters Enabled: past the next shown row (view.StepAt).
 // shown are the load positions of the rows shown, in order.
 func (s *API) MoveShown(ids []string, d int, shown []int) (*view.Result, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	st := s.boardState()
 	if st == nil {
 		return nil, errors.New("no list")
@@ -159,8 +162,11 @@ func (s *API) SetCategory(id, key string) (string, error) {
 // CompleteDependencies enables installed prerequisites and sorts the open plan.
 // Subscription remains a separate Subscribe call after choosing Steam or SteamCMD.
 func (s *API) CompleteDependencies() (*view.Result, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	s.needs, s.board = nil, nil
 	return s.after(view.CompleteDependencies(s.a))
 }
@@ -179,8 +185,11 @@ func (s *API) SortSteps(past []string) (*view.SortSteps, error) {
 
 // ApplySortStep applies one list step after a sort as its own undoable edit (16 §6.1).
 func (s *API) ApplySortStep(kind string) (*view.Result, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	s.needs, s.board = nil, nil
 	return s.after(view.ApplySortStep(s.a, kind))
 }
@@ -205,8 +214,11 @@ func (s *API) DownloadedToAdd(taskID string) (*view.AddOffer, error) {
 
 // AddDownloaded enables the downloaded Mods in the current list, one undo step.
 func (s *API) AddDownloaded(refs []string) (*view.Result, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	s.needs, s.board = nil, nil
 	return s.after(view.AddDownloaded(s.a, refs))
 }

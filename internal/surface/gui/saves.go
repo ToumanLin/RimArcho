@@ -372,16 +372,19 @@ func (s *API) SaveCopyTo(ref string) (*SaveFileReply, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	e, err := s.a.Env()
+	r, done, err := s.actionSession(false)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+	e, err := r.Env()
 	if err != nil {
 		return nil, err
 	}
 	if e == nil {
 		return nil, app.ErrNoEnv
 	}
-	to, err := s.a.CopySaveTo(sv, e)
+	to, err := r.CopySaveTo(sv, e)
 	if err != nil {
 		return nil, saveErr(err)
 	}
@@ -437,8 +440,11 @@ func (s *API) SaveFix(ref string, mods []string, disableAdded, order bool) (*Sav
 	}
 	// the list the page checked the save against: the applied one (SaveDetail), found on
 	// the window's session under its lock, so it is still the applied one when fixed
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	if sv, err = appliedTarget(s.a, sv); err != nil {
 		return nil, err
 	}
@@ -485,9 +491,12 @@ func (s *API) SaveRename(ref, name string) (*SaveFileReply, error) {
 	if p := view.SaveNameProblem(sv, name); p != "" {
 		return nil, errors.New(p)
 	}
-	s.mu.Lock()
-	to, err := s.a.RenameSave(sv, name)
-	s.mu.Unlock()
+	r, done, err := s.actionSession(false)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+	to, err := r.RenameSave(sv, name)
 	if err != nil {
 		return nil, saveErr(err)
 	}
@@ -535,9 +544,12 @@ func (s *API) SaveCopy(ref string) (*SaveFileReply, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.mu.Lock()
-	to, err := s.a.CopySave(sv)
-	s.mu.Unlock()
+	r, done, err := s.actionSession(false)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+	to, err := r.CopySave(sv)
 	if err != nil {
 		return nil, saveErr(err)
 	}
@@ -574,9 +586,12 @@ func (s *API) SaveBackup(refs []string, yes bool, token string) (*SaveFilesReply
 	if err != nil {
 		return nil, err
 	}
-	s.mu.Lock()
-	r, err := s.a.BackupSaves(saves, yes, token)
-	s.mu.Unlock()
+	a, done, err := s.actionSession(false)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+	r, err := a.BackupSaves(saves, yes, token)
 	if err != nil {
 		return nil, saveErr(err)
 	}
@@ -593,9 +608,12 @@ func (s *API) SaveTrash(refs []string, yes bool, token string) (*SaveFilesReply,
 	if err != nil {
 		return nil, err
 	}
-	s.mu.Lock()
-	r, err := s.a.TrashSaves(saves, yes, token)
-	s.mu.Unlock()
+	a, done, err := s.actionSession(false)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+	r, err := a.TrashSaves(saves, yes, token)
 	if err != nil {
 		return nil, saveErr(err)
 	}
@@ -618,8 +636,11 @@ func (s *API) SaveNewList(ref string, analyze bool) (*PlanDone, error) {
 	if sv.Colony != nil {
 		name = sv.Colony.Name
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	p, t, err := view.NewPlan(s.a, view.FreePlanName(s.a, name), sv.Path)
 	if p == nil {
 		return s.planDone(0, t, err)

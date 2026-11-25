@@ -230,8 +230,11 @@ func (s *API) ApplyManagerImportProfiles(request uint64, ids []string) (string, 
 	return s.applyManagerImport(request, ids, true)
 }
 func (s *API) applyManagerImport(request uint64, ids []string, selected bool) (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return "", err
+	}
+	defer release()
 	p := s.x.manager
 	e, err := s.a.Env()
 	if err != nil && !(p != nil && p.Kind == "rimcrow" && errors.Is(err, app.ErrNoEnv)) {

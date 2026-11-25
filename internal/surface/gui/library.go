@@ -157,8 +157,17 @@ func (s *API) LibraryDo(kind string, refs []string) (string, error) {
 	if view.TaskLane(kind) != "" && len(refs) > 0 {
 		return s.submitTask(kind, refs)
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	switch kind {
+	case view.OpAdd, view.OpEnable, view.OpTakeOut, view.OpDisable, view.OpPutBack, view.OpStage, view.OpUse, view.OpSwap, view.LibRemove:
+		release, err := s.lockEdit()
+		if err != nil {
+			return "", err
+		}
+		defer release()
+	default:
+		s.mu.Lock()
+		defer s.mu.Unlock()
+	}
 	s.board, s.needs, s.lib = nil, nil, nil
 	// the actions on folders and through Steam are background tasks (16 §2.16): queued
 	// here, one item at a time, one failure does not stop the rest

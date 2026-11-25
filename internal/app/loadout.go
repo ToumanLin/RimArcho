@@ -225,6 +225,9 @@ func (a *App) Loadout() (*LoadoutState, error) {
 			key += fmt.Sprintf("|%d|%d", fi.Size(), fi.ModTime().UnixNano())
 		}
 	}
+	if a.storedWorkspace && a.stKey != key {
+		key += "|stored"
+	}
 	if a.stCache != nil && a.stKey == key && a.stCache.Ix == ix {
 		c := *a.stCache
 		c.op = nil
@@ -262,6 +265,13 @@ func (a *App) LoadoutKey() (string, error) {
 }
 
 func (a *App) loadLoadout() (*LoadoutState, error) {
+	if a.storedWorkspace {
+		st, err := a.storedLoadout()
+		if st == nil && err == nil {
+			err = errors.New("no list")
+		}
+		return st, err
+	}
 	if a.workspaceSnapshot {
 		st, err := a.storedLoadout()
 		if err != nil {
@@ -353,7 +363,11 @@ func (a *App) sync(st *LoadoutState) error {
 	// handoff lock across that work. Rebuild the registry and reread ModsConfig
 	// under the guard, so a read overtaken by replacement cannot sync old IDs back.
 	now := a.Now().UTC()
-	unlock, err := a.lockLaunch()
+	lock := a.lockLaunch
+	if a.tryWorkspaceSync {
+		lock = a.tryLaunch
+	}
+	unlock, err := lock()
 	if err != nil {
 		return err
 	}
