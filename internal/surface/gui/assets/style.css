@@ -1123,6 +1123,12 @@ svg.i.fill { fill: currentColor; }
    the line that names the log; nothing is added under it */
 .hm-last-row { display: flex; align-items: center; gap: 10px; min-width: 0; border-bottom: 1px solid var(--line); }
 .hm-last-row .hm-actline { flex: 1 1 auto; min-width: 0; border-bottom: 0; }
+/* with a mark or a badge the last game line stays one row: its first fact (the day, or whose
+   game runs) yields with an ellipsis, the full text in the line's tooltip; the count and the
+   mark never split */
+.hm-last-row .hm-last-run .x, .hm-last-run .x:has(> .log-cov) { flex-wrap: nowrap; }
+:is(.hm-last-row .hm-last-run .x, .hm-last-run .x:has(> .log-cov)) > span { flex: none; white-space: nowrap; }
+:is(.hm-last-row .hm-last-run .x, .hm-last-run .x:has(> .log-cov)) > span:first-child { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .hm-last-row > .go { flex: none; color: var(--muted); cursor: pointer; transition: transform var(--t-layout) var(--ease); }
 .hm-last-row:has(> .hm-actline:hover) > .go { transform: translateX(4px); color: var(--fg); }
 .log-size { flex: none; display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 6px 0 9px; border-radius: 999px; font-size: 12px; white-space: nowrap; color: var(--amber); background: var(--amber-soft); transition: background var(--t-press); }
