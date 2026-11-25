@@ -19,7 +19,12 @@ func init() {
 			{Name: "select", Help: "include this log's clusters in archo problems"},
 			{Name: "since", Value: "<cursor>", Help: "only the clusters new or grown since an earlier archo log printed this cursor"},
 			{Name: "follow", Help: "follow Player.log while the game runs: new clusters as they appear"},
-			{Name: "once", Help: "with --follow: read what is there now and stop"}, {Name: "json", Help: "with --follow: one JSON object per cluster"}, gameVersionFlag}})
+			{Name: "once", Help: "with --follow: read what is there now and stop"},
+			{Name: "trim", Help: "preview trimming the oversized current log (use --prev for the previous log)"},
+			{Name: "delete", Help: "preview permanently deleting the oversized current log (use --prev for the previous log)"},
+			{Name: "dry-run", Help: "preview a trim or delete"},
+			{Name: "yes", Help: "apply a trim or delete with its preview token"},
+			{Name: "token", Value: "<preview token>"}, {Name: "json", Help: "with --follow: one JSON object per cluster"}, gameVersionFlag}})
 }
 
 // loadLog picks the log to analyse: --text, --file, --prev, else the current Player.log.
@@ -64,6 +69,13 @@ func loadLog(c *Ctx, a *Args) (*app.LogReport, *app.LoadoutState, error) {
 // its game folder is no environment's (attributed against this one anyway), when the
 // analysis was still running (MCP waits 10 s, 14 §1) and when mods were not analysed.
 func analysedAs(c *Ctx, root *render.Node, r *app.LogReport) {
+	if r.OmittedBytes > 0 {
+		pattern := "log too large: analysed the beginning and end (%d bytes omitted)"
+		if r.Trimmed {
+			pattern = "analysed the retained beginning and end (%d bytes omitted during trimming)"
+		}
+		root.KV("coverage", fmt.Sprintf(pattern, r.OmittedBytes))
+	}
 	if st := c.Loadout(); st != nil {
 		if g := c.App.UnregisteredLogGame(st, r.Path); g != "" {
 			root.KV("game", fmt.Sprintf("log game path %s is not this Game Config's game; attributed against %s", g, envRef(st.Ix.Env)))
@@ -87,6 +99,12 @@ func roleLine(ix *app.Index, at *app.Attribution) string {
 }
 
 func logCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	if a.Bool("trim") || a.Bool("delete") {
+		return logCleanupCmd(c, a)
+	}
+	if a.Bool("yes") || a.Bool("dry-run") || a.Bool("token") {
+		return nil, &UsageError{Msg: "--yes, --dry-run and --token apply to --trim or --delete"}
+	}
 	if a.Bool("follow") {
 		return logFollow(c, a)
 	}
@@ -272,7 +290,11 @@ func clusterLine(ix *app.Index, lc *app.LogCluster) string {
 func clusterDoc(c *Ctx, ix *app.Index, r *app.LogReport, lc *app.LogCluster) *render.Doc {
 	at := ""
 	if len(lc.Lines) > 0 && lc.Lines[0] > 0 { // 0: only the companion log has it
-		at = fmt.Sprintf("  first at %s:%d", r.Label, lc.Lines[0])
+		if r.OmittedBytes > 0 && !r.Trimmed {
+			at = fmt.Sprintf("  first at analysed line %d", lc.Lines[0])
+		} else {
+			at = fmt.Sprintf("  first at %s:%d", r.Label, lc.Lines[0])
+		}
 	}
 	d, root := render.New(fmt.Sprintf("log:%s %s x%d%s", lc.ID, lc.Class, lc.Count, at))
 	if phase := logs.PhaseSummary(lc.Phases); phase != "" {

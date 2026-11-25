@@ -1370,6 +1370,7 @@ async function loadWidths() {
 // ---- start ----
 
 const ui = {
+  readNewLog,
   reload, refreshEnvironment, relang, reaccent, render, pageEntering, pageEntered, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go, useEnv, offerDirect,
   back: () => travel(-1),
   palette: paletteChoice, paletteContext: () => ({ page: S.screen || "plan", parts: scr.pageParts() }), commandDone, uninstallStarted: () => uninst.restore(), selectionItems: selection, planMenu: (id, x, y, opener, keys) => plans.menuAt(id, x, y, opener, keys),
@@ -1609,7 +1610,7 @@ async function goHistory(h) {
 // liveShown: what the launch page shows of the live state besides its items: whether a game
 // runs, and whose (the TUI's liveKey also counts owner and blocked).
 // No game is the same before the first poll and after it, so that poll redraws nothing.
-const liveShown = (l) => (l && (l.running || l.blocked) ? JSON.stringify([!!l.running, l.blocked || "", l.owner || ""]) : "");
+const liveShown = (l) => (l && (l.running || l.blocked) ? JSON.stringify([!!l.running, l.blocked || "", l.owner || "", l.logNotice || ""]) : "");
 
 // pollLive follows the running game every two seconds (16 §2.1): its errors lead Can it run
 // (and its badge), Start says it runs, and launching waits until it exits (09 §4). A new
@@ -1637,13 +1638,18 @@ async function pollLive() {
 // readNewLog: the run's log counts without a visit to Can it run (16 §2.1; until 2026-10-30
 // the sidebar's foot said "analyse this run's log" and waited for a click). The pages showing it
 // read again.
-async function readNewLog() {
-  try {
-    if (!(await api.ReadNewLog())) return;
-  } catch { return; }
-  shell.sync();
-  if (S.screen === "needs") scr.needs(true);
-  else if (S.screen === "home") homePage.home({ keep: true });
+let readNewLogInFlight;
+function readNewLog() {
+  if (readNewLogInFlight) return readNewLogInFlight;
+  readNewLogInFlight = (async () => {
+    try {
+      if (!(await api.ReadNewLog())) return;
+    } catch { return; }
+    shell.sync();
+    if (S.screen === "needs") scr.needs(true);
+    else if (S.screen === "home") homePage.home({ keep: true });
+  })().finally(() => { readNewLogInFlight = null; });
+  return readNewLogInFlight;
 }
 
 start().catch((e) => { bootDone(); say("fail", errText(e)); });

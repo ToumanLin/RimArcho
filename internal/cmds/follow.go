@@ -49,10 +49,17 @@ func logFollow(c *Ctx, a *Args) (*render.Doc, error) {
 		Stream("following " + path)
 	}
 	asJSON := a.Bool("json")
+	var omitted int64
 	show := func(cs []*app.LiveCluster) {
+		if lv.OmittedBytes != omitted {
+			omitted = lv.OmittedBytes
+			if !asJSON && omitted > 0 {
+				emit(fmt.Sprintf("log backlog skipped to catch up (%d bytes omitted)", omitted))
+			}
+		}
 		for _, lc := range cs {
 			if asJSON {
-				b, _ := json.Marshal(liveJSON(st.Ix, lc))
+				b, _ := json.Marshal(liveJSON(st.Ix, lc, omitted))
 				emit(string(b))
 				continue
 			}
@@ -116,18 +123,19 @@ func firstMessage(lc *app.LiveCluster) string {
 }
 
 type liveOut struct {
-	Phases   []logs.PhaseCount `json:"phases,omitempty"`
-	At       string            `json:"at"`
-	Class    string            `json:"class"`
-	Count    int               `json:"count"`
-	Level    string            `json:"level,omitempty"`
-	Message  string            `json:"message"`
-	Mods     []string          `json:"mods,omitempty"` // "#ref role"
-	Template string            `json:"template"`
+	Phases       []logs.PhaseCount `json:"phases,omitempty"`
+	At           string            `json:"at"`
+	Class        string            `json:"class"`
+	Count        int               `json:"count"`
+	Level        string            `json:"level,omitempty"`
+	Message      string            `json:"message"`
+	Mods         []string          `json:"mods,omitempty"` // "#ref role"
+	Template     string            `json:"template"`
+	OmittedBytes int64             `json:"omittedBytes,omitempty"`
 }
 
-func liveJSON(ix *app.Index, lc *app.LiveCluster) liveOut {
-	o := liveOut{At: lc.At.Format(time.RFC3339), Class: lc.Class, Count: lc.Count, Level: lc.Level, Message: firstMessage(lc), Template: lc.Template}
+func liveJSON(ix *app.Index, lc *app.LiveCluster, omitted int64) liveOut {
+	o := liveOut{At: lc.At.Format(time.RFC3339), Class: lc.Class, Count: lc.Count, Level: lc.Level, Message: firstMessage(lc), Template: lc.Template, OmittedBytes: omitted}
 	o.Phases = lc.Phases
 	if lc.Report != nil {
 		for _, at := range lc.Report.Attr {

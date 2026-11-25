@@ -177,27 +177,15 @@ func (s *API) homeRead(all bool) *view.Home {
 	if st == nil {
 		return &view.Home{Featured: -1, Error: "could not read the current list"}
 	}
-	// The last run's line reads Player.log when it is newer than the one read last (06
-	// §2.3): the page loads, or the window comes back into focus, after a game. It reads it
-	// again when the stored report no longer matches (a later analysis, a Mod change, a new
-	// build): otherwise the line said "not checked yet" until Can it run was opened (VM
-	// 2026-11-22).
-	_, newer := r.NewLog(st)
-	if !newer {
-		newer = logReportMissing(r, st)
+	// The first paint uses the stored report. The window asks for a fresh
+	// report after drawing the reserved Last game row.
+	r.LazyLog, r.LogCacheOnly = false, true
+	release, err := r.Store.ReadSnapshot()
+	if err != nil {
+		return &view.Home{Featured: -1, Error: err.Error()}
 	}
-	if !newer {
-		release, err := r.Store.ReadSnapshot()
-		if err != nil {
-			return &view.Home{Featured: -1, Error: err.Error()}
-		}
-		defer release()
-		st, err = r.Loadout()
-		if err != nil {
-			return &view.Home{Featured: -1, Error: err.Error()}
-		}
-	}
-	n, _, err := readNeedsChecked(r, newer)
+	defer release()
+	n, st, err := readNeedsChecked(r, false)
 	if err != nil {
 		return &view.Home{Featured: -1, Error: err.Error()}
 	}
@@ -214,24 +202,16 @@ func (s *API) homeRead(all bool) *view.Home {
 		build = view.BuildHomeFromState
 	}
 	h := build(r, st, n, plans, packs)
+	h.CheckLastRun = n.LogPending || newLastRun(r, st)
+	h.OversizedLogs = view.OversizedLogs(r, st)
 	view.AddOtherEnvs(r, h, st.Ix.Env.ID)
 	view.PickFeatured(h, r.Store.Meta(view.FeaturedKey), st.Ix.Env.Name, st.Plan.ID)
 	return h
 }
 
-// logReportMissing: the current list's problem log has no stored report for the present
-// analysis and Mods, so a cache-only read leaves the last run pending.
-func logReportMissing(r *app.App, st *app.LoadoutState) bool {
-	path := r.ProblemLog(st)
-	if path == "" || !fileExists(path) {
-		// Player.log is gone (deleted, or the selected one was): Can it run reads
-		// Player-prev.log instead (06 §4), and so does the last game line (VM 2026-11-23:
-		// it showed nothing).
-		cur, prev := r.LogPaths(st)
-		return cur == "" && prev != ""
-	}
-	_, err := r.CachedLog(path)
-	return errors.Is(err, app.ErrLogNotCached)
+func newLastRun(r *app.App, st *app.LoadoutState) bool {
+	path, newer := r.NewLog(st)
+	return newer && path != r.LiveLog(st)
 }
 
 // ---- plans (07 §1.3, 16 §2.5) ----

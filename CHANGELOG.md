@@ -4,6 +4,9 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Launch opens while the last game log is analysed in the background. Logs over 64 MiB are analysed from both ends, with omitted bytes and repeated error counts in Game log, `archo log` and MCP `analyze_log`.
+- Trim or delete oversized Player logs from Launch or Game log after confirming their sizes and closing the game. `archo log --trim` and `--delete` and MCP `maintenance` support the same preview and confirmation.
+
 - Launching from the list editor asks before saving unsaved changes to the game.
 - Can it run opens promptly when you switch pages during a Mod check, even if Launch or Game log is still loading.
 - You can keep browsing while RimArcho prepares a launch, writes the Mod list to the game, or backs up, copies, renames, or recycles saves.

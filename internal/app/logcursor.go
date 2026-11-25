@@ -17,7 +17,7 @@ import (
 // since=<cursor> they list only the clusters that are new or whose count grew after it.
 //
 // The cursor holds no state on disk: it is how many bytes of the log (and of its companion
-// log, 06 §7) the report covered and a checksum of those bytes. A later call checks that
+// log, 06 §7) the report covered and a checksum of the retained bytes. A later call checks that
 // the log still starts with the same bytes — the game appends to Player.log while it runs and
 // starts a new one when it restarts (the old one becomes Player-prev.log) — and clusters that
 // prefix again, without attribution, to know each cluster's count at the cursor.
@@ -25,7 +25,7 @@ import (
 // LogCursor marks how far a report read a log and its companion.
 type LogCursor struct {
 	Size     int64  // bytes of the log the report covered
-	Sum      uint32 // their CRC-32C
+	Sum      uint32 // CRC-32C of the retained bytes
 	CompSize int64  // bytes of the companion log (0: none was read)
 	CompSum  uint32
 }
@@ -101,13 +101,28 @@ func readLog(path string, size int64) (*logs.File, logMark, error) {
 		return nil, logMark{}, err
 	}
 	defer f.Close()
-	h := newCRC()
-	lf, err := logs.Parse(io.TeeReader(io.LimitReader(f, size), h))
+	return readLogFile(f, size)
+}
+
+func readLogFile(f *os.File, size int64) (*logs.File, logMark, error) {
+	sections, err := logSections(f, size)
 	if err != nil {
 		return nil, logMark{}, err
 	}
-	io.Copy(h, io.LimitReader(f, size-h.n)) // whatever the parser left unread
-	return lf, logMark{h.n, h.h.Sum32()}, nil
+	h := newCRC()
+	head, tail := sections.readers(f)
+	var tailCRC io.Reader
+	if tail != nil {
+		tailCRC = io.TeeReader(tail, h)
+	}
+	lf, err := logs.ParseSections(io.TeeReader(head, h), tailCRC, sections.omitted())
+	if err != nil {
+		return nil, logMark{}, err
+	}
+	if h.n != size-sections.omitted() {
+		return nil, logMark{}, io.ErrUnexpectedEOF
+	}
+	return lf, logMark{size, h.h.Sum32()}, nil
 }
 
 // readCompanion reads a companion log, its first size bytes (size < 0: all of it, up to
@@ -118,8 +133,9 @@ func readCompanion(path string, size int64) (*logs.Companion, logMark) {
 		return nil, logMark{}
 	}
 	defer f.Close()
-	if size < 0 {
-		size = 256 << 20
+	const limit = 256 << 20
+	if size < 0 || size > limit {
+		size = limit
 	}
 	b, err := io.ReadAll(io.LimitReader(f, size))
 	if err != nil {
@@ -154,6 +170,17 @@ func (a *App) Since(rep *LogReport, cur LogCursor) (*LogSince, error) {
 		return nil, err
 	}
 	if !ok {
+		if cur.Size > LogSizeLimit {
+			out.Stale = "The sampled log prefix changed."
+			if strings.EqualFold(rep.Label, "Player.log") {
+				prev := filepath.Join(filepath.Dir(rep.Path), "Player-prev.log")
+				if _, matches, _ := prefixOf(prev, cur.Size, cur.Sum); matches {
+					out.Moved = prev
+				}
+			}
+			out.New = rep.Clusters
+			return out, nil
+		}
 		out.Stale = fmt.Sprintf("%s is a new run: it no longer starts with what the cursor saw (the game restarted)", rep.Label)
 		if strings.EqualFold(rep.Label, "Player.log") {
 			prev := filepath.Join(filepath.Dir(rep.Path), "Player-prev.log")
@@ -164,6 +191,13 @@ func (a *App) Since(rep *LogReport, cur LogCursor) (*LogSince, error) {
 		} else if strings.Contains(strings.ToLower(rep.Label), "-prev") {
 			out.Stale = fmt.Sprintf("%s was replaced by a newer run (the game restarted again)", rep.Label)
 		}
+		out.New = rep.Clusters
+		return out, nil
+	}
+	// A growing file's retained tail moves. Counts from two such samples
+	// cannot tell which clusters arrived after the cursor.
+	if current, err := ParseLogCursor(rep.Cursor); err == nil && current.Size != cur.Size && (current.Size > LogSizeLimit || rep.Trimmed) {
+		out.Stale = "The log coverage changed."
 		out.New = rep.Clusters
 		return out, nil
 	}
@@ -198,13 +232,11 @@ func prefixOf(path string, size int64, sum uint32) (*logs.File, bool, error) {
 	if fi, err := f.Stat(); err != nil || fi.Size() < size {
 		return nil, false, err
 	}
-	h := newCRC()
-	lf, err := logs.Parse(io.TeeReader(io.LimitReader(f, size), h))
+	lf, mark, err := readLogFile(f, size)
 	if err != nil {
 		return nil, false, err
 	}
-	io.Copy(h, io.LimitReader(f, size-h.n))
-	if h.n != size || h.h.Sum32() != sum {
+	if mark.sum != sum {
 		return nil, false, nil
 	}
 	return lf, true, nil

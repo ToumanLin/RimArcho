@@ -1109,7 +1109,7 @@ svg.i.fill { fill: currentColor; }
 .hm-act { grid-column: 9 / 13; grid-row: 1; min-width: 0; display: flex; flex-direction: column; } /* on 03's lines */
 /* Over a picture the lines get the shade's own ground: the top-right corner of a light
    photo can be dark, and grey text on it was unreadable (2026-11-19). */
-#app.photo .hm-act:not(:empty) { margin: -6px -12px 0; padding: 0 12px 6px; background: rgba(var(--photo-shade), .78); border-radius: var(--r-sm); }
+#app.photo .hm-act:has(> :not([aria-hidden="true"])) { margin: -6px -12px 0; padding: 0 12px 6px; background: rgba(var(--photo-shade), .78); border-radius: var(--r-sm); }
 /* title, text, →; a text that does not fit beside the title goes under it (03 is narrow);
    → stays at the right of the first line instead of wrapping onto a line of its own */
 .hm-actline { display: flex; align-items: baseline; gap: 14px; width: 100%; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12px; text-align: left; color: var(--fg-2); }
@@ -1117,6 +1117,11 @@ svg.i.fill { fill: currentColor; }
 .hm-actline .t { max-width: 100%; font-weight: 600; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hm-actline .x { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hm-actline .go { flex: none; color: var(--muted); transition: transform var(--t-layout) var(--ease); }
+.hm-last-run .tx { flex-wrap: nowrap; }
+.hm-last-run .t { flex: none; }
+.hm-last-run[aria-hidden="true"] { visibility: hidden; }
+.log-cleanup { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; padding: 4px 0; min-width: 0; }
+.log-cleanup-name, .log-size-notice { font-size: 12px; color: var(--fg-2); }
 .hm-actline:hover .go { transform: translateX(4px); color: var(--fg); }
 .hm-hero { grid-column: 1 / 13; grid-row: 2; align-self: end; padding-bottom: 34px; min-width: 0; }
 .hm-headline { overflow: hidden; margin-bottom: -.08em; }
@@ -1244,6 +1249,8 @@ svg.i.fill { fill: currentColor; }
 @media (max-width: 1000px) {
   .page.home { padding: 8px 28px 28px; }
   .hm-act { display: none; }
+  .hm-act:has(.log-cleanup) { display: flex; grid-column: 1 / 13; }
+  .hm-act:has(.log-cleanup) > :not(.hm-last-run, .log-cleanup) { display: none; }
   .hm-s1 { grid-column: 1 / 5; } .hm-s2 { grid-column: 5 / 13; } .hm-s3 { grid-column: 1 / 13; grid-row: 5; margin-top: 20px; }
   .hm-floor { grid-row: 3 / 6; margin: -64px -28px -28px; }
 }

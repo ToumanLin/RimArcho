@@ -643,9 +643,9 @@ func ClustersHint(f *File, hint Hint) []*Cluster {
 			out = append(out, c)
 			c.ID = "E" + itoa(len(out))
 		}
-		c.Count++
+		c.Count += 1 + e.count
 		if f.HasPhases {
-			c.Phases = AddPhaseCount(c.Phases, e.Phase, 1)
+			c.Phases = AddPhaseCount(c.Phases, e.Phase, 1+e.count)
 		}
 		if len(c.Lines) < 5 {
 			c.Lines = append(c.Lines, e.Line)
