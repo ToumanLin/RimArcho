@@ -737,7 +737,7 @@ async function drawDetail(edit = "") {
   const row = i && (L.page.rows || []).find((r) => r.insts.some((x) => x.ref === i.ref));
   els.dhead.innerHTML = "";
   els.dhead.append(el("span", "n", "3"), el("span", "t", T("details")));
-  if (i) els.dhead.append(el("span", "q word-facts", (row ? row.name : "") + "  " + i.label));
+  // the copy's name and source are the details' own head and facts (16 §2.9): not again in the area's
   if (!i) { box.innerHTML = ""; box.dataset.ref = ""; frame = null; return; }
   const openFull = el("button", "editor-full-link", T("view full details") + "  Enter ↵");
   openFull.onmousedown = (e) => e.stopPropagation();

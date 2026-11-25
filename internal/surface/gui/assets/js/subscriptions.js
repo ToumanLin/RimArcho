@@ -289,7 +289,9 @@ function sourcesLine() {
   const foot = el("div", "subs-foot");
   const b = el("button", "subs-row subs-srcsum" + (V.sel === "sources" ? " sel" : ""));
   b.type = "button"; b.dataset.key = "sources";
+  // the count only: Update checks shows each source's time; the last one is in the hover
   b.append(ic("rescan"), el("span", "word-facts", V.data?.summary?.line || T("sources not checked yet")));
+  if (V.data?.summary?.title) b.title = V.data.summary.title;
   b.onclick = () => pick("sources");
   b.onfocus = () => { if (V.sel !== "sources") pick("sources", true); };
   foot.append(b);
@@ -398,12 +400,14 @@ function pendingDetail(card, r) {
   src.append(ic(SRC_ICON[r.kind] || "local"), el("span", "", r.source));
   const upd = button(r.kind === "page" ? T("choose the new files below") : T("update"), "u", () => updateRows([r]), "primary", "subscription-update");
   if (r.kind === "page") upd.disabled = true;
-  detailHead(card, r.name, [el("span", "pill", T("waiting for you to update")), src, r.installed + " → " + r.available], upd);
+  // installed → available is the section below, with its labels: the head names it once
+  detailHead(card, r.name, [el("span", "pill", T("waiting for you to update")), src], upd);
   const body = el("div", "scroll");
   const s = section(body, T("this update"));
   const kv = el("div", "subs-kv");
   const add = (k, v) => { if (v) kv.append(el("span", "", k), el("span", "word-facts", v)); };
-  add(T("installed"), [r.installed, r.installedAt].filter(Boolean).join("  "));
+  // a SteamCMD copy's version is its download time: that time once, not twice
+  add(T("installed"), [...new Set([r.installed, r.installedAt].filter(Boolean))].join("  "));
   add(T("available"), r.available);
   add(T("track"), r.tracking);
   add(T("last check"), r.checked);

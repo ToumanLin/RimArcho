@@ -43,7 +43,7 @@ import * as updates from '/js/subscriptions.js';
 import * as library from '/js/library.js';
 import * as helpers from '/js/screens.js';
 window.calls=[];window.messages=[];window.opened=[];window.confirmations=[];
-window.data={summary:{line:'checked 4 sources, the last at 10:42, 1 check failed'},sources:[
+window.data={summary:{line:'checked 4 sources, 1 check failed',title:'checked 4 sources, the last at 10:42, 1 check failed'},sources:[
 {key:'workshop',name:'Steam Workshop',count:2,checked:'10:42',result:'1 check failed',failures:[{label:'connection timed out',items:['Network Mod: connection timed out']}]},
 {key:'steamcmd',name:'SteamCMD',count:1,checked:'10:42',result:'everything is up to date',account:'not logged in'},
 {key:'git',name:'Git',count:1,checked:'10:42',result:'everything is up to date'},

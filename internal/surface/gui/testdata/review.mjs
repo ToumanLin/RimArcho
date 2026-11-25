@@ -13,7 +13,7 @@ async function setup() {
   const root = new Element("div"); root.append(screen, status);
   const say = (kind, text) => { status.dataset.kind = kind || ""; status.dataset.message = text || ""; };
   const $ = (s) => s === "#screen" ? screen : s === "#status" ? status : root.querySelector(s.replace(/^#screen /, ""));
-  const asked = [], marks = [];
+  const asked = [], marks = [], heads = [];
   let handler = null;
   const el = (t, c, x) => new Element(t, c, x);
   const review = await loadModules("./review.js", {
@@ -26,7 +26,7 @@ async function setup() {
       button: (label, _k, fn, cls) => { const b = el("button", cls, label); b.onclick = fn; return b; },
     },
     "./icons.js": { icon: { chev: "" } },
-    "./detail.js": { detailFrame: () => ({ head() {}, detail() {}, settle: async () => {}, show() {} }) },
+    "./detail.js": { detailFrame: () => ({ head(name) { heads.push(name); }, detail() {}, settle: async () => {}, show() {} }) },
     "./separator.js": { wireSeparator() {} },
     "./choices.js": { choiceControl: () => el("select") },
     "./librarylink.js": { openLibraryInstance() {} },
@@ -34,7 +34,7 @@ async function setup() {
   }, { document, localStorage: { getItem: () => null, setItem() {} } });
   const send = (ev) => handler(ev);
   const leave = () => { S.screen = "saves"; S.screenSeq++; };
-  return { review, S, screen, status, asked, marks, send, document, leave };
+  return { review, S, screen, status, asked, marks, heads, send, document, leave };
 }
 
 const mod = (name, library, more = {}) => ({ name, packageId: "tester.hats", library, sum: "1 of 2 seen", where: "1 colony, 1 save", adds: 2, seen: 1, size: 2, part: 1, tip: "",
@@ -145,7 +145,9 @@ test("a Mod marked functional leaves the map and the pick moves to the next tile
   h.send({ request: h.asked.at(-1).n, page: pageOf({ groups: [{ key: "rest", label: "rest", hint: "", mods: three }] }) });
   await opened;
   find(h.screen, "rv-tile", (b) => b.dataset.mod === "vef").onclick();
-  const named = () => find(h.screen, "word-facts").textContent;
+  // the details card names the Mod (detailFrame's head); the area's head does not repeat it
+  const named = () => h.heads.at(-1);
+  assert.equal(find(h.screen, "q"), undefined, "the area's head does not name the Mod again");
   assert.equal(named(), "VEF");
   find(h.screen, "editor-full-link", (b) => b.dataset.key === "review-mark-vef").onclick();
   await flush();
