@@ -42,7 +42,7 @@ next:
 
 $ archo problems --code mod --min-severity info
 problems: 0 error, 1 warning, 0 info
-  analysis: a:1 2026-10-01 10:00
+  analysis: a:2 2026-10-01 10:00
   list:
     warning mod.pinned  #6olp Lockable is locked to #mdx4, and #6olp has been updated since the copy was made  (p:41b77e)
       evidence: inferred #mdx4 origin_snapshot 98fbacb19f50

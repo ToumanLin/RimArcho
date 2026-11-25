@@ -28,6 +28,25 @@ type factDB interface {
 }
 
 func pruneFactsOn(ctx context.Context, tx factDB, now time.Time) error {
+	if err := pruneFactViews(ctx, tx, now); err != nil {
+		return err
+	}
+	for _, table := range []string{"patch_fact", "finding"} {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE analysis_id IN (SELECT id FROM analysis WHERE publication<0)`); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM analysis WHERE publication<0`); err != nil {
+		return err
+	}
+	return pruneFactSetsOn(ctx, tx)
+}
+
+func pruneFactViews(ctx context.Context, tx factDB, now time.Time) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE analysis SET publication=-1 WHERE publication=0 AND finished_at<?`,
+		time.Now().Add(-analysisStageLifetime).Unix()); err != nil {
+		return err
+	}
 	type game struct{ id, mm string }
 	var games []game
 	rows, err := tx.QueryContext(ctx, `SELECT id, game_version FROM game`)
@@ -54,12 +73,7 @@ func pruneFactsOn(ctx context.Context, tx factDB, now time.Time) error {
 		if g.mm == "" {
 			continue
 		}
-		for _, table := range []string{"patch_fact", "finding"} {
-			if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE analysis_id IN (SELECT id FROM analysis WHERE game_id=? AND game_mm<>? AND finished_at<?)`, g.id, g.mm, now.Add(-ForeignAnalysisRetention).Unix()); err != nil {
-				return err
-			}
-		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM analysis WHERE game_id=? AND game_mm<>? AND finished_at<?`, g.id, g.mm, now.Add(-ForeignAnalysisRetention).Unix()); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE analysis SET publication=-1 WHERE publication>0 AND game_id=? AND game_mm<>? AND finished_at<?`, g.id, g.mm, now.Add(-ForeignAnalysisRetention).Unix()); err != nil {
 			return err
 		}
 	}
@@ -73,7 +87,7 @@ func pruneFactsOn(ctx context.Context, tx factDB, now time.Time) error {
 			return err
 		}
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO needed_fact_version SELECT game_id,game_mm FROM analysis`); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO needed_fact_version SELECT game_id,game_mm FROM analysis WHERE `+activeAnalysis); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM content_state WHERE NOT EXISTS (
@@ -82,15 +96,19 @@ func pruneFactsOn(ctx context.Context, tx factDB, now time.Time) error {
  AND (n.game_mm=content_state.game_mm OR n.game_mm='')))`); err != nil {
 		return err
 	}
-	return pruneFactSetsOn(ctx, tx)
+	return nil
 }
 
 func pruneFactSets(tx *sql.Tx) error { return pruneFactSetsOn(context.Background(), tx) }
 
+const unusedFactSet = `NOT EXISTS(SELECT 1 FROM content_state c WHERE c.def_set_id=fact_set.id)
+ AND NOT EXISTS(SELECT 1 FROM content_state c WHERE c.dll_set_id=fact_set.id)
+ AND NOT EXISTS(SELECT 1 FROM analysis_stage_content c WHERE c.def_set_id=fact_set.id)
+ AND NOT EXISTS(SELECT 1 FROM analysis_stage_content c WHERE c.dll_set_id=fact_set.id)`
+
 func pruneFactSetsOn(ctx context.Context, tx factDB) error {
 	// The child tables have set_id indexes for these cascading deletes.
-	_, err := tx.ExecContext(ctx, `DELETE FROM fact_set WHERE NOT EXISTS(SELECT 1 FROM content_state c WHERE c.def_set_id=fact_set.id)
- AND NOT EXISTS(SELECT 1 FROM content_state c WHERE c.dll_set_id=fact_set.id)`)
+	_, err := tx.ExecContext(ctx, `DELETE FROM fact_set WHERE `+unusedFactSet)
 	return err
 }
 

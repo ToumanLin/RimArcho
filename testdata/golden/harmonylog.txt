@@ -274,7 +274,7 @@ next:
 
 $ archo problems
 problems: 0 error, 2 warning, 3 info
-  analysis: a:1 2026-10-01 11:00
+  analysis: a:2 2026-10-01 11:00
   list:
     warning official.order  Core and the DLCs are not first in the list, in release order  (p:a4972d)
     warning patch.no-match  Patches/Compat.xml:2 Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) matched nothing (target-inactive, unguarded-optional)  (p:3d1d7c)
@@ -303,7 +303,7 @@ next:
 
 $ archo problems --code log
 problems: 0 error, 0 warning, 0 info
-  analysis: a:1 2026-10-01 11:00
+  analysis: a:2 2026-10-01 11:00
   list:
     (none)
   logs:

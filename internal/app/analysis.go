@@ -2,6 +2,7 @@ package app
 
 import (
 	"bufio"
+	"context"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -143,6 +144,11 @@ type AnalyzeReport struct {
 // Analyze runs the Def and Patch layers in this process and stores the result. It is what
 // the `archo analyze` child does (05 §3); other callers go through EnsureAnalysis.
 func (a *App) Analyze(progress func(string)) (*AnalyzeReport, error) {
+	return a.AnalyzeContext(context.Background(), progress)
+}
+
+// AnalyzeContext allows cancellation before publishing the completed analysis.
+func (a *App) AnalyzeContext(ctx context.Context, progress func(string)) (*AnalyzeReport, error) {
 	st, err := a.Loadout()
 	if err != nil {
 		return nil, err
@@ -158,7 +164,7 @@ func (a *App) Analyze(progress func(string)) (*AnalyzeReport, error) {
 		return nil, err
 	}
 	in = analyze.Input{} // release the declarations before writing
-	id, err := a.Store.SaveAnalysis(st.Ix.Env.GameID, SetFingerprint(st.List), key, st.GameMM(), a.planSetKeys(st), out, started, a.Now())
+	id, err := a.Store.SaveAnalysisContext(ctx, st.Ix.Env.GameID, SetFingerprint(st.List), key, st.GameMM(), a.planSetKeys(st), out, started, a.Now())
 	if err != nil {
 		return nil, err
 	}

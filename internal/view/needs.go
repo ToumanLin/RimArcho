@@ -897,12 +897,8 @@ func ignoreProblems(a *app.App, act Action) error {
 	if len(refs) == 0 {
 		refs = []string{act.Problem}
 	}
-	for _, ref := range refs {
-		if _, err := a.IgnoreProblem(ref, false); err != nil {
-			return err
-		}
-	}
-	return nil
+	_, err := a.IgnoreProblems(refs)
+	return err
 }
 
 // addPlanVersion adds the game version to the versions the plan allows.

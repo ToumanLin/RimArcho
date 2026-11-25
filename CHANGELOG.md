@@ -7,6 +7,9 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 - Can it run opens promptly when you switch pages during a Mod check, even if Launch or Game log is still loading.
 - You can keep browsing while RimArcho prepares a launch, writes the Mod list to the game, or backs up, copies, renames, or recycles saves.
 - List edits wait through brief background Mod updates while the window stays responsive. If RimArcho is preparing a launch in this window, it asks you to retry the edit after the launch.
+- Ignoring one missing dependency shared by many Mods applies the ignores together, so Can it run responds sooner.
+- Mod checks save their results in short batches. You can still save edits while a check writes, and an interrupted check leaves the previous results available.
+- The database moves to schema 45 (staged Mod checks). Versions 1.1.3 and earlier cannot open it after the upgrade. Analysis references still use `a:` followed by a number. The numbers can skip values because a check reserves its number before publishing.
 
 ## 1.1.3 — 2026-11-24
 

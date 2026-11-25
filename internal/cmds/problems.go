@@ -60,7 +60,7 @@ func (c *Ctx) progressCtx() func(string) {
 
 func analyzeCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	app.SetAnalyzeLimits()
-	r, err := c.App.Analyze(func(s string) {
+	r, err := c.App.AnalyzeContext(c.Context, func(s string) {
 		if Progress != nil {
 			Progress("progress: " + s)
 		}
