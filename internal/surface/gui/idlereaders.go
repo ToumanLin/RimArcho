@@ -4,17 +4,10 @@ package gui
 
 import "time"
 
-// Page readers close when unused (16 §2.16.1 M07, 17 §7.3). Each keeps its own SQLite
-// connection and a detached copy of the Mod index, list state and problems: about 5-12 MB
-// per reader for a library of 6,574 copies. A reader unused for readerIdle closes, drops
-// what only it built, and the window returns the memory (M01); the next visit reads again
-// on a new connection.
-//
-// Mods read their declarations lazily through the connection of the reader that copied
-// them, so a reader may close only when nothing it built stays published. That rules out
-// the editor and sidebar reader (the window's board is its board) and the log reader
-// (Can it run's saved problem sets are its objects; the launch page also reads on it
-// every 30 seconds). The Updates reader has its own expiry (subscriptionReader).
+// Expiring page readers share Mod index contents and keep their own SQLite connection,
+// list state and problems (16 §2.16.1 M07, 17 §7.3). After readerIdle, they close and
+// drop what only they built. The editor/sidebar, Can it run and Game log readers
+// stay open for published objects and cached reports. Updates has its own expiry.
 
 // readerIdle is how long an unused page reader keeps its connection and copies.
 const readerIdle = 5 * time.Minute

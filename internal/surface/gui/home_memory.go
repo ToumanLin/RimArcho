@@ -14,10 +14,11 @@ func (s *API) HomeMemory() (*view.MemoryLaunch, error) {
 }
 
 func (s *API) homeMemoryRead() (*view.MemoryLaunch, error) {
-	s.logRead.mu.Lock()
-	defer s.logRead.mu.Unlock()
-	r, err := s.logSession()
-	if err == nil {
+	s.launchRead.mu.Lock()
+	defer s.launchRead.mu.Unlock()
+	defer s.retainReader(&s.launchRead)
+	r, err := s.launchSession()
+	if err == nil && !r.IndexCached() {
 		err = s.refreshPageIndex(r)
 	}
 	if err != nil {

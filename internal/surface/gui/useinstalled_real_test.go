@@ -15,9 +15,9 @@ import (
 
 // Opt-in acceptance on an external SQLite backup, never on the user's live home.
 func TestUseInstalledRealCopy(t *testing.T) {
-	home := os.Getenv("RIMARCHO_HOME")
+	home := os.Getenv("RIMARCHO_USE_INSTALLED_HOME")
 	if home == "" {
-		t.Skip("set RIMARCHO_HOME to an isolated backup with a use-installed-check-copy marker")
+		t.Skip("set RIMARCHO_USE_INSTALLED_HOME to an isolated backup with a use-installed-check-copy marker")
 	}
 	if _, err := os.Stat(filepath.Join(home, "use-installed-check-copy")); err != nil {
 		t.Fatal("isolated backup marker required")

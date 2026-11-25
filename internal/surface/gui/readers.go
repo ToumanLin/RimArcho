@@ -183,6 +183,28 @@ func pinPageRead(a *app.App) (func(), error) {
 	return a.Store.ReadSnapshot()
 }
 
+// launchSession is called with launchRead.mu held.
+func (s *API) launchSession() (*app.App, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, err := s.a.Env()
+	if err != nil {
+		return nil, err
+	}
+	w := &s.launchRead
+	if w.a == nil {
+		w.a, err = s.pageReader()
+		if err != nil {
+			return nil, err
+		}
+	}
+	r := w.a
+	r.ReadOptions(s.a)
+	r.EnvName = e.Name
+	r.AnalyzeExe, r.AnalyzeWait = s.Exe, 200*time.Millisecond
+	return r, nil
+}
+
 // logSession is called with logRead.mu held; only snapshotting options needs s.mu.
 func (s *API) logSession() (*app.App, error) {
 	s.mu.Lock()
@@ -280,7 +302,7 @@ func (s *API) Close() {
 	s.libGate.Lock()
 	//lint:ignore SA2001 barrier, nothing to guard
 	s.libGate.Unlock()
-	for _, w := range []*logReader{&s.libRead, &s.plansRead, &s.workspaceReader, &s.indexRead, &s.detailRead, &s.saves.read} {
+	for _, w := range []*logReader{&s.libRead, &s.plansRead, &s.workspaceReader, &s.indexRead, &s.detailRead, &s.saves.read, &s.launchRead, &s.needsRead} {
 		w.mu.Lock()
 		w.release() // also stops an idle expiry
 		w.mu.Unlock()

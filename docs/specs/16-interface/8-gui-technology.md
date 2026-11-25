@@ -164,7 +164,7 @@ Clicking fast, switching pages and editing a list must not run the same work aga
 | Work | Starts by itself | Otherwise |
 | --- | --- | --- |
 | Checking the mods' files (analysis, 05 §3) | Whenever a list's findings are read and its check is stale or never ran: entering Can it run or Launch starts it at once; edits in the editor start it 2 s after the last edit (`analyzeSettle`), so a run of edits ends in one check (`API.autoAnalyzeLocked`, `analyzeSettled`). An edit while a check runs: that check ends, then one more (`analyzeAfter`). Once per inputs (scope and `app.AnalysisKey`) a session: a check that failed or left its inputs stale waits for the button. The task list keeps one row per list for it, updated in place (`Tasks.BeginOnce`; failures stay) | Can it run's check again (`A`), for a failed or stale-leaving check or to force one: "up to date" and off while the shown check is current; within 5 s of a check of the same inputs it starts nothing (`API.Analyze`). Can it run shows the check's state as an icon (current, checking, stale, never), with its words and "last checked …" as the tooltip |
-| Can it run's needs and the list's findings | Read on entering, from the change-keyed cache (§8.7) | — |
+| Can it run's needs and the list's findings | On entry, show the change-keyed cache (§8.7) or build from stored findings on its own reader. Refresh pending log findings and findings changed during the read in the background | — |
 | Reading a new game log | Once per new log (§2.1 "New logs are read automatically") | Game log page |
 | Memory estimate (Launch, Can it run, All lists) | When missing or over an hour old; a new estimate cancels the previous one | — |
 | Scan | At start and on file changes (04) | Rescan |
@@ -175,4 +175,4 @@ Clicking fast, switching pages and editing a list must not run the same work aga
 | Saves index | Entering Saves; one run at a time (`startSavesIndex`) | — |
 | Update checks, source checks, Workshop updates | Scheduled (§2.16.1) | Their buttons; repeats join the queued task |
 
-The joined reads are `Home`, `HomeMemory`, `LogPage`, `Library`, `PlanManage`, `SubscriptionsPage`, `Packs`, `Settings`, `Environment`, `ModSettings`, `FileSearchInfo`, `TexturesInfo` and `FeedbackCheck`. Measured counts before and after: 18 §2.
+The joined reads are `Home`, `HomeMemory`, `Needs`, `LogPage`, `Library`, `PlanManage`, `SubscriptionsPage`, `Packs`, `Settings`, `Environment`, `ModSettings`, `FileSearchInfo`, `TexturesInfo` and `FeedbackCheck`. Measured counts before and after: 18 §2.

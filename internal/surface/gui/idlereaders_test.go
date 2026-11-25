@@ -20,7 +20,7 @@ func TestHomeMemoryReusesLaunchReader(t *testing.T) {
 	if err != nil || first == nil {
 		t.Fatalf("%+v %v", first, err)
 	}
-	reader := api.logRead.a
+	reader := api.launchRead.a
 	if reader == nil || reader == e.App {
 		t.Fatal("HomeMemory did not read on the launch page's reader")
 	}
@@ -39,7 +39,7 @@ func TestHomeMemoryReusesLaunchReader(t *testing.T) {
 			t.Fatalf("%+v %v", m, err)
 		}
 	})
-	if api.logRead.a != reader {
+	if api.launchRead.a != reader {
 		t.Fatal("the launch reader was replaced")
 	}
 	// What each refresh used to do: a fresh session that reads the whole list.
@@ -60,7 +60,7 @@ func TestHomeMemoryReusesLaunchReader(t *testing.T) {
 	if warm*3 > cold {
 		t.Fatalf("an unchanged refresh allocates %d bytes, a cold read %d", warm, cold)
 	}
-	// Other pages on the same reader still see the opened list, not the launch page's.
+	// Home and HomeMemory use the same current list and estimate.
 	h := api.Home()
 	if h.Error != "" || h.Rows[0].Memory == nil || h.Rows[0].Memory.Token != first.Token {
 		t.Fatalf("home %+v", h)
@@ -71,6 +71,9 @@ func TestIdlePageReadersClose(t *testing.T) {
 	t.Parallel()
 	e, api, _ := fixture(t)
 	api.Board()
+	if _, err := api.HomeMemory(); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := api.Library("", nil, ""); err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +91,7 @@ func TestIdlePageReadersClose(t *testing.T) {
 	if _, err := api.LibraryCopy(id); err != nil {
 		t.Fatal(err)
 	}
-	readers := map[string]*logReader{"library": &api.libRead, "plans": &api.plansRead, "detail": &api.detailRead, "index": &api.indexRead}
+	readers := map[string]*logReader{"library": &api.libRead, "plans": &api.plansRead, "detail": &api.detailRead, "index": &api.indexRead, "launch": &api.launchRead}
 	for name, w := range readers {
 		if w.a == nil || w.timer == nil {
 			t.Fatalf("%s reader not retained with an expiry", name)

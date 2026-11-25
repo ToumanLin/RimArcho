@@ -153,11 +153,12 @@ func (s *API) home(name string, all bool) *view.Home {
 
 func (s *API) homeRead(all bool) *view.Home {
 	defer perftrace.Span("Home")()
-	s.logRead.mu.Lock()
-	defer s.logRead.mu.Unlock()
+	s.launchRead.mu.Lock()
+	defer s.launchRead.mu.Unlock()
+	defer s.retainReader(&s.launchRead)
 	defer s.free.soon()
-	r, err := s.logSession()
-	if err == nil {
+	r, err := s.launchSession()
+	if err == nil && !r.IndexCached() {
 		err = s.refreshPageIndex(r)
 	}
 	if err != nil {
