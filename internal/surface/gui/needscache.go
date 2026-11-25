@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -212,6 +213,7 @@ func (s *API) refreshNeedsLocked(c *needsSnapshot) {
 		defer s.needsActive.Add(-1)
 		defer r.Close()
 		r.LazyLog, r.LogCacheOnly = false, false
+		s.noteAnalysisAuto(r)
 		ps, err := r.Problems(false, nil)
 		var n *view.Needs
 		if err == nil && ps != nil && ps.State != nil {
@@ -252,7 +254,8 @@ func (s *API) refreshNeedsLocked(c *needsSnapshot) {
 	}()
 }
 
-// autoAnalyzeLocked keeps the shown findings current, the automatic part of 16 §8.9:
+// autoAnalyzeLocked keeps the shown findings current, the automatic part of 16 §8.9 (as
+// far as the analysis.auto setting allows):
 // wherever a list's findings are read (Can it run, the editor's problems, Launch) and its
 // files' check is stale or never ran, a check follows by itself. Edits settle first: each
 // call puts the start analyzeSettle later (analyzeSoonLocked), so a run of edits ends in
@@ -261,6 +264,16 @@ func (s *API) refreshNeedsLocked(c *needsSnapshot) {
 func (s *API) autoAnalyzeLocked(n *view.Needs, settle bool) bool {
 	if s.needsClosed || n != nil && (n.Error != "" || !(n.Stale || n.Never)) {
 		return false
+	}
+	// analysis.auto (16 §2.14): "save" leaves edits to the save (runListAction) and the
+	// pages that show findings (needsAsked); "off" leaves every check to the button
+	switch s.analysisAuto() {
+	case "off":
+		return false
+	case "save":
+		if settle && !s.needsAsked {
+			return false
+		}
 	}
 	d := time.Duration(0)
 	if settle {
@@ -271,6 +284,20 @@ func (s *API) autoAnalyzeLocked(n *view.Needs, settle bool) bool {
 	}
 	s.analyzeSoonLocked(d)
 	return true
+}
+
+// noteAnalysisAuto reads analysis.auto (16 §2.14) through a; never with s.mu held.
+func (s *API) noteAnalysisAuto(a *app.App) {
+	v := cmds.Setting(a, "analysis.auto")
+	s.autoMode.Store(&v)
+}
+
+// analysisAuto is analysis.auto as last read (edit before any read).
+func (s *API) analysisAuto() string {
+	if v := s.autoMode.Load(); v != nil {
+		return *v
+	}
+	return "edit"
 }
 
 // analyzeSettle: how long after the last edit the automatic check starts.
@@ -321,7 +348,7 @@ func (s *API) analyzeSettled() {
 	if s.autoAnalyzed[key] || key == s.analyzedKey {
 		return
 	}
-	if !s.startAnalyze() {
+	if !s.startAnalyzeOf("", true) {
 		return
 	}
 	started = true

@@ -321,7 +321,7 @@ The conclusions of the log corpus are one versioned bundle, separate from the pr
 4. Interpret the success attribute (`Always`, `Normal`, `Invert`, `Never`) using the game's semantics.
 5. The failure key combines the file and the game's description of the operation (`FailKey`), matching the failure messages in `Player.log` (06 §2).
 
-**XPath**. The engine must match .NET XPath 1.0 behavior. Test compatibility with all XPath expressions in the real Mod collection and replay `Player.log`, simulating every logged failure. The mismatch rate must be below 0.5%, with differences documented. See 18 for the measurements. The common `Defs/XDef[defName="…"]` form uses an indexed fast path.
+**XPath**. The engine must match .NET XPath 1.0 behavior. Test compatibility with all XPath expressions in the real Mod collection and replay `Player.log`, simulating every logged failure. The mismatch rate must be below 0.5%, with differences documented. See 18 for the measurements. The common `Defs/XDef[defName="…"]` form, and a predicate of such defName / `@Name` equalities joined by `or` (`Defs/ThingDef[defName="A" or defName="B"]`), also written with `*` for the root step (`*/TraitDef[defName="X"]`, while `Defs` is the only top-level element), a space before `[` or line breaks, use an indexed fast path that selects the same nodes in the same order as the engine (`TestFastPathMatchesEngine`); any other shape walks the whole document.
 
 **Memory and parsing**. The merged document exists only in the subprocess.
 

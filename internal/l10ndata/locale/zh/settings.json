@@ -397,5 +397,9 @@
   "sent as %s": "已发送为 %s",
   "%d sent": "已发 %d 份",
   "none sent yet": "还没发过",
-  "send or remove a problem first": "请先发送或移除一个问题"
+  "send or remove a problem first": "请先发送或移除一个问题",
+  "check files automatically": "自动检查文件",
+  "after edits": "编辑后",
+  "when saved": "保存时",
+  "Can it run checks the Mods' files (the patch simulation) by itself, at low priority. After edits: 2 seconds after you stop editing; when saved: when you save the list or open Can it run or Launch; off: only check again": "“能不能跑”会自己检查 Mod 文件（模拟补丁），以低优先级运行。编辑后：停止编辑 2 秒后；保存时：保存列表或打开“能不能跑”、启动页时；关闭：只在点“重新检查”时"
 }

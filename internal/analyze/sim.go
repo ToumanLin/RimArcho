@@ -134,7 +134,7 @@ func (s *sim) selectNodes(o *Op, one bool) ([]xdoc.Ref, error) {
 	}
 	s.evals++
 	var out []xdoc.Ref
-	if p := s.plan(o.XPath); p != nil {
+	if p := s.plan(o.XPath); s.usable(p) {
 		out = s.fastSelect(p, one)
 	} else {
 		var ok bool
@@ -577,6 +577,7 @@ type defIndex struct {
 	dirty             bool
 	byDefName         map[string][]int32
 	byName            map[string][]int32
+	pos               map[int32]int32 // top-level node -> document order (unions)
 	hits, rebuilds    int
 }
 
@@ -609,8 +610,10 @@ func (ix *defIndex) ensure() {
 	ix.rebuilds++
 	ix.byDefName = make(map[string][]int32, 40000)
 	ix.byName = make(map[string][]int32, 8000)
+	ix.pos = make(map[int32]int32, 40000)
 	d := ix.doc
 	for t := d.FirstChild(ix.root); t != xdoc.None; t = d.Next(t) {
+		ix.pos[t] = int32(len(ix.pos))
 		if d.Kind(t) != xdoc.KindElement {
 			continue
 		}
@@ -633,22 +636,83 @@ type fastPlan struct {
 	elem  string // element name or "*"
 	attr  bool   // @Name instead of defName
 	value string
+	alts  []fastKey   // [k1 or k2 or …]: any of these keys; nil = the single attr/value
 	rest  *xpath.Expr // nil = the candidate itself
+	// anyRoot: the root step is `*`, which is Defs only while Defs is the document's one
+	// element (usable)
+	anyRoot bool
 }
 
-var fastRe = regexp.MustCompile(`^/?Defs/([A-Za-z_][\w.\-]*|\*)\[\s*(defName|@Name)\s*=\s*(?:"([^"]*)"|'([^']*)')\s*\](.*)$`)
+type fastKey struct {
+	attr  bool
+	value string
+}
+
+// orRe and condRe recognise a predicate of defName / @Name equalities joined by `or`, the
+// common way a patch names several defs at once (Defs/ThingDef[defName="A" or defName="B"]).
+var (
+	orRe   = regexp.MustCompile(`(?s)^/?(?:Defs|\*)/([A-Za-z_][\w.\-]*|\*)\s*\[((?:\s*(?:defName|@Name)\s*=\s*(?:"[^"]*"|'[^']*')\s*(?:or\b)?)+)\](.*)$`)
+	condRe = regexp.MustCompile(`\s*(defName|@Name)\s*=\s*(?:"([^"]*)"|'([^']*)')\s*(or\b)?`)
+)
+
+// orPlan splits Defs/T[k1 or k2 or …]rest into T, its keys and rest; ok is false unless the
+// predicate is nothing but two or more such equalities joined by `or`.
+func orPlan(expr string) (elem string, alts []fastKey, rest string, ok bool) {
+	m := orRe.FindStringSubmatch(expr)
+	if m == nil {
+		return
+	}
+	in := m[2]
+	ms := condRe.FindAllStringSubmatchIndex(in, -1)
+	at := 0
+	for k, x := range ms {
+		if x[0] != at {
+			return
+		}
+		at = x[1]
+		hasOr := x[8] >= 0
+		if hasOr == (k == len(ms)-1) {
+			return
+		}
+		alts = append(alts, fastKey{attr: in[x[2]:x[3]] == "@Name", value: sub(in, x[4], x[5]) + sub(in, x[6], x[7])})
+	}
+	if at != len(in) || len(alts) < 2 {
+		return
+	}
+	return m[1], alts, m[3], true
+}
+
+func sub(s string, a, b int) string {
+	if a < 0 {
+		return ""
+	}
+	return s[a:b]
+}
+
+// fastRe: Defs/T[defName="X"]rest or Defs/T[@Name="X"]rest. The root step may be `*`: the
+// merged document's only top-level element is Defs. Whitespace before `[` and line breaks
+// inside the expression are allowed, as the engine allows them.
+var fastRe = regexp.MustCompile(`(?s)^/?(?:Defs|\*)/([A-Za-z_][\w.\-]*|\*)\s*\[\s*(defName|@Name)\s*=\s*(?:"([^"]*)"|'([^']*)')\s*\](.*)$`)
 
 func (s *sim) plan(expr string) *fastPlan {
 	if p, ok := s.plans[expr]; ok {
 		return p
 	}
 	var p *fastPlan
-	if m := fastRe.FindStringSubmatch(strings.TrimSpace(expr)); m != nil {
+	m := fastRe.FindStringSubmatch(strings.TrimSpace(expr))
+	var alts []fastKey
+	if m == nil {
+		if e, a, r, ok := orPlan(strings.TrimSpace(expr)); ok {
+			m, alts = []string{"", e, "", "", "", r}, a
+		}
+	}
+	if m != nil {
 		rest := strings.TrimSpace(m[5])
 		// Absolute references or unions in the remainder need the whole document.
 		if !strings.Contains(rest, "/Defs") && !strings.Contains(rest, "..") && !strings.Contains(rest, "ancestor") &&
 			!strings.Contains(rest, "preceding") && !strings.Contains(rest, "following") && !strings.Contains(rest, "|") && !strings.HasPrefix(rest, "//") {
-			p = &fastPlan{elem: m[1], attr: m[2] == "@Name", value: m[3] + m[4]}
+			p = &fastPlan{elem: m[1], attr: m[2] == "@Name", value: m[3] + m[4], alts: alts,
+				anyRoot: strings.HasPrefix(strings.TrimPrefix(strings.TrimSpace(expr), "/"), "*")}
 			if rest != "" {
 				var src string
 				switch rest[0] {
@@ -673,12 +737,50 @@ func (s *sim) plan(expr string) *fastPlan {
 	return p
 }
 
+// usable reports whether p may answer for the engine now: a plan whose root step is `*`
+// only while the document's sole element is the Defs root.
+func (s *sim) usable(p *fastPlan) bool {
+	if p == nil {
+		return false
+	}
+	if !p.anyRoot {
+		return true
+	}
+	n := 0
+	for c := s.doc.FirstChild(s.doc.Root()); c != xdoc.None; c = s.doc.Next(c) {
+		if s.doc.Kind(c) == xdoc.KindElement {
+			if n++; n > 1 || c != s.root {
+				return false
+			}
+		}
+	}
+	return n == 1
+}
+
 func (s *sim) fastSelect(p *fastPlan, one bool) []xdoc.Ref {
 	s.ix.ensure()
 	s.ix.hits++
 	cands := s.ix.byDefName[p.value]
 	if p.attr {
 		cands = s.ix.byName[p.value]
+	}
+	if p.alts != nil {
+		// the union of the keys' defs, once each, in document order as the predicate selects them
+		cands = nil
+		seen := map[int32]bool{}
+		for _, k := range p.alts {
+			l := s.ix.byDefName[k.value]
+			if k.attr {
+				l = s.ix.byName[k.value]
+			}
+			for _, c := range l {
+				if !seen[c] {
+					seen[c] = true
+					cands = append(cands, c)
+				}
+			}
+		}
+		sort.Slice(cands, func(i, j int) bool { return s.ix.pos[cands[i]] < s.ix.pos[cands[j]] })
 	}
 	var out []xdoc.Ref
 	for _, c := range cands {
@@ -703,7 +805,7 @@ func (s *sim) evalAtEnd(expr string) []xdoc.Ref {
 	if err != nil {
 		return nil
 	}
-	if p := s.plan(expr); p != nil {
+	if p := s.plan(expr); s.usable(p) {
 		return s.fastSelect(p, false)
 	}
 	r, _ := s.doc.Select(e, s.doc.Root(), false)

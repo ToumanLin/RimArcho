@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -130,6 +131,7 @@ func (a *App) AnalyzeInput(st *LoadoutState, mm string) (analyze.Input, string, 
 		})
 	}
 	in.Cached = a.Store.CachedDefs
+	in.Workers = a.AnalyzeWorkers
 	return in, a.AnalysisKey(st, mm), nil
 }
 
@@ -210,22 +212,33 @@ func (a *App) analysisOf(st *LoadoutState, newest bool) (*AnalysisState, error) 
 
 // ChildAnalyze runs `<this executable> analyze --env <name>` and streams its output lines.
 func ChildAnalyze(home, envName, plan, mm string, progress func(string)) error {
-	exe, err := os.Executable()
-	if err != nil {
-		return err
-	}
-	if b := strings.ToLower(filepath.Base(exe)); strings.HasSuffix(b, ".test") || strings.HasSuffix(b, ".test.exe") {
-		// A test binary would run its tests again instead of `analyze`, and those could
-		// start it again: tests set App.AnalyzeRunner (testkit uses InProcessAnalyze).
-		return errors.New("child analysis from a test binary: set App.AnalyzeRunner")
-	}
-	return ChildAnalyzeExe(exe, home, envName, plan, mm, progress)
+	return ChildAnalyzeExeOf("", home, envName, plan, mm, false, progress)
 }
 
 // ChildAnalyzeExe is ChildAnalyze with an explicit archo executable. plan is the list a
 // session opened ("" the current one, 07 §1.3).
 func ChildAnalyzeExe(exe, home, envName, plan, mm string, progress func(string)) error {
+	return ChildAnalyzeExeOf(exe, home, envName, plan, mm, false, progress)
+}
+
+// ChildAnalyzeExeOf is ChildAnalyzeExe; background starts an automatic check's child
+// (`analyze --background`, SetAnalyzeBackground). exe "" is this executable.
+func ChildAnalyzeExeOf(exe, home, envName, plan, mm string, background bool, progress func(string)) error {
+	if exe == "" {
+		var err error
+		if exe, err = os.Executable(); err != nil {
+			return err
+		}
+		if b := strings.ToLower(filepath.Base(exe)); strings.HasSuffix(b, ".test") || strings.HasSuffix(b, ".test.exe") {
+			// A test binary would run its tests again instead of `analyze`, and those could
+			// start it again: tests set App.AnalyzeRunner (testkit uses InProcessAnalyze).
+			return errors.New("child analysis from a test binary: set App.AnalyzeRunner")
+		}
+	}
 	args := []string{"analyze"}
+	if background {
+		args = append(args, "--background")
+	}
 	if envName != "" {
 		args = append(args, "--env", envName)
 	}
@@ -281,6 +294,7 @@ func (a *App) AnalyzeFrom(envName string) *App {
 	b.ReadOptions(a)
 	b.OpenPlan, b.PlanName = 0, a.OpenPlanName()
 	b.EnvName = envName
+	b.AnalyzeBackground = a.AnalyzeBackground
 	return b
 }
 
@@ -312,10 +326,7 @@ func (a *App) EnsureAnalysis(progress func(string)) (*AnalysisState, error) {
 	run := a.AnalyzeRunner
 	if run == nil {
 		run = func(from *App, p func(string)) error {
-			if from.AnalyzeExe != "" {
-				return ChildAnalyzeExe(from.AnalyzeExe, from.Home, from.EnvName, from.PlanName, from.GameVersion, p)
-			}
-			return ChildAnalyze(from.Home, from.EnvName, from.PlanName, from.GameVersion, p)
+			return ChildAnalyzeExeOf(from.AnalyzeExe, from.Home, from.EnvName, from.PlanName, from.GameVersion, from.AnalyzeBackground, p)
 		}
 	}
 	// the options are read now: with AnalyzeWait the runner goes on in a goroutine, after
@@ -351,3 +362,16 @@ func (a *App) EnsureAnalysis(progress func(string)) (*AnalysisState, error) {
 
 // SetAnalyzeLimits applies the analysis child's memory settings.
 func SetAnalyzeLimits() { debug.SetMemoryLimit(AnalyzeMemoryLimit) }
+
+// BackgroundWorkers is how many threads an automatic check uses (16 §8.9).
+const BackgroundWorkers = 2
+
+// SetAnalyzeBackground makes this process an automatic check's (`analyze --background`,
+// 16 §8.9): below normal priority with EcoQoS on Windows (nice 10 elsewhere), at most
+// BackgroundWorkers threads for Go and the file readers. The result is the same; it only
+// takes longer while it stays out of the way of the game and the window.
+func (a *App) SetAnalyzeBackground() {
+	lowerPriority()
+	runtime.GOMAXPROCS(BackgroundWorkers)
+	a.AnalyzeWorkers = BackgroundWorkers
+}

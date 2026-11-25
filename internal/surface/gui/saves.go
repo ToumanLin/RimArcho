@@ -649,7 +649,7 @@ func (s *API) SaveNewList(ref string, analyze bool) (*PlanDone, error) {
 	// Analysing the new list indexes the save's Mods, so Can it load? can check what they
 	// own (12 §4.6); the page stays and checks the save again when it is done.
 	if err == nil && analyze {
-		if s.startAnalyzeOf(p.Name) {
+		if s.startAnalyzeOf(p.Name, false) {
 			d.Text += "  " + view.Tf("analysing %s…", p.Name)
 		} else {
 			d.Text += "  " + view.T("an analysis is already running; analyse the new list once it is done")

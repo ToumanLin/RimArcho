@@ -397,5 +397,9 @@
   "sent as %s": "%s として送信しました",
   "%d sent": "%d 件送信",
   "none sent yet": "まだ送っていません",
-  "send or remove a problem first": "先に問題を送るか外してください"
+  "send or remove a problem first": "先に問題を送るか外してください",
+  "check files automatically": "ファイルを自動でチェック",
+  "after edits": "編集後",
+  "when saved": "保存時",
+  "Can it run checks the Mods' files (the patch simulation) by itself, at low priority. After edits: 2 seconds after you stop editing; when saved: when you save the list or open Can it run or Launch; off: only check again": "起動前チェックが Mod のファイル（パッチのシミュレーション）を低い優先度で自動チェックします。編集後：編集をやめて 2 秒後。保存時：リストの保存時と、起動前チェック・起動ページを開いたとき。オフ：「もう一度チェック」のときだけ"
 }

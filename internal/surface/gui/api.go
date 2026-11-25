@@ -83,6 +83,12 @@ type API struct {
 	analyzeTimer  *time.Timer
 	analyzeAfter  bool
 	analyzeSettle time.Duration
+	// needsAsked: a page showing findings (Can it run, Launch) read them since the last
+	// check started; with analysis.auto "save" only then does a settled refresh check.
+	needsAsked bool
+	// autoMode is analysis.auto as last read outside s.mu (noteAnalysisAuto): the store has
+	// one connection, so the setting is never read while s.mu is held
+	autoMode atomic.Pointer[string]
 	needsSequence uint64
 	listEdits     uint64
 	// building is the pack this window's build child is making ("" none).
@@ -163,6 +169,7 @@ type API struct {
 func newAPI(a *app.App) *API {
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &API{a: a, open: openURL, busy: map[string]bool{}, branchCtx: ctx, branchCancel: cancel}
+	s.noteAnalysisAuto(a)
 	a.TryWorkspaceSync()
 	a.LaunchWait = func(text string) { s.send("launch-wait", map[string]any{"text": view.T(text)}) }
 	// A SteamCMD window that may ask for the password opens or closes (11 §3).
@@ -714,6 +721,10 @@ func (s *API) ApplySetting(argv []string, value string) ([]string, error) {
 	}
 	text, code := cmds.Execute(s.a, run)
 	s.board, s.needs = nil, nil
+	if len(run) == 4 && run[0] == "config" && run[2] == "analysis.auto" && code == cmds.ExitOK {
+		v := run[3]
+		s.autoMode.Store(&v)
+	}
 	if len(run) == 4 && run[0] == "config" && run[2] == "ui.lang" && code == cmds.ExitOK {
 		view.SetLang(run[3])
 	}
@@ -1174,12 +1185,17 @@ func (s *API) runListAction(what string, run func(*app.App, string) *view.Outcom
 	defer done()
 	launchCurrent(r, what)
 	featured := r.Store.Meta(view.FeaturedKey)
+	s.noteAnalysisAuto(r)
 	o := run(r, what)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.needs, s.board = nil, nil
 	if what == view.ListSort && o.Undo {
 		s.listEdits++
+	}
+	// analysis.auto "save": saving the list is when its files are checked (16 §8.9)
+	if what == view.ListSave && len(o.Refused)+len(o.Confirm)+len(o.Moves) == 0 && s.analysisAuto() == "save" {
+		s.autoAnalyzeLocked(nil, false)
 	}
 	// A plan launch clears the applied pack it supersedes, even if the editor is open.
 	if what == view.ListLaunch && len(o.Refused)+len(o.Confirm)+len(o.Moves) == 0 &&
@@ -1367,6 +1383,7 @@ func (s *API) needsPage() *view.Needs {
 	s.needsRead.mu.Lock()
 	defer s.needsRead.mu.Unlock()
 	s.mu.Lock()
+	s.needsAsked = true
 	if c, key := s.cachedNeedsLocked(); c != nil {
 		if c.key == key {
 			s.refreshNeedsLocked(c)
@@ -1972,14 +1989,17 @@ func (s *API) analysisInputsLocked() string {
 	return s.needsScopeLocked() + "|" + s.a.AnalysisKey(st, "")
 }
 
-func (s *API) startAnalyze() bool { return s.startAnalyzeOf("") }
+func (s *API) startAnalyze() bool { return s.startAnalyzeOf("", false) }
 
-// startAnalyzeOf analyses a list by name ("" the open one); s.mu is held.
-func (s *API) startAnalyzeOf(list string) bool {
+// startAnalyzeOf analyses a list by name ("" the open one); background marks an automatic
+// check, which runs at low priority on two threads (app.SetAnalyzeBackground, 16 §8.9).
+// s.mu is held.
+func (s *API) startAnalyzeOf(list string, background bool) bool {
 	if s.needsClosed || s.busy["analyze"] {
 		return false
 	}
 	s.busy["analyze"] = true
+	s.needsAsked = false
 	run := s.a.AnalyzeRunner
 	home, env, exe, plan := s.a.Home, s.a.EnvName, s.Exe, s.a.OpenPlanName()
 	mm := s.a.GameVersion
@@ -1999,6 +2019,7 @@ func (s *API) startAnalyzeOf(list string) bool {
 	if run != nil { // read here, under s.mu: the page goes on changing s.a meanwhile
 		from = s.a.AnalyzeFrom(env)
 		from.PlanName = plan
+		from.AnalyzeBackground = background
 	}
 	task := s.tasks.BeginOnce(view.TaskAnalyze, obj, nil) // one row, updated in place (16 §8.9)
 	// the open list's findings will change: its problems button says so while this runs
@@ -2020,10 +2041,8 @@ func (s *API) startAnalyzeOf(list string) bool {
 		switch {
 		case run != nil:
 			err = run(from, progress)
-		case exe != "":
-			err = app.ChildAnalyzeExe(exe, home, env, plan, mm, progress)
 		default:
-			err = app.ChildAnalyze(home, env, plan, mm, progress)
+			err = app.ChildAnalyzeExeOf(exe, home, env, plan, mm, background, progress)
 		}
 		s.mu.Lock()
 		s.busy["analyze"], s.needs = false, nil
