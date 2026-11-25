@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- The Game Config page explains itself as "Game Config = game version + Mod list + saves folder; RimWorld starts from it" and opens with a new section, game versions on this computer: each RimWorld install with its version and folder, the Game Configs that use it as chips, and installs RimArcho finds in Steam's libraries that no Game Config uses yet (with Add Game Config). Then all Game Configs (each row now names its game version; the folder is in the hover) and this Game Config's settings.
 - Mod details no longer show the category row and its picker. The category glyph before each name and the category filter stay; `archo category` still sets one.
 - Give a Mod a custom name from its details or row menu (#23). A pencil marks aliased rows, and the original name stays visible in details and on hover. The list editor and Mod library also offer an Add note button and menu entry.
 - Launch opens while the last game log is analysed in the background. Logs over 64 MiB are analysed from both ends, with omitted bytes and repeated error counts in Game log, `archo log` and MCP `analyze_log`.

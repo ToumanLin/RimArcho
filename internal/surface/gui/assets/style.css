@@ -519,6 +519,10 @@ body.row-dragging, body.row-dragging * { cursor: grabbing !important; -webkit-us
 .envrow .btn.quiet { border-color: transparent; background: none; box-shadow: none; color: var(--muted); }
 .envrow .btn.quiet:hover, .envrow .btn.quiet:focus-visible { color: var(--fg); background: var(--pill); }
 .chip.cur { color: var(--accent-11, var(--accent)); background: var(--accent-soft); margin: 0; }
+/* the game versions on the Game Config page (16 §2.8): the configs that play a game as chips */
+.gamerow .uses { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px; max-width: 50%; }
+.gamerow .uses .chip { margin: 0; }
+.gamerow.detected .name { color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { .page.enter, :is(#board, #planhead).enter, .seg > .thumb { animation: none; transition: none; } }
 :root[data-motion="reduced"] .page.enter, :root[data-motion="reduced"] :is(#board, #planhead).enter, :root[data-motion="reduced"] .seg > .thumb { animation: none; transition: none; }
 .page-head { display: flex; gap: 6px 12px; align-items: center; flex-wrap: wrap; color: var(--muted); min-height: 28px; }

@@ -290,7 +290,7 @@ Launch arguments retain JSON string arrays for lossless argv storage and import.
 
 ### 6.5 Interface
 
-The player-facing term is **Game Config** (16 §7.2). A config acts as a separate copy of the game: its settings and saves apply only to it; its selected Mod list is global (07 §1.7). Installations remain an internal sharing mechanism with no settings of their own; only the TUI's picker groups configs by installation (16 §9.1).
+The player-facing term is **Game Config** (16 §7.2). A config acts as a separate copy of the game: its settings and saves apply only to it; its selected Mod list is global (07 §1.7). Installations have no settings of their own. The player sees them as **game versions**: the Game Config page lists them first, each with the configs that use it, plus detected games no config uses (16 §2.8); the TUI's picker groups configs by installation (16 §9.1).
 
 Game Config is display text only: protocol events, storage keys and identifiers retain environment terminology. Generic game labels describe RimWorld itself.
 
