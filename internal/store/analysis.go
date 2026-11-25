@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -40,17 +41,23 @@ func (s *Store) ContentKeys() (map[string]string, error) {
 // CachedDefs returns an instance's Def facts if they were built for key.
 func (s *Store) CachedDefs(instanceID, key string) ([]analyze.DefFact, bool) {
 	// The analysis reads every inactive mod's set once: its list comes with the set, not
-	// through the cache (setfiles.go).
+	// through the cache (setfiles.go). Keep the set and its rows in one snapshot.
+	tx, err := s.DB.BeginTx(context.Background(), &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, false
+	}
+	defer tx.Rollback()
 	var id int64
 	var data string
-	if err := s.DB.QueryRow(`SELECT id, files FROM fact_set WHERE instance_id=? AND kind='def' AND content_key=?`, instanceID, key).Scan(&id, &data); err != nil {
+	if err := tx.QueryRow(`SELECT id, files FROM fact_set WHERE instance_id=? AND kind='def' AND content_key=?
+		AND EXISTS(SELECT 1 FROM content_state WHERE def_set_id=fact_set.id)`, instanceID, key).Scan(&id, &data); err != nil {
 		return nil, false
 	}
 	files, err := decodeFiles(id, data)
 	if err != nil {
 		return nil, false
 	}
-	rows, err := s.DB.Query(`SELECT ? AS instance_id,`+defFields+` FROM def_fact f WHERE f.set_id=? ORDER BY f.rowid`, instanceID, id)
+	rows, err := tx.Query(`SELECT ? AS instance_id,`+defFields+` FROM def_fact f WHERE f.set_id=? ORDER BY f.rowid`, instanceID, id)
 	if err != nil {
 		return nil, false
 	}
@@ -185,92 +192,18 @@ type Analysis struct {
 	Stats    analyze.Stats
 }
 
-// SaveAnalysis persists a run: content states and rebuilt Def facts, the Patch facts and
-// findings. The run fills the slot (GameID, mm, setKey) (05 §3): the slot's older run
-// is deleted, and so is every run of the installation whose set key is not in keep
-// (the enabled sets the global plans have now), so slots do not pile up as plans
-// are edited.
-func (s *Store) SaveAnalysis(gameID, setKey, runKey, mm string, keep []string, out *analyze.Output, started, finished time.Time) (int64, error) {
-	var id int64
-	err := s.inTx(func(tx *sql.Tx) error {
-		if err := saveContent(tx, out, mm); err != nil {
-			return err
-		}
-		kept := map[string]bool{}
-		for _, k := range keep {
-			kept[k] = true
-		}
-		var old []int64
-		rows, err := tx.Query(`SELECT id, set_key, game_mm FROM analysis WHERE game_id=?`, gameID)
-		if err != nil {
-			return err
-		}
-		for rows.Next() {
-			var x int64
-			var k, oldMM string
-			if err := rows.Scan(&x, &k, &oldMM); err != nil {
-				rows.Close()
-				return err
-			}
-			if oldMM == mm && k == setKey || !kept[k] {
-				old = append(old, x)
-			}
-		}
-		rows.Close()
-		for _, x := range old {
-			for _, q := range []string{`DELETE FROM patch_fact WHERE analysis_id=?`, `DELETE FROM finding WHERE analysis_id=?`, `DELETE FROM analysis WHERE id=?`} {
-				if _, err := tx.Exec(q, x); err != nil {
-					return err
-				}
-			}
-		}
-		st, _ := json.Marshal(out.Stats)
-		res, err := tx.Exec(`INSERT INTO analysis(game_id, set_key, run_key, game_mm, version, started_at, finished_at, stats) VALUES(?,?,?,?,?,?,?,?)`,
-			gameID, setKey, runKey, mm, analyze.Version, started.Unix(), finished.Unix(), string(st))
-		if err != nil {
-			return err
-		}
-		id, _ = res.LastInsertId()
-		pins, err := tx.Prepare(`INSERT INTO patch_fact(analysis_id, instance_id, seq, file, line, class, xpath, descr, result, hits, reasons, detail, targets, leaf)
-			VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-		if err != nil {
-			return err
-		}
-		defer pins.Close()
-		for _, p := range out.Patches {
-			if _, err := pins.Exec(id, p.Instance, p.Seq, p.File, p.Line, p.Class, p.XPath, p.Desc, p.Result, p.Hits,
-				strings.Join(p.Reasons, " "), p.Detail, strings.Join(p.Targets, " "), p.Leaf); err != nil {
-				return err
-			}
-		}
-		fins, err := tx.Prepare(`INSERT INTO finding(analysis_id, layer, code, severity, key, subject_instance, data) VALUES(?,?,?,?,?,?,?)`)
-		if err != nil {
-			return err
-		}
-		defer fins.Close()
-		for _, f := range out.Findings {
-			b, _ := json.Marshal(f)
-			if _, err := fins.Exec(id, f.Layer, f.Code, f.Severity, f.Key, f.SubjectInstance(), string(b)); err != nil {
-				return err
-			}
-		}
-		return pruneFacts(tx, finished)
-	})
-	return id, err
-}
-
 // LatestAnalysis returns the stored run of the slot (GameID, Store.MM, setKey) (nil if
 // none).
 func (s *Store) LatestAnalysis(gameID, setKey string) (*Analysis, error) {
 	return s.latestAnalysis(`SELECT id, set_key, run_key, game_mm, version, started_at, finished_at, stats FROM analysis
-		WHERE game_id=? AND game_mm=? AND set_key=? ORDER BY id DESC LIMIT 1`, gameID, s.MM, setKey)
+		WHERE game_id=? AND game_mm=? AND set_key=? AND `+activeAnalysis+` ORDER BY publication DESC, id DESC LIMIT 1`, gameID, s.MM, setKey)
 }
 
 // NewestAnalysis returns the installation's newest run for Store.MM in any slot (nil if
 // none).
 func (s *Store) NewestAnalysis(gameID string) (*Analysis, error) {
 	return s.latestAnalysis(`SELECT id, set_key, run_key, game_mm, version, started_at, finished_at, stats FROM analysis
-		WHERE game_id=? AND game_mm=? ORDER BY id DESC LIMIT 1`, gameID, s.MM)
+		WHERE game_id=? AND game_mm=? AND `+activeAnalysis+` ORDER BY publication DESC, id DESC LIMIT 1`, gameID, s.MM)
 }
 
 func (s *Store) latestAnalysis(q string, args ...any) (*Analysis, error) {
@@ -290,9 +223,11 @@ func (s *Store) latestAnalysis(q string, args ...any) (*Analysis, error) {
 	return &a, nil
 }
 
+const publishedRun = `EXISTS(SELECT 1 FROM analysis WHERE analysis.id=analysis_id AND publication>0)`
+
 // Findings returns the stored Def/Patch-layer findings of a run.
 func (s *Store) Findings(analysisID int64) ([]*finding.Finding, error) {
-	rows, err := s.DB.Query(`SELECT data FROM finding WHERE analysis_id=? ORDER BY rowid`, analysisID)
+	rows, err := s.DB.Query(`SELECT data FROM finding WHERE analysis_id=? AND `+publishedRun+` ORDER BY rowid`, analysisID)
 	if err != nil {
 		return nil, err
 	}
@@ -329,7 +264,7 @@ func likeEscape(s string) string {
 
 // PatchFacts returns the Patch facts of a run, in load order of their files.
 func (s *Store) PatchFacts(analysisID int64, f PatchFilter) ([]*analyze.PatchFact, error) {
-	q := `SELECT instance_id, seq, file, line, class, xpath, descr, result, hits, reasons, detail, targets, leaf FROM patch_fact WHERE analysis_id=?`
+	q := `SELECT instance_id, seq, file, line, class, xpath, descr, result, hits, reasons, detail, targets, leaf FROM patch_fact WHERE analysis_id=? AND ` + publishedRun
 	args := []any{analysisID}
 	if f.Instance != "" {
 		q += ` AND instance_id=?`
@@ -374,7 +309,7 @@ func (s *Store) PatchFacts(analysisID int64, f PatchFilter) ([]*analyze.PatchFac
 
 // PatchCounts returns (operations, failed) per instance for a run.
 func (s *Store) PatchCounts(analysisID int64) (map[string][2]int, error) {
-	rows, err := s.DB.Query(`SELECT instance_id, count(*), sum(result='failed') FROM patch_fact WHERE analysis_id=? GROUP BY instance_id`, analysisID)
+	rows, err := s.DB.Query(`SELECT instance_id, count(*), sum(result='failed') FROM patch_fact WHERE analysis_id=? AND `+publishedRun+` GROUP BY instance_id`, analysisID)
 	if err != nil {
 		return nil, err
 	}
@@ -422,10 +357,28 @@ func (s *Store) Ignores(envID string) ([]*Ignore, error) {
 
 // SetIgnore adds or refreshes an ignore record.
 func (s *Store) SetIgnore(envID string, g *Ignore) error {
-	_, err := s.DB.Exec(`INSERT INTO finding_ignore(environment_id, lineage_id, code, key, snapshot_id, created_at) VALUES(?,?,?,?,?,?)
-		ON CONFLICT(environment_id, lineage_id, code, key) DO UPDATE SET snapshot_id=excluded.snapshot_id, created_at=excluded.created_at`,
-		envID, g.LineageID, g.Code, g.Key, g.SnapshotID, g.CreatedAt.Unix())
-	return err
+	return s.SetIgnores(envID, []*Ignore{g})
+}
+
+// SetIgnores adds or refreshes the records in input order in one transaction.
+func (s *Store) SetIgnores(envID string, ignores []*Ignore) error {
+	if len(ignores) == 0 {
+		return nil
+	}
+	return s.inTx(func(tx *sql.Tx) error {
+		ins, err := tx.Prepare(`INSERT INTO finding_ignore(environment_id, lineage_id, code, key, snapshot_id, created_at) VALUES(?,?,?,?,?,?)
+			ON CONFLICT(environment_id, lineage_id, code, key) DO UPDATE SET snapshot_id=excluded.snapshot_id, created_at=excluded.created_at`)
+		if err != nil {
+			return err
+		}
+		defer ins.Close()
+		for _, g := range ignores {
+			if _, err := ins.Exec(envID, g.LineageID, g.Code, g.Key, g.SnapshotID, g.CreatedAt.Unix()); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // RemoveIgnore deletes an ignore record; it reports whether one existed.
@@ -447,56 +400,29 @@ func (s *Store) DefCount(instanceID string) int {
 
 // PatchCount returns an instance's operations and failures in a run.
 func (s *Store) PatchCount(analysisID int64, instanceID string) (ops, failed int) {
-	s.DB.QueryRow(`SELECT count(*), coalesce(sum(result='failed'), 0) FROM patch_fact WHERE analysis_id=? AND instance_id=?`, analysisID, instanceID).Scan(&ops, &failed)
+	s.DB.QueryRow(`SELECT count(*), coalesce(sum(result='failed'), 0) FROM patch_fact WHERE analysis_id=? AND `+publishedRun+` AND instance_id=?`, analysisID, instanceID).Scan(&ops, &failed)
 	return
 }
 
-func saveHarmony(tx *sql.Tx, asms []*analyze.AssemblyFacts, sets map[string]int64) error {
-	insA, err := tx.Prepare(`INSERT INTO assembly_fact(set_id, file_ix, skipped, manual, uses_harmony, types, patches, error) VALUES(?,?,?,?,?,?,?,?)`)
-	if err != nil {
-		return err
-	}
-	defer insA.Close()
-	insT, err := tx.Prepare(`INSERT INTO type_fact(set_id, file_ix, type_name) VALUES(?,?,?)`)
-	if err != nil {
-		return err
-	}
-	defer insT.Close()
-	insH, err := tx.Prepare(`INSERT INTO harmony_fact(set_id, file_ix, patch_type, patch_method, kind, target, target_type, target_method, args, skips, dynamic) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
-	if err != nil {
-		return err
-	}
-	defer insH.Close()
-	insI, err := tx.Prepare(`INSERT INTO harmony_id(set_id, file_ix, id) VALUES(?,?,?)`)
-	if err != nil {
-		return err
-	}
-	defer insI.Close()
+func saveHarmony(exec factExec, asms []*analyze.AssemblyFacts, set int64) error {
+	const insertAssembly = `INSERT INTO assembly_fact(set_id, file_ix, skipped, manual, uses_harmony, types, patches, error) VALUES(?,?,?,?,?,?,?,?)`
+	const insertType = `INSERT INTO type_fact(set_id, file_ix, type_name) VALUES(?,?,?)`
+	const insertPatch = `INSERT INTO harmony_fact(set_id, file_ix, patch_type, patch_method, kind, target, target_type, target_method, args, skips, dynamic) VALUES(?,?,?,?,?,?,?,?,?,?,?)`
+	const insertID = `INSERT INTO harmony_id(set_id, file_ix, id) VALUES(?,?,?)`
 	b := func(v bool) int {
 		if v {
 			return 1
 		}
 		return 0
 	}
-	lists := map[int64]*fileIndex{}
-	var order []int64
+	var files fileIndex
 	for _, a := range asms {
-		set := sets[a.Instance]
-		if set == 0 {
-			continue
-		}
-		x := lists[set]
-		if x == nil {
-			x = &fileIndex{}
-			lists[set] = x
-			order = append(order, set)
-		}
-		file := x.of(a.File)
-		if _, err := insA.Exec(set, file, b(a.Skipped), b(a.Manual), b(a.UsesHarm), len(a.Types), len(a.Patches), a.Err); err != nil {
+		file := files.of(a.File)
+		if err := exec(insertAssembly, set, file, b(a.Skipped), b(a.Manual), b(a.UsesHarm), len(a.Types), len(a.Patches), a.Err); err != nil {
 			return err
 		}
 		for _, t := range a.Types {
-			if _, err := insT.Exec(set, file, t); err != nil {
+			if err := exec(insertType, set, file, t); err != nil {
 				return err
 			}
 		}
@@ -504,22 +430,17 @@ func saveHarmony(tx *sql.Tx, asms []*analyze.AssemblyFacts, sets map[string]int6
 			// dynamic holds three bits: 1 the target is chosen at run time, 2 the patch was
 			// found at a Harmony.Patch call in code (G9, 05 §5.3), 4 the target was read from a
 			// simple TargetMethod() body.
-			if _, err := insH.Exec(set, file, p.PatchType, p.PatchMethod, p.Kind, p.Target(), p.TargetType, p.TargetMethod, p.Args, b(p.Skips), b(p.Dynamic)|2*b(p.Manual)|4*b(p.FromTargetMethod)); err != nil {
+			if err := exec(insertPatch, set, file, p.PatchType, p.PatchMethod, p.Kind, p.Target(), p.TargetType, p.TargetMethod, p.Args, b(p.Skips), b(p.Dynamic)|2*b(p.Manual)|4*b(p.FromTargetMethod)); err != nil {
 				return err
 			}
 		}
 		for _, id := range a.IDs {
-			if _, err := insI.Exec(set, file, id); err != nil {
+			if err := exec(insertID, set, file, id); err != nil {
 				return err
 			}
 		}
 	}
-	for _, set := range order {
-		if _, err := tx.Exec(`UPDATE fact_set SET files=? WHERE id=?`, lists[set].json(), set); err != nil {
-			return err
-		}
-	}
-	return nil
+	return exec(`UPDATE fact_set SET files=? WHERE id=?`, files.json(), set)
 }
 
 // HarmonyRow is a stored Harmony patch.

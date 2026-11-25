@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -9,12 +10,19 @@ import (
 )
 
 func (s *Store) inTx(fn func(tx *sql.Tx) error) error {
-	tx, err := s.DB.Begin()
+	return s.inTxContext(context.Background(), fn)
+}
+
+func (s *Store) inTxContext(ctx context.Context, fn func(tx *sql.Tx) error) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
+	defer tx.Rollback()
 	if err := fn(tx); err != nil {
-		tx.Rollback()
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		return err
 	}
 	return tx.Commit()

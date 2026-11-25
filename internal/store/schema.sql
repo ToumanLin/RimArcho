@@ -55,7 +55,8 @@ CREATE TABLE launch(
   id INTEGER PRIMARY KEY, environment_id TEXT NOT NULL, started_at INTEGER NOT NULL, method TEXT NOT NULL, command TEXT NOT NULL, plan_id INTEGER, fingerprint TEXT NOT NULL DEFAULT '', version_n INTEGER NOT NULL DEFAULT 0, game_id TEXT NOT NULL DEFAULT '', user_data_root TEXT NOT NULL DEFAULT '', env_name TEXT NOT NULL DEFAULT '');
 CREATE TABLE analysis(
   id INTEGER PRIMARY KEY, game_id TEXT NOT NULL, run_key TEXT NOT NULL, game_mm TEXT NOT NULL,
-  version INTEGER NOT NULL, started_at INTEGER NOT NULL, finished_at INTEGER NOT NULL, stats TEXT NOT NULL DEFAULT '{}', set_key TEXT NOT NULL DEFAULT '');
+  version INTEGER NOT NULL, started_at INTEGER NOT NULL, finished_at INTEGER NOT NULL, stats TEXT NOT NULL DEFAULT '{}', set_key TEXT NOT NULL DEFAULT '',
+  publication INTEGER NOT NULL DEFAULT 1);
 CREATE INDEX analysis_env ON analysis(game_id, id);
 CREATE TABLE patch_fact(
   analysis_id INTEGER NOT NULL, instance_id TEXT NOT NULL, seq INTEGER NOT NULL, file TEXT NOT NULL, line INTEGER NOT NULL,

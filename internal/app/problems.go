@@ -367,8 +367,54 @@ func (ps *ProblemSet) All() []*Problem {
 	return append(append(append(append([]*Problem{}, ps.List...), ps.Ignored...), ps.Stale...), ps.Muted...)
 }
 
-// IgnoreProblem records an ignore on the subject's lineage at its current snapshot.
+// IgnoreProblems records the ignores together using the current problem set.
+func (a *App) IgnoreProblems(refs []string) ([]*Problem, error) {
+	if len(refs) == 0 {
+		return nil, nil
+	}
+	ps, err := a.Problems(false, nil)
+	if err != nil {
+		return nil, err
+	}
+	byRef := make(map[string]*Problem)
+	for _, p := range ps.All() {
+		if byRef[p.Ref] == nil {
+			byRef[p.Ref] = p
+		}
+	}
+	ignored := make([]*Problem, 0, len(refs))
+	rows := make([]*store.Ignore, 0, len(refs))
+	for _, ref := range refs {
+		p := byRef[ref]
+		if p == nil {
+			// The valid prefix still takes effect if a later ref has disappeared.
+			err = unknownProblemRef(ref)
+			break
+		}
+		row := &store.Ignore{Code: p.Code, Key: p.Key, CreatedAt: a.Now()}
+		if m := ps.State.Ix.ByID[p.SubjectInstance()]; m != nil {
+			row.LineageID, row.SnapshotID = m.LineageID, m.SnapID
+		}
+		rows = append(rows, row)
+		result := *p
+		result.Ignored = true
+		ignored = append(ignored, &result)
+	}
+	if writeErr := a.Store.SetIgnores(ps.State.Ix.Env.ID, rows); writeErr != nil {
+		return nil, writeErr
+	}
+	return ignored, err
+}
+
+// IgnoreProblem changes the ignore for a single ref.
 func (a *App) IgnoreProblem(ref string, undo bool) (*Problem, error) {
+	if !undo {
+		ignored, err := a.IgnoreProblems([]string{ref})
+		if err != nil {
+			return nil, err
+		}
+		return ignored[0], nil
+	}
 	ps, err := a.Problems(false, nil)
 	if err != nil {
 		return nil, err
@@ -377,20 +423,20 @@ func (a *App) IgnoreProblem(ref string, undo bool) (*Problem, error) {
 		if p.Ref != ref {
 			continue
 		}
-		lin, snap := "", int64(0)
+		lin := ""
 		if m := ps.State.Ix.ByID[p.SubjectInstance()]; m != nil {
-			lin, snap = m.LineageID, m.SnapID
+			lin = m.LineageID
 		}
-		if undo {
-			_, err := a.Store.RemoveIgnore(ps.State.Ix.Env.ID, lin, p.Code, p.Key)
-			p.Ignored = false
-			return p, err
-		}
-		err := a.Store.SetIgnore(ps.State.Ix.Env.ID, &store.Ignore{LineageID: lin, Code: p.Code, Key: p.Key, SnapshotID: snap, CreatedAt: a.Now()})
-		p.Ignored = true
-		return p, err
+		_, err := a.Store.RemoveIgnore(ps.State.Ix.Env.ID, lin, p.Code, p.Key)
+		result := *p
+		result.Ignored = false
+		return &result, err
 	}
-	return nil, &RefError{Ref: ref, Hint: "archo problems lists the current problems with their p: refs"}
+	return nil, unknownProblemRef(ref)
+}
+
+func unknownProblemRef(ref string) error {
+	return &RefError{Ref: ref, Hint: "archo problems lists the current problems with their p: refs"}
 }
 
 // DeclFindings computes the declaration layer (05 §4.3) for the workspace.

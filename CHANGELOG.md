@@ -5,6 +5,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 ## Unreleased
 
 - Can it run opens promptly when you switch pages during a Mod check, even if Launch or Game log is still loading.
+- Ignoring one missing dependency shared by many Mods applies the ignores together, so Can it run responds sooner.
+- Mod checks save their results in short batches. You can still save edits while a check writes, and an interrupted check leaves the previous results available.
 
 ## 1.1.3 — 2026-11-24
 

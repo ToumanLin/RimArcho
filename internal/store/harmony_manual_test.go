@@ -1,6 +1,7 @@
 package store
 
 import (
+	"database/sql"
 	"path/filepath"
 	"testing"
 
@@ -26,7 +27,14 @@ func TestHarmonyManualFlag(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := saveContent(tx, &analyze.Output{Content: map[string]*analyze.ContentState{"inst": {Key: "manual", AssemblyKey: "manual-dll"}}, NewDefs: map[string][]analyze.DefFact{"inst": nil}, Assemblies: []*analyze.AssemblyFacts{asm}}, "1.6"); err != nil {
+	defer tx.Rollback()
+	if _, err := tx.Exec(`INSERT INTO analysis(id,game_id,run_key,game_mm,version,started_at,finished_at) VALUES(1,'game','test','1.6',1,1,1)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := stageContent(func(f func(*sql.Tx) error) error { return f(tx) }, 1, &analyze.Output{Content: map[string]*analyze.ContentState{"inst": {Key: "manual", AssemblyKey: "manual-dll"}}, NewDefs: map[string][]analyze.DefFact{"inst": nil}, Assemblies: []*analyze.AssemblyFacts{asm}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := publishContent(tx, 1, "1.6"); err != nil {
 		t.Fatal(err)
 	}
 	if err := tx.Commit(); err != nil {
