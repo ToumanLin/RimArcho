@@ -4,6 +4,7 @@ package gui
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/perftrace"
@@ -123,27 +124,47 @@ func (s *API) OpPreview(code string, ids []string) (*view.Preview, error) {
 // Keys is the help of a page (`?`, 16 §3.5).
 func (s *API) Keys(page string) []view.KeyRow { return view.KeyHelp(page, false) }
 
-// ModNote is a mod's own note (n).
-func (s *API) ModNote(id string) string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	st := s.boardState()
-	if st == nil || st.Ix.ByID[id] == nil {
-		return ""
+// SetModAlias changes the display name for all copies of a Mod ("" clears it).
+func (s *API) SetModAlias(id, alias string) (string, error) {
+	release, err := s.lockEdit()
+	if err != nil {
+		return "", err
 	}
-	return st.Ix.ByID[id].Note
-}
-
-// SetModNote sets a mod's own note ("" clears it).
-func (s *API) SetModNote(id, text string) (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	st := s.boardState()
-	if st == nil || st.Ix.ByID[id] == nil {
+	defer release()
+	ix, err := s.a.Index()
+	if err != nil {
+		return "", err
+	}
+	m := ix.ByID[id]
+	if m == nil {
 		return "", errors.New("no mod " + id)
 	}
-	s.board, s.lib = nil, nil
-	return s.text(view.SetModNote(s.a, st.Ix.Ref(id), text))
+	if err := s.a.SetAlias("#"+id, alias); err != nil {
+		return s.text("", err)
+	}
+	s.lib = nil
+	if strings.TrimSpace(alias) == "" {
+		return s.text(view.Tf("cleared the alias of %s", m.Name), nil)
+	}
+	return s.text(view.Tf("saved the alias of %s", m.Name), nil)
+}
+
+// SetModNote sets a Mod's Lineage note ("" clears it).
+func (s *API) SetModNote(id, text string) (string, error) {
+	release, err := s.lockEdit()
+	if err != nil {
+		return "", err
+	}
+	defer release()
+	ix, err := s.a.Index()
+	if err != nil {
+		return "", err
+	}
+	if ix.ByID[id] == nil {
+		return "", errors.New("no mod " + id)
+	}
+	s.lib = nil
+	return s.text(view.SetModNote(s.a, "#"+id, text))
 }
 
 // SetCategory sets the player's category of a Mod (all its copies), or with "" gives it back

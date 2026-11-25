@@ -334,8 +334,9 @@ export function renderRows(k) {
     if (!d) { d = el("div", "row"); box.appendChild(d); pool.set(i, d); }
     d.id = rowID(k, it);
     d.setAttribute("role", "option");
-    // Preserve the hover title without announcing the name again as a description.
-    d.setAttribute("aria-description", [it.missing || it.gone ? T(it.canUse ? "installed copy available" : "not installed") : k === 1 && it.copyCount > 1 ? it.copyLabel : "", it.unsaved ? T("unsaved") : ""].filter(Boolean).join("; "));
+    const original = it.originalName ? Tf("original name: %s", it.originalName) : "";
+    // Preserve the hover title without announcing the display name again as a description.
+    d.setAttribute("aria-description", [it.missing || it.gone ? T(it.canUse ? "installed copy available" : "not installed") : k === 1 && it.copyCount > 1 ? it.copyLabel : "", it.unsaved ? T("unsaved") : "", original].filter(Boolean).join("; "));
     d.setAttribute("aria-setsize", String(c.view.length));
     d.setAttribute("aria-posinset", String(i + 1));
     d.setAttribute("aria-selected", String(c.sel.has(key(it))));
@@ -367,13 +368,26 @@ export function renderRows(k) {
         d.prepend(head);
       }
     }
+    if (original) {
+      const mark = el("span", "mod-alias-mark");
+      mark.setAttribute("aria-hidden", "true");
+      mark.innerHTML = icon.edit;
+      const head = $(".editor-copy-head", d);
+      if (head) head.append(mark);
+      else {
+        const title = $(".t", d);
+        const name = el("span", "row-name");
+        title.before(name);
+        name.append(title, mark);
+      }
+    }
     $(".t", d).id = d.id + "-name";
     // A grouped copy shows only "└ <copy>"; its name carries the Mod, as the group head does.
     if (d.classList.contains("copy-item")) { d.removeAttribute("aria-labelledby"); d.setAttribute("aria-label", it.name + ", " + it.copyLabel); }
     else { d.removeAttribute("aria-label"); d.setAttribute("aria-labelledby", d.id + "-name"); }
     // The visible note on the name's line (not installed, which copy) describes the row.
     d.removeAttribute("aria-describedby");
-    d.title = it.name + (it.missing ? "  " + it.ref.replace(/^pkg:/, "") + "  " + T(it.canUse ? "installed copy available" : "not installed") : it.gone ? "  " + T("not installed") : it.copyCount > 1 && it.copyLabel ? "  " + it.copyLabel : "");
+    d.title = it.name + (it.missing ? "  " + it.ref.replace(/^pkg:/, "") + "  " + T(it.canUse ? "installed copy available" : "not installed") : it.gone ? "  " + T("not installed") : it.copyCount > 1 && it.copyLabel ? "  " + it.copyLabel : "") + (original ? "\n" + original : "");
   }
   const active = pool.get(c.cursor);
   if (active) {
@@ -453,7 +467,7 @@ function historyPanel() {
 
 function rowSig(k, i, it) {
   const c = S.cols[k];
-  return [key(it), it.pos, it.unsaved, it.dim, it.gone, it.canUse, (it.tags || []).join(","), it.new, i === c.cursor, c.sel.has(key(it)), rowStatus(it), it.name, it.copyLabel, it.copyCount, it.lineage, it.cat, it.catSet].join("|");
+  return [key(it), it.pos, it.unsaved, it.dim, it.gone, it.canUse, (it.tags || []).join(","), it.new, i === c.cursor, c.sel.has(key(it)), rowStatus(it), it.name, it.originalName, it.copyLabel, it.copyCount, it.lineage, it.cat, it.catSet].join("|");
 }
 
 // rowStatus mirrors view.RowStatus (missing entries are errors, unloadable rows dim).

@@ -1544,6 +1544,20 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; -webkit-
 .lib-note:hover:not(.editing) { background: color-mix(in srgb, var(--amber) 14%, transparent); }
 .lib-note.empty { background: none; border: var(--hairline) dashed var(--line-2); }
 .lib-note.empty .txt { color: var(--faint); }
+.lib-note.md-note-action:not(.editing) { padding: 0; border: 0; background: none; cursor: default; }
+.lib-note .md-player-action { margin-top: 4px; }
+.lib-note.md-note-action .md-player-action { margin-top: 0; }
+.md-player-action { display: inline-flex; align-items: center; gap: 5px; }
+.md-player-action svg { width: 14px; height: 14px; }
+.mod-alias { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 5px 0; }
+.mod-alias .by, .mod-original-name { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.mod-alias .mod-alias-in { resize: none; }
+.row .row-name { display: flex; align-items: center; gap: 5px; flex: 1; min-width: 0; }
+.row .row-name .t { flex: 0 1 auto; }
+.row:has(> .nw) .row-name { flex: 0 1 auto; }
+.mod-alias-mark { display: inline-flex; flex: none; align-items: center; color: var(--muted); }
+.mod-alias-mark svg { width: 12px; height: 12px; }
+.editor-copy-head .mod-alias-mark { margin-left: 5px; }
 .lib-note .by { margin-top: 3px; font-size: 12px; color: var(--faint); }
 .lib-note-in { display: block; width: 100%; resize: vertical; font: inherit; line-height: 1.5; padding: 6px 8px; border-radius: var(--r-sm); border: var(--hairline) solid var(--line-2); background: var(--card); color: var(--fg); outline: 0; }
 .lib-note-in:focus { border-color: var(--accent); }
@@ -1555,7 +1569,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; -webkit-
    collapse into the grid) would only add to the pane's padding. #detail beats the .sub rule. */
 #detail .md-copies .sub { margin-top: 0; }
 .md-acts .lib-acts { margin: 12px 0 4px; }
-.md-acts:empty, .md-note:empty, .md-copies:empty, .md-hist:empty, .md-more:empty { display: none; }
+.md-acts:empty, .md-note:empty, .md-alias:empty, .md-copy-note:empty, .md-copies:empty, .md-hist:empty, .md-more:empty { display: none; }
 .lib-fields .fields { margin-top: 4px; }
 .lib-bar { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 6px 10px; border-radius: var(--r-lg); background: var(--card); border: var(--hairline) solid var(--line-2); box-shadow: 0 1px 2px rgba(0, 0, 0, .05); animation: view-in var(--t-enter) var(--ease); }
 .lib-bar > .accent { font-weight: 600; margin-right: 4px; font-size: 12px; }

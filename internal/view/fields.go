@@ -97,12 +97,17 @@ func ModFields(a *app.App, st *app.LoadoutState, mod *store.Mod, d *DetailData) 
 	}
 	fs = append(fs, Field{Kind: FieldTags, Label: T("tags"), Value: strings.Join(mod.Tags, "  "), List: mod.Tags, Act: ActTags, ActAt: T("edit")})
 	if mod.Alias != "" {
-		fs = append(fs, Field{Kind: FieldAlias, Label: T("alias"), Value: mod.Alias, Extra: mod.Name})
+		fs = append(fs, AliasField(mod))
 	}
 	if mod.Note != "" {
 		fs = append(fs, Field{Kind: FieldNote, Label: T("note"), Value: mod.Note})
 	}
 	return append(fs, tailFields(a, st, mod, d)...)
+}
+
+// AliasField is the saved alias and About.xml name in Mod details (16 §4.1).
+func AliasField(mod *store.Mod) Field {
+	return Field{Kind: FieldAlias, Label: T("alias"), Value: mod.Alias, Extra: mod.Name}
 }
 
 func headFields(st *app.LoadoutState, mod *store.Mod) []Field {

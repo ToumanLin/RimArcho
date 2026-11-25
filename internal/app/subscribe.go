@@ -852,7 +852,7 @@ func (a *App) SubscriptionLineages() ([]*LibLineage, error) {
 					break
 				}
 			}
-			l.Name = libName(ix, m.LineageID, l)
+			l.Name, l.OriginalName = libName(ix, m.LineageID, l)
 			l.Instances = nil
 			byLin[m.LineageID] = l
 		}

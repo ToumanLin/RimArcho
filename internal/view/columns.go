@@ -61,12 +61,15 @@ type Item struct {
 	CanUse      bool              `json:"canUse,omitempty"`  // missing, but an installed copy can take its place
 	Tags        []string          `json:"tags,omitempty"`
 	Alias       bool              `json:"alias,omitempty"`
+	HasNote     bool              `json:"hasNote,omitempty"`
 	Note        string            `json:"-"`
 	Package     string            `json:"-"`
 	Workshop    string            `json:"-"`
 	Author      string            `json:"-"`
 	Versions    []string          `json:"-"` // the game versions it supports ("1.6")
 	Location    string            `json:"-"` // the registered source root, including for linked mods
+
+	OriginalName string `json:"originalName,omitempty"` // About.xml name when an alias is set
 
 	// Cat is the Mod's category (app.CategoryKeys, 16 §2.5): the row's marker and the
 	// category: filter; CatSet when the player chose it.
@@ -225,6 +228,10 @@ func ModItem(st *app.LoadoutState, mod *store.Mod) Item {
 	it.text = it.names + " " + it.author
 	it.Package, it.Workshop = mod.PackageID, mod.WorkshopID()
 	it.Tags, it.Note, it.Alias = mod.Tags, mod.Note, mod.Alias != ""
+	it.HasNote = mod.Note != ""
+	if it.Alias {
+		it.OriginalName = mod.Name
+	}
 	it.Versions = strings.Fields(mod.SupportedVersions)
 	it.Kind, it.SteamCMD = SourceKind(mod), mod.Kind == source.SteamCMD
 	if s := st.Ix.Source(mod.SourceID); s != nil {

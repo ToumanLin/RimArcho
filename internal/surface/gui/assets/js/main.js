@@ -790,15 +790,11 @@ async function verb(name) {
     case "swap":
       if (sel.length === 1 && sel[0].id) return edited(() => api.Swap(sel[0].id), true, ids);
       return;
-    case "note": {
-      // the mod's own note (16 §3.5): one line, from what is there; empty clears it
+    case "alias": case "note": {
       const it = sel.length === 1 ? sel[0] : null;
-      if (!it || !it.id) return say("", T("one mod at a time"));
-      const now = await api.ModNote(it.id).catch(() => "");
-      return pop.ask(Tf("note on %s", it.name), T("a note on this mod…"), async (text) => {
-        try { say("ok", await api.SetModNote(it.id, text)); } catch (err) { say("fail", errText(err)); }
-        await reload();
-      }, now);
+      if (!it?.id || it.missing) return say("", T("one mod at a time"));
+      focusArea(3);
+      return showDetail(it, k === 2, name);
     }
     case "undo": return edited(() => api.Undo(), false);
     case "redo": return edited(() => api.Redo(), false);
@@ -1096,7 +1092,10 @@ async function openRowMenu(x, y, keys) {
   else try { codes = await api.RowOps(k, it.id); } catch { codes = []; }
   const n = S.focus < 3 ? selection().length : 1;
   if (n > 1) codes = codes.filter((c) => !ops.op(c).one);
-  ops.openMenu(x, y, codes, (c) => rowOp(c), keys, { name: it.name, opener: $(`.area[data-area="${k}"] .rows`) });
+  ops.openMenu(x, y, codes, (c) => rowOp(c), keys, {
+    name: it.name, opener: $(`.area[data-area="${k}"] .rows`),
+    playerData: it.id ? { alias: it.alias, note: it.hasNote } : null,
+  });
 }
 
 function menuAtCursor() {
@@ -1109,7 +1108,7 @@ function menuAtCursor() {
 // rowOp runs an op of the menu on the object: the plan's own as their verbs, the version
 // and disk ops as Mod library runs them (a dry run first when they change files).
 async function rowOp(code, only = null) {
-  const verbs = { enable: "toggle", disable: "toggle", "put-back": "toggle", "enable-at": "move", "move-to": "move", stage: "stage", swap: "swap", tags: "tags", note: "note", folder: "folder", linked: "linked", workshop: "workshop-id", steam: "steam" };
+  const verbs = { enable: "toggle", disable: "toggle", "put-back": "toggle", "enable-at": "move", "move-to": "move", stage: "stage", swap: "swap", tags: "tags", alias: "alias", note: "note", folder: "folder", linked: "linked", workshop: "workshop-id", steam: "steam" };
   if (verbs[code] && !only) return verb(verbs[code]);
   const ids = only || idsOf(actionContext().sel);
   if (!ids.length) return;
@@ -1441,6 +1440,7 @@ async function start() {
   document.addEventListener("editor-full",()=>fullPage.full("plan",S.detail?.id));
   // a Mod's tags were reordered in its details: the rows' colour marks follow (16 §2.9)
   document.addEventListener("tags-changed", () => reload());
+  document.addEventListener("mod-player-data-changed", () => reload());
   document.addEventListener("filter-tag", (e) => S.bar.set("tags:" + e.detail, 1));
   document.addEventListener("open-tag", (e) => openTag(e.detail));
   document.addEventListener("editor-use-copy", async (e) => {

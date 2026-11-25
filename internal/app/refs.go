@@ -110,13 +110,13 @@ func (a *App) readIndex(e *env.Environment, repair bool) (*Index, error) {
 	if err != nil {
 		return nil, err
 	}
+	if mods, srcs, err = a.withElsewhere(e, mods, srcs); err != nil {
+		return nil, err
+	}
 	for _, m := range mods {
 		if p := pd[m.LineageID]; p != nil {
 			m.Alias, m.Note, m.Category, m.Tags = p.Alias, p.Note, p.Category, slices.Clip(p.Tags)
 		}
-	}
-	if mods, srcs, err = a.withElsewhere(e, mods, srcs); err != nil {
-		return nil, err
 	}
 	ix := &Index{store: a.Store, Env: e, Mods: mods, ByID: map[string]*store.Mod{}, ByLineage: map[string][]*store.Mod{}, Lineages: lins, Sources: srcs, cats: &indexCategories{},
 		corpus: func() *corpus.Active { return a.CorpusData(e) }}
