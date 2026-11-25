@@ -39,11 +39,12 @@ async function setup(opts = {}) {
     document: { querySelector: (s) => body.querySelector(s), querySelectorAll: (s) => body.querySelectorAll(s), activeElement: null },
     addEventListener(name, fn) { listeners[name] = fn; }, getComputedStyle: () => ({ fontSize: "96px" }),
     setTimeout() {}, clearTimeout() {},
+    ...(opts.globals || {}),
   });
-  q.initHome({ go() {} });
+  q.initHome({ go() {}, ...(opts.ui || {}) });
   const page = opts.page || { featured: 0, rows: [{ kind: "plan", envName: "1.6", plan: 1, name: "Main", current: true, mods: 5, level: "ok", env: "1.6  1.6.4871", page: "plan" }] };
   // answer the oldest Home read still waiting
-  const answer = async () => { homeReads.shift().resolve(structuredClone(page)); await flush(); await flush(); };
+  const answer = async (p = page) => { homeReads.shift().resolve(structuredClone(p)); await flush(); await flush(); };
   return { q, S, body, screen, calls, art, listeners, answer, homeReads, applies };
 }
 
@@ -137,3 +138,28 @@ test("picking another game applies that Game Config's current list", async () =>
   await flush();
   assert.deepEqual(h.applies, [["plan", "1.7", 2, ""]]);
 });
+
+// Release 1.1.4 VM round: Launch asked ReadNewLog for a pending last run, but another read had
+// parsed the log first, so ReadNewLog read nothing and the page kept "reading the log…".
+test("a pending last run that another read parsed is read again once", async () => {
+  const asks = [];
+  const h = await setup({ ui: { readNewLog: async () => { asks.push(1); return false; } }, globals: { requestAnimationFrame: (fn) => fn() } });
+  h.S.screen = "home";
+  const pending = { ...structuredClone(rowsPage()), lastRun: "the list  Nov 24 21:05", lastRunPending: true, checkLastRun: true };
+  const done = { ...structuredClone(rowsPage()), lastRun: "the list  Nov 24 21:05" };
+  const run = h.q.home();
+  await h.answer(pending);
+  await run;
+  await flush(); await flush();
+  assert.equal(asks.length, 1);
+  assert.equal(h.homeReads.length, 1, "the page is read again");
+  await h.answer(done);
+  await flush(); await flush();
+  assert.doesNotMatch(h.screen.textContent, /reading the log/);
+  assert.equal(asks.length, 1, "a settled run asks nothing more");
+  assert.equal(h.homeReads.length, 0);
+});
+
+function rowsPage() {
+  return { featured: 0, rows: [{ kind: "plan", envName: "1.6", plan: 1, name: "Main", current: true, mods: 5, level: "ok", env: "1.6  1.6.4871", page: "plan" }] };
+}

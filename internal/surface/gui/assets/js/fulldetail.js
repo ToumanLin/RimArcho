@@ -286,10 +286,10 @@ async function runOp(code) {
 // editNote: the copy's note in place (n): enter saves, shift+enter breaks the line, esc
 // leaves it.
 function editNote(c) {
-  pop.ask(T("the copy's note"), T("write a note"), async (text) => {
+  pop.ask(T("the copy's note"), (!c.note && c.auto) || T("write a note"), async (text) => {
     try { say("ok", await api.LibrarySetNote(c.ref, text)); } catch (e) { say("fail", errText(e)); }
     await full(F.from, F.id);
-  }, c.note || c.auto || "");
+  }, c.note || "");
 }
 
 // back is esc: the list the page came from, where it was.

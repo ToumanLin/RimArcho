@@ -84,11 +84,12 @@ type API struct {
 	analyzeAfter  bool
 	analyzeSettle time.Duration
 	// needsAsked: a page showing findings (Can it run, Launch) read them since the last
-	// check started; with analysis.auto "save" only then does a settled refresh check.
+	// check started and the last list edit; with analysis.auto "save" only then does a
+	// settled refresh check (an edit's refresh never does, 16 §8.9).
 	needsAsked bool
 	// autoMode is analysis.auto as last read outside s.mu (noteAnalysisAuto): the store has
 	// one connection, so the setting is never read while s.mu is held
-	autoMode atomic.Pointer[string]
+	autoMode      atomic.Pointer[string]
 	needsSequence uint64
 	listEdits     uint64
 	// building is the pack this window's build child is making ("" none).
@@ -1000,6 +1001,7 @@ func (s *API) after(r *view.Result, err error) (*view.Result, error) {
 		return nil, errors.New(view.Humanize(s.boardState(), err.Error()))
 	}
 	s.listEdits++
+	s.needsAsked = false
 	if r != nil {
 		r.Problems = s.editProblemsLocked()
 	}
@@ -1073,6 +1075,7 @@ func (s *API) text(t string, err error) (string, error) {
 		return "", errors.New(view.Humanize(s.boardState(), err.Error()))
 	}
 	s.listEdits++
+	s.needsAsked = false
 	if s.needsCache != nil {
 		p := s.editProblemsLocked()
 		go s.send("list-problems", p)
@@ -1192,9 +1195,11 @@ func (s *API) runListAction(what string, run func(*app.App, string) *view.Outcom
 	s.needs, s.board = nil, nil
 	if what == view.ListSort && o.Undo {
 		s.listEdits++
+		s.needsAsked = false
 	}
-	// analysis.auto "save": saving the list is when its files are checked (16 §8.9)
-	if what == view.ListSave && len(o.Refused)+len(o.Confirm)+len(o.Moves) == 0 && s.analysisAuto() == "save" {
+	// analysis.auto "save": saving or launching the list is when its files are checked
+	// (16 §8.9)
+	if (what == view.ListSave || what == view.ListLaunch) && len(o.Refused)+len(o.Confirm)+len(o.Moves) == 0 && s.analysisAuto() == "save" {
 		s.autoAnalyzeLocked(nil, false)
 	}
 	// A plan launch clears the applied pack it supersedes, even if the editor is open.

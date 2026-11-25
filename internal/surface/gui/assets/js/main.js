@@ -1637,17 +1637,18 @@ async function pollLive() {
 
 // readNewLog: the run's log counts without a visit to Can it run (16 §2.1; until 2026-10-30
 // the sidebar's foot said "analyse this run's log" and waited for a click). The pages showing it
-// read again.
+// read again. It resolves to whether it read a log (false: nothing new, or it failed).
 let readNewLogInFlight;
 function readNewLog() {
   if (readNewLogInFlight) return readNewLogInFlight;
   readNewLogInFlight = (async () => {
     try {
-      if (!(await api.ReadNewLog())) return;
-    } catch { return; }
+      if (!(await api.ReadNewLog())) return false;
+    } catch { return false; }
     shell.sync();
     if (S.screen === "needs") scr.needs(true);
     else if (S.screen === "home") homePage.home({ keep: true });
+    return true;
   })().finally(() => { readNewLogInFlight = null; });
   return readNewLogInFlight;
 }

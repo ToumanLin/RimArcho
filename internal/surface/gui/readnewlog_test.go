@@ -150,3 +150,96 @@ func TestHomeReadsThePreviousLogWhenTheCurrentIsGone(t *testing.T) {
 		t.Fatalf("Launch says nothing of the last run with Player-prev.log left: %+v", h)
 	}
 }
+
+// A 1.6 Game Config on the shared default folder whose oversized Player.log is deleted from
+// the size badge: Player-prev.log is its last run, never the stale 1.7 Logs/Player.log a
+// RimWorld 1.7 run left in the same folder without a RimArcho launch record. Launch named
+// nothing (an empty placeholder), and Game log and `archo log` read the 1.7 file (release
+// 1.1.4 VM round, bug 2).
+func TestDeletedPlayerLogFallsBackToOwnVersion(t *testing.T) {
+	view.SetLang("en")
+	e := testkit.New(t)
+	e.AddWorkshop("1001", testkit.Mod{PackageID: "tester.alpha", Name: "Alpha Props", Files: map[string]string{"Defs/Test.xml": "<Defs><ThingDef><defName>AlphaDef</defName></ThingDef></Defs>"}})
+	e.WriteModsConfig("1.6.4633", "ludeon.rimworld", "tester.alpha")
+	e.AddEnv(false)
+	e.MustRun("scan")
+	e.MustRun("analyze")
+	e.App.LazyLog, e.App.LogCacheOnly = true, true
+	api := gui.NewAPI(e.App, nil)
+	defer api.Close()
+	// a 1.7 run written outside RimArcho, days ago
+	stale := filepath.Join(e.UserData, "Logs", "Player.log")
+	e.WriteFile(stale, "=== Waylith log ===\n2026-11-21 09:00:00.000  INFO [Verse] RimWorld 1.7.5014 rev1\n"+
+		"2026-11-21 09:00:01.000 ERROR [Verse] Exception ticking WaylithOnly: System.NullReferenceException: 1.7-only\n")
+	old := e.Now().Add(-96 * time.Hour)
+	if err := os.Chtimes(stale, old, old); err != nil {
+		t.Fatal(err)
+	}
+	e.RecordLaunch(e.Now().Add(-time.Hour))
+	prev := filepath.Join(e.UserData, "Player-prev.log")
+	e.WriteFile(prev, "RimWorld 1.6.4633 rev1\n\n"+
+		strings.Repeat("Could not load Texture2D at 'Things/Alpha' for def 'AlphaDef'\n\n", 3))
+	// the run before the last launch (the game moved it aside when it started)
+	if err := os.Chtimes(prev, e.Now().Add(-2*time.Hour), e.Now().Add(-2*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	cur := filepath.Join(e.UserData, "Player.log")
+	e.WriteFile(cur, "RimWorld 1.6.4633 rev1\n\nOversized run\n\n")
+	if err := os.Truncate(cur, app.LogSizeLimit+1); err != nil {
+		t.Fatal(err)
+	}
+	p, err := api.PreviewLogCleanup(cur, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := api.ApplyLogCleanup(cur, p.Token, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(cur); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("Player.log not deleted: %v", err)
+	}
+
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c, pr := e.App.LogPaths(st); c == stale || pr == stale {
+		t.Fatalf("the 1.7 log counts as this 1.6 Game Config's: cur %q prev %q", c, pr)
+	}
+	e.App.LazyLog = false
+	if got := e.App.ProblemLog(st); got != prev {
+		t.Fatalf("problem log %q, want Player-prev.log", got)
+	}
+	e.App.LazyLog = true
+	// as home.js does: a pending last run asks ReadNewLog, then Launch draws again
+	if h := api.Home(); h.CheckLastRun {
+		api.ReadNewLog()
+	}
+	if h := api.Home(); h.LastRunPending {
+		t.Fatalf("Launch keeps reading the log: %+v", h)
+	} else if h.LastRun == "" && h.MissingLog == "" {
+		t.Fatalf("Launch says nothing of the last run: %+v", h)
+	} else if strings.Contains(h.LastRun, "WaylithOnly") || strings.Contains(h.MissingLog, "Logs") {
+		t.Fatalf("Launch reads the 1.7 log: %+v", h)
+	}
+	page, err := view.BuildLogPage(e.App, st, "", nil)
+	if err != nil || page.Path != prev {
+		t.Fatalf("Game log opens %q (%v), want Player-prev.log", page.Path, err)
+	}
+	out := e.MustRun("log")
+	if strings.Contains(out, "WaylithOnly") || strings.Contains(out, "1.7") {
+		t.Fatalf("archo log reads the 1.7 log:\n%s", out)
+	}
+	if out := e.MustRun("status"); strings.Contains(out, "stale log") || strings.Contains(out, "1.7") {
+		t.Fatalf("archo status names the 1.7 log:\n%s", out)
+	}
+
+	// only another game version's log left (a 1.5 run before the game was updated): Launch
+	// says the log was not found instead of an empty line
+	e.WriteFile(prev, "RimWorld 1.5.4104 rev1\n\nOld run\n\n")
+	e.App.DropLogCaches()
+	api.ReadNewLog()
+	if h := api.Home(); h.LastRun != "" || !strings.Contains(h.MissingLog, "not found") {
+		t.Fatalf("Launch with only a 1.5 log: last run %q, missing %q", h.LastRun, h.MissingLog)
+	}
+}

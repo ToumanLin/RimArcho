@@ -159,7 +159,13 @@ async function readHome({ keep = false, all = false } = {}) {
   if (next.checkLastRun) {
     const env = S.envSeq;
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      if (S.screen === "home" && S.envSeq === env) ui.readNewLog();
+      if (S.screen !== "home" || S.envSeq !== env) return;
+      // read nothing new: another read (Can it run's refresh, the full read) parsed the log
+      // first, so this page still shows it pending; read the page once more, which stops
+      // here when nothing changed (release 1.1.4 VM round: "reading the log…" stayed)
+      Promise.resolve(ui.readNewLog()).then((read) => {
+        if (read === false && S.screen === "home" && S.envSeq === env) home({ keep: true });
+      });
     }));
   }
 }

@@ -12,8 +12,9 @@ import (
 )
 
 // 16 §8.9, §2.14: automatic checks run in the background mode (low priority, two threads);
-// check again does not. analysis.auto "save" checks on Save and on entering Can it run,
-// not after edits; "off" checks only on the button.
+// check again does not. analysis.auto "save" checks on Save and on entering Can it run
+// while the findings are stale, never after edits (not even after a visit to Can it run);
+// "off" checks only on the button.
 func TestAutoAnalysisModes(t *testing.T) {
 	t.Parallel()
 	e, s, _ := fixture(t)
@@ -34,23 +35,24 @@ func TestAutoAnalysisModes(t *testing.T) {
 		defer mu.Unlock()
 		return append([]bool(nil), runs...)
 	}
-	// each step enables one more disabled Mod, so every list is one not checked yet
-	// (each enabled set keeps its own check, app.Analysis)
+	// each step makes an enabled set not checked yet (each set keeps its own check,
+	// app.Analysis): from {a}: +b, +harmony, -b, -a, -harmony
 	ix := s.Board().St.Ix
-	var off []string
-	for _, ref := range []string{"pkg:tester.b", "pkg:brrainz.harmony"} {
-		m, _ := ix.ResolveOne(ref)
-		off = append(off, m.ID)
+	id := func(ref string) string { m, _ := ix.ResolveOne(ref); return m.ID }
+	steps := []struct {
+		col view.Column // the column the Mod is in now
+		id  string
+	}{
+		{view.Inactive, id("pkg:tester.b")}, {view.Inactive, id("pkg:brrainz.harmony")},
+		{view.Active, id("pkg:tester.b")}, {view.Active, id("pkg:tester.a")},
+		{view.Active, id("pkg:brrainz.harmony")},
 	}
 	step := 0
 	toggle := func() {
 		t.Helper()
-		col, id := view.Inactive, off[step%2] // the column the Mod is in now
-		if step >= 2 {
-			col = view.Active
-		}
+		st := steps[step]
 		step++
-		if _, err := s.Toggle(int(col), []string{id}, nil); err != nil {
+		if _, err := s.Toggle(int(st.col), []string{st.id}, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -109,6 +111,27 @@ func TestAutoAnalysisModes(t *testing.T) {
 	if r := got(); len(r) != 5 || !r[4] {
 		t.Fatalf("save mode: Save ran %v, want one background check", r[4:])
 	}
+	// a visit to Can it run while its findings are current starts nothing, and the next
+	// edit still waits for the save (release 1.1.4 VM round, bug 1)
+	s.Needs()
+	settle(s)
+	s.Leave("needs")
+	s.Board()
+	if r := got(); len(r) != 5 {
+		t.Fatalf("save mode: entering Can it run with current findings ran %v", r[5:])
+	}
+	toggle()
+	quiet()
+	if r := got(); len(r) != 5 {
+		t.Fatalf("save mode: an edit after a visit to Can it run ran %d checks, want 0", len(r)-5)
+	}
+	if _, err := s.Run(view.ListSave); err != nil {
+		t.Fatal(err)
+	}
+	settle(s)
+	if r := got(); len(r) != 6 || !r[5] {
+		t.Fatalf("save mode: Save after the visit ran %v, want one background check", r[5:])
+	}
 
 	// "off": nothing by itself, not on entering Can it run nor on Save
 	set("off")
@@ -121,8 +144,8 @@ func TestAutoAnalysisModes(t *testing.T) {
 		t.Fatal(err)
 	}
 	quiet()
-	if r := got(); len(r) != 5 {
-		t.Fatalf("off: %d checks started by themselves, want 0", len(r)-5)
+	if r := got(); len(r) != 6 {
+		t.Fatalf("off: %d checks started by themselves, want 0", len(r)-6)
 	}
 	if n := s.Needs(); !n.Stale && !n.Never {
 		t.Fatal("off: the findings should stay stale until check again")
