@@ -60,9 +60,8 @@ export function planActions(x) {
     c.title = Tf("the game is launched with %s; this list is only open here", x.current.name) + T("; ") + T("no game file is written");
     out.push(c);
   } else {
-    // the game starts from here, as from Launch (16 §2.5)
     const l = btn(T("launch"), "L", x.launch, "primary", "launch");
-    l.title = T("starts the game with this list; unsaved changes are saved first") + T("; ") + "L";
+    l.title = T("starts the game with this list") + T("; ") + "L";
     out.push(l);
   }
   return out;

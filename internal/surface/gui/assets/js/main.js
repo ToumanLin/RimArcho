@@ -287,9 +287,13 @@ function exportCurrent() {
 }
 
 // launchHere is the editor's launch (its button, L and the command panel's launch; 16 §2.5,
-// editorlaunch.js): a running game is refused before the open list becomes current.
+// editorlaunch.js): refusals and unsaved changes are handled before the open list becomes current.
 const launchHere = editorLauncher({
   S, T, say,
+  unsavedConfirm: (count, go) => pop.confirm(
+    count === 1 ? T("1 unsaved change") : Tf("%d unsaved changes", count),
+    [T("Launching saves your edits to the game.")], T("Save and launch"), go, "launch",
+  ),
   usePlan: (id) => plans.usePlan(id),
   homeMemory: () => api.HomeMemory(),
   memoryConfirm: (m, go) => pop.memoryConfirm(m, go),
