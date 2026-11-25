@@ -220,8 +220,11 @@ func (s *API) ImportPreview(kind, src string) (*view.ImportPreview, error) {
 // or with merge adds the installed mods it has that the list lacks. One undo step;
 // ModsConfig.xml is written only by save.
 func (s *API) ImportApply(merge bool) (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return "", err
+	}
+	defer release()
 	if s.x.imp == nil {
 		return "", errors.New(view.T("nothing to import"))
 	}

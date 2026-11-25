@@ -230,3 +230,126 @@ func TestGameActionKeepsAutomaticSaveCopy(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestEditorWaitsForBriefWorkspaceLock(t *testing.T) {
+	e, api, _ := fixture(t)
+	e.MustRun("env", "set", "main", "--launch", "direct")
+	r, err := e.ChildApp()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	holdLaunch, entered, release := actionGate()
+	r.GameProbe = func(string) *app.GameRun { holdLaunch(); return nil }
+	launchDone := make(chan error, 1)
+	go func() {
+		_, err := r.Launch(true)
+		launchDone <- err
+	}()
+	select {
+	case <-entered:
+	case err := <-launchDone:
+		t.Fatalf("lock holder ended before reaching the gate: %v", err)
+	case <-time.After(5 * time.Second):
+		release()
+		<-launchDone
+		t.Fatal("lock holder did not reach the gate")
+	}
+	done := make(chan error, 1)
+	start := time.Now()
+	go func() {
+		_, err := api.Toggle(int(view.Inactive), nil, []string{"pkg:tester.b"})
+		done <- err
+	}()
+	time.Sleep(75 * time.Millisecond)
+	hold := time.Since(start)
+	release()
+	if err := <-launchDone; err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("edit did not finish after release")
+	}
+	t.Logf("hold %.3f ms, edit %.3f ms", hold.Seconds()*1000, time.Since(start).Seconds()*1000)
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.List.Index(st.Reg.Resolve("tester.b").Instance) < 0 {
+		t.Fatal("Beta was not enabled")
+	}
+}
+
+func TestEditorWaitDoesNotBlockSettings(t *testing.T) {
+	e, api, _ := fixture(t)
+	r, err := e.ChildApp()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	hold, entered, release := actionGate()
+	r.GameProbe = func(string) *app.GameRun { hold(); return nil }
+	e.MustRun("env", "set", "main", "--launch", "direct")
+	var editDone chan error
+	measureConcurrentRead(t, func() error {
+		_, err := r.Launch(true)
+		return err
+	}, entered, release, func() error {
+		editDone = make(chan error, 1)
+		go func() {
+			_, err := api.Toggle(int(view.Inactive), nil, []string{"pkg:tester.b"})
+			editDone <- err
+		}()
+		select {
+		case err := <-editDone:
+			editDone = nil
+			return fmt.Errorf("edit finished before the lock was released: %v", err)
+		case <-time.After(60 * time.Millisecond):
+		}
+		start := time.Now()
+		if len(api.Settings()) == 0 {
+			return fmt.Errorf("missing settings")
+		}
+		t.Logf("Settings while edit waits: %.3f ms", time.Since(start).Seconds()*1000)
+		return nil
+	})
+	if editDone != nil {
+		select {
+		case err := <-editDone:
+			if err != nil {
+				t.Fatal(err)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("edit did not resume")
+		}
+	}
+}
+
+func TestEditorRefusesDuringWindowLaunch(t *testing.T) {
+	e := actionLockFixture(t)
+	hold, entered, release := actionGate()
+	e.App.GameProbe = func(string) *app.GameRun { hold(); return nil }
+	api := NewAPI(e.App, nil)
+	t.Cleanup(api.Close)
+	measureConcurrentRead(t, func() error {
+		o, err := api.RunAnyway(view.ListLaunch)
+		if err != nil || o == nil || len(o.Refused) != 0 {
+			return fmt.Errorf("launch outcome %+v: %v", o, err)
+		}
+		return nil
+	}, entered, release, func() error {
+		start := time.Now()
+		_, err := api.Toggle(int(view.Active), nil, []string{"pkg:ludeon.rimworld"})
+		t.Logf("edit reply during launch: %.3f ms", time.Since(start).Seconds()*1000)
+		if err == nil || err.Error() != view.T("RimArcho is preparing a launch. Try editing the list again after the launch finishes.") {
+			return fmt.Errorf("expected launch-specific refusal, got %v", err)
+		}
+		_, err = api.Live()
+		return err
+	})
+}

@@ -743,6 +743,8 @@
   "the unfinished pack %s and what it copied (%s) are deleted; your mods are not touched": "删除没创建完的 %s 和已复制的内容（%s）；你的 Mod 不受影响",
   "the whole library": "整个 Mod 库",
   "the window is closing": "窗口正在关闭",
+  "RimArcho is preparing a launch. Try editing the list again after the launch finishes.": "RimArcho 正在准备启动游戏。请在启动完成后重试编辑列表。",
+  "the open list or Game Config changed. Review the list and try again.": "打开的列表或游戏配置已更改。请检查列表后重试。",
   "this answer cannot be undone with u": "这个回答不能用 u 撤销",
   "this copy is already listed independently or is no longer available": "这一份已单独列出，或已不在 Mod 库中",
   "this list": "这个列表",

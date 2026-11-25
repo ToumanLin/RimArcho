@@ -363,7 +363,11 @@ func (a *App) sync(st *LoadoutState) error {
 	// handoff lock across that work. Rebuild the registry and reread ModsConfig
 	// under the guard, so a read overtaken by replacement cannot sync old IDs back.
 	now := a.Now().UTC()
-	unlock, err := a.lockLaunch()
+	lock := a.lockLaunch
+	if a.tryWorkspaceSync {
+		lock = a.tryLaunch
+	}
+	unlock, err := lock()
 	if err != nil {
 		return err
 	}

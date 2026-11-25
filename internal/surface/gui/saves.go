@@ -440,8 +440,11 @@ func (s *API) SaveFix(ref string, mods []string, disableAdded, order bool) (*Sav
 	}
 	// the list the page checked the save against: the applied one (SaveDetail), found on
 	// the window's session under its lock, so it is still the applied one when fixed
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	if sv, err = appliedTarget(s.a, sv); err != nil {
 		return nil, err
 	}
@@ -633,8 +636,11 @@ func (s *API) SaveNewList(ref string, analyze bool) (*PlanDone, error) {
 	if sv.Colony != nil {
 		name = sv.Colony.Name
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	p, t, err := view.NewPlan(s.a, view.FreePlanName(s.a, name), sv.Path)
 	if p == nil {
 		return s.planDone(0, t, err)

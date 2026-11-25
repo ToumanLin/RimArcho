@@ -128,8 +128,11 @@ func (s *API) runMigration(id string, picks []app.MigrationPick) {
 // migrateOne brings one part over while it holds the window's lock; the window answers
 // between parts.
 func (s *API) migrateOne(p app.MigrationPick) (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return "", err
+	}
+	defer release()
 	defer func() { s.board, s.needs = nil, nil }()
 	if p.Source == "list" && p.Mode == "update" {
 		plan := s.a.ImportedPlan(p.Path)

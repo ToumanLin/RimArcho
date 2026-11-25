@@ -113,6 +113,9 @@ func (s *API) actionSession(launch bool) (*app.App, func(), error) {
 	r, err := s.detachedSessionLocked()
 	if err == nil {
 		r.ReadIndex(s.a)
+		if launch {
+			s.launching.Store(true)
+		}
 	}
 	s.mu.Unlock()
 	if err != nil {
@@ -121,6 +124,7 @@ func (s *API) actionSession(launch bool) (*app.App, func(), error) {
 	}
 	done := func() {
 		if launch {
+			s.launching.Store(false)
 			// App.Close waits for the automatic copy. Its connection must stay
 			// open for the operation log after the launch reply has returned.
 			s.launchCopies.Add(1)

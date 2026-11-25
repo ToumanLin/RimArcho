@@ -68,6 +68,7 @@ func (b *App) ReadOptions(a *App) {
 	b.GameProbe, b.LockBase, b.MonitorBundle = a.GameProbe, a.LockBase, a.MonitorBundle
 	b.Launcher, b.SteamRunning = a.Launcher, a.SteamRunning
 	b.HTTP, b.SteamAPI = a.HTTP, a.SteamAPI
+	b.SteamCollectionAPI = a.SteamCollectionAPI
 	b.SteamSignedIn, b.SteamSignedInID = a.SteamSignedIn, a.SteamSignedInID
 	b.FindTool, b.SteamWorker, b.TrashFunc = a.FindTool, a.SteamWorker, a.TrashFunc
 	b.SteamWorkerStream = a.SteamWorkerStream

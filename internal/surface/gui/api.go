@@ -37,7 +37,8 @@ import (
 type API struct {
 	mu              sync.Mutex
 	actionMu        sync.Mutex // serializes game actions and save file operations
-	actionsClosed   bool       // guarded by mu
+	launching       atomic.Bool
+	actionsClosed   bool // guarded by mu
 	launchCopies    sync.WaitGroup
 	filesMu         sync.RWMutex // scans and file jobs; never acquired by page reads/edits
 	a               *app.App
@@ -162,7 +163,7 @@ type API struct {
 func newAPI(a *app.App) *API {
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &API{a: a, open: openURL, busy: map[string]bool{}, branchCtx: ctx, branchCancel: cancel}
-	a.FailFastLaunchLock()
+	a.TryWorkspaceSync()
 	a.LaunchWait = func(text string) { s.send("launch-wait", map[string]any{"text": view.T(text)}) }
 	// A SteamCMD window that may ask for the password opens or closes (11 §3).
 	a.SteamCMDSignIn = func(open bool) { s.send("steamcmd-signin", map[string]any{"open": open}) }
@@ -649,6 +650,7 @@ func (s *API) settingsRead() []view.SettingGroup {
 	defer r.Close()
 	defer s.free.soon()
 	// The Game Config's own settings are on the Game Config page (16 §2.8), not here.
+	defer r.UseStoredWorkspace()()
 	return view.SettingsPage(r, nil)
 }
 
@@ -686,10 +688,18 @@ func (s *API) ToolInstallOffer(name string) (*app.SteamCMDOffer, error) {
 
 // ApplySetting runs one of the settings page's commands, with value in place of {}.
 func (s *API) ApplySetting(argv []string, value string) ([]string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	if err := view.SettingCommand(argv); err != nil {
 		return nil, err
+	}
+	if len(argv) >= 2 && argv[0] == "env" && argv[1] == "set" {
+		release, err := s.lockEdit()
+		if err != nil {
+			return nil, err
+		}
+		defer release()
+	} else {
+		s.mu.Lock()
+		defer s.mu.Unlock()
 	}
 	run := make([]string, len(argv))
 	for i, x := range argv {
@@ -727,8 +737,11 @@ func (s *API) History() ([]view.HistItem, error) {
 // HistoryGo moves through the unsaved steps (n > 0 undoes n, n < 0 redoes -n) or, with
 // version > 0, loads that version into the list (loadout checkout).
 func (s *API) HistoryGo(steps, version int) (*view.Result, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	if version > 0 {
 		r, _, err := s.a.Checkout(fmt.Sprintf("v%d", version))
 		if err != nil {
@@ -984,36 +997,51 @@ func (s *API) after(r *view.Result, err error) (*view.Result, error) {
 
 // Toggle is space: enable, disable, or put back (by the column the object is in).
 func (s *API) Toggle(col int, ids, refs []string) (*view.Result, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return s.after(view.Toggle(s.a, view.Column(col), s.object(ids, refs)))
 }
 
 // Stage is t: stage, or put back from staging.
 func (s *API) Stage(col int, ids []string) (*view.Result, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return s.after(view.Stage(s.a, view.Column(col), s.object(ids, nil)))
 }
 
 // Unstage takes mods out of staging (a drop on Disabled).
 func (s *API) Unstage(ids []string) (*view.Result, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return s.after(view.Unstage(s.a, s.object(ids, nil)))
 }
 
 // MoveBy is J / K.
 func (s *API) MoveBy(ids []string, d int) (*view.Result, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return s.after(view.MoveBy(s.a, s.object(ids, nil), d))
 }
 
 // Place puts the mods at a 1-based place of the list without them (m, or a drop).
 func (s *API) Place(col int, ids []string, at int) (*view.Result, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return s.after(view.Place(s.a, view.Column(col), s.object(ids, nil), at))
 }
 
@@ -1043,36 +1071,51 @@ func (s *API) text(t string, err error) (string, error) {
 
 // Undo and Redo step the workspace (u, ctrl+r).
 func (s *API) Undo() (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return "", err
+	}
+	defer release()
 	return s.text(view.UndoRedo(s.a, false))
 }
 
 // Redo steps the workspace forward.
 func (s *API) Redo() (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return "", err
+	}
+	defer release()
 	return s.text(view.UndoRedo(s.a, true))
 }
 
 // StageAll is T: every enabled mod but Core and the DLCs goes to staging (one undo step).
 func (s *API) StageAll() (*view.Result, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return s.after(view.StageAll(s.a))
 }
 
 // RestoreAll puts everything in staging back (the palette).
 func (s *API) RestoreAll() (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return "", err
+	}
+	defer release()
 	return s.text(view.RestoreAll(s.a))
 }
 
 // Swap is x.
 func (s *API) Swap(id string) (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return "", err
+	}
+	defer release()
 	st := s.boardState()
 	if st == nil {
 		return "", errors.New("no list")
@@ -1150,8 +1193,11 @@ func (s *API) runListAction(what string, run func(*app.App, string) *view.Outcom
 // answer to a Steam launch with no Steam client (view.Outcome.Direct, 16 §2.3). The page
 // then launches again.
 func (s *API) LaunchDirect() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return err
+	}
+	defer release()
 	e, err := s.a.Env()
 	if err != nil {
 		return err
@@ -1489,8 +1535,18 @@ func (s *API) DoAction(act view.Action, option int) (string, error) {
 		}
 		return act.Done, nil
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	switch act.Kind {
+	case view.ActMove, view.ActSort, view.ActEnable, view.ActUseInstalled, view.ActDisable, view.ActChooseDisable,
+		view.ActLoadExternal, view.ActDismissConflict, view.ActKeepOutside, view.ActSwap, view.ActReplace:
+		release, err := s.lockEdit()
+		if err != nil {
+			return "", err
+		}
+		defer release()
+	default:
+		s.mu.Lock()
+		defer s.mu.Unlock()
+	}
 	done, err := view.Do(s.a, act, option)
 	if errors.Is(err, view.ErrNothing) {
 		return done, nil
@@ -1729,8 +1785,11 @@ func (s *API) InstallMonitor() (string, error) {
 // AddMonitor puts Archo Monitor after Harmony in the current plan (the log page's action;
 // one undoable step).
 func (s *API) AddMonitor() (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return "", err
+	}
+	defer release()
 	return s.text(view.MonitorAdd(s.a))
 }
 

@@ -51,7 +51,7 @@ type App struct {
 	dataKey           string          // community data generation read by this connection's compact indexes
 	workspaceSnapshot bool
 	storedWorkspace   bool
-	failFastLaunch    bool
+	tryWorkspaceSync  bool
 	// LaunchWait reports a launch waiting for the cross-process handoff lock.
 	LaunchWait      func(string)
 	launchDepth     int

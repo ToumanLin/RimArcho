@@ -277,8 +277,11 @@ func (s *API) planDone(p int64, text string, err error) (*PlanDone, error) {
 
 // NewPlan creates a plan (from "" empty, "current", "v<n>") and switches to it.
 func (s *API) NewPlan(name, from string) (*PlanDone, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	p, t, err := view.NewPlan(s.a, name, from)
 	if p == nil {
 		return s.planDone(0, t, err)
@@ -288,8 +291,11 @@ func (s *API) NewPlan(name, from string) (*PlanDone, error) {
 
 // ImportAsPlan makes the import being previewed a new plan and switches to it.
 func (s *API) ImportAsPlan(name string) (*PlanDone, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return s.importAsPlan(name)
 }
 

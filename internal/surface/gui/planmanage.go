@@ -192,10 +192,16 @@ func (s *API) PlanUnfollow(id int64, ws string) (string, error) {
 
 // PlanSync catches a list up with a collection: one undoable edit of that list.
 func (s *API) PlanSync(id int64, ws string) (string, error) {
+	r, err := s.detachedReader()
+	if err != nil {
+		return "", err
+	}
+	defer r.Close()
+	text, err := view.SyncPlan(r, id, ws)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.needs = nil
-	return s.text(view.SyncPlan(s.a, id, ws))
+	return s.text(text, err)
 }
 
 // PlanExport renders a list in a format for the export sub-page.
