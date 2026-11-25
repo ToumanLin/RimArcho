@@ -97,7 +97,7 @@ RimArcho 展示每个 Mod 更新了什么，不用再看着“正在更新 RimWo
 
 - 支持从 Steam 工坊、GitHub 和 LoversLab 链接直接添加 Mod，这些 Mod 有更新时跟着更新。
 - 贴图优化用 [todds](https://github.com/joseasoler/todds) 把 Mod 里的 PNG 转成 DDS，降低游戏内存占用。PNG 会保留，RimArcho 也能把 DDS 全部撤回。
-- 搜索所有 Mod 的文件；不用启动游戏就能改 Mod 设置。
+- 搜索所有 Mod 的文件；不用启动游戏就能改 Mod 配置。
 
 ## 存档
 
@@ -119,7 +119,7 @@ Archo Monitor 是 RimArcho 的游戏内辅助 Mod，随每个版本一起提供�
 
 **要配置它，只需要把这份 README 发给你的 AI agent**（Codex、Claude Code、Pi Agent、DeepSeek Harness……），它会按[安装](#安装)和[接入 agent](#接入-agentarcho-mcp)自己装好。
 
-MCP 服务内置 47 个工具，渐进式披露（默认提供 30 个）：读取 Mod、Def、补丁、Harmony 补丁、日志、Mod 设置、存档和 C# 源码；编辑、保存和启动列表；自动启动游戏的试运行。RimArcho 还提供 [RimWorld Probe 技能](skills/rimworld-probe/SKILL.md)，让 agent 创建小型测试 Mod，在游戏里运行，检查某个行为的实际结果。
+MCP 服务内置 47 个工具，渐进式披露（默认提供 30 个）：读取 Mod、Def、补丁、Harmony 补丁、日志、Mod 配置、存档和 C# 源码；编辑、保存和启动列表；自动启动游戏的试运行。RimArcho 还提供 [RimWorld Probe 技能](skills/rimworld-probe/SKILL.md)，让 agent 创建小型测试 Mod，在游戏里运行，检查某个行为的实际结果。
 
 **Archo MCP 排错实测。** 在 Pi Agent 中用 DeepSeek V4.1 Flash 做 A/B 测试。测试环境是真实的 RimWorld 1.6 和 35 个真实 Mod，注入 5 类常见故障。agent 要找出出问题的 Mod 并交上修复；修复后重启游戏，新增的报错全部消失才算通过。每道题每组跑 3 次，每次限时 15 分钟。
 
@@ -237,7 +237,7 @@ RimArcho 的设计原则是尊重你的文件。它会写入的全部内容，�
 
 - **`ModsConfig.xml`**，只在你保存或启动列表时写入。旧文件作为备份留在旁边，新文件原子替换。
 - **游戏 `Mods/` 文件夹里的链接**，名字以 `_Archo_` 开头，指向 SteamCMD、额外目录里的 Mod 和随附的 Archo Monitor。它只创建和删除带这个前缀的链接，从不写入链接目标。
-- **你要求的操作：** Mod 的锁定副本、PNG 旁边的 DDS 贴图、Mod 设置的值（先把文件复制为 `.rimarcho.bak`）、存档的重命名和复制。
+- **你要求的操作：** Mod 的锁定副本、PNG 旁边的 DDS 贴图、Mod 配置的值（先把文件复制为 `.rimarcho.bak`）、存档的重命名和复制。
 - **它自己的数据：** `%APPDATA%\RimArcho\`（数据库、列表历史、缓存）和托管目录 `%LOCALAPPDATA%\RimArcho\`（SteamCMD、工具、下载的 Mod），Linux 上是 XDG 目录。
 
 **它从不做什么**

@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Fewer repeats on screen. Mod library and Play review no longer repeat the Mod's name (and the copy's source) in the details heading. On Updates, the foot of the list says only how many sources were checked; the time of the last check is in its hover and in Update checks, so the left column shows one time (the last scan's). A waiting update's head no longer repeats installed → available, and a SteamCMD copy's install time shows once. In Chinese, Mod settings are now called `Mod 配置` (was `Mod 设置`, which read like RimArcho's own Settings).
 - Mod details no longer show the category row and its picker. The category glyph before each name and the category filter stay; `archo category` still sets one.
 - Give a Mod a custom name from its details or row menu (#23). A pencil marks aliased rows, and the original name stays visible in details and on hover. The list editor and Mod library also offer an Add note button and menu entry.
 - Launch opens while the last game log is analysed in the background. Logs over 64 MiB are analysed from both ends, with omitted bytes and repeated error counts in Game log, `archo log` and MCP `analyze_log`.

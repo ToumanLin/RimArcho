@@ -59,8 +59,12 @@ type RemovedSubscription struct {
 }
 
 // SourceSummary is the selectable Update checks row. Only real check failures count here.
+// Line counts the checked sources without the time: Update checks beside it shows each
+// source's own time, and the scope bar above shows the last scan's (16 §2.9). Title is the
+// line with the last check's time, the row's hover and accessible description.
 type SourceSummary struct {
 	Line     string `json:"line"`
+	Title    string `json:"title,omitempty"`
 	Failures int    `json:"failures,omitempty"`
 }
 
@@ -297,15 +301,20 @@ func sourceSummary(a *app.App, sources []SubscriptionSource, checks map[string]a
 	}
 	sum.Line = T("sources not checked yet")
 	if n == 1 {
-		sum.Line = Tf("checked 1 source, the last at %s", a.FormatTime(last))
+		sum.Line, sum.Title = T("checked 1 source"), Tf("checked 1 source, the last at %s", a.FormatTime(last))
 	} else if n > 1 {
-		sum.Line = Tf("checked %d sources, the last at %s", n, a.FormatTime(last))
+		sum.Line, sum.Title = Tf("checked %d sources", n), Tf("checked %d sources, the last at %s", n, a.FormatTime(last))
 	}
-	if sum.Failures == 1 {
-		sum.Line = Tf("%s, 1 check failed", sum.Line)
-	} else if sum.Failures > 1 {
-		sum.Line = Tf("%s, %d checks failed", sum.Line, sum.Failures)
+	failed := func(s string) string {
+		if s == "" || sum.Failures == 0 {
+			return s
+		}
+		if sum.Failures == 1 {
+			return Tf("%s, 1 check failed", s)
+		}
+		return Tf("%s, %d checks failed", s, sum.Failures)
 	}
+	sum.Line, sum.Title = failed(sum.Line), failed(sum.Title)
 	return sum
 }
 

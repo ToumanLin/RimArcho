@@ -534,7 +534,7 @@ function drawRightCards(x) {
   if (!x) { dbody.replaceChildren(); shown = ""; delete pwrap.dataset.mod; return; }
   const m = x.m, id = modId(m);
   pwrap.dataset.mod = id;
-  dinfo.append(el("span", "q word-facts", m.name));
+  // the Mod's name is the card's own head (detailFrame): not again in the area's (16 §2.11)
   if (m.library) {
     const go = el("button", "editor-full-link", T("show in the mod library"));
     go.type = "button";

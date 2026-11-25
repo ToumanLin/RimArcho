@@ -251,8 +251,8 @@ func TestSourceSummaryCountsListedSources(t *testing.T) {
 	if p, err = view.BuildSubscriptions(e.App, st, modchanges.Opts{}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(p.Summary.Line, "checked 1 source, ") {
-		t.Fatalf("listed source not counted: %q", p.Summary.Line)
+	if p.Summary.Line != "checked 1 source" || !strings.HasPrefix(p.Summary.Title, "checked 1 source, the last at ") {
+		t.Fatalf("listed source not counted: %+v", p.Summary)
 	}
 }
 

@@ -12,7 +12,7 @@ async function setup(overrides = {}) {
     return n;
   };
   const data = {
-    summary: { line: "checked 4 sources, the last at 10:42, 1 check failed", failures: 1 },
+    summary: { line: "checked 4 sources, 1 check failed", title: "checked 4 sources, the last at 10:42, 1 check failed", failures: 1 },
     sources: [
       { key: "workshop", name: "Steam Workshop", count: 2, checked: "10:42", result: "1 check failed", failures: [{ label: "timed out", items: ["Network Mod: timed out"] }] },
       { key: "steamcmd", name: "SteamCMD", count: 1, result: "everything is up to date", account: "not logged in" },
@@ -56,6 +56,9 @@ test("source summary is an arrow-selectable item with full detail and no inline 
   const h = await setup();
   h.key("End");
   assert.equal(h.row("sources").classList.contains("sel"), true);
+  // the row counts; the time is its hover, as Update checks shows each source's own (16 §2.9)
+  assert.equal(h.row("sources").textContent, "checked 4 sources, 1 check failed");
+  assert.equal(h.row("sources").title, "checked 4 sources, the last at 10:42, 1 check failed");
   const detail = h.screen.querySelector(".subs-detail");
   assert.equal(detail.querySelector("h2").textContent, "Update checks");
   assert.equal(detail.querySelectorAll(".subs-src").length, 5);
@@ -66,6 +69,15 @@ test("source summary is an arrow-selectable item with full detail and no inline 
   assert.deepEqual(h.calls, ["read"], "navigation must not check or reread a source");
   await detail.querySelectorAll(".subs-src")[0].querySelector("button").onclick();
   assert.deepEqual(h.calls, ["read", "workshop"]);
+});
+
+test("a waiting update names installed and available once, and a download time equal to the version once", async () => {
+  const h = await setup({ pending: [{ id: "cmd", ref: "#cmd", name: "CMD", kind: "steamcmd", source: "SteamCMD", installed: "2026-10-26 19:01", installedAt: "2026-10-26 19:01", available: "2026-11-16 18:49", inPlan: true }] });
+  h.row("p:#cmd").onclick();
+  const detail = h.screen.querySelector(".subs-detail");
+  assert.equal(detail.querySelector(".subs-dhead").textContent.includes("→"), false);
+  assert.equal(detail.textContent.split("2026-10-26 19:01").length - 1, 1);
+  assert.equal(detail.textContent.split("2026-11-16 18:49").length - 1, 1);
 });
 
 test("source checks stay reachable when history and pending lists are empty", async () => {
