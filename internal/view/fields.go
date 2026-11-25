@@ -39,9 +39,6 @@ const (
 	// FieldLinked is another manager's link that brings the Mod into the game (RimCrow
 	// `_Link_<id>`): not a copy, so a line of the Mod's details (04 §5, 16 §2.9)
 	FieldLinked = "linked"
-	// FieldCategory is the Mod's category (16 §2.5): Value its name, Extra why, List its key
-	// (and "player" when the player chose it); the window's picker sets the player's (Target)
-	FieldCategory = "category"
 )
 
 // Field acts: what the row's button does.
@@ -133,9 +130,6 @@ func headFields(st *app.LoadoutState, mod *store.Mod) []Field {
 // tailFields: settings files, languages, dependencies, conflicts.
 func tailFields(a *app.App, st *app.LoadoutState, mod *store.Mod, d *DetailData) []Field {
 	var fs []Field
-	if st != nil && mod.Status == identity.Live {
-		fs = append(fs, CategoryField(st.Ix.CategoryDetail(mod.ID), mod.ID))
-	}
 	if st != nil {
 		if n, ok := app.StoredSettingsOf(st, mod); ok {
 			fs = append(fs, Field{Kind: FieldSettings, Label: T("mod settings"), Value: Tf("%d stored values", n),

@@ -437,7 +437,6 @@
   "nothing to tell it by": "判断できる中身なし",
   "set by you; automatic: %s": "あなたが設定；自動判定：%s",
   "%s: automatic category": "%s：自動のカテゴリに戻した",
-  "set the category": "カテゴリを設定",
   "%d XML in Defs": "Defs に XML %d 個",
   "only patches: %d XML in Patches, no Defs or DLL": "パッチのみ：Patches に XML %d 個、Def と DLL なし"
 }

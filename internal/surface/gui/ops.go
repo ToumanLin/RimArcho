@@ -167,19 +167,6 @@ func (s *API) SetModNote(id, text string) (string, error) {
 	return s.text(view.SetModNote(s.a, "#"+id, text))
 }
 
-// SetCategory sets the player's category of a Mod (all its copies), or with "" gives it back
-// to the automatic one (16 §2.5).
-func (s *API) SetCategory(id, key string) (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	st := s.boardState()
-	if st == nil || st.Ix.ByID[id] == nil {
-		return "", errors.New("no mod " + id)
-	}
-	s.board, s.lib = nil, nil
-	return s.text(view.SetCategory(s.a, st.Ix.Ref(id), key))
-}
-
 // CompleteDependencies enables installed prerequisites and sorts the open plan.
 // Subscription remains a separate Subscribe call after choosing Steam or SteamCMD.
 func (s *API) CompleteDependencies() (*view.Result, error) {

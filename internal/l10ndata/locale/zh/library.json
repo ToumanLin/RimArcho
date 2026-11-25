@@ -437,7 +437,6 @@
   "nothing to tell it by": "没有可判断的内容",
   "set by you; automatic: %s": "你设的；自动判断：%s",
   "%s: automatic category": "%s：改回自动类别",
-  "set the category": "设置类别",
   "%d XML in Defs": "Defs 里 %d 个 XML",
   "only patches: %d XML in Patches, no Defs or DLL": "只有补丁：Patches 里 %d 个 XML，没有 Def 和 DLL"
 }
