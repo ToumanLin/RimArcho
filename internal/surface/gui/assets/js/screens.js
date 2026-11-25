@@ -21,6 +21,7 @@ import { wireSeparator } from "./separator.js";
 import { changes, changesKey, initSubscriptions } from "./subscriptions.js";
 import { setNeedRunner } from "./badgepop.js";
 import { initNeedText, needText, needParts, evidenceMark } from "./needtext.js";
+import { logCleanupButtons } from "./logcleanup.js";
 import { reportMark } from "./reportmark.js";
 import { getChoices } from "./credit.js";
 import { memBars, countBar, countMark, stepMeter, visTip, diskMeter } from "./membar.js";
@@ -1370,7 +1371,7 @@ export async function gameLog(path, open = false) {
     // the mods are being analysed for the log's game version: look again shortly
     L.pending = p.pending;
     L.loading = false;
-    L.page = { files: p.files, path: "" };
+    L.page = { files: p.files, path: p.path };
     L.path = p.path;
     drawGameLog();
     setTimeout(() => { if (current()) gameLog(p.path); }, 1500);
@@ -1431,6 +1432,12 @@ function drawGameLog() {
   if (files.length) bar.append(filePicker(files));
   if (p && p.facts && !L.loading) bar.append(el("span", "muted word-facts", p.facts));
   w.append(bar);
+  const oversized = files.find(f => f.path === p?.path && f.oversized);
+  if (oversized && !L.loading) w.append(logCleanupButtons(oversized, async () => {
+    await ui.reload();
+    gameLog(p.path);
+  }));
+  if (p?.notice && !L.loading) w.append(el("div", "log-size-notice muted", p.notice));
   if (L.error) { w.append(el("div", "card empty-state err", L.error)); return; }
   if (p && p.noMonitor && !L.loading) w.append(noMonitor(p));
   if (L.pending) { w.append(el("div", "card empty-state", Tf("the mods are analysed for %s first (once per game version)…", L.pending))); return; }
@@ -1450,7 +1457,7 @@ function drawGameLog() {
   L.els = [];
   if (L.tab === 1) monitorRows(scroll, mon);
   else {
-    if (!(p.rows || []).length) scroll.append(el("div", "empty-state", "✓ " + T("no errors in this log")));
+    if (!(p.rows || []).length) scroll.append(el("div", "empty-state", "✓ " + T(p.notice ? "no errors in the analysed sections" : "no errors in this log")));
     const rows = p.rows || [];
     const most = rows.reduce((m, r) => Math.max(m, r.count || 0), 0); // the ×count bars' scale (V4)
     L.cur = Math.min(L.cur, Math.max(0, rows.length - 1));
@@ -1465,7 +1472,9 @@ function drawGameLog() {
       const top = el("div", "top");
       const chip = el("span", "chip", r.class);
       if (r.code) chip.title = r.code;
-      top.append(chip, el("span", "count", "×" + r.count));
+      const count = el("span", "count", "×" + r.count);
+      if (r.count > 1) count.title = Tf("Repeated %d times", r.count);
+      top.append(chip, count);
       if (r.mods) top.append(el("span", "mods", r.mods));
       top.querySelector(".count")?.after(countMark(r.count, most));
       const message = logText(r);

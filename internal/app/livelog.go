@@ -1,10 +1,8 @@
 package app
 
 import (
-	"bufio"
 	"bytes"
 	"hash/maphash"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -47,12 +45,13 @@ type LiveCluster struct {
 
 // LiveLog follows one Player.log.
 type LiveLog struct {
-	Path      string
-	Companion string // the companion log followed: ArchoMonitor.log or RimCrow's ("" for none)
-	Version   string
-	Lines     int
-	Resets    int // times the file started over (the game restarted)
-	BadLines  int // companion lines that were not JSON
+	Path         string
+	Companion    string // the companion log followed: ArchoMonitor.log or RimCrow's ("" for none)
+	Version      string
+	Lines        int
+	Resets       int   // times the file started over (the game restarted)
+	BadLines     int   // companion lines that were not JSON
+	OmittedBytes int64 // backlog skipped to catch up to the running game
 
 	dataRoot string // automatic pairing for FollowRun
 	session  string
@@ -60,6 +59,7 @@ type LiveLog struct {
 
 	off      int64
 	pending  []byte
+	gap      bool
 	p        *logs.Parser
 	by       map[string]*LiveCluster
 	byMatch  map[string]bool         // normalised first lines of the clusters' entries
@@ -142,6 +142,7 @@ func (lv *LiveLog) follow(companion string) {
 
 func (lv *LiveLog) reset() {
 	lv.off, lv.pending, lv.Lines = 0, nil, 0
+	lv.OmittedBytes, lv.gap = 0, false
 	lv.p = logs.NewParser()
 	lv.by = map[string]*LiveCluster{}
 	lv.byMatch = map[string]bool{}
@@ -229,37 +230,79 @@ func (lv *LiveLog) Poll(a *App) ([]*LiveCluster, error) {
 	}
 	var fresh []*LiveCluster
 	if fi.Size() > lv.off {
-		f, err := os.Open(lv.Path)
+		fresh, err = lv.readPlayer(fresh, fi.Size())
 		if err != nil {
 			return nil, err
 		}
-		n := min(fi.Size()-lv.off, liveMaxRead)
-		buf := make([]byte, n)
-		_, err = f.ReadAt(buf, lv.off)
-		f.Close()
-		if err != nil && err != io.EOF {
-			return nil, err
-		}
-		lv.off += n
-		lv.pending = append(lv.pending, buf...)
-		if i := bytes.LastIndexByte(lv.pending, '\n'); i >= 0 {
-			sc := bufio.NewScanner(bytes.NewReader(lv.pending[:i+1]))
-			sc.Buffer(make([]byte, 64<<10), 64<<20)
-			for sc.Scan() {
-				l := sc.Text()
-				if strings.Contains(l, "[Archo Monitor]") {
-					lv.marker(l)
-				}
-				lv.p.Line(l)
-			}
-			lv.pending = append([]byte(nil), lv.pending[i+1:]...)
-		}
-		fresh = lv.take(false)
 	}
 	lv.behind = fi.Size() > lv.off
 	lv.Lines, lv.Version = lv.p.F.Lines, lv.p.F.Version
 	fresh = append(fresh, lv.companionOnly(false)...)
 	return fresh, lv.finish(a, fresh)
+}
+
+func (lv *LiveLog) readPlayer(fresh []*LiveCluster, size int64) ([]*LiveCluster, error) {
+	f, err := os.Open(lv.Path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	if size-lv.off > LogSizeLimit {
+		s, err := logSections(f, size)
+		if err != nil {
+			return nil, err
+		}
+		if lv.off < s.headEnd {
+			if err := lv.readTo(f, s.headEnd); err != nil {
+				return nil, err
+			}
+		}
+		lv.p.Gap()
+		fresh = append(fresh, lv.take(true)...)
+		lv.OmittedBytes += s.tailStart - lv.off
+		lv.off, lv.pending, lv.gap = s.tailStart, nil, true
+	}
+	if err := lv.readTo(f, min(size, lv.off+liveMaxRead)); err != nil {
+		return nil, err
+	}
+	return append(fresh, lv.take(false)...), nil
+}
+
+func (lv *LiveLog) readTo(f *os.File, end int64) error {
+	if end == lv.off {
+		return nil
+	}
+	buf := make([]byte, end-lv.off)
+	if _, err := f.ReadAt(buf, lv.off); err != nil {
+		return err
+	}
+	for len(buf) > 0 {
+		line, rest, complete := bytes.Cut(buf, []byte{'\n'})
+		if room := 4096 - len(lv.pending); room > 0 {
+			lv.pending = append(lv.pending, line[:min(len(line), room)]...)
+		}
+		if !complete {
+			break
+		}
+		lv.feedLine()
+		buf = rest
+	}
+	lv.off = end
+	return nil
+}
+
+func (lv *LiveLog) feedLine() {
+	line := string(lv.pending)
+	lv.pending = lv.pending[:0]
+	if lv.gap && logs.Continuation(line) {
+		lv.p.F.Lines++
+		return
+	}
+	lv.gap = false
+	if strings.Contains(line, "[Archo Monitor]") {
+		lv.marker(line)
+	}
+	lv.p.Line(line)
 }
 
 // Close ends the log (the game exited): the last entry is complete.
@@ -268,7 +311,7 @@ func (lv *LiveLog) Close(a *App) ([]*LiveCluster, error) {
 		return nil, nil
 	}
 	if len(lv.pending) > 0 {
-		lv.p.Line(string(lv.pending))
+		lv.feedLine()
 		lv.pending = nil
 	}
 	lv.p.Close()

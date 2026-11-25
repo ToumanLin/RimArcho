@@ -180,7 +180,7 @@ func HiddenArgv(in HiddenIn) []string {
 	return unknown("manage_hidden", in.Action)
 }
 
-// MaintenanceArgv maps maintenance to the data management commands.
+// MaintenanceArgv maps maintenance to the data and log management commands.
 func MaintenanceArgv(in MaintenanceIn) []string {
 	switch in.Action {
 	case "data_update":
@@ -190,6 +190,9 @@ func MaintenanceArgv(in MaintenanceIn) []string {
 			flag("include-disabled-rules", in.IncludeDisabledRules).flag("all", in.All).a
 	case "import_rimstack":
 		return argv("import", "rimstack").str("dir", in.Dir).flag("dry-run", in.DryRun).flag("all", in.All).a
+	case "trim_log", "delete_log":
+		return argv("log").flag("trim", in.Action == "trim_log").flag("delete", in.Action == "delete_log").
+			flag("prev", in.Prev).flag("dry-run", in.DryRun).flag("yes", in.Confirm && !in.DryRun).str("token", in.Token).a
 	case "gc":
 		return argv("gc").flag("dry-run", in.DryRun).a
 	case "vacuum":
@@ -263,7 +266,7 @@ type HiddenIn struct {
 
 type MaintenanceIn struct {
 	Env                  string  `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
-	Action               string  `json:"action" jsonschema:"data_update, import_rimcrow, import_rimstack, vacuum or gc"`
+	Action               string  `json:"action" jsonschema:"data_update, import_rimcrow, import_rimstack, vacuum, gc, trim_log or delete_log"`
 	Datasets             StrList `json:"datasets,omitempty" jsonschema:"data_update: rules, steamdb, replacements (default: all)"`
 	DB                   string  `json:"db,omitempty" jsonschema:"import_rimcrow: RimCrow's data\\mod_manager.db"`
 	Rules                string  `json:"rules,omitempty" jsonschema:"import_rimcrow: RimCrow's user_rules.json (default: next to the database)"`
@@ -271,4 +274,7 @@ type MaintenanceIn struct {
 	Dir                  string  `json:"dir,omitempty" jsonschema:"import_rimstack: RimStack's data folder (default: where RimStack keeps it)"`
 	All                  bool    `json:"all,omitempty" jsonschema:"import_rimcrow, import_rimstack: no truncation"`
 	DryRun               bool    `json:"dry_run,omitempty" jsonschema:"report what would happen, change nothing"`
+	Prev                 bool    `json:"prev,omitempty"`
+	Confirm              bool    `json:"confirm,omitempty"`
+	Token                string  `json:"token,omitempty"`
 }

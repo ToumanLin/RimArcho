@@ -109,6 +109,7 @@ type Entry struct {
 	// unityCaller: a Unity "Type:Method (args)" stack began with StackTraceUtility:ExtractStackTrace,
 	// so its frames are the logging call's stack, not the exception's.
 	unityCaller bool
+	count       int // extra occurrences represented by this sample
 }
 
 // File is a parsed log.
@@ -117,11 +118,13 @@ type File struct {
 	Phases    []*Phase `json:",omitempty"`
 	// GameMarks: the game's own new-game and save-load lines (GameMark), kept apart from
 	// the Monitor's phases; only test runs read them (20 §2).
-	GameMarks []*Phase `json:",omitempty"`
-	Entries   []*Entry
-	Lines     int
-	Version   string // "1.6.4871 rev…" from the header, if found
-	Waylith   bool   // the 1.7 log format
+	GameMarks    []*Phase `json:",omitempty"`
+	Entries      []*Entry
+	Lines        int
+	Version      string // "1.6.4871 rev…" from the header, if found
+	OmittedBytes int64  // bytes missing between the head and tail
+	Trimmed      bool   // the file contains a RimArcho trim marker
+	Waylith      bool   // the 1.7 log format
 }
 
 var (
@@ -226,6 +229,7 @@ type Parser struct {
 	phase        *Phase
 	F            *File
 	cur          *Entry
+	compact      map[entrySampleKey]entrySamples
 	afterSubnode bool
 	orig         map[string]*Entry // [Ref X] originals, for duplicates that follow them
 	// An XML Extensions error block: "[Mod - Start of stack trace]", the failure lines,
@@ -287,6 +291,9 @@ func (p *Parser) finish() {
 			e.Frames = o.Frames
 		}
 	}
+	if p.compact != nil {
+		p.keepSample(e)
+	}
 }
 
 // Line feeds one line (without its newline).
@@ -336,6 +343,7 @@ func (p *Parser) Line(l string) {
 		}
 		p.cur = next
 		if next != nil && next.Line == n {
+			p.addEntry(next)
 			next.Phase = p.phase
 			if m := xmlExtStartRe.FindStringSubmatch(next.Message); m != nil {
 				p.xname = m[1]
@@ -374,7 +382,7 @@ func (p *Parser) Line(l string) {
 	if m := xmlExtStartRe.FindStringSubmatch(l); m != nil {
 		p.finish()
 		p.cur = &Entry{Line: n, Message: "[" + m[1] + "]", Phase: p.phase}
-		f.Entries = append(f.Entries, p.cur)
+		p.addEntry(p.cur)
 		p.xname = m[1]
 		return
 	}
@@ -393,7 +401,7 @@ func (p *Parser) Line(l string) {
 	}
 	p.finish()
 	p.cur = &Entry{Line: n, Message: l, Phase: p.phase}
-	f.Entries = append(f.Entries, p.cur)
+	p.addEntry(p.cur)
 }
 
 // waylithXMLBlock takes a line of an XML Extensions block in a 1.7 log: the message is
@@ -454,7 +462,6 @@ func (p *Parser) marker(msg, line string, n int) bool {
 func waylithLine(f *File, cur *Entry, n int, l string) *Entry {
 	if m := waylithLineRe.FindStringSubmatch(l); m != nil {
 		e := &Entry{Line: n, Message: m[2], Level: m[1]}
-		f.Entries = append(f.Entries, e)
 		return e
 	}
 	if cur == nil {

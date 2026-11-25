@@ -83,7 +83,7 @@ const descIdentity = `RimArcho's identity of mods: answer open questions (is thi
 
 const descHidden = `Mods another manager hid (About.xml renamed to About.xml.disabled): unhide renames it back; trash moves a hidden or unsubscribed Workshop folder to the recycle bin. Changes mod folders: dry_run=true first and ask.`
 
-const descMaintenance = `RimArcho's own data: data_update (downloads community data), import_rimcrow, import_rimstack, vacuum (compacts the database), gc (drops expired records and their history). dry_run=true first, show the player, then ask.`
+const descMaintenance = `Manage data or oversized game logs. Actions are data_update, import_rimcrow, import_rimstack, vacuum, gc, trim_log and delete_log. Show the dry run and ask the player first. Log changes need confirm=true and the preview token.`
 
 const descCheckLinks = `Read fresh health and ownership evidence of RimArcho's links in Mods/ for the selected game, or every known game (JSON). Changes no files.`
 

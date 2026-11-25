@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ToumanLin/RimArcho/internal/analyze"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/finding"
 	"github.com/ToumanLin/RimArcho/internal/gametest"
@@ -561,7 +560,7 @@ func (a *App) testRunLog(st *LoadoutState, r *TestRunReport) error {
 	prevMM := a.Store.MM
 	defer func() { a.Store.MM = prevMM }()
 	a.Store.MM = copy.GameMM()
-	fails, err := analyze.ParseLogFailures(r.LogPath)
+	fails, err := readLogFailures(r.LogPath, fi.Size())
 	if err != nil {
 		return err
 	}

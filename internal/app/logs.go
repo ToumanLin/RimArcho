@@ -82,12 +82,14 @@ type LogReport struct {
 	Phases    []*logs.Phase `json:",omitempty"`
 	// GameMarks: the game's own new-game and save-load lines (logs.GameMark); test runs
 	// place clusters without Monitor phases by them (20 §2).
-	GameMarks []*logs.Phase `json:",omitempty"`
-	Path      string
-	Label     string // "Player.log", "Player-prev.log" or "<text>"
-	ModTime   time.Time
-	Lines     int
-	Version   string
+	GameMarks    []*logs.Phase `json:",omitempty"`
+	Path         string
+	Label        string // "Player.log", "Player-prev.log" or "<text>"
+	ModTime      time.Time
+	Lines        int
+	OmittedBytes int64 `json:",omitempty"`
+	Trimmed      bool  `json:",omitempty"`
+	Version      string
 	// AnalysedAs is the major.minor the log was attributed against when it differs from
 	// the environment's (EnvMM): the log's own version (06 §4).
 	AnalysedAs, EnvMM string
@@ -249,7 +251,8 @@ var ErrLogNotCached = errors.New("log not analysed yet")
 // 22: audio and other asset paths in stable finding keys and attribution on both platforms.
 // 23: isolated log ownership ignores later redirected sibling and pack launches.
 // 24: 1.7 caller frames that name a source file ("[0x6] in <file>:<line>") (06 §1).
-const logCacheVersion = 24
+// 25: bounded windows and compact repeated entries (06 §1).
+const logCacheVersion = 25
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -271,6 +274,12 @@ func (a *App) analyzeLog(path string, cacheOnly bool) (*LogReport, error) {
 	}
 	if err := a.CheckLogOwner(st, path); err != nil {
 		return nil, err
+	}
+	if cacheOnly {
+		size, mtime, ok := a.Store.LogCacheStamp(path)
+		if !ok || size != fi.Size() || mtime != fi.ModTime().UnixNano() {
+			return nil, ErrLogNotCached
+		}
 	}
 	compPath := CompanionFor(path)
 	key := fmt.Sprintf("%s|%d|%d|%s|%s|%s", path, fi.Size(), fi.ModTime().UnixNano(), a.Store.ChangeKey(), a.GameVersion, companionKey(compPath))
@@ -315,8 +324,8 @@ func (a *App) analyzeLog(path string, cacheOnly bool) (*LogReport, error) {
 			return nil, err
 		}
 	}
-	rep.Lines = lf.Lines
-	fails, _ := analyze.ParseLogFailures(path)
+	rep.Lines, rep.OmittedBytes, rep.Trimmed = lf.Lines, lf.OmittedBytes, lf.Trimmed
+	fails, _ := readLogFailures(path, mark.size)
 	var comp *logs.Companion
 	cur := LogCursor{Size: mark.size, Sum: mark.sum}
 	if compPath != "" {
@@ -1660,7 +1669,9 @@ type LogRun struct {
 	UnknownGame string `json:",omitempty"`
 	// Pending: a cache-only problem list (status, mod) found no stored report; the log's
 	// problems are not in the list until a log or problems command analyses it.
-	Pending bool
+	Pending      bool
+	OmittedBytes int64 `json:",omitempty"`
+	Trimmed      bool  `json:",omitempty"`
 }
 
 // Stale reports whether the log's problems describe another run or an earlier state. A log
@@ -1713,6 +1724,7 @@ func (a *App) logFindings(st *LoadoutState) ([]*finding.Finding, map[string]hotM
 		return nil, nil, r
 	}
 	run := a.logRun(st, path, rep.Version, rep.ModTime)
+	run.OmittedBytes, run.Trimmed = rep.OmittedBytes, rep.Trimmed
 	if rep.HasPhases {
 		run.Phases = map[string][]logs.PhaseCount{}
 		run.Marks = rep.Phases

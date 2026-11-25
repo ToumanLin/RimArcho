@@ -15,6 +15,7 @@ import { openScreen, page, changesPlan, beginPageRead } from "./screens.js";
 import { launchPack } from "./packs.js";
 import { withEnvironmentSwitch } from "./environment.js";
 import { places, slideFrom } from "./motion.js";
+import { logCleanupButtons } from "./logcleanup.js";
 import { memoryConfirm } from "./popups.js";
 import { goSelfUpdate } from "./selfupdate.js";
 
@@ -155,6 +156,12 @@ async function readHome({ keep = false, all = false } = {}) {
   drawnSig = sig;
   read.finish();
   refreshHomeMemory(next);
+  if (next.checkLastRun) {
+    const env = S.envSeq;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (S.screen === "home" && S.envSeq === env) ui.readNewLog();
+    }));
+  }
 }
 
 // retryHome reads the page again after 1, 2, 4, 8 s, then every 10 s, for about a minute
@@ -654,15 +661,28 @@ function showSwitch(r) {
 function activity() {
   const box = el("div", "hm-act");
   const live = running();
-  if (live || data.lastRun || data.missingLog) {
-    // another Game Config's game: its owner, without this run's errors (they are not ours)
-    const errs = (n) => n === 1 ? T("1 error") : Tf("%d errors", n);
-    const runText = live && S.live.blocked ? S.live.blocked
-      : live ? (S.live.owner || T("the game is running")) + "  " + (S.live.errors ? errs(S.live.errors) : T("no errors yet"))
-      : data.missingLog || (data.lastRunDay || data.lastRun) + "  " + (data.lastRunErrors ? errs(data.lastRunErrors) : data.lastRunPending ? T("not checked yet") : T("no errors"));
-    // the game crashed or errored: the log, at its first error, answers what happened; Can it
-    // run is about the next launch (16 §2.3)
-    box.append(actLine(T("last game"), runText, () => ui.go("log")));
+  const showRun = live || data.lastRun || data.missingLog;
+  const errs = n => n === 1 ? T("1 error") : Tf("%d errors", n);
+  const count = data.lastRunNotice
+    ? Tf("%d errors in the analysed sections", data.lastRunErrors)
+    : data.lastRunErrors ? errs(data.lastRunErrors) : T("no errors");
+  const runText = live && S.live.blocked ? S.live.blocked
+    : live ? (S.live.owner || T("the game is running")) + "  " + (S.live.errors ? errs(S.live.errors) : T("no errors yet"))
+    : data.missingLog || (data.lastRunDay || data.lastRun || "") + "  " +
+      (data.lastRunPending ? T("reading the log…") : count);
+  const last = actLine(T("last game"), runText + (live && S.live.logNotice ? "  " + S.live.logNotice : ""), () => ui.go("log"));
+  last.classList.add("hm-last-run");
+  if (!live && data.lastRunNotice) last.title += "\n" + data.lastRunNotice;
+  if (!showRun) {
+    last.disabled = true;
+    last.setAttribute("aria-hidden", "true");
+  }
+  box.append(last);
+  for (const file of data.oversizedLogs || []) {
+    box.append(logCleanupButtons(file, async () => {
+      await ui.reload();
+      home({ keep: true });
+    }));
   }
   // "nothing changed" tells nothing: the line shows only with changes or before a scan
   const c = data.changes;

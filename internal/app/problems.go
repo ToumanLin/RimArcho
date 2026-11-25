@@ -130,7 +130,7 @@ func (a *App) problems(ensure bool, progress func(string)) (*ProblemSet, error) 
 		return &c, nil
 	}
 	defer func() {
-		if key != "" && ps.AnalysisErr == nil && ps.State != nil {
+		if key != "" && ps.AnalysisErr == nil && ps.State != nil && !hasPendingLog(ps) {
 			a.prCache, a.prKey = ps, key
 		}
 	}()
@@ -228,13 +228,23 @@ func (a *App) PlanProblems(p *store.Plan) (*ProblemSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	if key != "" {
+	if key != "" && !hasPendingLog(ps) {
 		if a.planPS == nil {
 			a.planPS = map[int64]*planProblems{}
 		}
 		a.planPS[st.Plan.ID] = &planProblems{key: key, ps: ps}
 	}
 	return ps, nil
+}
+
+// A background reader can publish a report without changing the file or workspace stamp.
+func hasPendingLog(ps *ProblemSet) bool {
+	for _, run := range ps.Logs {
+		if run.Pending {
+			return true
+		}
+	}
+	return false
 }
 
 // collectProblems fills ps for ps.State with ps.Analysis set: the declaration layer, the

@@ -14,11 +14,12 @@ const GroupThisRun = 6
 
 // Live is the running game as the interfaces show it.
 type Live struct {
-	Running bool   `json:"running"`
-	Owner   string `json:"owner,omitempty"`
-	Since   string `json:"since,omitempty"` // HH:MM
-	Errors  int    `json:"errors"`
-	Items   []Need `json:"items"`
+	Running   bool   `json:"running"`
+	Owner     string `json:"owner,omitempty"`
+	Since     string `json:"since,omitempty"` // HH:MM
+	Errors    int    `json:"errors"`
+	LogNotice string `json:"logNotice,omitempty"`
+	Items     []Need `json:"items"`
 	// Pack is the pack the game plays ("" for the environment's list); Guess: taken from
 	// the launch records because the game's command line could not be read.
 	Pack  string `json:"pack,omitempty"`
@@ -88,6 +89,9 @@ func (t *LiveTracker) Update(a *app.App, st *app.LoadoutState) (*Live, error) {
 	l := &Live{Running: true, Owner: runningOwner(g), Since: run.Started.In(a.Loc).Format("15:04"), Pack: t.what.Pack, Guess: t.what.Guess}
 	l.Items = LiveNeeds(st, t.lv.Clusters())
 	l.Errors = len(l.Items)
+	if t.lv.OmittedBytes > 0 {
+		l.LogNotice = Tf("Skipped %s of the log to catch up.", SizeText(t.lv.OmittedBytes))
+	}
 	return l, nil
 }
 

@@ -2,6 +2,7 @@ package analyze
 
 import (
 	"bufio"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -26,9 +27,21 @@ func ParseLogFailures(path string) ([]LogFailure, error) {
 		return nil, err
 	}
 	defer f.Close()
-	sc := bufio.NewScanner(f)
+	return ReadLogFailures(f)
+}
+
+// ReadLogFailures extracts failures from one contiguous section of a log.
+func ReadLogFailures(r io.Reader) ([]LogFailure, error) {
+	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 1<<20), 1<<24)
 	var out []LogFailure
+	seen := make(map[LogFailure]bool)
+	keep := func(f LogFailure) {
+		if !seen[f] {
+			out = append(out, f)
+			seen[f] = true
+		}
+	}
 	var cur *LogFailure
 	var desc strings.Builder
 	for sc.Scan() {
@@ -45,7 +58,7 @@ func ParseLogFailures(path string) ([]LogFailure, error) {
 			if strings.HasPrefix(line, "file: ") {
 				cur.File = strings.TrimPrefix(line, "file: ")
 			}
-			out = append(out, *cur)
+			keep(*cur)
 			cur = nil
 			if strings.HasPrefix(line, "file: ") {
 				continue
@@ -61,7 +74,7 @@ func ParseLogFailures(path string) ([]LogFailure, error) {
 		}
 	}
 	if cur != nil {
-		out = append(out, *cur)
+		keep(*cur)
 	}
 	return out, sc.Err()
 }

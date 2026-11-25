@@ -10,6 +10,7 @@ const part = (start, end) => js.slice(js.indexOf(start), js.indexOf(end, js.inde
 function el(tag, cls = '', text = '') {
   const node = { tag, className: cls, textContent: text, children: [], dataset: {},
     append(...children) { this.children.push(...children); }, prepend(...children) { this.children.unshift(...children); } };
+  node.classList = { add: (name) => { node.className += ' ' + name; } };
   return node;
 }
 const all = (node) => [node, ...node.children.flatMap(all)];

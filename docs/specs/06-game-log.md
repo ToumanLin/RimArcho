@@ -9,6 +9,8 @@ This document describes how RimArcho reads RimWorld's `Player.log`: parsing and 
 
 Log locations and explicit redirection are defined in 03 §3.3 and §6.3; file selection is in §4.
 
+**File coverage.** Analyse a file of up to 64 MiB in full. Above that limit, `app.logSections` retains up to 4 MiB at each end, aligning the inner edges at newlines. The beginning captures Mod loading and the end captures recent errors and crashes. Patch-failure evidence uses the same windows. Reports give the omitted byte count and the number of lines analysed. Line numbers for a sampled file count the retained lines. A gap ends the current entry and clears the phase until the next marker. Exact repeated entries keep the first five samples per phase and count all observed occurrences, with the same attribution and clustering rules. Counts describe observed entries plus companion evidence (§7).
+
 **A log uploaded by HugsLib** starts with HugsLib's own header: `Log uploaded on …` on the first line, the Mod list, the active Harmony patches, the Harmony versions, then `Log file contents:` and the game's log (2,061 header lines at the median in the corpus, where every log is such an upload). Skip the header; the game's log starts after `Log file contents:`, or at a `RimWorld X.Y.Z revN` or `=== Waylith log ===` line when an upload cut short lacks it. Line numbers stay those of the file.
 
 **Two formats** are supported:
@@ -146,13 +148,17 @@ A matching installation startup header does not identify a sibling environment. 
 
 **Heading**. Show one heading per log with the filename, declared game version, write time, current or stale status with a reason (for example `written by 1.6, the game is 1.7`), and severity counts. Add `not counted` and an expand command for a stale log (CLI and MCP forms: `archo problems --code log --all; MCP: list_problems code=log`). List its clusters below the heading.
 
+### 4.1 Oversized log cleanup
+
+The player can trim or permanently delete a regular `Player.log` or `Player-prev.log` above the §1 limit in the selected environment. See 16 §2.3 and §2.10 for the controls, 13 §4.2 for CLI and 14 §2 for MCP. A preview gives the path and current size. A trim also gives the size of the omitted middle and the resulting file. Both changes are irreversible and require confirmation bound to the previewed file and action. Recheck the file and refuse while any game runs. Trimming copies the two §1 windows to a temporary sibling, inserts one omission marker between them, preserves the write time, and replaces the original by rename. Subsequent reports recognise the marker and give the original omitted size. The action only changes the confirmed Player log.
+
 ## 5. Caching
 
 - Parsing and clustering are fast; referrer searches take most of the time. Cache the **whole attribution report**, with one `log_cache` row per path and a copy in memory.
 - The key combines the path, size, mtime, and an input fingerprint: `logCacheVersion`, `--game-version`, game major.minor version, analysis run, enabled list, and each installed Mod's ID, snapshot, name, alias, `packageId`, and directory. Reparse if any of these changes.
 - The status and mod commands (MCP status and `get_mod`) read only the cache and never parse the log. A missing cache marks the log Pending; status explains that its errors are not counted.
 - Store the report as gzip-compressed JSON: reports are often larger than the log itself (a 4 MB `Player.log` gives about 9 MB), and compression shrinks them about twentyfold. If a cached report cannot be decompressed, treat it as a cache miss and reparse.
-- The report covers only the file size at read time, since the game may still append to it. Record the CRC-32C of those bytes for the cursor (§6).
+- The report covers only the file size at read time, since the game may still append to it. Record a CRC-32C for the cursor (§6).
 
 **The first query for a new log** has a target of ≤500 ms on a cache miss (measured: 18 §2):
 
@@ -165,12 +171,12 @@ A matching installation startup header does not identify a sibling environment. 
 
 See 09 §4 for game detection. While the game runs:
 
-- **Incremental read** (`app.LiveLog`): remember the `Player.log` path and read offset. Check each second and read up to 8 MiB, leaving the remainder for the next read. A smaller file means a new file (a game restart): reset the offset and clear the old clusters. Split new content into lines and keep an incomplete last line until the next read.
+- **Incremental read** (`app.LiveLog`): remember the `Player.log` path and read offset. Check each second and read up to 8 MiB, leaving the remainder for the next read. A smaller file resets the offset and clears the old clusters. If the reader falls more than 64 MiB behind, read any remaining part of the head window, skip to the tail window, and report the omitted bytes. Keep up to 4 KiB of an incomplete line until the next read.
 - Preserve parser state across batches. An entry ends at the next noncontinuation line or at game exit (`logs.Parser`).
 - Preserve phase markers across batches too (§7). If an old cluster repeats in another phase, update that phase's count and the this-run entry without requiring a new cluster. The first marker assigns preceding entries to loading. Without any markers, keep the flat entries.
 - **Memory**: keep clusters, not the raw log. Keep the first 3 sample entries and the count per cluster. Above 2000 clusters, discard the oldest informational clusters. Memoize the category by message, location frame, and continuations, so repeated messages are classified once; clear the table at 10000 entries.
 - Fully attribute the first sample of each new cluster (§2). Show the result in the this-run part of errors from the last run on Can it run, in first-appearance order (16 §2.4). Update counts without dialogs. Show the game-running status and this run's error count on the GUI Launch page and the TUI status line.
-- On exit, stop tracking and perform a full analysis, as with `archo log`. Replace the this-run section with the result.
+- On exit, stop tracking and analyse the log using §1, as with `archo log`. Replace the this-run section with the result.
 
 **Companion logs** (Archo Monitor's `ArchoMonitor.log` or RimCrow's `RimCrow_Realtime.log`, §7) are read incrementally alongside `Player.log` to add timestamps, levels, counts, files, and related `Mods`.
 
@@ -178,9 +184,10 @@ See 09 §4 for game detection. While the game runs:
 
 **The since cursor** supports agent polling (MCP `analyze_log` since, CLI `archo log --since`):
 
-- The cluster lists include `cursor: log1.<size>.<checksum>[.<companion-size>.<checksum>]`: the number of bytes read from `Player.log` and its paired companion (§7), in base 36, plus their CRC-32C checksums. The cursor stores no state on disk. The CLI and MCP results are identical.
-- With since, analyze the current log normally, using the cache if possible. Recluster the first size bytes without attribution to obtain the counts at the cursor. Show only new clusters (new) and clusters with increased counts (`+N`), with the added and total counts in the heading and a new cursor. Also read the companion prefix, so companion-only entries after the game stops writing `Player.log` and increased companion counts are included. A changed companion session means nothing was known about it at the cursor.
+- The cluster lists include `cursor: log1.<size>.<checksum>[.<companion-size>.<checksum>]`: the snapshot size of `Player.log` and the bytes read from its companion (§7), in base 36, plus CRC-32C checksums. Up to the §1 limit the Player checksum covers the full prefix and is compatible with existing cursors. For an oversized prefix, checksum the head and tail in order. The cursor stores no state on disk. The CLI and MCP results are identical.
+- With since, analyze the current log normally, using the cache if possible. Recluster the retained windows of the first size bytes without attribution to obtain the counts at the cursor. Show only new clusters (new) and clusters with increased counts (`+N`), with the added and total counts in the heading and a new cursor. Also read the companion prefix, so companion-only entries after the game stops writing `Player.log` and increased companion counts are included. A changed companion session means nothing was known about it at the cursor.
 - **Expiry**: if the prefix is shorter or its checksum differs, the game has restarted and written a new log. State that the cursor expired and list all current clusters. If the current `Player.log` does not match but the `Player-prev.log` prefix does, explain that the cursor's run is now `Player-prev.log` and suggest `archo log --prev --since <cursor>` (MCP `prev=true`). If the previous log itself does not match, explain that a newer run replaced it after another restart.
+- A growing sampled log moves the tail window, so the report lists the current clusters with a coverage-change notice. A legacy cursor that checksummed all bytes of an oversized file expires. A trimmed file likewise requires a fresh report when compared with a cursor for a different size.
 - The last line at the cursor may have been half-written. Count the entry as new when it is completed, preferring an extra report to an omission.
 - This polls full analysis, not `LiveLog`: analyze the file size at each call. See §5 for first-query speed.
 

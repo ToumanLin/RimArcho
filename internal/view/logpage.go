@@ -18,10 +18,11 @@ import (
 // set: the Player.log it belongs to, listed right before it; it shows as that log's
 // companion section.
 type LogFile struct {
-	Label string `json:"label"` // "Player.log" / "Player-prev.log" / "ArchoMonitor.log"
-	Path  string `json:"path"`
-	When  string `json:"when"`
-	Of    string `json:"of,omitempty"`
+	Label     string `json:"label"` // "Player.log" / "Player-prev.log" / "ArchoMonitor.log"
+	Path      string `json:"path"`
+	When      string `json:"when"`
+	Of        string `json:"of,omitempty"`
+	Oversized string `json:"oversized,omitempty"`
 }
 
 // LogRow is one cluster.
@@ -48,6 +49,7 @@ type LogRow struct {
 type LogPage struct {
 	Files    []LogFile `json:"files"`
 	Path     string    `json:"path"`
+	Notice   string    `json:"notice,omitempty"`
 	Facts    string    `json:"facts"` // "1.6.4633  12 840 lines"
 	Rows     []LogRow  `json:"rows"`
 	Selected bool      `json:"selected"` // its errors are in Can it run
@@ -71,23 +73,61 @@ type LogPage struct {
 // companion log when it has one (06 §7).
 func LogFiles(a *app.App, st *app.LoadoutState) []LogFile {
 	var out []LogFile
-	cur, prev := a.LogPaths(st)
-	when := func(p string) string {
-		if fi, err := os.Stat(p); err == nil {
-			return ShortDate(fi.ModTime()) + " " + fi.ModTime().In(a.Loc).Format("15:04")
+	for _, row := range playerLogFiles(a, st) {
+		out = append(out, row)
+		if c := companionOf(row.Path); c != "" {
+			comp := LogFile{Label: filepath.Base(c), Path: c, Of: row.Path}
+			if fi, err := os.Stat(c); err == nil {
+				comp.When = logFileDate(a, fi)
+			}
+			out = append(out, comp)
 		}
-		return ""
 	}
+	return out
+}
+
+func logFileDate(a *app.App, fi os.FileInfo) string {
+	return ShortDate(fi.ModTime()) + " " + fi.ModTime().In(a.Loc).Format("15:04")
+}
+
+func playerLogFiles(a *app.App, st *app.LoadoutState) []LogFile {
+	cur, prev := a.LogPaths(st)
+	var out []LogFile
 	for i, p := range []string{cur, prev} {
 		if p == "" {
 			continue
 		}
-		out = append(out, LogFile{Label: []string{"Player.log", "Player-prev.log"}[i], Path: p, When: when(p)})
-		if c := companionOf(p); c != "" {
-			out = append(out, LogFile{Label: filepath.Base(c), Path: c, When: when(c), Of: p})
+		row := LogFile{Label: []string{"Player.log", "Player-prev.log"}[i], Path: p}
+		if fi, err := os.Lstat(p); err == nil {
+			row.When = logFileDate(a, fi)
+			if fi.Mode().IsRegular() && fi.Size() > app.LogSizeLimit {
+				row.Oversized = SizeText(fi.Size())
+			}
+		}
+		out = append(out, row)
+	}
+	return out
+}
+
+// OversizedLogs returns the Player logs eligible for a cleanup preview.
+func OversizedLogs(a *app.App, st *app.LoadoutState) []LogFile {
+	var out []LogFile
+	for _, f := range playerLogFiles(a, st) {
+		if f.Oversized != "" {
+			out = append(out, f)
 		}
 	}
 	return out
+}
+
+func logCoverage(omitted int64, trimmed bool) string {
+	if omitted <= 0 {
+		return ""
+	}
+	if trimmed {
+		return Tf("Analysed the retained beginning and end (%s omitted during trimming).", SizeText(omitted))
+	}
+	return Tf("Log too large. Analysed the beginning and end (%s omitted).", SizeText(omitted))
 }
 
 // Companion files can appear or rotate while Player.log stays unchanged.
@@ -142,11 +182,16 @@ func BuildLogPage(a *app.App, st *app.LoadoutState, path string, live *LiveTrack
 		facts = append(facts, r.Version)
 	}
 	// the file picker beside it already says when the log was written
-	facts = append(facts, Tf("%d lines", r.Lines))
+	if r.OmittedBytes > 0 && !r.Trimmed {
+		facts = append(facts, Tf("%d lines analysed", r.Lines))
+	} else {
+		facts = append(facts, Tf("%d lines", r.Lines))
+	}
 	if r.AnalysedAs != "" {
 		facts = append(facts, Tf("read as %s", r.AnalysedAs))
 	}
 	p.Facts = strings.Join(facts, "  ")
+	p.Notice = logCoverage(r.OmittedBytes, r.Trimmed)
 	p.Links = logLinks(r.Clusters)
 	if m := LiveMonitor(a, st, live, path, p.Links); m != nil {
 		p.Monitor = m

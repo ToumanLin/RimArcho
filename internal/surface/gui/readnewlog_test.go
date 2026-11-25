@@ -3,12 +3,14 @@
 package gui_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/surface/gui"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -84,6 +86,8 @@ func TestHomeReadsALogWhoseReportNoLongerMatches(t *testing.T) {
 	e.MustRun("scan")
 	e.MustRun("analyze")
 	e.App.LazyLog, e.App.LogCacheOnly = true, true
+	// Keep the Mod-file check's publication separate from the log refresh.
+	e.App.AnalyzeRunner = func(*app.App, func(string)) error { return errors.New("fixture") }
 	api := gui.NewAPI(e.App, nil)
 	defer api.Close()
 	e.RecordLaunch(e.Now().Add(-time.Minute))
@@ -98,8 +102,14 @@ func TestHomeReadsALogWhoseReportNoLongerMatches(t *testing.T) {
 	// another Mod comes in (Steam downloads one): the stored report no longer matches
 	e.AddWorkshop("1002", testkit.Mod{PackageID: "tester.beta", Name: "Beta"})
 	e.MustRun("scan")
+	if h := api.Home(); !h.CheckLastRun || !h.LastRunPending {
+		t.Fatalf("after a Mod change: want the first read to leave the log pending, got %+v", h)
+	}
+	if !api.ReadNewLog() {
+		t.Fatal("did not refresh the stale report after the page read")
+	}
 	if h := api.Home(); h.LastRun == "" || h.LastRunPending {
-		t.Fatalf("after a Mod change: last run %q, pending %v; want the log read again", h.LastRun, h.LastRunPending)
+		t.Fatalf("after refreshing the report: last run %q, pending %v; want the log read again", h.LastRun, h.LastRunPending)
 	}
 }
 
@@ -129,6 +139,12 @@ func TestHomeReadsThePreviousLogWhenTheCurrentIsGone(t *testing.T) {
 	}
 	if err := os.Rename(cur, filepath.Join(e.UserData, "Player-prev.log")); err != nil {
 		t.Fatal(err)
+	}
+	if h := api.Home(); !h.CheckLastRun {
+		t.Fatalf("the previous log should be queued for background analysis: %+v", h)
+	}
+	if !api.ReadNewLog() {
+		t.Fatal("did not analyse the previous log")
 	}
 	if h := api.Home(); h.LastRun == "" && h.MissingLog == "" {
 		t.Fatalf("Launch says nothing of the last run with Player-prev.log left: %+v", h)

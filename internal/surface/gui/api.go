@@ -1467,12 +1467,20 @@ func (s *API) ReadNewLog() bool {
 	if err != nil {
 		return false
 	}
+	r.OpenPlan, r.PlanName = 0, ""
 	st, err := r.Loadout()
 	if err != nil || st == nil {
 		return false
 	}
-	if _, newer := r.NewLog(st); !newer {
-		return false
+	r.LazyLog, r.LogCacheOnly = false, true
+	if !newLastRun(r, st) {
+		path := r.ProblemLog(st)
+		if path == "" {
+			return false
+		}
+		if _, err := r.CachedLog(path); !errors.Is(err, app.ErrLogNotCached) {
+			return false
+		}
 	}
 	_, _, err = readNeedsChecked(r, true)
 	return err == nil
