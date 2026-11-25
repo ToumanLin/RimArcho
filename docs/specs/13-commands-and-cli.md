@@ -391,6 +391,8 @@ Run `archo workshop publish` from the repository root after building the release
 
 ## 5. Stability
 
+- Analysis references use `a:` followed by the stored run ID. The sequence can skip numbers because a check reserves its ID before publication (05 §3).
+
 - English output keywords, such as `depends:`, `evidence:`, `next:`, and finding codes, are part of the interface. Record changes in CHANGELOG (17 §5).
 - Reference formats are stable. Instance IDs are independent of paths and package IDs (04); `p:` references are stable across analyses. A log finding key keeps only the last three segments of the absolute path, so its references and ignore records stay valid after the library directory moves. Pattern references `pattern:g:<id>` and `pattern:m:<packageId>:<hash>` are stable within a dataset version. Generic IDs persist across versions; a Mod-specific hash comes from its template and stays the same while the template does.
 - New fields are appended without changing the meaning of existing lines.

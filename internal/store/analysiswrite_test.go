@@ -87,8 +87,16 @@ func TestAnalysisYieldsToSmallWrite(t *testing.T) {
 	err := other.SetMeta("test-edit", "committed")
 	elapsed := time.Since(start)
 	t.Logf("independent write during %d Def inserts took %v (%v)", mods*defsPerMod, elapsed, err)
-	if err != nil || elapsed > 500*time.Millisecond {
-		t.Error("expected the independent write to commit within 500 ms")
+	if err != nil {
+		t.Errorf("independent write failed: %v", err)
+	}
+	if !raceBuild && elapsed > 500*time.Millisecond {
+		t.Error("independent write exceeded 500 ms")
+	}
+	select {
+	case err := <-done:
+		t.Fatalf("analysis finished before the independent write returned: %v", err)
+	default:
 	}
 	if err := <-done; err != nil {
 		t.Fatal(err)

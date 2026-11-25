@@ -42,6 +42,9 @@ func upgradeAnalysisStage(tx *sql.Tx, _ func(int64, int64)) error {
 // current runs. Positive values order publication even when saves overlap.
 const activeAnalysis = `publication>0`
 const analysisChunkRows = 4000
+
+// A writer refreshes its heartbeat in every chunk. Allow a suspended writer
+// to resume for up to an hour before a later save or maintenance retires it.
 const analysisStageLifetime = time.Hour
 
 // SaveAnalysis saves an analysis run and atomically publishes its views and findings.
