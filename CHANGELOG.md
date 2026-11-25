@@ -4,6 +4,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+## 1.1.4 — 2026-11-25
+
 - Fewer repeats on screen. Mod library and Play review no longer repeat the Mod's name (and the copy's source) in the details heading. On Updates, the foot of the list says only how many sources were checked; the time of the last check is in its hover and in Update checks, so the left column shows one time (the last scan's). A waiting update's head no longer repeats installed → available, and a SteamCMD copy's install time shows once. In Chinese, Mod settings are now called `Mod 配置` (was `Mod 设置`, which read like RimArcho's own Settings).
 - The Game Config page explains itself as "Game Config = game version + Mod list + saves folder; RimWorld starts from it" and opens with a new section, game versions on this computer: each RimWorld install with its version and folder, the Game Configs that use it as chips, and installs RimArcho finds in Steam's libraries that no Game Config uses yet (with Add Game Config). Then all Game Configs (each row now names its game version; the folder is in the hover) and this Game Config's settings.
 - Mod details no longer show the category row and its picker. The category glyph before each name and the category filter stay; `archo category` still sets one.
