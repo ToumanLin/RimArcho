@@ -3,6 +3,7 @@ package view
 import (
 	"fmt"
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"sort"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -163,10 +164,24 @@ type EnvRow struct {
 	Current      bool   `json:"current"`
 }
 
-// EnvPage is the environment page: the environments, and the current one's game folder,
-// version, launch and saves (what belongs to one game, 03 §2; the mod folders every game
-// shares are on the settings page).
+// GameRow is one game installation on the Game Config page (16 §2.8): the game version on
+// this computer and the Game Configs that use it. A detected game no Game Config uses yet
+// has Detected set and no Configs.
+type GameRow struct {
+	Version  string   `json:"version"`         // "1.6" (major.minor), or "" when unknown
+	Full     string   `json:"full"`            // "1.6.4633 rev1261"
+	Path     string   `json:"path"`            // the game folder
+	Build    string   `json:"build,omitempty"` // "Proton" (ProtonBadge)
+	Configs  []string `json:"configs,omitempty"`
+	Current  bool     `json:"current"` // the Game Config in use plays this game
+	Detected bool     `json:"detected,omitempty"`
+}
+
+// EnvPage is the environment page: the game installations on this computer, the
+// environments, and the current one's game folder, version, launch and saves (what belongs
+// to one game, 03 §2; the mod folders every game shares are on the settings page).
 type EnvPage struct {
+	Games   []GameRow      `json:"games"`
 	Envs    []EnvRow       `json:"envs"`
 	Groups  []SettingGroup `json:"groups"`
 	Notices []string       `json:"notices,omitempty"`
@@ -190,6 +205,7 @@ func BuildEnvPage(a *app.App, st *app.LoadoutState) *EnvPage {
 		cur = st.Ix.Env.ID
 	}
 	p.Envs = EnvironmentRows(a, cur)
+	p.Games = GameRows(a, cur)
 	if text := AliasNoticeText(a); text != "" {
 		p.Notices = []string{text}
 	}
@@ -214,7 +230,7 @@ func EnvGroups(a *app.App, st *app.LoadoutState) []SettingGroup {
 	if p, _ := a.Store.CurrentPlan(e.ID); p != nil {
 		current = p.Name
 	}
-	return []SettingGroup{{Title: T("Game Config"), Items: []SettingItem{
+	return []SettingGroup{{Title: T("this Game Config"), Items: []SettingItem{
 		{Key: "environment.name", Label: T("name"), Value: e.Name, Edit: "text", Argv: []string{"env", "set", e.Name, "--name", "{}"}},
 		{Label: T("game folder"), Value: e.GameRoot, ValuePath: true, Note: version, Edit: "path", Argv: []string{"env", "set", e.Name, "--game", "{}"}},
 		// shared / own / a folder the player chooses (custom: the page asks for the folder,
@@ -536,6 +552,51 @@ func EnvironmentRows(a *app.App, current string) []EnvRow {
 		}
 		out = append(out, EnvRow{Name: e.Name, GameID: e.GameID, Installation: title, Path: e.GameRoot, Game: e.GameVersion + "  " + e.GameRoot, Build: build, Current: e.ID == current})
 	}
+	return out
+}
+
+// GameRows are the game versions on this computer (16 §2.8): each installation a Game
+// Config uses, with those configs' names, then the games detection finds that no config
+// uses (env.DetectAll: Steam's library list and a few fixed folders, no folder walk).
+// Ordered by version, then folder.
+func GameRows(a *app.App, current string) []GameRow {
+	es, err := a.Store.Envs()
+	if err != nil {
+		return nil
+	}
+	var out []GameRow
+	at := map[string]int{}
+	for _, e := range es {
+		k := env.PathKey(e.GameRoot)
+		i, ok := at[k]
+		if !ok {
+			i = len(out)
+			at[k] = i
+			out = append(out, GameRow{Version: env.MajorMinor(e.GameVersion), Full: e.GameVersion, Path: e.GameRoot, Build: ProtonBadge(e.GameRoot)})
+		}
+		out[i].Configs = append(out[i].Configs, e.Name)
+		out[i].Current = out[i].Current || e.ID == current
+	}
+	for _, d := range env.DetectAll(a.Detect) {
+		k := env.PathKey(d.GameRoot)
+		if _, ok := at[k]; ok || d.GameRoot == "" {
+			continue
+		}
+		at[k] = len(out)
+		out = append(out, GameRow{Version: env.MajorMinor(d.GameVersion), Full: d.GameVersion, Path: d.GameRoot, Build: ProtonBadge(d.GameRoot), Detected: true})
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Detected != out[j].Detected {
+			return !out[i].Detected
+		}
+		vi, vj := env.ParseVersion(out[i].Full), env.ParseVersion(out[j].Full)
+		for _, c := range [][2]int{{vi.Major, vj.Major}, {vi.Minor, vj.Minor}, {vi.Build, vj.Build}} {
+			if c[0] != c[1] {
+				return c[0] < c[1]
+			}
+		}
+		return env.PathKey(out[i].Path) < env.PathKey(out[j].Path)
+	})
 	return out
 }
 

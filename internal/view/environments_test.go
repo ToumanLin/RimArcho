@@ -30,7 +30,7 @@ func TestPhase3EnvironmentViews(t *testing.T) {
 	if page.Envs[1].GameID != page.Envs[2].GameID || page.Envs[1].Installation != page.Envs[2].Installation || !page.Envs[1].Current {
 		t.Fatalf("groups/current: %+v", page.Envs)
 	}
-	if len(page.Groups) != 1 || page.Groups[0].Title != "Game Config" || len(page.Groups[0].Items) != 7 {
+	if len(page.Groups) != 1 || page.Groups[0].Title != "this Game Config" || len(page.Groups[0].Items) != 7 {
 		t.Fatalf("settings: %+v", page.Groups)
 	}
 	preview, err := e.App.EnvRemovePreview("main")

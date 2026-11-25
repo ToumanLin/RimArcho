@@ -2324,9 +2324,9 @@ export async function pickFolder(start, then) {
 }
 
 // ---- the environment (the pill on the left of the top bar) ----
-// Everything here belongs to one game folder (03 §2): which one is in use, the folder, its
-// version, how it is started and its saves. The mod folders every game shares are on the
-// settings page.
+// Three sections (16 §2.8): the game versions on this computer and the configs that play
+// each, all Game Configs, and the one in use (its folder, version, launch and saves, 03 §2).
+// The mod folders every game shares are on the settings page.
 
 export async function environment() {
   const read = beginPageRead("env");
@@ -2337,8 +2337,37 @@ export async function environment() {
   const top = sc.scrollTop;
   sc.innerHTML = "";
   const current=(p.envs||[]).find(e=>e.current);
-  const w = page("env", T("Game Config: a game folder with its own saves, settings and current list"), act(T("Add Game Config"), "plus", () => ui.go("guide")), act(T("copy the game folder…"), "copy", () => ui.go("guide:copy")), rescanButton());
+  const w = page("env", T("Game Config = game version + Mod list + saves folder; RimWorld starts from it"), act(T("Add Game Config"), "plus", () => ui.go("guide")), act(T("copy the game folder…"), "copy", () => ui.go("guide:copy")), rescanButton());
   sc.append(w);
+  // 1. the game versions on this computer (16 §2.8): each game, the configs that play it
+  const gameLab = el("div", "label section", T("game versions on this computer"));
+  // what a game version is: the label's tooltip, and read with the label
+  visTip(gameLab, T("game version: a copy of RimWorld downloaded on your computer"), "group", false);
+  gameLab.removeAttribute("role");
+  gameLab.setAttribute("aria-label", gameLab.textContent + ". " + gameLab.dataset.tip);
+  w.append(gameLab);
+  const games = el("section", "card");
+  area(games, gameLab);
+  for (const g of p.games || []) {
+    const row = el("div", "envrow gamerow" + (g.current ? " on" : "") + (g.detected ? " detected" : ""));
+    const l = el("div", "l");
+    const name = el("div", "name", "RimWorld " + (g.version || T("unknown")));
+    if (g.build) name.append(el("span", "chip", g.build));
+    l.append(name, factText(el("div", "sub"), { text: g.full + "  " + g.path, paths: [g.path] }));
+    row.append(l);
+    const uses = el("div", "uses");
+    if (g.detected) {
+      uses.append(el("span", "chip", T("not added yet")), button(T("Add Game Config"), "", () => ui.go("guide"), "quiet"));
+    } else {
+      // the configs as chips, the one in use tinted; the sentence is for hover and readers
+      visTip(uses, Tf("Game Configs using this game: %s", g.configs.join(", ")), "group", false);
+      for (const c of g.configs || []) uses.append(el("span", "chip" + (c === current?.name ? " cur" : ""), c));
+    }
+    row.append(uses);
+    games.append(row);
+  }
+  w.append(games);
+  // 2. all Game Configs
   const envLab = el("div", "label section", T("all Game Configs"));
   w.append(envLab);
   const card = el("section", "card");
@@ -2349,7 +2378,10 @@ export async function environment() {
     const l = el("div", "l");
     const name = el("div", "name", e.name);
     if (e.build) name.append(el("span", "chip", e.build)); // Proton (16 §2.8)
-    l.append(name, factText(el("div", "sub"), { text: e.game, paths: [e.path] }));
+    // the game it plays, as in section 1; the full version and folder are there and in the hover
+    const sub = el("div", "sub", e.installation);
+    sub.title = e.game;
+    l.append(name, sub);
     row.append(l);
     if (e.current) {
       const current = el("button", "chip cur", T("in use"));

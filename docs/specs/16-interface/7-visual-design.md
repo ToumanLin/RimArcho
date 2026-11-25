@@ -177,7 +177,7 @@ English UI text is the translation lookup key, so changing it also requires chan
 | save | Save; the editor button says Save changes / no changes, the count says N unsaved, and versions are saved versions | save; save changes / no changes; N unsaved; saved versions | write to game, unwritten, not yet written, written versions |
 | checkout | Go back to this version; history step go back | go back to this version | load version, load list |
 | External ModsConfig changes | Use outside change | use the outside change | load into list |
-| Environment (internal) | A play context with its own user data and current list | Game Config everywhere: the sidebar, Launch (01 Game Config), the switcher; remove Game Config. Its own page explains it with the line “a game folder with its own saves, settings and current list” (Chinese and Japanese: see glossary) | environment; game for this context |
+| Environment (internal) | A play context with its own user data and current list | Game Config everywhere: the sidebar, Launch (01 Game Config), the switcher; remove Game Config. Its own page explains it with the line “Game Config = game version + Mod list + saves folder; RimWorld starts from it”; an installation is a game version (“game versions on this computer”, §2.8; Chinese and Japanese: see glossary) | environment; game for this context |
 | Game installation (internal only) | The physical installed game | game folder | showing an installation layer or grouping |
 | Source | Mod folders in settings, source in filters and details, such as Workshop or local | mod folders; source | — |
 | Instance | This one, another copy, N copies | this one, another copy | instance, Instance |
