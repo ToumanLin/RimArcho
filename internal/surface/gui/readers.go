@@ -183,35 +183,59 @@ func pinPageRead(a *app.App) (func(), error) {
 	return a.Store.ReadSnapshot()
 }
 
-// launchSession is called with launchRead.mu held.
-func (s *API) launchSession() (*app.App, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	e, err := s.a.Env()
-	if err != nil {
-		return nil, err
-	}
-	w := &s.launchRead
-	if w.a == nil {
-		w.a, err = s.pageReader()
-		if err != nil {
-			return nil, err
+// Launch borrows the retained log session while it is idle. Game log can open its own
+// session during a loan and keeps its session while a cross-version check runs.
+func (s *API) launchSession() (*app.App, func(), error) {
+	w := &s.logRead
+	if w.mu.TryLock() {
+		if w.a == nil || !w.a.AnalysisRunning() {
+			r, err := s.logSession()
+			if err == nil {
+				w.a = nil
+			}
+			w.mu.Unlock()
+			return r, func() { s.returnLaunchSession(r) }, err
 		}
+		w.mu.Unlock()
 	}
-	r := w.a
-	r.ReadOptions(s.a)
-	r.EnvName = e.Name
-	r.AnalyzeExe, r.AnalyzeWait = s.Exe, 200*time.Millisecond
-	return r, nil
+	s.mu.Lock()
+	r, err := s.pageReader()
+	s.mu.Unlock()
+	return r, func() { s.closeLaunchSession(r) }, err
+}
+
+func (s *API) returnLaunchSession(r *app.App) {
+	if r == nil {
+		return
+	}
+	w := &s.logRead
+	if w.mu.TryLock() {
+		if w.a == nil {
+			w.a = r
+			w.mu.Unlock()
+			return
+		}
+		w.mu.Unlock()
+	}
+	s.closeLaunchSession(r)
+}
+
+func (s *API) closeLaunchSession(r *app.App) {
+	if r != nil {
+		r.Close()
+		s.free.soon()
+	}
 }
 
 // logSession is called with logRead.mu held; only snapshotting options needs s.mu.
 func (s *API) logSession() (*app.App, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if e, err := s.a.Env(); err != nil {
+	e, err := s.a.Env()
+	if err != nil {
 		return nil, err
-	} else if s.board != nil && s.board.St != nil && s.board.St.Ix.Env.ID != e.ID {
+	}
+	if s.board != nil && s.board.St != nil && s.board.St.Ix.Env.ID != e.ID {
 		s.board, s.logLinks, s.logPath = nil, nil, ""
 	}
 	if s.logRead.a == nil {
@@ -223,9 +247,7 @@ func (s *API) logSession() (*app.App, error) {
 	}
 	r := s.logRead.a
 	r.ReadOptions(s.a)
-	if e, err := s.a.Env(); err == nil {
-		r.EnvName = e.Name
-	}
+	r.EnvName = e.Name
 	r.AnalyzeExe, r.AnalyzeWait = s.Exe, 200*time.Millisecond
 	return r, nil
 }
@@ -302,7 +324,9 @@ func (s *API) Close() {
 	s.libGate.Lock()
 	//lint:ignore SA2001 barrier, nothing to guard
 	s.libGate.Unlock()
-	for _, w := range []*logReader{&s.libRead, &s.plansRead, &s.workspaceReader, &s.indexRead, &s.detailRead, &s.saves.read, &s.launchRead, &s.needsRead} {
+	s.launchMu.Lock()
+	defer s.launchMu.Unlock()
+	for _, w := range []*logReader{&s.libRead, &s.plansRead, &s.workspaceReader, &s.indexRead, &s.detailRead, &s.saves.read, &s.needsRead} {
 		w.mu.Lock()
 		w.release() // also stops an idle expiry
 		w.mu.Unlock()

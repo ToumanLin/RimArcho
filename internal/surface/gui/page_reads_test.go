@@ -79,7 +79,7 @@ func TestHomeAndNeedsReadersLeaveNavigationResponsive(t *testing.T) {
 			e, api, _ := fixture(t)
 			e.App.LazyLog, e.App.LogCacheOnly = true, true
 			e.App.AnalyzeRunner = func(*app.App, func(string)) error { return errors.New("fixture") }
-			w := &api.launchRead
+			w := &api.logRead
 			if page == "needs" {
 				w = &api.needsRead
 			}
@@ -90,7 +90,7 @@ func TestHomeAndNeedsReadersLeaveNavigationResponsive(t *testing.T) {
 				t.Fatal(err)
 			}
 			reader := r.Store.DB
-			conn, err := reader.Conn(context.Background()) // hold only the log reader's sole connection
+			conn, err := reader.Conn(context.Background()) // hold only this page's connection
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -135,7 +135,7 @@ func TestNeedsDoesNotWaitForLaunchRead(t *testing.T) {
 	if _, err := api.HomeMemory(); err != nil {
 		t.Fatal(err)
 	}
-	reader := api.launchRead.a.Store.DB
+	reader := api.logRead.a.Store.DB
 	conn, err := reader.Conn(t.Context())
 	if err != nil {
 		t.Fatal(err)
@@ -179,6 +179,64 @@ func TestNeedsDoesNotWaitForLaunchRead(t *testing.T) {
 		case <-time.After(5 * time.Second):
 			t.Error("Can it run did not finish after releasing Launch")
 		}
+	}
+}
+
+func TestGameLogCanReadWhileLaunchBorrowsItsConnection(t *testing.T) {
+	_, api, _ := fixture(t)
+	api.needsClosed = true
+	if _, err := api.HomeMemory(); err != nil {
+		t.Fatal(err)
+	}
+	borrowed := api.logRead.a
+	db := borrowed.Store.DB
+	conn, err := db.Conn(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	before := db.Stats().WaitCount
+	launch := make(chan *view.Home, 1)
+	go func() { launch <- api.Home() }()
+	deadline := time.Now().Add(5 * time.Second)
+	for db.Stats().WaitCount == before {
+		if time.Now().After(deadline) {
+			t.Fatal("Launch did not start reading on the borrowed connection")
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	log := make(chan error, 1)
+	go func() {
+		_, err := api.LogPage("")
+		log <- err
+	}()
+	select {
+	case err := <-log:
+		if err != nil {
+			t.Error(err)
+		}
+	case <-time.After(time.Second):
+		t.Error("Game log waited behind Launch")
+		conn.Close()
+		select {
+		case <-log:
+		case <-time.After(5 * time.Second):
+			t.Fatal("Game log did not finish after releasing Launch")
+		}
+	}
+	conn.Close()
+	select {
+	case h := <-launch:
+		if h.Error != "" {
+			t.Fatal(h.Error)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Launch did not finish")
+	}
+	if db.Stats().OpenConnections != 0 || api.logRead.a == nil || api.logRead.a == borrowed {
+		t.Fatal("Launch did not close the borrowed connection after Game log replaced it")
 	}
 }
 

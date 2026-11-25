@@ -5,8 +5,8 @@ package gui
 import "github.com/ToumanLin/RimArcho/internal/view"
 
 // HomeMemory refreshes only stored totals and the OS snapshot, never Mod files. The launch
-// page asks every 30 seconds (16 §2.16.1 G19), so it reads on the page's own retained
-// reader, as Home does: a warm index and list state make an unchanged refresh rebuild
+// page asks every 30 seconds (16 §2.16.1 G19), so it borrows the retained log session, as
+// Home does: a warm index and list state make an unchanged refresh rebuild
 // nothing. A fresh session here rebuilt the whole index and list each time (about 30 MB
 // allocated per call for 6,574 Mods, 17 §7.3).
 func (s *API) HomeMemory() (*view.MemoryLaunch, error) {
@@ -14,10 +14,10 @@ func (s *API) HomeMemory() (*view.MemoryLaunch, error) {
 }
 
 func (s *API) homeMemoryRead() (*view.MemoryLaunch, error) {
-	s.launchRead.mu.Lock()
-	defer s.launchRead.mu.Unlock()
-	defer s.retainReader(&s.launchRead)
-	r, err := s.launchSession()
+	s.launchMu.Lock()
+	defer s.launchMu.Unlock()
+	r, releaseSession, err := s.launchSession()
+	defer releaseSession()
 	if err == nil && !r.IndexCached() {
 		err = s.refreshPageIndex(r)
 	}

@@ -35,7 +35,7 @@ func TestPageReadersRetainIndexAcrossEditorCommits(t *testing.T) {
 		}
 	}
 	read(1)
-	readers := []*logReader{&api.launchRead, &api.plansRead, &api.libRead, &api.workspaceReader}
+	readers := []*logReader{&api.logRead, &api.plansRead, &api.libRead, &api.workspaceReader}
 	apps := make([]*app.App, len(readers))
 	indexes := make([]*app.Index, len(readers))
 	for i, r := range readers {

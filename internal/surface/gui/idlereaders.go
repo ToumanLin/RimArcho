@@ -6,8 +6,8 @@ import "time"
 
 // Expiring page readers share Mod index contents and keep their own SQLite connection,
 // list state and problems (16 §2.16.1 M07, 17 §7.3). After readerIdle, they close and
-// drop what only they built. The editor/sidebar, Can it run and Game log readers
-// stay open for published objects and cached reports. Updates has its own expiry.
+// drop what only they built. The editor/sidebar and log readers stay open for
+// published objects and cached reports. Updates has its own expiry.
 
 // readerIdle is how long an unused page reader keeps its connection and copies.
 const readerIdle = 5 * time.Minute

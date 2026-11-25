@@ -20,7 +20,7 @@ func TestHomeMemoryReusesLaunchReader(t *testing.T) {
 	if err != nil || first == nil {
 		t.Fatalf("%+v %v", first, err)
 	}
-	reader := api.launchRead.a
+	reader := api.logRead.a
 	if reader == nil || reader == e.App {
 		t.Fatal("HomeMemory did not read on the launch page's reader")
 	}
@@ -39,7 +39,7 @@ func TestHomeMemoryReusesLaunchReader(t *testing.T) {
 			t.Fatalf("%+v %v", m, err)
 		}
 	})
-	if api.launchRead.a != reader {
+	if api.logRead.a != reader {
 		t.Fatal("the launch reader was replaced")
 	}
 	// What each refresh used to do: a fresh session that reads the whole list.
@@ -70,8 +70,28 @@ func TestHomeMemoryReusesLaunchReader(t *testing.T) {
 func TestIdlePageReadersClose(t *testing.T) {
 	t.Parallel()
 	e, api, _ := fixture(t)
+	api.needsClosed = true
+	r, err := api.inventorySession(&api.needsRead)
+	if err != nil {
+		t.Fatal(err)
+	}
+	needsDB := r.Store.DB
+	first := api.Needs()
+	if first.Error != "" || first.Plan == 0 {
+		t.Fatalf("Can it run: %+v", first)
+	}
+	if api.needsRead.a != nil || needsDB.Stats().OpenConnections != 0 {
+		t.Fatal("Can it run retained its cache-miss connection")
+	}
 	api.Board()
 	if _, err := api.HomeMemory(); err != nil {
+		t.Fatal(err)
+	}
+	shared := api.logRead.a
+	if h := api.Home(); h.Error != "" {
+		t.Fatal(h.Error)
+	}
+	if _, err := api.LogPage(""); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := api.Library("", nil, ""); err != nil {
@@ -91,7 +111,7 @@ func TestIdlePageReadersClose(t *testing.T) {
 	if _, err := api.LibraryCopy(id); err != nil {
 		t.Fatal(err)
 	}
-	readers := map[string]*logReader{"library": &api.libRead, "plans": &api.plansRead, "detail": &api.detailRead, "index": &api.indexRead, "launch": &api.launchRead}
+	readers := map[string]*logReader{"library": &api.libRead, "plans": &api.plansRead, "detail": &api.detailRead, "index": &api.indexRead}
 	for name, w := range readers {
 		if w.a == nil || w.timer == nil {
 			t.Fatalf("%s reader not retained with an expiry", name)
@@ -136,6 +156,19 @@ func TestIdlePageReadersClose(t *testing.T) {
 	if api.copyRead.a != nil || api.copyRead.lib != nil {
 		t.Fatal("idle copy reader kept its connection")
 	}
+
+	// After expiry, only the shared reader from the page tour remains. The
+	// Launch poll still uses that connection and a Needs cache hit opens none.
+	if _, err := api.HomeMemory(); err != nil {
+		t.Fatal(err)
+	}
+	if n := api.Needs(); n.Error != "" || n.Plan != first.Plan {
+		t.Fatalf("Can it run after expiry: %+v", n)
+	}
+	if api.logRead.a != shared || shared.Store.DB.Stats().OpenConnections != 1 || api.needsRead.a != nil {
+		t.Fatal("Launch, Game log and Can it run should retain one connection after expiry")
+	}
+	t.Log("Launch, Game log and Can it run retain one SQLite connection after readerIdle")
 
 	// The next visit reads again on new connections, with current data.
 	e.MustRun("disable", "pkg:tester.a")

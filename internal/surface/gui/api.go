@@ -129,7 +129,7 @@ type API struct {
 	texCancel     context.CancelFunc
 	texMeasure    textureMeasurement
 	logRead       logReader
-	launchRead    logReader
+	launchMu      sync.Mutex // serializes reads of the current list on Launch
 	needsRead     logReader
 	texRead       logReader
 	feedback      feedbackState
@@ -1348,6 +1348,7 @@ func (s *API) needsPage() *view.Needs {
 	expected, sequence := s.inventoryKey(), s.needsSequence
 	r, err := s.inventorySession(&s.needsRead)
 	s.mu.Unlock()
+	defer s.needsRead.release()
 	if err != nil {
 		return &view.Needs{Status: map[string]int{}, Error: err.Error()}
 	}
@@ -1389,7 +1390,10 @@ func (s *API) initialNeeds(r *app.App, expected string, sequence uint64) *view.N
 	// If a task committed during the read, keep the first drawing and refresh it
 	// as soon as the stored findings are available.
 	eager := !n.LastRunPending && s.inventoryKey() == expected
-	c := s.saveFreshNeedsLocked(ps, n, eager)
+	// The cached findings use the main loadout, whose lookups outlive this read.
+	saved := *ps
+	saved.State = current
+	c := s.saveFreshNeedsLocked(&saved, n, eager)
 	if !eager {
 		s.refreshNeedsLocked(c)
 	}
