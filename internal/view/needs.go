@@ -216,6 +216,7 @@ type Needs struct {
 	LastRunPending bool   `json:"lastRunPending,omitempty"`
 	LogPending     bool   `json:"-"`
 	LastRunNotice  string `json:"lastRunNotice,omitempty"`
+	LastRunTrimmed bool   `json:"lastRunTrimmed,omitempty"`
 	// MissingLog explains why no clean last-run verdict is available.
 	MissingLog string `json:"missingLog,omitempty"`
 	// Elsewhere: what is not on Can it run but handled on another page (SectionElsewhere),
@@ -430,7 +431,7 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 		when := ShortDate(r.ModTime) + " " + r.ModTime.In(a.Loc).Format("15:04")
 		n.LastRunDay = ShortDate(r.ModTime)
 		n.LastRunPending = r.Pending
-		n.LastRunNotice = logCoverage(r.OmittedBytes, r.Trimmed)
+		n.LastRunNotice, n.LastRunTrimmed = logCoverage(r.OmittedBytes, r.Trimmed), r.Trimmed && r.OmittedBytes > 0
 		if pack := a.RunOfLog(st.Ix.Env.ID, r.ModTime); pack != "" {
 			n.LastRun = Tf("pack %s", pack) + "  " + when
 		} else {

@@ -23,6 +23,7 @@ type LogFile struct {
 	When      string `json:"when"`
 	Of        string `json:"of,omitempty"`
 	Oversized string `json:"oversized,omitempty"`
+	bytes     int64
 }
 
 // LogRow is one cluster.
@@ -47,12 +48,15 @@ type LogRow struct {
 
 // LogPage is one analysed log.
 type LogPage struct {
-	Files    []LogFile `json:"files"`
-	Path     string    `json:"path"`
-	Notice   string    `json:"notice,omitempty"`
-	Facts    string    `json:"facts"` // "1.6.4633  12 840 lines"
-	Rows     []LogRow  `json:"rows"`
-	Selected bool      `json:"selected"` // its errors are in Can it run
+	Files []LogFile `json:"files"`
+	Path  string    `json:"path"`
+	// Notice says how much of an oversized or trimmed log was analysed (06 §1); the GUI
+	// draws it as a coverage mark with the sentence as its name and tooltip (16 §2.10).
+	Notice   string   `json:"notice,omitempty"`
+	Trimmed  bool     `json:"trimmed,omitempty"`
+	Facts    string   `json:"facts"` // "1.6.4633  12 840 lines"
+	Rows     []LogRow `json:"rows"`
+	Selected bool     `json:"selected"` // its errors are in Can it run
 	// Live: the running game still writes it; its errors join Can it run when the game exits.
 	Live bool `json:"live,omitempty"`
 	// Pending is the game version whose analysis is still running: no rows yet, ask again.
@@ -101,12 +105,24 @@ func playerLogFiles(a *app.App, st *app.LoadoutState) []LogFile {
 		if fi, err := os.Lstat(p); err == nil {
 			row.When = logFileDate(a, fi)
 			if fi.Mode().IsRegular() && fi.Size() > app.LogSizeLimit {
-				row.Oversized = SizeText(fi.Size())
+				row.Oversized, row.bytes = SizeText(fi.Size()), fi.Size()
 			}
 		}
 		out = append(out, row)
 	}
 	return out
+}
+
+// OversizedSize is the oversized logs' size together, for the Launch page's size badge.
+func OversizedSize(files []LogFile) string {
+	var n int64
+	for _, f := range files {
+		n += f.bytes
+	}
+	if n == 0 {
+		return ""
+	}
+	return SizeText(n)
 }
 
 // OversizedLogs returns the Player logs eligible for a cleanup preview.
@@ -125,9 +141,9 @@ func logCoverage(omitted int64, trimmed bool) string {
 		return ""
 	}
 	if trimmed {
-		return Tf("Analysed the retained beginning and end (%s omitted during trimming).", SizeText(omitted))
+		return Tf("trimmed: %s was removed from the middle; the rest was analysed", SizeText(omitted))
 	}
-	return Tf("Log too large. Analysed the beginning and end (%s omitted).", SizeText(omitted))
+	return Tf("too large to read in full: the beginning and end were analysed, %s in the middle skipped", SizeText(omitted))
 }
 
 // Companion files can appear or rotate while Player.log stays unchanged.
@@ -191,7 +207,7 @@ func BuildLogPage(a *app.App, st *app.LoadoutState, path string, live *LiveTrack
 		facts = append(facts, Tf("read as %s", r.AnalysedAs))
 	}
 	p.Facts = strings.Join(facts, "  ")
-	p.Notice = logCoverage(r.OmittedBytes, r.Trimmed)
+	p.Notice, p.Trimmed = logCoverage(r.OmittedBytes, r.Trimmed), r.Trimmed && r.OmittedBytes > 0
 	p.Links = logLinks(r.Clusters)
 	if m := LiveMonitor(a, st, live, path, p.Links); m != nil {
 		p.Monitor = m

@@ -204,6 +204,7 @@ func (s *API) homeRead(all bool) *view.Home {
 	h := build(r, st, n, plans, packs)
 	h.CheckLastRun = n.LogPending || newLastRun(r, st)
 	h.OversizedLogs = view.OversizedLogs(r, st)
+	h.OversizedSize = view.OversizedSize(h.OversizedLogs)
 	view.AddOtherEnvs(r, h, st.Ix.Env.ID)
 	view.PickFeatured(h, r.Store.Meta(view.FeaturedKey), st.Ix.Env.Name, st.Plan.ID)
 	return h

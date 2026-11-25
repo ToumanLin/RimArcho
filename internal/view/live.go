@@ -90,7 +90,7 @@ func (t *LiveTracker) Update(a *app.App, st *app.LoadoutState) (*Live, error) {
 	l.Items = LiveNeeds(st, t.lv.Clusters())
 	l.Errors = len(l.Items)
 	if t.lv.OmittedBytes > 0 {
-		l.LogNotice = Tf("Skipped %s of the log to catch up.", SizeText(t.lv.OmittedBytes))
+		l.LogNotice = Tf("%s of the log skipped to catch up with the game", SizeText(t.lv.OmittedBytes))
 	}
 	return l, nil
 }

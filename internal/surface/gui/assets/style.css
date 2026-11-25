@@ -1119,8 +1119,20 @@ svg.i.fill { fill: currentColor; }
 .hm-last-run .tx { flex-wrap: nowrap; }
 .hm-last-run .t { flex: none; }
 .hm-last-run[aria-hidden="true"] { visibility: hidden; }
-.log-cleanup { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; padding: 4px 0; min-width: 0; }
-.log-cleanup-name, .log-size-notice { font-size: 12px; color: var(--fg-2); }
+/* oversized logs (16 §2.3, §2.10): the size as an amber badge that opens trim and delete, on
+   the line that names the log; nothing is added under it */
+.hm-last-row { display: flex; align-items: center; gap: 10px; min-width: 0; border-bottom: 1px solid var(--line); }
+.hm-last-row .hm-actline { flex: 1 1 auto; min-width: 0; border-bottom: 0; }
+.hm-last-row > .go { flex: none; color: var(--muted); cursor: pointer; transition: transform var(--t-layout) var(--ease); }
+.hm-last-row:has(> .hm-actline:hover) > .go { transform: translateX(4px); color: var(--fg); }
+.log-size { flex: none; display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 6px 0 9px; border-radius: 999px; font-size: 12px; white-space: nowrap; color: var(--amber); background: var(--amber-soft); transition: background var(--t-press); }
+.log-size:hover, .log-size[aria-expanded="true"] { background: color-mix(in srgb, var(--amber) 24%, var(--amber-soft)); }
+.log-size .chev { font-size: 12px; line-height: 1; opacity: .7; }
+/* how much of a log was analysed: [head][hatched middle][tail]; trimmed, the middle is empty */
+.log-cov { display: inline-flex; align-items: center; gap: 2px; margin-left: 10px; vertical-align: middle; border-radius: var(--r-sm); outline-offset: 2px; }
+.log-cov i { display: block; width: 6px; height: 8px; background: var(--muted); }
+.log-cov i.gap { width: 14px; background: repeating-linear-gradient(135deg, var(--muted) 0 1px, transparent 1px 3px); opacity: .7; }
+.log-cov.trimmed i.gap { width: 10px; background: repeating-linear-gradient(90deg, var(--muted) 0 2px, transparent 2px 4px) center / 100% 1px no-repeat; }
 .hm-actline:hover .go { transform: translateX(4px); color: var(--fg); }
 .hm-hero { grid-column: 1 / 13; grid-row: 2; align-self: end; padding-bottom: 34px; min-width: 0; }
 .hm-headline { overflow: hidden; margin-bottom: -.08em; }
@@ -1248,8 +1260,8 @@ svg.i.fill { fill: currentColor; }
 @media (max-width: 1000px) {
   .page.home { padding: 8px 28px 28px; }
   .hm-act { display: none; }
-  .hm-act:has(.log-cleanup) { display: flex; grid-column: 1 / 13; }
-  .hm-act:has(.log-cleanup) > :not(.hm-last-run, .log-cleanup) { display: none; }
+  .hm-act:has(.log-size) { display: flex; grid-column: 1 / 13; }
+  .hm-act:has(.log-size) > :not(.hm-last-row) { display: none; }
   .hm-s1 { grid-column: 1 / 5; } .hm-s2 { grid-column: 5 / 13; } .hm-s3 { grid-column: 1 / 13; grid-row: 5; margin-top: 20px; }
   .hm-floor { grid-row: 3 / 6; margin: -64px -28px -28px; }
 }
@@ -1723,6 +1735,8 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; -webkit-
 #menu button.danger { color: var(--red); }
 #menu button.danger:hover, #menu button.danger:focus { background: var(--red-soft); }
 #menu button:focus { outline: 0; background: var(--pill); }
+#menu button:disabled { color: var(--faint); cursor: default; background: none; }
+#menu button.why:disabled { color: var(--amber); }
 
 /* settings › uninstall RimArcho (16 §2.14): one row per step, the answer inline, the items folded */
 .uninstall .un-step + .un-step { border-top: var(--hairline) solid var(--line-2); }

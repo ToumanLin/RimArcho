@@ -21,7 +21,7 @@ import { wireSeparator } from "./separator.js";
 import { changes, changesKey, initSubscriptions } from "./subscriptions.js";
 import { setNeedRunner } from "./badgepop.js";
 import { initNeedText, needText, needParts, evidenceMark } from "./needtext.js";
-import { logCleanupButtons } from "./logcleanup.js";
+import { logSizeBadge, coverageMark } from "./logcleanup.js";
 import { reportMark } from "./reportmark.js";
 import { getChoices } from "./credit.js";
 import { memBars, countBar, countMark, stepMeter, visTip, diskMeter } from "./membar.js";
@@ -1430,14 +1430,19 @@ function drawGameLog() {
   const files = (p && p.files) || [];
   const bar = el("div", "subbar");
   if (files.length) bar.append(filePicker(files));
-  if (p && p.facts && !L.loading) bar.append(el("span", "muted word-facts", p.facts));
-  w.append(bar);
+  // an oversized log: its size as a badge that trims or deletes it, and how much of it was
+  // analysed as a mark after the facts, on the picker's line (16 §2.10)
   const oversized = files.find(f => f.path === p?.path && f.oversized);
-  if (oversized && !L.loading) w.append(logCleanupButtons(oversized, async () => {
+  if (oversized && !L.loading) bar.append(logSizeBadge([oversized], oversized.oversized, async () => {
     await ui.reload();
     gameLog(p.path);
   }));
-  if (p?.notice && !L.loading) w.append(el("div", "log-size-notice muted", p.notice));
+  if (p && p.facts && !L.loading) {
+    const facts = el("span", "muted word-facts", p.facts);
+    if (p.notice) facts.append(coverageMark(p.notice, p.trimmed));
+    bar.append(facts);
+  }
+  w.append(bar);
   if (L.error) { w.append(el("div", "card empty-state err", L.error)); return; }
   if (p && p.noMonitor && !L.loading) w.append(noMonitor(p));
   if (L.pending) { w.append(el("div", "card empty-state", Tf("the mods are analysed for %s first (once per game version)…", L.pending))); return; }
@@ -1473,7 +1478,7 @@ function drawGameLog() {
       const chip = el("span", "chip", r.class);
       if (r.code) chip.title = r.code;
       const count = el("span", "count", "×" + r.count);
-      if (r.count > 1) count.title = Tf("Repeated %d times", r.count);
+      if (r.count > 1) count.title = Tf("repeated %d times", r.count);
       top.append(chip, count);
       if (r.mods) top.append(el("span", "mods", r.mods));
       top.querySelector(".count")?.after(countMark(r.count, most));
@@ -1555,7 +1560,7 @@ function filePicker(files) {
     e.stopPropagation();
     const r = b.getBoundingClientRect();
     pop.menu(r.left, r.bottom + 4, files.map((f) => ({
-      label: f.label, key: f.when, current: f.of ? f.of === L.path && L.tab === 1 : f.path === L.path && L.tab === 0, cls: (f.of ? "sub" : "") + ((f.of ? f.of === L.path && L.tab === 1 : f.path === L.path && L.tab === 0) ? " on" : ""),
+      label: f.label, key: f.when + (f.oversized ? "  " + f.oversized : ""), current: f.of ? f.of === L.path && L.tab === 1 : f.path === L.path && L.tab === 0, cls: (f.of ? "sub" : "") + ((f.of ? f.of === L.path && L.tab === 1 : f.path === L.path && L.tab === 0) ? " on" : ""),
       run: () => {
         L.tab = f.of ? 1 : 0;
         if ((f.of || f.path) === L.path) return drawGameLog();

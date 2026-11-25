@@ -46,11 +46,11 @@ func (s *API) ApplyLogCleanup(path, token string, trim bool) error {
 func cleanupError(err error) error {
 	switch {
 	case errors.Is(err, app.ErrGameRunning):
-		return errors.New(view.T("Close the game before trimming or deleting a log."))
+		return errors.New(view.T("the game is running: close it first"))
 	case errors.Is(err, app.ErrLogCleanupChanged):
-		return errors.New(view.T("The log changed. Review its new size and confirm again."))
+		return errors.New(view.T("the log changed: check its new size and confirm again"))
 	case errors.Is(err, app.ErrLogCleanupTarget):
-		return errors.New(view.T("Choose an oversized Player.log or Player-prev.log for this game."))
+		return errors.New(view.T("only an oversized Player.log or Player-prev.log of this Game Config can be trimmed or deleted"))
 	default:
 		return err
 	}

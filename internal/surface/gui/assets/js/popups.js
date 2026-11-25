@@ -619,6 +619,7 @@ export function menu(x, y, actions, keys = false, { name, opener = document.acti
       b.append(key);
     }
     if (a.envWrite) b.dataset.envWrite = a.envWrite;
+    for (const [k, v] of Object.entries(a.data || {})) b.dataset[k] = v;
     b.onclick = () => { hideMenu(true); a.run(); };
     m.append(b);
   }
