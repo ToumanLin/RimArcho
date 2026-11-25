@@ -428,6 +428,12 @@ function rowEl(x, k) {
     else if (v) cell.title = v;
     r.append(cell);
   }
+  const originalName = x.t === "lin" || x.lone ? x.r.originalName : x.i.originalName;
+  if (originalName) {
+    const original = Tf("original name: %s", originalName);
+    r.setAttribute("aria-description", original);
+    r.title = original;
+  }
   const name = r.querySelector(".name .t");
   if (name) {
     name.id = r.id + "-name";
@@ -514,6 +520,13 @@ function nameCell(x, k) {
     const branch = el("span", "tree", "└");
     branch.setAttribute("aria-hidden", "true");
     left.append(branch, el("span", "t kind", x.i.label || x.i.name));
+  }
+  const originalName = x.t === "lin" || x.lone ? x.r.originalName : x.i.originalName;
+  if (originalName) {
+    const mark = el("span", "mod-alias-mark");
+    mark.setAttribute("aria-hidden", "true");
+    mark.innerHTML = icon.edit;
+    left.append(mark);
   }
   return left;
 }
@@ -715,7 +728,7 @@ let detailSeq = 0, frame = null;
 // detailFrame): its note, picture and name, where it comes from, Mod library's field list, its
 // actions, the description and history (16 §2.9). A Workshop page not read yet is fetched
 // once the cursor rested (fetchRest).
-async function drawDetail() {
+async function drawDetail(edit = "") {
   if (!els) return;
   const x = L.flat[L.cur];
   if (L.view === "tags" && (!x || x.t === "grp")) return drawTagManager(x ? x.g : null);
@@ -731,10 +744,11 @@ async function drawDetail() {
   openFull.onclick = (e) => { e.stopPropagation(); full("library", i.id || i.ref); };
   els.dhead.append(openFull);
   const same = frame && box.dataset.ref === i.ref && box.contains(frame.box);
-  if (same && box.dataset.stamp === stampOf(i)) return;
+  const stamp = stampOf(i, row);
+  if (same && box.dataset.stamp === stamp && (!edit || frame.edit(edit))) return;
   const n = ++detailSeq;
   const current = () => n === detailSeq && box.dataset.ref === i.ref;
-  box.dataset.stamp = stampOf(i);
+  box.dataset.stamp = stamp;
   if (!same) {
     // the copy shown stays, inert, until the next one's parts are in; then one swap (16 §4.1)
     box.dataset.ref = i.ref;
@@ -749,8 +763,7 @@ async function drawDetail() {
         openTag: (t) => openTag(t),
       }),
       run: (c, r) => run(c, [findCopy(r.ref) || r]),
-      noteSaved: () => load(),
-      noteLeave: () => els.rows.focus(),
+      playerDataSaved: () => { ui.reload(); return load(); },
       later: true,
       mount: () => { box.replaceChildren(inner); box.scrollTop = 0; },
     });
@@ -768,13 +781,14 @@ async function drawDetail() {
   await f.settle([fields, detail]);
   if (!current()) return;
   f.show();
+  if (edit) { await fields; if (current()) f.edit(edit); }
   const d = await detail;
   if (!current() || d?.state !== "not cached" || !(await fetchRest(current))) return;
   f.fetching();
   const d2 = await api.Detail(i.id, false, true, false).catch(() => null);
   if (d2 && current()) f.detail(d2);
 }
-const stampOf = (i) => [i.note, i.auto, (i.ops || []).join(","), i.state, i.inPlan].join("|");
+const stampOf = (i, row) => JSON.stringify([i.note, i.auto, i.ops, i.state, i.inPlan, row?.name, row?.originalName]);
 
 function findCopy(ref) {
   for (const r of L.page.rows || []) for (const i of r.insts) if (i.ref === ref) return i;
@@ -936,8 +950,13 @@ function drawBar() {
 
 // menuAt: the row menu (16 §8.5), the same groups as the editor's.
 function menuAt(x, y, keys = false) {
-  const by = opsOf(selected());
-  ops.openMenu(x, y, [...by.keys()], (c) => run(c, by.get(c)), keys, { name: L.flat[L.cur]?.r?.name, opener: els.rows });
+  const copies = selected(), by = opsOf(copies);
+  const i = copies.length === 1 && copies[0].id ? copies[0] : null;
+  const row = i && L.page.rows.find((r) => r.insts.some((c) => c.ref === i.ref));
+  ops.openMenu(x, y, [...by.keys()], (c) => run(c, c === "alias" ? [i] : by.get(c)), keys, {
+    name: L.flat[L.cur]?.r?.name, opener: els.rows,
+    playerData: i && { alias: i.originalName || row?.originalName, note: i.note },
+  });
 }
 
 // menuAtCursor: the menu key or shift+F10 open the menu at the cursor's row.
@@ -984,11 +1003,16 @@ async function run(code, copies) {
       const row = (L.page.rows || []).find((r) => r.insts.some((x) => x.ref === i0.ref));
       return pop.tags(copies.filter((i) => i.id).map((i) => ({ id: i.id, name: row ? row.name : i.label })), () => load());
     }
-    case "note": {
-      if (!L.full && innerWidth <= 760) setFull(true);
-      const n = els.scroll.querySelector(".lib-note");
-      if (n) n.click();
-      return;
+    case "alias": case "note": {
+      if (i0.ref !== cursorCopy()?.ref) {
+        const at = L.flat.findIndex((x) => x.t === "inst" && x.i.ref === i0.ref);
+        if (at < 0) return;
+        L.cur = at;
+        ensureVisible();
+        drawRows();
+      }
+      if (!L.full && innerWidth <= 900) setFull(true);
+      return drawDetail(code);
     }
   }
   if (!o.confirm) return done(api.LibraryDo(code, refs));

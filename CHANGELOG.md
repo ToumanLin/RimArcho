@@ -4,6 +4,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Give a Mod a custom name from its details or row menu (#23). A pencil marks aliased rows, and the original name stays visible in details and on hover. The list editor and Mod library also offer an Add note button and menu entry.
+
 - Launching from the list editor asks before saving unsaved changes to the game.
 - Can it run opens promptly when you switch pages during a Mod check, even if Launch or Game log is still loading.
 - You can keep browsing while RimArcho prepares a launch, writes the Mod list to the game, or backs up, copies, renames, or recycles saves.

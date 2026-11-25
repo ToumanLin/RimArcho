@@ -345,6 +345,9 @@ func (s *API) LibraryFields(ref string) ([]view.Field, error) {
 			data = view.LoadDetail(r, lib.St.Ix, i.Mod, false, false)
 		}
 		out = view.LibFields(r, lib, i, data)
+		if i.Mod != nil && i.Mod.Alias != "" {
+			out = append(out, view.AliasField(i.Mod))
+		}
 		return nil
 	})
 	return out, err
@@ -352,8 +355,11 @@ func (s *API) LibraryFields(ref string) ([]view.Field, error) {
 
 // LibrarySetNote sets a copy's own note ("" clears it).
 func (s *API) LibrarySetNote(ref, text string) (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	release, err := s.lockEdit()
+	if err != nil {
+		return "", err
+	}
+	defer release()
 	s.lib = nil
 	return s.text(view.LibSetNote(s.a, ref, text))
 }

@@ -16,7 +16,7 @@ const writesGame = new Set([
   "Run", "RunAnyway", "RunMoving", "RunCLI", "Toggle", "Stage", "Unstage", "StageAll", "RestoreAll",
   "MoveBy", "MoveShown", "Place", "Swap", "Undo", "Redo", "HistoryGo", "RunOp", "DoAction",
   "CreatePlan", "ImportApplyTo", "UsePlan", "OpenPlan", "NewPlan", "RenamePlan", "RemovePlan", "ImportApply", "ImportAsPlan", "ImportAsPlanPreview", "ImportFollow",
-  "PlanSync", "PlanFollow", "PlanFollowMode", "PlanUnfollow", "PlanVersionsSet", "SetModNote", "SetCategory", "SetTag",
+  "PlanSync", "PlanFollow", "PlanFollowMode", "PlanUnfollow", "PlanVersionsSet", "SetModNote", "SetModAlias", "SetCategory", "SetTag",
   "RenameTag", "MergeTags", "DeleteTags", "SetTagNote", "PinTag",
   "LibraryDo", "LibrarySetNote", "SaveReviewMark", "Subscribe", "SubscriptionFrom", "CheckSubscriptionSource", "WorkshopUpdate", "Scan", "Analyze", "RemoveEnv", "ApplySetting", "AddMonitor",
   "PackLaunch", "PackBuild", "PackRemove", "ImportSettings", "PackRemoveUnfinished", "TexturesRun", "TexturesClean", "CreditAnswer",

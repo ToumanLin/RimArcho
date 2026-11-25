@@ -42,10 +42,10 @@ export function followDetail(it, staged) {
 // showDetail draws the plan editor's details of a row (16 §4.1): its copies, name and
 // picture, the detail, and the copy's note and actions, shown together once Go has answered
 // (REVEAL_MS at most). A Workshop page not read yet is fetched once the cursor rested.
-export async function showDetail(it, staged) {
+export async function showDetail(it, staged, edit = "") {
  clearTimeout(detailTimer);
   const n = ++seq, gameRequest = S.envSeq;
-  const current = () => n === seq && S.envSeq === gameRequest;
+  const current = () => n === seq && S.envSeq === gameRequest && !S.screen;
   const box = $("#detail"), sc = $(".detail .scroll");
   if (!it) { box.innerHTML = ""; delete box.dataset.ref; editorFrame = null; S.detail = null; unstale(box); return; }
   if (it.missing || !it.id) {
@@ -68,9 +68,9 @@ export async function showDetail(it, staged) {
       openTag: (t) => document.dispatchEvent(new CustomEvent("open-tag", { detail: t })),
     }),
     run: (code, i) => document.dispatchEvent(new CustomEvent("detail-op", { detail: { code, id: i.id || it.id } })),
-    noteSaved: async () => { const i = await api.LibraryCopy(it.id).catch(() => null); if (current() && i) f.inst(i); },
+    playerDataSaved: () => document.dispatchEvent(new CustomEvent("mod-player-data-changed")),
     tech: true,
-    ownNote: true, // the editor shows only the player's note (16 §4)
+    modNote: true,
     later: !same,
     host: box,
   }));
@@ -90,6 +90,7 @@ export async function showDetail(it, staged) {
   if (!current()) return;
   box.dataset.ref = it.id;
   f.show();
+  if (edit) { await detail; if (current()) f.edit(edit); }
   const d = await detail;
   if (!current() || d?.state !== "not cached" || !(await fetchRest(current))) return;
   f.fetching();
@@ -147,7 +148,7 @@ function editorCopies(it) {
 //   inst(row)                the copy's library row: its note and its ops
 //   detail(d)                the Detail: header, fields, description, history
 //   fields(list)             a field list of its own (Mod library's, with its extra fields)
-// o: fieldActs(d, row), run(code, row), noteSaved(), noteLeave(), tech (the full detail's
+// o: fieldActs(d, row), run(code, row), playerDataSaved(), modNote (the Lineage's note), tech (the full detail's
 // link), ownFields (the fields come through fields(), not with the Detail).
 // With o.later the parts are built off screen and replace box's content only at show()
 // (o.mount() instead, when given); settle(waits) waits for them and the picture, REVEAL_MS at
@@ -156,10 +157,10 @@ export function detailFrame(box, sc, o = {}) {
   const parts = [];
   const part = (cls) => { const e = el("div", "md-" + cls); parts.push(e); return e; };
   const P = {
-    copies: part("copies"), note: part("note"), head: part("head"), facts: part("facts"),
-    version: part("version"), fields: part("fields"), acts: part("acts"), desc: part("desc"), hist: part("hist"), more: part("more"),
+    copies: part("copies"), note: part("note"), head: part("head"), facts: part("facts"), alias: part("alias"),
+    version: part("version"), fields: part("fields"), copyNote: part("copy-note"), acts: part("acts"), desc: part("desc"), hist: part("hist"), more: part("more"),
   };
-  let shownID = "", row = null, d0 = null, picture = null, shown = false;
+  let aliasName, aliasOriginal, shownNote, shownCopyNote, shownID = "", row = null, d0 = null, picture = null, shown = false;
   const f = {
     box,
     show() {
@@ -216,13 +217,31 @@ export function detailFrame(box, sc, o = {}) {
       if (h && name) h.textContent = name;
       if (w) { w.textContent = authors || ""; w.hidden = !authors; }
     },
+    edit(kind) {
+      const button = P[kind].querySelector("button");
+      if (!button || button.disabled) return false;
+      button.click();
+      return true;
+    },
+    note(r, save) {
+      if (P.note.querySelector(".lib-note.editing")) return;
+      if (shownNote && shownNote.note === r.note && shownNote.auto === r.auto && shownNote.id === r.id) return;
+      shownNote = r;
+      P.note.replaceChildren(noteEl(r, { save, saved: o.playerDataSaved, details: true, modNote: o.modNote }));
+    },
     inst(r) {
       row = r;
-      const editing = P.note.querySelector(".lib-note.editing");
-      if (!editing || P.note.dataset.ref !== r.ref) {
-        P.note.innerHTML = "";
-        P.note.dataset.ref = r.ref;
-        P.note.append(noteEl(r, { saved: o.noteSaved, leave: o.noteLeave, ownOnly: o.ownNote }));
+      if (!o.modNote) f.note(r);
+      else if (!P.copyNote.querySelector(".lib-note.editing") && r.note !== shownCopyNote?.note) {
+        shownCopyNote = r;
+        P.copyNote.replaceChildren();
+        if (r.note) {
+          const saved = () => {
+            if (!r.note) P.copyNote.replaceChildren();
+            return o.playerDataSaved?.();
+          };
+          P.copyNote.append(noteEl(r, { saved, details: true, editLabel: "edit copy note" }));
+        }
       }
       P.acts.innerHTML = "";
       const codes = ops.sorted((r.ops || []).filter((c) => { const x = ops.op(c); return x.detail || x.group === 4; }));
@@ -265,9 +284,20 @@ export function detailFrame(box, sc, o = {}) {
         P.more.append(more);
       }
     },
-    fields(list) {
-      P.fields.innerHTML = "";
-      P.fields.append(fieldList(list, o.fieldActs ? o.fieldActs(d0 || { id: shownID }, row) : {}));
+    fields(list = []) {
+      const alias = list.find((x) => x.kind === "alias");
+      const id = d0?.id || row?.id || shownID;
+      if (id && !P.alias.querySelector("input") && (!P.alias.firstChild || alias?.value !== aliasName || alias?.extra !== aliasOriginal)) {
+        aliasName = alias?.value;
+        aliasOriginal = alias?.extra;
+        P.alias.replaceChildren(aliasEl(id, alias, () => P.head.querySelector("h1")?.textContent, o.playerDataSaved));
+      }
+      if (o.modNote && id) {
+        const note = list.find((x) => x.kind === "note");
+        f.note({ id, note: note?.value }, (text) => api.SetModNote(id, text));
+      }
+      const rest = list.filter((x) => x.kind !== "alias" && !(o.modNote && x.kind === "note"));
+      P.fields.replaceChildren(fieldList(rest, o.fieldActs ? o.fieldActs(d0 || { id: shownID }, row) : {}));
     },
     fetching() {
       const note = P.desc.querySelector(".desc-note");
@@ -301,33 +331,93 @@ function description(d) {
   return desc;
 }
 
-// noteEl: the copy's own note (16 §2.9). The player's text, else what RimArcho wrote (grey),
+function playerDataButton(label, glyph) {
+  const b = el("button", "btn quiet md-player-action");
+  b.innerHTML = glyph;
+  b.append(el("span", "", label));
+  return b;
+}
+
+function aliasEl(id, alias, currentName, saved) {
+  const box = el("div", "mod-alias");
+  const originalName = alias?.extra || currentName();
+  const original = () => el("span", "mod-original-name", Tf("original name: %s", originalName));
+  const show = (focus) => {
+    box.replaceChildren();
+    if (alias) box.append(original());
+    const button = playerDataButton(T(alias ? "edit alias" : "add alias"), alias ? icon.edit : icon.plus);
+    button.dataset.envWrite = "alias";
+    button.onclick = open;
+    box.append(button);
+    if (focus) button.focus();
+  };
+  const open = () => {
+    const input = el("input", "lib-note-in mod-alias-in");
+    input.setAttribute("aria-label", T("alias"));
+    input.value = alias?.value || "";
+    box.replaceChildren(input);
+    if (alias) box.append(original());
+    box.append(el("span", "by", T("enter saves, esc cancels")));
+    input.focus();
+    input.setSelectionRange(0, input.value.length);
+    input.onkeydown = async (e) => {
+      e.stopPropagation();
+      if (e.isComposing || e.keyCode === 229 || input.readOnly) return;
+      if (e.key === "Escape") { e.preventDefault(); show(true); return; }
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      const value = input.value.trim();
+      if (value === (alias?.value || "")) { show(true); return; }
+      input.readOnly = true;
+      try {
+        say("ok", await api.SetModAlias(id, value));
+      } catch (e) {
+        input.readOnly = false;
+        say("fail", errText(e));
+        return;
+      }
+      alias = value ? { value, extra: originalName } : null;
+      show(document.activeElement === input);
+      await saved?.();
+    };
+  };
+  show(false);
+  return box;
+}
+
+// noteEl: the player's note (16 §4.1, §2.9). The player's text, else what RimArcho wrote (grey),
 // else a place to write one; a click (or n) edits it, enter saves, shift+enter breaks the
 // line, esc leaves it as it was. o.saved() after a save, o.leave() when the editing ends;
 // o.save(text) saves another note (a tag's) in place of the copy's, o.placeholder its hint.
-// o.ownOnly (the editor's details, 16 §4): only the player's own note shows; what RimArcho
-// wrote is the empty note's hover, not a line read every time.
 export function noteEl(i, o = {}) {
-  const auto = o.ownOnly ? "" : i.auto;
-  const box = el("div", "lib-note" + (i.note ? "" : auto ? " auto" : " empty"));
-  const show = () => {
-    box.innerHTML = "";
+  const auto = i.auto || "";
+  const editable = !!(i.id || o.save);
+  const box = el("div", "lib-note");
+  const show = (focus) => {
+    box.replaceChildren();
     box.classList.remove("editing");
-    box.append(el("div", "txt", i.note || auto || T("write a note")));
-    if (!i.note && auto) box.append(el("div", "by", T("by RimArcho, click to edit")));
+    box.classList.toggle("empty", !i.note && !auto);
+    box.classList.toggle("auto", !i.note && !!auto);
+    box.classList.toggle("md-note-action", !!o.details && !i.note && !auto);
+    if (!o.details || i.note || auto) box.append(el("div", "txt", i.note || auto || T("write a note")));
+    if (!i.note && auto) box.append(el("div", "by", T(o.details ? "by RimArcho" : "by RimArcho, click to edit")));
+    if (o.details && editable) {
+      const b = playerDataButton(T(i.note ? o.editLabel || "edit note" : "add note"), i.note ? icon.edit : icon.plus);
+      b.dataset.envWrite = "note";
+      b.onclick = open;
+      box.append(b);
+      if (focus) b.focus();
+    }
   };
-  show();
-  const hover = !i.note && i.auto && o.ownOnly ? i.auto + "\n" : "";
-  if (!i.id && !o.save) return box;
-  box.title = hover + T("click to edit") + T("; ") + "n";
-  box.onclick = () => {
+  const open = () => {
     if (box.classList.contains("editing")) return;
     box.classList.add("editing");
     box.innerHTML = "";
     const start = i.note || i.auto || "";
     const ta = el("textarea", "lib-note-in");
     ta.value = start;
-    ta.placeholder = o.placeholder || T("a note on this copy…");
+    ta.placeholder = o.placeholder || T(o.modNote ? "a note on this mod…" : "a note on this copy…");
+    ta.setAttribute("aria-label", T("note"));
     ta.rows = Math.min(6, Math.max(2, start.split("\n").length + 1));
     box.append(ta, el("div", "by", T("enter saves, esc cancels")));
     ta.focus();
@@ -338,19 +428,26 @@ export function noteEl(i, o = {}) {
       if (done) return;
       done = true;
       const text = ta.value.trim();
-      if (text === start.trim()) { show(); leave(); return; }
-      try { say("ok", await (o.save ? o.save(text) : api.LibrarySetNote(i.ref, text))); i.note = text; } catch (e) { say("fail", errText(e)); }
-      show();
+      if (text === start.trim()) { show(document.activeElement === ta); leave(); return; }
+      try { say("ok", await (o.save ? o.save(text) : api.LibrarySetNote(i.ref, text))); i.note = text; }
+      catch (e) { say("fail", errText(e)); done = false; return; }
+      show(document.activeElement === ta);
       leave();
       if (o.saved) await o.saved(text);
     };
     ta.onkeydown = (e) => {
       e.stopPropagation();
+      if (e.isComposing || e.keyCode === 229 || done) return;
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); }
-      else if (e.key === "Escape") { e.preventDefault(); done = true; show(); leave(); }
+      else if (e.key === "Escape") { e.preventDefault(); done = true; show(true); leave(); }
     };
     ta.onblur = save;
   };
+  show(false);
+  if (editable && !o.details) {
+    box.title = T("click to edit") + T("; ") + "n";
+    box.onclick = open;
+  }
   return box;
 }
 

@@ -153,6 +153,7 @@ func (i *LibInstance) State() string {
 // LibLineage is one mod: its instances in source order.
 type LibLineage struct {
 	ID, Ref, Name string
+	OriginalName  string // the displayed Mod's About.xml name when aliased
 	Alias, Note   string
 	Tags          []string
 	Instances     []*LibInstance
@@ -580,7 +581,7 @@ func (b *libBuild) finishLineages() {
 	added, newSince := Added(b.st), a.NewSince(ix.Env.GameID)
 	for id, l := range b.byLin {
 		if l.Name == "" {
-			l.Name = libName(ix, id, l)
+			l.Name, l.OriginalName = libName(ix, id, l)
 		}
 		l.Added = added[id]
 		l.New = IsNew(l.Added, newSince)
@@ -625,18 +626,28 @@ func foldLinked(l *LibLineage) {
 }
 
 // libName is the lineage's name: its primary instance's, else its first instance's.
-func libName(ix *Index, id string, l *LibLineage) string {
+func libName(ix *Index, id string, l *LibLineage) (name, original string) {
+	var mod *store.Mod
 	if lin := ix.Lineages[id]; lin != nil {
 		if p := ix.ByID[lin.PrimaryID]; p != nil && p.Status == identity.Live {
-			return p.DisplayName()
+			mod = p
 		}
 	}
-	for _, i := range l.Instances {
-		if i.Mod != nil {
-			return i.Mod.DisplayName()
+	if mod == nil {
+		for _, i := range l.Instances {
+			if i.Mod != nil {
+				mod = i.Mod
+				break
+			}
 		}
 	}
-	return id
+	if mod == nil {
+		return id, ""
+	}
+	if mod.Alias != "" {
+		original = mod.Name
+	}
+	return mod.DisplayName(), original
 }
 
 func libStates(st *LoadoutState, m *store.Mod, updated bool) []string {

@@ -2,7 +2,7 @@
 // menu group) and the row menu built from a row's codes. The plan editor and Mod library > All
 // list the same groups in the same order, each item with its key on the right, only the
 // ops that apply, unsubscribe / delete last in red.
-import { S } from "./state.js";
+import { S, T } from "./state.js";
 import * as pop from "./popups.js";
 
 let table = new Map();
@@ -27,21 +27,24 @@ export function sorted(codes) {
 }
 
 // menuItems are the menu's items for codes; run(code) runs one.
-export function menuItems(codes, run) {
+export function menuItems(codes, run, playerData) {
   const out = [];
   let group = 0;
   for (const c of sorted(codes)) {
     const o = op(c);
     if (group && o.group !== group) out.push({ sep: true });
     group = o.group;
-    out.push({ label: o.label, key: o.key || "", cls: o.danger ? "danger" : "", envWrite: o.group !== 3 ? c : "", run: () => run(c) });
+    if (c === "note" && playerData) {
+      out.push({ label: T(playerData.alias ? "edit alias…" : "add alias…"), envWrite: "alias", run: () => run("alias") });
+      out.push({ label: T(playerData.note ? "edit note…" : "add note…"), key: o.key, envWrite: c, run: () => run(c) });
+    } else out.push({ label: o.label, key: o.key || "", cls: o.danger ? "danger" : "", envWrite: o.group !== 3 ? c : "", run: () => run(c) });
   }
   return out;
 }
 
 // openMenu shows the row menu at x, y (keys: opened from the keyboard, the first item focused).
 export function openMenu(x, y, codes, run, keys = false, context) {
-  const items = menuItems(codes, run);
+  const items = menuItems(codes, run, context?.playerData);
   if (items.length) pop.menu(x, y, items, keys, context);
 }
 

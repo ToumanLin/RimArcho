@@ -78,7 +78,8 @@ Both palettes draw text on the terminal's own background. Each role also names a
 | Automatic sort | sort-amount-asc `U+F160` | `↨` U+21A8 | Text |
 | Search | search `U+F002` | `/` | Secondary |
 
-- A row has at most two icons: source and status. A status icon appears for a finding or corpus hint and is absent otherwise. In the GUI, hovering explains it and clicking pins the explanation (§5). The popover uses `--pop-bg`, a hairline, and `--shadow`; its text is selectable (§3.1 rule 13).
+- The source and status icons sit in dedicated row slots. A status icon appears for a finding or corpus hint and is absent otherwise. In the GUI, hovering explains it and clicking pins the explanation (§5). The popover uses `--pop-bg`, a hairline, and `--shadow`; its text is selectable (§3.1 rule 13).
+- Aliased Mods in the window carry a small pencil beside the name or copy label. The original About.xml name is available on hover and in the row's accessible description (§4.1).
 - The lock icon is not shown; the `official.order` finding expresses Core's position.
 - Both modes share the cursor ▸, success ✓, prompt ❯, and progress … markers, all drawn in one cell. Failure uses times-circle in full mode and ⨯ in compatibility mode; Cascadia Mono lacks ✗.
 - Compatibility glyphs have East Asian Neutral width N. Their width is 1 with either value of runewidth's EastAsianWidth, and default Cascadia Mono has a one-cell glyph for each. Nerd private-use icons and … have Ambiguous width A, so RimArcho must disable EastAsianWidth when measuring. A terminal that renders ambiguous characters in 2 cells, such as WezTerm with treat_east_asian_ambiguous_width_as_wide or some CJK consoles, will misalign Nerd icons; use compatibility mode there. `TestIconWidths` verifies that both icon sets occupy one cell.

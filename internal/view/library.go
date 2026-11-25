@@ -105,10 +105,11 @@ type LibRow struct {
 	Name string   `json:"name"`
 	Tags []string `json:"tags,omitempty"`
 	LibCells
-	Single bool         `json:"single,omitempty"`
-	New    bool         `json:"new,omitempty"` // a scan first found it lately (app.IsNew)
-	Insts  []LibInstRow `json:"insts"`
-	Copies int          `json:"copies"` // all copies (Insts are the matching ones)
+	OriginalName string       `json:"originalName,omitempty"`
+	Single       bool         `json:"single,omitempty"`
+	New          bool         `json:"new,omitempty"` // a scan first found it lately (app.IsNew)
+	Insts        []LibInstRow `json:"insts"`
+	Copies       int          `json:"copies"` // all copies (Insts are the matching ones)
 }
 
 // LibInstRow is one copy.
@@ -116,7 +117,8 @@ type LibInstRow struct {
 	SubscriptionKind string `json:"subscriptionKind,omitempty"`
 	ID               string `json:"id"` // the instance ("" for a subscribed item RimArcho never saw)
 	Ref              string `json:"ref"`
-	Label            string `json:"label"` // workshop  local  locked version  26/10/21 14:27 …
+	OriginalName     string `json:"originalName,omitempty"` // About.xml name when an alias is set
+	Label            string `json:"label"`                  // workshop  local  locked version  26/10/21 14:27 …
 	// Cells: Name and Source use the abstract copy caption; paths live in fields.
 	LibCells
 	// Note is the copy's own note (the player's or an agent's); Auto what RimArcho knows
@@ -433,7 +435,7 @@ func BuildLibrary(lib *app.Library, search string, filters []string, sort string
 	p := &LibPage{Total: res.Total, Shown: len(res.Matches), Sort: sort, Search: search, Complete: CompleteLibrary(search, lib), Ops: OpTable()}
 	var bytes int64
 	for _, m := range res.Matches {
-		r := LibRow{ID: m.ID, Ref: m.Ref, Name: m.Name, Tags: m.Tags, Copies: len(m.Instances), Single: len(m.Instances) == 1, New: m.New}
+		r := LibRow{ID: m.ID, Ref: m.Ref, Name: m.Name, OriginalName: m.OriginalName, Tags: m.Tags, Copies: len(m.Instances), Single: len(m.Instances) == 1, New: m.New}
 		r.Added = libDate(m.Added)
 		if m.Instances[0].Mod == nil {
 			r.Name = Tf("Workshop item %s", m.Instances[0].WorkshopID)
@@ -552,6 +554,9 @@ func libInst(lib *app.Library, l *app.LibLineage, i *app.LibInstance) LibInstRow
 	}
 	if i.Mod != nil {
 		r.ID = i.Mod.ID
+		if i.Mod.Alias != "" {
+			r.OriginalName = i.Mod.Name
+		}
 		r.LibCells.Name = r.Label // player-facing copy name; raw folder remains in fields
 	}
 	if s := rowState(i.States); s != "" {
@@ -1126,17 +1131,18 @@ func idsOfRefs(st *app.LoadoutState, refs []string) []string {
 // SetModNote sets a mod's own note (`n` in the editor, 16 §3.5; the note on the Lineage,
 // `archo note <ref>`); "" clears it.
 func SetModNote(a *app.App, ref, text string) (string, error) {
-	st, err := a.Loadout()
+	ix, err := a.Index()
 	if err != nil {
 		return "", err
 	}
-	if err := a.SetNote(ref, strings.TrimSpace(text)); err != nil {
+	m, err := ix.ResolveOne(ref)
+	if err != nil {
 		return "", err
 	}
-	name := ref
-	if m, err := st.Ix.ResolveOne(ref); err == nil {
-		name = m.DisplayName()
+	if err := a.SetNote(ref, text); err != nil {
+		return "", err
 	}
+	name := m.DisplayName()
 	if strings.TrimSpace(text) == "" {
 		return Tf("cleared the note of %s", name), nil
 	}
