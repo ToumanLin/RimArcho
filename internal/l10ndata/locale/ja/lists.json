@@ -163,7 +163,7 @@
   "keep %d where they are": "%d件を現在の場所に保持",
   "keep %d: moved to the folder below": "%d件を保持し、下記フォルダへ移動",
   "keep at least one version": "最低1つのバージョンを残してください",
-  "keep each game's current list (%d), without Archo Monitor and the mods only there through a link; RimArcho's backups of the list and of Mod settings are deleted (the settings stay)": "各ゲームの現在のリスト（%d件）は残し、Archo Monitorとリンクでのみ存在するMODだけを外します。RimArchoが作成したリストとMOD設定のバックアップは削除します（設定そのものは残ります）",
+  "keep each game's current list (%d), without Archo Monitor and the mods only there through a link; RimArcho's backups of the list and of Mod options are deleted (the settings stay)": "各ゲームの現在のリスト（%d件）は残し、Archo Monitorとリンクでのみ存在するMODだけを外します。RimArchoが作成したリストとMODオプションのバックアップは削除します（設定そのものは残ります）",
   "keep the change": "変更を保持",
   "keep them as ordinary mods": "通常のMODとして保持",
   "keep; move out": "保持して外へ移動",

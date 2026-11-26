@@ -21,7 +21,7 @@ The domain/UI distinction follows [03 §1](specs/03-environments-and-sources.md#
 | 官方来源 | official source | official | The game's Data directory containing Core and DLC. |
 | 后补订阅 | subscribe after downloading |  | Download with SteamCMD now, subscribe through Steam later to credit authors (11 §1); distinguish subscribing from downloading. |
 | 游戏版本 | game installation | game version | One physical installed game (a RimWorld folder on this computer). The Game Config page lists them first (“game versions on this computer”, `本机的游戏版本`, `このPCのゲームバージョン`); zh UI text names an installed game 游戏版本 (never 本体 or 安装); the same word also stays for a version number where Mods or packs name versions (`其他游戏版本`). Japanese UI: ゲームバージョン. |
-| 游戏配置 | environment | Game Config | A play context selecting a game installation, user data directory and current plan; Japanese UI: ゲーム構成. The interface says Game Config everywhere (the sidebar, Launch's 01 column, the switcher, Saves, Mod settings); its page explains it in one line: Game Config = game version + Mod Config (`游戏配置 = 游戏版本 + Mod 配置`); the Mod list is not part of the explanation (player's wording, 2026-11-25). Not game: the player decided to keep the name (2026-11-19, D2 reversed). |
+| 游戏配置 | environment | Game Config | A play context selecting a game installation, user data directory and current plan; Japanese UI: ゲーム構成. The interface says Game Config everywhere (the sidebar, Launch's 01 column, the switcher, Saves, Mod settings); its page explains it in one line: Game Config = game version + Mod options (`游戏配置 = 游戏版本 + Mod 选项`); the Mod list is not part of the explanation (player's wording, 2026-11-25). Not game: the player decided to keep the name (2026-11-19, D2 reversed). |
 | 游戏目录 | game folder | | The installation directory; Japanese: ゲームフォルダー. |
 | 环境来源 | environment source |  | An official or local source belonging to one game installation. |
 | 快照 | snapshot |  | Metadata and content fingerprints from one scan of an instance. |
@@ -169,7 +169,7 @@ The domain/UI distinction follows [03 §1](specs/03-environments-and-sources.md#
 | 眉题 | eyebrow |  | Short contextual label above a heading. |
 | 面包屑 | breadcrumbs |  |  |
 | 命令面板 | command panel |  |  |
-| Mod 配置 | Mod settings | mod settings | The Mod library page and the files of each Mod's stored settings. Not 设置: that is RimArcho's own Settings page (player's choice, 2026-11-25). The game's own in-game "Mod settings" window may still be called 设置 when quoting the game. |
+| Mod 选项 | Mod settings | Mod options | The Mod library page and the files of each Mod's stored settings. Every interface language uses the game's own name for its Mod options window: Mod options, `Mod 选项` (the game writes `Mod选项`), `MODオプション` (player's choice, 2026-11-25; was `Mod 配置`). Not 设置: that is RimArcho's own Settings page. |
 | Mod 库 | Mod library | mod library | The page listing every installed Mod copy; the English page name is lowercase. |
 | 能不能跑 | Can it run | can it run | The page that checks whether the current plan can run; the English page name is lowercase. |
 | 强调色 | accent color |  |  |

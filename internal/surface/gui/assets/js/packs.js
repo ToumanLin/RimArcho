@@ -473,7 +473,7 @@ function drawBuild() {
   const setRow = el("label", "xc-check");
   const set = el("input"); set.type = "checkbox"; set.checked = !B.noSettings;
   set.onchange = () => { closeDryRun(); B.noSettings = !set.checked; };
-  setRow.append(set, el("span", "", T("include Mod settings")), el("span", "xc-hint", T("this list's Mod settings, written into the pack's own settings on its first launch")));
+  setRow.append(set, el("span", "", T("include Mod options")), el("span", "xc-hint", T("this list's Mod options, written into the pack's own settings on its first launch")));
   bc.append(nameRow, nameError, revRow, setRow);
   basics.append(bc);
 

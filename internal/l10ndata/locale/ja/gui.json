@@ -489,7 +489,7 @@
   "add only what it lacks": "足りない分だけ追加",
   "after the import; settings files you have are kept": "取り込み後に適用；既存の設定ファイルは残ります",
   "another manager's data: a folder, a .db file, userRules.json": "他のマネージャーのデータ：フォルダー、.db ファイル、userRules.json",
-  "apply the Mod settings of %d mods": "%d 個の Mod の設定を適用",
+  "apply the Mod options of %d mods": "%d 個の MOD オプションを適用",
   "apply to %s": "%s に適用",
   "changes place": "位置が変わる",
   "choose it with “import” in Import a pack": "「パックを取り込む」の「取り込む」で選んでください",

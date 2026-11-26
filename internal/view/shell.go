@@ -191,7 +191,7 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 		{ID: PagePlan, Label: T("lists"), Kids: planKids},
 		{ID: PagePacks, Label: T("packs"), Kids: packKids},
 		// Below the packs (2026-10-28). The entry opens All, its first sub-entry (16 §2.9).
-		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all mods")}, {ID: PageChanges, Label: T("updates")}, {ID: PageSubscribe, Label: T("add a subscription")}, {ID: PageSearch, Label: T("search files")}, {ID: PageModSettings, Label: T("mod settings")},
+		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all mods")}, {ID: PageChanges, Label: T("updates")}, {ID: PageSubscribe, Label: T("add a subscription")}, {ID: PageSearch, Label: T("search files")}, {ID: PageModSettings, Label: T("mod options")},
 			// what the game loads faster (10 §2); a sub-entry since 2026-11-18, keeping shift+7
 			{ID: PageTextures, Label: T("texture optimisation")}}},
 		{ID: PageEnv, Label: T("Game Config")},
@@ -871,7 +871,7 @@ func PackUpdateOfferOf(u *app.PackUpdate) *PackUpdateOffer {
 		list(Tf("removed %d", len(d.Removed)), d.Removed)
 		list(Tf("changed %d", len(d.Changed)), d.Changed)
 		if d.Settings > 0 {
-			o.Lines = append(o.Lines, Tf("Mod settings of %d mods: only those the pack has none of yet", d.Settings))
+			o.Lines = append(o.Lines, Tf("Mod options of %d mods: only those the pack has none of yet", d.Settings))
 		}
 	}
 	return o

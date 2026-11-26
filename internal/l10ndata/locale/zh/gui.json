@@ -489,7 +489,7 @@
   "add only what it lacks": "只补上缺的",
   "after the import; settings files you have are kept": "导入后应用；已有的设置文件保留",
   "another manager's data: a folder, a .db file, userRules.json": "其他管理器的数据：文件夹、.db 文件、userRules.json",
-  "apply the Mod settings of %d mods": "应用 %d 个 Mod 的配置",
+  "apply the Mod options of %d mods": "应用 %d 个 Mod 的选项",
   "apply to %s": "应用到 %s",
   "changes place": "换了位置",
   "choose it with “import” in Import a pack": "请用“导入整合包”的“导入”选择它",

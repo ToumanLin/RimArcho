@@ -390,7 +390,7 @@ function configChoices(card) {
   if (A.from && copy) {
     // what the choice copies: on hover of the row, not a line under it (16 §2.15)
     row(T("start with"), seg([Tf("copy the settings of %s", A.from), T("game defaults")], A.copy ? 0 : 1, (k) => { A.copy = k === 0; draw(); }))
-      .title = A.copy ? T("copies game settings and Mod settings; no Mod files or saves are copied") : T("game defaults; no settings or saves are copied");
+      .title = A.copy ? T("copies game settings and Mod options; no Mod files or saves are copied") : T("game defaults; no settings or saves are copied");
   } else if (A.from && g) {
     row(T("start with"), el("span", "", T("game defaults")));
     box.append(el("div", "dl-note muted", Tf("%s uses another game folder, so its settings cannot be copied; no settings or saves are copied", A.from)));

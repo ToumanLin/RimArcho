@@ -1040,7 +1040,7 @@ function drawExport() {
     const cb = el("input"); cb.type = "checkbox"; cb.checked = !!d.settings;
     cb.onchange = () => setSettings(cb.checked);
     const note = d.settings ? Tf("settings of %d mods", d.settingsMods) : T("they choose whether to apply them");
-    lb.append(cb, el("span", "", T("include Mod settings")), el("span", "xc-hint", note));
+    lb.append(cb, el("span", "", T("include Mod options")), el("span", "xc-hint", note));
     right.append(lb);
   }
   right.append(acts, out, show, pre);

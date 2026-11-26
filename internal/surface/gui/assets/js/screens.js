@@ -2337,7 +2337,7 @@ export async function environment() {
   const top = sc.scrollTop;
   sc.innerHTML = "";
   const current=(p.envs||[]).find(e=>e.current);
-  const w = page("env", T("Game Config = game version + Mod Config; RimWorld starts from it"), act(T("Add Game Config"), "plus", () => ui.go("guide")), act(T("copy the game folder…"), "copy", () => ui.go("guide:copy")), rescanButton());
+  const w = page("env", T("Game Config = game version + Mod options; RimWorld starts from it"), act(T("Add Game Config"), "plus", () => ui.go("guide")), act(T("copy the game folder…"), "copy", () => ui.go("guide:copy")), rescanButton());
   sc.append(w);
   // 1. the game versions on this computer (16 §2.8): each game, the configs that play it
   const gameLab = el("div", "label section", T("game versions on this computer"));

@@ -51,7 +51,7 @@ func (s *API) ImportSettings(mods []string, replace, dryRun bool) (*app.ListSett
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.x.settings.Empty() {
-		return nil, errors.New(view.T("the list carries no Mod settings"))
+		return nil, errors.New(view.T("the list carries no Mod options"))
 	}
 	p, err := s.a.ApplyListSettings(s.x.settings, mods, replace, dryRun)
 	if err != nil {

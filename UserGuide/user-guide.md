@@ -20,7 +20,7 @@ This guide is for players. It walks through every part of RimArcho 1.1.4: what e
 12. [Saves](#12-saves)
 13. [Packs](#13-packs)
 14. [Texture optimisation](#14-texture-optimisation)
-15. [Search files and Mod settings](#15-search-files-and-mod-settings)
+15. [Search files and Mod options](#15-search-files-and-mod-options)
 16. [Background tasks](#16-background-tasks)
 17. [Settings](#17-settings)
 18. [The terminal interface](#18-the-terminal-interface)
@@ -122,7 +122,7 @@ archo status                     # overview: Mods, the list, problem counts
 | library | **lists** | `shift+4` | Edit the current list. Below it: **all lists** and your recent lists |
 | | **packs** | `shift+5` | Frozen Mod sets with their own saves |
 | | **saves** | — | Saves grouped by colony, load checks, playthrough history |
-| | **mod library** | `shift+6` | Every installed Mod. Below it: **all mods**, **updates**, **add a subscription**, **search files**, **mod settings** |
+| | **mod library** | `shift+6` | Every installed Mod. Below it: **all mods**, **updates**, **add a subscription**, **search files**, **mod options** |
 | | **texture optimisation** | `shift+7` | Convert textures so the game loads faster |
 | | **game** | `shift+8` | Your RimWorld installations and their settings |
 | footer | **background tasks** | `ctrl+j` | Downloads, conversions and other long jobs |
@@ -429,7 +429,7 @@ When you launch, RimArcho saves the list, prepares links, and starts the game th
 
 **A folder in the way.** If an ordinary folder in `Mods/` would hide the copy your list wants, RimArcho can offer **move and go on**: it moves that folder into the lock library (your lists that used it keep using it) and links the right copy. The preview names every move.
 
-**Mod settings follow the copy.** When a Mod's folder name changes (say from the Workshop to a link), the game would look for a differently named settings file. RimArcho copies your existing settings to the new name, never overwriting anything.
+**Mod options follow the copy.** When a Mod's folder name changes (say from the Workshop to a link), the game would look for a differently named settings file. RimArcho copies your existing settings to the new name, never overwriting anything.
 
 ---
 
@@ -493,7 +493,7 @@ Archo Monitor (`toumanlin.archomonitor`) is a small helper Mod that comes with R
 - which XML file and Def was loading when an error happened;
 - which phase the game was in: starting up, main menu, loading a save, creating a colony, playing;
 - how often each error repeats, even after the game has reached its message limit and stopped logging;
-- what Mod settings screens contain, so RimArcho can show labels and defaults for settings outside the game.
+- what Mod options screens contain, so RimArcho can show labels and defaults for settings outside the game.
 
 It writes `ArchoMonitor.log` and `ArchoMonitor-prev.log` next to the game's own logs and uploads nothing. These files can contain paths and save names, so look before sharing them. RimArcho adds it to new lists right after Harmony (switch this off in **settings › game log › add Archo Monitor to lists**) and keeps it up to date. Logs from RimCrow's companion (`RimCrow_Realtime.log`) are read too.
 
@@ -639,7 +639,7 @@ A pack is a frozen copy of a list: the exact Mod files, in order, with its own s
 
 Textures can be pre-converted at full size, or slimmed to 80, 75, 60, 50, 40 or 25 % for a smaller pack (`D` changes the choice; **count the textures** measures it). Then **create pack** (`B`). An interrupted copy offers **create again** or **delete what it copied** (your original Mods are never touched).
 
-**Playing.** **play** (`L`) on the pack's page, or choose it on **start**. The first launch copies your existing Mod settings into the pack without replacing its own. A pack needs the same game major version (1.6, 1.7…) and its DLC; a different build of the same version only warns.
+**Playing.** **play** (`L`) on the pack's page, or choose it on **start**. The first launch copies your existing Mod options into the pack without replacing its own. A pack needs the same game major version (1.6, 1.7…) and its DLC; a different build of the same version only warns.
 
 **Sharing.** **export** (`e`) writes an `.archopack` with the Mod files (no game, DLC, saves or settings). **export the list** (`E`) writes a small list file without Mod files. Importing checks every file against the pack's fingerprints.
 
@@ -661,7 +661,7 @@ Original PNGs stay where they are; RimArcho writes the DDS next to them and reme
 
 ---
 
-## 15. Search files and Mod settings
+## 15. Search files and Mod options
 
 ### Search files
 
@@ -669,9 +669,9 @@ Original PNGs stay where they are; RimArcho writes the DDS next to them and reme
 
 `enter` searches; `alt+c` case-sensitive; `alt+r` regular expression; `n`/`N` next/previous match; `alt+z` wrap lines; `ctrl+o` open folder; `ctrl+c` copy path; `esc` stop. Searching never changes Mod files.
 
-### Mod settings
+### Mod options
 
-**mod library › mod settings** lists the settings files of the current list's Mods, including HugsLib settings. Select one to see its stored values and, when Archo Monitor has seen the in-game settings screen, the labels and defaults.
+**mod library › mod options** lists the settings files of the current list's Mods, including HugsLib settings. Select one to see its stored values and, when Archo Monitor has seen the in-game settings screen, the labels and defaults.
 
 Switches change directly; value fields save with `enter` and cancel with `esc`; **reset** removes a stored value. Each change writes the file at once, keeps a `.rimarcho.bak` backup, and refuses if the game is running or the file changed meanwhile. Complex or ambiguous values stay read-only. **open the Config folder** (`ctrl+o`).
 
@@ -831,7 +831,7 @@ args = ["mcp"]
 { "mcpServers": { "rimarcho": { "command": "C:\\Tools\\RimArcho\\archo.exe", "args": ["mcp"] } } }
 ```
 
-By default the agent gets the tools for diagnosing and fixing a list: reading Mods, Defs, patches, Harmony patches, logs, Mod settings, saves and C# source; editing, saving and launching the list; test runs; locking versions; rules; ignoring problems. Add `--tools all` (`"args": ["mcp", "--tools", "all"]`) to also let it manage packs, subscriptions, the library, textures, memory estimates, upkeep, tags and notes, and change Mod settings and saves. Each tool costs the agent context, so add them only when you want the agent to do those jobs.
+By default the agent gets the tools for diagnosing and fixing a list: reading Mods, Defs, patches, Harmony patches, logs, Mod options, saves and C# source; editing, saving and launching the list; test runs; locking versions; rules; ignoring problems. Add `--tools all` (`"args": ["mcp", "--tools", "all"]`) to also let it manage packs, subscriptions, the library, textures, memory estimates, upkeep, tags and notes, and change Mod options and saves. Each tool costs the agent context, so add them only when you want the agent to do those jobs.
 
 Then ask, for example: "My log has `Patch operation … failed` errors, which Mod is wrong?", or paste a stack trace.
 
@@ -868,7 +868,7 @@ RimArcho writes game files only when you ask:
 | --- | --- |
 | `Config/ModsConfig.xml` in the game's user data folder | Your list, on save or launch; the previous file is kept as `ModsConfig.xml.rimarcho.bak` |
 | Game `Mods/` | Links named `_Archo_…` and `!ArchoPack_…` (locked and local copies live in the lock library and are linked in) |
-| Mod settings files | Only when you edit a setting (with a `.rimarcho.bak`), or a copy for a renamed folder |
+| Mod options files | Only when you edit a setting (with a `.rimarcho.bak`), or a copy for a renamed folder |
 | Mod folders, Workshop ones included | Only on request: un-hiding (`About.xml.disabled` → `About.xml`), DDS textures you converted, moving a folder to the recycle bin |
 | Lock library, packs, downloads | Copies and downloads you asked for, in folders you chose |
 

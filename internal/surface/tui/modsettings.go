@@ -22,7 +22,7 @@ func (m *model) modSettingsPanel() tea.Cmd {
 		m.say(sayFail, err.Error())
 		return nil
 	}
-	m.openPanel(T("mod settings"), modSettingsText(l))
+	m.openPanel(T("mod options"), modSettingsText(l))
 	m.panel.nav, m.panel.navSub = 6, view.PageModSettings
 	return nil
 }
@@ -31,7 +31,7 @@ func (m *model) modSettingsPanel() tea.Cmd {
 func modSettingsText(l *app.ModSettingsList) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s: %s\n", T("folder"), l.Config)
-	b.WriteString(T("change simple values on the GUI's Mod settings page, with archo mod-settings set, or in the game") + "\n")
+	b.WriteString(T("change simple values on the GUI's Mod options page, with archo mod-settings set, or in the game") + "\n")
 	if len(l.Mods) == 0 {
 		b.WriteString("\n" + T("no Mod of this list has a settings file, and Archo Monitor recorded no settings window yet") + "\n")
 		return b.String()

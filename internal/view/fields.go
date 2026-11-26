@@ -132,7 +132,7 @@ func tailFields(a *app.App, st *app.LoadoutState, mod *store.Mod, d *DetailData)
 	var fs []Field
 	if st != nil {
 		if n, ok := app.StoredSettingsOf(st, mod); ok {
-			fs = append(fs, Field{Kind: FieldSettings, Label: T("mod settings"), Value: Tf("%d stored values", n),
+			fs = append(fs, Field{Kind: FieldSettings, Label: T("mod options"), Value: Tf("%d stored values", n),
 				Act: ActSettings, ActAt: T("open"), Target: mod.ID})
 		}
 	}

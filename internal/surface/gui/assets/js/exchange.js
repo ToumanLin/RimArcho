@@ -925,7 +925,7 @@ async function preview(kind, src, fileName, from = "file", view = null) {
   let follow = !!p.collection, settings = false;
   const opts = [];
   if (p.collection) opts.push(checkLine(T("follow this collection"), T("RimArcho tells you when it changes; catching up is one undoable step"), () => follow, v => { follow = v; }));
-  if (p.settings) opts.push(checkLine(Tf("apply the Mod settings of %d mods", p.settings), T("after the import; settings files you have are kept"), () => settings, v => { settings = v; }));
+  if (p.settings) opts.push(checkLine(Tf("apply the Mod options of %d mods", p.settings), T("after the import; settings files you have are kept"), () => settings, v => { settings = v; }));
 
   let busy = false;
   const name0 = fromGame && cfg ? cfg : p.name || (p.source || "").replace(/^.*[\\/]/, "").replace(/\.[^.]*$/, "");
@@ -1087,8 +1087,8 @@ function errorRow(name, why) {
 function settingsLine(pl) {
   let n = 0, failed = 0;
   for (const m of pl.mods) for (const f of m.files) { if (f.error) failed++; else if (f.write) n++; }
-  if (n === 1) return failed ? Tf("Mod settings: %d file written, %d failed", n, failed) : Tf("Mod settings: %d file written", n);
-  return failed ? Tf("Mod settings: %d files written, %d failed", n, failed) : Tf("Mod settings: %d files written", n);
+  if (n === 1) return failed ? Tf("Mod options: %d file written, %d failed", n, failed) : Tf("Mod options: %d file written", n);
+  return failed ? Tf("Mod options: %d files written, %d failed", n, failed) : Tf("Mod options: %d files written", n);
 }
 
 // Shared by the Import page and the lists' new / import form: the source as the card's first
@@ -1103,7 +1103,7 @@ export function showImportSummary(body, p, sourceIsPath = !!p.sourcePath) {
   if (p.name) facts.push(Tf("list: %s", p.name));
   if (p.game) facts.push("RimWorld " + p.game);
   if (p.allowed) facts.push(Tf("suggested game versions: %s", p.allowed));
-  if (p.settings) facts.push(Tf("Mod settings of %d mods", p.settings));
+  if (p.settings) facts.push(Tf("Mod options of %d mods", p.settings));
   l.append(factText(el("div", "sub facts"), facts.filter(Boolean)));
   if (p.gameNote) l.append(el("div", "sub warn", p.gameNote));
   top.append(l);

@@ -357,7 +357,7 @@ async function openFiles() {
   tableCard = detailCard = null; rowEls = [];
   if (!shown.length) {
     const empty = el("section", "card empty-state");
-    empty.append(el("p", "", view === 2 ? T("no orphaned settings file: every Mod settings file belongs to an installed Mod") : T("no such file in the Config folder")));
+    empty.append(el("p", "", view === 2 ? T("no orphaned settings file: every Mod options file belongs to an installed Mod") : T("no such file in the Config folder")));
     w.append(empty);
     sc.append(w);
     read.finish();
