@@ -1,6 +1,7 @@
 package feedback
 
 import (
+	"slices"
 	"strings"
 )
 
@@ -13,6 +14,7 @@ const (
 	KindDiagnosis = "diagnosis"
 	KindData      = "data"
 	KindOther     = "other"
+	KindL10n      = "l10n" // a translation fix: element codes (ctrl+\) and better wording
 )
 
 // Question forms.
@@ -24,6 +26,7 @@ const (
 	FormFinding = "finding" // a Can it run item's ID, picked from the current ones
 	FormMod     = "mod"     // a Mod's packageId or Workshop ID
 	FormURL     = "url"     // one line, a link
+	FormFixes   = "fixes"   // lines of "code → wording": a reference number (ctrl+\) and the fix
 )
 
 // Question is one thing a report kind asks.
@@ -58,7 +61,21 @@ const DataFinding = "finding"
 // carries the recent operations and the relay labels it priority.
 const FilesQuestion = "files"
 
-// Templates are the five kinds in the order the page lists them.
+// L10nQuestion is the translation-fix kind's "code → wording" lines; the codes in it pick
+// the reference-number entries that go with the report (RefCodes).
+const L10nQuestion = "fixes"
+
+// Machine-translated interface languages: the translation-fix kind's lead and note say so
+// in them and ask for corrections (16 §2.14).
+var MachineLangs = []string{"ko", "ru"}
+
+// The translation-fix kind's lead and note in a machine-translated language.
+const (
+	L10nLeadMT = "Claude translated this language: fix wording that reads oddly"
+	L10nNoteMT = "RimArcho's Korean and Russian are translated by Claude. If some wording reads oddly, press ctrl+\\, then write the element's code and your correction here."
+)
+
+// Templates are the six kinds in the order the page lists them.
 var Templates = []Template{
 	{Kind: KindFeature, Label: "feature request", Lead: "something RimArcho could do",
 		Questions: []Question{
@@ -74,26 +91,34 @@ var Templates = []Template{
 			{Key: "every", Label: "does it happen again", Form: FormChoice, Choices: []string{"every time", "sometimes", "only once"}, Optional: true},
 			{Key: FilesQuestion, Label: "files were changed or lost", Form: FormCheck, Optional: true},
 		},
-		Attach: []string{"log"}},
+		Attach: []string{"log", "ops"}},
 	{Kind: KindDiagnosis, Label: "wrong diagnosis", Lead: "a false alarm, or a problem RimArcho missed",
 		Questions: []Question{
 			{Key: "finding", Label: "which diagnosis", Form: FormFinding, Hint: "pick one, or describe the one RimArcho missed"},
 			{Key: "why", Label: "why you think it is wrong", Form: FormText},
 			{Key: "game", Label: "what happened in the game", Form: FormText, Optional: true},
 		},
-		Attach: []string{"mods"}, Auto: []string{"finding"}},
+		Attach: []string{"mods", "problems"}, Auto: []string{"finding"}},
 	{Kind: KindData, Label: "outdated data", Lead: "shared-log data or the replacement library",
 		Questions: []Question{
 			{Key: "mod", Label: "which Mod", Form: FormMod, Hint: "packageId or Workshop ID"},
 			{Key: "should", Label: "what it should be", Form: FormText, Hint: "for example: this Mod has been replaced by …"},
 			{Key: "source", Label: "a link that shows it", Form: FormURL, Optional: true},
 		},
-		Auto: []string{"mod", "data"}},
+		Attach: []string{"mods", "problems"}, Auto: []string{"mod", "data"}},
+	{Kind: KindL10n, Label: "translation fix", Lead: "wording that reads oddly in your language",
+		Note: "press ctrl+\\ to show each element's code, then write the code and the wording you suggest",
+		Questions: []Question{
+			{Key: L10nQuestion, Label: "codes and corrections", Form: FormFixes, Hint: "one per line: hom22 → the wording you suggest"},
+			{Key: "note", Label: "anything else", Form: FormText, Optional: true},
+		},
+		Auto: []string{"refnums"}},
 	{Kind: KindOther, Label: "other / help", Lead: "a question, or anything else",
 		Note: "a problem in the game or in a Mod itself? its Mod page usually answers it sooner",
 		Questions: []Question{
 			{Key: "text", Label: "what you want to say", Form: FormText},
-		}},
+		},
+		Attach: []string{"ops"}},
 }
 
 // TemplateOf is the template of a kind; an unknown kind is "other".
@@ -113,6 +138,39 @@ func Kinds() []string {
 		out[i] = t.Kind
 	}
 	return out
+}
+
+// RefCodes are the reference numbers (ctrl+\, such as hom22) a translation fix names: the
+// code that starts each line or each "; "-separated part, in order, once each.
+func RefCodes(text string) []string {
+	var out []string
+	for _, line := range strings.FieldsFunc(text, func(r rune) bool { return r == '\n' || r == ';' }) {
+		if c := refCode(line); c != "" && !slices.Contains(out, c) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// refCode is the code a line starts with: two to eight letters, then digits (refnums.js
+// prefixes are page names; SaveRefNums takes up to eight letters).
+func refCode(line string) string {
+	line = strings.ToLower(strings.TrimSpace(line))
+	i := 0
+	for i < len(line) && line[i] >= 'a' && line[i] <= 'z' {
+		i++
+	}
+	j := i
+	for j < len(line) && line[j] >= '0' && line[j] <= '9' {
+		j++
+	}
+	if i < 2 || i > 8 || j == i || j-i > 6 {
+		return ""
+	}
+	if j < len(line) && (line[j] >= 'a' && line[j] <= 'z' || line[j] == '_') {
+		return "" // a word, not a code
+	}
+	return line[:j]
 }
 
 // Priority reports whether a report of this kind with these answers goes to the top: a bug

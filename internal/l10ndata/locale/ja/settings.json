@@ -406,5 +406,21 @@
   "check files automatically": "ファイルを自動でチェック",
   "after edits": "編集後",
   "when saved": "保存時",
-  "Can it run checks the Mods' files (the patch simulation) by itself, at low priority. After edits: 2 seconds after you stop editing; when saved: when you save the list or open Can it run or Launch; off: only check again": "起動前チェックが Mod のファイル（パッチのシミュレーション）を低い優先度で自動チェックします。編集後：編集をやめて 2 秒後。保存時：リストの保存時と、起動前チェック・起動ページを開いたとき。オフ：「もう一度チェック」のときだけ"
+  "Can it run checks the Mods' files (the patch simulation) by itself, at low priority. After edits: 2 seconds after you stop editing; when saved: when you save the list or open Can it run or Launch; off: only check again": "起動前チェックが Mod のファイル（パッチのシミュレーション）を低い優先度で自動チェックします。編集後：編集をやめて 2 秒後。保存時：リストの保存時と、起動前チェック・起動ページを開いたとき。オフ：「もう一度チェック」のときだけ",
+  "translation fix": "翻訳の修正",
+  "wording that reads oddly in your language": "不自然に読める表示文字",
+  "press ctrl+\\ to show each element's code, then write the code and the wording you suggest": "ctrl+\\ で各要素の番号を表示し、その番号と提案する言い回しを書いてください",
+  "codes and corrections": "番号と修正",
+  "one per line: hom22 → the wording you suggest": "1 行に 1 つ：hom22 → 提案する言い回し",
+  "anything else": "その他",
+  "Claude translated this language: fix wording that reads oddly": "この言語は Claude が翻訳しました：不自然な言い回しを直す",
+  "RimArcho's Korean and Russian are translated by Claude. If some wording reads oddly, press ctrl+\\, then write the element's code and your correction here.": "RimArcho の韓国語とロシア語は Claude が翻訳しています。不自然な言い回しがあれば ctrl+\\ を押し、その要素の番号と修正をここに書いてください。",
+  "interface language: %s": "表示言語: %s",
+  "reference numbers (%d)": "要素の番号（%d）",
+  "not numbered on this computer": "このコンピューターでは番号が付いていません",
+  "another line": "もう 1 行",
+  "the wording you suggest": "提案する言い回し",
+  "(no text)": "（テキストなし）",
+  "press %s on that page first": "先にそのページで %s を押してください",
+  "remove this line": "この行を削除"
 }

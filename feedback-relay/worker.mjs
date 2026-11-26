@@ -109,7 +109,7 @@ export const MAX_SPLIT = 3;
 // KIND_LABELS turn a report's template into a label; anything else gets none. A ticked "files
 // were changed or lost" adds PRIORITY_LABEL. GitHub's own labels (bug, enhancement, question)
 // exist in every repository; the others are created once by hand (README step 6).
-export const KIND_LABELS = { feature: "enhancement", bug: "bug", diagnosis: "diagnosis", data: "data", other: "question" };
+export const KIND_LABELS = { feature: "enhancement", bug: "bug", diagnosis: "diagnosis", data: "data", l10n: "localization", other: "question" };
 export const PRIORITY_LABEL = "priority";
 const GITHUB_LABELS = new Set(["bug", "enhancement", "question"]);
 const REQUEST_LABEL = KIND_LABELS.feature;

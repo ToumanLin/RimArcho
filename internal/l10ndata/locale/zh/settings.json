@@ -406,5 +406,21 @@
   "check files automatically": "自动检查文件",
   "after edits": "编辑后",
   "when saved": "保存时",
-  "Can it run checks the Mods' files (the patch simulation) by itself, at low priority. After edits: 2 seconds after you stop editing; when saved: when you save the list or open Can it run or Launch; off: only check again": "“能不能跑”会自己检查 Mod 文件（模拟补丁），以低优先级运行。编辑后：停止编辑 2 秒后；保存时：保存列表或打开“能不能跑”、启动页时；关闭：只在点“重新检查”时"
+  "Can it run checks the Mods' files (the patch simulation) by itself, at low priority. After edits: 2 seconds after you stop editing; when saved: when you save the list or open Can it run or Launch; off: only check again": "“能不能跑”会自己检查 Mod 文件（模拟补丁），以低优先级运行。编辑后：停止编辑 2 秒后；保存时：保存列表或打开“能不能跑”、启动页时；关闭：只在点“重新检查”时",
+  "translation fix": "翻译修正",
+  "wording that reads oddly in your language": "读起来别扭的界面文字",
+  "press ctrl+\\ to show each element's code, then write the code and the wording you suggest": "按 ctrl+\\ 显示每个元素的编号，再写下编号和你建议的说法",
+  "codes and corrections": "编号与修正",
+  "one per line: hom22 → the wording you suggest": "每行一条：hom22 → 你建议的说法",
+  "anything else": "其他补充",
+  "Claude translated this language: fix wording that reads oddly": "这门语言由 Claude 翻译：修正读起来别扭的文字",
+  "RimArcho's Korean and Russian are translated by Claude. If some wording reads oddly, press ctrl+\\, then write the element's code and your correction here.": "RimArcho 的韩语和俄语由 Claude 翻译。若有文字读起来别扭，请按 ctrl+\\，然后在这里写下该元素的编号和你的修正。",
+  "interface language: %s": "界面语言：%s",
+  "reference numbers (%d)": "元素编号（%d）",
+  "not numbered on this computer": "这台电脑上没有这个编号",
+  "another line": "再加一行",
+  "the wording you suggest": "你建议的说法",
+  "(no text)": "（无文字）",
+  "press %s on that page first": "先在那个页面按 %s",
+  "remove this line": "删除这一行"
 }

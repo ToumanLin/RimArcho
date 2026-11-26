@@ -334,6 +334,13 @@ test("a report's kind becomes a label, files lost adds priority; missing labels 
   gh = hub();
   await send(env(), gh, { title: "a", body: "x", kind: "made-up" }, { ip: "192.0.2.51" });
   assert.deepEqual(created(gh), [["feedback"]], "an unknown kind adds nothing");
+  gh = hub();
+  await send(env(), gh, { title: "a", body: "x", kind: "l10n", priority: true }, { ip: "192.0.2.58" });
+  assert.deepEqual(created(gh), [["feedback", "localization"]], "a translation fix is labelled localization");
+  // localization does not exist yet: LABEL still goes on
+  gh = hub({ missing: ["localization"] });
+  await send(env(), gh, { title: "a", body: "x", kind: "l10n" }, { ip: "192.0.2.59" });
+  assert.deepEqual(created(gh), [["feedback", "localization"], ["feedback"]]);
 
   // diagnosis does not exist yet: LABEL still goes on
   gh = hub({ missing: ["diagnosis", "priority"] });

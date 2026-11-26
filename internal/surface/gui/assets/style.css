@@ -1886,6 +1886,13 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .fb-pills { display: flex; flex-wrap: wrap; gap: 6px; font-weight: 400; }
 .page .btn.fb-pill { height: 26px; padding: 0 12px; border-radius: 999px; font-size: 12px; }
 .page .btn.fb-pill.on { border-color: var(--accent); background: var(--accent-soft); color: var(--fg); }
+/* a translation fix: code, the element's text now, the wording suggested (16 §2.14) */
+.fb-fix-rows { display: flex; flex-direction: column; gap: 6px; font-weight: 400; }
+.fb-fix { display: grid; grid-template-columns: 84px minmax(0, 1fr) minmax(0, 1.3fr) 22px; align-items: center; gap: 8px; }
+.fb-fix .field { height: 30px; }
+.fb-fix-now { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
+.fb-fix-now.warn { color: var(--amber); }
+.fb-fixes > .btn.link.fb-add { align-self: flex-start; }
 .fb-files { padding: 6px 0 2px; }
 .fb-files .name { font-weight: 500; }
 .fb-files input:checked + .name { color: var(--red); }
