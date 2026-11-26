@@ -93,7 +93,7 @@ func TestIgnoreMergedDependency(t *testing.T) {
 	}
 	elapsed := time.Since(start)
 	t.Logf("%d refs in %v, %d problem computations, %d write commits", count, elapsed, probe.problems, probe.commits)
-	if probe.problems != 1 || probe.commits != 1 || elapsed > 500*time.Millisecond {
+	if probe.problems != 1 || probe.commits != 1 || elapsed > timingLimit(500*time.Millisecond) {
 		t.Error("expected one problem computation and one write transaction within 500 ms")
 	}
 	rows, err := s.Ignores(ps.State.Ix.Env.ID)

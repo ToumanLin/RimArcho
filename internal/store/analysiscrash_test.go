@@ -72,7 +72,7 @@ func TestAnalysisReclaimsAbandonedStage(t *testing.T) {
 	assertPending(live.id, "live")
 	start := time.Now()
 	replacement, err := s.SaveAnalysis(game, "plan", "replacement", "1.6", keep, &analyze.Output{}, now, now)
-	if elapsed := time.Since(start); err != nil || elapsed > 500*time.Millisecond {
+	if elapsed := time.Since(start); err != nil || elapsed > timingLimit(500*time.Millisecond) {
 		t.Fatalf("reclaim during the next save took %v: %v", elapsed, err)
 	}
 	if replacement <= dead.id {
