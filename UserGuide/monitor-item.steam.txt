@@ -9,7 +9,7 @@ To see what it found, get RimArcho (free, MIT). The last time RimArcho was publi
 [img]https://steamuserimages-a.akamaihd.net/ugc/1830159746169505364/6FEA4D465978DCEBC9815AE94D6FB6329550F442/?imw=5000&imh=5000&ima=fit&impolicy=Letterbox&imcolor=%23000000&letterbox=false[/img]
 
 [img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/en/header-02-rimarcho.gif[/img]
-A clean, fast, lightweight RimWorld launcher and Mod manager: less fiddling with Mods, less reading errors, more playing. [strike]RimArcho has the cutest Archo-chan.[/strike]
+A RimWorld launcher and Mod manager that looks past your current list: game versions, playthroughs and saves, one click apart. When something breaks, your AI agent launches the game and finds the culprit: no more halving your Mod list for hours. [strike]RimArcho has the cutest Archo-chan.[/strike]
 [list]
 [*][b]Platforms and languages:[/b] Windows (stable) and Linux (testing); English, Chinese and Japanese.
 [*][b]Light:[/b] core 47 MB of memory, peak <250 MB, ~100 MB at rest (RimSort and RimCrow: usually 500+ MB; tested with my 450-Mod list).

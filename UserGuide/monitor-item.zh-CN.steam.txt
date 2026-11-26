@@ -9,7 +9,7 @@ Archo Monitor 是 RimArcho 启动器的游戏内辅助 Mod. 它记录游戏的�
 [img]https://steamuserimages-a.akamaihd.net/ugc/1830159746169505364/6FEA4D465978DCEBC9815AE94D6FB6329550F442/?imw=5000&imh=5000&ima=fit&impolicy=Letterbox&imcolor=%23000000&letterbox=false[/img]
 
 [img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/zh/header-02-rimarcho.gif[/img]
-简洁高效且占用小的 RimWorld 启动器和 Mod 管理器: 少纠结 Mod, 少查报错, 多玩游戏. [strike]RimArcho 有最可爱的 Archo 酱[/strike]
+不只管当前列表的 RimWorld 启动器和 Mod 管理器: 游戏版本, 周目, 存档一键切换. 出了错, AI 自己启动游戏找到元凶, 不用再花几个小时对半拆 Mod 列表. [strike]RimArcho 有最可爱的 Archo 酱[/strike]
 [list]
 [*][b]多版本多语言:[/b] 目前支持Windows(稳定)和Linux(测试), 支持英语, 中文, 日语.
 [*][b]轻量:[/b] 业务部分 47MB 内存, 峰值 <250MB, GUI 日常 ~100MB (RimSort, RimCrow 普遍 500+MB, 以我的450Mods列表测试).

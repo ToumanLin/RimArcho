@@ -6,8 +6,8 @@
 
 # RimArcho
 
-**一款简洁、快速、轻量的 RimWorld 启动器和 Mod 管理器。**<br>
-少纠结 Mod，少查报错，多玩游戏。
+**不只管当前列表的 RimWorld 启动器和 Mod 管理器。**<br>
+游戏版本、周目、存档一键切换。出了错，AI 自己启动游戏找到元凶，不用再花几个小时对半拆 Mod 列表。
 
 [![最新版本](https://img.shields.io/github/v/release/ToumanLin/RimArcho?label=release&color=a5b4fc)](https://github.com/ToumanLin/RimArcho/releases/latest)
 [![下载量](https://img.shields.io/github/downloads/ToumanLin/RimArcho/total?color=6fd99b)](https://github.com/ToumanLin/RimArcho/releases)

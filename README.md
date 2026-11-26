@@ -6,8 +6,8 @@ English | [&#31616;&#20307;&#20013;&#25991;](README.zh-CN.md)
 
 # RimArcho
 
-**A clean, fast, lightweight RimWorld launcher and Mod manager.**<br>
-Less fussing with Mods, less digging through errors, more playing.
+**A RimWorld launcher and Mod manager that looks past your current list.**<br>
+Game versions, playthroughs and saves, one click apart. When something breaks, your AI agent launches the game and finds the culprit: no more halving your Mod list for hours.
 
 [![Latest release](https://img.shields.io/github/v/release/ToumanLin/RimArcho?label=release&color=a5b4fc)](https://github.com/ToumanLin/RimArcho/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/ToumanLin/RimArcho/total?color=6fd99b)](https://github.com/ToumanLin/RimArcho/releases)
