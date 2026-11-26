@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <ArchoMonitor_RecordMessages>정보 메시지 기록 (Log.Message)</ArchoMonitor_RecordMessages>
+  <ArchoMonitor_RecordMessagesTip>다음 실행부터 적용됩니다. 기본값은 꺼짐: 정보 메시지가 가장 많습니다.</ArchoMonitor_RecordMessagesTip>
+  <ArchoMonitor_Log>로그</ArchoMonitor_Log>
+  <ArchoMonitor_Entries>항목</ArchoMonitor_Entries>
+  <ArchoMonitor_HooksNotInstalled>후크가 설치되지 않음</ArchoMonitor_HooksNotInstalled>
+</LanguageData>

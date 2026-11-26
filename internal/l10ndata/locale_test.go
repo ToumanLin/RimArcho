@@ -1,6 +1,7 @@
 package l10ndata
 
 import (
+	"fmt"
 	"reflect"
 	"regexp"
 	"sort"
@@ -165,7 +166,8 @@ func TestLocalesMatchChinese(t *testing.T) {
 				}
 			}
 			for key := range pair.got {
-				if _, ok := pair.want[key]; !ok {
+				// A noun's number forms (@plural.mod) belong to languages whose nouns change with the count.
+				if _, ok := pair.want[key]; !ok && !strings.HasPrefix(key, "@plural.") {
 					t.Errorf("%s %s has %q, which Chinese no longer has", code, pair.name, key)
 				}
 			}
@@ -175,12 +177,50 @@ func TestLocalesMatchChinese(t *testing.T) {
 
 func TestResolveLangKeepsTheLanguage(t *testing.T) {
 	t.Setenv("ARCHO_LANG", "")
-	for input, want := range map[string]string{"ja": "ja", "ja-JP": "ja", "ja_JP.UTF-8": "ja", "zh-Hans-CN": "zh", "zh_CN": "zh", "en-US": "en", "fr-FR": "en"} {
+	for input, want := range map[string]string{"ja": "ja", "ja-JP": "ja", "ja_JP.UTF-8": "ja", "zh-Hans-CN": "zh", "zh_CN": "zh", "ru-RU": "ru", "ru_RU.UTF-8": "ru", "ko-KR": "ko", "ko_KR.UTF-8": "ko", "en-US": "en", "fr-FR": "en"} {
 		if got := ResolveLang(input); got != want {
 			t.Errorf("ResolveLang(%q) = %q, want %q", input, got, want)
 		}
 	}
 	if LanguageName("ja") == "ja" || LanguageName("zh") == "zh" || LanguageName("xx") != "xx" {
 		t.Error("language names come from name.txt, falling back to the code")
+	}
+}
+
+// Tf passes arguments in the English key's order, so a translation that moves them must index
+// them (%[2]s); formatting every text with arguments of the key's kinds finds one that does
+// not (a %!d(string=…) on the page). %w stays out: only fmt.Errorf formats it.
+func TestLocaleArgumentOrder(t *testing.T) {
+	verbs := regexp.MustCompile(`%(\[\d+\])?[-+#0]*\d*(\.\d+)?[dsvqxfgcw%]`)
+	for code, load := range Locales {
+		for key, text := range load().Text {
+			// a text with a % that is no verb (18% of logs, %USERPROFILE%) is not a format
+			if strings.Contains(verbs.ReplaceAllString(key, ""), "%") {
+				continue
+			}
+			var args []any
+			for _, v := range verbs.FindAllString(key, -1) {
+				switch v[len(v)-1] {
+				case '%':
+				case 'd', 'x', 'c':
+					args = append(args, 7)
+				case 'f', 'g':
+					args = append(args, 1.5)
+				case 'w':
+					args = nil
+				default:
+					args = append(args, "s")
+				}
+				if v[len(v)-1] == 'w' {
+					break
+				}
+			}
+			if strings.Contains(key, "%w") || len(args) == 0 {
+				continue
+			}
+			if out := fmt.Sprintf(text, args...); strings.Contains(out, "%!") {
+				t.Errorf("%s %q: %q", code, key, out)
+			}
+		}
 	}
 }

@@ -1,0 +1,4 @@
+{
+  "This build has no window; the text interface (archo) has the same features.": "В этой сборке нет окна; текстовый интерфейс (archo) умеет то же самое.",
+  "RimArcho's window needs a graphical desktop, and none was found (DISPLAY and WAYLAND_DISPLAY are not set).\n\nIn a terminal, use archo instead: the same manager as a text interface.": "Окну RimArcho нужен графический рабочий стол, но он не найден (DISPLAY и WAYLAND_DISPLAY не заданы).\n\nВ терминале используйте archo: тот же менеджер в текстовом интерфейсе."
+}

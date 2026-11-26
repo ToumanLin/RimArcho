@@ -103,7 +103,7 @@ func expansions(game, lang string) ([]expansion, error) {
 // place. Translation XML is small; no language archive is extracted (16 §2.14).
 // gameLanguageFolders names the game's own Languages folder (or .tar) for an interface
 // language whose ExpansionDef labels the backgrounds use; other languages keep the defName.
-var gameLanguageFolders = map[string]string{"zh": "ChineseSimplified", "ja": "Japanese"}
+var gameLanguageFolders = map[string]string{"zh": "ChineseSimplified", "ja": "Japanese", "ru": "Russian", "ko": "Korean"}
 
 func translatedLabels(game, folder string) map[string]string {
 	labels := map[string]string{}

@@ -1,0 +1,13 @@
+{
+  "delete generated code; it can be recreated": "удалить сгенерированный код; его можно создать заново",
+  "source library": "библиотека исходников",
+  "remove unused": "удалить неиспользуемое",
+  "remove unused folders from the source library": "удалить неиспользуемые папки из библиотеки исходников",
+  "decompile the current list's mods": "декомпилировать моды текущего списка",
+  "decompiling…": "декомпиляция…",
+  "removed %d folders (%s)": "удалено папок: %d (%s)",
+  "the current list's mods are in the source library": "моды текущего списка есть в библиотеке исходников",
+  "%d unused folders, %s": "неиспользуемых папок: %d, %s",
+  "same code in: %s": "тот же код в: %s",
+  "the source library has no unused folders": "в библиотеке исходников нет неиспользуемых папок"
+}

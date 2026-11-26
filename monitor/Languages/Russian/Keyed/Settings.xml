@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <ArchoMonitor_RecordMessages>Записывать информационные сообщения (Log.Message)</ArchoMonitor_RecordMessages>
+  <ArchoMonitor_RecordMessagesTip>Вступает в силу при следующем запуске. По умолчанию выключено: информационных сообщений больше всего.</ArchoMonitor_RecordMessagesTip>
+  <ArchoMonitor_Log>Журнал</ArchoMonitor_Log>
+  <ArchoMonitor_Entries>Записи</ArchoMonitor_Entries>
+  <ArchoMonitor_HooksNotInstalled>Перехватчики не установлены</ArchoMonitor_HooksNotInstalled>
+</LanguageData>
