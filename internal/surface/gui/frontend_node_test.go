@@ -3,6 +3,7 @@
 package gui
 
 import (
+	"github.com/ToumanLin/RimArcho/internal/testkit/hide"
 	"os/exec"
 	"testing"
 )
@@ -61,7 +62,7 @@ func TestFrontendNodeSuites(t *testing.T) {
 		t.Skip("node is needed for the frontend behavior tests")
 	}
 	args := append([]string{"--experimental-vm-modules", "--test"}, frontendNodeSuites...)
-	if out, err := exec.Command(node, args...).CombinedOutput(); err != nil {
+	if out, err := hide.Cmd(exec.Command(node, args...)).CombinedOutput(); err != nil {
 		t.Fatalf("frontend suites: %v\n%s", err, out)
 	}
 }

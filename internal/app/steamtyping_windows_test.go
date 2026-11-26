@@ -3,6 +3,7 @@ package app_test
 import (
 	"bytes"
 	"context"
+	testhide "github.com/ToumanLin/RimArcho/internal/testkit/hide"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -103,7 +104,7 @@ func buildTypingStub(t *testing.T, dir string) string {
 	}
 	exe := filepath.Join(dir, deps.SteamCMDExecutable())
 	os.MkdirAll(dir, 0o755)
-	cmd := exec.Command("go", "build", "-o", exe, ".")
+	cmd := testhide.Cmd(exec.Command("go", "build", "-o", exe, "."))
 	cmd.Dir = src
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("building the stub: %v\n%s", err, out)

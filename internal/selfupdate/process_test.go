@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ToumanLin/RimArcho/internal/testkit/hide"
 	"io"
 	"os"
 	"os/exec"
@@ -125,7 +126,7 @@ func TestRenameWhileRunning(t *testing.T) {
 	copyTestBinary(t, filepath.Join(stage, "archo.exe"))
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, filepath.Join(program, "archo.exe"))
+	cmd := hide.Cmd(exec.CommandContext(ctx, filepath.Join(program, "archo.exe")))
 	cmd.Env = append(os.Environ(), "SELFUPDATE_HELPER=sleep")
 	hideWindow(cmd)
 	stdout, err := cmd.StdoutPipe()

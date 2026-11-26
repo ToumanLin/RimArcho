@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"github.com/ToumanLin/RimArcho/internal/testkit/hide"
 	"io"
 	"os"
 	"os/exec"
@@ -115,7 +116,7 @@ func startAnalysisStage(t *testing.T, reader *store.Store, game, slot, key strin
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
 	t.Cleanup(cancel)
-	child := &stagedAnalysisProcess{cmd: exec.CommandContext(ctx, os.Args[0], "-test.run=^TestAnalysisStageChild$")}
+	child := &stagedAnalysisProcess{cmd: hide.Cmd(exec.CommandContext(ctx, os.Args[0], "-test.run=^TestAnalysisStageChild$"))}
 	isolated := t.TempDir()
 	child.cmd.Env = append(os.Environ(), "RIMARCHO_HOME="+filepath.Dir(reader.Path), "APPDATA="+isolated,
 		"LOCALAPPDATA="+isolated, "RIMARCHO_ANALYSIS_TEST_GAME="+game, "RIMARCHO_ANALYSIS_TEST_SLOT="+slot,

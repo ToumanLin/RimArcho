@@ -3,6 +3,7 @@ package l10ndata
 import (
 	"bytes"
 	"fmt"
+	"github.com/ToumanLin/RimArcho/internal/testkit/hide"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -198,7 +199,7 @@ func sourceLanguageLines(data []byte, markdown bool) []int {
 }
 
 func sourceLanguagePaths(root string) ([]string, error) {
-	cmd := exec.Command("git", "ls-files", "-z", "--cached", "--others", "--exclude-standard")
+	cmd := hide.Cmd(exec.Command("git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"))
 	cmd.Dir = root
 	if data, err := cmd.Output(); err == nil {
 		return strings.Split(strings.TrimSuffix(string(data), "\x00"), "\x00"), nil

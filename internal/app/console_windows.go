@@ -14,8 +14,14 @@ import (
 // os/exec supplies NUL for nil streams and sets STARTF_USESTDHANDLES. A new
 // console instead needs Windows to create its own input and screen buffers.
 func startConsole(exe string, args []string) (SteamCMDProc, error) {
-	return createSteamProcess(exe, args, windows.CREATE_NEW_CONSOLE, false)
+	return createSteamProcess(exe, args, newConsole, false)
 }
+
+// newConsole is the flag that gives SteamCMD a console of its own. Tests replace it with
+// CREATE_NO_WINDOW: still a console to read from and type into, but no window. With Windows
+// Terminal as the default terminal, each visible console a test opened stayed on the screen
+// as an error tab once its stub exited (17 §4).
+var newConsole uint32 = windows.CREATE_NEW_CONSOLE
 
 // callerConsole reports whether stdin and stdout are a console the player can type into.
 // The GUI has none; `archo mcp` has pipes that carry the protocol (14 §1).
@@ -30,7 +36,7 @@ func callerConsole() bool {
 func startWorkshopCMD(exe string, args []string, console bool) (SteamCMDProc, error) {
 	flags := uint32(windows.CREATE_NO_WINDOW)
 	if console {
-		flags = windows.CREATE_NEW_CONSOLE
+		flags = newConsole
 	}
 	return createSteamProcess(exe, args, flags, true)
 }
@@ -53,7 +59,7 @@ func createSteamProcess(exe string, args []string, flags uint32, tracked bool) (
 		return nil, err
 	}
 	startup := windows.StartupInfo{Cb: uint32(unsafe.Sizeof(windows.StartupInfo{}))}
-	if flags&windows.CREATE_NEW_CONSOLE != 0 {
+	if flags&newConsole != 0 {
 		// The window's title carries the password hints (11 §3); SteamCMD keeps it.
 		if t := consoleTitle.Load(); t != nil && *t != "" {
 			if title, err := windows.UTF16PtrFromString(*t); err == nil {

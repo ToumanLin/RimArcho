@@ -3,6 +3,7 @@ package app_test
 import (
 	"database/sql"
 	"encoding/json"
+	testhide "github.com/ToumanLin/RimArcho/internal/testkit/hide"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -49,7 +50,7 @@ func TestCopyLocal(t *testing.T) {
 		t.Fatal("a link inside the mod folder is copied as content")
 	}
 	git := func(args ...string) string {
-		cmd := exec.Command("git", args...)
+		cmd := testhide.Cmd(exec.Command("git", args...))
 		cmd.Dir = dst
 		b, err := cmd.CombinedOutput()
 		if err != nil {

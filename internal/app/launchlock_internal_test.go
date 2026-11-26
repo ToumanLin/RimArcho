@@ -1,6 +1,7 @@
 package app
 
 import (
+	testhide "github.com/ToumanLin/RimArcho/internal/testkit/hide"
 	"os"
 	"os/exec"
 	"strings"
@@ -52,7 +53,7 @@ func TestCreditLaunchLockAcrossProcesses(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer unlock()
-	cmd := exec.Command(os.Args[0], "-test.run=^TestCreditLaunchLockHelper$", "-test.count=1")
+	cmd := testhide.Cmd(exec.Command(os.Args[0], "-test.run=^TestCreditLaunchLockHelper$", "-test.count=1"))
 	cmd.Env = append(os.Environ(), "RIMARCHO_TEST_LAUNCH_LOCK="+a.Home)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("cross-process exclusion: %v\n%s", err, out)

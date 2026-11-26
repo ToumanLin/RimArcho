@@ -3,6 +3,7 @@ package store_test
 import (
 	"context"
 	"errors"
+	"github.com/ToumanLin/RimArcho/internal/testkit/hide"
 	"os"
 	"os/exec"
 	"strconv"
@@ -22,7 +23,7 @@ func TestMaintenanceLeaseOfDeadProcess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gone := exec.Command(exe, "-test.run=^$")
+	gone := hide.Cmd(exec.Command(exe, "-test.run=^$"))
 	if err := gone.Run(); err != nil {
 		t.Fatal(err)
 	}

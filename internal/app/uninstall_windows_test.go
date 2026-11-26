@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	testhide "github.com/ToumanLin/RimArcho/internal/testkit/hide"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -43,14 +44,14 @@ func TestAfterExitScript(t *testing.T) {
 	log := filepath.Join(root, "uninstall.log")
 
 	// A process that has already ended: the script does not wait.
-	c := exec.Command("cmd", "/c", "exit", "0")
+	c := testhide.Cmd(exec.Command("cmd", "/c", "exit", "0"))
 	if err := c.Run(); err != nil {
 		t.Fatal(err)
 	}
 	x := app.AfterExit{Dirs: []string{data, filepath.Join(prog, "fonts")}, Files: []string{filepath.Join(prog, "archo.exe")}, Empty: []string{prog}}
 	script := filepath.Join(root, "run.cmd")
 	write(script, app.AfterExitScript(x, c.Process.Pid, log))
-	out, err := exec.Command("cmd", "/d", "/c", script).CombinedOutput()
+	out, err := testhide.Cmd(exec.Command("cmd", "/d", "/c", script)).CombinedOutput()
 	if err != nil {
 		t.Fatalf("%v: %s", err, out)
 	}
@@ -82,7 +83,7 @@ func TestAfterExitScriptWaits(t *testing.T) {
 	decoy := filepath.Join(root, "decoy")
 	os.MkdirAll(decoy, 0o755)
 	os.WriteFile(filepath.Join(decoy, "find.cmd"), []byte("@exit /b 1\r\n"), 0o644)
-	running := exec.Command(filepath.Join(os.Getenv("SystemRoot"), "System32", "ping.exe"), "-n", "4", "127.0.0.1")
+	running := testhide.Cmd(exec.Command(filepath.Join(os.Getenv("SystemRoot"), "System32", "ping.exe"), "-n", "4", "127.0.0.1"))
 	if err := running.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +91,7 @@ func TestAfterExitScriptWaits(t *testing.T) {
 	go func() { running.Wait(); ended <- time.Now() }()
 	script := filepath.Join(root, "run.cmd")
 	os.WriteFile(script, []byte(app.AfterExitScript(app.AfterExit{Dirs: []string{data}}, running.Process.Pid, filepath.Join(root, "log"))), 0o644)
-	c := exec.Command("cmd", "/d", "/c", script)
+	c := testhide.Cmd(exec.Command("cmd", "/d", "/c", script))
 	c.Env = append(os.Environ(), "PATH="+decoy+";"+os.Getenv("PATH"))
 	if out, err := c.CombinedOutput(); err != nil {
 		t.Fatalf("%v: %s", err, out)

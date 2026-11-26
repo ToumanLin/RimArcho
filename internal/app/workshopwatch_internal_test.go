@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	testhide "github.com/ToumanLin/RimArcho/internal/testkit/hide"
 	"io"
 	"os"
 	"os/exec"
@@ -30,7 +31,7 @@ func TestSteamStreamingIsLiveAndCancellationReapsWorker(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestSteamStreamHelper$")
+	cmd := testhide.Cmd(exec.CommandContext(ctx, os.Args[0], "-test.run=^TestSteamStreamHelper$"))
 	cmd.Env = append(os.Environ(), "RIMARCHO_FAKE_WATCH=1")
 	seen := false
 	err := streamSteamCommand(cmd, func(line string) {
@@ -85,7 +86,7 @@ func TestSteamWatchEOFShutsDownCleanly(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestSteamStreamHelper$")
+	cmd := testhide.Cmd(exec.CommandContext(ctx, os.Args[0], "-test.run=^TestSteamStreamHelper$"))
 	cmd.Env = append(os.Environ(), "RIMARCHO_FAKE_WATCH=1", "RIMARCHO_FAKE_WATCH_EOF=1")
 	input, err := cmd.StdinPipe()
 	if err != nil {

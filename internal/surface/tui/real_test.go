@@ -7,6 +7,7 @@ package tui
 // the copy (17 §4 rule 3): the scan and the TUI write to the database.
 
 import (
+	"github.com/ToumanLin/RimArcho/internal/testkit/hide"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -53,7 +54,7 @@ func TestRealIdleMemory(t *testing.T) {
 	ws1, _, _ := procmem.MB()
 	t.Logf("after one workspace load: working set %.1f MB", ws1)
 	opts := Options{App: a, Scan: func(env string) (string, error) {
-		cmd := exec.Command(exe, "scan")
+		cmd := hide.Cmd(exec.Command(exe, "scan"))
 		cmd.Env = append(os.Environ(), "RIMARCHO_HOME="+home) // the copy, never the real data directory
 		out, err := cmd.CombinedOutput()
 		return string(out), err

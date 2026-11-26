@@ -2,6 +2,7 @@ package app
 
 import (
 	"flag"
+	testhide "github.com/ToumanLin/RimArcho/internal/testkit/hide"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,7 +26,7 @@ func TestWorkshopProcessHelper(t *testing.T) {
 	if err != nil {
 		os.Exit(2)
 	}
-	cmd := exec.Command(exe, "-test.run=^TestWorkshopProcessHelper$", "--", "workshop-child", args[1])
+	cmd := testhide.Cmd(exec.Command(exe, "-test.run=^TestWorkshopProcessHelper$", "--", "workshop-child", args[1]))
 	hideWindow(cmd)
 	if cmd.Start() != nil {
 		os.Exit(3)

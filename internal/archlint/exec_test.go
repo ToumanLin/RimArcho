@@ -163,3 +163,72 @@ var bad = &textures.Todds{Path: p}
 	expect(t, "stale child exception", staleProblems("childWindowAllowed", allow, used), 1)
 	expect(t, "tests are exempt", childWindowProblems(synthetic(t, map[string]string{"internal/app/x_test.go": src}), m, nil, map[string]bool{}), 0)
 }
+
+// testChildWindowProblems: every exec.Command / exec.CommandContext in a test that can run
+// on Windows is wrapped in hide.Cmd (internal/testkit/hide). go test started from a shell
+// without a console (an agent's) gives each unwrapped console child a console window of its
+// own; with Windows Terminal as the default terminal, one full test run left ~120 error
+// windows on the developer's screen (17 §4).
+func testChildWindowProblems(files []*goFile, mod string) []string {
+	var out []string
+	for _, g := range files {
+		if !g.test || g.dir == "internal/archlint" || unixOnly(g.path) {
+			continue
+		}
+		wrapped := map[ast.Node]bool{}
+		ast.Inspect(g.f, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			if s, ok := call.Fun.(*ast.SelectorExpr); ok && s.Sel.Name == "Cmd" && len(call.Args) == 1 {
+				if id, ok := s.X.(*ast.Ident); ok && g.imports()[id.Name] == mod+"/internal/testkit/hide" {
+					wrapped[call.Args[0]] = true
+				}
+			}
+			if s, ok := call.Fun.(*ast.SelectorExpr); ok && (s.Sel.Name == "Command" || s.Sel.Name == "CommandContext") {
+				if id, ok := s.X.(*ast.Ident); ok && g.imports()[id.Name] == "os/exec" && !wrapped[call] {
+					out = append(out, fmt.Sprintf("17 §4: %s starts a test's child without hiding its console window; wrap it in hide.Cmd (internal/testkit/hide)", loc(g.fset.Position(call.Pos()), g.path)))
+				}
+			}
+			return true
+		})
+	}
+	sort.Strings(out)
+	return out
+}
+
+// unixOnly: a file Go builds only on Linux, macOS or other non-Windows systems, by name.
+func unixOnly(path string) bool {
+	for _, s := range []string{"_linux_test.go", "_darwin_test.go", "_unix_test.go", "_other_test.go"} {
+		if len(path) > len(s) && path[len(path)-len(s):] == s {
+			return true
+		}
+	}
+	return false
+}
+
+func TestArchTestChildrenHidden(t *testing.T) {
+	t.Parallel()
+	_, mod := repoRoot(t)
+	report(t, testChildWindowProblems(repoSource(t), mod))
+}
+
+func TestArchTestChildrenHiddenDetection(t *testing.T) {
+	t.Parallel()
+	const m = "example.com/x"
+	src := `package app
+import (
+	"os/exec"
+	"example.com/x/internal/testkit/hide"
+)
+func ok() { hide.Cmd(exec.Command("x")).Run() }
+func okCtx() { c := hide.Cmd(exec.CommandContext(ctx, "x")); c.Run() }
+func bad() { exec.Command("x").Run() }
+func later() { c := exec.Command("x"); hide.Cmd(c) }
+`
+	got := testChildWindowProblems(synthetic(t, map[string]string{"internal/app/x_test.go": src}), m)
+	expect(t, "test children", got, 2) // bad, later (wrap at the call)
+	expect(t, "production code is TestArchChildWindows's", testChildWindowProblems(synthetic(t, map[string]string{"internal/app/x.go": src}), m), 0)
+	expect(t, "Linux-only tests are exempt", testChildWindowProblems(synthetic(t, map[string]string{"internal/app/x_linux_test.go": src}), m), 0)
+}

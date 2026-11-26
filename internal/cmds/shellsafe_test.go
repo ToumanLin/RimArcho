@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"github.com/ToumanLin/RimArcho/internal/testkit/hide"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -210,7 +211,7 @@ func psParse(t *testing.T, exe string, lines []string) []psLine {
 	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	c := exec.Command(exe, "-NoProfile", "-NonInteractive", "-Command", psScript)
+	c := hide.Cmd(exec.Command(exe, "-NoProfile", "-NonInteractive", "-Command", psScript))
 	c.Env = append(os.Environ(), "ARCHO_PS_LINES="+path)
 	out, err := c.CombinedOutput()
 	if err != nil {

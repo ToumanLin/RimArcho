@@ -3,6 +3,7 @@ package subscribe_test
 import (
 	"context"
 	"encoding/json"
+	"github.com/ToumanLin/RimArcho/internal/testkit/hide"
 	"net/url"
 	"os"
 	"os/exec"
@@ -159,7 +160,7 @@ func TestNormalizeRepo(t *testing.T) {
 	// The same folder through a junction (as with an 8.3 short name) is the same repository.
 	if runtime.GOOS == "windows" {
 		link := filepath.Join(t.TempDir(), "alias")
-		if out, err := exec.Command("cmd", "/c", "mklink", "/J", link, dir).CombinedOutput(); err != nil {
+		if out, err := hide.Cmd(exec.Command("cmd", "/c", "mklink", "/J", link, dir)).CombinedOutput(); err != nil {
 			t.Fatalf("mklink: %v %s", err, out)
 		}
 		if subscribe.NormalizeRepo(link) != subscribe.NormalizeRepo(dir) {

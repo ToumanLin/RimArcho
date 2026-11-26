@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"errors"
+	testhide "github.com/ToumanLin/RimArcho/internal/testkit/hide"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -123,7 +124,7 @@ func TestFakeSteamCMDScript(t *testing.T) {
 	e.WriteFile(script, "@echo off\r\nif not exist logs mkdir logs\r\necho Logging in user 'fixture-player' to Steam Public...OK>>logs\\console_log.txt\r\necho Waiting for user info...OK>>logs\\console_log.txt\r\n")
 	e.MustRun("config", "set", "steamcmd.account", "fixture-player")
 	e.App.SteamCMDStart = func(_ string, args []string, console bool) (app.SteamCMDProc, error) {
-		cmd := exec.Command("cmd.exe", "/c", script)
+		cmd := testhide.Cmd(exec.Command("cmd.exe", "/c", script))
 		cmd.Dir = dir
 		if cmd.Stdin != nil {
 			t.Fatal("stdin captured")
