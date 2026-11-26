@@ -1,6 +1,8 @@
 package xdoc
 
 import (
+	"errors"
+
 	"github.com/antchfx/xpath"
 )
 
@@ -62,6 +64,7 @@ func (n *Nav) Copy() xpath.NodeNavigator { c := *n; return &c }
 func (n *Nav) MoveToRoot() { n.cur, n.attr = 0, -1 }
 
 func (n *Nav) MoveToParent() bool {
+	n.d.step()
 	if n.attr >= 0 {
 		n.attr = -1
 		return true
@@ -75,6 +78,7 @@ func (n *Nav) MoveToParent() bool {
 }
 
 func (n *Nav) MoveToNextAttribute() bool {
+	n.d.step()
 	nd := n.d.at(n.cur)
 	if nd.kind != KindElement || nd.attrs == 0 {
 		return false
@@ -87,6 +91,7 @@ func (n *Nav) MoveToNextAttribute() bool {
 }
 
 func (n *Nav) MoveToChild() bool {
+	n.d.step()
 	if n.attr >= 0 {
 		return false
 	}
@@ -99,6 +104,7 @@ func (n *Nav) MoveToChild() bool {
 }
 
 func (n *Nav) MoveToFirst() bool {
+	n.d.step()
 	if n.attr >= 0 {
 		return false
 	}
@@ -115,6 +121,7 @@ func (n *Nav) MoveToFirst() bool {
 }
 
 func (n *Nav) MoveToNext() bool {
+	n.d.step()
 	if n.attr >= 0 {
 		return false
 	}
@@ -127,6 +134,7 @@ func (n *Nav) MoveToNext() bool {
 }
 
 func (n *Nav) MoveToPrevious() bool {
+	n.d.step()
 	if n.attr >= 0 {
 		return false
 	}
@@ -147,13 +155,43 @@ func (n *Nav) MoveTo(other xpath.NodeNavigator) bool {
 	return true
 }
 
+// ErrSteps: an evaluation made more navigator moves than SelectLimit allowed.
+var ErrSteps = errors.New("xpath evaluation over its step budget")
+
+// ErrEngine: the engine panicked during an evaluation.
+var ErrEngine = errors.New("xpath engine error")
+
+type overBudget struct{}
+
+// step counts one navigator move against the running evaluation's budget. A count, not a
+// clock, bounds an evaluation, so the same document and expression stop at the same place
+// on every machine and at every priority (05 §5.2).
+func (d *Doc) step() {
+	d.steps++
+	if d.limit > 0 && d.steps > d.limit {
+		panic(overBudget{})
+	}
+}
+
 // Select evaluates a compiled expression with node i as the context and returns the
 // selected nodes in document order (xpath.Expr.Select semantics). A panic inside the
 // engine is returned as ok=false.
 func (d *Doc) Select(e *xpath.Expr, i int32, one bool) (out []Ref, ok bool) {
+	out, err := d.SelectLimit(e, i, one, 0)
+	return out, err == nil
+}
+
+// SelectLimit is Select with a budget of navigator moves (0: none). Past the budget the
+// evaluation stops with ErrSteps; a panic inside the engine is ErrEngine.
+func (d *Doc) SelectLimit(e *xpath.Expr, i int32, one bool, limit int64) (out []Ref, err error) {
+	d.steps, d.limit = 0, limit
 	defer func() {
+		d.limit = 0
 		if r := recover(); r != nil {
-			out, ok = nil, false
+			out, err = nil, ErrEngine
+			if _, over := r.(overBudget); over {
+				err = ErrSteps
+			}
 		}
 	}()
 	it := e.Select(d.NewNav(i))
@@ -163,5 +201,8 @@ func (d *Doc) Select(e *xpath.Expr, i int32, one bool) (out []Ref, ok bool) {
 			break
 		}
 	}
-	return out, true
+	return out, nil
 }
+
+// Steps is how many navigator moves the last SelectLimit made.
+func (d *Doc) Steps() int64 { return d.steps }

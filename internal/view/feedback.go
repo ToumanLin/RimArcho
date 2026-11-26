@@ -65,6 +65,9 @@ func FeedbackAttachments(a *app.App, st *app.LoadoutState, o FeedbackOptions, n 
 		out.Basic = append(out.Basic, "RimWorld "+st.Ix.Env.GameVersion)
 	}
 	out.Basic = append(out.Basic, feedback.System())
+	if st != nil && st.Ix != nil && st.Ix.Env != nil {
+		out.Basic = append(out.Basic, feedbackCheckLine(a, st))
+	}
 	if o.Kind == feedback.KindData {
 		out.Basic = append(out.Basic, feedbackDataLines(a)...)
 	}
@@ -127,6 +130,28 @@ func FeedbackAttachments(a *app.App, st *app.LoadoutState, o FeedbackOptions, n 
 	}
 	out.Parts = []FeedbackPart{mods, paths, logPart, ops, probs}
 	return out
+}
+
+// feedbackCheckLine is the open list's last finished Mod check: when, how many operations,
+// how long the patches took, the slowest operation and how many were not simulated, so a
+// report about a check that stops tells a slow operation from one that never ends (05 §3).
+func feedbackCheckLine(a *app.App, st *app.LoadoutState) string {
+	s, err := a.Analysis(st)
+	if err != nil || s == nil || s.Run == nil {
+		return T("Mod check: none finished yet")
+	}
+	r := s.Run
+	line := Tf("Mod check: finished %s, %d operations in %d ms", r.Finished.Local().Format("2006-01-02 15:04"), r.Stats.TopOps, r.Stats.PatchMs)
+	if r.Stats.SlowestOp != "" {
+		line += "; " + Tf("slowest %s, %d ms", r.Stats.SlowestOp, r.Stats.SlowestMs)
+	}
+	if r.Stats.SlowOps > 0 {
+		line += "; " + Tf("%d not simulated (too slow)", r.Stats.SlowOps)
+	}
+	if !s.Fresh {
+		line += "; " + T("the list changed since")
+	}
+	return line
 }
 
 // feedbackDataLines are the versions of the data a report about outdated data is about: the

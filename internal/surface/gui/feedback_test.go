@@ -33,7 +33,7 @@ func TestFeedbackAttachments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(at.Sections) != 0 || len(at.Basic) != 4 || at.Basic[0] != "report: other / help" || !strings.HasPrefix(at.Basic[1], "RimArcho ") || at.Basic[2] != "RimWorld 1.6.4633 rev1261" {
+	if len(at.Sections) != 0 || len(at.Basic) != 5 || at.Basic[4] != "Mod check: none finished yet" || at.Basic[0] != "report: other / help" || !strings.HasPrefix(at.Basic[1], "RimArcho ") || at.Basic[2] != "RimWorld 1.6.4633 rev1261" {
 		t.Fatalf("basics only by default: %+v", at)
 	}
 	if len(at.Parts) != 5 || at.Parts[4].Key != "problems" || !at.Parts[4].None || at.Parts[0].Key != "mods" || at.Parts[0].None || !at.Parts[2].None || at.Parts[3].Key != "ops" || !at.Parts[3].None {

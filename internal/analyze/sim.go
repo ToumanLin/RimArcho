@@ -21,6 +21,10 @@ type topOp struct {
 	folderReq []string
 	ok        bool
 	err       bool
+	// slow: an XPath evaluation of the operation went past the step budget (05 §5.2):
+	// not simulated, its effect unknown; slowXPath is that expression.
+	slow      bool
+	slowXPath string
 
 	allocFrom, allocTo int32 // node indices allocated by this operation
 }
@@ -51,6 +55,8 @@ type sim struct {
 	ix        defIndex
 	evals     int
 	guards    map[*Op]guard
+	// maxSteps overrides the evaluation budget (tests); 0 uses evalBudget.
+	maxSteps int64
 
 	mm        string
 	folderOf  map[string][]string
@@ -64,6 +70,28 @@ type sim struct {
 }
 
 var errRuntime = errors.New("runtime exception")
+
+// errTooSlow: an XPath evaluation went past its step budget; the operation is not
+// simulated (05 §5.2).
+var errTooSlow = errors.New("xpath evaluation too slow")
+
+// The step budget of one XPath evaluation (05 §5.2): navigator moves, so that a run gives
+// the same result on every machine and priority. A walk of the whole document costs a few
+// moves per node; expressions that the engine evaluates again for every candidate
+// (`[last()]`, `position()`, `following::`, `count(//…)`, an absolute path inside a
+// predicate) cost candidates × document and go past it on a large list.
+const (
+	EvalStepsMin     = 100_000_000
+	EvalStepsPerNode = 20
+)
+
+// budget is the step budget of an evaluation on the document as it is now.
+func (s *sim) budget() int64 {
+	if s.maxSteps > 0 {
+		return s.maxSteps
+	}
+	return max(EvalStepsMin, EvalStepsPerNode*int64(s.doc.Len()))
+}
 
 func newSim(doc *xdoc.Doc, root int32, active []*Mod, mm string, folders map[string][]string) *sim {
 	s := &sim{doc: doc, root: root, mm: mm, folderOf: folders, activePkg: map[string]bool{}, activeNm: map[string]bool{},
@@ -84,6 +112,10 @@ func (s *sim) run(t *topOp) {
 	s.cur = t
 	t.allocFrom = int32(s.doc.Len())
 	ok, err := s.apply(t.op, guard{folder: t.folderReq})
+	if errors.Is(err, errTooSlow) {
+		// not simulated: counted as successful, like a mod-defined class (patch.too-slow)
+		t.slow, ok, err = true, true, nil
+	}
 	t.ok, t.err = ok && err == nil, err != nil
 	t.allocTo = int32(s.doc.Len())
 }
@@ -96,7 +128,7 @@ func (s *sim) apply(o *Op, g guard) (bool, error) {
 	s.guards[o] = g
 	r, err := s.worker(o, g)
 	if err != nil {
-		o.err = true
+		o.err = err != errTooSlow
 		return false, err
 	}
 	switch o.success {
@@ -135,13 +167,18 @@ func (s *sim) selectNodes(o *Op, one bool) ([]xdoc.Ref, error) {
 	s.evals++
 	var out []xdoc.Ref
 	if p := s.plan(o.XPath); s.usable(p) {
-		out = s.fastSelect(p, one)
+		out, err = s.fastSelect(p, one)
 	} else {
-		var ok bool
-		out, ok = s.doc.Select(e, s.doc.Root(), one)
-		if !ok {
-			return nil, errRuntime
+		out, err = s.doc.SelectLimit(e, s.doc.Root(), one, s.budget())
+	}
+	switch {
+	case err == xdoc.ErrSteps:
+		if s.cur != nil && s.cur.slowXPath == "" {
+			s.cur.slowXPath = o.XPath
 		}
+		return nil, errTooSlow
+	case err != nil:
+		return nil, errRuntime
 	}
 	o.hits += len(out)
 	if g := s.guards[o]; len(out) > 0 && !g.any() && !g.always {
@@ -757,7 +794,7 @@ func (s *sim) usable(p *fastPlan) bool {
 	return n == 1
 }
 
-func (s *sim) fastSelect(p *fastPlan, one bool) []xdoc.Ref {
+func (s *sim) fastSelect(p *fastPlan, one bool) ([]xdoc.Ref, error) {
 	s.ix.ensure()
 	s.ix.hits++
 	cands := s.ix.byDefName[p.value]
@@ -789,14 +826,16 @@ func (s *sim) fastSelect(p *fastPlan, one bool) []xdoc.Ref {
 		}
 		if p.rest == nil {
 			out = append(out, xdoc.Ref{N: c, A: -1})
-		} else if r, ok := s.doc.Select(p.rest, c, one); ok {
+		} else if r, err := s.doc.SelectLimit(p.rest, c, one, s.budget()); err == nil {
 			out = append(out, r...)
+		} else if err == xdoc.ErrSteps {
+			return nil, err
 		}
 		if one && len(out) > 0 {
-			return out[:1]
+			return out[:1], nil
 		}
 	}
-	return out
+	return out, nil
 }
 
 // evalAtEnd re-evaluates an expression against the final document (target-later check).
@@ -806,9 +845,10 @@ func (s *sim) evalAtEnd(expr string) []xdoc.Ref {
 		return nil
 	}
 	if p := s.plan(expr); s.usable(p) {
-		return s.fastSelect(p, false)
+		r, _ := s.fastSelect(p, false)
+		return r
 	}
-	r, _ := s.doc.Select(e, s.doc.Root(), false)
+	r, _ := s.doc.SelectLimit(e, s.doc.Root(), false, s.budget())
 	return r
 }
 

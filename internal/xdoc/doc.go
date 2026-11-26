@@ -55,6 +55,10 @@ type Doc struct {
 	// OnTouch, if set, is called before p's child list or n's attributes change (index
 	// invalidation); attr is the attribute name for attribute changes, else -1.
 	OnTouch func(p, n int32, attr int32)
+
+	// steps counts the navigator moves of the evaluation SelectLimit is running; limit is
+	// its budget (0: none).
+	steps, limit int64
 }
 
 // Names interns element and attribute names; documents that exchange nodes share one.
