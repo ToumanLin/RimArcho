@@ -537,6 +537,7 @@
   "other": "其他",
   "other areas: ": "其他区：",
   "p again locks this version of %s (a copy in the lock library)": "再按 p 锁定 %s 的这个版本（在锁定库里复制一份）",
+  "p again keeps the updated version of %s; later updates do not change it": "再按 p 保留 %s 更新后的版本；之后的更新不会改动它",
   "pack %s": "整合包 %s",
   "pack %s goes to the recycle bin; you can restore it from there": "整合包 %s 会移到回收站，可以从那里还原",
   "pack %s is in the recycle bin": "整合包 %s 已移到回收站",

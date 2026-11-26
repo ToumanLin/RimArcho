@@ -310,9 +310,10 @@ func (m *model) changesKey(s string) tea.Cmd {
 	return m.changesListKey(s, r, mod)
 }
 
-// armLock arms p to lock this version of the mod ref (a copy in the lock library).
-func (m *model) armLock(ref, name string) tea.Cmd {
-	return m.arm("p", Tf("p again locks this version of %s (a copy in the lock library)", name), func(m *model) tea.Cmd {
+// armLock arms p to lock this version of the mod ref (a copy in the lock library);
+// prompt is the armed line, which on a change row names the updated version.
+func (m *model) armLock(ref, prompt, name string) tea.Cmd {
+	return m.arm("p", prompt, func(m *model) tea.Cmd {
 		m.act(Tf("locked %s", name), "pin", ref)
 		m.reload()
 		m.loadChanges()
@@ -358,7 +359,7 @@ func (m *model) changesRowKey(s string, r *chRow, mod *modchanges.Row, pend *vie
 			return m.openLibraryInstance(g.ID), true
 		}
 		if s == "p" {
-			return m.armLock(g.Ref, g.Name), true
+			return m.armLock(g.Ref, Tf("p again locks this version of %s (a copy in the lock library)", g.Name), g.Name), true
 		}
 	}
 	if s == "l" {
@@ -372,7 +373,7 @@ func (m *model) changesRowKey(s string, r *chRow, mod *modchanges.Row, pend *vie
 	if pend != nil {
 		switch s {
 		case "p":
-			return m.armLock(pend.Ref, pend.Name), true
+			return m.armLock(pend.Ref, Tf("p again locks this version of %s (a copy in the lock library)", pend.Name), pend.Name), true
 		case "ctrl+w":
 			return m.openSource(pend), true
 		}
@@ -450,7 +451,7 @@ func (m *model) changesListKey(s string, r *chRow, mod *modchanges.Row) tea.Cmd 
 		}
 	case "p":
 		if has(mod, modchanges.ActLock) {
-			return m.armLock(mod.Ref, mod.Mod)
+			return m.armLock(mod.Ref, Tf("p again keeps the updated version of %s; later updates do not change it", mod.Mod), mod.Mod)
 		}
 	}
 	return nil
