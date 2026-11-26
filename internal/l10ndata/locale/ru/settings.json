@@ -401,5 +401,10 @@
   "check files automatically": "проверять файлы автоматически",
   "after edits": "после правок",
   "when saved": "при сохранении",
-  "Can it run checks the Mods' files (the patch simulation) by itself, at low priority. After edits: 2 seconds after you stop editing; when saved: when you save the list or open Can it run or Launch; off: only check again": "«Проверка запуска» сама проверяет файлы модов (симуляция патчей) с низким приоритетом. После правок: через 2 секунды после окончания правки; при сохранении: при сохранении списка или открытии «Проверки запуска» или «Запуска»; выкл.: только по «проверить снова»"
+  "Can it run checks the Mods' files (the patch simulation) by itself, at low priority. After edits: 2 seconds after you stop editing; when saved: when you save the list or open Can it run or Launch; off: only check again": "«Проверка запуска» сама проверяет файлы модов (симуляция патчей) с низким приоритетом. После правок: через 2 секунды после окончания правки; при сохранении: при сохранении списка или открытии «Проверки запуска» или «Запуска»; выкл.: только по «проверить снова»",
+  "Mod check: none finished yet": "Проверка файлов модов: ещё ни разу не завершалась",
+  "Mod check: finished %s, %d operations in %d ms": "Проверка файлов модов: завершена %s, операций патчей: %d, %d мс",
+  "slowest %s, %d ms": "самая медленная %s, %d мс",
+  "%d not simulated (too slow)": "не симулировано (слишком медленно): %d",
+  "the list changed since": "с тех пор список менялся"
 }
