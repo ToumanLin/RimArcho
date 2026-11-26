@@ -51,6 +51,13 @@ export function visTip(node, text, role = "img", focusable = true) {
   return node;
 }
 
+// visTipText changes the tooltip of a visual made by visTip while it shows (a segment under
+// the pointer naming itself); the accessible name stays the whole visual's sentence.
+export function visTipText(node, text) {
+  node.dataset.tip = text;
+  if (tipFor === node) tipShow(node);
+}
+
 // A page change or scroll takes the tooltip away with the element it was for.
 globalThis.addEventListener?.("scroll", () => tipHide(), true);
 

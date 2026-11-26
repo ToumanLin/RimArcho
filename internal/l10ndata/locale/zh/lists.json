@@ -346,5 +346,7 @@
   "for another manager": "给其他管理器",
   "a pack, with the Mod files…": "整合包（带 Mod 文件）…",
   "show the file": "查看文件内容",
-  "hide the file": "收起文件内容"
+  "hide the file": "收起文件内容",
+  "%d of %d enabled mods have a tag, %d have none": "已启用的 %[2]d 个 Mod 中 %[1]d 个有标签，%[3]d 个没有",
+  "click a colour: that tag; the stripes or enter: the mods with no tag": "点颜色：看这个标签；点斜纹或按 Enter：只看没有标签的 Mod"
 }

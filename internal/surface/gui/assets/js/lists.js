@@ -10,6 +10,7 @@ import { beginPageRead, pageLoading } from "./screens.js";
 import { markOf, paintMark, tagCSS, tagColors } from "./tagcolor.js";
 import { G, grouped, shape, curKey, headOf, findEntry, matched, foldAll, setView, setSort } from "./disabledgroups.js";
 import { choiceControl } from "./choices.js";
+import { tagCoverage } from "./tagcoverage.js";
 
 const rowID = (k, it) => `editor-${k}-${encodeURIComponent(key(it))}`;
 const rowsEl = (k) => $(`.area[data-area="${k}"] .rows`);
@@ -184,6 +185,7 @@ export function renderHeads() {
       if (k === 0) h.append(viewControls());
     }
     if (k === 0) syncViewControls();
+    if (k === 1) placeCoverage(h);
     const box = rowsEl(k);
     if (box.getAttribute("role") !== "listbox") {
       box.setAttribute("role", "listbox");
@@ -203,6 +205,14 @@ export function renderHeads() {
       factText(o, Tf("other areas: %s, tab goes to the next area with matches", parts.join("  ")));
     } else if (o) o.remove();
   }
+}
+
+// placeCoverage puts the tag coverage bar after Enabled's count (16 §3.8), or takes it away.
+function placeCoverage(h) {
+  const cov = tagCoverage(S.cols, S.bar, (tag) => document.dispatchEvent(new CustomEvent("open-tag", { detail: tag })));
+  const old = $(".tagcov", h);
+  if (old && old !== cov) old.remove();
+  if (cov && cov.parentNode !== h) $(".num", h).after(cov);
 }
 
 // detailHead: the details area's head. On a tag group's header in Disabled (S.tagHead) it is
