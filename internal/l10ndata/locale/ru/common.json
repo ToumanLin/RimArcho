@@ -537,6 +537,7 @@
   "other": "прочее",
   "other areas: ": "другие области: ",
   "p again locks this version of %s (a copy in the lock library)": "повторное p закрепляет эту версию %s (копия в закреплённой библиотеке)",
+  "p again keeps the updated version of %s; later updates do not change it": "повторное p оставляет обновлённую версию %s; последующие обновления её не изменят",
   "pack %s": "сборка %s",
   "pack %s goes to the recycle bin; you can restore it from there": "сборка %s отправится в корзину; оттуда её можно восстановить",
   "pack %s is in the recycle bin": "сборка %s в корзине",

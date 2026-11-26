@@ -64,7 +64,7 @@ const (
 	ActWorkshop = "workshop" // open page: the Workshop change notes (ctrl+w)
 	ActDeps     = "deps"     // see dependencies: Can it run (D)
 	ActSort     = "sort"     // sort (S)
-	ActLock     = "lock"     // lock this one (p)
+	ActLock     = "lock"     // keep the updated version: a locked copy (p)
 )
 
 // Action is a row's action.
@@ -816,7 +816,7 @@ func (b *changeBuilder) rowActions(r *Row, m *store.Mod, kinds map[string]bool, 
 		r.Actions = append(r.Actions, Action{ActSort, tx.T("sort"), "S"})
 	}
 	if kinds[identity.EvUpdated] && m != nil && m.Status == identity.Live && m.Kind.WorkshopLike() && b.locks[r.ID] == nil && r.InPlan {
-		r.Actions = append(r.Actions, Action{ActLock, tx.T("keep this one"), "p"})
+		r.Actions = append(r.Actions, Action{ActLock, tx.T("keep this updated version"), "p"})
 	}
 }
 

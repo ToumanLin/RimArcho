@@ -535,11 +535,12 @@ async function openSource(r) {
   try { say("ok", await api.OpenSubscriptionSource(r.ref)); } catch (e) { say("fail", errText(e)); }
 }
 
-// lock: a copy in the lock library, the dry run first (as on Mod library, 16 §6).
-async function lock(ref) {
+// lock: a copy in the lock library, the dry run first (as on Mod library, 16 §6). label
+// names the version kept: the installed one, which on a change row is the updated one.
+async function lock(ref, label = T("keep this version")) {
   let p;
   try { p = await api.LibraryPreview("pin", [ref]); } catch (e) { return say("fail", errText(e)); }
-  pop.confirm(p.title, p.lines, T("keep this one"), p.apply ? async () => {
+  pop.confirm(label, [T("Later updates do not change the kept copy."), ...(p.lines || [])], label, p.apply ? async () => {
     try { say("ok", await api.LibraryDo("pin", [ref])); } catch (e) { say("fail", errText(e)); }
     await ui.reload();
     changes();
@@ -566,7 +567,7 @@ async function changeAct(r, kind) {
       return;
     case "deps": return ui.go("needs");
     case "sort": return ui.run("sort");
-    case "lock": return lock(r.ref);
+    case "lock": return lock(r.ref, T("keep this updated version"));
   }
 }
 
