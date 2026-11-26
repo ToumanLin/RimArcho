@@ -9,18 +9,19 @@ To see what it found, get RimArcho (free, MIT). The last time RimArcho was publi
 [img]https://steamuserimages-a.akamaihd.net/ugc/1830159746169505364/6FEA4D465978DCEBC9815AE94D6FB6329550F442/?imw=5000&imh=5000&ima=fit&impolicy=Letterbox&imcolor=%23000000&letterbox=false[/img]
 
 [img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/en/header-02-rimarcho.gif[/img]
-A RimWorld launcher and Mod manager that looks past your current list: game versions, playthroughs and saves, one click apart. When something breaks, your AI agent launches the game and finds the culprit: no more halving your Mod list for hours. [strike]RimArcho has the cutest Archo-chan.[/strike]
+[b]A RimWorld launcher and Mod manager that looks past your current list. [/b] It manages different game versions, different mod lists, and check whether your saves can be loaded cleanly. less fiddling with Mods, less reading errors, more playing.
 [list]
 [*][b]Platforms and languages:[/b] Windows (stable) and Linux (testing); English, Chinese and Japanese.
 [*][b]Light:[/b] core 47 MB of memory, peak <250 MB, ~100 MB at rest (RimSort and RimCrow: usually 500+ MB; tested with my 450-Mod list).
 [*][b]Bring your data:[/b] import from RimSort, RimCrow and RimPy: Mod lists, aliases, notes, tags, colour marks, ignored warnings and sorting rules; nothing already there is imported twice.
-[*][b]Sorting:[/b] built from 40,326 player error logs (26 GB, updated weekly) and 5,143 Mods. I believe RimArcho's sort is the best in the community today.
-[*][b]Errors and conflicts:[/b] from those 40,326 logs I counted error patterns and rated their severity (and found most red text needs no worry); I also found Mods that often conflict, and RimArcho warns you if you enable them together.
-[*][b]Archo Monitor:[/b] in-game information the outside can't see, so errors are easier to locate and debug.
+[*][b]Sorting Algorithm:[/b] built from 40,326 player error logs (26 GB, updated weekly) and 5,143 Mods. I believe RimArcho's sort is the best in the community today.
+[*][b]Errors and potential conflicts:[/b] from those 40,326 logs I counted error patterns and rated their severity (and found most red text needs no worry); I also found Mods that often conflict, and RimArcho warns you if you enable them together.
+[*][b]Archo Monitor:[/b] gives in-game information that game log won't tell, so errors are easier to locate and debug.
 [*][b]Saves:[/b] which Mods a save needs, and whether removing or adding one breaks it, loses content or does nothing.
 [*][b]Mod copies:[/b] make a copy and switch to it in one click; Steam won't update it, so an update can't bring new errors.
-[*][b]Game versions:[/b] several game versions and configs side by side (yes, 1.6 and 1.7 at once), download versions with SteamCMD, back up the current game version in one click (Tynan-flare protection, lol).
+[*][b]Game versions:[/b] several game versions and configs side by side (yes, you can now play 1.6 and 1.7 together), download versions with SteamCMD, back up the current game version in one click (Tynan-flare protection, lol).
 [*][b]Subscriptions:[/b] GitHub and LoversLab, checked for updates automatically.
+[*][b][strike]RimArcho has the cutest Archo-chan.[/strike]
 [/list]
 
 [img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/en/header-03-ai.gif[/img]
@@ -63,4 +64,6 @@ The approach follows RimCrow Companion, which in turn credits:
 [/list]
 Archo Monitor copies none of their code. MIT License.
 
-RimArcho's code is developed and tested by Claude Opus 5.5 and ChatGPT 6.1 SOL, and every feature is fully tested for real in a virtual machine; I review the features myself.
+RimArcho's code is developed and tested by Claude Opus 5.5 and ChatGPT 6.1 SOL, and every feature is fully tested for real in a virtual machine; I review the code and features myself.
+
+[b]RimArcho is NOT vibe coded.[/b] I have a B.S. in Aerospace Engineering at UCLA, and I am familiar with .go (the coding language RimArcho used), which I used in my research at the lab. It's kinda sad that I need to add this paragraph here.

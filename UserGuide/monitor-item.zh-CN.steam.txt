@@ -9,7 +9,7 @@ Archo Monitor 是 RimArcho 启动器的游戏内辅助 Mod. 它记录游戏的�
 [img]https://steamuserimages-a.akamaihd.net/ugc/1830159746169505364/6FEA4D465978DCEBC9815AE94D6FB6329550F442/?imw=5000&imh=5000&ima=fit&impolicy=Letterbox&imcolor=%23000000&letterbox=false[/img]
 
 [img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/zh/header-02-rimarcho.gif[/img]
-不只管当前列表的 RimWorld 启动器和 Mod 管理器: 游戏版本, 周目, 存档一键切换. 出了错, AI 自己启动游戏找到元凶, 不用再花几个小时对半拆 Mod 列表. [strike]RimArcho 有最可爱的 Archo 酱[/strike]
+[b]不只管当前列表的 RimWorld 启动器和 Mod 管理器: [\b]游戏版本, 周目, 存档一键切换. 出了错, AI 自己启动游戏找到元凶, 不用再花几个小时对半拆 Mod 列表.
 [list]
 [*][b]多版本多语言:[/b] 目前支持Windows(稳定)和Linux(测试), 支持英语, 中文, 日语.
 [*][b]轻量:[/b] 业务部分 47MB 内存, 峰值 <250MB, GUI 日常 ~100MB (RimSort, RimCrow 普遍 500+MB, 以我的450Mods列表测试).
@@ -21,6 +21,7 @@ Archo Monitor 是 RimArcho 启动器的游戏内辅助 Mod. 它记录游戏的�
 [*][b]Mod 副本:[/b] 一键创建并替换; 副本不随 Steam 自动更新, 不怕更新带来新报错.
 [*][b]多游戏版本:[/b] 管理多个游戏版本和配置 (是的, 可以同时玩 1.6 和 1.7), 通过 SteamCMD 下载其它版本, 一键备份当前游戏版本 (泰南耀斑防护, 笑).
 [*][b]订阅:[/b] 支持 GitHub 和 LoversLab, 自动检查更新.
+[*][strike]RimArcho 有最可爱的 Archo 酱[/strike]
 [/list]
 
 [img]https://raw.githubusercontent.com/ToumanLin/RimArcho/master/docs/assets/workshop-monitor/zh/header-03-ai.gif[/img]
