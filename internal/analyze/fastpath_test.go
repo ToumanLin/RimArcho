@@ -58,7 +58,7 @@ func TestFastPathMatchesEngine(t *testing.T) {
 				t.Fatal(err)
 			}
 			want, _ := doc.Select(e, doc.Root(), one)
-			got := s.fastSelect(s.plan(x), one)
+			got, _ := s.fastSelect(s.plan(x), one)
 			if fmt.Sprint(got) != fmt.Sprint(want) {
 				t.Errorf("%s (one=%v): fast %v, engine %v", x, one, got, want)
 			}

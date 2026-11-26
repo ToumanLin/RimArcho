@@ -76,3 +76,29 @@ func TestParseSelectMutate(t *testing.T) {
 		t.Fatalf("cross clone: %v", r)
 	}
 }
+
+// SelectLimit stops an evaluation at its budget of navigator moves, the same place every
+// time, and a later evaluation starts with a fresh count (05 §5.2).
+func TestSelectLimit(t *testing.T) {
+	d, err := ParseDoc([]byte(sample), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := xpath.MustCompile(`Defs/ThingDef[last()]`)
+	all, err := d.SelectLimit(e, 0, false, 0)
+	if err != nil || len(all) != 1 {
+		t.Fatalf("unlimited: %v %v", all, err)
+	}
+	need := d.Steps()
+	if r, err := d.SelectLimit(e, 0, false, need); err != nil || len(r) != 1 || d.Steps() != need {
+		t.Fatalf("at the budget: %v %v, %d steps of %d", r, err, d.Steps(), need)
+	}
+	for range 2 {
+		if r, err := d.SelectLimit(e, 0, false, need-1); err != ErrSteps || r != nil || d.Steps() != need {
+			t.Fatalf("over the budget: %v %v, %d steps", r, err, d.Steps())
+		}
+	}
+	if _, ok := d.Select(e, 0, false); !ok {
+		t.Fatal("Select after an evaluation over budget")
+	}
+}

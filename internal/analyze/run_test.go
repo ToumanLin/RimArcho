@@ -57,6 +57,7 @@ func TestRunEdgePaths(t *testing.T) {
 	}
 	st := out.Stats
 	st.DefsMs, st.PatchMs, st.TotalMs, st.HarmonyMs, st.PeakHeapMB, st.LiveHeapMB = 0, 0, 0, 0, 0, 0
+	st.SlowestOp, st.SlowestMs = "", 0
 	view := struct {
 		Progress []string
 		After    int

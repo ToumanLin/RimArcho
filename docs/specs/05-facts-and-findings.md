@@ -60,7 +60,8 @@ Assemblies use a separate key, `analyze.AssemblyKey`: the snapshot hash, the rel
 
 **Subprocess**. The `Def`, Patch, and Harmony analyses run in an `archo analyze` subprocess. When the stored results are stale, the caller (`App.EnsureAnalysis`) starts `<exe> analyze --env <name>` and passes `RIMARCHO_HOME` and `--game-version`. The subprocess writes the facts and exits without affecting the main process's memory.
 
-- The subprocess writes `progress: …` lines to stderr. The interface displays them in the status bar or progress bar, and the CLI displays them as text.
+- The subprocess writes `progress: …` lines to stderr. The interface displays them in the status bar or progress bar, and the CLI displays them as text. The Patch simulation writes `patches: k/N operations` every 1,000 operations, after the last one, and after any operation that ends at least `analyze.ProgressEvery` (2 s) after the previous line, so a background task's elapsed time keeps moving while operations are slow; it stops only while one evaluation runs, which the step budget bounds (§5.2).
+- The run's stats (`analyze.Stats`, stored with the run) keep `SlowOps` (operations not simulated, `patch.too-slow`) and the slowest operation (`SlowestOp` as "Mod file:line", `SlowestMs`). The feedback report's basic information carries them as one line (16 §2.14).
 - The subprocess has a soft limit of `debug.SetMemoryLimit(300 MiB)` (`AnalyzeMemoryLimit`). See 18 for the peak target.
 - Tests inject an in-process runner (`InProcessAnalyze`).
 - **Wait limit**: the default `App.AnalyzeWait` for each entry point is in 16 §2.16.1 W01; the CLI has no limit. On timeout, return the declaration findings with "still computing in the background". The subprocess continues, and the next call retrieves its results. Meanwhile, def, patches, and harmony use the previous, stale results.
@@ -186,6 +187,7 @@ Uninstalled candidates come from the subject's dependency declarations (includin
 | `patch.no-match` | warning | A top-level operation fails in simulation, at the layer the game logs. Emit one finding per failed top-level operation, with reasons (§4.4). |
 | `patch.contested` | info | Two or more `Mods` use `Replace` or `Remove` on the same node. The node key combines the `Def` and element path. The later Mod's change is the one the game keeps; sorting does not order for it (08 §1.6). The claim names who wins in the list as it is now, and the fixes are the user rule that keeps that winner and `rule add ignore contested:<#a>:<#b>`, which hides the pair (`App.contestFindings`, also after a list edit before the next check). Mods no longer enabled drop out; fewer than two left, no finding. |
 | `patch.unknown-op` | info | A custom PatchOperation cannot be simulated. Emit one finding per Mod listing its custom classes, and treat these operations as successful. |
+| `patch.too-slow` | info | An XPath evaluation of an operation went past its step budget (§5.2), so the operation was not simulated: its result is `unknown`, it counts as successful, and its effect is not applied. Emit one finding per Mod, with up to ten operations as `file:line xpath` evidence. The confidence is possible. |
 
 **Harmony layer**
 
@@ -322,6 +324,8 @@ The conclusions of the log corpus are one versioned bundle, separate from the pr
 5. The failure key combines the file and the game's description of the operation (`FailKey`), matching the failure messages in `Player.log` (06 §2).
 
 **XPath**. The engine must match .NET XPath 1.0 behavior. Test compatibility with all XPath expressions in the real Mod collection and replay `Player.log`, simulating every logged failure. The mismatch rate must be below 0.5%, with differences documented. See 18 for the measurements. The common `Defs/XDef[defName="…"]` form, and a predicate of such defName / `@Name` equalities joined by `or` (`Defs/ThingDef[defName="A" or defName="B"]`), also written with `*` for the root step (`*/TraitDef[defName="X"]`, while `Defs` is the only top-level element), a space before `[` or line breaks, use an indexed fast path that selects the same nodes in the same order as the engine (`TestFastPathMatchesEngine`); any other shape walks the whole document.
+
+**Step budget** (`xdoc.Doc.SelectLimit`, `analyze.EvalStepsMin`, `EvalStepsPerNode`). One XPath evaluation may make at most max(100,000,000, 20 × the document's nodes) navigator moves. A walk of the whole document takes up to about 4 moves per node. The engine evaluates some expressions again for every candidate: `[last()]` and `position()` count every sibling, and reverse and `following::` axes, `count(//…)` and absolute paths inside a predicate walk the document again. These cost candidates × document; on a list with 100,000 top-level Defs one such operation ran for hours. The budget counts moves, not time, so a run gives the same result on every machine and at every priority. Past it, the evaluation stops and the operation is not simulated (`patch.too-slow`): nothing it would change is changed, a `Sequence` stops there, and the operations after it run as usual. The `target-later` check (§4.4) has the same budget and treats an evaluation over it as matching nothing.
 
 **Memory and parsing**. The merged document exists only in the subprocess.
 

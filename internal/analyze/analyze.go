@@ -117,9 +117,15 @@ type Output struct {
 
 // Stats summarise a run.
 type Stats struct {
-	ActiveMods, InstalledMods  int
-	DefFiles, PatchFiles       int
-	Defs, TopOps, UnknownOps   int
+	ActiveMods, InstalledMods int
+	DefFiles, PatchFiles      int
+	Defs, TopOps, UnknownOps  int
+	// SlowOps: operations not simulated because an XPath evaluation went past the step
+	// budget (patch.too-slow, 05 §5.2); SlowestOp and SlowestMs: the operation that took
+	// longest ("file:line", for the feedback report's Mod check line)
+	SlowOps                    int    `json:",omitempty"`
+	SlowestOp                  string `json:",omitempty"`
+	SlowestMs                  int64  `json:",omitempty"`
 	Failed                     int
 	ParseErrors                int
 	Nodes, TextMB              int
@@ -135,6 +141,10 @@ type Stats struct {
 	// check between runs trusts only such runs (05 §4.4 "Between checks")
 	Guards bool `json:",omitempty"`
 }
+
+// ProgressEvery is the longest the Patch simulation goes without a progress line while it
+// is still moving (05 §3).
+var ProgressEvery = 2 * time.Second
 
 func (in *Input) progress(f string, a ...any) {
 	if in.Progress != nil {
@@ -377,15 +387,24 @@ func (r *run) parsePatches() []*topOp {
 // simulate runs the operations against the merged document and records the run's size.
 func (r *run) simulate(sim *sim, tops []*topOp) {
 	seq := map[string]int{}
+	st := &r.out.Stats
+	last := time.Now()
 	for k, t := range tops {
 		seq[t.mod.Instance]++
 		t.seq = seq[t.mod.Instance]
+		t0 := time.Now()
 		sim.run(t)
-		if (k+1)%1000 == 0 {
+		now := time.Now()
+		if d := now.Sub(t0).Milliseconds(); d > st.SlowestMs {
+			st.SlowestMs, st.SlowestOp = d, fmt.Sprintf("%s %s:%d", t.mod.Name, t.file, t.op.Line)
+		}
+		// every 1000 operations, and at least every ProgressEvery while operations are
+		// slow: the window's elapsed time moves only with these lines (05 §3)
+		if (k+1)%1000 == 0 || k+1 == len(tops) || now.Sub(last) >= ProgressEvery {
 			r.in.progress("patches: %d/%d operations", k+1, len(tops))
+			last = now
 		}
 	}
-	st := &r.out.Stats
 	st.TopOps = len(tops)
 	st.IndexHits, st.IndexRebuilds, st.Evaluations = sim.ix.hits, sim.ix.rebuilds, sim.evals
 	st.Nodes, st.TextMB = r.doc.Len(), r.doc.TextBytes()>>20
@@ -402,12 +421,15 @@ func (r *run) patchFindings(sim *sim, tops []*topOp) {
 	out := r.out
 	kb := newKnowledge(r.in.Mods, r.allDefs)
 	out.Patches = sim.facts(tops, kb)
-	for _, p := range out.Patches {
+	for i, p := range out.Patches {
 		if p.Result == ResultFailed {
 			out.Stats.Failed++
 		}
 		if p.Result == ResultUnknown {
 			out.Stats.UnknownOps++
+		}
+		if tops[i].slow {
+			out.Stats.SlowOps++
 		}
 	}
 	out.Findings = append(out.Findings, defFindings(r.active, r.allDefs, r.isActive)...)

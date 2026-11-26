@@ -20,7 +20,7 @@ type Finding = finding.Finding
 const (
 	ResultOK      = "ok"
 	ResultFailed  = "failed"
-	ResultUnknown = "unknown" // mod-defined operation class: not simulated
+	ResultUnknown = "unknown" // mod-defined operation class, or too slow to evaluate: not simulated
 )
 
 // No-match reasons (05 §4.4), plus node-absent: the def exists but the path inside it does not.
@@ -152,6 +152,9 @@ func (s *sim) facts(tops []*topOp, k *knowledge) []*PatchFact {
 		f.Hits = hits
 		f.Targets = sortedKeys(s.targets[t])
 		switch {
+		case t.slow:
+			f.Result = ResultUnknown
+			f.Detail = "not simulated: evaluating " + t.slowXPath + " went past the step budget (05 §5.2)"
 		case !t.op.Known:
 			f.Result = ResultUnknown
 		case t.ok:
@@ -673,10 +676,19 @@ func (s *sim) findings(tops []*topOp, facts []*PatchFact) []*Finding {
 	var out []*Finding
 	unknown := map[*Mod]map[string]int{}
 	var umods []*Mod
+	slow := map[*Mod][]*topOp{}
+	var smods []*Mod
 	for i, t := range tops {
 		p := facts[i]
 		switch p.Result {
 		case ResultUnknown:
+			if t.slow {
+				if slow[t.mod] == nil {
+					smods = append(smods, t.mod)
+				}
+				slow[t.mod] = append(slow[t.mod], t)
+				continue
+			}
 			if unknown[t.mod] == nil {
 				unknown[t.mod] = map[string]int{}
 				umods = append(umods, t.mod)
@@ -728,6 +740,20 @@ func (s *sim) findings(tops []*topOp, facts []*PatchFact) []*Finding {
 			Key: "unknown", Subjects: []string{finding.Inst(m.Instance)},
 			Claim:    fmt.Sprintf("%d operations use mod-defined classes that cannot be simulated; their effect is not known", n),
 			Evidence: []finding.Evidence{{Source: finding.Inferred, Text: strings.Join(cls, ", ")}}})
+	}
+	for _, m := range smods {
+		f := &Finding{Code: "patch.too-slow", Severity: finding.Info, Layer: "patch", Confidence: finding.Possible,
+			Key: "too-slow", Subjects: []string{finding.Inst(m.Instance)},
+			Claim: fmt.Sprintf("%d operations were not simulated: their XPath takes too long to evaluate on this list; their effect is not known", len(slow[m]))}
+		for k, t := range slow[m] {
+			if k == 10 {
+				f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Inferred, Text: fmt.Sprintf("… %d more", len(slow[m])-k)})
+				break
+			}
+			f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Declared, Ref: finding.Inst(m.Instance),
+				Text: fmt.Sprintf("%s:%d %s", t.file, t.op.Line, t.slowXPath)})
+		}
+		out = append(out, f)
 	}
 	var keys []string
 	for k, ms := range s.contests {
