@@ -152,3 +152,31 @@ test("the history's bar says 1 step, 2 steps (VM 2026-11-23: \"1 steps\")", asyn
   lists.renderHistory();
   assert.match($(".hbar").innerHTML, /2 steps</);
 });
+
+test("Enabled's tag coverage: one segment per first tag, coloured first, no tag hatched last and toggling has:notag", async () => {
+  const doc = { documentElement: { lang: "en" } };
+  const tc = await loadModules("./tagcoverage.js", {
+    "./state.js": { el: (tag, cls = "") => { const e = new Element(tag); e.className = cls; return e; }, T: (s) => s, Tf: (s, ...a) => s + " " + a.join(","), factText: () => {} },
+    "./tagcolor.js": { tagColors: () => ({ qol: "grass" }), tagCSS: (v) => (v ? "var(--tag-" + v + ")" : "") },
+    "./membar.js": { visTip: (n, text) => { n.tip = text; n.tabIndex = 0; return n; }, visTipText: () => {} },
+  }, { document: doc });
+  const cols = [{ items: [{ tags: ["x"] }] }, { items: [{ tags: ["visuals"] }, { tags: ["QoL", "visuals"] }, { tags: ["qol"] }, {}, { tags: [] }] }];
+  const sets = [], opened = [];
+  const bar = { search: "", set: (f, on) => sets.push([f, on]) };
+  const box = tc.tagCoverage(cols, bar, (t) => opened.push(t));
+  const segs = box.children[0].children;
+  assert.deepEqual(segs.map((s) => [s.className, s.style.flexGrow]), [["seg-tag", "2"], ["seg-tag plain", "1"], ["seg-none", "2"]]);
+  assert.match(box.tip, /%d of %d enabled mods have a tag, %d have none 3,5,2/);
+  segs[0].onclick({ stopPropagation() {} });
+  segs[2].onclick({ stopPropagation() {} });
+  assert.deepEqual(opened, ["QoL"]);
+  assert.deepEqual(sets, [["has:notag", 1]]);
+  assert.equal(tc.tagCoverage(cols, bar, () => {}), box, "unchanged numbers keep the element");
+  bar.search = "has:notag";
+  const on = tc.tagCoverage(cols, bar, () => {});
+  assert.notEqual(on, box);
+  on.onkeydown({ key: "Enter", preventDefault() {}, stopPropagation() {} });
+  assert.deepEqual(sets.at(-1), ["has:notag", 0]);
+  // nobody tags: nothing is drawn
+  assert.equal(tc.tagCoverage([{ items: [{}] }, { items: [{}, { tags: [] }] }], bar, () => {}), null);
+});

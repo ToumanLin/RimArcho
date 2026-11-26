@@ -226,7 +226,7 @@ func typeMatch(v string, it *Item, f MatchFacts) bool {
 	return false
 }
 
-// hasMatch is the term has:v: a problem, an error, tags, a note or an alias.
+// hasMatch is the term has:v: a problem, an error, tags, no tag, a note or an alias.
 func hasMatch(v string, it *Item, f MatchFacts) bool {
 	switch v {
 	case "problem", "problems":
@@ -237,6 +237,8 @@ func hasMatch(v string, it *Item, f MatchFacts) bool {
 		return s == StatusErr || s == StatusLog
 	case "tag", "tags":
 		return len(it.Tags) > 0
+	case "notag":
+		return len(it.Tags) == 0
 	case "note":
 		return it.Note != ""
 	case "alias":
@@ -305,7 +307,7 @@ var queryFieldOrder = []string{"lists", "name", "author", "tag", "id", "type", "
 // queryValues are the fixed values of type: and has: (16 §3.7), in the order offered.
 var queryValues = map[string][]string{
 	"type":     {"workshop", "local", "official", "copy", "git", "steamcmd", "assembly", "xml", "language"},
-	"has":      {"problem", "error", "tag", "note", "alias"},
+	"has":      {"problem", "error", "tag", "notag", "note", "alias"},
 	"category": app.CategoryKeys,
 }
 

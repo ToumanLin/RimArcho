@@ -26,7 +26,7 @@ var barValues = map[string][]string{
 	"source":   {"workshop", "steamcmd", "local", "locked", "official", "other"},
 	"content":  {"assembly", "xml", "language"},
 	"category": app.CategoryKeys,
-	"has":      {"problem", "error", "note", "alias"},
+	"has":      {"problem", "error", "note", "alias", "notag"},
 	"added":    app.LibAdded,
 }
 
@@ -176,8 +176,42 @@ func FilterBoard(b *Board, search string, filters []string, f MatchFacts, groups
 		sortBar(k, g.Values)
 		out.Groups = append(out.Groups, g)
 	}
-	out.Groups = append(out.Groups, boardTextGroups(b)...)
+	out.Groups = append(moveNoTag(out.Groups), boardTextGroups(b)...)
 	return out
+}
+
+// moveNoTag puts has:notag ("no tag", the Mods without a tag) last in the tags group, where a
+// player checking their tags looks for it (16 §3.7), rather than among has:'s values. Its
+// filter stays has:notag, so it counts and toggles as a has: value.
+func moveNoTag(groups []LibGroup) []LibGroup {
+	var none *LibChoice
+	for gi := range groups {
+		if groups[gi].Key != "has" {
+			continue
+		}
+		vs := groups[gi].Values
+		for i := range vs {
+			if vs[i].Filter == "has:notag" {
+				c := vs[i]
+				none = &c
+				groups[gi].Values = append(vs[:i:i], vs[i+1:]...)
+				break
+			}
+		}
+	}
+	if none == nil {
+		return groups
+	}
+	for gi := range groups {
+		if groups[gi].Key == "tag" {
+			if len(groups[gi].Values) == 0 && none.On == 0 {
+				return groups // nothing is tagged: no tag would be every Mod
+			}
+			groups[gi].Values = append(groups[gi].Values, *none)
+			return groups
+		}
+	}
+	return groups
 }
 
 // barTally is each bar group's values as shown and their counts of rows in the search.
@@ -321,7 +355,7 @@ func barValueText(k, v string) string {
 	case "category":
 		return CategoryText(v)
 	case "has":
-		return T(map[string]string{"problem": "a problem", "error": "an error", "note": "a note", "alias": "an alias"}[v])
+		return T(map[string]string{"problem": "a problem", "error": "an error", "note": "a note", "alias": "an alias", "notag": "no tag"}[v])
 	case "added":
 		return addedText(v)
 	}

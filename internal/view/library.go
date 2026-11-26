@@ -540,7 +540,7 @@ func libraryGroups(lib *app.Library, res *app.LibResult) []LibGroup {
 		}
 		groups = append(groups, g)
 	}
-	return groups
+	return moveNoTag(groups)
 }
 
 func libInst(lib *app.Library, l *app.LibLineage, i *app.LibInstance) LibInstRow {

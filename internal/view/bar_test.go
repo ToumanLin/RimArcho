@@ -78,6 +78,49 @@ func TestFilterBoardGroups(t *testing.T) {
 	}
 }
 
+// No tag (GitHub #28): has:notag keeps the Mods without a tag, typed or clicked, and the bar
+// offers it last in the tags group, counted like a has: value (16 §3.7).
+func TestFilterBoardNoTag(t *testing.T) {
+	t.Parallel()
+	b := barBoard()
+	for _, q := range []struct{ search, filter string }{{"has:notag", ""}, {"", "has:notag"}, {"-has:tag", ""}} {
+		var fs []string
+		if q.filter != "" {
+			fs = []string{q.filter}
+		}
+		if got := fmt.Sprint(FilterBoard(b, q.search, fs, MatchFacts{}, false, "1.6").Rows); got != "[[2] [1]]" {
+			t.Errorf("%+v: got %s, want [[2] [1]]", q, got)
+		}
+	}
+	got := FilterBoard(b, "", []string{"has:notag"}, MatchFacts{}, true, "1.6")
+	for _, g := range got.Groups {
+		switch g.Key {
+		case "tag":
+			last := g.Values[len(g.Values)-1]
+			if last.Filter != "has:notag" || last.Count != 2 || last.On != 1 || last.Label != "no tag" {
+				t.Errorf("tags group ends with %+v", last)
+			}
+		case "has":
+			for _, v := range g.Values {
+				if v.Filter == "has:notag" {
+					t.Errorf("has:notag is offered under has too")
+				}
+			}
+		}
+	}
+	// nothing tagged: no tag would be every Mod, so it is not offered
+	for k := range b.Cols {
+		for i := range b.Cols[k] {
+			b.Cols[k][i].Tags = nil
+		}
+	}
+	for _, g := range FilterBoard(b, "", nil, MatchFacts{}, true, "1.6").Groups {
+		if g.Key == "tag" && len(g.Values) > 0 {
+			t.Errorf("an untagged board offers %+v", g.Values)
+		}
+	}
+}
+
 func TestFilterBoardLocations(t *testing.T) {
 	t.Parallel()
 	b := barBoard()

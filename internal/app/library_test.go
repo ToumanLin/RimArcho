@@ -133,6 +133,9 @@ func TestLibraryFilter(t *testing.T) {
 		{app.LibQuery{Include: []string{"tag:qol"}}, []string{"Idle"}},
 		{app.LibQuery{Include: []string{"used:plan:default"}}, []string{"Lockable"}},
 		{app.LibQuery{Include: []string{"version:1.4"}}, []string{"Oldie"}},
+		// no tag (GitHub #28), and its old spelling
+		{app.LibQuery{Include: []string{"has:notag"}, Exclude: []string{"state:missing"}}, []string{"Gone", "Lockable", "Oldie"}},
+		{app.LibQuery{Exclude: []string{"has:tag", "state:missing"}}, []string{"Gone", "Lockable", "Oldie"}},
 	}
 	for _, c := range cases {
 		if got := filtered(t, lib, c.q); !slices.Equal(got, c.want) {

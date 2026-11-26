@@ -999,6 +999,8 @@ func libValues(l *LibLineage, i *LibInstance, key string, now time.Time) []strin
 		}
 		if len(l.Tags) > 0 {
 			vs = append(vs, "tag")
+		} else {
+			vs = append(vs, "notag") // no tag (16 §3.7): the filter bar offers it with the tags
 		}
 		if l.Alias != "" {
 			vs = append(vs, "alias")

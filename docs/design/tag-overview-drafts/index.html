@@ -1,0 +1,91 @@
+<!doctype html>
+<!-- GitHub #28 drafts: where a player reviews tags and finds untagged enabled Mods.
+     Static, dark theme, editor at 1280 wide. Option A was chosen (README.md). -->
+<html lang="en"><head><meta charset="utf-8"><title>Tag overview drafts (#28)</title>
+<style>
+:root{--bg:#1a1a1e;--card:#232327;--pill:#2d2d33;--line:#333339;--fg:#ededf1;--fg-2:#b9b9c1;--muted:#8b8b94;--faint:#56565f;--accent:#a5b4fc;--accent-soft:#2b2c47;
+--blue:#70b8ff;--cyan:#4ccce6;--teal:#0bd8b6;--grass:#71d083;--orange:#ff9f5a;--pink:#ff8dcc;--plum:#e796f3;--violet:#baa7ff}
+body{margin:0;background:var(--bg);color:var(--fg-2);font:13px "Segoe UI Variable Text","Segoe UI",sans-serif;padding:24px}
+h1{font-size:16px;color:var(--fg);margin:0 0 4px} h2{font-size:14px;color:var(--fg);margin:32px 0 6px}
+p{max-width:900px;line-height:1.5;margin:4px 0}
+.board{display:grid;grid-template-columns:38fr 31fr 31fr;gap:4px;width:1280px;height:470px;margin-top:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.head{display:flex;align-items:center;gap:8px;padding:8px 12px;color:var(--muted);height:20px}
+.head .n{color:var(--faint)} .head .t{color:var(--fg);font-weight:600} .head .num{color:var(--muted)}
+.row{display:flex;align-items:center;height:28px;padding-right:10px}
+.row .m{width:3px;align-self:stretch;margin-right:9px} .row .i{width:30px;text-align:right;color:var(--faint);margin-right:10px}
+.row .nm{color:var(--fg-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row.cur{background:#2a2a30} .row.cur .nm{color:var(--accent)}
+.cov{display:flex;align-items:center;gap:6px;margin-left:auto;cursor:pointer}
+.cov .bar{display:flex;width:96px;height:6px;border-radius:3px;overflow:hidden;background:var(--pill)}
+.cov .bar span{height:100%} .hatch{background:repeating-linear-gradient(135deg,var(--muted) 0 2px,transparent 2px 4px)}
+.cov .u{color:var(--muted);font-variant-numeric:tabular-nums}
+.cov svg{width:14px;height:14px;color:var(--muted)}
+.tip{position:absolute;background:#111114;border:1px solid var(--line);color:var(--fg-2);padding:6px 8px;border-radius:6px;font-size:12px;white-space:pre}
+.det{padding:4px 14px;line-height:1.6}
+.det .k{color:var(--muted);display:inline-block;width:80px}
+.chip{display:inline-flex;gap:5px;align-items:center;background:var(--pill);border-radius:10px;padding:1px 8px;margin:2px 2px;color:var(--fg-2)}
+.chip i{width:8px;height:8px;border-radius:50%;display:inline-block} .chip b{font-weight:400;color:var(--muted)}
+.chip.on{background:var(--accent-soft);color:var(--accent)}
+.fbar{padding:8px 12px;border-bottom:1px solid var(--line)}
+.fbar .q{background:var(--pill);border-radius:6px;padding:5px 8px;color:var(--fg)}
+.fbar .g{margin-top:8px;color:var(--muted)} .fbar .g .chip{font-size:12px}
+.side{width:150px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px}
+.side div{padding:5px 8px;border-radius:6px} .side .on{background:var(--pill);color:var(--fg)}
+table{border-collapse:collapse;width:100%} td,th{padding:6px 10px;text-align:left;border-bottom:1px solid var(--line)} th{color:var(--muted);font-weight:400}
+.sw{width:12px;height:12px;border-radius:3px;display:inline-block;vertical-align:middle}
+.minibar{display:inline-block;height:6px;background:var(--accent);border-radius:3px;vertical-align:middle}
+.verdict{background:var(--accent-soft);padding:10px 14px;border-radius:8px;max-width:900px;margin-top:24px}
+</style></head><body>
+<h1>Where players review tags: two drafts (GitHub #28)</h1>
+<p>What exists: tag colours, the first tag's colour band in every editor row, the Tag manager (note, rename, merge, colour, all tags with counts) and <code>-has:tag</code>. What the player could not find: the Tag manager is reached only from Disabled's tags view or the Mod library's Tags view, and nothing says how many enabled Mods have no tag.</p>
+
+<h2>A · A tag coverage bar in Enabled's heading (chosen)</h2>
+<p>Enabled's heading draws its Mods by their first tag's colour: one segment per colour, grey for a tag with no colour, hatched for no tag, with the untagged count printed. Clicking a segment shows that tag in the Tag manager (the details, as a tag clicked in a Mod's details does today), whose all tags chips are the overview. Clicking the hatched part filters to <code>has:notag</code>. The filter bar's Tags group ends with a <b>no tag</b> value. No row changes: rows stay 28px.</p>
+<div class="board">
+  <div class="card">
+    <div class="fbar"><div class="q">has:notag</div>
+      <div class="g">tags &nbsp;<span class="chip"><i style="background:var(--blue)"></i>framework <b>41</b></span><span class="chip"><i style="background:var(--grass)"></i>QoL <b>63</b></span><span class="chip"><i style="background:var(--orange)"></i>races <b>22</b></span><span class="chip">visuals <b>38</b></span><span class="chip on">no tag <b>27</b></span></div></div>
+    <div class="head"><span class="n">4</span><span class="t">tags</span><span>QoL</span></div>
+    <div class="det">
+      <div style="color:var(--fg);font-weight:600;font-size:14px">QoL</div>
+      <div style="color:var(--muted)">63 mods &nbsp; 51 enabled</div>
+      <div><span class="k">colour</span><span class="chip"><i style="background:var(--grass)"></i>grass</span> <span class="sw" style="background:var(--blue)"></span> <span class="sw" style="background:var(--teal)"></span> <span class="sw" style="background:var(--pink)"></span> …</div>
+      <div style="color:var(--muted);margin-top:8px">all tags</div>
+      <div><span class="chip"><i style="background:var(--blue)"></i>framework <b>41</b></span><span class="chip on"><i style="background:var(--grass)"></i>QoL <b>63</b></span><span class="chip"><i style="background:var(--orange)"></i>races <b>22</b></span><span class="chip">visuals <b>38</b></span><span class="chip">weapons <b>17</b></span></div>
+    </div>
+  </div>
+  <div class="card" style="position:relative">
+    <div class="head"><span class="n">2</span><span class="t">Enabled</span><span class="num">27 / 300</span>
+      <span class="cov" title="273 of 300 enabled mods have a tag, 27 have none">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 2h6l6 6-6 6-6-6z"/><circle cx="5.5" cy="5.5" r="1"/></svg>
+        <span class="bar"><span style="width:14%;background:var(--blue)"></span><span style="width:21%;background:var(--grass)"></span><span style="width:7%;background:var(--orange)"></span><span style="width:49%;background:var(--muted)"></span><span class="hatch" style="width:9%"></span></span>
+        <span class="u">27</span></span></div>
+    <div class="row"><span class="m"></span><span class="i">12</span><span class="nm">Some Untagged Mod</span></div>
+    <div class="row cur"><span class="m"></span><span class="i">48</span><span class="nm">Better Pawn Control</span></div>
+    <div class="row"><span class="m"></span><span class="i">77</span><span class="nm">Dub's Paint Shop</span></div>
+    <div class="row"><span class="m"></span><span class="i">105</span><span class="nm">Wall Light</span></div>
+    <div class="tip" style="top:30px;left:120px">273 of 300 enabled mods have a tag, 27 have none
+click a colour: that tag · the stripes: mods with no tag</div>
+  </div>
+  <div class="card"><div class="head"><span class="n">1</span><span class="t">Disabled</span><span class="num">200</span></div>
+    <div class="row"><span class="m" style="background:var(--blue)"></span><span class="nm">HugsLib</span></div>
+    <div class="row"><span class="m" style="background:var(--grass)"></span><span class="nm">Pick Up And Haul</span></div></div>
+</div>
+
+<h2>B · A Tags page in the sidebar</h2>
+<p>A new page lists every tag as a table: colour swatch, name, Mods, enabled, a bar of its share, the note; a last row No tag. Editing opens the Tag manager. It is a full page of text and numbers the Mod library's Tags view already has, and the player leaves the list they are checking.</p>
+<div style="display:flex;gap:4px;width:1280px;height:300px;margin-top:10px">
+  <div class="side"><div>Home</div><div>Lists</div><div>Mod library</div><div class="on">Tags</div><div>Logs</div></div>
+  <div class="card" style="flex:1;padding:8px">
+    <table><tr><th></th><th>tag</th><th>mods</th><th>enabled</th><th></th><th>note</th></tr>
+      <tr><td><span class="sw" style="background:var(--blue)"></span></td><td>framework</td><td>41</td><td>35</td><td><span class="minibar" style="width:70px"></span></td><td>libraries others need</td></tr>
+      <tr><td><span class="sw" style="background:var(--grass)"></span></td><td>QoL</td><td>63</td><td>51</td><td><span class="minibar" style="width:102px"></span></td><td></td></tr>
+      <tr><td><span class="sw" style="background:var(--orange)"></span></td><td>races</td><td>22</td><td>12</td><td><span class="minibar" style="width:24px"></span></td><td></td></tr>
+      <tr><td></td><td>visuals</td><td>38</td><td>30</td><td><span class="minibar" style="width:60px"></span></td><td></td></tr>
+      <tr><td></td><td style="color:var(--muted)">No tag</td><td>61</td><td>27</td><td><span class="minibar" style="width:54px;background:var(--muted)"></span></td><td></td></tr></table>
+  </div>
+</div>
+
+<div class="verdict"><b>Chosen: A.</b> It answers the issue's question (is every enabled Mod tagged, and with what) as a picture where the player is already looking, with one click to the untagged ones and one to any tag's manager. It costs no row height, no new page and no per-row work (one pass over Enabled's rows the board already has). B repeats the Tags view as a text table (16 §7 principle 9: show quantities, not sentences or tables of numbers), adds a page and takes the player away from the list.</div>
+</body></html>

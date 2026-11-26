@@ -346,5 +346,7 @@
   "for another manager": "ほかのマネージャー向け",
   "a pack, with the Mod files…": "MODパック（Mod ファイル付き）…",
   "show the file": "ファイルを表示",
-  "hide the file": "ファイルを隠す"
+  "hide the file": "ファイルを隠す",
+  "%d of %d enabled mods have a tag, %d have none": "有効なMOD %[2]d件のうち%[1]d件にタグあり、%[3]d件はタグなし",
+  "click a colour: that tag; the stripes or enter: the mods with no tag": "色をクリック：そのタグ／斜線かEnter：タグのないMODだけ表示"
 }

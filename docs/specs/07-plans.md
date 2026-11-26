@@ -347,7 +347,7 @@ Recycling Mod folders: 09 §5, 02 §3.
 | Data | Owner | Description | Command |
 | --- | --- | --- | --- |
 | Alias | Lineage | Display name in all interfaces. `find` and search match both names. The window edits it in Mod details (16 §4.1). Log attribution still matches the About.xml name, because the game prints `[Name]`, not the alias | `archo alias <ref> [<name>] [--clear]` |
-| Tags | Lineage | Several, case-insensitive; RimCrow groups import as tags. Ordered per Lineage (new tags last; the first one's colour marks the Mod's rows, 16 §3.8). A tag itself can be renamed, merged into another, deleted, given a note and a colour, on every Mod at once (the GUI's Tag manager, 16 §2.9) | `archo tag add\|remove <ref> <tags…> [--mod <ref>]…`, `archo tag list`, `archo tag rename\|merge\|delete\|note\|color`, `archo tag order <ref> <tags…>`; filter `list --filter tag:<tag>` |
+| Tags | Lineage | Several, case-insensitive; RimCrow groups import as tags. Ordered per Lineage (new tags last; the first one's colour marks the Mod's rows, 16 §3.8). A tag itself can be renamed, merged into another, deleted, given a note and a colour, on every Mod at once (the GUI's Tag manager, 16 §2.9) | `archo tag add\|remove <ref> <tags…> [--mod <ref>]…`, `archo tag list`, `archo tag rename\|merge\|delete\|note\|color`, `archo tag order <ref> <tags…>`; filter `list --filter tag:<tag>`, untagged `has:notag` (16 §3.7) |
 | Note | Lineage | Plain text | `archo note <ref> [<text>] [--clear]` |
 | Category | Lineage | The player's category for the Mod, one of 16 §2.5's; none means the automatic one. Display and filters only | `archo category <ref> [<category>] [--clear]`; filter `category:<category>` |
 
