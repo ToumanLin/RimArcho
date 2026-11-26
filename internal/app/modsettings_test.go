@@ -44,14 +44,14 @@ func TestSettingsFollowDeployedCopy(t *testing.T) {
 	// Played as the copy, its settings change; back on the Workshop folder, its own file stays.
 	e.WriteFile(carried, "<SettingsBlock>copy</SettingsBlock>")
 	e.MustRun("swap", refOf(t, e, "A", source.SteamCMD), refOf(t, e, "A", source.Workshop))
-	if out := e.MustRun("save"); strings.Contains(out, "Mod settings") {
+	if out := e.MustRun("save"); strings.Contains(out, "Mod options") {
 		t.Fatalf("copied over an existing file:\n%s", out)
 	}
 	if got := readFile(t, filepath.Join(cfg, "Mod_1001_AMod.xml")); got != "<SettingsBlock>workshop</SettingsBlock>" {
 		t.Fatalf("the Workshop file changed: %q", got)
 	}
 	e.MustRun("env", "set", "main", "--launch", "direct")
-	if out := e.MustRun("launch", "--dry-run"); strings.Contains(out, "Mod settings") {
+	if out := e.MustRun("launch", "--dry-run"); strings.Contains(out, "Mod options") {
 		t.Fatalf("launch preview:\n%s", out)
 	}
 }
@@ -104,7 +104,7 @@ func TestPackSettingsFollowTheMod(t *testing.T) {
 
 	e.WriteFile(filepath.Join(packCfg, to), "<SettingsBlock>pack</SettingsBlock>")
 	e.WriteFile(filepath.Join(cfg, "Mod_1001_AMod.xml"), "<SettingsBlock>env later</SettingsBlock>")
-	if out := e.MustRun("pack", "launch", "first"); strings.Contains(out, "Mod settings") || strings.Contains(out, "HugsLib") {
+	if out := e.MustRun("pack", "launch", "first"); strings.Contains(out, "Mod options") || strings.Contains(out, "HugsLib") {
 		t.Fatalf("second launch copied again:\n%s", out)
 	}
 	if got := readFile(t, filepath.Join(packCfg, to)); got != "<SettingsBlock>pack</SettingsBlock>" {
@@ -159,7 +159,7 @@ func TestModSettingsCommand(t *testing.T) {
 		`<SettingsBlock><ModSettings Class="A.Settings"><fast>True</fast><speed>2.5</speed><things><li>x</li></things></ModSettings></SettingsBlock>`)
 
 	out := e.MustRun("mod-settings")
-	if !strings.Contains(out, "mod settings: 2 Mods in plan:") || !strings.Contains(out, "A settings") || !strings.Contains(out, "Mod_1001_AMod.xml") ||
+	if !strings.Contains(out, "mod options: 2 Mods in plan:") || !strings.Contains(out, "A settings") || !strings.Contains(out, "Mod_1001_AMod.xml") ||
 		!strings.Contains(out, "B options") || !strings.Contains(out, "defaults (no file yet)") || strings.Contains(out, "Harmony") {
 		t.Fatalf("list:\n%s", out)
 	}

@@ -169,7 +169,7 @@ The domain/UI distinction follows [03 §1](specs/03-environments-and-sources.md#
 | 眉题 | eyebrow |  | Short contextual label above a heading. |
 | 面包屑 | breadcrumbs |  |  |
 | 命令面板 | command panel |  |  |
-| Mod 选项 | Mod settings | Mod options | The Mod library page and the files of each Mod's stored settings. Every interface language uses the game's own name for its Mod options window: Mod options, `Mod 选项` (the game writes `Mod选项`), `MODオプション` (player's choice, 2026-11-25; was `Mod 配置`). Not 设置: that is RimArcho's own Settings page. |
+| Mod 选项 | Mod settings | Mod options | The Mod library page and the files of each Mod's stored settings. Every interface language uses the game's own name for its Mod options window: Mod options, `Mod 选项` (the game writes `Mod选项`), `MODオプション` (player's choice, 2026-11-25; was `Mod 配置`). CLI output and MCP descriptions say Mod options too; the command `mod-settings` and the tools `get_mod_settings` / `set_mod_settings` keep their names. Not 设置: that is RimArcho's own Settings page. |
 | Mod 库 | Mod library | mod library | The page listing every installed Mod copy; the English page name is lowercase. |
 | 能不能跑 | Can it run | can it run | The page that checks whether the current plan can run; the English page name is lowercase. |
 | 强调色 | accent color |  |  |

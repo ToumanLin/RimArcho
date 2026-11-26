@@ -379,7 +379,7 @@ func (p *ListSettingsPlan) Writes() (n int) {
 // HugsLib file does. Refused while a game runs; dryRun only plans.
 func (a *App) ApplyListSettings(s *PackSettings, mods []string, replace, dryRun bool) (*ListSettingsPlan, error) {
 	if s.Empty() {
-		return nil, errors.New("the list carries no Mod settings")
+		return nil, errors.New("the list carries no Mod options")
 	}
 	if err := s.check(); err != nil {
 		return nil, err

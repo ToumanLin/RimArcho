@@ -83,7 +83,7 @@ func (a *App) ExportPlanWith(planID int64, format string, settings bool) ([]byte
 }
 
 // ErrSettingsFormat: only a RimArcho list carries Mod settings.
-var ErrSettingsFormat = errors.New("only a RimArcho list (--format archo) carries Mod settings")
+var ErrSettingsFormat = errors.New("only a RimArcho list (--format archo) carries Mod options")
 
 func (a *App) exportList(st *LoadoutState, format string, settings bool) ([]byte, error) {
 	if settings && format != FormatArcho {

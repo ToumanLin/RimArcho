@@ -378,7 +378,7 @@ type PlanExport struct {
 	Formats []ExportFormat `json:"formats"`
 	Format  string         `json:"format"`
 	Text    string         `json:"text"`
-	// Settings: the RimArcho list carries the list's Mod settings ("include Mod settings",
+	// Settings: the RimArcho list carries the list's Mod settings ("include Mod options",
 	// 07 §7.3); SettingsMods is how many Mods it carries settings of.
 	Settings     bool `json:"settings"`
 	SettingsMods int  `json:"settingsMods"`

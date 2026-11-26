@@ -13,7 +13,7 @@ import (
 // Mod settings (16 §2.9 "Mod settings", 13 §4): the current list's Mods that have settings,
 // and what one Mod's settings files store.
 func init() {
-	register(&Command{Name: "mod-settings", Args: "[<ref>]", Summary: "Mod settings: the current list's Mods that have settings, or what one Mod's files store (change values with mod-settings set)",
+	register(&Command{Name: "mod-settings", Args: "[<ref>]", Summary: "Mod options: the current list's Mods that have settings, or what one Mod's files store (change values with mod-settings set)",
 		MinArgs: 0, MaxArgs: 1, Run: modSettingsCmd,
 		Flags: []Flag{{Name: "all", Help: "every Mod or value, not only the first ones"}}})
 }
@@ -137,7 +137,7 @@ func modSettingsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
-	d, root := render.New(fmt.Sprintf("mod settings: %s in %s (%s)", render.Plural(len(l.Mods), "Mod"), l.Plan, l.Config))
+	d, root := render.New(fmt.Sprintf("mod options: %s in %s (%s)", render.Plural(len(l.Mods), "Mod"), l.Plan, l.Config))
 	var rows [][]string
 	for _, sm := range l.Mods {
 		for _, f := range sm.Files {

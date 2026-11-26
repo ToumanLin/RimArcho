@@ -208,7 +208,7 @@ func (a *App) RecycleModSettings(names []string, dryRun bool) (*SettingsRecycle,
 		case !ok:
 			return nil, fmt.Errorf("%s is not in %s", n, cf.Config)
 		case !f.Recyclable():
-			return nil, fmt.Errorf("%s is not a Mod settings file (Mod_<folder>_<class>.xml); RimArcho leaves the game's own files alone", n)
+			return nil, fmt.Errorf("%s is not a Mod options file (Mod_<folder>_<class>.xml); RimArcho leaves the game's own files alone", n)
 		}
 		seen[strings.ToLower(n)] = true
 		pick = append(pick, f)

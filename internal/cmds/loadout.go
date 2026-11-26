@@ -481,7 +481,7 @@ func settingsKV(root *render.Node, cs []app.SettingsCarry, dryRun bool) {
 	if failed > 0 {
 		head += fmt.Sprintf("; %d could not be copied", failed)
 	}
-	n := root.KV("Mod settings", head)
+	n := root.KV("Mod options", head)
 	for _, c := range cs {
 		line := c.Mod + ": " + c.From + " → " + c.To
 		if c.Err != "" {

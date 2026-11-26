@@ -62,7 +62,7 @@ func TestRecycleModSettings(t *testing.T) {
 	if out := e.MustRun("mod-settings", "recycle", "--orphans", "--dry-run"); !strings.Contains(out, "would move 1 settings file") || len(*got) != 0 {
 		t.Fatalf("dry run %v:\n%s", *got, out)
 	}
-	if out, code := e.Run("mod-settings", "recycle", "Prefs.xml"); code == 0 || !strings.Contains(out, "not a Mod settings file") {
+	if out, code := e.Run("mod-settings", "recycle", "Prefs.xml"); code == 0 || !strings.Contains(out, "not a Mod options file") {
 		t.Fatalf("Prefs.xml: %d\n%s", code, out)
 	}
 	if err := e.App.ToTrash(filepath.Join(e.Root, "Mod_x_Y.xml")); err == nil {

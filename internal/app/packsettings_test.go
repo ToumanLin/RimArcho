@@ -58,7 +58,7 @@ func TestPackCarriesSettings(t *testing.T) {
 		t.Fatal("the game's own settings were not copied")
 	}
 	if _, err := os.Stat(filepath.Join(packCfg, "Mod_1001_AMod.xml")); err == nil {
-		t.Fatal("the receiver's Mod settings were copied")
+		t.Fatal("the receiver's Mod options were copied")
 	}
 	hugs := readFile(t, filepath.Join(e.App.PacksDir(), "first", "userdata", "HugsLib", "ModSettings.xml"))
 	if !strings.Contains(hugs, "<x>author</x>") || strings.Contains(hugs, "other.mod") {
@@ -176,7 +176,7 @@ func TestListSettingsExportApply(t *testing.T) {
 		t.Fatalf("text with settings: %d\n%s", code, out)
 	}
 	file := filepath.Join(e.Root, "with.archolist.json")
-	if out := e.MustRun("loadout", "export", "--format", "archo", "--settings", "--out", file); !strings.Contains(out, "Mod settings") {
+	if out := e.MustRun("loadout", "export", "--format", "archo", "--settings", "--out", file); !strings.Contains(out, "Mod options") {
 		t.Fatal(out)
 	}
 	if json.Unmarshal([]byte(readFile(t, file)), &lp) != nil || lp.Format != app.PackFormat || lp.Settings.Mods() != 1 {
@@ -217,7 +217,7 @@ func TestListSettingsExportApply(t *testing.T) {
 		t.Fatalf("again:\n%s", out)
 	}
 	// an older list without settings
-	if out, code := e.Run("mod-settings", "apply", plain); code == 0 || !strings.Contains(out, "carries no Mod settings") {
+	if out, code := e.Run("mod-settings", "apply", plain); code == 0 || !strings.Contains(out, "carries no Mod options") {
 		t.Fatalf("plain apply: %d\n%s", code, out)
 	}
 }

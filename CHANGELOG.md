@@ -4,7 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
-- Mod settings take the game's own name in every language: "Mod options", `Mod 选项`, `MODオプション`. This covers the Mod library page, the details row, the palette, and the import, export, pack and uninstall texts. The Game Config page's lead now reads "Game Config = game version + Mod options" (zh: `游戏版本 + Mod 选项`); it no longer mentions the Mod list or the saves folder. CLI and MCP output are unchanged.
+- Mod settings take the game's own name in every language: "Mod options", `Mod 选项`, `MODオプション`. This covers the Mod library page, the details row, the palette, and the import, export, pack and uninstall texts. The Game Config page's lead now reads "Game Config = game version + Mod options" (zh: `游戏版本 + Mod 选项`); it no longer mentions the Mod list or the saves folder. CLI output and MCP tool descriptions say Mod options too; the command `archo mod-settings` and the MCP tools `get_mod_settings` / `set_mod_settings` keep their names.
 
 ## 1.1.4 — 2026-11-25
 

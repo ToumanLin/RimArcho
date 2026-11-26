@@ -169,7 +169,7 @@ func UninstallStepText(p *app.UninstallPlan, s *app.UninstallStep) string {
 			parts = append(parts, render.Plural(folders, "folder")+" named like one but not a link: left alone")
 		}
 	case app.UnModsConfig:
-		add(app.DoClean, "user data folder", "keep the ModsConfig.xml list of {n} without Archo Monitor and the mods only reached through a removed link; remove RimArcho's backups of the list and of Mod settings (the settings stay)")
+		add(app.DoClean, "user data folder", "keep the ModsConfig.xml list of {n} without Archo Monitor and the mods only reached through a removed link; remove RimArcho's backups of the list and of Mod options (the settings stay)")
 		add(app.DoRestore, "user data folder", "put the ModsConfig.xml backup back in {n}")
 	case app.UnLocked:
 		add(app.DoTrash, "lock library copy", "{n} to the recycle bin"+size+" (--keep-locked: into a game's Mods/)")

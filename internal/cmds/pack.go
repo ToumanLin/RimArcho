@@ -15,7 +15,7 @@ func init() {
 	register(&Command{Name: "pack build", Args: "<name>", Summary: "compile the workspace into a pack: checked, sorted, each mod copied without the version folders this game does not load", MinArgs: 1, MaxArgs: 1, Run: packBuildCmd,
 		Flags: []Flag{{Name: "textures", Help: "convert the copies' PNG textures to DDS and delete the PNGs (pre-convert; with --texture-scale: slim)"},
 			{Name: "texture-scale", Value: "<percent>", Help: "with --textures: scale textures down (20 25 40 50 60 75 80; never below 128 px or off a multiple of 4)"},
-			{Name: "no-settings", Help: "leave the list's Mod settings out (by default the pack carries them)"},
+			{Name: "no-settings", Help: "leave the list's Mod options out (by default the pack carries them)"},
 			{Name: "update", Help: "build the next revision of the existing pack <name>: its Mods are replaced, its saves and settings stay"}, dry}})
 	register(&Command{Name: "pack list", Summary: "the packs: mods, size, game version, last played", MaxArgs: 0, Run: packListCmd})
 	register(&Command{Name: "pack launch", Args: "<name>", Summary: "play a pack: link its mods into Mods/, its own list and saves, start the game", MinArgs: 1, MaxArgs: 1, Run: packLaunchCmd,
@@ -153,9 +153,9 @@ func packBuildCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	root.KV("game", r.Pack.Game)
 	if n := r.Pack.Settings.Mods(); n > 0 {
-		root.KV("Mod settings", fmt.Sprintf("carries the settings of %s (--no-settings leaves them out)", render.Plural(n, "Mod")))
+		root.KV("Mod options", fmt.Sprintf("carries the settings of %s (--no-settings leaves them out)", render.Plural(n, "Mod")))
 	} else {
-		root.KV("Mod settings", "none carried")
+		root.KV("Mod options", "none carried")
 	}
 	if r.Diff != nil {
 		root.KV("revision", fmt.Sprintf("%d: replaces the pack's Mods; its saves and settings stay", r.Pack.Revision))
@@ -293,7 +293,7 @@ func packImportCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			packDiffKV(root, r.Update.Diff)
 		}
 		if n := r.Pack.Settings.Mods(); n > 0 {
-			root.KV("Mod settings", fmt.Sprintf("carries settings of %s; written on its next launch where the pack has none", render.Plural(n, "Mod")))
+			root.KV("Mod options", fmt.Sprintf("carries settings of %s; written on its next launch where the pack has none", render.Plural(n, "Mod")))
 		}
 		root.KV("folder", r.Dir)
 		if r.Verified {
@@ -468,6 +468,6 @@ func packDiffKV(root *render.Node, d *app.PackDiff) {
 		n.Truncate(10, "")
 	}
 	if d.Settings > 0 {
-		root.KV("Mod settings", fmt.Sprintf("carries settings of %s (missing files only)", render.Plural(d.Settings, "Mod")))
+		root.KV("Mod options", fmt.Sprintf("carries settings of %s (missing files only)", render.Plural(d.Settings, "Mod")))
 	}
 }

@@ -17,7 +17,7 @@ const descGuide = `Read-only help: a tool's full reference (topic=<tool name>: e
 
 const descStatus = `Overview of the current environment: game version, mods per source, the current plan and how it differs from the game's list, whether a game runs, problem counts, pending updates. Call first in a session. show=envs|folders|settings|data|db|cache gives one read-only page of RimArcho's setup instead.`
 
-const descModSettings = `Mod settings, read only. No ref: the current list's Mods that have settings (window title, file, or defaults when there is none yet). ref: what one Mod's files and HugsLib packs store, with window labels and HugsLib defaults from Archo Monitor. files: the Config folder's files and where each stands.`
+const descModSettings = `Mod options, read only. No ref: the current list's Mods that have settings (window title, file, or defaults when there is none yet). ref: what one Mod's files and HugsLib packs store, with window labels and HugsLib defaults from Archo Monitor. files: the Config folder's files and where each stands.`
 
 const descModSettingsSet = `With the game closed: change simple values (on/off, numbers, text, a HugsLib choice; reset = default); action=recycle|reset|copy_from|apply: recycle files, copy from a Game Config, apply a list's (dry_run first, ask).`
 

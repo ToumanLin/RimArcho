@@ -213,7 +213,7 @@ pack build: dry run, nothing written
   space: <free> free on the packs drive
   trimmed: nothing (no folders for other game versions)
   game: 1.6.4633 rev1261
-  Mod settings: none carried
+  Mod options: none carried
 next:
   archo pack build first
 
@@ -229,7 +229,7 @@ pack build: dry run, nothing written
     encoder: todds (the DDS encoder) is not installed; archo textures tool --install downloads it — the build is refused
   trimmed: nothing (no folders for other game versions)
   game: 1.6.4633 rev1261
-  Mod settings: none carried
+  Mod options: none carried
 next:
   archo pack build first
 
@@ -244,7 +244,7 @@ built pack first
   size: 868 B; 0 B of other game versions left out
   trimmed: nothing (no folders for other game versions)
   game: 1.6.4633 rev1261
-  Mod settings: none carried
+  Mod options: none carried
 next:
   archo pack launch first
 

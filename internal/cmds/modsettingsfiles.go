@@ -21,7 +21,7 @@ func init() {
 			{Name: "all", Help: "every file, not only the first ones"},
 		}})
 	register(&Command{Name: "mod-settings recycle", Args: "[<file>…]",
-		Summary: "move Mod settings files (Mod_*.xml in the Config folder) to the recycle bin, with the game closed",
+		Summary: "move Mod options files (Mod_*.xml in the Config folder) to the recycle bin, with the game closed",
 		MaxArgs: -1, Run: modSettingsRecycleCmd,
 		Flags: []Flag{
 			{Name: "orphans", Help: "every orphan: the files no installed Mod reads"},
@@ -36,7 +36,7 @@ func init() {
 		MinArgs: 1, MaxArgs: -1, Run: modSettingsCopyCmd,
 		Flags: []Flag{{Name: "dry-run", Help: "show what would be copied and replaced"}}})
 	register(&Command{Name: "mod-settings apply", Args: "<list file> [<package>…]",
-		Summary: "apply the Mod settings a RimArcho list carries to the installed Mods (all, or the packages named); existing files are kept unless --replace",
+		Summary: "apply the Mod options a RimArcho list carries to the installed Mods (all, or the packages named); existing files are kept unless --replace",
 		MinArgs: 1, MaxArgs: -1, Run: modSettingsApplyCmd,
 		Flags: []Flag{{Name: "replace", Help: "also replace settings files that are here (each goes to the recycle bin first)"},
 			{Name: "dry-run", Help: "the per-Mod preview: what would be written, kept or replaced"}}})
@@ -55,7 +55,7 @@ func modSettingsApplyCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if p.DryRun {
 		verb = "would write"
 	}
-	d, root := render.New(fmt.Sprintf("Mod settings from %s: %s %s into %s", a.Pos[0], verb, render.Plural(p.Writes(), "file"), p.Config))
+	d, root := render.New(fmt.Sprintf("Mod options from %s: %s %s into %s", a.Pos[0], verb, render.Plural(p.Writes(), "file"), p.Config))
 	failed, kept := 0, 0
 	for _, m := range p.Mods {
 		n := root.Add(m.Mod + "  pkg:" + m.PackageID)
@@ -180,7 +180,7 @@ func modSettingsRecycleCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			}
 		}
 		if len(names) == 0 {
-			d, _ := render.New("no orphaned settings file: every Mod settings file belongs to an installed Mod")
+			d, _ := render.New("no orphaned settings file: every Mod options file belongs to an installed Mod")
 			return d, nil
 		}
 	}

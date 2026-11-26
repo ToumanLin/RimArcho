@@ -506,7 +506,7 @@ var stableScrollers = map[string][]string{
 	"tasks":            {".tk-rows"},
 	"updates":          {".subs-list > .scroll", ".subs-detail > .scroll"},
 	"saves":            {".sv-body"},
-	"Mod settings":     {".ms-body"},
+	"Mod options":     {".ms-body"},
 	"All lists":        {".pm-list .scroll"},
 }
 

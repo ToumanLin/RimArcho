@@ -229,7 +229,7 @@ type ExchangeIn struct {
 	From   string `json:"from,omitempty" jsonschema:"import: a list file path or a RimCrow share code; collection: a Workshop collection link or ID"`
 	Import bool   `json:"import,omitempty" jsonschema:"collection: also replace the Loadout with its installed mods in order (undoable)"`
 	// Settings: a RimArcho list carries the list's Mod settings (07 §7.3).
-	Settings bool `json:"settings,omitempty" jsonschema:"export archo: with Mod settings"`
+	Settings bool `json:"settings,omitempty" jsonschema:"export archo: with Mod options"`
 }
 
 type PackIn struct {
@@ -241,7 +241,7 @@ type PackIn struct {
 	Textures       bool   `json:"textures,omitempty" jsonschema:"build: PNG textures to DDS, PNGs deleted (pre-convert)"`
 	TextureScale   int    `json:"texture_scale,omitempty" jsonschema:"build: also scale textures to this percent (20 25 40 50 60 75 80): slim"`
 	AsPlan         bool   `json:"as_plan,omitempty" jsonschema:"import of a list: also load it into the Loadout (undoable)"`
-	NoSettings     bool   `json:"no_settings,omitempty" jsonschema:"build: without Mod settings"`
+	NoSettings     bool   `json:"no_settings,omitempty" jsonschema:"build: without Mod options"`
 	Update         bool   `json:"update,omitempty" jsonschema:"build/import: a new revision; keeps saves"`
 	Unfinished     bool   `json:"unfinished,omitempty" jsonschema:"remove: what an interrupted build copied"`
 	DryRun         bool   `json:"dry_run,omitempty" jsonschema:"build / launch / remove / unlink: show, change nothing"`

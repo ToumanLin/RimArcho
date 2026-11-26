@@ -174,7 +174,7 @@ func (a *App) trashAllowed(path string) error {
 	if a.settingsFileTrashable(p) {
 		return nil // a Mod settings file in a Game Config's Config/ (16 §2.9)
 	}
-	return fmt.Errorf("%w: %s is not a mod folder, a pack, saves, a Mod settings file or a downloaded game", ErrNotInTrashList, path)
+	return fmt.Errorf("%w: %s is not a mod folder, a pack, saves, a Mod options file or a downloaded game", ErrNotInTrashList, path)
 }
 
 // realOrAbs resolves links where the path exists, else makes it absolute.
