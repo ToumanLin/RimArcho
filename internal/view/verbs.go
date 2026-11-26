@@ -72,8 +72,15 @@ func Named(st *app.LoadoutState, ids []string) string {
 	return Plural(len(ids), "mod")
 }
 
-// Plural: "1 mod" / "3 mods" (English), or the locale's count format with T(noun).
+// Plural: "1 mod" / "3 mods" (English), or the locale's count format with T(noun). A locale
+// whose nouns change with the number (Russian) gives a noun its forms in @plural.<noun>:
+// "%d мод|%d мода|%d модов" for one, few and many (pluralForm).
 func Plural(n int, noun string) string {
+	if forms, ok := localeFormat("@plural." + strings.ToLower(noun)); ok {
+		if f := strings.Split(forms, "|"); len(f) == 3 {
+			return fmt.Sprintf(f[pluralForm(n)], n)
+		}
+	}
 	if format, ok := localeFormat("@plural"); ok {
 		return fmt.Sprintf(format, n, T(noun))
 	}
@@ -84,6 +91,21 @@ func Plural(n int, noun string) string {
 		return fmt.Sprintf("%d %ses", n, noun)
 	}
 	return fmt.Sprintf("%d %ss", n, noun)
+}
+
+// pluralForm is the East Slavic rule: 1, 21, 31… take the first form; 2–4, 22–24… the
+// second; 0, 5–20, 25–30… the third.
+func pluralForm(n int) int {
+	if n < 0 {
+		n = -n
+	}
+	switch m10, m100 := n%10, n%100; {
+	case m10 == 1 && m100 != 11:
+		return 0
+	case m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14):
+		return 1
+	}
+	return 2
 }
 
 // Object is what a verb acts on: the instances, their CLI references (a missing list entry

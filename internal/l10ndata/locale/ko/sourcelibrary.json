@@ -1,0 +1,13 @@
+{
+  "delete generated code; it can be recreated": "생성된 코드 삭제(다시 만들 수 있어요)",
+  "source library": "소스 라이브러리",
+  "remove unused": "미사용 항목 제거",
+  "remove unused folders from the source library": "소스 라이브러리에서 사용하지 않는 폴더 제거",
+  "decompile the current list's mods": "현재 목록의 모드 디컴파일",
+  "decompiling…": "디컴파일 중…",
+  "removed %d folders (%s)": "폴더 %d개 제거함(%s)",
+  "the current list's mods are in the source library": "현재 목록의 모드가 소스 라이브러리에 있어요",
+  "%d unused folders, %s": "사용하지 않는 폴더 %d개, %s",
+  "same code in: %s": "같은 코드: %s",
+  "the source library has no unused folders": "소스 라이브러리에 사용하지 않는 폴더가 없어요"
+}

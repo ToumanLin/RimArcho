@@ -17,7 +17,7 @@ Game versions, playthroughs and saves, one click apart. When something breaks, y
 <br>
 [![Platform: Windows | Linux (experimental)](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20(experimental)-0078d4)](#install)
 [![RimWorld 1.6 | 1.7](https://img.shields.io/badge/RimWorld-1.6%20%7C%201.7-c8a24a)](https://rimworldgame.com/)
-[![Languages: English, Simplified Chinese, Japanese](https://img.shields.io/badge/languages-English%20%7C%20%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87%20%7C%20%E6%97%A5%E6%9C%AC%E8%AA%9E-555)](internal/l10ndata/locale)
+[![Languages: English, Simplified Chinese, Japanese, Russian, Korean](https://img.shields.io/badge/languages-English%20%7C%20%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87%20%7C%20%E6%97%A5%E6%9C%AC%E8%AA%9E%20%7C%20%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9%20%7C%20%ED%95%9C%EA%B5%AD%EC%96%B4-555)](internal/l10ndata/locale)
 [![MCP: 47 tools](https://img.shields.io/badge/MCP-47%20tools-7c6cf0)](#ai-agents-and-mcp)
 [![Discord](https://img.shields.io/badge/Discord-join-5865f2?logo=discord&logoColor=white)](https://discord.gg/HF2GVyurQs)
 [![GitHub stars](https://img.shields.io/github/stars/ToumanLin/RimArcho?style=flat&color=eed75e)](https://github.com/ToumanLin/RimArcho/stargazers)

@@ -31,3 +31,16 @@ func TestIMEPageKeys(t *testing.T) {
 		t.Fatal("pasted text taken for a key")
 	}
 }
+
+// The Russian layout's letters are read as the US keys they sit on; pasted text is not.
+func TestRussianLayoutKeys(t *testing.T) {
+	t.Parallel()
+	for ru, us := range map[string]string{"\u0439": "q", "\u0435": "t", "\u0420": "H", "\u0436": ";", "\u0416": ":", "\u2116": "#", "\u0451": "`"} {
+		if got := keyName(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(ru)}); got != us {
+			t.Errorf("%q: %q, want %q", ru, got, us)
+		}
+	}
+	if keyName(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("\u0439"), Paste: true}) == "q" {
+		t.Fatal("pasted Cyrillic taken for a key")
+	}
+}

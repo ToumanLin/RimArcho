@@ -34,7 +34,7 @@ func TestGameConfigCopyTranslated(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, lang := range []string{"zh", "ja"} {
+	for _, lang := range []string{"zh", "ja", "ru", "ko"} {
 		table := Locales[lang]()
 		for _, key := range keys {
 			if text := table.Text[key]; text == "" || text == key {

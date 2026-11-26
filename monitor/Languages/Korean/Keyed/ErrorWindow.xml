@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <ArchoMonitor_OpenErrors>모드별 오류…</ArchoMonitor_OpenErrors>
+  <ArchoMonitor_ErrorsTitle>이번 세션의 오류</ArchoMonitor_ErrorsTitle>
+  <ArchoMonitor_Warnings>경고도 표시</ArchoMonitor_Warnings>
+  <ArchoMonitor_StatErrors>오류</ArchoMonitor_StatErrors>
+  <ArchoMonitor_StatProblems>오류와 경고</ArchoMonitor_StatProblems>
+  <ArchoMonitor_StatMods>모드</ArchoMonitor_StatMods>
+  <ArchoMonitor_Stopped>{1}에 게임이 로그 기록을 멈춤: 이후 +{0}</ArchoMonitor_Stopped>
+  <ArchoMonitor_StoppedTip>메시지가 10,000개를 넘으면 게임은 로그 기록을 멈춥니다. Archo Monitor는 계속 셉니다: 주황색 숫자는 그 이후에 나온 것으로 Player.log에는 없습니다.</ArchoMonitor_StoppedTip>
+  <ArchoMonitor_After>게임이 로그 기록을 멈춘 뒤 {0}</ArchoMonitor_After>
+  <ArchoMonitor_FileFull>ArchoMonitor.log가 가득 참: 개수만 기록합니다</ArchoMonitor_FileFull>
+  <ArchoMonitor_Dropped>서로 다른 메시지가 4,000개를 넘음: 오래된 메시지는 버렸습니다</ArchoMonitor_Dropped>
+  <ArchoMonitor_NoErrors>이번 세션에 오류 없음</ArchoMonitor_NoErrors>
+  <ArchoMonitor_NoErrorsSub>Archo Monitor는 게임이 로그 기록을 멈춘 뒤에도 모든 오류를 셉니다.</ArchoMonitor_NoErrorsSub>
+  <ArchoMonitor_NoMod>모드를 찾지 못함</ArchoMonitor_NoMod>
+  <ArchoMonitor_Distinct>서로 다른 메시지 {0}개</ArchoMonitor_Distinct>
+  <ArchoMonitor_More>+{0}개 더</ArchoMonitor_More>
+  <ArchoMonitor_Copy>복사</ArchoMonitor_Copy>
+  <ArchoMonitor_Copied>복사됨</ArchoMonitor_Copied>
+  <ArchoMonitor_Loading>불러오는 중</ArchoMonitor_Loading>
+  <ArchoMonitor_AlsoMods>그 밖에:</ArchoMonitor_AlsoMods>
+  <ArchoMonitor_Role_xml>해당 모드의 XML</ArchoMonitor_Role_xml>
+  <ArchoMonitor_Role_def>부모 Def를 정의함</ArchoMonitor_Role_def>
+  <ArchoMonitor_Role_patch>패치</ArchoMonitor_Role_patch>
+  <ArchoMonitor_Role_stack>스택의 코드</ArchoMonitor_Role_stack>
+  <ArchoMonitor_Role_text>메시지에 이름이 나옴</ArchoMonitor_Role_text>
+  <ArchoMonitor_Kind_DefConfigError>Def 설정</ArchoMonitor_Kind_DefConfigError>
+  <ArchoMonitor_Kind_CrossRefError>참조 누락</ArchoMonitor_Kind_CrossRefError>
+  <ArchoMonitor_Kind_PatchError>XML 패치</ArchoMonitor_Kind_PatchError>
+  <ArchoMonitor_Kind_XMLSyntaxError>XML 불러오기</ArchoMonitor_Kind_XMLSyntaxError>
+  <ArchoMonitor_Kind_AssemblyConflict>어셈블리 충돌</ArchoMonitor_Kind_AssemblyConflict>
+  <ArchoMonitor_Kind_TickException>틱 예외</ArchoMonitor_Kind_TickException>
+  <ArchoMonitor_Kind_DrawException>그리기 예외</ArchoMonitor_Kind_DrawException>
+  <ArchoMonitor_Kind_NullReference>널 참조</ArchoMonitor_Kind_NullReference>
+  <ArchoMonitor_Kind_OutOfMemory>메모리 부족</ArchoMonitor_Kind_OutOfMemory>
+  <ArchoMonitor_Kind_MissingTexture>텍스처 누락</ArchoMonitor_Kind_MissingTexture>
+  <ArchoMonitor_Kind_Warning>경고</ArchoMonitor_Kind_Warning>
+  <ArchoMonitor_Kind_Other>기타</ArchoMonitor_Kind_Other>
+</LanguageData>

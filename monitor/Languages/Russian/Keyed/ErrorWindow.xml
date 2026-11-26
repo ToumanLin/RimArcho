@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <ArchoMonitor_OpenErrors>Ошибки по модам…</ArchoMonitor_OpenErrors>
+  <ArchoMonitor_ErrorsTitle>Ошибки за этот сеанс</ArchoMonitor_ErrorsTitle>
+  <ArchoMonitor_Warnings>И предупреждения</ArchoMonitor_Warnings>
+  <ArchoMonitor_StatErrors>ошибки</ArchoMonitor_StatErrors>
+  <ArchoMonitor_StatProblems>ошибки и предупреждения</ArchoMonitor_StatProblems>
+  <ArchoMonitor_StatMods>Моды</ArchoMonitor_StatMods>
+  <ArchoMonitor_Stopped>Игра перестала вести журнал в {1}: с тех пор +{0}</ArchoMonitor_Stopped>
+  <ArchoMonitor_StoppedTip>После 10 000 сообщений игра перестаёт писать журнал. Archo Monitor продолжает считать: янтарные числа появились уже после этого, и их нет в Player.log.</ArchoMonitor_StoppedTip>
+  <ArchoMonitor_After>{0} после остановки журнала игры</ArchoMonitor_After>
+  <ArchoMonitor_FileFull>ArchoMonitor.log заполнен: записываются только счётчики</ArchoMonitor_FileFull>
+  <ArchoMonitor_Dropped>Больше 4000 разных сообщений: старые отброшены</ArchoMonitor_Dropped>
+  <ArchoMonitor_NoErrors>За этот сеанс ошибок нет</ArchoMonitor_NoErrors>
+  <ArchoMonitor_NoErrorsSub>Archo Monitor считает каждую ошибку, даже после того как игра перестаёт вести журнал.</ArchoMonitor_NoErrorsSub>
+  <ArchoMonitor_NoMod>Мод не найден</ArchoMonitor_NoMod>
+  <ArchoMonitor_Distinct>Разных сообщений: {0}</ArchoMonitor_Distinct>
+  <ArchoMonitor_More>и ещё {0}</ArchoMonitor_More>
+  <ArchoMonitor_Copy>Копировать</ArchoMonitor_Copy>
+  <ArchoMonitor_Copied>Скопировано</ArchoMonitor_Copied>
+  <ArchoMonitor_Loading>Загрузка</ArchoMonitor_Loading>
+  <ArchoMonitor_AlsoMods>Также:</ArchoMonitor_AlsoMods>
+  <ArchoMonitor_Role_xml>его XML</ArchoMonitor_Role_xml>
+  <ArchoMonitor_Role_def>определяет родительский Def</ArchoMonitor_Role_def>
+  <ArchoMonitor_Role_patch>патч</ArchoMonitor_Role_patch>
+  <ArchoMonitor_Role_stack>код в стеке вызовов</ArchoMonitor_Role_stack>
+  <ArchoMonitor_Role_text>назван в сообщении</ArchoMonitor_Role_text>
+  <ArchoMonitor_Kind_DefConfigError>Настройка Def</ArchoMonitor_Kind_DefConfigError>
+  <ArchoMonitor_Kind_CrossRefError>Нет ссылки</ArchoMonitor_Kind_CrossRefError>
+  <ArchoMonitor_Kind_PatchError>XML-патч</ArchoMonitor_Kind_PatchError>
+  <ArchoMonitor_Kind_XMLSyntaxError>Загрузка XML</ArchoMonitor_Kind_XMLSyntaxError>
+  <ArchoMonitor_Kind_AssemblyConflict>Конфликт сборок</ArchoMonitor_Kind_AssemblyConflict>
+  <ArchoMonitor_Kind_TickException>Исключение в тике</ArchoMonitor_Kind_TickException>
+  <ArchoMonitor_Kind_DrawException>Исключение отрисовки</ArchoMonitor_Kind_DrawException>
+  <ArchoMonitor_Kind_NullReference>Пустая ссылка</ArchoMonitor_Kind_NullReference>
+  <ArchoMonitor_Kind_OutOfMemory>Нехватка памяти</ArchoMonitor_Kind_OutOfMemory>
+  <ArchoMonitor_Kind_MissingTexture>Нет текстуры</ArchoMonitor_Kind_MissingTexture>
+  <ArchoMonitor_Kind_Warning>Предупреждение</ArchoMonitor_Kind_Warning>
+  <ArchoMonitor_Kind_Other>Другое</ArchoMonitor_Kind_Other>
+</LanguageData>

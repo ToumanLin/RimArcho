@@ -79,7 +79,7 @@ func TestUninstallAgentKeyRow(t *testing.T) {
 	t.Setenv("ARCHO_LANG", "")
 	old := Lang()
 	defer SetLang(old)
-	for _, lang := range []string{"en", "zh", "ja"} {
+	for _, lang := range []string{"en", "zh", "ja", "ru", "ko"} {
 		SetLang(lang)
 		p := &app.UninstallPlan{Steps: []*app.UninstallStep{{Key: app.UnAccounts, Items: []*app.UninstallItem{
 			{Do: "forget-accounts"}, {Do: "forget-agent-key", Path: "Windows Credential Manager: RimArcho/agent-api-key"},

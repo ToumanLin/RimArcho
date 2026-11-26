@@ -73,6 +73,15 @@
   --font: "Segoe UI Variable Text", "Segoe UI", "Yu Gothic UI", "Meiryo UI", "Meiryo", system-ui, sans-serif;
   --code: "Cascadia Mono", Consolas, "BIZ UDGothic", "MS Gothic", "Yu Gothic UI", monospace;
 }
+/* Russian labels run long: the detail's field names get a wider column and wrap by words
+   («поддерживаемые / версии») instead of ending in an ellipsis */
+:root:lang(ru) { --field-k: 96px; }
+:root:lang(ru) .frow .k { white-space: normal; }
+/* Hangul from Malgun Gothic: Segoe UI has none, and YaHei's is a fallback */
+:root:lang(ko) {
+  --font: "Segoe UI Variable Text", "Segoe UI", "Malgun Gothic", system-ui, sans-serif;
+  --code: "Cascadia Mono", Consolas, "Malgun Gothic", monospace;
+}
 :root[data-scheme="dark"] {
   color-scheme: dark;
   --photo-shade: 0, 0, 0;
@@ -455,8 +464,10 @@ body.row-dragging, body.row-dragging * { cursor: grabbing !important; -webkit-us
 /* the detail's one field list (fields.js, 16 §4.1): addresses and identifiers copy from their trailing icon */
 .fields { margin: 8px 0 14px; font-size: 13px; }
 .frow { position: relative; display: flex; gap: 12px; align-items: baseline; padding: 2px 0; }
-.frow .k { width: 64px; flex: none; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.frow .k { width: var(--field-k, 64px); flex: none; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .frow .v { flex: 1; min-width: 0; color: var(--fg-2); overflow-wrap: anywhere; display: flex; flex-wrap: wrap; gap: 2px 0; align-items: baseline; }
+/* a tag chip in a narrow field keeps its word whole (RimWorld, never RimWorl / d) */
+.frow .v .chip { white-space: nowrap; overflow-wrap: normal; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .frow.deps .v, .frow.conflicts .v { flex-direction: column; align-items: flex-start; }
 .path-copy { display: inline-flex; align-items: center; gap: 4px; min-width: min(100%, 200px); max-width: 100%; vertical-align: bottom; white-space: nowrap; }
 .address-text { display: inline-grid; min-width: 0; overflow: hidden; white-space: pre; }
