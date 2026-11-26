@@ -93,7 +93,7 @@
   "versions locked  own saves": "バージョン固定・専用セーブデータ",
   "window controls": "ウィンドウ操作",
   "write these edits to the game's mod list now, without launching; launching saves them too": "ゲームを起動せず、変更をMODリストに書き込みます。起動時にも自動保存されます",
-  "Game Config = game version + Mod list + saves folder; RimWorld starts from it": "ゲーム構成 = ゲームバージョン + Mod リスト + セーブフォルダー。RimWorld はここから起動",
+  "Game Config = game version + Mod Config; RimWorld starts from it": "ゲーム構成 = ゲームバージョン + MOD設定。RimWorld はここから起動",
   "game versions on this computer": "このPCのゲームバージョン",
   "game version: a copy of RimWorld downloaded on your computer": "ゲームバージョン：このPCにダウンロードしたRimWorld",
   "not added yet": "未追加",

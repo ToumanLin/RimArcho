@@ -4,6 +4,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- The Game Config page's lead now reads "Game Config = game version + Mod Config" (zh: `游戏版本 + Mod 配置`); it no longer mentions the Mod list or the saves folder.
+
 ## 1.1.4 — 2026-11-25
 
 - Fewer repeats on screen. Mod library and Play review no longer repeat the Mod's name (and the copy's source) in the details heading. On Updates, the foot of the list says only how many sources were checked; the time of the last check is in its hover and in Update checks, so the left column shows one time (the last scan's). A waiting update's head no longer repeats installed → available, and a SteamCMD copy's install time shows once. In Chinese, Mod settings are now called `Mod 配置` (was `Mod 设置`, which read like RimArcho's own Settings).
