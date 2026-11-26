@@ -11,10 +11,10 @@ import (
 	"testing"
 )
 
-// 16 §2.14: five templates in the page's order, each question key unique within its template,
+// 16 §2.14: six templates in the page's order, each question key unique within its template,
 // and a files-lost bug is the only priority.
 func TestTemplates(t *testing.T) {
-	if got := strings.Join(Kinds(), ","); got != "feature,bug,diagnosis,data,other" {
+	if got := strings.Join(Kinds(), ","); got != "feature,bug,diagnosis,data,l10n,other" {
 		t.Fatalf("kinds: %s", got)
 	}
 	for _, tp := range Templates {
@@ -35,6 +35,33 @@ func TestTemplates(t *testing.T) {
 	got := AnswersText([]Answer{{"what you did", "x"}, {"empty", " "}, {"", "free words"}}, []string{"files were changed or lost"})
 	if got != "**files were changed or lost**\n\n**what you did**\nx\n\nfree words" {
 		t.Fatalf("answers:\n%s", got)
+	}
+}
+
+// What each template ticks first (16 §2.14 "Templates", 2026-11-26).
+func TestTemplateAttach(t *testing.T) {
+	want := map[string]string{KindFeature: "", KindBug: "log,ops", KindDiagnosis: "mods,problems", KindData: "mods,problems", KindL10n: "", KindOther: "ops"}
+	for _, tp := range Templates {
+		if got := strings.Join(tp.Attach, ","); got != want[tp.Kind] {
+			t.Errorf("%s ticks %q, want %q", tp.Kind, got, want[tp.Kind])
+		}
+	}
+}
+
+// A translation fix's codes: the one each line or ;-part starts with, once each, lowercased;
+// words and bare text are not codes.
+func TestRefCodes(t *testing.T) {
+	got := RefCodes(`hom22 → 시작
+LIB3: x; fbk40 = y
+hom22 again
+hello world
+abc
+run7x → no
+  edt5
+verylongpfx1 z
+ab123456789 → too many digits`)
+	if s := strings.Join(got, ","); s != "hom22,lib3,fbk40,edt5" {
+		t.Fatalf("codes: %s", s)
 	}
 }
 

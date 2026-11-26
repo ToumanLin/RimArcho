@@ -77,6 +77,14 @@ func (s *API) FeedbackChoices() view.FeedbackChoices {
 	return view.FeedbackChoicesOf(st, s.feedbackNeeds())
 }
 
+// FeedbackRefNums are the reference numbers a translation fix names (ctrl+\), as the window
+// recorded them: the page shows each code's current text beside the player's wording.
+func (s *API) FeedbackRefNums(codes []string) []view.RefNum {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return view.RefNums(s.a, codes)
+}
+
 // FeedbackCompose is the issue's body and link for the problem shown with the attachments
 // read last; the page calls it as the player types.
 func (s *API) FeedbackCompose(p view.FeedbackProblem) feedback.Result {

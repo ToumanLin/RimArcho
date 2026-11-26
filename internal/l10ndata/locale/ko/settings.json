@@ -406,5 +406,21 @@
   "Mod check: finished %s, %d operations in %d ms": "모드 파일 점검: %s 완료, 패치 작업 %d개, %d ms",
   "slowest %s, %d ms": "가장 느린 작업 %s, %d ms",
   "%d not simulated (too slow)": "%d개는 너무 느려 시뮬레이션 안 함",
-  "the list changed since": "그 뒤 목록이 바뀜"
+  "the list changed since": "그 뒤 목록이 바뀜",
+  "translation fix": "번역 수정",
+  "wording that reads oddly in your language": "어색하게 읽히는 문구",
+  "press ctrl+\\ to show each element's code, then write the code and the wording you suggest": "ctrl+\\를 누르면 각 요소의 코드가 보여요. 코드와 바꾸고 싶은 문구를 적어 주세요",
+  "codes and corrections": "코드와 수정 문구",
+  "one per line: hom22 → the wording you suggest": "한 줄에 하나씩: hom22 → 제안하는 문구",
+  "anything else": "그 밖에 하고 싶은 말",
+  "Claude translated this language: fix wording that reads oddly": "한국어는 Claude가 번역했어요: 어색한 문구를 고쳐 주세요",
+  "RimArcho's Korean and Russian are translated by Claude. If some wording reads oddly, press ctrl+\\, then write the element's code and your correction here.": "RimArcho의 한국어는 Claude가 번역했어요. 어색하게 읽히는 문구가 있으면 ctrl+\\를 눌러 그 요소의 코드를 확인한 뒤, 코드와 고친 문구를 여기에 적어 주세요.",
+  "interface language: %s": "인터페이스 언어: %s",
+  "reference numbers (%d)": "요소 코드 (%d)",
+  "not numbered on this computer": "이 컴퓨터에서 표시된 적 없는 코드",
+  "another line": "한 줄 더",
+  "the wording you suggest": "제안하는 문구",
+  "(no text)": "(텍스트 없음)",
+  "press %s on that page first": "먼저 그 페이지에서 %s를 누르세요",
+  "remove this line": "이 줄 삭제"
 }

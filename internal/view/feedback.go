@@ -2,9 +2,11 @@ package view
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,6 +32,8 @@ type FeedbackOptions struct {
 	Kind     string `json:"kind,omitempty"`
 	Finding  string `json:"finding,omitempty"`
 	Mod      string `json:"mod,omitempty"`
+	// Refs: the reference numbers a translation fix names (feedback.RefCodes).
+	Refs []string `json:"refs,omitempty"`
 }
 
 // FeedbackPart is one optional attachment: its name, what it holds, and whether there is any.
@@ -71,6 +75,9 @@ func FeedbackAttachments(a *app.App, st *app.LoadoutState, o FeedbackOptions, n 
 	if o.Kind == feedback.KindData {
 		out.Basic = append(out.Basic, feedbackDataLines(a)...)
 	}
+	if o.Kind == feedback.KindL10n {
+		out.Basic = append(out.Basic, Tf("interface language: %s", Lang()))
+	}
 	home, _ := os.UserHomeDir()
 	scrub := func(lines []string) []string {
 		for i := range lines {
@@ -81,6 +88,13 @@ func FeedbackAttachments(a *app.App, st *app.LoadoutState, o FeedbackOptions, n 
 	loaded := st != nil && st.Ix != nil && st.Ix.Env != nil
 	if f := strings.TrimSpace(o.Finding); f != "" {
 		out.Sections = append(out.Sections, feedback.Section{Key: "finding", Heading: Tf("the diagnosis %s", f), Lines: scrub(feedbackFinding(n, f))})
+	}
+	if len(o.Refs) > 0 {
+		var lines []string
+		for _, r := range RefNums(a, o.Refs) {
+			lines = append(lines, r.Line())
+		}
+		out.Sections = append(out.Sections, feedback.Section{Key: "refnums", Heading: Tf("reference numbers (%d)", len(o.Refs)), Lines: scrub(lines)})
 	}
 	if m := strings.TrimSpace(o.Mod); m != "" {
 		out.Sections = append(out.Sections, feedback.Section{Key: "mod", Heading: Tf("the Mod %s", m), Lines: scrub(feedbackMod(a, st, m))})
@@ -408,6 +422,10 @@ type FeedbackTemplate = feedback.Template
 func FeedbackTemplates() []FeedbackTemplate {
 	out := make([]FeedbackTemplate, len(feedback.Templates))
 	for i, t := range feedback.Templates {
+		if t.Kind == feedback.KindL10n && MachineTranslated() {
+			// Claude translated this language: say so, and ask for corrections (16 §2.14)
+			t.Lead, t.Note = feedback.L10nLeadMT, feedback.L10nNoteMT
+		}
 		t.Label, t.Lead = T(t.Label), T(t.Lead)
 		if t.Note != "" {
 			t.Note = T(t.Note)
@@ -436,10 +454,12 @@ func FeedbackTemplates() []FeedbackTemplate {
 func (p FeedbackProblem) Options() FeedbackOptions {
 	o := p.Opts
 	o.Kind = feedback.TemplateOf(p.Kind).Kind
-	o.Finding, o.Mod = "", ""
+	o.Finding, o.Mod, o.Refs = "", "", nil
 	switch o.Kind {
 	case feedback.KindDiagnosis:
 		o.Finding = strings.TrimSpace(p.Answers["finding"])
+	case feedback.KindL10n:
+		o.Refs = feedback.RefCodes(p.Answers[feedback.L10nQuestion])
 	case feedback.KindData:
 		o.Mod = strings.TrimSpace(p.Answers["mod"])
 		// reported from a Can it run item or a Mod's details: the item that showed the data
@@ -556,6 +576,75 @@ func SendFeedbackProblems(ctx context.Context, ps []FeedbackProblem, ats []*Feed
 		return sent, feedbackSendError(err)
 	}
 	return sent, nil
+}
+
+// MachineTranslated: the interface language is one Claude translated (feedback.MachineLangs),
+// whose players are asked for corrections.
+func MachineTranslated() bool {
+	l := Lang()
+	for _, m := range feedback.MachineLangs {
+		if l == m || strings.HasPrefix(l, m+"-") {
+			return true
+		}
+	}
+	return false
+}
+
+// RefNum is one reference number (ctrl+\, refnums.js) as this computer recorded it: where
+// the element sits in the page and its text when it was last numbered. Found is false for a
+// code this computer never showed.
+type RefNum struct {
+	Code  string `json:"code"`
+	Where string `json:"where,omitempty"`
+	Text  string `json:"text,omitempty"`
+	Found bool   `json:"found"`
+}
+
+// Line is the entry as the report carries it: the code, where it sits and its text quoted.
+func (r RefNum) Line() string {
+	if !r.Found {
+		return r.Code + "  " + T("not numbered on this computer")
+	}
+	return r.Code + "  " + r.Where + "  " + strconv.Quote(r.Text)
+}
+
+// refBook is the GUI setting ui.gui.refnums: per page prefix, the next number and each
+// element's [number, where, text] by its signature.
+const refBook = "ui.gui.refnums"
+
+// RefNums looks the codes up in the reference numbers the window keeps (the setting
+// ui.gui.refnums, written whenever ctrl+\ numbers a page), so a report needs no refnums
+// file and only the entries named leave the computer. The text's home folder becomes
+// %USERPROFILE%.
+func RefNums(a *app.App, codes []string) []RefNum {
+	var book map[string]struct {
+		Seen map[string][]any `json:"seen"`
+	}
+	if a != nil && a.Store != nil {
+		_ = json.Unmarshal([]byte(a.Store.Meta(refBook)), &book)
+	}
+	home, _ := os.UserHomeDir()
+	out := make([]RefNum, 0, len(codes))
+	for _, c := range codes {
+		r := RefNum{Code: c}
+		i := strings.IndexFunc(c, func(ch rune) bool { return ch >= '0' && ch <= '9' })
+		if i > 0 {
+			n, err := strconv.Atoi(c[i:])
+			for _, rec := range book[c[:i]].Seen {
+				if err != nil || len(rec) < 3 {
+					break
+				}
+				if f, ok := rec[0].(float64); ok && int(f) == n {
+					w, _ := rec[1].(string)
+					t, _ := rec[2].(string)
+					r.Where, r.Text, r.Found = w, feedback.Scrub(t, home), true
+					break
+				}
+			}
+		}
+		out = append(out, r)
+	}
+	return out
 }
 
 // CommunityLink is one of RimArcho's public places, shown on the Feedback page (16 §2.14): a

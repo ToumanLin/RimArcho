@@ -107,7 +107,7 @@ func TestFeedbackSendTUI(t *testing.T) {
 	if !strings.Contains(strings.Join(m.panel.lines, "\n"), "s: answer the questions here") {
 		t.Fatalf("s offered:\n%s", strings.Join(m.panel.lines, "\n"))
 	}
-	m.panelKey("5") // other / help: one question
+	m.panelKey("6") // other / help: one question
 	m.panelKey("s")
 	for _, typed := range []string{"on load", "Crash"} {
 		if m.prompt == nil {

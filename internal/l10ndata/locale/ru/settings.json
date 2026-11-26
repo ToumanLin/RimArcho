@@ -406,5 +406,21 @@
   "Mod check: finished %s, %d operations in %d ms": "Проверка файлов модов: завершена %s, операций патчей: %d, %d мс",
   "slowest %s, %d ms": "самая медленная %s, %d мс",
   "%d not simulated (too slow)": "не симулировано (слишком медленно): %d",
-  "the list changed since": "с тех пор список менялся"
+  "the list changed since": "с тех пор список менялся",
+  "translation fix": "исправление перевода",
+  "wording that reads oddly in your language": "неудачные формулировки в интерфейсе",
+  "press ctrl+\\ to show each element's code, then write the code and the wording you suggest": "нажмите ctrl+\\, чтобы увидеть код каждого элемента, затем напишите код и ваш вариант текста",
+  "codes and corrections": "коды и исправления",
+  "one per line: hom22 → the wording you suggest": "по одному в строке: hom22 → ваш вариант",
+  "anything else": "что-то ещё",
+  "Claude translated this language: fix wording that reads oddly": "этот язык перевёл Claude: исправьте неудачные формулировки",
+  "RimArcho's Korean and Russian are translated by Claude. If some wording reads oddly, press ctrl+\\, then write the element's code and your correction here.": "Русский перевод RimArcho сделан Claude. Если какая-то формулировка звучит странно, нажмите ctrl+\\, найдите код элемента и напишите здесь этот код и ваш вариант.",
+  "interface language: %s": "язык интерфейса: %s",
+  "reference numbers (%d)": "коды элементов (%d)",
+  "not numbered on this computer": "на этом компьютере такого кода нет",
+  "another line": "ещё строка",
+  "the wording you suggest": "ваш вариант",
+  "(no text)": "(без текста)",
+  "press %s on that page first": "сначала нажмите %s на той странице",
+  "remove this line": "удалить строку"
 }

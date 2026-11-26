@@ -356,6 +356,7 @@ function question(p, q) {
     wrap.append(pills);
     return wrap;
   }
+  if (q.form === "fixes") return fixesField(p, q, label(), set);
   const multi = q.form === "text";
   const f = el(multi ? "textarea" : "input", "field " + (multi ? "fb-text" : "fb-title"));
   f.dataset.q = q.key;
@@ -372,6 +373,75 @@ function question(p, q) {
     if (p.kind === "feature") similarSoon();
   };
   return field(label(), f, "fb-q");
+}
+
+// A translation fix's line: a reference number (ctrl+\, refnums.js) and the wording suggested.
+// The answer is these lines as "code → wording" (feedback.RefCodes reads the codes back).
+const FIX = /^\s*([a-z]{2,8}\d{1,6})(?![a-z_])\s*(?:→|->|=>|:|=)?\s*(.*)$/i;
+const parseFixes = (s) => String(s || "").split("\n").filter(l => l.trim()).map(l => {
+  const m = l.match(FIX);
+  return m ? { code: m[1].toLowerCase(), text: m[2].trim() } : { code: "", text: l.trim() };
+});
+const joinFixes = (rows) => rows.filter(r => r.code || r.text).map(r => r.code ? (r.text ? `${r.code} → ${r.text}` : r.code) : r.text).join("\n");
+
+// fixesField is the translation fix's rows: the code, the element's text now (read from the
+// reference numbers this computer keeps, view.RefNums) and the wording suggested; "+ another"
+// adds a row. The codes' entries go with the report (16 §2.14).
+function fixesField(p, q, label, set) {
+  const wrap = el("div", "fb-field fb-q fb-fixes");
+  wrap.append(label);
+  const rows = parseFixes(p.answers[q.key]);
+  if (!rows.length) rows.push({ code: "", text: "" });
+  const list = el("div", "fb-fix-rows");
+  const save = () => { set(joinFixes(rows)); typed(); };
+  const add = button("+ " + T("another line"), "", () => { rows.push({ code: "", text: "" }); draw(); list.querySelector(".fb-fix:last-child .fb-fix-code")?.focus(); }, "link fb-add");
+  const draw = () => {
+    list.innerHTML = "";
+    rows.forEach((r, i) => list.append(fixRow(r, () => { rows.splice(i, 1); if (!rows.length) rows.push({ code: "", text: "" }); draw(); save(); reattach(); }, rows.length > 1, save)));
+  };
+  draw();
+  wrap.append(list, add);
+  return wrap;
+}
+
+function fixRow(r, remove, removable, save) {
+  const row = el("div", "fb-fix");
+  const code = el("input", "field fb-fix-code num");
+  code.value = r.code; code.spellcheck = false;
+  code.placeholder = "hom22";
+  code.setAttribute("aria-label", T("code"));
+  const now = el("div", "fb-fix-now");
+  const text = el("input", "field fb-fix-text");
+  text.value = r.text; text.spellcheck = false;
+  text.placeholder = T("the wording you suggest");
+  text.setAttribute("aria-label", T("the wording you suggest"));
+  const look = async () => {
+    const c = r.code;
+    now.textContent = ""; now.classList.remove("warn");
+    if (!c) return;
+    let got;
+    try { [got] = await api.FeedbackRefNums([c]); } catch { return; }
+    if (c !== r.code) return;
+    if (got?.found) { now.textContent = got.text || T("(no text)"); now.title = got.where || ""; }
+    else { now.textContent = T("not numbered on this computer"); now.classList.add("warn"); now.title = Tf("press %s on that page first", "ctrl+\\"); }
+  };
+  code.oninput = () => {
+    r.code = code.value.trim().toLowerCase();
+    save();
+    clearTimeout(code._t);
+    code._t = setTimeout(() => { look(); reattach(); }, 300);
+  };
+  text.oninput = () => { r.text = text.value.trim(); save(); };
+  row.append(code, now, text);
+  if (removable) {
+    const x = button("", "", remove, "icon fb-prob-x");
+    x.innerHTML = icon.close || "×";
+    x.title = T("remove this line");
+    x.setAttribute("aria-label", T("remove this line"));
+    row.append(x);
+  }
+  look();
+  return row;
 }
 
 // fillLists puts the diagnoses and Mods in the datalists the two kinds of line use.
@@ -437,7 +507,8 @@ function partRow(part) {
   const c = el("input");
   c.type = "checkbox";
   const forced = part.key === "ops" && priority(p);
-  c.checked = forced || !!p.opts[part.key];
+  // a part with nothing in it shows unticked, whatever the template ticks
+  c.checked = forced || (!part.none && !!p.opts[part.key]);
   c.disabled = !!part.none || forced;
   box.append(c, el("span", "name", part.label), el("span", "sub", part.note || ""));
   c.onchange = () => { p.opts[part.key] = c.checked; reattach(); };
