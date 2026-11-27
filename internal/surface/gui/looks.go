@@ -22,8 +22,9 @@ import (
 // and kept in memory; the choices are resolved against it again whenever the database
 // changed. The page polls LooksProgress while a read waits for the build. Texture pictures
 // come from /looktex/, which finds a file only through this index. The index is dropped
-// when the page leaves the view (LooksLeave) and when nothing read it for readerIdle
-// (16 §10: no page's data stays in memory for good).
+// when nothing read it for readerIdle (16 §10: no page's data stays in memory for good); it
+// stays while the player goes to the editor and back, which would otherwise build it again
+// on every switch (a third of a second on a large plan).
 
 // looksCache is the plan's index in memory, guarded by its own mutex: the page lock is not
 // held while the index is built, and the picture route never takes it.
@@ -223,12 +224,6 @@ func (s *API) LooksOverview() (*view.LooksOverview, error) {
 func (s *API) LooksRefresh() (*view.LooksOverview, error) {
 	s.looks.drop()
 	return s.LooksOverview()
-}
-
-// LooksLeave drops the index when the page leaves the looks view (16 §10); the next read
-// builds it again from the header cache.
-func (s *API) LooksLeave() {
-	s.looks.drop()
 }
 
 // LooksGallery lists the looks of one Mod (mod: its position, as "12"), of the choices

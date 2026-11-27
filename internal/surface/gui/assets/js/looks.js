@@ -91,7 +91,7 @@ function build() {
   L.bar = createBar({
     cls: "lk-fbar", data: () => L.barData, change: () => barChanged(), splitKey: "ui.gui.filter.split:looks",
     column: () => $("#looks .lk-left"), resized: () => relayout(true), leave: () => focusCard(1),
-    placeholder: () => T("search looks; filter Mods: tags:, source:, content:") + "  /",
+    placeholder: () => T("search looks and Mods; filter Mods: tags:, source:, content:") + "  /",
   });
   const ghead = el("div", "lk-ghead");
   const gline = el("div", "lk-gline");
@@ -117,7 +117,20 @@ function build() {
   const pref = el("section", "area lk-pref");
   pref.dataset.area = "looks-4";
   pref.append(el("div", "head"), el("div", "lk-prefbody"));
-  side.append(mods, pref);
+  // the gaps between the right column's cards are splitters too: each sizes the card under it
+  const gapRules = el("div", "hsplit lk-hsplit lk-gap-rules"), gapPref = el("div", "hsplit lk-hsplit lk-gap-pref");
+  side.append(mods, gapRules, gapPref, pref);
+  const sizer = (gap, card, name, cls, key, enabled) => wireSeparator(gap, {
+    axis: "y", direction: -1, key, enabled,
+    get: () => (card() ? card().getBoundingClientRect().height : 0),
+    range: () => [72, Math.max(72, side.clientHeight - 180 - [...side.children].filter((c) => c !== card() && c !== mods && !c.classList.contains("hsplit")).reduce((h, c) => h + c.getBoundingClientRect().height, 0))],
+    set: (v) => { side.classList.add(cls); side.style.setProperty(name, v + "px"); },
+    reset: () => { side.classList.remove(cls); side.style.removeProperty(name); },
+    restore: (v) => { if (+v) { side.classList.add(cls); side.style.setProperty(name, +v + "px"); } },
+    changed: () => drawMods(),
+  });
+  sizer(gapRules, () => $(".rulesarea", side), "--lk-rules", "rules-sized", "ui.gui.looks.rules", () => !!$(".rulesarea.open", side));
+  sizer(gapPref, () => pref, "--lk-pref", "pref-sized", "ui.gui.looks.pref");
   const left = el("div", "fcol lk-left");
   left.append(L.bar.el, gal);
   l1.append(left, split, side);
@@ -177,6 +190,14 @@ export function relang() {
   load(false);
 }
 
+// back: the mouse's back button or alt+left in the looks editor returns to the gallery
+// (navigation.js travel); false when there is nothing of the looks view to go back from.
+export function back() {
+  if (!L.on || L.layer !== 2 || S.screen) return false;
+  closeLook();
+  return true;
+}
+
 // sync runs with every drawing of the editor (main.js render): the switch follows the view,
 // and the remembered view is applied the first time the editor shows.
 export function sync() {
@@ -202,7 +223,7 @@ function placeRules(here) {
   if (!card) return;
   if (here) {
     if (!rulesHome) rulesHome = { parent: card.parentElement, next: card.nextElementSibling };
-    $("#looks .lk-side").insertBefore(card, $("#looks .lk-pref"));
+    $("#looks .lk-side").insertBefore(card, $("#looks .lk-gap-pref"));
     card.dataset.area = "looks-3";
     setRulesNumber("3");
     setRulesPlace(true);
@@ -245,8 +266,8 @@ function leave() {
   viewSwitch.paint("editor");
   clearPicked();
   drop();
-  // the index is dropped in Go as the view is left (16 §10); the next visit builds it again
-  api.LooksLeave().catch(() => {});
+  // Go keeps the index for a while (it drops one nothing read for five minutes, 16 §10), so
+  // going to the editor and back does not build it again
   L.ui.render();
   $("#board").focus({ preventScroll: true });
 }
@@ -342,7 +363,7 @@ function setOverview(ov) {
 }
 
 // the Mods the Mods card lists: load order, without RimArcho Looks Preference (it has its own card)
-const mods = () => (L.ov ? L.ov.mods.filter((m) => !m.generated && (!L.modSet || L.modSet.has(m.pos))) : []);
+const mods = () => (L.ov ? L.ov.mods.filter((m) => !m.generated && (!L.modSet || L.modSet.has(m.pos)) && (!L.found || L.found.has(m.pos))) : []);
 const modAt = (pos) => (L.ov ? L.ov.mods.find((m) => m.pos === pos) : null) || null;
 const pickedMod = () => (L.pick && !L.pick.chosen && !L.pick.none && !L.search ? modAt(L.pick.pos) : null);
 
@@ -405,11 +426,24 @@ async function barChanged() {
   L.bar.draw();
 }
 
+// setFound: a search over the list also narrows the Mods card to the Mods it finds (by
+// name, else the Mods that supply a look it finds); Go says which (LooksGallery.mods).
+function setFound(list) {
+  const was = L.found ? [...L.found].join() : null, now = list ? list.join() : null;
+  if (was === now) return;
+  L.found = list ? new Set(list) : null;
+  if (L.pick && !L.pick.chosen && !L.pick.none) L.modCursor = Math.max(0, mods().findIndex((m) => m.pos === L.pick.pos));
+  else L.modCursor = Math.min(L.modCursor, Math.max(0, mods().length - 1));
+  drawModsHead();
+  drawMods(true);
+}
+
 async function loadGallery(keep = false) {
   if (!L.on || !L.ov) return;
   const n = ++L.galSeq, top = scroller().scrollTop, at = L.rows[L.cursor]?.id;
   if (L.pick?.none && !L.search) { // no Mod passes the bar's conditions
     L.galSeq++; L.error = ""; L.gal = { groups: [], counts: {}, rows: 0, stamp: L.ov.stamp }; L.rows = [];
+    setFound(null);
     drawFilter(); drawHead(); relayout(false); drawNote(); drawAct(); L.ui.renderWhere();
     return;
   }
@@ -422,6 +456,7 @@ async function loadGallery(keep = false) {
   if (n !== L.galSeq || !L.on) return;
   L.error = "";
   L.gal = g;
+  setFound(L.search && g.mods ? g.mods : null);
   L.rows = (g.groups || []).flatMap((grp) => grp.rows || []);
   const alive = new Set(L.rows.map((r) => r.id));
   for (const id of [...L.sel]) if (!alive.has(id)) L.sel.delete(id);
@@ -750,7 +785,7 @@ function drawPref() {
     return box;
   };
   const facts = (x) => {
-    const box = el("div", "lk-pfacts");
+    const box = el("span", "lk-pfacts");
     const how = !x.files ? "" : x.copied && x.linked ? Tf("%s linked, %s copied", num(x.linked), num(x.copied)) : x.copied ? T("copied") : T("linked, not copied");
     box.append(el("span", "", x.files === 1 ? T("1 file") : Tf("%s files", num(x.files))));
     if (x.files) box.append(el("span", "", x.size), el("span", "", how));
@@ -761,18 +796,20 @@ function drawPref() {
   row.title = T("show the looks that have a choice");
   row.setAttribute("aria-pressed", String(!!L.pick?.chosen && !L.pick.styles && !L.search));
   row.onclick = () => showChosen();
-  row.append(el("span", "pn", g.name), states([[g.applied, "%s applied", ""], [g.notNeeded, "%s not needed", ""], [g.asleep, "%s asleep", "dim"], [g.broken, "%s broken", "bad"]], T("no choice yet")));
-  body.append(row, facts(g));
+  // the name on a line of its own; under it the states, then the file facts
+  const under = (a, b) => { const line = el("span", "lk-pline"); line.append(a, b); return line; };
+  row.append(el("span", "pn", g.name), under(states([[g.applied, "%s applied", ""], [g.notNeeded, "%s not needed", ""], [g.asleep, "%s asleep", "dim"], [g.broken, "%s broken", "bad"]], T("no choice yet")), facts(g)));
+  body.append(row);
   if (st) {
     const srow = el("button", "lk-prow lk-pstyles" + (L.pick?.styles && !L.search ? " sel" : ""));
     srow.type = "button";
     srow.title = T("show the looks that have a style or random variant");
     srow.setAttribute("aria-pressed", String(!!L.pick?.styles && !L.search));
     srow.onclick = () => showChosen(true);
-    srow.append(el("span", "pn", st.name), states([[st.active, "%s active", ""], [st.skipped, "%s skipped", "dim"], [st.asleep, "%s asleep", "dim"], [st.broken, "%s broken", "bad"]], T("no style or random variant yet")));
     const sfacts = facts(st);
     sfacts.classList.add("lk-psfacts");
-    body.append(srow, sfacts);
+    srow.append(el("span", "pn", st.name), under(states([[st.active, "%s active", ""], [st.skipped, "%s skipped", "dim"], [st.asleep, "%s asleep", "dim"], [st.broken, "%s broken", "bad"]], T("no style or random variant yet")), sfacts));
+    body.append(srow);
   }
   const dir = el("div", "lk-pdir");
   copyablePath(dir, g.dir);
@@ -802,7 +839,9 @@ function drawPref() {
       wrote(d);
     };
     const why = x.mod ? Tf(x.state === "broken" ? "%s no longer has this look" : "%s is not in this list", x.mod) : T("its Mod is not installed");
-    note(x.id + "    " + T(x.state) + "    " + why, "dim lk-pabsent", b);
+    const line = el("p", "lk-pnote lk-pabsent");
+    line.append(el("span", "id", x.id), el("span", x.state === "broken" ? "bad" : "", T(x.state)), el("span", "", why), b);
+    body.append(line);
   }
   if (g.absentMore) note(Tf("… %d more", g.absentMore), "dim");
   if (L.stylesError) note(Tf("RimArcho Styles Preference was not rebuilt: %s", L.stylesError), "warn lk-pstyleserr");

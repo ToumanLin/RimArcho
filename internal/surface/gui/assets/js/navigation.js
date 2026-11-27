@@ -23,6 +23,7 @@ import * as fileSearch from "./filesearch.js";
 import * as modSettings from "./modsettings.js";
 import * as savesPage from "./saves.js";
 import * as reviewPage from "./review.js";
+import { back as looksBack } from "./looks.js";
 
 let ui;
 // The displayed shell can still name the previous plan while OpenPlan is in flight:
@@ -171,6 +172,7 @@ export async function travel(direction) {
   }
   if (uninst.locked()) return;
   if (direction < 0 && S.screen === "full") return fullPage.back();
+  if (direction < 0 && looksBack()) return; // the looks editor is a layer over the gallery (16 §2.5)
   const current = target();
   // Back can arrive as soon as the destination's sidebar item lights up. Keep
   // that explicitly requested route available to Forward while its read is pending.

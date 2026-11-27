@@ -155,7 +155,7 @@
   "worn": "穿着",
   "worn condition": "穿着状态",
   "your choice": "你的选择",
-  "search looks; filter Mods: tags:, source:, content:": "搜索外观；筛选 Mod：tags:、source:、content:",
+  "search looks and Mods; filter Mods: tags:, source:, content:": "搜索外观和 Mod；筛选 Mod：tags:、source:、content:",
   "no Mod with textures passes the filter": "没有带贴图的 Mod 符合筛选条件",
   "that Mod is not in the list": "那个 Mod 不在列表里",
   "that Mod no longer has a texture of this look": "那个 Mod 已不再有这个外观的贴图",

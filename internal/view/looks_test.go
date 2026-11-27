@@ -368,6 +368,16 @@ func TestLooksApplyManyIsOneUndoStep(t *testing.T) {
 		t.Fatalf("the generated Mod's row %+v", last)
 	}
 	ls := looksState(t, e)
+	// a search names the Mods for the Mods card: by name, else the providers of what it found
+	if byName, err := view.BuildLooksGallery(e.App, ls, "", "", "bravo"); err != nil || len(byName.Mods) != 1 || byName.Mods[0] != 2 || byName.Rows == 0 {
+		t.Fatalf("search by a Mod's name: %+v %v", byName, err)
+	}
+	if byLook, err := view.BuildLooksGallery(e.App, ls, "", "", "gun"); err != nil || len(byLook.Mods) < 2 || byLook.Rows != 1 {
+		t.Fatalf("search by a look: %+v %v", byLook, err)
+	}
+	if one, _ := view.BuildLooksGallery(e.App, ls, "2", "", "gun"); one.Mods != nil {
+		t.Fatalf("a Mod's own gallery names Mods: %v", one.Mods)
+	}
 	g, err := view.BuildLooksGallery(e.App, ls, "chosen", "", "")
 	if err != nil || galleryIDs(g) != "shirt gun" || !g.Chosen || g.Groups[1].Rows[0].Choice != "applied" || g.Groups[1].Rows[0].From != "Bravo" || g.Groups[0].Rows[0].Choice != "not needed" {
 		t.Fatalf("chosen %q %+v %v", galleryIDs(g), g, err)

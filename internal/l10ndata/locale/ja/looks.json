@@ -155,7 +155,7 @@
   "worn": "着用",
   "worn condition": "着用時",
   "your choice": "あなたの選択",
-  "search looks; filter Mods: tags:, source:, content:": "見た目を検索、Mod を絞り込み: tags:, source:, content:",
+  "search looks and Mods; filter Mods: tags:, source:, content:": "見た目と Mod を検索、Mod を絞り込み: tags:, source:, content:",
   "no Mod with textures passes the filter": "テクスチャを持つ Mod でフィルターに合うものはありません",
   "that Mod is not in the list": "その Mod はリストにありません",
   "that Mod no longer has a texture of this look": "その Mod にはもうこの見た目のテクスチャがありません",

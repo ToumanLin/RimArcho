@@ -230,11 +230,6 @@ func TestLooksIndexIsBuiltOncePerPlanState(t *testing.T) {
 	if err := api.LookShow("things/item/gun", 1, "../../About"); err == nil {
 		t.Fatal("a slot that is not there was shown")
 	}
-	// leaving the view drops the index
-	api.LooksLeave()
-	if left, _ := api.looks.current(); left != nil {
-		t.Fatal("the index stayed after the page left the view")
-	}
 	// the page keeps its choices with Setting / SetSetting
 	for _, k := range []string{view.PlanViewKey, view.LooksScopeKey, view.LooksConfirmedKey} {
 		if err := api.SetSetting(k, "all"); err != nil || api.Setting(k) != "all" {

@@ -155,7 +155,7 @@
   "worn": "надето",
   "worn condition": "в надетом виде",
   "your choice": "ваш выбор",
-  "search looks; filter Mods: tags:, source:, content:": "поиск: виды; фильтр модов: tags:, source:, content:",
+  "search looks and Mods; filter Mods: tags:, source:, content:": "поиск: виды и моды; фильтр модов: tags:, source:, content:",
   "no Mod with textures passes the filter": "нет модов с текстурами, проходящих фильтр",
   "that Mod is not in the list": "Этого мода нет в списке",
   "that Mod no longer has a texture of this look": "В этом моде больше нет текстуры этого вида",

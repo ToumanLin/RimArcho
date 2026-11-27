@@ -82,7 +82,17 @@ export function initEditor(ctx) {
   chain.tabIndex = -1;
   chain.setAttribute("role", "listbox");
   const right = el("div", "lk-ecol");
-  right.append(card("lk-chain", 3, chain), card("lk-ops", 4, el("div", "lk-opsbody")));
+  const gapOps = el("div", "hsplit lk-hsplit");
+  right.append(card("lk-chain", 3, chain), gapOps, card("lk-ops", 4, el("div", "lk-opsbody")));
+  // the gap over the operation card sizes it (16 §3.1 rule 10)
+  wireSeparator(gapOps, {
+    axis: "y", direction: -1, key: "ui.gui.looks.ops",
+    get: () => $(".lk-ops", right).getBoundingClientRect().height,
+    range: () => [120, Math.max(120, right.clientHeight - 140)],
+    set: (v) => { right.classList.add("ops-sized"); right.style.setProperty("--lk-ops", v + "px"); },
+    reset: () => { right.classList.remove("ops-sized"); right.style.removeProperty("--lk-ops"); },
+    restore: (v) => { if (+v) { right.classList.add("ops-sized"); right.style.setProperty("--lk-ops", +v + "px"); } },
+  });
   const s0 = el("div", "split lk-esplit"), s1 = el("div", "split lk-esplit");
   h.append(card("lk-which", 1, which), s0, card("lk-cmp", 2, cmp), s1, right);
   // the gaps between the three columns are splitters (16 §3.1 rule 10)

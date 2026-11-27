@@ -180,8 +180,11 @@ type LooksGallery struct {
 	// rows without a filter.
 	Counts map[string]int `json:"counts"`
 	Groups []LooksGroup   `json:"groups"`
-	Rows   int            `json:"rows"`           // rows in Groups
-	More   int            `json:"more,omitempty"` // matching rows left out (LooksGalleryLimit)
+	Rows   int            `json:"rows"` // rows in Groups
+	// Mods, with a search over the whole plan: the positions of the Mods whose name has
+	// every word, else of the Mods that supply a matching look. The Mods card lists these.
+	Mods []int `json:"mods,omitempty"`
+	More int   `json:"more,omitempty"` // matching rows left out (LooksGalleryLimit)
 }
 
 // LookFileFacts is one texture file.
@@ -688,10 +691,14 @@ func BuildLooksGallery(a *app.App, ls *app.LooksState, mod, filter, search strin
 		return true
 	}
 	groups := map[string]int{}
+	found := map[int]bool{} // the providers of the matching looks
 	for _, l := range ls.Index.Looks {
 		switch {
 		case g.Mod >= 0 && lookProvider(l, g.Mod) == nil, g.Chosen && ls.Looks[l.ID] == nil, g.Styles && !styled[l.ID], !match(l):
 			continue
+		}
+		for i := range l.Providers {
+			found[l.Providers[i].Pos] = true
 		}
 		row := lookRow(ls, l, g.Mod)
 		g.Counts["all"]++
@@ -720,7 +727,35 @@ func BuildLooksGallery(a *app.App, ls *app.LooksState, mod, filter, search strin
 	sort.SliceStable(g.Groups, func(i, j int) bool {
 		return strings.ToLower(g.Groups[i].Category) < strings.ToLower(g.Groups[j].Category)
 	})
+	if len(words) > 0 && g.Mod < 0 && !g.Chosen && !g.Styles {
+		g.Mods = foundMods(ls, found, words)
+	}
 	return g, nil
+}
+
+// foundMods names the Mods a search over the plan found, in load order: those among the
+// providers of the matching looks whose name has every word, else all those providers.
+func foundMods(ls *app.LooksState, found map[int]bool, words []string) []int {
+	named := map[int]bool{}
+	for pos := range found {
+		name := strings.ToLower(looksModName(ls, pos))
+		ok := true
+		for _, w := range words {
+			ok = ok && strings.Contains(name, w)
+		}
+		if ok {
+			named[pos] = true
+		}
+	}
+	if len(named) > 0 {
+		found = named
+	}
+	out := make([]int, 0, len(found))
+	for pos := range found {
+		out = append(out, pos)
+	}
+	sort.Ints(out)
+	return out
 }
 
 func instanceAt(st *app.LoadoutState, pos int) string {
