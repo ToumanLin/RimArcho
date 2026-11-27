@@ -152,7 +152,7 @@ function build() {
   });
   $(".lk-act", gal).addEventListener("click", actClick);
   editor.initEditor({
-    host: l2, way, ui,
+    host: l2, way, ui: L.ui,
     scope: () => L.scope || "plan",
     overview: () => L.ov,
     setOverview: (ov) => { if (ov) { L.ov = ov; drawSide(); } },
@@ -383,7 +383,8 @@ function relayout(keep) {
 }
 
 function groupOf(gi) { return (L.gal.groups || [])[gi]; }
-function rowOf(card) { return groupOf(card.group).rows[card.item]; }
+// a row's card ({ x, w, n }) names the look by its place n in reading order
+function rowOf(card) { const c = card.group === undefined ? L.layout.cards[card.n] : card; return groupOf(c.group).rows[c.item]; }
 
 // drawRows keeps only the rows in view (and a small margin) in the page (16 §10).
 function drawRows() {
