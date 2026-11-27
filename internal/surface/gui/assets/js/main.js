@@ -17,7 +17,7 @@ import "./activity.js";
 import "./fulltitle.js";
 import { applyAccent } from "./accent.js";
 import { factText, S, $, $$, el, esc, T, Tf, errText, say, clearSay, undoStatus, busyStart, col, cur, selection, key, idsOf, refsOf, named, AREAS, keyCaps } from "./state.js";
-import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, pageDelta, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn, setOnViewChange, setOnSortChange, detailHead } from "./lists.js";
+import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, pageDelta, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn, setOnViewChange, setOnSortChange, detailHead, detailView, setDetailView, setOnDetailView } from "./lists.js";
 import { G, grouped, headOf, curKey, shownItems, shape, findEntry, setGroupOpen, reveal, setView, loadView, refreshOrder, regroup } from "./disabledgroups.js";
 import { createBar } from "./filterbar.js";
 import { followDetail, showDetail, scrollDetail, refreshCopies, showPanel } from "./detail.js";
@@ -142,6 +142,8 @@ function detailTarget() {
   return { it, k, id: it ? key(it) + "|" + (it.pos || 0) + "|" + S.board.stamp : "" };
 }
 function detailFollow(force) {
+  // the tags view stands in for the details: they follow again when the switch comes back
+  if (detailView() === "tags") { detailKey = ""; return; }
   const t = detailTarget();
   if (!force && t.id === detailKey) return;
   detailKey = t.id;
@@ -1247,6 +1249,7 @@ function onKey(e) {
     const kk = e.shiftKey && k === "m" ? "M" : k;
     if (g && !g.none && ["F2", "n", "M", "Delete"].includes(kk)) {
       handled();
+      setDetailView("details"); // the Tag manager they act on is the details'
       if (kk === "F2") return startRename(tagBox(), g, tagCtx);
       if (kk === "n") return editTagNote(tagBox(), tagCtx);
       if (kk === "M") return pickMerge(g.tag, tagCtx);
@@ -1444,6 +1447,7 @@ async function start() {
   document.addEventListener("mod-player-data-changed", () => reload());
   document.addEventListener("filter-tag", (e) => S.bar.set("tags:" + e.detail, 1));
   document.addEventListener("open-tag", (e) => openTag(e.detail));
+  setOnDetailView(() => detailFollow(true));
   document.addEventListener("editor-use-copy", async (e) => {
     if(environmentReason())return say("busy",environmentReason());
     const id = e.detail;

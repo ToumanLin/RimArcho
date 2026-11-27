@@ -10,7 +10,7 @@ import { beginPageRead, pageLoading } from "./screens.js";
 import { markOf, paintMark, tagCSS, tagColors } from "./tagcolor.js";
 import { G, grouped, shape, curKey, headOf, findEntry, matched, foldAll, setView, setSort } from "./disabledgroups.js";
 import { choiceControl } from "./choices.js";
-import { tagCoverage } from "./tagcoverage.js";
+import { tagView } from "./tagview.js";
 
 const rowID = (k, it) => `editor-${k}-${encodeURIComponent(key(it))}`;
 const rowsEl = (k) => $(`.area[data-area="${k}"] .rows`);
@@ -171,7 +171,7 @@ export function renderHeads() {
     const a = $(`.area[data-area="${k}"]`);
     a.classList.toggle("focus", S.focus === k && !S.popup);
     const h = $(".head", a);
-    if (k === 3) { detailHead(h); continue; }
+    if (k === 3) { detailHead(h); renderTagView(); continue; }
     const c = S.cols[k];
     const filtered = k < 2 ? barOn() : !!c.query.trim();
     const n = filtered ? Tf("%d / %d", matched(c), c.items.length) : `${c.items.length}`;
@@ -185,7 +185,6 @@ export function renderHeads() {
       if (k === 0) h.append(viewControls());
     }
     if (k === 0) syncViewControls();
-    if (k === 1) placeCoverage(h);
     const box = rowsEl(k);
     if (box.getAttribute("role") !== "listbox") {
       box.setAttribute("role", "listbox");
@@ -207,31 +206,92 @@ export function renderHeads() {
   }
 }
 
-// placeCoverage puts the tag coverage bar after Enabled's count (16 §3.8), or takes it away.
-function placeCoverage(h) {
-  const cov = tagCoverage(S.cols, S.bar, (tag) => document.dispatchEvent(new CustomEvent("open-tag", { detail: tag })));
-  const old = $(".tagcov", h);
-  if (old && old !== cov) old.remove();
-  if (cov && cov.parentNode !== h) $(".num", h).after(cov);
+// The details area's view (16 §2.5): details, or tags (tagview.js). Kept per browser, as
+// the folds are.
+let dview = (() => { try { return localStorage.getItem("archo.detailview") === "tags" ? "tags" : "details"; } catch { return "details"; } })();
+export const detailView = () => dview;
+let onDetailView = () => {};
+export function setOnDetailView(fn) { onDetailView = fn; }
+export function setDetailView(v) {
+  if (v === dview) return;
+  dview = v;
+  try { localStorage.setItem("archo.detailview", v); } catch { /* not kept */ }
+  detailHead();
+  renderTagView();
+  onDetailView(v);
 }
 
-// detailHead: the details area's head. On a tag group's header in Disabled (S.tagHead) it is
-// the Tag manager's, as on Mod library (16 §2.9): "tags", the tag, and a filter to it.
+// detailSwitch: details | tags, made once and kept, so its thumb slides.
+let dswitch = null;
+function detailSwitch() {
+  if (!dswitch) {
+    dswitch = el("span", "seg sub dview-seg dtab-seg");
+    dswitch.setAttribute("role", "group");
+    dswitch.setAttribute("aria-label", T(AREAS[3]));
+    dswitch.append(el("span", "thumb"));
+    for (const v of ["details", "tags"]) {
+      const b = el("button");
+      b.type = "button";
+      b.dataset.view = v;
+      b.onmousedown = (e) => e.stopPropagation();
+      b.onclick = (e) => { e.stopPropagation(); setDetailView(v); };
+      dswitch.append(b);
+    }
+  }
+  for (const b of dswitch.querySelectorAll("button")) {
+    const label = T(b.dataset.view);
+    if (b.textContent !== label) b.textContent = label;
+    const on = b.dataset.view === dview;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-pressed", String(on));
+  }
+  return dswitch;
+}
+const syncSwitch = () => {
+  const on = dswitch && $("button.on", dswitch);
+  if (dswitch?.isConnected && on && on.offsetWidth) slideThumb(dswitch, on);
+};
+
+// detailHead: the details area's head: its number and the details | tags switch; in details,
+// view full details, or on a tag group's header in Disabled (S.tagHead) the Tag manager's
+// tag and a filter to it, as on Mod library (16 §2.9).
 export function detailHead(h = $('.area[data-area="3"] .head')) {
-  const g = S.tagHead;
+  const g = dview === "details" ? S.tagHead : null;
   const link = (label, run) => {
     const b = el("button", "editor-full-link", label);
     b.onmousedown = (e) => e.stopPropagation();
     b.onclick = (e) => { e.stopPropagation(); run(); };
     return b;
   };
+  const sw = detailSwitch();
+  const sig = dview + "|" + (g ? JSON.stringify([!!g.none, g.tag]) : "") + "|" + document.documentElement.lang;
+  if (h.detailSig === sig && sw.parentNode === h) return syncSwitch();
+  h.detailSig = sig;
+  h.innerHTML = `<span class="n">4</span>`;
+  h.append(sw);
+  if (dview === "tags") return syncSwitch();
   if (!g) {
-    h.innerHTML = `<span class="n">4</span><span class="t">${esc(T(AREAS[3]))}</span>`;
     h.append(link(T("view full details") + "  Enter ↵", () => document.dispatchEvent(new CustomEvent("editor-full"))));
-    return;
+    return syncSwitch();
   }
-  h.innerHTML = `<span class="n">4</span><span class="t">${esc(T("tags"))}</span><span class="q word-facts">${esc(g.none ? T("no tag") : g.tag)}</span>`;
+  h.insertAdjacentHTML("beforeend", `<span class="q word-facts">${esc(g.none ? T("no tag") : g.tag)}</span>`);
   if (!g.none) h.append(link(T("filter to this tag"), () => document.dispatchEvent(new CustomEvent("filter-tag", { detail: g.tag }))));
+  syncSwitch();
+}
+
+// renderTagView shows the tags view in place of the details (16 §2.5), or the details again.
+export function renderTagView() {
+  const box = $("#tagview"), det = $("#detail");
+  if (!box || !det) return;
+  const on = dview === "tags";
+  box.hidden = !on;
+  det.hidden = on;
+  if (!on || !S.cols[1]) return;
+  const v = tagView(S.cols[1].items, tagColors(), S.bar?.search || "", {
+    filter: (f, set) => S.bar?.set(f, set),
+    edit: (tag) => { setDetailView("details"); document.dispatchEvent(new CustomEvent("open-tag", { detail: tag })); },
+  });
+  if (v.parentNode !== box) box.replaceChildren(v);
 }
 
 // viewControls: the Disabled column's view switch, individual | tags (v), and in the tags

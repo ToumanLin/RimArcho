@@ -384,13 +384,6 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .sec.area-on > h2 { color: var(--accent-11, var(--accent)); }
 .area .head .t { color: var(--muted); font-size: 12px; font-weight: 600; }
 .area .head .num { color: var(--faint); font-size: 12px; }
-/* tag coverage (16 §3.8): Enabled's Mods by first tag's colour, no tag hatched; it narrows before undo and sort do */
-.tagcov { display: inline-flex; align-items: center; align-self: center; flex: 0 1 44px; min-width: 16px; padding: 4px 0; border-radius: var(--r-sm); outline-offset: 2px; }
-.tagcov-bar { display: flex; width: 100%; height: 6px; border-radius: 999px; overflow: hidden; background: var(--pill); }
-.tagcov-bar > span { min-width: 1px; height: 100%; cursor: pointer; }
-.tagcov-bar .plain { background: color-mix(in srgb, var(--muted) 55%, transparent); }
-.tagcov-bar .seg-none { background: repeating-linear-gradient(135deg, var(--muted) 0 1px, transparent 1px 3px); }
-.tagcov.on .seg-none { background: repeating-linear-gradient(135deg, var(--accent) 0 1px, transparent 1px 3px); }
 .area.focus .head .t { color: var(--accent-11, var(--accent)); }
 .area .head .q { color: var(--faint); overflow: hidden; text-overflow: ellipsis; }
 .search { padding: 6px 10px 4px; display: none; }
@@ -3638,3 +3631,24 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .xc-item .md, .xc-item .vl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .xc-item .vl { color: var(--fg-2); }
 .xc-item.had .md, .xc-item.had .vl { color: var(--faint); }
+
+/* the editor details' tags view (16 §2.5, §3.8): a row per tag of Enabled's Mods, its colour, a bar of how many and the number; no tag last */
+.tagview { padding: 6px 8px 10px; }
+.tv-line { display: flex; align-items: center; gap: 2px; }
+.tv-line.none { margin-top: 4px; padding-top: 4px; border-top: var(--hairline) solid var(--line-2); }
+.tv-row { flex: 1; min-width: 0; display: grid; grid-template-columns: 3px minmax(0, 1fr) minmax(48px, 32%) 4ch; align-items: center; gap: 8px; height: 28px; padding: 0 8px; border-radius: var(--r-sm); color: var(--fg-2); font-size: 13px; text-align: left; transition: background var(--t-press); }
+.tv-row:hover { background: var(--pill); color: var(--fg); }
+.tv-row.on { background: var(--accent-soft); color: var(--accent-11, var(--accent)); }
+.tv-mark { width: 3px; height: 14px; border-radius: 999px; }
+.tv-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tv-bar { height: 6px; border-radius: 999px; background: var(--pill); overflow: hidden; }
+.tv-bar > i { display: block; height: 100%; min-width: 2px; border-radius: 999px; background: color-mix(in srgb, var(--muted) 55%, transparent); }
+.tv-line.none .tv-bar > i { background: repeating-linear-gradient(135deg, var(--muted) 0 1px, transparent 1px 3px); }
+.tv-row.on .tv-bar { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.tv-n { color: var(--muted); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+.tv-row.on .tv-n { color: inherit; }
+.tv-edit, .tv-edit-gap { flex: none; width: 24px; height: 24px; }
+.tv-edit { display: grid; place-items: center; border-radius: var(--r-sm); color: var(--faint); opacity: 0; transition: opacity var(--t-press); }
+.tv-edit svg { width: 14px; height: 14px; }
+.tv-line:hover .tv-edit, .tv-edit:focus-visible, .tv-row:focus-visible + .tv-edit { opacity: 1; }
+.tv-edit:hover { background: var(--pill); color: var(--fg); }

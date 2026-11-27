@@ -348,8 +348,7 @@
   "a pack, with the Mod files…": "сборка с файлами модов…",
   "show the file": "показать файл",
   "hide the file": "скрыть файл",
-  "%d of %d enabled mods have a tag, %d have none": "включённых модов с тегом: %d из %d, без тега: %d",
-  "click a colour: that tag; the stripes or enter: the mods with no tag": "цвет: этот тег; штриховка или Enter: моды без тега",
+  "%d of %d enabled mods": "включённых модов: %d из %d",
   "%d installed, not enabled": "%d установлено, ещё не включено",
   "ready to catch up: %s": "можно догнать: %s",
   "no list is open": "нет открытого списка"
