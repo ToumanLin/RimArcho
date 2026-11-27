@@ -403,7 +403,7 @@ type ProblemsIn struct {
 	Ignored     bool   `json:"ignored,omitempty" jsonschema:"list the problems the player ignored"`
 	GameVersion string `json:"game_version,omitempty" jsonschema:"another game major.minor than the Game Config's, e.g. 1.6"`
 
-	IncludeMuted bool `json:"include_muted,omitempty" jsonschema:"also show ignored version warnings, marked ignored"`
+	IncludeMuted bool `json:"include_muted,omitempty" jsonschema:"also show ignored version warnings and those community data (No Version Warning) confirms, marked"`
 }
 
 type OpsIn struct {

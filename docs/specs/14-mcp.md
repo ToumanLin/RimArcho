@@ -37,7 +37,7 @@ Annotations follow the MCP specification; the external harness decides whether t
 | `get_patches` | patches (mod, target, failed, all, and `game_version`) | true | — |
 | `get_harmony` | harmony (mod, target, shared, all, and `game_version`) | true | — |
 | `explain_relation` | why (a, b, and `game_version`) | true | — |
-| `list_problems` | problems; ref maps to `problems --ref`, keeping all and `game_version`. `--min-severity warning` is added by default, unless severity, `min_severity`, all, or `include_muted` is given. `include_muted` maps to `--include-muted`. | true | — |
+| `list_problems` | problems; ref maps to `problems --ref`, keeping all and `game_version`. `--min-severity warning` is added by default, unless severity, `min_severity`, all, or `include_muted` is given. `include_muted` maps to `--include-muted` (also lists warnings No Version Warning confirms, 05 §4.2). | true | — |
 | `list_changes` | changes (ref, since, and all) | true | — |
 | `list_operations` | ops (since, op, failed, all; 13 §1.3); no env parameter because the log covers every environment. | true | — |
 | `analyze_log` | log (cluster, text, file, prev, all, since, and `game_version`); `pattern=<reference>` maps to `pattern`, where `list` lists them all. | true | — |

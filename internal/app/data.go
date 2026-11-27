@@ -16,8 +16,8 @@ import (
 	"time"
 )
 
-// Community data (08 §2.3): RimSort's sorting rules and Steam Workshop database and
-// the "Use This Instead" replacements. Downloaded manually or by automatic maintenance; stored in
+// Community data (08 §2.3): RimSort's sorting rules and Steam Workshop database,
+// the "Use This Instead" replacements and the No Version Warning lists. Downloaded manually or by automatic maintenance; stored in
 // <home>/cache with a sidecar recording where and when each came from.
 
 // Dataset is one community data file.
@@ -36,6 +36,9 @@ var Datasets = []Dataset{
 		URL: "https://raw.githubusercontent.com/RimSort/Steam-Workshop-Database/main/steamDB.json"},
 	{Key: "replacements", File: "replacements.json.gz", Desc: "Use This Instead replacements",
 		URL: "https://raw.githubusercontent.com/emipa606/UseThisInstead/main/replacements.json.gz"},
+	// One ModIdsToFix.xml per game version, so the repository zip (about 0.6 MB), not one raw file.
+	{Key: "noversionwarning", File: "noVersionWarning.zip", Desc: "No Version Warning: Mods known to work on game versions they do not list",
+		URL: "https://github.com/emipa606/NoVersionWarning/archive/refs/heads/main.zip"},
 }
 
 // DataSource is where a dataset is fetched from: config data.<key>.url, else the default.
@@ -350,6 +353,12 @@ func validateData(d Dataset, path string, info *DataInfo) error {
 			return fmt.Errorf("not a Use This Instead list (%v)", err)
 		}
 		info.Version, info.Entries = string(v.Version), len(v.Rules)
+	case "noversionwarning":
+		l, err := parseNoVersionWarning(b)
+		if err != nil {
+			return err
+		}
+		info.Version, info.Entries = l.versionText(), l.entries()
 	}
 	return nil
 }
@@ -372,9 +381,11 @@ type WorkshopEntry struct {
 type dataIndex struct {
 	byOldWS, byOldPkg map[string]*Replacement
 	byPkg             map[string]WorkshopEntry // steamDB: packageId → item
+	noVersion         *nvwLists                // No Version Warning; nil without the dataset
 }
 
-// dataIndex loads the replacements and a packageId index of steamDB once per process.
+// dataIndexes loads the replacements, No Version Warning and a packageId index of steamDB
+// once per community data generation.
 func (a *App) dataIndexes() *dataIndex {
 	key := a.Store.Meta("community:generation")
 	if a.dataIdx != nil && a.dataKey == key {
@@ -382,6 +393,9 @@ func (a *App) dataIndexes() *dataIndex {
 	}
 	a.dataKey = key
 	ix := &dataIndex{byOldWS: map[string]*Replacement{}, byOldPkg: map[string]*Replacement{}, byPkg: map[string]WorkshopEntry{}}
+	if b, err := readDataFile(a.dataPath(Datasets[3])); err == nil {
+		ix.noVersion, _ = parseNoVersionWarning(b)
+	}
 	if b, err := readDataFile(a.dataPath(Datasets[2])); err == nil {
 		for _, x := range replacementRules(b) {
 			if x.OldWorkshopID != "" {

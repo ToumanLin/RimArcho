@@ -142,6 +142,8 @@ func TestAutomaticCommunityDataConditionalChecksAndFailure(t *testing.T) {
 			io.WriteString(w, `{"version":1,"database":{}}`)
 		case "/replacements":
 			io.WriteString(w, `{"version":"one","rules":[]}`)
+		case "/noversionwarning":
+			io.WriteString(w, `<ModIdsToFix><li>tester.a</li></ModIdsToFix>`)
 		}
 	}))
 	defer srv.Close()
@@ -162,7 +164,7 @@ func TestAutomaticCommunityDataConditionalChecksAndFailure(t *testing.T) {
 		t.Fatal(ran, err)
 	}
 	second := e.App.DataStatus()["rules"]
-	if !second.Checked.After(first.Checked) || !second.Fetched.Equal(first.Fetched) || calls != 6 {
+	if !second.Checked.After(first.Checked) || !second.Fetched.Equal(first.Fetched) || calls != 8 {
 		t.Fatal("304 sidecar", first, second, calls)
 	}
 	if e.App.AutomaticDue("data") {

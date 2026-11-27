@@ -34,7 +34,10 @@ type PlanVersions struct {
 	// supportedVersions are not).
 	Missing map[string]int
 	Muted   map[string]int // missing declarations the player chose not to warn about
-	Counted int
+	// Confirmed: missing declarations community data (No Version Warning) answers; counted
+	// neither as missing nor as support (05 §4.2).
+	Confirmed map[string]int
+	Counted   int
 }
 
 // PlanVersionsOf works out a plan's game versions in st's environment.
@@ -43,7 +46,7 @@ func (a *App) PlanVersionsOf(st *LoadoutState, p *store.Plan) (*PlanVersions, er
 	if err != nil {
 		return nil, err
 	}
-	pv := &PlanVersions{Plan: p, Created: env.MajorMinor(p.CreatedGame), Game: st.GameMM(), Missing: map[string]int{}, Muted: map[string]int{}}
+	pv := &PlanVersions{Plan: p, Created: env.MajorMinor(p.CreatedGame), Game: st.GameMM(), Missing: map[string]int{}, Muted: map[string]int{}, Confirmed: map[string]int{}}
 	mutes, err := a.Store.AllVersionMutes()
 	if err != nil {
 		return nil, err
@@ -100,7 +103,9 @@ func (a *App) PlanVersionsOf(st *LoadoutState, p *store.Plan) (*PlanVersions, er
 		n := 0
 		for i, s := range sets {
 			if !s[v] {
-				if mutes[v][packages[i]] {
+				if a.VersionConfirmed(packages[i], v) {
+					pv.Confirmed[v]++
+				} else if mutes[v][packages[i]] {
 					pv.Muted[v]++
 				} else {
 					n++

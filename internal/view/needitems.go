@@ -165,6 +165,9 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 	if len(ps.Muted) > 0 {
 		b.add(mutedVersionsNeed(st, ps.Muted))
 	}
+	if len(ps.Confirmed) > 0 {
+		b.add(confirmedVersionsNeed(st, ps.Confirmed))
+	}
 	if v := env.MajorMinor(st.FileVersionMismatch()); v != "" {
 		b.add(Need{rank: 6, Group: GroupList, Text: Tf("the list was saved for %s; the game resets it when it starts — launching from RimArcho or saving once saves it for the current version", v),
 			Actions: []Action{{Kind: ActSave, Key: "w", Label: T("save")}}, Counted: true, Status: StatusWarn,

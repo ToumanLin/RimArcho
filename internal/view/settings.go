@@ -458,7 +458,7 @@ func CommunityDataGroup(a *app.App) SettingGroup {
 			Note: v})
 	}
 	data.Items = append(data.Items, SettingItem{Label: T("update the community data"), Actions: []SettingAction{{Label: T("update now"), Argv: []string{"data", "update"},
-		Confirm: T("RimArcho downloads the three files from their sources (about 50 MB)")}}})
+		Confirm: T("RimArcho downloads the four files from their sources (about 50 MB)")}}})
 	data.Summary = facts(T("not downloaded"))
 	if !missing && !oldest.IsZero() {
 		data.Summary = facts(Tf("updated %s", ShortDate(oldest)))

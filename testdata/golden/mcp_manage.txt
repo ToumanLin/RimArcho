@@ -15,6 +15,7 @@ Game Configs: 1
 > status {"show":"settings"}
 settings
   analysis.auto: edit
+  data.noversionwarning.url: https://github.com/emipa606/NoVersionWarning/archive/refs/heads/main.zip
   data.replacements.url: https://raw.githubusercontent.com/emipa606/UseThisInstead/main/replacements.json.gz
   data.rules.url: https://raw.githubusercontent.com/RimSort/Community-Rules-Database/main/communityRules.json
   data.steamdb.url: https://raw.githubusercontent.com/RimSort/Steam-Workshop-Database/main/steamDB.json
@@ -45,6 +46,7 @@ community data
   rules: not downloaded (RimSort community sorting rules)
   steamdb: not downloaded (RimSort Steam Workshop database (packageIds, dependencies, versions))
   replacements: not downloaded (Use This Instead replacements)
+  noversionwarning: not downloaded (No Version Warning: Mods known to work on game versions they do not list)
   automatic checks: on; nothing waiting (not checked yet)
 next:
   archo data update

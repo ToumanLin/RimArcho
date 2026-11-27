@@ -25,6 +25,8 @@
   "%d matches": "%d개 일치",
   "%d matches in %d files of %d mods": "모드 %[3]d개의 파일 %[2]d개에서 %[1]d개 일치",
   "%d mods' %s warnings are ignored": "모드 %d개의 %s 경고를 무시해요",
+  "%d mods confirmed working on %s by community data (No Version Warning)": "모드 %d개가 커뮤니티 데이터(No Version Warning)로 %s에서 작동이 확인됐어요",
+  "confirmed working on %s by community data (No Version Warning)": "커뮤니티 데이터(No Version Warning)로 %s에서 작동이 확인됐어요",
   "%d mods' %s warnings are restored": "모드 %d개의 %s 경고를 다시 표시해요",
   "%d more": "%d개 더",
   "%d more…": "%d개 더…",

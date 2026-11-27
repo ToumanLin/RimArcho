@@ -26,9 +26,10 @@ func TestCommunityDataIndexFailureKeepsWholeSet(t *testing.T) {
 	t.Parallel()
 	e := loadoutEnv(t)
 	payloads := map[string]string{
-		"rules":        `{"timestamp":1,"rules":{}}`,
-		"steamdb":      `{"version":1,"database":{"42":{"packageId":"tester.old","name":"Old"}}}`,
-		"replacements": `{"version":"one","rules":[]}`,
+		"rules":            `{"timestamp":1,"rules":{}}`,
+		"steamdb":          `{"version":1,"database":{"42":{"packageId":"tester.old","name":"Old"}}}`,
+		"replacements":     `{"version":"one","rules":[]}`,
+		"noversionwarning": `<ModIdsToFix><li>tester.a</li></ModIdsToFix>`,
 	}
 	for _, d := range app.Datasets {
 		path := filepath.Join(e.Root, "sources", d.File)
@@ -119,6 +120,7 @@ func TestCommunityDataToleratesBadRecords(t *testing.T) {
 			{"oldWorkshopId":"1001","oldPackageId":"Tester.A","oldAuthor":null,"newWorkshopId":"9999","newPackageId":"Tester.A2","newName":"A Continued","newVersions":["1.6",1.7]},
 			{"oldWorkshopId":"1002","oldPackageId":{"bad":true},"newPackageId":"tester.b2"},
 			{"oldWorkshopId":"1003","oldPackageId":null,"newPackageId":"tester.c2"}]}`,
+		"noversionwarning": `<ModIdsToFix><li>tester.a</li></ModIdsToFix>`,
 	}
 	for _, d := range app.Datasets {
 		path := filepath.Join(e.Root, "sources", d.File)
@@ -166,6 +168,7 @@ func TestCommunityData(t *testing.T) {
 		"/steamdb.json": []byte(`{"version": 1790337009, "database": {"4242": {"packageId": "Gone.Mod", "name": "Gone Mod"}, "294100": {"appid": true, "packageid": "ludeon.rimworld"}}}`),
 		"/repl.json.gz": gz(`{"version": "2026-10-19T06:29:54Z", "rules": [{"oldWorkshopId": "1001", "oldPackageId": "tester.a", "oldName": "A", "oldAuthor": "x", "oldVersions": ["1.5"],
 			"newWorkshopId": "9999", "newPackageId": "tester.a2", "newName": "A Continued", "newAuthor": "Mlie", "newVersions": ["1.6"]}]}`),
+		"/nvw.zip": nvwZip(t, map[string]string{"1.6/ModIdsToFix.xml": nvwList("tester.a", "tester.b")}),
 	}
 	hits := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -187,18 +190,19 @@ func TestCommunityData(t *testing.T) {
 	e.MustRun("config", "set", "data.rules.url", srv.URL+"/rules.json")
 	e.MustRun("config", "set", "data.steamdb.url", srv.URL+"/steamdb.json")
 	e.MustRun("config", "set", "data.replacements.url", srv.URL+"/repl.json.gz")
+	e.MustRun("config", "set", "data.noversionwarning.url", srv.URL+"/nvw.zip")
 
 	if out := e.MustRun("data", "update", "--dry-run"); hits != 0 || !strings.Contains(out, srv.URL+"/rules.json") {
 		t.Fatalf("dry run fetched %d:\n%s", hits, out)
 	}
 	e.MustRun("data", "update")
 	out := e.MustRun("data", "status")
-	for _, want := range []string{"rules: 1 entries", "steamdb: 2 entries", "replacements: 1 entries"} {
+	for _, want := range []string{"rules: 1 entries", "steamdb: 2 entries", "replacements: 1 entries", "noversionwarning: 2 entries"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("D1 status lacks %q:\n%s", want, out)
 		}
 	}
-	if out := e.MustRun("data", "update"); strings.Count(out, "unchanged") != 3 {
+	if out := e.MustRun("data", "update"); strings.Count(out, "unchanged") != 4 {
 		t.Fatalf("ETag: %s", out)
 	}
 

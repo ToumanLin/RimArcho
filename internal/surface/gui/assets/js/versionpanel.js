@@ -55,7 +55,9 @@ export function openVersionList(act, run, show) {
       };
     });
   }
+  // Rows community data answers (No Version Warning) have nothing to ignore or restore.
   const button = (action) => {
+    if (!action?.kind) return "";
     const b = el("button", "btn small", action.label);
     b.dataset.envWrite = action.kind;
     b.onclick = () => apply(action);
@@ -68,7 +70,7 @@ export function openVersionList(act, run, show) {
       const scroll = body.scrollTop;
       title.textContent = data.title;
       body.replaceChildren();
-      all.hidden = !data.groups.length;
+      all.hidden = !data.all.refs?.length;
       all.disabled = false;
       all.textContent = data.all.label;
       all.dataset.envWrite = data.all.kind;

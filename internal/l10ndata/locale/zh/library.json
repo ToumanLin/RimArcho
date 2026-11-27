@@ -25,6 +25,8 @@
   "%d matches": "%d 处",
   "%d matches in %d files of %d mods": "%[1]d 处，在 %[3]d 个 Mod 的 %[2]d 个文件里",
   "%d mods' %s warnings are ignored": "%d 个 Mod 的 %s 提醒已忽略",
+  "%d mods confirmed working on %s by community data (No Version Warning)": "%d 个 Mod 经社区数据（No Version Warning）确认可在 %s 上运行",
+  "confirmed working on %s by community data (No Version Warning)": "社区数据（No Version Warning）确认可在 %s 上运行",
   "%d mods' %s warnings are restored": "已恢复 %d 个 Mod 的 %s 提醒",
   "%d more": "还有 %d 个",
   "%d more…": "还有 %d 个…",
