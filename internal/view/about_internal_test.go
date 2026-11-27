@@ -54,7 +54,8 @@ func TestChangelogView(t *testing.T) {
 func TestChangelogEmbedded(t *testing.T) {
 	g := ChangelogGroup()
 	c := g.Changelog
-	if c == nil || len(c.Versions) < 5 || c.Versions[0].Key != "Unreleased" || !c.Versions[0].Current {
+	// The first is Unreleased, or at a release commit (an empty Unreleased) the new version.
+	if c == nil || len(c.Versions) < 5 || !c.Versions[0].Current {
 		t.Fatalf("changelog %+v", c)
 	}
 	b, _ := json.Marshal(g)
