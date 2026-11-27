@@ -160,11 +160,16 @@ func (a *App) AnalyzeContext(ctx context.Context, progress func(string)) (*Analy
 		return nil, err
 	}
 	in.Progress = progress
+	cache := a.assemblyCache()
+	if cache != nil {
+		in.Assemblies = cache
+	}
 	started := a.Now()
 	out, err := analyze.Run(in)
 	if err != nil {
 		return nil, err
 	}
+	cache.prune()
 	in = analyze.Input{} // release the declarations before writing
 	id, err := a.Store.SaveAnalysisContext(ctx, st.Ix.Env.GameID, SetFingerprint(st.List), key, st.GameMM(), a.planSetKeys(st), out, started, a.Now())
 	if err != nil {

@@ -302,7 +302,7 @@ func topMayRequire(o *Op) (string, bool) {
 }
 
 // intendedOwners are the mods a patch evidently targets: FindMod names, MayRequire
-// packages, and hard dependencies.
+// packages, and hard dependencies (by package ID).
 func (s *sim) intendedOwners(g guard, deps map[string]bool, k *knowledge) []*Mod {
 	seen := map[*Mod]bool{}
 	var out []*Mod
@@ -323,7 +323,7 @@ func (s *sim) intendedOwners(g guard, deps map[string]bool, k *knowledge) []*Mod
 	for _, p := range g.folder {
 		addAll(k.byPkg[p])
 	}
-	for p := range deps {
+	for _, p := range sortedKeys(deps) { // in a fixed order: the evidence lists them
 		if !strings.HasPrefix(p, "brrainz.harmony") && !strings.HasPrefix(p, "ludeon.") {
 			addAll(k.byPkg[p])
 		}
@@ -341,8 +341,8 @@ func (s *sim) otherVersion(m *Mod, tg target, k *knowledge, g guard, deps map[st
 	}
 	for _, c := range cands {
 		for _, a := range content.OtherXML(c.Dir, s.folders(c), "Defs") {
-			b, err := os.ReadFile(a.Path)
-			if err == nil && strings.Contains(string(b), string(needle)) {
+			b, err := s.readOnce(a.Path)
+			if err == nil && bytes.Contains(b, needle) {
 				return finding.Inst(c.Instance) + " " + a.Rel
 			}
 		}
@@ -364,7 +364,7 @@ func (s *sim) inactiveFolder(m *Mod, tg target, k *knowledge, g guard, deps map[
 	for _, c := range append([]*Mod{m}, s.intendedOwners(g, deps, k)...) {
 		for _, sk := range s.skippedOf[c.Instance] {
 			for _, a := range content.Assets(c.Dir, []string{sk.Folder}, "Defs") {
-				b, err := os.ReadFile(a.Path)
+				b, err := s.readOnce(a.Path)
 				if err != nil || !bytes.Contains(b, needle) {
 					continue
 				}
@@ -794,3 +794,28 @@ func shortDesc(p *PatchFact) string {
 }
 
 var _ = xdoc.None
+
+// readFile reads the files readOnce keeps (tests count the reads).
+var readFile = os.ReadFile
+
+// readOnceCap bounds the bytes readOnce keeps for a run.
+const readOnceCap = 64 << 20
+
+// readOnce reads a file of another version or an inactive folder for the not-found reasons
+// (otherVersion, inactiveFolder), at most once per run while the kept files stay under
+// readOnceCap: failed operations often name the same Mods, whose files were read again for
+// each (18 §2: 1,485 reads of 828 files on a 720-Mod list, single-threaded on a cold disk).
+func (s *sim) readOnce(path string) ([]byte, error) {
+	if b, ok := s.read[path]; ok {
+		return b, nil
+	}
+	b, err := readFile(path)
+	if err == nil && s.readBytes+len(b) <= readOnceCap {
+		if s.read == nil {
+			s.read = map[string][]byte{}
+		}
+		s.read[path] = b
+		s.readBytes += len(b)
+	}
+	return b, err
+}

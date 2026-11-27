@@ -91,6 +91,8 @@ type Input struct {
 	Workers  int
 	// HarmonySkip lists library DLLs (globs) whose Harmony facts are skipped; nil = default.
 	HarmonySkip []string
+	// Assemblies keeps Harmony facts by DLL content between checks; nil reads every DLL.
+	Assemblies AssemblyCache
 	// AfterSimulation is called with the merged document still live (diagnostics).
 	AfterSimulation func()
 }
@@ -203,6 +205,10 @@ func Run(in Input) (*Output, error) {
 	// Facts and findings.
 	r.patchFindings(sim, tops)
 	r.out.Stats.PatchMs = time.Since(t1).Milliseconds()
+	// The merged document (most of the heap) is not needed by the Harmony layer: freed
+	// before it, the child's soft memory limit (app.AnalyzeMemoryLimit) does not make the
+	// collector run without pause while the DLLs are read (18 §2).
+	r.doc = nil
 
 	// Harmony layer (independent of the others).
 	t2 := time.Now()
@@ -211,7 +217,6 @@ func Run(in Input) (*Output, error) {
 	out.Stats.HarmonyMs = time.Since(t2).Milliseconds()
 	out.Stats.TotalMs = time.Since(t0).Milliseconds()
 	in.progress("done: %d failed operations, %d findings, %v", out.Stats.Failed, len(out.Findings), time.Since(t0).Round(time.Millisecond))
-	runtime.KeepAlive(r.doc)
 	return out, nil
 }
 
@@ -445,7 +450,7 @@ func (r *run) readAssemblies() {
 	if skip == nil {
 		skip = harmony.DefaultSkip
 	}
-	out.Assemblies = harmonyLayer(r.active, r.folders, skip, r.in.Workers)
+	out.Assemblies = harmonyLayer(r.active, r.folders, skip, r.in.Workers, r.in.Assemblies)
 	for _, a := range out.Assemblies {
 		out.Stats.Assemblies++
 		out.Stats.HarmonyPatches += len(a.Patches)
