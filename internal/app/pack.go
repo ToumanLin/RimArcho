@@ -111,21 +111,24 @@ func TextureLabel(o textures.Options) string {
 
 // PackEntry is one mod of a pack, in load order.
 type PackEntry struct {
-	PackageID       string   `json:"package_id"`
-	Name            string   `json:"name"`
-	Official        bool     `json:"official,omitempty"` // Core or a DLC: from the game, not carried
-	Lineage         string   `json:"lineage,omitempty"`
-	Instance        string   `json:"instance,omitempty"`
-	WorkshopID      string   `json:"workshop_id,omitempty"`
-	Hash            string   `json:"hash,omitempty"`   // semantic snapshot hash (04 §1)
-	Folder          string   `json:"folder,omitempty"` // under mods/ (carried entries)
-	Bytes           int64    `json:"bytes,omitempty"`
-	Trimmed         int64    `json:"trimmed_bytes,omitempty"`
-	TrimmedDir      []string `json:"trimmed,omitempty"` // version folders left out
-	Files           int      `json:"files,omitempty"`
-	SHA256          string   `json:"sha256,omitempty"`
-	WorkshopUpdated int64    `json:"workshop_updated,omitempty"`
-	GitHead         string   `json:"git_head,omitempty"` // observed fingerprint, not Git subscription provenance
+	PackageID  string   `json:"package_id"`
+	Name       string   `json:"name"`
+	Official   bool     `json:"official,omitempty"` // Core or a DLC: from the game, not carried
+	Lineage    string   `json:"lineage,omitempty"`
+	Instance   string   `json:"instance,omitempty"`
+	WorkshopID string   `json:"workshop_id,omitempty"`
+	Hash       string   `json:"hash,omitempty"`   // semantic snapshot hash (04 §1)
+	Folder     string   `json:"folder,omitempty"` // under mods/ (carried entries)
+	Bytes      int64    `json:"bytes,omitempty"`
+	Trimmed    int64    `json:"trimmed_bytes,omitempty"`
+	TrimmedDir []string `json:"trimmed,omitempty"` // version folders left out
+	// LooksRemoved: textures the looks step took out of this copy (10 §2). Such a copy is no
+	// longer the Mod as installed: a launch never swaps a Mods/ folder in for it (10 §3).
+	LooksRemoved    int    `json:"looks_removed,omitempty"`
+	Files           int    `json:"files,omitempty"`
+	SHA256          string `json:"sha256,omitempty"`
+	WorkshopUpdated int64  `json:"workshop_updated,omitempty"`
+	GitHead         string `json:"git_head,omitempty"` // observed fingerprint, not Git subscription provenance
 }
 
 // PacksDir is where packs are kept: config pack.dir, else <local>/packs (17 §3). Homes from

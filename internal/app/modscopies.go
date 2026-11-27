@@ -235,7 +235,7 @@ func (a *App) duplicateFindings(st *LoadoutState, dups []ModsDuplicate) []*findi
 
 // packSameContent: the instance m is what the pack entry carries (same semantic hash).
 func packSameContent(pe PackEntry, m *store.Mod) bool {
-	return m != nil && pe.Hash != "" && hex.EncodeToString(m.SnapHash) == pe.Hash
+	return m != nil && pe.LooksRemoved == 0 && pe.Hash != "" && hex.EncodeToString(m.SnapHash) == pe.Hash
 }
 
 // folderToMove picks the plain folder of a Mods/ duplicate to move into the lock library

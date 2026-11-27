@@ -137,6 +137,7 @@ func (p *packLooksPlan) expect(r *PackBuild) {
 		pk.Removed++
 		pk.Bytes += x.size
 		r.Pack.Entries[x.entry].Bytes -= x.size
+		r.Pack.Entries[x.entry].LooksRemoved++
 	}
 	r.Final -= pk.Bytes
 	if pk.Removed > 0 || pk.Choices > 0 {
@@ -218,6 +219,7 @@ func (a *App) packLooks(r *PackBuild, p *packLooksPlan, tmp string, bs *buildSta
 		pk.Removed++
 		pk.Bytes += fi.Size()
 		pe.Bytes -= fi.Size()
+		pe.LooksRemoved++
 		removeEmptyTextureDirs(dir, filepath.Dir(path))
 		bs.update(func(b *BuildProgress) { b.Files = i + 1 })
 	}
