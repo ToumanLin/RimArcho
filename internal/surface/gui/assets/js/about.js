@@ -4,9 +4,9 @@
 // opens. Its Markdown is drawn as plain DOM from text nodes, never as HTML.
 import { el, api, T } from "./state.js";
 
-// authorCard: the name with the GitHub handle after it, the study line, the work looked for
-// (in the accent), and the links as Feedback's community pills. pill(label, run) is
-// screens.js's button, passed in so this module does not import it.
+// authorCard: the name with the GitHub handle after it, the degree line, the work looked for
+// (in the accent), then one row of Feedback's community pills under them. pill(label, run)
+// is screens.js's button, passed in so this module does not import it.
 export function authorCard(a, { pill, open }) {
   const box = el("div", "about-author");
   const text = el("div", "aa-text");
@@ -34,14 +34,17 @@ export function changelogView(c, { open }) {
   for (const v of vs.slice(0, c.shown)) box.append(versionFold(v, c, open));
   const rest = vs.slice(c.shown);
   if (rest.length) {
-    const older = fold("cl-older", (body) => { for (const v of rest) body.append(versionFold(v, c, open)); });
-    older.head.append(span("cl-v", T("older versions")), span("muted num", String(rest.length)));
+    const older = fold("cl-older", (body) => { for (const v of rest) body.append(versionFold(v, c, open)); }, false,
+      [span("cl-v", T("older versions")), span("muted num", String(rest.length))]);
     box.append(older.box);
   }
   return box;
 }
 
 function versionFold(v, c, open) {
+  const title = span("cl-v" + (v.current ? " current" : ""), v.title);
+  if (v.current) title.title = T("the version you are running");
+  const words = v.note ? [title, span("muted num cl-note", v.note)] : [title];
   const f = fold("cl-ver", async (body) => {
     const text = v.text ?? await api.ChangelogText(v.key).catch(() => "");
     const md = renderMarkdown(text || "", { source: c.source, open, leads: true });
@@ -49,18 +52,15 @@ function versionFold(v, c, open) {
     // measured once it has a width: About may be hidden behind another group when drawn
     const ro = new ResizeObserver(() => { if (md.clientWidth) { ro.disconnect(); wrapWhenCut(md); } });
     ro.observe(md);
-  }, v.current);
+  }, v.current, words);
   f.box.dataset.version = v.key;
-  const title = span("cl-v" + (v.current ? " current" : ""), v.title);
-  if (v.current) title.title = T("the version you are running");
-  f.head.append(title);
-  if (v.note) f.head.append(span("muted num cl-note", v.note));
   return f.box;
 }
 
-// fold is a heading with Settings › Folders' chevron (folderfolds.js) over a body that fill
-// draws the first time it opens; a click on the heading or enter on the chevron toggles it.
-function fold(cls, fill, startOpen = false) {
+// fold is a heading over a body that fill draws the first time it opens: the heading's words
+// at the card's left edge, the same edge as the body's lines, and Settings › Folders' chevron
+// (folderfolds.js) last, at its right; a click on the heading or enter on the chevron toggles it.
+function fold(cls, fill, startOpen, words) {
   const box = el("div", "folder-fold " + cls);
   const head = el("div", "folder-fold-head cl-head " + cls + "-head");
   const toggle = el("button", "folder-fold-toggle");
@@ -68,7 +68,7 @@ function fold(cls, fill, startOpen = false) {
   const chev = el("span", "fold-chev", "›");
   chev.setAttribute("aria-hidden", "true");
   toggle.append(chev);
-  head.append(toggle);
+  head.append(...words, toggle);
   const body = el("div", "cl-body");
   let filled = null;
   const show = (on) => {
@@ -78,7 +78,7 @@ function fold(cls, fill, startOpen = false) {
     toggle.title = T(on ? "hide" : "show");
     if (on && !filled) filled = Promise.resolve(fill(body)).catch(() => {});
   };
-  show(startOpen);
+  show(!!startOpen);
   toggle.onclick = (e) => { e.stopPropagation(); show(body.hidden); };
   head.onclick = (e) => { if (!e.target.closest("a, .cl-body")) toggle.click(); };
   // the heading's text names the toggle

@@ -36,7 +36,8 @@ func SelfUpdateHome(a *app.App) *SelfUpdateLine {
 }
 
 // SelfUpdateItem is the first row of the About group (16 §2.14): the running
-// version, what the last check found, its notes folded under the row, and the buttons.
+// version, what the last check found, its notes folded under the row, and its one button:
+// "check for updates", or "install update" once a check found an installable release.
 func SelfUpdateItem(a *app.App) SettingItem {
 	cur := a.SelfVersionNow()
 	it := SettingItem{Key: "archo.version", Label: T("version"), Value: cur}
@@ -80,13 +81,13 @@ func SelfUpdateItem(a *app.App) SettingItem {
 			install.Confirm += " " + Tf("%d other RimArcho are open: the files are replaced once they close.", n)
 		}
 	}
-	it.Actions = []SettingAction{install, check}
+	// One button: "check for updates" becomes "install update" once a check found one.
+	it.Actions = []SettingAction{install}
 	if info.Manual == r.Version {
 		// Neither GitHub nor Lanzou gave the zip: the player downloads it in the browser.
 		it.ValueNote += "  " + T("automatic download failed")
 		install.Label = T("try again")
 		it.Actions = append([]SettingAction{install}, SelfUpdateManual(r.Version)...)
-		it.Actions = append(it.Actions, check)
 	}
 	return it
 }

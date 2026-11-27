@@ -60,6 +60,12 @@ func TestSelfUpdateRowSourcesAndManual(t *testing.T) {
 	if !page || !pick || it.Actions[0].Label != "try again" {
 		t.Fatalf("manual actions %+v", it.Actions)
 	}
+	// 16 §2.14: a row that offers an install has no check button beside it
+	for _, a := range it.Actions {
+		if a.Task == view.TaskSelfCheck {
+			t.Fatalf("check offered beside the install: %+v", it.Actions)
+		}
+	}
 
 	// A newer check result is a new chance for the automatic download.
 	s.Manual = "1.0.10"

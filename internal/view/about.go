@@ -18,7 +18,8 @@ const (
 )
 
 // AuthorCard is who made RimArcho: the name with the GitHub handle after it, a line on their
-// study, one on the work they are looking for, and links that open in the browser. No email.
+// degree, one on the work they are looking for, and a row of links that open in the browser.
+// No email.
 type AuthorCard struct {
 	Name    string          `json:"name"`
 	Handle  string          `json:"handle"`
@@ -30,12 +31,12 @@ type AuthorCard struct {
 // AuthorGroup is About's Author section.
 func AuthorGroup() SettingGroup {
 	return SettingGroup{Key: GroupAuthor, Title: T("author"), Attention: AttentionNone, Author: &AuthorCard{
-		Name:    "Zixian (Jason) Zhang",
+		Name:    `Zixian "Jason" Zhang`,
 		Handle:  "ToumanLin",
-		Lines:   []string{T("Aerospace Engineering, UCLA, class of 2027")},
-		Seeking: T("Looking for full-time aerospace roles from spring 2027"),
+		Lines:   []string{T("B.S. Aerospace Engineering, UCLA (class of 2027)")},
+		Seeking: T("Looking for a full-time role from spring 2027"),
 		Links: []CommunityLink{
-			{Label: T("Website"), URL: "https://www.zixianz.com"},
+			{Label: T("Personal Website"), URL: "https://www.zixianz.com"},
 			{Label: "LinkedIn", URL: "https://www.linkedin.com/in/zixianz"},
 			{Label: "GitHub", URL: "https://github.com/ToumanLin"},
 		},

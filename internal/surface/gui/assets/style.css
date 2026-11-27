@@ -3651,25 +3651,27 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 /* Settings › About (16 §2.14): three text levels, as the other sections: the heading (.st-title);
    primary text as a row's label (13 px, 500, --fg): the name, the version rows, the bullet
    leads, and the job line in the accent; secondary as a row's description (12 px, --muted):
-   the handle, the study line, dates, "more" and an opened bullet. Nothing else. */
-.about-author { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 24px; padding: 12px 14px; }
-.aa-text { flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+   the handle, the degree line, dates, "more" and an opened bullet. Nothing else.
+   One left edge, the rows' 14 px: the author's lines and links, the changelog's version
+   headings and their bullets; a fold's chevron ends its heading at the right. */
+.about-author { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 12px 14px; }
+.aa-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .aa-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; }
 .aa-n, .cl-v, .cl-lead, .cl-md .cl-h { font-size: 13px; font-weight: 500; color: var(--fg); }
 .aa-seek { font-size: 13px; font-weight: 500; color: var(--accent); }
 .aa-h, .aa-line, .cl-note, .cl-older-head .num, .cl-more, .cl-md p, .cl-full { font-size: 12px; font-weight: 400; color: var(--muted); }
 .aa-line { margin: 0; }
-.aa-links { flex: none; }
+.aa-links { flex-wrap: wrap; }
 .cl-v.current { color: var(--accent); }
-.cl-body { border-top: var(--hairline) solid var(--line-2); }
+.cl-older > .cl-body { border-top: var(--hairline) solid var(--line-2); }
+.cl-head .folder-fold-toggle { margin-left: auto; }
 .cl-body[hidden] { display: none; }
 .cl-body > .folder-fold:first-child { border-top: 0; }
-/* a folded version inside "older versions": its own chevron, one step in */
 .cl .folder-fold:not(.open) > .cl-head .fold-chev { transform: none; }
-.cl-older > .cl-body > .cl-ver > .cl-head { padding-left: 38px; }
-.cl-older > .cl-body > .cl-ver > .cl-body > .cl-md { padding-left: 66px; }
-.cl-md { padding: 6px 18px 10px 42px; max-width: 860px; line-height: 1.5; -webkit-user-select: text; user-select: text; }
-.cl-md ul { margin: 0; padding-left: 16px; }
+.cl-md { padding: 0 14px 10px; max-width: 860px; line-height: 1.5; -webkit-user-select: text; user-select: text; }
+/* the bullets: lines at the heading's edge, no marker; an opened bullet's sub-bullets keep theirs */
+.cl-md ul { margin: 0; padding: 0; list-style: none; }
+.cl-md .cl-full ul { padding-left: 16px; list-style: disc; }
 .cl-md li { margin: 2px 0; }
 .cl-md li::marker { color: var(--faint); font-size: 12px; }
 .cl-md p { margin: 4px 0; }

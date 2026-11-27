@@ -50,7 +50,7 @@ test("the current version is open; another reads its text once, when opened; old
   assert.ok(folds[0].textContent.includes("now"));
   assert.ok(!folds[1].classList.contains("open"));
   assert.deepEqual(asked, []);
-  const toggle = folds[1].children[0].children[0];
+  const toggle = folds[1].children[0].children.at(-1); // the chevron ends the heading
   toggle.onclick({ stopPropagation() {} });
   await flush();
   assert.deepEqual(asked, ["1.1.4"]);
@@ -60,7 +60,7 @@ test("the current version is open; another reads its text once, when opened; old
   assert.deepEqual(asked, ["1.1.4"]);
   // "older versions": 1.1.3 is drawn only once the fold opens
   assert.ok(!folds[2].textContent.includes("1.1.3"));
-  folds[2].children[0].children[0].onclick({ stopPropagation() {} });
+  folds[2].children[0].children.at(-1).onclick({ stopPropagation() {} });
   await flush();
   assert.ok(folds[2].textContent.includes("1.1.3"));
 });

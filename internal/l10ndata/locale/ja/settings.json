@@ -442,9 +442,9 @@
   "development version": "開発版",
   "changelog": "更新履歴",
   "unreleased": "未リリース",
-  "Aerospace Engineering, UCLA, class of 2027": "UCLA 航空宇宙工学専攻 2027 年卒業予定",
-  "Looking for full-time aerospace roles from spring 2027": "2027 年春からの航空宇宙分野の正社員職を探しています",
-  "Website": "ウェブサイト",
+  "B.S. Aerospace Engineering, UCLA (class of 2027)": "UCLA 航空宇宙工学 学士（2027 年卒業予定）",
+  "Looking for a full-time role from spring 2027": "2027 年春からの正社員職を探しています",
+  "Personal Website": "個人サイト",
   "older versions": "以前のバージョン",
   "the version you are running": "使用中のバージョン",
   "%d versions: read them in the window (archo gui) or in CHANGELOG.md": "%d 個のバージョン：ウィンドウ（archo gui）または CHANGELOG.md で読めます"

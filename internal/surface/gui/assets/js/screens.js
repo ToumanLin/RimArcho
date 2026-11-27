@@ -2101,6 +2101,9 @@ function renderGroupRows(card, g, again, ids) {
     row.title = it.hover || "";
     const left = el("div", "l");
     const label = el("div", "name", it.label);
+    // About's version row reads "version 1.1.4" at its left, its one button at the right (16 §2.14)
+    const inline = it.key === "archo.version" && !it.edit && !!it.value;
+    if (inline) label.append(" ", el("span", "num", it.value));
     label.id = row.id + "-label";
     row.setAttribute("aria-labelledby", label.id);
     left.append(label);
@@ -2168,7 +2171,7 @@ function renderGroupRows(card, g, again, ids) {
       const b = button("↗", "", () => api.OpenURL(it.url).catch(e => say("fail", errText(e))), "link");
       b.title = T("open the web page"); b.setAttribute("aria-label", T("open the web page"));
       right.append(copyablePath(value, it.url), b);
-    } else {
+    } else if (!inline) {
       right.append(factText(el("span", "muted setting-value"), { text: it.value || "", paths: it.valuePath ? [it.value] : [] }));
     }
     const valueNote = el("span", "muted word-facts setting-value-note", it.valueNote || "");
