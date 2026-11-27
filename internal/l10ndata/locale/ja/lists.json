@@ -352,5 +352,6 @@
   "hide the file": "ファイルを隠す",
   "%d installed, not enabled": "%d 個がインストール済み・未有効",
   "ready to catch up: %s": "追従できます：%s",
-  "no list is open": "開いているリストがありません"
+  "no list is open": "開いているリストがありません",
+  "RimArcho Looks Preference and RimArcho Styles Preference": "RimArcho Looks Preference と RimArcho Styles Preference"
 }

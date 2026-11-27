@@ -116,8 +116,14 @@ type LookFile struct {
 }
 
 // LookFiles lists the recorded files, ordered by Rel.
-func (s *Store) LookFiles() ([]LookFile, error) {
-	rows, err := s.DB.Query(`SELECT rel, source, size, mtime, linked FROM look_file ORDER BY rel`)
+func (s *Store) LookFiles() ([]LookFile, error) { return s.genFiles("look_file") }
+
+// ReplaceLookFiles makes fs the whole recorded set, in one transaction.
+func (s *Store) ReplaceLookFiles(fs []LookFile) error { return s.replaceGenFiles("look_file", fs) }
+
+// genFiles lists the recorded files of one generated Mod (table: look_file or style_file).
+func (s *Store) genFiles(table string) ([]LookFile, error) {
+	rows, err := s.DB.Query(`SELECT rel, source, size, mtime, linked FROM ` + table + ` ORDER BY rel`)
 	if err != nil {
 		return nil, err
 	}
@@ -133,14 +139,13 @@ func (s *Store) LookFiles() ([]LookFile, error) {
 	return out, rows.Err()
 }
 
-// ReplaceLookFiles makes fs the whole recorded set, in one transaction.
-func (s *Store) ReplaceLookFiles(fs []LookFile) error {
+func (s *Store) replaceGenFiles(table string, fs []LookFile) error {
 	return s.inTx(func(tx *sql.Tx) error {
-		if _, err := tx.Exec(`DELETE FROM look_file`); err != nil {
+		if _, err := tx.Exec(`DELETE FROM ` + table); err != nil {
 			return err
 		}
 		for _, f := range fs {
-			if _, err := tx.Exec(`INSERT INTO look_file(rel, source, size, mtime, linked) VALUES(?,?,?,?,?)`,
+			if _, err := tx.Exec(`INSERT INTO `+table+`(rel, source, size, mtime, linked) VALUES(?,?,?,?,?)`,
 				f.Rel, f.Source, f.Size, f.MTime, f.Linked); err != nil {
 				return err
 			}

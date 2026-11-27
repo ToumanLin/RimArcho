@@ -47,10 +47,15 @@ type rawDef struct {
 	modIdx, pos                int
 	f                          [nFields]string
 	rows                       []styleRow // StyleCategoryDef/thingDefStyles
+	gd                         []gdField  // ThingDef: the other children of graphicData
 
 	res       *[nFields]string
 	resolving bool
 }
+
+// gdField is one child of a ThingDef's graphicData other than texPath and graphicClass,
+// as XML: a style of that thing repeats them (21 §5).
+type gdField struct{ name, xml string }
 
 func (d *rawDef) refName() string {
 	if d.defName != "" {
@@ -134,7 +139,13 @@ func parseDefs(data []byte) ([]*rawDef, error) {
 		text  []byte
 		cur   *rawDef
 		row   styleRow
+		gd    strings.Builder
 	)
+	// inGD: inside a child of a ThingDef's graphicData, which is kept as XML.
+	inGD := func() bool {
+		return cur != nil && cur.typ == "ThingDef" && len(stack) >= 4 && stack[2] == "graphicData" &&
+			stack[3] != "texPath" && stack[3] != "graphicClass"
+	}
 	for {
 		tok, err := dec.Token()
 		if err == io.EOF {
@@ -150,7 +161,19 @@ func parseDefs(data []byte) ([]*rawDef, error) {
 			if len(stack) == 2 {
 				cur = newRawDef(t)
 			}
+			if inGD() {
+				gd.WriteString("<" + t.Name.Local)
+				for _, a := range t.Attr {
+					gd.WriteString(" " + a.Name.Local + `="`)
+					xml.EscapeText(&gd, []byte(a.Value))
+					gd.WriteString(`"`)
+				}
+				gd.WriteString(">")
+			}
 		case xml.CharData:
+			if inGD() && len(bytes.TrimSpace(t)) > 0 {
+				xml.EscapeText(&gd, bytes.TrimSpace(t))
+			}
 			if n := len(stack); n >= 3 && n <= 5 {
 				text = append(text, t...)
 			}
@@ -160,6 +183,13 @@ func parseDefs(data []byte) ([]*rawDef, error) {
 			}
 			if cur != nil && len(stack) > 2 && len(stack) <= 5 {
 				cur.end(stack[2:], strings.TrimSpace(string(text)), &row)
+			}
+			if inGD() {
+				gd.WriteString("</" + t.Name.Local + ">")
+				if len(stack) == 4 {
+					cur.gd = append(cur.gd, gdField{stack[3], gd.String()})
+					gd.Reset()
+				}
 			}
 			if len(stack) == 2 && cur != nil {
 				if cur.defName != "" || cur.name != "" {
@@ -267,9 +297,40 @@ func (s *defSet) resolve(d *rawDef, depth int) *[nFields]string {
 	return d.res
 }
 
+// graphic returns d's graphicData children other than texPath and graphicClass, with its
+// parents' where d has none of that name, as XML. One level is merged: a child element d
+// writes replaces the parent's whole element.
+func (s *defSet) graphic(d *rawDef) string {
+	var out []gdField
+	seen := map[*rawDef]bool{}
+	for n := 0; d != nil && !seen[d] && n < maxParents; n++ {
+		seen[d] = true
+	next:
+		for _, f := range d.gd {
+			for _, o := range out {
+				if o.name == f.name {
+					continue next
+				}
+			}
+			out = append(out, f)
+		}
+		d = s.parentOf(d)
+	}
+	var sb strings.Builder
+	for _, f := range out {
+		sb.WriteString(f.xml)
+	}
+	return sb.String()
+}
+
 // normPath is the form texture paths are compared in: lower case, forward slashes.
 func normPath(p string) string {
 	return strings.ToLower(strings.Trim(strings.ReplaceAll(strings.TrimSpace(p), `\`, "/"), "/"))
+}
+
+// cleanPath is a texture path as its Def writes it, with forward slashes.
+func cleanPath(p string) string {
+	return strings.Trim(strings.ReplaceAll(strings.TrimSpace(p), `\`, "/"), "/")
 }
 
 // folderTag names the kind of folder graphic a graphic class is ("" for a class that
@@ -308,6 +369,7 @@ type defFacts struct {
 	styleUses  map[string][]styleUse // style defName -> categories and thing Defs
 	stylePaths map[string][]string   // style defName -> its paths
 	categories map[string]bool
+	things     map[string]*Thing // thing defName -> its graphic, the Def that loads last
 }
 
 func resolveDefs(scans []*modScan) *defFacts {
@@ -321,10 +383,15 @@ func resolveDefs(scans []*modScan) *defFacts {
 		}
 	}
 	fa := &defFacts{refs: map[string][]DefRef{}, folders: map[string]string{}, worn: map[string]bool{},
-		styleUses: map[string][]styleUse{}, stylePaths: map[string][]string{}, categories: map[string]bool{}}
+		styleUses: map[string][]styleUse{}, stylePaths: map[string][]string{}, categories: map[string]bool{}, things: map[string]*Thing{}}
 	for _, s := range scans {
 		for _, d := range s.defs {
-			fa.add(d, set.resolve(d, 0))
+			r := set.resolve(d, 0)
+			fa.add(d, r)
+			if d.typ == "ThingDef" && d.defName != "" && !d.abstract && (r[fTexPath] != "" || r[fApparelWorn] != "") {
+				fa.things[d.defName] = &Thing{Label: r[fLabel], TexPath: cleanPath(r[fTexPath]), GraphicClass: r[fGraphicClass],
+					Graphic: set.graphic(d), WornPath: cleanPath(r[fApparelWorn]), ModPos: d.pos}
+			}
 		}
 	}
 	return fa

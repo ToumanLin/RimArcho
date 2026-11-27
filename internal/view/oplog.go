@@ -71,13 +71,15 @@ var opWhat = map[string]string{
 	oplog.PlanSync:           "caught a list up with a collection",
 	oplog.LooksChoice:        "chose which Mod's textures the game shows",
 	oplog.LooksBuild:         "rebuilt RimArcho Looks Preference",
+	oplog.LooksStyle:         "added or removed a style of a look",
+	oplog.StylesBuild:        "rebuilt RimArcho Styles Preference",
 }
 
 var opIcon = map[string]string{
 	oplog.Trash: "bin", oplog.Delete: "bin", oplog.SubscriptionRemove: "bin", oplog.Unsubscribe: "workshop", oplog.ModsConfigWrite: "plan", oplog.LinkCreate: "link", oplog.LinkRemove: "unlink",
 	oplog.SaveRename: "saves", oplog.SaveCopy: "saves", oplog.SaveBackup: "saves", oplog.SaveTrash: "bin",
 	oplog.UpdateApply: "rescan", oplog.UpdateRollback: "rescan", oplog.Uninstall: "close", oplog.Launch: "play", oplog.PlanSync: "workshop",
-	oplog.LooksChoice: "plan", oplog.LooksBuild: "link",
+	oplog.LooksChoice: "plan", oplog.LooksBuild: "link", oplog.LooksStyle: "plan", oplog.StylesBuild: "link",
 }
 
 var opResult = map[string]string{

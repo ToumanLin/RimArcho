@@ -97,7 +97,9 @@ type LooksOverview struct {
 	// Scope is where the next choice is stored: "plan" or "all" (LooksScopeKey).
 	Scope     string         `json:"scope"`
 	Generated LooksGenerated `json:"generated"`
-	Warnings  int            `json:"warnings"` // files the index could not read
+	// Styles is the second Preference row: RimArcho Styles Preference (21 §5).
+	Styles   StylesGenerated `json:"styles"`
+	Warnings int             `json:"warnings"` // files the index could not read
 	// GameRunning: a game runs, so an apply or undo keeps the choice and does not rebuild
 	// RimArcho Looks Preference until the next write to the game.
 	GameRunning bool `json:"gameRunning"`
@@ -315,6 +317,9 @@ type LookDetail struct {
 	Targets   []LookTarget   `json:"targets"`
 	// CanUndo: the look has a choice in Scope.
 	CanUndo bool `json:"canUndo,omitempty"`
+	// Add is the add row: what the selected Mod's version can be kept as (a style in a
+	// category, a random variant), and the look's entries (21 §5).
+	Add *LookAdd `json:"add"`
 }
 
 // LooksOutcome is one look of an apply or undo.
@@ -498,6 +503,13 @@ func BuildLooksOverview(a *app.App, ls *app.LooksState) (*LooksOverview, error) 
 	}
 	g.Size = SizeText(g.Bytes)
 	o.Generated = g
+	ss, err := a.StylesStateOf(ls)
+	if err != nil {
+		return nil, err
+	}
+	if o.Styles, err = stylesGenerated(a, ss); err != nil {
+		return nil, err
+	}
 	if run, _ := a.RunningGame(); run != nil {
 		o.GameRunning = true
 	}
@@ -868,6 +880,11 @@ func BuildLookDetail(a *app.App, ls *app.LooksState, id string, selected int, sc
 			d.Choices = append(d.Choices, row)
 		}
 	}
+	ss, err := a.StylesStateOf(ls)
+	if err != nil {
+		return nil, err
+	}
+	d.Add = lookAdd(ss, l.ID, d.Selected)
 	return d, nil
 }
 

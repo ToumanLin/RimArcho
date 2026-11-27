@@ -37,5 +37,7 @@
   "what": "что",
   "why": "почему",
   "window": "окно",
-  "wrote the list to the game": "список записан в игру"
+  "wrote the list to the game": "список записан в игру",
+  "added or removed a style of a look": "добавление или удаление стиля вида",
+  "rebuilt RimArcho Styles Preference": "пересборка RimArcho Styles Preference"
 }

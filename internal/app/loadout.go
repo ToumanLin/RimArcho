@@ -1040,8 +1040,9 @@ func (a *App) sortList(st *LoadoutState, l loadout.List) (*SortResult, error) {
 		l = append(l.Clone(), loadout.Entry{Instance: core})
 	}
 	l, monitorSkipped := a.sortMonitor(st, l)
-	// RimArcho Looks Preference is no part of the order: it stays the last entry (08 §1.1, 21 §4).
-	l, looksEntry := takeLooks(st, l)
+	// The generated Mods are no part of the order: they stay the last entries, RimArcho Looks
+	// Preference last (08 §1.1, 21 §4, §5).
+	l, looksEntry := takeGenerated(st, l)
 	in, err := a.SortInput(st, l)
 	if err != nil {
 		return nil, err
@@ -1140,6 +1141,9 @@ type SaveResult struct {
 	// LooksError: why RimArcho Looks Preference was left out of this write although the list has it: its
 	// rebuild failed (21 §4 "Failure"). The choices and the list entry stay.
 	LooksError string
+	// StylesError is the same for RimArcho Styles Preference (21 §5): its entries and the
+	// list entry stay, and RimArcho Looks Preference is still written.
+	StylesError string
 }
 
 // Save writes the workspace to ModsConfig.xml without starting the game (09 §2 "writegame":
@@ -1200,7 +1204,7 @@ func (a *App) writeGameOnce(st *LoadoutState, dryRun, launch, move bool, creditF
 	if err := a.checkGameWritable(st, dryRun); err != nil {
 		return nil, err
 	}
-	looksErr := a.looksForWrite(st, dryRun)
+	looksErr, stylesErr := a.generatedForWrite(st, dryRun)
 	copies := a.ModsCopies(st.Ix)
 	mods, links, dups, err := planLinks(st, copies)
 	if err != nil {
@@ -1224,7 +1228,7 @@ func (a *App) writeGameOnce(st *LoadoutState, dryRun, launch, move bool, creditF
 	if err != nil {
 		return nil, err
 	}
-	r.LooksError = looksErr
+	r.LooksError, r.StylesError = looksErr, stylesErr
 	settings := a.listSettings(st, nil, filepath.Dir(st.FilePath))
 	if dryRun {
 		r.Settings = planModSettings(settings)

@@ -31,8 +31,9 @@ func init() {
 			scope, dry}})
 	register(&Command{Name: "looks undo", Args: "<look-id>", Summary: "remove a look's choices in one scope; the game shows the load-order result again", MinArgs: 1, MaxArgs: 1, Run: looksUndoCmd,
 		Flags: []Flag{scope, dry}})
-	register(&Command{Name: "looks rebuild", Summary: "rebuild the generated Mod RimArcho Looks Preference from the current plan's choices (also done before every write to the game)", MaxArgs: 0, Run: looksRebuildCmd,
+	register(&Command{Name: "looks rebuild", Summary: "rebuild the generated Mods RimArcho Looks Preference and RimArcho Styles Preference for the current plan (also done before every write to the game)", MaxArgs: 0, Run: looksRebuildCmd,
 		Flags: []Flag{dry}})
+	registerStyles(dry)
 }
 
 func looksState(c *Ctx) (*app.LooksState, error) {
@@ -362,6 +363,19 @@ func looksRebuildCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		looksSummary(root, r.State)
 	}
 	looksResult(root, r)
+	if err != nil {
+		return d, err
+	}
+	// The same pass rebuilds RimArcho Styles Preference (21 §5).
+	sr, err := c.App.StylesRebuild(c.Context, a.Bool("dry-run"))
+	if err != nil && sr == nil {
+		return d, err
+	}
+	if sr.State != nil && (len(sr.State.Entries) > 0 || sr.State.Entry > 0) {
+		sec := root.Section(app.StylesName)
+		stylesSummary(sec, sr.State)
+		stylesResult(sec, sr)
+	}
 	return d, err
 }
 

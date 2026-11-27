@@ -352,5 +352,6 @@
   "hide the file": "파일 숨기기",
   "%d installed, not enabled": "%d개 설치됨, 아직 켜지 않음",
   "ready to catch up: %s": "따라잡을 수 있어요: %s",
-  "no list is open": "열린 목록이 없어요"
+  "no list is open": "열린 목록이 없어요",
+  "RimArcho Looks Preference and RimArcho Styles Preference": "RimArcho Looks Preference 및 RimArcho Styles Preference"
 }

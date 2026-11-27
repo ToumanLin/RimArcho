@@ -381,6 +381,11 @@ func movedCount(before, after loadout.List) int {
 	return len(seq) - len(tails)
 }
 
+// logStyle records a style entry added or removed (13 §1.3); entries apply to all plans.
+func (a *App) logStyle(st *LoadoutState, e *StyleEntryState, detail string) {
+	a.Ops.Add(oplog.Row{Op: oplog.LooksStyle, EnvID: st.Ix.Env.ID, Subject: e.Look, Target: "all plans", Result: oplog.OK, Detail: detail})
+}
+
 // logLooksChoice records an apply or an undo (13 §1.3).
 func (a *App) logLooksChoice(st *LoadoutState, r *LooksResult, detail string) {
 	target := "plan:" + st.Plan.Name

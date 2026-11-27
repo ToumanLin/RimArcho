@@ -97,6 +97,12 @@ func group(idx *Index, scans []*modScan, fa *defFacts) {
 		idx.Categories = append(idx.Categories, c)
 	}
 	sort.Strings(idx.Categories)
+	idx.Things = map[string]*Thing{}
+	for name, th := range fa.things {
+		if lookOf[normPath(th.TexPath)] != "" || lookOf[normPath(th.WornPath)] != "" {
+			idx.Things[name] = th
+		}
+	}
 	styleIndex(idx, fa, lookOf)
 }
 

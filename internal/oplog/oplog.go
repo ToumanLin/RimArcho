@@ -33,13 +33,15 @@ const (
 	UpdateRollback     = "update.rollback"
 	Uninstall          = "uninstall"
 	Launch             = "launch"
-	PlanSync           = "plan.sync"    // a plan caught up with a followed collection
-	LooksChoice        = "looks.choice" // a look was applied from a Mod, or that choice undone (21 §3.3)
-	LooksBuild         = "looks.build"  // the generated Mod RimArcho Looks Preference was rebuilt (21 §4)
+	PlanSync           = "plan.sync"        // a plan caught up with a followed collection
+	LooksChoice        = "looks.choice"     // a look was applied from a Mod, or that choice undone (21 §3.3)
+	LooksBuild         = "looks.build"      // the generated Mod RimArcho Looks Preference was rebuilt (21 §4)
+	LooksStyle         = "looks.style"      // a style or random variant entry was added or removed (21 §5)
+	StylesBuild        = "looks.stylebuild" // the generated Mod RimArcho Styles Preference was rebuilt (21 §5)
 )
 
 // Codes lists every op code, in the order the filters show them.
-var Codes = []string{Launch, ModsConfigWrite, LinkCreate, LinkRemove, Trash, Delete, Unsubscribe, SubscriptionRemove, SaveRename, SaveCopy, SaveBackup, SaveTrash, UpdateApply, UpdateRollback, Uninstall, PlanSync, LooksChoice, LooksBuild}
+var Codes = []string{Launch, ModsConfigWrite, LinkCreate, LinkRemove, Trash, Delete, Unsubscribe, SubscriptionRemove, SaveRename, SaveCopy, SaveBackup, SaveTrash, UpdateApply, UpdateRollback, Uninstall, PlanSync, LooksChoice, LooksBuild, LooksStyle, StylesBuild}
 
 // Permanent begins the detail of a subscription.remove whose folder was deleted for good
 // (quick delete) instead of moved to the recycle bin.

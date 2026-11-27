@@ -37,5 +37,7 @@
   "what": "内容",
   "why": "理由",
   "window": "ウィンドウ",
-  "wrote the list to the game": "リストをゲームに書き込み"
+  "wrote the list to the game": "リストをゲームに書き込み",
+  "added or removed a style of a look": "見た目のスタイルを追加または削除",
+  "rebuilt RimArcho Styles Preference": "RimArcho Styles Preference を再構築"
 }

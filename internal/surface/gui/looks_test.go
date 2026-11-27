@@ -387,3 +387,59 @@ func TestLookTexRoute(t *testing.T) {
 		t.Fatal("a refused request wrote into the cache")
 	}
 }
+
+// 21 §6: the add row's calls. The confirmation's dry run writes nothing; an add and a
+// remove report the card of RimArcho Styles Preference and keep the index in memory.
+func TestLookStyleCalls(t *testing.T) {
+	e, api := looksFixture(t)
+	e.WriteMod(filepath.Join(e.Game, "Mods", "S"), testkit.Mod{PackageID: "looks.s", Name: "Styles", Files: map[string]string{
+		"Defs/Styles.xml": `<Defs><StyleCategoryDef><defName>Rustic</defName></StyleCategoryDef>
+<ThingDef><defName>Gun</defName><graphicData><texPath>Things/Item/Gun</texPath><graphicClass>Graphic_Multi</graphicClass></graphicData></ThingDef></Defs>`,
+	}})
+	e.MustRun("scan")
+	e.MustRun("enable", "pkg:looks.s")
+	o, err := api.LooksOverview()
+	if err != nil || o.Styles.Name != "RimArcho Styles Preference" || o.Styles.Active != 0 || o.Styles.Confirmed {
+		t.Fatalf("overview %+v %v", o, err)
+	}
+	d, err := api.LookDetail("things/item/gun", 1, "plan")
+	if err != nil || d.Add == nil || len(d.Add.Styles) != 1 || !d.Add.Styles[0].OK {
+		t.Fatalf("detail %+v %v", d, err)
+	}
+	idx, _ := api.looks.current()
+	ref := o.Mods[0].Ref
+	dry, err := api.LookStyleAddPreview("things/item/gun", ref, "style", "Rustic", false)
+	if err != nil || !dry.DryRun || !dry.Added || dry.Files != 2 || dry.DefFiles != 2 || !dry.DirChosen {
+		t.Fatalf("dry run %+v %v", dry, err)
+	}
+	if rows, _ := e.App.Store.LookStyles(); len(rows) != 0 {
+		t.Fatal("the dry run wrote")
+	}
+	if _, err := api.LookStyleAdd("things/item/gun", ref, "variant", "default", false); err == nil || !strings.Contains(err.Error(), "1.7") {
+		t.Fatalf("a refused add: %v", err)
+	}
+	done, err := api.LookStyleAdd("things/item/gun", ref, "style", "Rustic", true)
+	if err != nil || !done.Added || done.Entry == nil || done.Overview.Styles.Active != 1 || done.Overview.Styles.Files != 2 {
+		t.Fatalf("add %+v %v", done, err)
+	}
+	if again, _ := api.looks.current(); again != idx {
+		t.Fatal("an add built the index again")
+	}
+	d, err = api.LookDetail("things/item/gun", 1, "plan")
+	if err != nil || len(d.Add.Entries) != 1 || d.Add.Entries[0].State != "active" {
+		t.Fatalf("detail after the add %+v %v", d, err)
+	}
+	if err := api.SetSetting(view.StylesConfirmedKey, "1"); err != nil {
+		t.Fatal(err)
+	}
+	if o, _ := api.LooksOverview(); !o.Styles.Confirmed || o.Confirmed {
+		t.Fatalf("the styles confirmation is its own setting: %+v", o.Styles)
+	}
+	rm, err := api.LookStyleRemove(int(done.Entry.ID))
+	if err != nil || !rm.Removed || rm.Overview.Styles.Active != 0 || rm.Overview.Styles.Files != 0 {
+		t.Fatalf("remove %+v %v", rm, err)
+	}
+	if _, err := api.LookStyleRemove(int(done.Entry.ID)); err == nil {
+		t.Fatal("removing it twice succeeded")
+	}
+}

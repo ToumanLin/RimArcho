@@ -113,7 +113,11 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     looks show <look-id>                      one look: its Defs, its slots with every Mod's texture in load order, what the game shows, and the choices
     looks apply <look-id>                     show a look, or some of its slots, from a Mod of the plan: writes the choice and rebuilds the generated Mod RimArcho Looks Preference; the load order stays
     looks undo <look-id>                      remove a look's choices in one scope; the game shows the load-order result again
-    looks rebuild                             rebuild the generated Mod RimArcho Looks Preference from the current plan's choices (also done before every write to the game)
+    looks rebuild                             rebuild the generated Mods RimArcho Looks Preference and RimArcho Styles Preference for the current plan (also done before every write to the game)
+    looks style list                          the style and random variant entries with their state in the current plan (active, skipped, broken, asleep)
+    looks style choices <look-id>             what can be added for a look from a Mod: the style categories and the random variant targets, or why not
+    looks style add <look-id>                 keep a Mod's version of a look as a new style in a style category, or as a random variant of the default look or of a style; for all plans
+    looks style remove <entry>                remove one style or random variant entry (its number in looks style list)
     mod-settings set <ref> [<name>=<value>…]  change a Mod's simple settings values (on/off, numbers, one line of text, a HugsLib choice) with the game closed; backs the file up first
     mod-settings files                        every file in the Game Config's Config folder: read by this list, an installed Mod's not in it, an orphan (no installed Mod), or the game's own
     mod-settings recycle [<file>…]            move Mod options files (Mod_*.xml in the Config folder) to the recycle bin, with the game closed

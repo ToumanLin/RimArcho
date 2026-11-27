@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,8 +13,6 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/content"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/fsscan"
-	"github.com/ToumanLin/RimArcho/internal/identity"
-	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/looks"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
@@ -53,10 +50,12 @@ const (
 	LookBroken    = "broken"
 )
 
-// IsLooks reports whether m is the generated Mod RimArcho Looks Preference.
-func IsLooks(m *store.Mod) bool {
-	return m != nil && m.Kind == source.Extra && strings.EqualFold(m.PackageID, LooksPackage)
-}
+// IsLooks reports whether m is the generated Mod RimArcho Looks Preference. What holds for
+// both generated Mods asks IsGenerated (generated.go).
+func IsLooks(m *store.Mod) bool { return genOf(m) == looksGen }
+
+// IsStyles reports whether m is the generated Mod RimArcho Styles Preference.
+func IsStyles(m *store.Mod) bool { return genOf(m) == stylesGen }
 
 // LooksDir is the looks directory (21 §4 "Where"): the folder of the registered looks
 // source, else config looks.dir; "" until the first apply chooses one.
@@ -93,8 +92,8 @@ func volumeRoot(path string) string {
 	return filepath.VolumeName(path) + string(filepath.Separator)
 }
 
-// looksModDir is the generated Mod's folder in the looks directory dir.
-func looksModDir(dir string) string { return filepath.Join(dir, looksFolder) }
+// looksModDir is the folder of RimArcho Looks Preference in the looks directory dir.
+func looksModDir(dir string) string { return looksGen.dir(dir) }
 
 // looksDirReady checks a looks directory like the Monitor folder (19 §6): it must not
 // contain or be contained by the data directory or another source root.
@@ -139,50 +138,8 @@ func (a *App) ensureLooksDir(gameRoot string) (dir string, chosen bool, err erro
 	return dir, true, a.Store.SetMeta("cfg:looks.dir", dir)
 }
 
-// looksInstance is the environment's usable RimArcho Looks Preference instance (nil before the first apply).
-func looksInstance(ix *Index) *store.Mod {
-	for _, m := range ix.Mods {
-		if IsLooks(m) && m.Status == identity.Live && !m.Residue && m.Unloadable == "" {
-			return m
-		}
-	}
-	return nil
-}
-
-// ensureLooksMod makes the generated Mod exist and known: the looks directory, the Mod's
-// folder with its About.xml, the shared source src:looks, and a scan of that source alone
-// when it has no Instance yet (as Archo Monitor's folder is read, 19 §6).
-func (a *App) ensureLooksMod(gameRoot string) (m *store.Mod, dir string, chosen bool, err error) {
-	if dir, chosen, err = a.ensureLooksDir(gameRoot); err != nil {
-		return nil, "", false, err
-	}
-	if err := looksSkeleton(looksModDir(dir)); err != nil {
-		return nil, dir, chosen, err
-	}
-	src, err := a.sharedSource(LooksLabel, dir)
-	if err != nil {
-		return nil, dir, chosen, err
-	}
-	ix, err := a.Index()
-	if err != nil {
-		return nil, dir, chosen, err
-	}
-	if m = looksInstance(ix); m == nil {
-		if _, err := a.ScanWith(ScanOptions{Sources: []string{src.ID}}); err != nil {
-			return nil, dir, chosen, err
-		}
-		if ix, err = a.Index(); err != nil {
-			return nil, dir, chosen, err
-		}
-		if m = looksInstance(ix); m == nil {
-			return nil, dir, chosen, fmt.Errorf("the scan did not find %s in %s", LooksName, dir)
-		}
-	}
-	return m, dir, chosen, nil
-}
-
 // LooksIndex builds the looks index of the plan in st (21 §2): its entries in load order
-// with their effective load folders. The generated Mod itself is no provider. With
+// with their effective load folders. The generated Mods themselves are no providers. With
 // LooksCache set and no progress wanted, an index already built for the same key is reused.
 func (a *App) LooksIndex(ctx context.Context, st *LoadoutState, progress func(done, total int)) (*looks.Index, error) {
 	job, err := a.LooksIndexJob(st)
@@ -212,14 +169,14 @@ func (a *App) LooksIndexJob(st *LoadoutState) (func(ctx context.Context, progres
 }
 
 // LooksKey names what the looks index of st's plan is built from (21 §2.5): the game
-// version and every entry's position, Instance and snapshot. The RimArcho Looks Preference entry is no
-// provider and is left out, so adding it last keeps the key. An interface keeps the index
+// version and every entry's position, Instance and snapshot. The generated Mods' entries
+// are no providers and are left out, so adding them last keeps the key. An interface keeps the index
 // in memory under this key and drops it when the key changes.
 func (a *App) LooksKey(st *LoadoutState) string {
 	h := sha1.New()
 	fmt.Fprintf(h, "%s|%s", st.Ix.Env.ID, st.GameMM())
 	for i, e := range st.List {
-		if m := st.Ix.ByID[e.Instance]; m != nil && !IsLooks(m) && m.TombstoneAt.IsZero() {
+		if m := st.Ix.ByID[e.Instance]; m != nil && !IsGenerated(m) && m.TombstoneAt.IsZero() {
 			fmt.Fprintf(h, "|%d:%s:%d", i, m.ID, m.SnapID)
 		}
 	}
@@ -242,7 +199,7 @@ func (a *App) looksMods(st *LoadoutState) ([]looks.Mod, error) {
 	var out []looks.Mod
 	for i, e := range st.List {
 		m := st.Ix.ByID[e.Instance]
-		if m == nil || IsLooks(m) || !m.TombstoneAt.IsZero() {
+		if m == nil || IsGenerated(m) || !m.TombstoneAt.IsZero() {
 			continue
 		}
 		dir := modDir(st.Ix, m)
@@ -284,8 +241,8 @@ type LooksState struct {
 	Mods  map[int]*store.Mod    // the plan's Mods by position (looks.Provider.Pos)
 	Looks map[string]*LookState // the looks that have a choice, by id
 	// Entry is the 1-based position of RimArcho Looks Preference in the plan; 0: not in it, so applied
-	// choices do not reach the game.
-	Entry int
+	// choices do not reach the game. StylesEntry is the same for RimArcho Styles Preference.
+	Entry, StylesEntry int
 	// Counts of choices by state (overruled ones are not counted).
 	Applied, NotNeeded, Asleep, Broken int
 }
@@ -327,6 +284,8 @@ func looksState(st *LoadoutState, idx *looks.Index, rows []store.LookChoice) *Lo
 		case m == nil:
 		case IsLooks(m):
 			ls.Entry = i + 1
+		case IsStyles(m):
+			ls.StylesEntry = i + 1
 		default:
 			ls.Mods[i] = m
 			if _, ok := byLineage[m.LineageID]; !ok {
@@ -483,17 +442,6 @@ func slotState(l *looks.Look, pos int, slot string, wins, base map[string]looks.
 	return LookNotNeeded
 }
 
-// takeLooks takes the RimArcho Looks Preference entry out of l: a sort orders the rest and puts it back last.
-func takeLooks(st *LoadoutState, l loadout.List) (rest, entry loadout.List) {
-	for i, e := range l {
-		if IsLooks(st.Ix.ByID[e.Instance]) {
-			rest = append(l[:i:i].Clone(), l[i+1:]...)
-			return rest, loadout.List{e}
-		}
-	}
-	return l, nil
-}
-
 // LooksResult is what an apply, an undo or a rebuild did, or with DryRun would do.
 type LooksResult struct {
 	DryRun  bool
@@ -636,7 +584,7 @@ func (a *App) LooksApply(ctx context.Context, lookID, modRef string, slots []str
 	if dryRun {
 		return a.looksPreview(r, ls, withRowsOf(a, st, set, sc, r.Look, whole))
 	}
-	if _, r.Dir, r.DirChosen, err = a.ensureLooksMod(st.Ix.Env.GameRoot); err != nil {
+	if _, r.Dir, r.DirChosen, err = a.ensureGenMod(looksGen, st.Ix.Env.GameRoot); err != nil {
 		return nil, err
 	}
 	if err := a.Store.SetLookChoices(set, whole); err != nil {
@@ -680,25 +628,7 @@ func (a *App) looksPreview(r *LooksResult, ls *LooksState, rows []store.LookChoi
 
 // looksLast makes RimArcho Looks Preference the current plan's last entry as one undoable edit; added
 // reports a change.
-func (a *App) looksLast() (added bool, err error) {
-	r, err := a.edit(LooksAddOp, func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
-		m := looksInstance(st.Ix)
-		if m == nil {
-			return nil, nil, errors.New(LooksName + " is not installed")
-		}
-		out := make(loadout.List, 0, len(l)+1)
-		for _, e := range l {
-			if !IsLooks(st.Ix.ByID[e.Instance]) {
-				out = append(out, e)
-			}
-		}
-		return append(out, loadout.Entry{Instance: m.ID}), nil, nil
-	})
-	if err != nil {
-		return false, err
-	}
-	return len(r.Changes) > 0, nil
-}
+func (a *App) looksLast() (added bool, err error) { return a.genLast(looksGen) }
 
 // looksAfter rebuilds the generated Mod for the current plan after an apply or an undo and
 // fills the result's state. A rebuild that fails leaves the choices as they are.
@@ -781,7 +711,7 @@ func (a *App) LooksRebuild(ctx context.Context, dryRun bool) (*LooksResult, erro
 		return r, nil
 	}
 	if ls.Applied > 0 {
-		if _, r.Dir, r.DirChosen, err = a.ensureLooksMod(st.Ix.Env.GameRoot); err != nil {
+		if _, r.Dir, r.DirChosen, err = a.ensureGenMod(looksGen, st.Ix.Env.GameRoot); err != nil {
 			return nil, err
 		}
 		if r.Added, err = a.looksLast(); err != nil {

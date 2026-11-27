@@ -419,3 +419,86 @@ func TestLooksApplyManyIsOneUndoStep(t *testing.T) {
 		t.Fatalf("rebuild %+v %v", r, err)
 	}
 }
+
+// 21 §5, §6: the add row of a look (what the selected Mod's version can be kept as, or
+// why not), its entries, and the RimArcho Styles Preference card.
+func TestLookAddRowAndStylesCard(t *testing.T) {
+	e := looksHome(t)
+	e.WriteMod(filepath.Join(e.Game, "Mods", "D"), testkit.Mod{PackageID: "looks.d", Name: "Delta", Files: map[string]string{
+		"Defs/Styles.xml": `<Defs><StyleCategoryDef><defName>Rustic</defName></StyleCategoryDef>
+<ThingDef><defName>Hat</defName><graphicData><texPath>Things/Item/Hat</texPath><graphicClass>Graphic_Single</graphicClass></graphicData></ThingDef></Defs>`,
+	}})
+	e.MustRun("scan")
+	e.MustRun("enable", "pkg:looks.d")
+	ctx := context.Background()
+	detail := func(id string, mod int) *view.LookAdd {
+		t.Helper()
+		d, err := view.BuildLookDetail(e.App, looksState(t, e), id, mod, "plan")
+		if err != nil || d.Add == nil {
+			t.Fatalf("detail %s: %+v %v", id, d, err)
+		}
+		return d.Add
+	}
+	if a := detail(looksHat, -1); a.StylesNone == "" || a.VariantsNone != a.StylesNone || len(a.Styles) != 0 || a.RandomLabel == "" {
+		t.Fatalf("no Mod selected: %+v", a)
+	}
+	a := detail(looksHat, 1)
+	if len(a.Styles) != 1 || !a.Styles[0].OK || a.Styles[0].Target != "Rustic" || a.Styles[0].Label != "style in Rustic" || a.Styles[0].Note == "" || a.Styles[0].Shared || a.StylesNone != "" {
+		t.Fatalf("styles: %+v", a)
+	}
+	// Alpha's and Charlie's hat are the same file: the game already shows it.
+	if len(a.Variants) != 1 || a.Variants[0].OK || a.Variants[0].Code != app.StyleWhyShown || a.VariantsNone != "the game already shows that Mod's version" {
+		t.Fatalf("variants: %+v", a)
+	}
+	if a := detail(looksIcon, 1); a.StylesNone != "no thing Def in the list uses this look as its graphic" || a.VariantsNone != a.StylesNone {
+		t.Fatalf("a look no Def uses: %+v", a)
+	}
+	if a := detail(looksGun, 1); a.Variants[0].Code != app.StyleWhyFacings || !a.Styles[0].OK {
+		t.Fatalf("the gun on 1.6: %+v", a)
+	}
+	if a := detail(looksShirt, 1); a.Variants[0].Code != app.StyleWhyKind || !a.Styles[0].OK {
+		t.Fatalf("a worn look: %+v", a)
+	}
+	if a := detail(looksRocks, 1); a.Variants[0].Code != app.StyleWhyKind || !a.Styles[0].OK {
+		t.Fatalf("a folder look: %+v", a)
+	}
+
+	dry, err := view.LookStyleAdd(ctx, e.App, looksHat, "pkg:looks.a", app.StyleKindStyle, "Rustic", true, true)
+	if err != nil || !dry.DryRun || !dry.Added || dry.Files != 1 || dry.DefFiles != 2 || dry.Linked != 1 || !dry.DirChosen || dry.Overview != nil || dry.Entry.State != app.StyleActive {
+		t.Fatalf("dry run: %+v %v", dry, err)
+	}
+	if rows, _ := e.App.Store.LookStyles(); len(rows) != 0 {
+		t.Fatal("the dry run wrote")
+	}
+	done, err := view.LookStyleAdd(ctx, e.App, looksHat, "pkg:looks.a", app.StyleKindStyle, "Rustic", true, false)
+	if err != nil || done.Text != "style in Rustic added for all lists" || !done.Added || done.Note == "" || done.Entry.ID == 0 || !done.Entry.Random || done.Entry.Mod != "Alpha" {
+		t.Fatalf("add: %+v %v", done, err)
+	}
+	g := done.Overview.Styles
+	if g.Name != "RimArcho Styles Preference" || g.Active != 1 || g.Skipped+g.Broken+g.Asleep != 0 || g.Files != 1 || g.Linked != 1 || g.Bytes == 0 || g.Dir == "" || g.DirChosen || g.Entry != 6 || g.Confirmed {
+		t.Fatalf("the card: %+v", g)
+	}
+	for _, m := range done.Overview.Mods {
+		if m.Name == app.StylesName {
+			t.Fatal("RimArcho Styles Preference is listed as a Mod with looks")
+		}
+	}
+	a = detail(looksHat, 1)
+	if len(a.Entries) != 1 || a.Entries[0].State != app.StyleActive || a.Entries[0].ID != done.Entry.ID || a.Styles[0].OK || a.Styles[0].Code != app.StyleWhyExists || a.StylesNone != "" {
+		t.Fatalf("after the add: %+v", a)
+	}
+	if b, _ := json.Marshal(a); !strings.Contains(string(b), `"styles":[{"kind":"style","target":"Rustic"`) || !strings.Contains(string(b), `"entries":[{"id":1,`) {
+		t.Fatalf("JSON: %s", b)
+	}
+	if _, err := view.LookStyleAdd(ctx, e.App, looksHat, "pkg:looks.a", app.StyleKindVariant, "default", false, false); err == nil || err.Error() != "the game already shows that Mod's version" {
+		t.Fatalf("a refused add: %v", err)
+	}
+	e.MustRun("disable", "pkg:looks.a")
+	if a := detail(looksHat, -1); a.Entries[0].State != app.StyleAsleep || a.Entries[0].Why == "" || a.Entries[0].Mod != "Alpha" {
+		t.Fatalf("asleep: %+v", a.Entries)
+	}
+	rm, err := view.LookStyleRemove(ctx, e.App, done.Entry.ID, false)
+	if err != nil || !rm.Removed || rm.Text != "style in Rustic removed" || rm.Overview.Styles.Asleep != 0 || rm.Overview.Styles.Files != 0 {
+		t.Fatalf("remove: %+v %v", rm, err)
+	}
+}

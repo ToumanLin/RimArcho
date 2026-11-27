@@ -28,8 +28,8 @@ func DeployName(m *store.Mod) string {
 	if m.Kind == source.Elsewhere { // another game's Mods/ (07 §1.7), named as on switching games
 		return envLinkPrefix + m.ID
 	}
-	if IsLooks(m) { // the generated Mod has one fixed name (21 §4)
-		return LooksLink
+	if g := genOf(m); g != nil { // a generated Mod has one fixed name (21 §4, §5)
+		return g.Link
 	}
 	r := strings.NewReplacer("/", "_", `\`, "_", ":", "_")
 	return DeployPrefix + r.Replace(m.SourceLabel) + "_" + r.Replace(m.Rel)

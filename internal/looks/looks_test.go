@@ -498,3 +498,29 @@ func TestCancel(t *testing.T) {
 		t.Errorf("cancelled after two Mods: index %v, err %v, %d progress calls", idx != nil, err, calls)
 	}
 }
+
+// 21 §2.3: Index.Things keeps, for a concrete ThingDef whose graphic or worn path leads to
+// a look, the path as written, the graphic class and the other children of graphicData as
+// XML, with what the Def inherits; a thing whose textures no Mod ships is not kept.
+func TestThingGraphics(t *testing.T) {
+	a := newMod(t, t.TempDir(), "A")
+	a.tex(1, "Things/Item/Hat.png", "Things/Worn/Cap/Cap_Male_south.png")
+	a.defs("Things.xml", `
+<ThingDef Name="Base" Abstract="True"><graphicData><graphicClass>Graphic_Single</graphicClass><drawSize>(2,2)</drawSize><shadowData><volume>(0.3, 0.5, 0.3)</volume></shadowData></graphicData></ThingDef>
+<ThingDef ParentName="Base"><defName>Hat</defName><label>hat</label><graphicData><texPath>Things\Item\Hat</texPath><drawSize>3</drawSize><color>(1,2,3)</color></graphicData></ThingDef>
+<ThingDef ParentName="Base"><defName>Cap</defName><graphicData><texPath>Things/Item/CapItem</texPath></graphicData><apparel><wornGraphicPath>Things/Worn/Cap/Cap</wornGraphicPath></apparel></ThingDef>
+<ThingDef ParentName="Base"><defName>Official</defName><graphicData><texPath>Things/Item/InABundle</texPath></graphicData></ThingDef>`)
+	idx := build(t, plan(a), Options{})
+	hat := idx.Things["Hat"]
+	if hat == nil || hat.TexPath != "Things/Item/Hat" || hat.GraphicClass != "Graphic_Single" || hat.Label != "hat" || hat.ModPos != 0 ||
+		hat.Graphic != "<drawSize>3</drawSize><color>(1,2,3)</color><shadowData><volume>(0.3, 0.5, 0.3)</volume></shadowData>" {
+		t.Fatalf("Hat = %+v", hat)
+	}
+	cap := idx.Things["Cap"]
+	if cap == nil || cap.TexPath != "Things/Item/CapItem" || cap.WornPath != "Things/Worn/Cap/Cap" || cap.Graphic != "<drawSize>(2,2)</drawSize><shadowData><volume>(0.3, 0.5, 0.3)</volume></shadowData>" {
+		t.Fatalf("Cap = %+v", cap)
+	}
+	if len(idx.Things) != 2 {
+		t.Fatalf("things: %v", idx.Things)
+	}
+}

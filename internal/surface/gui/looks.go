@@ -320,6 +320,56 @@ func (s *API) LooksRebuild() (*view.LooksDone, error) {
 	return s.looksWrite(false, func() (*view.LooksDone, error) { return view.LooksRebuild(s.branchCtx, s.a, false) })
 }
 
+// styleWrite runs a style add or remove under the page lock, like looksWrite: the plan may
+// have gained its RimArcho Styles Preference entry, so the board is dropped.
+func (s *API) styleWrite(dryRun bool, fn func() (*view.LookStyleDone, error)) (*view.LookStyleDone, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	d, err := fn()
+	if !dryRun {
+		s.board = nil
+		s.looks.mu.Lock()
+		s.looks.ls, s.looks.lsAt = nil, ""
+		s.looks.mu.Unlock()
+	}
+	if err != nil {
+		return nil, errors.New(view.Humanize(s.boardState(), err.Error()))
+	}
+	if d.Added && !dryRun {
+		s.listEdits++
+		s.needsAsked = false
+	}
+	return d, nil
+}
+
+// LookStyleAdd keeps the Mod modRef's version of a look for all plans (21 §5): kind
+// "style" adds it as a new style in the style category target (random: new items may also
+// receive it at random); kind "variant" adds it as a random variant of target, "default"
+// or a style Def. The choices LookDetail carries (add.styles, add.variants) name what can
+// be added.
+func (s *API) LookStyleAdd(lookID, modRef, kind, target string, random bool) (*view.LookStyleDone, error) {
+	return s.styleWrite(false, func() (*view.LookStyleDone, error) {
+		return view.LookStyleAdd(s.branchCtx, s.a, lookID, modRef, kind, target, random, false)
+	})
+}
+
+// LookStyleAddPreview is what LookStyleAdd would write, for the first add's confirmation
+// (ui.gui.styles.confirmed): the folder, the textures as links or copies, the Def files,
+// and whether the plan gains RimArcho Styles Preference. It writes nothing.
+func (s *API) LookStyleAddPreview(lookID, modRef, kind, target string, random bool) (*view.LookStyleDone, error) {
+	return s.styleWrite(true, func() (*view.LookStyleDone, error) {
+		return view.LookStyleAdd(s.branchCtx, s.a, lookID, modRef, kind, target, random, true)
+	})
+}
+
+// LookStyleRemove deletes one style or random variant entry (its id in LookDetail's
+// add.entries); the generated Mod is rebuilt without it.
+func (s *API) LookStyleRemove(id int) (*view.LookStyleDone, error) {
+	return s.styleWrite(false, func() (*view.LookStyleDone, error) {
+		return view.LookStyleRemove(s.branchCtx, s.a, int64(id), false)
+	})
+}
+
 // lookFile finds a texture file through the index in memory: look, provider position and
 // slot are keys of its maps, and nothing of them is ever part of a path.
 func (s *API) lookFile(lookID string, pos int, slot string) (*looks.File, string) {

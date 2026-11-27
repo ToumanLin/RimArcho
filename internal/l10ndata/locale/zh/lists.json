@@ -352,5 +352,6 @@
   "hide the file": "收起文件内容",
   "%d installed, not enabled": "%d 个已装好、还没启用",
   "ready to catch up: %s": "可以跟上了：%s",
-  "no list is open": "没有打开的列表"
+  "no list is open": "没有打开的列表",
+  "RimArcho Looks Preference and RimArcho Styles Preference": "RimArcho Looks Preference 和 RimArcho Styles Preference"
 }

@@ -98,7 +98,7 @@ func (a *App) LooksApplyMany(ctx context.Context, ids []string, modRef, scope st
 		out.mixed()
 		return out, nil
 	}
-	if _, r.Dir, r.DirChosen, err = a.ensureLooksMod(st.Ix.Env.GameRoot); err != nil {
+	if _, r.Dir, r.DirChosen, err = a.ensureGenMod(looksGen, st.Ix.Env.GameRoot); err != nil {
 		return nil, err
 	}
 	if err := a.Store.SetLookChoices(out.Set, true); err != nil {

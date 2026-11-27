@@ -48,7 +48,9 @@ type Index struct {
 	ByID       map[string]*Look
 	Styles     map[string][]StyleRef // thing defName -> styles
 	Categories []string              // all StyleCategoryDef defNames, sorted
-	Warnings   []string              // files that could not be read; never fatal
+	// Things: the thing Defs whose graphic or worn path leads to a look, by defName (21 §5).
+	Things   map[string]*Thing
+	Warnings []string // files that could not be read; never fatal
 }
 
 // Look is the textures that together draw one thing.
@@ -97,6 +99,16 @@ type DefRef struct {
 type LookStyle struct {
 	StyleDef              string
 	Categories, ThingDefs []string
+}
+
+// Thing is a concrete ThingDef's graphic as its Def, with its parents, writes it.
+type Thing struct {
+	Label        string
+	TexPath      string // graphicData/texPath
+	GraphicClass string
+	Graphic      string // the other children of graphicData, as XML
+	WornPath     string // apparel/wornGraphicPath
+	ModPos       int    // the Mod that defines the Def
 }
 
 // StyleRef is one style of a thing Def.

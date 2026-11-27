@@ -352,5 +352,6 @@
   "hide the file": "скрыть файл",
   "%d installed, not enabled": "%d установлено, ещё не включено",
   "ready to catch up: %s": "можно догнать: %s",
-  "no list is open": "нет открытого списка"
+  "no list is open": "нет открытого списка",
+  "RimArcho Looks Preference and RimArcho Styles Preference": "RimArcho Looks Preference и RimArcho Styles Preference"
 }

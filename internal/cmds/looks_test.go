@@ -123,3 +123,44 @@ func TestLooksCommands(t *testing.T) {
 	wantAll(t, e.MustRun("looks", "undo", "things/item/gun", "--scope", "all"), "removed 1 choice", "(all plans)")
 	wantAll(t, e.MustRun("looks", "--filter", "chosen"), "0 looks")
 }
+
+// 13 §4.2 `looks style`: choices, add with its dry run, list, remove, and the shared
+// rebuild (21 §5).
+func TestLooksStyleCommands(t *testing.T) {
+	t.Parallel()
+	e := looksFixture(t)
+	e.WriteMod(filepath.Join(e.Game, "Mods", "S"), testkit.Mod{PackageID: "looks.s", Name: "S", Files: map[string]string{
+		"Defs/Styles.xml": `<Defs><StyleCategoryDef><defName>Rustic</defName></StyleCategoryDef></Defs>`,
+	}})
+	e.MustRun("scan")
+	e.MustRun("enable", "pkg:looks.s")
+	wantAll(t, e.MustRun("looks", "style", "list"), "RimArcho Styles Preference: 0 entries (all plans)")
+	wantAll(t, e.MustRun("looks", "style", "choices", "things/item/gun", "--from", "pkg:looks.a"),
+		"style in Rustic  (A_Gun)", "random variant of the default look  no: a look with facings needs game 1.7 for a random variant (the plan's game is 1.6)")
+	if out, code := e.Run("looks", "style", "add", "things/item/gun", "--from", "pkg:looks.a"); code != 2 {
+		t.Fatalf("add without a kind: %d\n%s", code, out)
+	}
+	if out, code := e.Run("looks", "style", "add", "things/item/gun", "--from", "pkg:looks.a", "--variant", "default"); code == 0 || !strings.Contains(out, "needs game 1.7") {
+		t.Fatalf("a refused add: %d\n%s", code, out)
+	}
+	dry := e.MustRun("looks", "style", "add", "things/item/gun", "--from", "pkg:looks.a", "--category", "Rustic", "--random", "--dry-run")
+	wantAll(t, dry, "would add look things/item/gun as style in Rustic (also at random) (all plans)", "things: A_Gun",
+		"would put RimArcho Styles Preference at the end of plan:", "(would be chosen: looks.dir)", "would write 2 textures and 2 Def files in ", "2 hard links, 0 copies",
+		"Defs/RimArchoStyles.xml  generated", "Textures/RimArchoStyles/Style/0/Gun_south.png  hard link to ")
+	wantAll(t, e.MustRun("looks", "style", "list"), "0 entries")
+	if out := e.MustRun("list", "--active"); strings.Contains(out, "RimArcho Styles Preference") {
+		t.Fatalf("the dry run changed the plan:\n%s", out)
+	}
+	wantAll(t, e.MustRun("looks", "style", "add", "things/item/gun", "--from", "pkg:looks.a", "--category", "Rustic", "--random"),
+		"added look things/item/gun as style in Rustic (also at random) (all plans)", "entry: 1", "put RimArcho Styles Preference at the end of plan:", "wrote 2 textures and 2 Def files in ")
+	wantAll(t, e.MustRun("looks", "style", "list"), "1 entry (all plans)", "entries: 1 active, 0 skipped, 0 broken, 0 asleep", "1  things/item/gun  style in Rustic (also at random) from ", " A  active  (A_Gun)")
+	wantAll(t, e.MustRun("looks", "style", "choices", "things/item/gun", "--from", "pkg:looks.a"), "style in Rustic  no: this entry already exists")
+	wantAll(t, e.MustRun("looks", "rebuild"), "RimArcho Styles Preference:", "2 textures and 2 Def files", "unchanged: nothing written")
+	wantAll(t, e.MustRun("ops", "--op", "looks"), "looks.style", "looks.stylebuild", "add: style in Rustic, also at random from A")
+	if out, code := e.Run("looks", "style", "remove", "x"); code != 2 {
+		t.Fatalf("remove x: %d\n%s", code, out)
+	}
+	wantAll(t, e.MustRun("looks", "style", "remove", "1", "--dry-run"), "would remove entry 1: look things/item/gun as style in Rustic")
+	wantAll(t, e.MustRun("looks", "style", "remove", "1"), "removed entry 1", "wrote 0 textures and 0 Def files")
+	wantAll(t, e.MustRun("looks", "style", "list"), "0 entries")
+}

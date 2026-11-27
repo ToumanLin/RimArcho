@@ -3,6 +3,7 @@ package store
 import (
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -116,7 +117,7 @@ func TestUpgradeLooksAndPlanDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	if got := s.Meta("schema_version"); got != "46" {
+	if got := s.Meta("schema_version"); got != strconv.Itoa(SchemaVersion) {
 		t.Fatalf("schema = %s", got)
 	}
 	a, err := s.CreatePlan("", "one", time.Unix(1, 0))
@@ -141,5 +142,64 @@ func TestUpgradeLooksAndPlanDelete(t *testing.T) {
 	got, _ := s.LookChoices()
 	if want := []string{LookScope(b.ID) + "|x|all|L1", "all|x|all|L1"}; !reflect.DeepEqual(lookKeys(got), want) {
 		t.Fatalf("after deleting the plan: %v", lookKeys(got))
+	}
+}
+
+// 21 §5, 04 §4: schema 47 adds look_style and style_file to a schema 46 database; an entry
+// is unique by kind, look, Mod and target, and its ID is never reused.
+func TestLookStyles(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "archo.db")
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.DB.Exec(`DROP TABLE look_style; DROP TABLE style_file; UPDATE meta SET value='46' WHERE key='schema_version'`); err != nil {
+		t.Fatal(err)
+	}
+	s.Close()
+	if s, err = Open(path); err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if got := s.Meta("schema_version"); got != strconv.Itoa(SchemaVersion) {
+		t.Fatalf("schema = %s", got)
+	}
+	e := LookStyle{Kind: StyleKindStyle, Look: "a/gun", Lineage: "L1", Target: "Hindu", Random: true, At: time.Unix(5, 0)}
+	a, err := s.AddLookStyle(e)
+	if err != nil || a.ID == 0 {
+		t.Fatalf("add: %+v %v", a, err)
+	}
+	if _, err := s.AddLookStyle(e); err != ErrStyleExists {
+		t.Fatalf("the same entry twice: %v", err)
+	}
+	e.Kind, e.Target, e.Random = StyleKindVariant, "default", false
+	b, err := s.AddLookStyle(e)
+	if err != nil || b.ID <= a.ID {
+		t.Fatalf("second: %+v %v", b, err)
+	}
+	got, err := s.LookStyles()
+	if err != nil || !reflect.DeepEqual(got, []LookStyle{a, b}) {
+		t.Fatalf("entries = %+v %v", got, err)
+	}
+	if ok, err := s.DeleteLookStyle(b.ID); err != nil || !ok {
+		t.Fatalf("delete: %v %v", ok, err)
+	}
+	if ok, _ := s.DeleteLookStyle(b.ID); ok {
+		t.Fatal("deleted twice")
+	}
+	c, err := s.AddLookStyle(e)
+	if err != nil || c.ID <= b.ID {
+		t.Fatalf("an ID was reused: %+v after %+v (%v)", c, b, err)
+	}
+	fs := []LookFile{{Rel: "Textures/a.png", Source: `D:\m\a.png`, Size: 1, MTime: 10, Linked: true}}
+	if err := s.ReplaceStyleFiles(fs); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.StyleFiles(); !reflect.DeepEqual(got, fs) {
+		t.Fatalf("style files = %+v", got)
+	}
+	if got, _ := s.LookFiles(); len(got) != 0 {
+		t.Fatalf("the looks Mod's files hold the styles Mod's: %+v", got)
 	}
 }

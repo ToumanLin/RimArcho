@@ -16,7 +16,7 @@ import (
 
 // SchemaVersion is the version schema creates. A schema change bumps it, extends
 // the fresh schema and appends the step that upgrades the previous version to upgrades.
-const SchemaVersion = 46
+const SchemaVersion = 47
 
 // FirstReleaseSchema is the schema of the first public release (1.0.0). Databases from
 // development builds before it are not upgraded (04 §4).
@@ -25,7 +25,7 @@ const FirstReleaseSchema = 29
 //go:embed schema.sql
 var baseSchema string
 
-var schema = baseSchema + saveReviewSchema + saveReviewCatalogSchema + saveReviewCatalogReference + lineageFunctionalSchema + opLogSchema + analysisStageSchema + looksSchema
+var schema = baseSchema + saveReviewSchema + saveReviewCatalogSchema + saveReviewCatalogReference + lineageFunctionalSchema + opLogSchema + analysisStageSchema + looksSchema + stylesSchema
 
 // upgrades[i] upgrades schema FirstReleaseSchema+i to the next version, inside one
 // transaction; report gives progress for slow steps (Done of Total rows).
@@ -47,6 +47,7 @@ var upgrades = []func(tx *sql.Tx, report func(done, total int64)) error{
 	upgradeLineageCategory,   // 43 → 44
 	upgradeAnalysisStage,     // 44 → 45
 	upgradeLooks,             // 45 → 46
+	upgradeStyles,            // 46 → 47
 }
 
 // ErrPreRelease: the database was created by a development build before 1.0.0.

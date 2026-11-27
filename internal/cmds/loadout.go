@@ -519,6 +519,9 @@ func writeBody(c *Ctx, root *render.Node, r *app.SaveResult) {
 	if r.LooksError != "" {
 		root.KV("looks", app.LooksName+" left out of this write, the choices stay: "+r.LooksError)
 	}
+	if r.StylesError != "" {
+		root.KV("styles", app.StylesName+" left out of this write, the entries stay: "+r.StylesError)
+	}
 	if r.Source == "undo" {
 		root.KV("source", fmt.Sprintf("undo (restores v%d)", r.Restores))
 	}

@@ -38,7 +38,7 @@ const (
 	UnTextures   = "textures"   // the DDS RimArcho wrote next to mods' PNGs (Texture optimisation)
 	UnLocked     = "locked"     // the lock library's copies
 	UnMonitor    = "monitor"    // Archo Monitor's folder
-	UnLooks      = "looks"      // the generated Mod RimArcho Looks Preference in the looks directory (21 §4)
+	UnLooks      = "looks"      // the generated Mods in the looks directory: RimArcho Looks Preference, RimArcho Styles Preference (21 §4, §5)
 	UnPacks      = "packs"      // packs and the saves inside them
 	UnSaves      = "saves"      // the "own" save folders and save backups in the data folder
 	UnGames      = "games"      // game folders downloaded with SteamCMD
@@ -552,7 +552,7 @@ func (pl *uninstallPlanner) modsConfigItem(e *env.Environment, k string) (*Unins
 		it.Do, it.Note = DoRestore, "the list from before RimArcho's last save"
 		return it, nil
 	}
-	drop := map[string]bool{MonitorPackage: true, LooksPackage: true}
+	drop := map[string]bool{MonitorPackage: true, LooksPackage: true, StylesPackage: true}
 	for pkg := range pl.gone[k] {
 		drop[pkg] = true
 	}
@@ -596,17 +596,20 @@ func (pl *uninstallPlanner) monitorItems() []*UninstallItem {
 	return mon
 }
 
-// looksItems lists the generated Mod RimArcho Looks Preference and what an interrupted rebuild left
-// beside it (RimArcho's own; its textures are hard links and copies, the Mods' files stay).
+// looksItems lists the generated Mods RimArcho Looks Preference and RimArcho Styles
+// Preference and what an interrupted rebuild left beside them (RimArcho's own; their
+// textures are hard links and copies, the Mods' files stay).
 func (pl *uninstallPlanner) looksItems() []*UninstallItem {
 	var out []*UninstallItem
 	if pl.looksRoot == "" {
 		return nil
 	}
-	for _, name := range []string{looksFolder, looksFolder + TmpSuffix, looksFolder + looksOldSuffix} {
-		path := filepath.Join(pl.looksRoot, name)
-		if fi, err := os.Lstat(path); err == nil && fi.IsDir() {
-			out = append(out, &UninstallItem{Path: path, Do: DoDelete, Bytes: pl.sizeOf(path)})
+	for _, g := range []*genMod{looksGen, stylesGen} {
+		for _, name := range g.leftovers() {
+			path := filepath.Join(pl.looksRoot, name)
+			if fi, err := os.Lstat(path); err == nil && fi.IsDir() {
+				out = append(out, &UninstallItem{Path: path, Do: DoDelete, Bytes: pl.sizeOf(path)})
+			}
 		}
 	}
 	return out

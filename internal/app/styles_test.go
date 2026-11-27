@@ -1,0 +1,816 @@
+package app_test
+
+import (
+	"context"
+	"encoding/xml"
+	"errors"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/looks"
+	"github.com/ToumanLin/RimArcho/internal/oplog"
+	"github.com/ToumanLin/RimArcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
+)
+
+const (
+	capLook    = "things/worn/cap/cap"
+	rusticLook = "things/item/hatrustic"
+)
+
+const stylesThings = `<Defs>
+  <ThingDef Name="ItemBase" Abstract="True">
+    <graphicData>
+      <graphicClass>Graphic_Single</graphicClass>
+      <drawSize>(2,2)</drawSize>
+    </graphicData>
+  </ThingDef>
+  <ThingDef ParentName="ItemBase">
+    <defName>Hat</defName>
+    <label>hat</label>
+    <graphicData>
+      <texPath>Things/Item/Hat</texPath>
+      <shaderType>CutoutComplex</shaderType>
+    </graphicData>
+  </ThingDef>
+  <ThingDef>
+    <defName>Gun</defName>
+    <graphicData>
+      <texPath>Things/Item/Gun</texPath>
+      <graphicClass>Graphic_Multi</graphicClass>
+    </graphicData>
+  </ThingDef>
+  <ThingDef ParentName="ItemBase">
+    <defName>Cap</defName>
+    <graphicData>
+      <texPath>Things/Item/CapItem</texPath>
+    </graphicData>
+    <apparel>
+      <wornGraphicPath>Things/Worn/Cap/Cap</wornGraphicPath>
+    </apparel>
+  </ThingDef>
+</Defs>`
+
+const stylesCategories = `<Defs>
+  <StyleCategoryDef>
+    <defName>Rustic</defName>
+    <thingDefStyles>
+      <li>
+        <thingDef>Hat</thingDef>
+        <styleDef>Rustic_Hat</styleDef>
+      </li>
+    </thingDefStyles>
+  </StyleCategoryDef>
+  <StyleCategoryDef>
+    <defName>Bare</defName>
+  </StyleCategoryDef>
+  <ThingStyleDef>
+    <defName>Rustic_Hat</defName>
+    <graphicData>
+      <texPath>Things/Item/HatRustic</texPath>
+      <graphicClass>Graphic_Single</graphicClass>
+    </graphicData>
+  </ThingStyleDef>
+</Defs>`
+
+// stylesEnv: Core and the Mods A, B (Workshop), C and S (Mods/), in that load order. A
+// defines the things Hat (one texture), Gun (facings) and Cap (worn) and ships all three
+// looks; B ships the gun and the cap's male body; C ships the hat with a mask; S defines
+// the style categories Rustic (with a style of Hat, whose texture it ships) and Bare.
+func stylesEnv(t *testing.T, version string) *testkit.Env {
+	t.Helper()
+	e := setup(t, true)
+	if version == "" {
+		version = "1.6.4633 rev1261"
+	}
+	e.WriteFile(filepath.Join(e.Game, "Version.txt"), version+"\n")
+	mod := func(pkg, name string, shade uint8, files ...string) testkit.Mod {
+		m := testkit.Mod{PackageID: pkg, Name: name, Files: map[string]string{}}
+		for i, f := range files {
+			m.Files["Textures/"+f] = lookPNG(t, shade+uint8(i))
+		}
+		return m
+	}
+	a := mod("looks.a", "A", 10, "Things/Item/Gun_south.png", "Things/Item/Gun_north.png", "Things/Item/Hat.png",
+		"Things/Worn/Cap/Cap_Male_south.png", "Things/Worn/Cap/Cap_Female_south.png")
+	a.Files["Defs/Things.xml"] = stylesThings
+	e.AddWorkshop("1001", a)
+	e.AddWorkshop("1002", mod("looks.b", "B", 60, "Things/Item/Gun_south.png", "Things/Item/Gun_north.png", "Things/Worn/Cap/Cap_Male_south.png"))
+	e.WriteMod(filepath.Join(e.Game, "Mods", "C"), mod("looks.c", "C", 120, "Things/Item/Hat.png", "Things/Item/Hat_m.png"))
+	s := mod("looks.s", "S", 180, "Things/Item/HatRustic.png")
+	s.Files["Defs/Styles.xml"] = stylesCategories
+	e.WriteMod(filepath.Join(e.Game, "Mods", "S"), s)
+	e.WriteModsConfig(version, "ludeon.rimworld", "looks.a", "looks.b", "looks.c", "looks.s")
+	scanNow(t, e)
+	if got := joined(active(t, e)); got != "Core, A, B, C, S" {
+		t.Fatalf("plan: %s", got)
+	}
+	return e
+}
+
+func addStyle(t *testing.T, e *testkit.Env, in app.StyleAddInput) *app.StylesResult {
+	t.Helper()
+	r, err := e.App.StyleAdd(context.Background(), in, false)
+	if err != nil {
+		t.Fatalf("add %+v: %v", in, err)
+	}
+	return r
+}
+
+func stylesOf(t *testing.T, e *testkit.Env) *app.StylesState {
+	t.Helper()
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ss, err := e.App.StylesState(context.Background(), st, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ss
+}
+
+func stylesModDir(e *testkit.Env) string {
+	return filepath.Join(e.App.LooksDir(), "Styles")
+}
+
+func entryStates(ss *app.StylesState) string {
+	var out []string
+	for _, en := range ss.Entries {
+		s := en.State
+		if en.Why.Code != "" {
+			s += "(" + en.Why.Code + ")"
+		}
+		out = append(out, s)
+	}
+	return strings.Join(out, " ")
+}
+
+func wellFormed(t *testing.T, name, data string) {
+	t.Helper()
+	dec := xml.NewDecoder(strings.NewReader(data))
+	for {
+		if _, err := dec.Token(); err == io.EOF {
+			return
+		} else if err != nil {
+			t.Fatalf("%s is not well-formed: %v\n%s", name, err, data)
+		}
+	}
+}
+
+func relsOf(files []app.LooksFile) string {
+	var out []string
+	for _, f := range files {
+		out = append(out, f.Rel+" <- "+f.Source)
+	}
+	return strings.Join(out, "\n")
+}
+
+const wantStyleDefs = `<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated by RimArcho (looks). Rebuilt before every write to the game; do not edit. -->
+<Defs>
+  <!-- entry 1: things/item/hat, style in Rustic -->
+  <ThingStyleDef>
+    <defName>RimArchoStyle_1_Hat</defName>
+    <graphicData>
+      <texPath>RimArchoStyles/Style/1/Hat</texPath>
+      <graphicClass>Graphic_Single</graphicClass>
+      <shaderType>CutoutComplex</shaderType><drawSize>(2,2)</drawSize>
+    </graphicData>
+  </ThingStyleDef>
+  <!-- entry 4: things/worn/cap/cap, style in Bare -->
+  <ThingStyleDef>
+    <defName>RimArchoStyle_4_Cap</defName>
+    <wornGraphicPath>RimArchoStyles/Style/4/Cap</wornGraphicPath>
+    <graphicData>
+      <texPath>Things/Item/CapItem</texPath>
+      <graphicClass>Graphic_Single</graphicClass>
+      <drawSize>(2,2)</drawSize>
+    </graphicData>
+  </ThingStyleDef>
+</Defs>
+`
+
+const wantStylePatches = `<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated by RimArcho (looks). Rebuilt before every write to the game; do not edit. -->
+<Patch>
+  <!-- entry 1: things/item/hat, style in Rustic -->
+  <Operation Class="PatchOperationConditional">
+    <xpath>Defs/ThingDef[defName="Hat"]</xpath>
+    <match Class="PatchOperationConditional">
+      <xpath>Defs/StyleCategoryDef[defName="Rustic"]/thingDefStyles</xpath>
+      <match Class="PatchOperationAdd">
+        <xpath>Defs/StyleCategoryDef[defName="Rustic"]/thingDefStyles</xpath>
+        <value>
+          <li>
+            <thingDef>Hat</thingDef>
+            <styleDef>RimArchoStyle_1_Hat</styleDef>
+          </li>
+        </value>
+      </match>
+      <nomatch Class="PatchOperationConditional">
+        <xpath>Defs/StyleCategoryDef[defName="Rustic"]</xpath>
+        <match Class="PatchOperationAdd">
+          <xpath>Defs/StyleCategoryDef[defName="Rustic"]</xpath>
+          <value>
+            <thingDefStyles>
+              <li>
+                <thingDef>Hat</thingDef>
+                <styleDef>RimArchoStyle_1_Hat</styleDef>
+              </li>
+            </thingDefStyles>
+          </value>
+        </match>
+      </nomatch>
+    </match>
+  </Operation>
+  <Operation Class="PatchOperationConditional">
+    <xpath>Defs/ThingDef[defName="Hat"]/randomStyle</xpath>
+    <match Class="PatchOperationAdd">
+      <xpath>Defs/ThingDef[defName="Hat"]/randomStyle</xpath>
+      <value>
+        <li>
+          <styleDef>RimArchoStyle_1_Hat</styleDef>
+        </li>
+      </value>
+    </match>
+    <nomatch Class="PatchOperationConditional">
+      <xpath>Defs/ThingDef[defName="Hat"]</xpath>
+      <match Class="PatchOperationAdd">
+        <xpath>Defs/ThingDef[defName="Hat"]</xpath>
+        <value>
+          <randomStyle>
+            <li>
+              <styleDef>RimArchoStyle_1_Hat</styleDef>
+            </li>
+          </randomStyle>
+        </value>
+      </match>
+    </nomatch>
+  </Operation>
+  <Operation Class="PatchOperationConditional">
+    <xpath>Defs/ThingDef[defName="Hat"]/randomStyleChance</xpath>
+    <nomatch Class="PatchOperationConditional">
+      <xpath>Defs/ThingDef[defName="Hat"]</xpath>
+      <match Class="PatchOperationAdd">
+        <xpath>Defs/ThingDef[defName="Hat"]</xpath>
+        <value>
+          <randomStyleChance>0.5</randomStyleChance>
+        </value>
+      </match>
+    </nomatch>
+  </Operation>
+`
+
+// 21 §5: the Defs and patches RimArcho Styles Preference holds for a style with the random
+// option, a style of a worn look, and random variants of the default graphic and of a
+// style; the textures lie under paths of the Mod's own.
+func TestStylesXMLAndFiles(t *testing.T) {
+	t.Parallel()
+	e := stylesEnv(t, "")
+	r := addStyle(t, e, app.StyleAddInput{Look: hatLook, Mod: "pkg:looks.a", Kind: app.StyleKindStyle, Target: "Rustic", Random: true})
+	if !r.Added || r.Entry.State != app.StyleActive || !r.Entry.Shared || strings.Join(r.Entry.Things, ",") != "Hat" {
+		t.Fatalf("first add: %+v", r.Entry)
+	}
+	addStyle(t, e, app.StyleAddInput{Look: hatLook, Mod: "pkg:looks.a", Kind: app.StyleKindVariant})
+	addStyle(t, e, app.StyleAddInput{Look: hatLook, Mod: "pkg:looks.a", Kind: app.StyleKindVariant, Target: "Rustic_Hat"})
+	r = addStyle(t, e, app.StyleAddInput{Look: capLook, Mod: "pkg:looks.b", Kind: app.StyleKindStyle, Target: "Bare"})
+	if r.Added || r.Entry.Shared || r.BuildErr != "" {
+		t.Fatalf("fourth add: %+v", r)
+	}
+	ss := stylesOf(t, e)
+	if got := entryStates(ss); got != "active active active active" || ss.Active != 4 {
+		t.Fatalf("states: %s", got)
+	}
+	texts := map[string]string{}
+	for _, tx := range ss.Texts() {
+		wellFormed(t, tx.Rel, tx.Data)
+		texts[tx.Rel] = tx.Data
+		disk, err := os.ReadFile(filepath.Join(stylesModDir(e), filepath.FromSlash(tx.Rel)))
+		if err != nil || string(disk) != tx.Data {
+			t.Fatalf("%s on disk differs (%v)", tx.Rel, err)
+		}
+	}
+	if got := texts["Defs/RimArchoStyles.xml"]; got != wantStyleDefs {
+		t.Fatalf("Defs:\n%s", got)
+	}
+	patches := texts["Patches/RimArchoStyles.xml"]
+	if !strings.HasPrefix(patches, wantStylePatches) {
+		t.Fatalf("Patches:\n%s", patches)
+	}
+	for _, want := range []string{
+		`<xpath>Defs/StyleCategoryDef[defName="Bare"]/thingDefStyles</xpath>`,
+		"<!-- random variants of ThingDef Hat -->",
+		`<match Class="PatchOperationReplace">
+      <xpath>Defs/ThingDef[defName="Hat"]/graphicData/texPath</xpath>`,
+		`<nomatch Class="PatchOperationConditional">
+      <xpath>Defs/ThingDef[defName="Hat"]/graphicData</xpath>
+      <match Class="PatchOperationAdd">
+        <xpath>Defs/ThingDef[defName="Hat"]/graphicData</xpath>
+        <value>
+          <graphicClass>Graphic_Random</graphicClass>
+        </value>`,
+		"<!-- random variants of ThingStyleDef Rustic_Hat -->",
+		`<xpath>Defs/ThingStyleDef[defName="Rustic_Hat"]/graphicData/graphicClass</xpath>`,
+		"<texPath>RimArchoStyles/Random/",
+	} {
+		if !strings.Contains(patches, want) {
+			t.Fatalf("Patches lack %q:\n%s", want, patches)
+		}
+	}
+	if strings.Contains(patches, "MayRequire") {
+		t.Fatal("a patch operation carries MayRequire")
+	}
+
+	// The textures: the style's under its entry, the worn style with the body type the Mod
+	// lacks from what the game shows, each variant folder with v0 (in game now) and v1.
+	var rels []string
+	variants := map[string][]string{}
+	for _, f := range ss.Files() {
+		mod := filepath.Base(strings.SplitN(filepath.ToSlash(f.Source), "/Textures/", 2)[0])
+		rel := strings.TrimPrefix(f.Rel, "Textures/RimArchoStyles/")
+		if dir, name, ok := strings.Cut(strings.TrimPrefix(rel, "Random/"), "/"); ok && strings.HasPrefix(rel, "Random/") {
+			variants[dir] = append(variants[dir], name+"<"+mod)
+			continue
+		}
+		rels = append(rels, rel+"<"+mod)
+	}
+	if got := strings.Join(rels, " "); got != "Style/1/Hat.png<1001 Style/4/Cap_Female_south.png<1001 Style/4/Cap_Male_south.png<1002" {
+		t.Fatalf("style files: %s", got)
+	}
+	var sets []string
+	for dir, names := range variants {
+		if !strings.Contains(patches, "<texPath>RimArchoStyles/Random/"+dir+"</texPath>") {
+			t.Fatalf("no patch names the folder %s", dir)
+		}
+		sets = append(sets, strings.Join(names, " "))
+	}
+	if len(sets) != 2 || !contains(sets, "v0.png<C v0_m.png<C v1.png<1001") || !contains(sets, "v0.png<S v1.png<1001") {
+		t.Fatalf("variant folders: %q", sets)
+	}
+	for _, f := range ss.Files() {
+		if _, err := os.Stat(filepath.Join(stylesModDir(e), filepath.FromSlash(f.Rel))); err != nil {
+			t.Fatalf("not on disk: %s", f.Rel)
+		}
+	}
+	about, _ := os.ReadFile(filepath.Join(stylesModDir(e), "About", "About.xml"))
+	wellFormed(t, "About.xml", string(about))
+	if !strings.Contains(string(about), "<packageId>rimarcho.styles</packageId>") || !strings.Contains(string(about), "<name>RimArcho Styles Preference</name>") {
+		t.Fatalf("About.xml:\n%s", about)
+	}
+
+	// A second variant of the same target extends the same folder.
+	e.MustRun("looks", "apply", hatLook, "--from", "pkg:looks.a") // the game now shows A's hat
+	ss = stylesOf(t, e)
+	if got := entryStates(ss); got != "active skipped(shown) active active" {
+		t.Fatalf("after the hat is applied from A: %s", got)
+	}
+	addStyle(t, e, app.StyleAddInput{Look: hatLook, Mod: "pkg:looks.c", Kind: app.StyleKindVariant, Target: "Rustic_Hat"})
+	n := 0
+	for _, f := range stylesOf(t, e).Files() {
+		if strings.Contains(f.Rel, "/Random/") {
+			n++
+		}
+	}
+	if n != 4 { // v0 (S), v1 (A), v2 and its mask (C)
+		t.Fatalf("the style's folder holds %d files:\n%s", n, relsOf(stylesOf(t, e).Files()))
+	}
+}
+
+// 21 §5: what an add refuses, with the reason, and the choices the add row offers.
+func TestStylesRefusals(t *testing.T) {
+	t.Parallel()
+	e := stylesEnv(t, "")
+	refused := func(in app.StyleAddInput, code string) {
+		t.Helper()
+		_, err := e.App.StyleAdd(context.Background(), in, false)
+		var ref *app.ErrStyleRefused
+		if !errors.As(err, &ref) || ref.Why.Code != code || ref.Why.Text() == "" {
+			t.Fatalf("add %+v: %v, want refusal %s", in, err, code)
+		}
+	}
+	refused(app.StyleAddInput{Look: gunLook, Mod: "pkg:looks.a", Kind: app.StyleKindVariant}, app.StyleWhyFacings)
+	refused(app.StyleAddInput{Look: capLook, Mod: "pkg:looks.a", Kind: app.StyleKindVariant}, app.StyleWhyKind)
+	refused(app.StyleAddInput{Look: hatLook, Mod: "pkg:looks.c", Kind: app.StyleKindVariant}, app.StyleWhyShown)
+	refused(app.StyleAddInput{Look: hatLook, Mod: "pkg:looks.a", Kind: app.StyleKindVariant, Target: "Nope"}, app.StyleWhyNoStyle)
+	refused(app.StyleAddInput{Look: hatLook, Mod: "pkg:looks.a", Kind: app.StyleKindStyle, Target: "Nope"}, app.StyleWhyNoCategory)
+	refused(app.StyleAddInput{Look: rusticLook, Mod: "pkg:looks.s", Kind: app.StyleKindStyle, Target: "Bare"}, app.StyleWhyNoThing)
+	if _, err := e.App.StyleAdd(context.Background(), app.StyleAddInput{Look: hatLook, Mod: "pkg:looks.b", Kind: app.StyleKindStyle, Target: "Bare"}, false); err == nil {
+		t.Fatal("a Mod without the look was accepted")
+	}
+	if rows, _ := e.App.Store.LookStyles(); len(rows) != 0 || e.App.LooksDir() != "" {
+		t.Fatalf("a refused add wrote: %+v %s", rows, e.App.LooksDir())
+	}
+	addStyle(t, e, app.StyleAddInput{Look: hatLook, Mod: "pkg:looks.a", Kind: app.StyleKindStyle, Target: "Bare"})
+	refused(app.StyleAddInput{Look: hatLook, Mod: "pkg:looks.a", Kind: app.StyleKindStyle, Target: "Bare", Random: true}, app.StyleWhyExists)
+
+	ss := stylesOf(t, e)
+	var got []string
+	for _, c := range ss.StyleChoices(hatLook, 1) { // A
+		got = append(got, c.Kind+":"+c.Target+":"+c.Why.Code)
+	}
+	if want := "style:Bare:exists style:Rustic: variant:default: variant:Rustic_Hat:"; strings.Join(got, " ") != want {
+		t.Fatalf("choices for the hat from A: %v", got)
+	}
+	for _, c := range ss.StyleChoices(hatLook, 1) {
+		if c.Kind == app.StyleKindStyle && c.Shared != (c.Target == "Rustic") {
+			t.Fatalf("shared: %+v", c)
+		}
+	}
+	for _, c := range ss.StyleChoices(gunLook, 2) { // B
+		if c.Kind == app.StyleKindVariant && c.Why.Code != app.StyleWhyFacings {
+			t.Fatalf("gun variant on 1.6: %+v", c)
+		}
+	}
+}
+
+// 21 §5: from game 1.7 a look with facings can get a random variant; the folder holds one
+// set of facings per variant.
+func TestStylesFacingsVariant(t *testing.T) {
+	t.Parallel()
+	e := stylesEnv(t, "1.7.5014 rev100")
+	r := addStyle(t, e, app.StyleAddInput{Look: gunLook, Mod: "pkg:looks.a", Kind: app.StyleKindVariant})
+	var names []string
+	for _, f := range r.State.Files() {
+		names = append(names, filepath.Base(f.Rel)+"<"+filepath.Base(strings.SplitN(filepath.ToSlash(f.Source), "/Textures/", 2)[0]))
+	}
+	if got := strings.Join(names, " "); got != "v0_north.png<1002 v0_south.png<1002 v1_north.png<1001 v1_south.png<1001" {
+		t.Fatalf("files: %s", got)
+	}
+	for _, tx := range r.State.Texts() {
+		wellFormed(t, tx.Rel, tx.Data)
+		if tx.Rel != "Patches/RimArchoStyles.xml" || !strings.Contains(tx.Data, "<graphicClass>Graphic_Random</graphicClass>") {
+			t.Fatalf("texts: %s\n%s", tx.Rel, tx.Data)
+		}
+	}
+}
+
+// 21 §5 "States": active, asleep (the Mod is not in the plan), broken (the Mod no longer
+// supplies the look) and skipped (the category is not in the plan); nothing is deleted.
+func TestStylesStates(t *testing.T) {
+	t.Parallel()
+	e := stylesEnv(t, "")
+	addStyle(t, e, app.StyleAddInput{Look: hatLook, Mod: "pkg:looks.a", Kind: app.StyleKindStyle, Target: "Rustic"})
+	addStyle(t, e, app.StyleAddInput{Look: capLook, Mod: "pkg:looks.b", Kind: app.StyleKindStyle, Target: "Bare"})
+	state := func() string { return entryStates(stylesOf(t, e)) }
+	if got := state(); got != "active active" {
+		t.Fatal(got)
+	}
+	e.MustRun("disable", "pkg:looks.s")
+	if got := state(); got != "skipped(category) skipped(category)" {
+		t.Fatalf("without the category's Mod: %s", got)
+	}
+	ss := stylesOf(t, e)
+	if len(ss.Files()) != 0 || len(ss.Texts()) != 0 || ss.Skipped != 2 {
+		t.Fatalf("skipped entries are built: %d files", len(ss.Files()))
+	}
+	e.MustRun("undo")
+	e.MustRun("disable", "pkg:looks.b")
+	if got := state(); got != "active asleep(asleep)" {
+		t.Fatalf("without B: %s", got)
+	}
+	e.MustRun("undo")
+	e.Remove(filepath.Join(e.Workshop, "1002", "Textures", "Things", "Worn"))
+	e.Advance(1)
+	scanNow(t, e)
+	if got := state(); got != "active broken(broken)" {
+		t.Fatalf("B lost the cap: %s", got)
+	}
+	// The thing Def's Mod leaves: the look has no thing Def, and A's entry sleeps.
+	e.MustRun("disable", "pkg:looks.a")
+	if got := state(); got != "asleep(asleep) broken(broken)" {
+		t.Fatalf("without A: %s", got)
+	}
+	if rows, _ := e.App.Store.LookStyles(); len(rows) != 2 {
+		t.Fatalf("an entry was deleted: %+v", rows)
+	}
+	if out := e.MustRun("looks", "style", "list"); !strings.Contains(out, "asleep") || !strings.Contains(out, "broken") {
+		t.Fatalf("archo looks style list:\n%s", out)
+	}
+}
+
+// 21 §5 "Rebuild": hard links on one volume, recorded; an unchanged rebuild writes
+// nothing; copies without hard links; a removed entry's files and Defs go with the next
+// rebuild; a dry run writes nothing.
+func TestStylesRebuild(t *testing.T) {
+	t.Parallel()
+	e := stylesEnv(t, "")
+	in := app.StyleAddInput{Look: hatLook, Mod: "pkg:looks.a", Kind: app.StyleKindStyle, Target: "Rustic"}
+	dry, err := e.App.StyleAdd(context.Background(), in, true)
+	if err != nil || !dry.DryRun || !dry.Added || !dry.DirChosen || dry.Build == nil || len(dry.Build.Files) != 1 || len(dry.Build.Texts) != 2 {
+		t.Fatalf("dry run: %+v %v", dry, err)
+	}
+	if rows, _ := e.App.Store.LookStyles(); len(rows) != 0 || e.App.LooksDir() != "" || joined(active(t, e)) != "Core, A, B, C, S" {
+		t.Fatal("the dry run wrote")
+	}
+	if _, err := os.Lstat(dry.Dir); err == nil {
+		t.Fatalf("the dry run made %s", dry.Dir)
+	}
+	if rows := opRows(t, e); len(rows) != 0 {
+		t.Fatalf("the dry run logged %+v", rows)
+	}
+
+	r := addStyle(t, e, in)
+	if r.Build == nil || r.Build.Links != 1 || r.Build.Copies != 0 || r.Build.Unchanged {
+		t.Fatalf("build: %+v", r.Build)
+	}
+	file := filepath.Join(stylesModDir(e), "Textures", "RimArchoStyles", "Style", "1", "Hat.png")
+	src := filepath.Join(e.Workshop, "1001", "Textures", "Things", "Item", "Hat.png")
+	if !sameFile(t, file, src) {
+		t.Fatal("the texture is no hard link to the Mod's file")
+	}
+	rec, _ := e.App.Store.StyleFiles()
+	if len(rec) != 1 || !rec[0].Linked || rec[0].Rel != "Textures/RimArchoStyles/Style/1/Hat.png" {
+		t.Fatalf("recorded: %+v", rec)
+	}
+	if lf, _ := e.App.Store.LookFiles(); len(lf) != 0 {
+		t.Fatalf("recorded as the looks Mod's: %+v", lf)
+	}
+	ops := len(opRows(t, e))
+	again, err := e.App.StylesRebuild(context.Background(), false)
+	if err != nil || again.Build == nil || !again.Build.Unchanged || again.Added {
+		t.Fatalf("second rebuild: %+v %v", again, err)
+	}
+	if len(opRows(t, e)) != ops {
+		t.Fatal("an unchanged rebuild wrote an operation-log row")
+	}
+
+	e.App.HardLink = func(string, string) error { return errors.New("no hard links") }
+	r = addStyle(t, e, app.StyleAddInput{Look: capLook, Mod: "pkg:looks.b", Kind: app.StyleKindStyle, Target: "Bare"})
+	if r.Build.Links != 0 || r.Build.Copies != 3 {
+		t.Fatalf("without hard links: %+v", r.Build)
+	}
+	if sameFile(t, file, src) {
+		t.Fatal("still a hard link")
+	}
+	if rec, _ := e.App.Store.StyleFiles(); len(rec) != 3 || rec[0].Linked {
+		t.Fatalf("recorded copies: %+v", rec)
+	}
+	e.App.HardLink = nil
+
+	if _, err := e.App.StyleRemove(context.Background(), 99, false); err == nil {
+		t.Fatal("removing an entry that is not there succeeded")
+	}
+	dryRm, err := e.App.StyleRemove(context.Background(), 1, true)
+	if err != nil || len(dryRm.Build.Files) != 2 {
+		t.Fatalf("dry remove: %+v %v", dryRm, err)
+	}
+	if _, err := os.Stat(file); err != nil {
+		t.Fatal("the dry remove deleted the file")
+	}
+	rm, err := e.App.StyleRemove(context.Background(), 1, false)
+	if err != nil || !rm.Removed || rm.Entry.ID != 1 || len(rm.State.Entries) != 1 {
+		t.Fatalf("remove: %+v %v", rm, err)
+	}
+	if _, err := os.Stat(file); err == nil {
+		t.Fatal("the removed entry's file stayed")
+	}
+	if _, err := os.Stat(src); err != nil {
+		t.Fatal("the Mod's file went with it")
+	}
+	defs, _ := os.ReadFile(filepath.Join(stylesModDir(e), "Defs", "RimArchoStyles.xml"))
+	if strings.Contains(string(defs), "RimArchoStyle_1_") || !strings.Contains(string(defs), "RimArchoStyle_2_Cap") {
+		t.Fatalf("Defs after the remove:\n%s", defs)
+	}
+	if got := active(t, e); got[len(got)-1] != app.StylesName {
+		t.Fatalf("a remove takes the Mod out of the plan: %v", got)
+	}
+	if _, err := e.App.StyleRemove(context.Background(), 2, false); err != nil {
+		t.Fatal(err)
+	}
+	for _, rel := range []string{"Defs", "Patches", "Textures"} {
+		if _, err := os.Stat(filepath.Join(stylesModDir(e), rel)); err == nil {
+			t.Fatalf("an empty generated Mod keeps %s", rel)
+		}
+	}
+	rows, _ := e.App.Operations(oplog.Query{Op: oplog.LooksStyle})
+	if len(rows) != 4 || !strings.HasPrefix(rows[0].Detail, "remove: ") || !strings.HasPrefix(rows[3].Detail, "add: style in Rustic from A") {
+		t.Fatalf("looks.style rows: %+v", rows)
+	}
+	if b, _ := e.App.Operations(oplog.Query{Op: oplog.StylesBuild}); len(b) != 4 {
+		t.Fatalf("looks.stylebuild rows: %+v", b)
+	}
+}
+
+// 21 §5 "In the plan", 08 §1.1: both generated Mods are the plan's last entries,
+// RimArcho Styles Preference before RimArcho Looks Preference, whichever came first; a
+// sort keeps them there; the link is _Archo_Styles.
+func TestStylesEntryPlaceAndLink(t *testing.T) {
+	t.Parallel()
+	e := stylesEnv(t, "")
+	in := app.StyleAddInput{Look: hatLook, Mod: "pkg:looks.a", Kind: app.StyleKindStyle, Target: "Rustic"}
+	if r := addStyle(t, e, in); !r.Added {
+		t.Fatal("the first add adds the entry")
+	}
+	if got := joined(active(t, e)); got != "Core, A, B, C, S, "+app.StylesName {
+		t.Fatalf("after the add: %s", got)
+	}
+	if _, op, err := e.App.UndoRedo(false); err != nil || op != app.StylesAddOp {
+		t.Fatalf("undo: %q %v", op, err)
+	}
+	if ss := stylesOf(t, e); ss.Entry != 0 || ss.Active != 1 {
+		t.Fatalf("after the undo the entry stays stored: %+v", ss)
+	}
+	if _, _, err := e.App.UndoRedo(true); err != nil {
+		t.Fatal(err)
+	}
+	applyLook(t, e, gunLook, "pkg:looks.a", app.LooksPlan)
+	want := "Core, A, B, C, S, " + app.StylesName + ", " + app.LooksName
+	if got := joined(active(t, e)); got != want {
+		t.Fatalf("after an apply: %s", got)
+	}
+	// The other way round: the looks Mod first, then a style.
+	e.MustRun("disable", "pkg:"+app.StylesPackage)
+	in.Target = "Bare"
+	if r := addStyle(t, e, in); !r.Added {
+		t.Fatal("the add puts the entry back")
+	}
+	if got := joined(active(t, e)); got != want {
+		t.Fatalf("after an add into a plan with the looks Mod: %s", got)
+	}
+	ls := looksOf(t, e)
+	if ls.Entry != 7 || ls.StylesEntry != 6 || len(ls.Mods) != 5 {
+		t.Fatalf("entries: looks %d, styles %d, %d Mods", ls.Entry, ls.StylesEntry, len(ls.Mods))
+	}
+	for _, l := range ls.Index.Looks {
+		if strings.HasPrefix(l.ID, "rimarchostyles/") {
+			t.Fatalf("the generated Mod's texture is a look: %s", l.ID)
+		}
+	}
+
+	e.MustRun("move", "pkg:"+app.LooksPackage, "--to", "2")
+	e.MustRun("move", "pkg:"+app.StylesPackage, "--to", "2")
+	sr, err := e.App.Sort(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := joined(active(t, e)); got != want {
+		t.Fatalf("after a sort: %s", got)
+	}
+	if len(sr.MissingDependencies) != 0 || len(sr.MissingMods) != 0 || len(sr.Result.Dropped) != 0 || len(sr.Result.Cycles) != 0 {
+		t.Fatalf("the sort reports a problem: %+v %+v", sr.MissingDependencies, sr.MissingMods)
+	}
+	for _, nd := range sr.Input.Nodes {
+		if nd.PackageID == app.StylesPackage || nd.PackageID == app.LooksPackage {
+			t.Fatalf("the sort orders %s", nd.PackageID)
+		}
+	}
+	if sr2, err := e.App.Sort(true); err != nil || len(sr2.Changes) != 0 {
+		t.Fatalf("not stable: %+v %v", sr2.Changes, err)
+	}
+
+	sv, err := e.App.Save(false)
+	if err != nil || sv.LooksError != "" || sv.StylesError != "" {
+		t.Fatalf("save: %+v %v", sv, err)
+	}
+	link := filepath.Join(e.Game, "Mods", "_Archo_Styles")
+	if real, err := source.RealPath(link); !source.IsLink(link) || err != nil || !sameFile(t, real, stylesModDir(e)) {
+		t.Fatalf("the link %s: %v", link, err)
+	}
+	cfg := e.ReadModsConfig()
+	if a, b, c := strings.Index(cfg, "looks.s"), strings.Index(cfg, "rimarcho.styles"), strings.Index(cfg, "rimarcho.looks"); a < 0 || a > b || b > c {
+		t.Fatalf("ModsConfig.xml: %s", cfg)
+	}
+}
+
+// 21 §5 "Failure": one pass before a write to the game rebuilds both generated Mods; a
+// styles rebuild that fails leaves RimArcho Styles Preference alone out of the write.
+func TestStylesFailedRebuildLeavesOnlyItOut(t *testing.T) {
+	t.Parallel()
+	e := stylesEnv(t, "")
+	applyLook(t, e, gunLook, "pkg:looks.a", app.LooksPlan)
+	addStyle(t, e, app.StyleAddInput{Look: capLook, Mod: "pkg:looks.a", Kind: app.StyleKindStyle, Target: "Bare"})
+	sv, err := e.App.Save(false)
+	if err != nil || sv.LooksError != "" || sv.StylesError != "" {
+		t.Fatalf("save: %+v %v", sv, err)
+	}
+	if cfg := e.ReadModsConfig(); !strings.Contains(cfg, "rimarcho.styles") || !strings.Contains(cfg, "rimarcho.looks") {
+		t.Fatalf("ModsConfig.xml: %s", cfg)
+	}
+
+	// The index in memory still names a file that is gone: the styles rebuild cannot copy
+	// it, the looks rebuild has nothing new to write.
+	var kept *looks.Index
+	e.App.LooksCache = func(_ string, build func() (*looks.Index, error)) (*looks.Index, error) {
+		if kept != nil {
+			return kept, nil
+		}
+		idx, err := build()
+		kept = idx
+		return idx, err
+	}
+	addStyle(t, e, app.StyleAddInput{Look: hatLook, Mod: "pkg:looks.a", Kind: app.StyleKindStyle, Target: "Bare"})
+	e.Remove(filepath.Join(stylesModDir(e), "Textures", "RimArchoStyles", "Style", "2", "Hat.png"))
+	hat := filepath.Join(e.Workshop, "1001", "Textures", "Things", "Item", "Hat.png")
+	data, _ := os.ReadFile(hat)
+	e.Remove(hat)
+	sv, err = e.App.Save(false)
+	if err != nil || sv.StylesError == "" || sv.LooksError != "" {
+		t.Fatalf("save with a failing styles rebuild: %+v %v", sv, err)
+	}
+	cfg := e.ReadModsConfig()
+	if strings.Contains(cfg, "rimarcho.styles") || !strings.Contains(cfg, "rimarcho.looks") {
+		t.Fatalf("ModsConfig.xml: %s", cfg)
+	}
+	if got := active(t, e); got[len(got)-2] != app.StylesName || got[len(got)-1] != app.LooksName {
+		t.Fatalf("the plan lost an entry: %v", got)
+	}
+	if rows, _ := e.App.Store.LookStyles(); len(rows) != 2 {
+		t.Fatalf("the entries did not stay: %+v", rows)
+	}
+	if out := e.MustRun("save"); !strings.Contains(out, "styles: RimArcho Styles Preference left out of this write") || strings.Contains(out, "looks: RimArcho Looks Preference left out") {
+		t.Fatalf("archo save:\n%s", out)
+	}
+	rows, _ := e.App.Operations(oplog.Query{Op: oplog.StylesBuild, Failed: true})
+	if len(rows) == 0 || rows[0].Result != oplog.Failed {
+		t.Fatalf("no failed looks.stylebuild row: %+v", rows)
+	}
+
+	// The file is back: the next write rebuilds and the entry returns.
+	e.WriteFile(hat, string(data))
+	sv, err = e.App.Save(false)
+	if err != nil || sv.StylesError != "" {
+		t.Fatalf("save after the file came back: %+v %v", sv, err)
+	}
+	if !strings.Contains(e.ReadModsConfig(), "rimarcho.styles") {
+		t.Fatal("the entry did not come back")
+	}
+
+	// A running game refuses both rebuilds that have something to write.
+	e.App.GameProbe = func(string) *app.GameRun { return &app.GameRun{PID: 7, Started: e.Now()} }
+	r, err := e.App.StyleRemove(context.Background(), 1, false)
+	if err != nil || !strings.Contains(r.BuildErr, "the entries are kept") {
+		t.Fatalf("remove while a game runs: %+v %v", r, err)
+	}
+}
+
+// 21 §5: nothing is written into a Mod folder by an add, a rebuild with links or copies, a
+// write to the game, a remove or the uninstall; texture optimisation leaves the Mod alone.
+func TestStylesWriteNothingIntoMods(t *testing.T) {
+	t.Parallel()
+	e := stylesEnv(t, "")
+	dirs := []string{filepath.Join(e.Workshop, "1001"), filepath.Join(e.Workshop, "1002"), filepath.Join(e.Game, "Mods", "C"), filepath.Join(e.Game, "Mods", "S"), filepath.Join(e.Game, "Data")}
+	before := modsDigest(t, dirs...)
+	check := func(step string) {
+		t.Helper()
+		if got := modsDigest(t, dirs...); got != before {
+			t.Fatalf("%s changed a Mod folder", step)
+		}
+	}
+	addStyle(t, e, app.StyleAddInput{Look: hatLook, Mod: "pkg:looks.a", Kind: app.StyleKindStyle, Target: "Rustic", Random: true})
+	check("add a style")
+	addStyle(t, e, app.StyleAddInput{Look: hatLook, Mod: "pkg:looks.a", Kind: app.StyleKindVariant})
+	check("add a variant")
+	applyLook(t, e, gunLook, "pkg:looks.a", app.LooksPlan)
+	if _, err := e.App.Save(false); err != nil {
+		t.Fatal(err)
+	}
+	check("save")
+	e.App.HardLink = func(string, string) error { return errors.New("no hard links") }
+	addStyle(t, e, app.StyleAddInput{Look: capLook, Mod: "pkg:looks.b", Kind: app.StyleKindStyle, Target: "Bare"})
+	check("rebuild with copies")
+	e.App.HardLink = nil
+	if _, err := e.App.StyleRemove(context.Background(), 2, false); err != nil {
+		t.Fatal(err)
+	}
+	check("remove")
+
+	ts, err := e.App.TextureTargets(nil, app.TexAll)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range ts {
+		if tt.Mod.Name == app.StylesName || tt.Mod.Name == app.LooksName {
+			t.Fatalf("texture optimisation takes %s", tt.Mod.Name)
+		}
+	}
+	st, _ := e.App.Loadout()
+	for _, m := range st.Ix.Mods {
+		if app.IsGenerated(m) != (m.Name == app.StylesName || m.Name == app.LooksName) || app.IsLooks(m) && m.Name != app.LooksName {
+			t.Fatalf("IsGenerated(%s) = %v", m.Name, app.IsGenerated(m))
+		}
+	}
+
+	looksDir := e.App.LooksDir()
+	p, err := e.App.Uninstall(app.UninstallOptions{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, s := range p.Steps {
+		if s.Key == app.UnLooks {
+			found = len(s.Items) == 2 && s.Items[0].Done && s.Items[1].Done
+		}
+	}
+	if !found {
+		t.Fatalf("the looks step does not delete both generated Mods: %+v", p.Steps)
+	}
+	if _, err := os.Lstat(looksDir); err == nil || looksDir == "" {
+		t.Fatal("the looks directory stayed")
+	}
+	check("uninstall")
+}
