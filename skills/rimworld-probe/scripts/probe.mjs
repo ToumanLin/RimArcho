@@ -3,13 +3,14 @@
 //
 //   node probe.mjs new   <probeDir> [--id probe.scenario]
 //   node probe.mjs build <probeDir> --game <gameDir> --harmony <harmonyModDir>
-//   node probe.mjs run   --game <gameDir> --work <workDir> --name <run> --mods "<pkgId>=<folder>,..." [--no-dlc ideology,...] [--lang <folder>] [--seconds 600]
+//   node probe.mjs run   --game <gameDir> --work <workDir> --name <run> --mods "<pkgId>=<folder>,..." [--no-dlc ideology,...] [--lang <folder>] [--before-core <pkgId>,...] [--seconds 600]
 //   node probe.mjs clean --work <workDir>
 //
 // build detects the game version and builds <probeDir>/<version>/Assemblies/Probe.dll.
 // run: --mods lists every non-official mod in load order, Harmony and the probe included. Official content
 // (Core and the DLCs found in <gameDir>/Data) loads first; --no-dlc leaves listed DLCs off; --lang sets the game's
-// language by its folder name, e.g. "ChineseSimplified (简体中文)" (default English).
+// language by its folder name, e.g. "ChineseSimplified (简体中文)" (default English); --before-core loads the listed
+// mods right after Harmony and before the official content, as mods with loadBefore Ludeon.RimWorld sit for players.
 // The sandbox is <workDir>/game-<version>: the game's folders and every mod folder are junctions, the game's top-level
 // files are hard links (copies only if the work folder is on another drive). User data (config, saves, the 1.7 shader
 // and texture caches) is <workDir>/userdata-<version>, reused between runs; each run's log, probe lines and screenshot go
@@ -153,6 +154,8 @@ async function cmdRun(o) {
   const active = ['ludeon.rimworld', ...known.filter(d => !off.includes(d)), ...mods.map(m => m.pkg)];
   // Harmony must load before the official content, as players have it.
   const h = active.indexOf('brrainz.harmony'); if (h > 0) { active.splice(h, 1); active.unshift('brrainz.harmony'); }
+  const early = String(o['before-core'] || '').split(',').map(s => s.trim().toLowerCase()).filter(p => active.includes(p));
+  for (const p of early.reverse()) { active.splice(active.indexOf(p), 1); active.splice(active[0] === 'brrainz.harmony' ? 1 : 0, 0, p); }
 
   const g = path.join(work, `game-${info.version}`);
   buildGame(game, g, mods);

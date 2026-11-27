@@ -5,6 +5,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 ## Unreleased
 
 - Archo Monitor 0.13.1: the main menu's translation panel lists the translators again in every language other than English. Since 0.12.0 Monitor's own translation folders, loaded before Core, hid the language's details from the game: no translator names, the folder name in place of the language's own name, and the game's default grammar in place of the language's own (articles and plurals in English, particles in Korean, cases in Russian).
+- RimWorld probe skill: `run --lang <folder>` starts the sandbox game in another language, and `--before-core <pkgId>,...` loads mods before the official content, as players load Archo Monitor.
 - Looks: a style or random variant no longer shows as broken in a list that holds another copy of its Mod without the textures (a pack's copy, a trimmed local copy) while the copy it was added from is still installed; it is asleep in that list, and `archo looks style list` says why.
 - Looks: the game no longer logs “Mod RimArcho Looks Preference did not load any content” (or the same for RimArcho Styles Preference) after the last choice or entry is removed; the generated Mods carry an empty language file.
 - `archo test run`: a Mod the game lists as “(incompatible version)” no longer makes the run report that Mod and every Mod after it as not loaded (`status: incomplete`).
