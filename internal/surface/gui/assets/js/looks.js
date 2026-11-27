@@ -29,7 +29,7 @@ const L = {
   focus: 1,       // the numbered card of layer 1 that has the focus (16 §3.5)
   ov: null,       // view.LooksOverview
   gal: null,      // view.LooksGallery
-  pick: null,     // what the gallery shows: { pos } a Mod, { chosen: true } the choices
+  pick: null,     // what the gallery shows: { pos } a Mod, { chosen: true } the choices, with styles: true the looks with a style entry
   modCursor: 0,   // the Mods card's cursor (an index into mods())
   filter: "", search: "",
   bar: null,      // the filter bar (filterbar.js), a card of its own over the gallery
@@ -396,7 +396,7 @@ async function loadGallery(keep = false) {
     drawFilter(); drawHead(); relayout(false); drawNote(); drawAct(); L.ui.renderWhere();
     return;
   }
-  const args = L.search ? ["", L.filter, L.search] : L.pick?.chosen ? ["chosen", L.filter, ""] : [String(L.pick ? L.pick.pos : ""), L.filter, ""];
+  const args = L.search ? ["", L.filter, L.search] : L.pick?.chosen ? [L.pick.styles ? "styles" : "chosen", L.filter, ""] : [String(L.pick ? L.pick.pos : ""), L.filter, ""];
   let g;
   try { g = await reading(() => api.LooksGallery(...args)); } catch (e) {
     if (n === L.galSeq && L.on) { L.error = errText(e); drawNote(); }
@@ -541,11 +541,11 @@ function drawHead() {
     src.innerHTML = sourceIcon(m.kind);
     h.append(src, el("b", "mname", m.name), el("span", "pos", "#" + m.no));
     h.lastChild.previousSibling.title = m.name;
-  } else h.append(el("b", "mname", (L.ov && L.ov.generated.name) || "RimArcho Looks Preference"));
+  } else h.append(el("b", "mname", genName()));
   h.append(el("span", "gcnt", shown));
   if (m && m.overridden) h.append(el("span", "gov", Tf("%s overridden", num(m.overridden))));
   if (g.more) h.append(el("span", "gov", Tf("the first %s are shown: search or filter to see the rest", num(g.rows))));
-  $("#looks .lk-scroll").setAttribute("aria-label", (m ? m.name : L.search || "RimArcho Looks Preference") + ", " + shown);
+  $("#looks .lk-scroll").setAttribute("aria-label", (m ? m.name : L.search || genName()) + ", " + shown);
 }
 
 // drawNote: what the gallery says in the place of its cards: the index being built, a read
@@ -563,6 +563,7 @@ function drawNote() {
     else if (L.pick?.none) text = T("no Mod with textures passes the filter");
     else if (L.filter && m) text = Tf("%s has no look under this filter", m.name);
     else if (L.filter) text = T("no look under this filter");
+    else if (L.pick?.styles) text = T("no style or random variant yet: open a look, select a Mod and add");
     else if (L.pick?.chosen) text = T("no choice yet: open a look, select a Mod and apply");
     else text = T("this Mod has no textures");
   }
@@ -697,13 +698,15 @@ export function showModByID(id) {
 }
 
 // ruleTarget: the Mod a new load-order rule is about (the rules card's add a rule, r).
+// the generated Mod whose looks the gallery shows when no Mod is selected
+const genName = () => (L.pick?.styles ? L.ov?.styles?.name || "RimArcho Styles Preference" : L.ov?.generated.name || "RimArcho Looks Preference");
 export function ruleTarget() {
   const m = mods()[L.modCursor];
   return m ? { id: m.id, name: m.name } : null;
 }
 
-function showChosen() {
-  L.pick = { chosen: true };
+function showChosen(styles) {
+  L.pick = styles ? { chosen: true, styles: true } : { chosen: true };
   dropWords();
   clearPicked();
   drawMods();
@@ -736,16 +739,19 @@ function drawPref() {
     if (x.files) box.append(el("span", "", x.size), el("span", "", how));
     return box;
   };
-  const row = el("button", "lk-prow lk-plooks" + (L.pick?.chosen && !L.search ? " sel" : ""));
+  const row = el("button", "lk-prow lk-plooks" + (L.pick?.chosen && !L.pick.styles && !L.search ? " sel" : ""));
   row.type = "button";
   row.title = T("show the looks that have a choice");
-  row.setAttribute("aria-pressed", String(!!L.pick?.chosen && !L.search));
+  row.setAttribute("aria-pressed", String(!!L.pick?.chosen && !L.pick.styles && !L.search));
   row.onclick = () => showChosen();
   row.append(el("span", "pn", g.name), states([[g.applied, "%s applied", ""], [g.notNeeded, "%s not needed", ""], [g.asleep, "%s asleep", "dim"], [g.broken, "%s broken", "bad"]], T("no choice yet")));
   body.append(row, facts(g));
   if (st) {
-    // the styles row only states: Go has no gallery of the looks that have an entry
-    const srow = el("div", "lk-prow lk-pstyles");
+    const srow = el("button", "lk-prow lk-pstyles" + (L.pick?.styles && !L.search ? " sel" : ""));
+    srow.type = "button";
+    srow.title = T("show the looks that have a style or random variant");
+    srow.setAttribute("aria-pressed", String(!!L.pick?.styles && !L.search));
+    srow.onclick = () => showChosen(true);
     srow.append(el("span", "pn", st.name), states([[st.active, "%s active", ""], [st.skipped, "%s skipped", "dim"], [st.asleep, "%s asleep", "dim"], [st.broken, "%s broken", "bad"]], T("no style or random variant yet")));
     const sfacts = facts(st);
     sfacts.classList.add("lk-psfacts");
@@ -1137,7 +1143,7 @@ export function hintList() {
 export function where() {
   if (L.layer === 2) return editor.where();
   const m = pickedMod();
-  let s = `${T("looks")}    ${L.search ? "“" + L.search + "”" : m ? m.name : "RimArcho Looks Preference"}    ${L.rows.length ? Math.max(0, L.cursor) + 1 : 0} / ${L.rows.length}`;
+  let s = `${T("looks")}    ${L.search ? "“" + L.search + "”" : m ? m.name : genName()}    ${L.rows.length ? Math.max(0, L.cursor) + 1 : 0} / ${L.rows.length}`;
   if (L.sel.size) s += "  " + Tf("%d selected", L.sel.size);
   return s;
 }

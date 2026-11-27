@@ -41,6 +41,10 @@ const (
 	LooksNoDef      = "nodef"
 )
 
+// LooksStyled is the gallery's Mod argument for the looks that have a style or random
+// variant entry; LooksChosen is the one for the looks that have a choice.
+const LooksStyled = "styles"
+
 // LooksFilters lists the filters in the order the page offers them.
 var LooksFilters = []string{LooksOverridden, LooksOverriding, LooksMixed, LooksChosen, LooksNoDef}
 
@@ -149,10 +153,12 @@ type LooksGroup struct {
 // LooksGallery is the looks of one Mod, of the choices, or of a search.
 type LooksGallery struct {
 	Stamp string `json:"stamp"`
-	// Mod is the selected Mod's position; -1 with Chosen (the looks that have a choice) or
-	// with neither (every look, for a search).
+	// Mod is the selected Mod's position; -1 with Chosen (the looks that have a choice),
+	// with Styles (the looks that have a style or random variant entry) or with none of
+	// them (every look, for a search).
 	Mod    int    `json:"mod"`
 	Chosen bool   `json:"chosen,omitempty"`
+	Styles bool   `json:"styles,omitempty"`
 	Filter string `json:"filter,omitempty"`
 	// Counts are the rows each filter would show, with the search applied; "all" is the
 	// rows without a filter.
@@ -591,7 +597,8 @@ func (r *LookRow) is(filter string) bool {
 }
 
 // BuildLooksGallery lists the looks of the Mod at the position mod names ("12"), the looks
-// that have a choice (mod "chosen"), or every look (mod ""), narrowed by filter (one of
+// that have a choice (mod "chosen"), the looks that have a style or random variant entry
+// (mod "styles"), or every look (mod ""), narrowed by filter (one of
 // LooksFilters, "" none) and by search: every word must be in the look's path, a Def name
 // or label, or, when no Mod is selected, a provider's name.
 func BuildLooksGallery(a *app.App, ls *app.LooksState, mod, filter, search string) (*LooksGallery, error) {
@@ -600,15 +607,30 @@ func BuildLooksGallery(a *app.App, ls *app.LooksState, mod, filter, search strin
 	case "":
 	case LooksChosen:
 		g.Chosen = true
+	case LooksStyled:
+		g.Styles = true
 	default:
 		pos, err := strconv.Atoi(mod)
 		if err != nil || pos < 0 {
-			return nil, fmt.Errorf("mod %q: a position, chosen or nothing", mod)
+			return nil, fmt.Errorf("mod %q: a position, chosen, styles or nothing", mod)
 		}
-		if m := ls.St.Ix.ByID[instanceAt(ls.St, pos)]; app.IsLooks(m) {
+		switch m := ls.St.Ix.ByID[instanceAt(ls.St, pos)]; {
+		case app.IsLooks(m):
 			g.Chosen = true // the RimArcho Looks Preference row shows the choices
-		} else {
+		case app.IsStyles(m):
+			g.Styles = true // and RimArcho Styles Preference the looks with an entry
+		default:
 			g.Mod = pos
+		}
+	}
+	styled := map[string]bool{}
+	if g.Styles {
+		ss, err := a.StylesStateOf(ls)
+		if err != nil {
+			return nil, err
+		}
+		for _, e := range ss.Entries {
+			styled[e.Look] = true
 		}
 	}
 	for _, f := range LooksFilters {
@@ -636,7 +658,7 @@ func BuildLooksGallery(a *app.App, ls *app.LooksState, mod, filter, search strin
 	groups := map[string]int{}
 	for _, l := range ls.Index.Looks {
 		switch {
-		case g.Mod >= 0 && lookProvider(l, g.Mod) == nil, g.Chosen && ls.Looks[l.ID] == nil, !match(l):
+		case g.Mod >= 0 && lookProvider(l, g.Mod) == nil, g.Chosen && ls.Looks[l.ID] == nil, g.Styles && !styled[l.ID], !match(l):
 			continue
 		}
 		row := lookRow(ls, l, g.Mod)

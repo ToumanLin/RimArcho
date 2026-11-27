@@ -173,6 +173,8 @@
   "random variant of the default look": "デフォルトの見た目のランダムバリアント",
   "random variant of the style %s": "スタイル %s のランダムバリアント",
   "each item shows one variant, by its ID; items already in a save may change look": "各アイテムは ID に応じてバリアントの 1 つを表示します。セーブ内の既存アイテムは見た目が変わることがあります",
+  "show the looks that have a style or random variant": "スタイルまたはランダムバリアントのある見た目を表示",
+  "no style or random variant yet: open a look, select a Mod and add": "スタイルもランダムバリアントもまだありません：見た目を開き、Mod を選んで追加してください",
   "this category already has a style for the thing: the game uses one of them per ideoligion, not per item": "このカテゴリにはすでにこの物のスタイルがあります。ゲームはアイテムごとではなく、イデオロギーごとにどれか 1 つを使います",
   "an ideoligion with this style category gives the thing this look": "このスタイルカテゴリを持つイデオロギーでは、この物がこの見た目になります",
   "allow new items to receive this style at random": "新しいアイテムがランダムにこのスタイルになることを許可",

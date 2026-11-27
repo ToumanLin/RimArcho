@@ -56,7 +56,8 @@ export function applyLines(facts, done, w) {
 
 // addLines: the lines of the first add's confirmation, for a style (kind "style") or a random
 // variant; done is the dry run (view.LookStyleDone), whose note is Go's sentence for the
-// chosen target (a category that already has a style for the thing says so there).
+// chosen target (a category that already has a style for the thing says so there); a random
+// variant's note is left out, since the lines above already say it.
 export function addLines(facts, done, kind, w) {
   const { T } = w, style = kind !== "variant";
   const lines = [...facts.map(([k, v]) => k + ": " + v), T("folder") + ": " + done.dir,
@@ -66,7 +67,7 @@ export function addLines(facts, done, kind, w) {
       : T("The Def lets the game pick one of the textures for each item. Items you already have may change look."),
     style ? T("Items that got the style go back to their default look if RimArcho Styles Preference is removed.")
       : T("Saves do not depend on a random variant.")];
-  if (done.note) lines.push(done.note);
+  if (style && done.note) lines.push(done.note);
   if (done.added) lines.push(T("This list gains RimArcho Styles Preference near its end: one step of the list's undo."));
   if (done.dirChosen) lines.push(T("The folder is created now."));
   if (done.buildError) lines.push(done.buildError);

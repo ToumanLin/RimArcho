@@ -173,6 +173,8 @@
   "random variant of the default look": "기본 외형의 무작위 변형",
   "random variant of the style %s": "스타일 %s의 무작위 변형",
   "each item shows one variant, by its ID; items already in a save may change look": "각 아이템은 ID에 따라 변형 중 하나를 표시합니다. 세이브에 이미 있는 아이템은 외형이 바뀔 수 있습니다",
+  "show the looks that have a style or random variant": "스타일 또는 무작위 변형이 있는 외형 표시",
+  "no style or random variant yet: open a look, select a Mod and add": "아직 스타일이나 무작위 변형이 없습니다: 외형을 열고 Mod를 선택한 뒤 추가하세요",
   "this category already has a style for the thing: the game uses one of them per ideoligion, not per item": "이 범주에는 이미 이 사물의 스타일이 있습니다. 게임은 아이템마다가 아니라 이념마다 그중 하나를 사용합니다",
   "an ideoligion with this style category gives the thing this look": "이 스타일 범주를 쓰는 이념에서 이 사물이 이 외형으로 보입니다",
   "allow new items to receive this style at random": "새 아이템이 무작위로 이 스타일을 받도록 허용",

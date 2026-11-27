@@ -173,6 +173,8 @@
   "random variant of the default look": "默认外观的随机变体",
   "random variant of the style %s": "风格 %s 的随机变体",
   "each item shows one variant, by its ID; items already in a save may change look": "每件物品按它的 ID 显示其中一个变体；存档里已有的物品可能变样",
+  "show the looks that have a style or random variant": "显示有风格或随机变体的外观",
+  "no style or random variant yet: open a look, select a Mod and add": "还没有风格或随机变体：打开一个外观，选中一个 Mod 再添加",
   "this category already has a style for the thing: the game uses one of them per ideoligion, not per item": "这个类别已经有这件物品的风格：游戏按文化选其中一个，而不是按每件物品",
   "an ideoligion with this style category gives the thing this look": "用这个风格类别的文化会让这件物品显示这个外观",
   "allow new items to receive this style at random": "允许新物品随机获得这个风格",

@@ -375,6 +375,9 @@ func TestLooksApplyManyIsOneUndoStep(t *testing.T) {
 	if byRow, _ := view.BuildLooksGallery(e.App, ls, "4", "chosen", ""); galleryIDs(byRow) != "shirt gun" {
 		t.Fatalf("the generated Mod's row shows %q", galleryIDs(byRow))
 	}
+	if none, err := view.BuildLooksGallery(e.App, ls, "styles", "", ""); err != nil || !none.Styles || none.Mod != -1 || none.Rows != 0 {
+		t.Fatalf("styles without an entry %+v %v", none, err)
+	}
 	det, err := view.BuildLookDetail(e.App, ls, looksGun, 2, "plan")
 	if err != nil || !det.CanUndo || len(det.Choices) != 1 || det.Choices[0].Scope != "plan" || det.Choices[0].Slot != "all" || det.Choices[0].Mod != "Bravo" || det.Choices[0].State != "applied" ||
 		det.Slots[0].InGame != 2 || !det.Slots[0].ByChoice || det.Slots[0].State != "applied" {
@@ -473,6 +476,9 @@ func TestLookAddRowAndStylesCard(t *testing.T) {
 	done, err := view.LookStyleAdd(ctx, e.App, looksHat, "pkg:looks.a", app.StyleKindStyle, "Rustic", true, false)
 	if err != nil || done.Text != "style in Rustic added for all lists" || !done.Added || done.Note == "" || done.Entry.ID == 0 || !done.Entry.Random || done.Entry.Mod != "Alpha" {
 		t.Fatalf("add: %+v %v", done, err)
+	}
+	if styled, err := view.BuildLooksGallery(e.App, looksState(t, e), "styles", "", ""); err != nil || !styled.Styles || styled.Rows != 1 || styled.Groups[0].Rows[0].ID != looksHat {
+		t.Fatalf("the looks with an entry: %+v %v", styled, err)
 	}
 	g := done.Overview.Styles
 	if g.Name != "RimArcho Styles Preference" || g.Active != 1 || g.Skipped+g.Broken+g.Asleep != 0 || g.Files != 1 || g.Linked != 1 || g.Bytes == 0 || g.Dir == "" || g.DirChosen || g.Entry != 6 || g.Confirmed {

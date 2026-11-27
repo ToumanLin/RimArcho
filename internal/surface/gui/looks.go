@@ -232,7 +232,8 @@ func (s *API) LooksLeave() {
 }
 
 // LooksGallery lists the looks of one Mod (mod: its position, as "12"), of the choices
-// (mod "chosen") or of the whole plan (mod ""), narrowed by a filter and a search.
+// (mod "chosen"), of the style and random variant entries (mod "styles") or of the whole
+// plan (mod ""), narrowed by a filter and a search.
 func (s *API) LooksGallery(mod, filter, search string) (*view.LooksGallery, error) {
 	return withLooks(s, func(ls *app.LooksState) (*view.LooksGallery, error) {
 		return view.BuildLooksGallery(s.a, ls, mod, filter, search)

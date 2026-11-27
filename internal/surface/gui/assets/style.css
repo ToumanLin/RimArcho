@@ -3757,8 +3757,7 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .lk-prow .pv { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0 12px; margin-left: auto; color: var(--fg-2); font-size: 12px; font-variant-numeric: tabular-nums; }
 .lk-prow .pv .dim { color: var(--faint); }
 .lk-prow .pv .bad { color: var(--red); }
-.lk-prow.lk-pstyles { margin-top: 4px; cursor: default; }
-.lk-prow.lk-pstyles:hover { background: none; }
+.lk-prow.lk-pstyles { margin-top: 4px; }
 .lk-pfacts { display: flex; flex-wrap: wrap; gap: 0 12px; padding: 0 8px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .lk-pdir { max-width: 100%; padding: 0 8px; color: var(--muted); font-size: 12px; }
 .lk-pnote { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 2px 0 0; padding: 0 8px; color: var(--muted); font-size: 12px; line-height: 1.4; }
