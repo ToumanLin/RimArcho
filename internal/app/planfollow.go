@@ -252,7 +252,7 @@ func (a *App) checkFollowed(st *LoadoutState, p *store.Plan, ref string, force b
 	out := make([]*Followed, 0, len(cs))
 	for _, c := range cs {
 		if force || c.Checked.IsZero() || now.Sub(c.Checked) >= CheckEvery {
-			col, err := a.ReadCollection(c.WorkshopID)
+			col, err := a.readCollection(c.WorkshopID, knownTitles(c))
 			if err != nil {
 				errs = append(errs, fmt.Errorf("%s: %w", c.Title, err))
 			} else {
@@ -268,6 +268,19 @@ func (a *App) checkFollowed(st *LoadoutState, p *store.Plan, ref string, force b
 		out = append(out, followedOf(st, c))
 	}
 	return out, errors.Join(errs...)
+}
+
+// knownTitles are the item titles a followed collection already has.
+func knownTitles(c *store.PlanCollection) map[string]string {
+	out := make(map[string]string, len(c.Seen)+len(c.Snapshot))
+	for _, l := range [][]store.CollectionItem{c.Snapshot, c.Seen} {
+		for _, it := range l {
+			if it.Title != "" {
+				out[it.WorkshopID] = it.Title
+			}
+		}
+	}
+	return out
 }
 
 // SyncResult is what catching up with a collection did (or would do).
@@ -290,6 +303,17 @@ type SyncResult struct {
 // The snapshot becomes what the collection holds now. ref "" needs exactly one followed
 // collection. dryRun changes nothing.
 func (a *App) SyncCollection(planName, ref string, dryRun bool) (*SyncResult, error) {
+	return a.syncCollection(planName, ref, dryRun, true)
+}
+
+// SyncCollectionShown catches up with the collection as RimArcho last read it, without the
+// network: the changes the player saw on the card (16 §2.17) are the ones made, however
+// long ago it was read.
+func (a *App) SyncCollectionShown(planName, ref string) (*SyncResult, error) {
+	return a.syncCollection(planName, ref, false, false)
+}
+
+func (a *App) syncCollection(planName, ref string, dryRun, read bool) (*SyncResult, error) {
 	st, err := a.Loadout()
 	if err != nil {
 		return nil, err
@@ -312,11 +336,20 @@ func (a *App) SyncCollection(planName, ref string, dryRun bool) (*SyncResult, er
 			return nil, fmt.Errorf("%s follows %d collections: name one (archo plan sync %s <ID>)", PlanRef(p), len(cs), quoteName(p.Name))
 		}
 	}
-	fs, err := a.checkFollowed(st, p, ref, false)
-	if err != nil {
-		return nil, err
+	var f *Followed
+	if read {
+		fs, err := a.checkFollowed(st, p, ref, false)
+		if err != nil {
+			return nil, err
+		}
+		f = fs[0]
+	} else {
+		c, err := a.planFollow(st, p, ref)
+		if err != nil {
+			return nil, err
+		}
+		f = followedOf(st, c)
 	}
-	f := fs[0]
 	ps, err := a.PlanState(st, p)
 	if err != nil {
 		return nil, err
@@ -370,8 +403,10 @@ func (a *App) SyncCollection(planName, ref string, dryRun bool) (*SyncResult, er
 		return r, nil
 	}
 	if err := a.editPlan(p, ps.WS, r.Before, after, "sync collection "+f.Title); err != nil {
+		a.logSync(r, err)
 		return nil, err
 	}
+	a.logSync(r, nil)
 	if ps == st {
 		st.List = after
 	}

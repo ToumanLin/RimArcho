@@ -844,8 +844,10 @@ function collection(p, f) {
     sync.dataset.envWrite = "plan-sync";
     sync.onclick = async () => {
       sync.disabled = true;
+      sync.classList.add("busy");
+      say("busy", T("catching up…"));
       let tx;
-      try { tx = await api.PlanSync(p.id, f.id); } catch (e) { sync.disabled = false; return say("fail", errText(e)); }
+      try { tx = await api.PlanSync(p.id, f.id); } catch (e) { sync.disabled = false; sync.classList.remove("busy"); return say("fail", errText(e)); }
       M.open.delete(key);
       await ui.reload();
       await open();
@@ -862,7 +864,9 @@ function collection(p, f) {
     }
   } else if (f.checked) {
     const same = el("div", "same");
-    same.append(ic("ok"), T("same as the collection"));
+    // the collection did not change since the snapshot (07 §7.6); what is not installed or
+    // not enabled is the line above's business, so this never claims the list matches it
+    same.append(ic("ok"), T("no change since the last catch-up"));
     c.append(same);
   }
 

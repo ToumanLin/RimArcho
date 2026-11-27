@@ -315,19 +315,20 @@ func UnfollowPlan(a *app.App, id int64, ws string) (string, error) {
 	return Tf("%s no longer follows %s; the list is unchanged", p.Name, c.Title), nil
 }
 
-// SyncPlan catches a list up with a collection: one undoable edit of that list.
+// SyncPlan catches a list up with a collection as its card shows it (no network): one
+// undoable edit of that list.
 func SyncPlan(a *app.App, id int64, ws string) (string, error) {
 	p, err := planByID(a, id)
 	if err != nil {
 		return "", err
 	}
-	r, err := a.SyncCollection(p.Name, ws, false)
+	r, err := a.SyncCollectionShown(p.Name, ws)
 	if err != nil {
 		return "", errors.New(Humanize(nil, err.Error()))
 	}
 	t := Tf("%s caught up with %s: %d enabled", p.Name, r.Collection.Title, len(r.Enabled))
 	if len(r.Disabled) > 0 {
-		t += ", " + Tf("%d disabled", len(r.Disabled))
+		t += T(", ") + Tf("%d disabled", len(r.Disabled))
 	}
 	if len(r.NotInstalled) > 0 {
 		t += "  " + Tf("%d not installed", len(r.NotInstalled))
