@@ -3884,3 +3884,11 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
   .lk-l1 { --lk-side: 260px; }
   .lk-l2 { --lk-e0: 168px; --lk-e2: 260px; }
 }
+
+/* looks view: the filter bar is a card of its own over the gallery; the editor's page actions are not shown */
+#planhead.looks-on .page-acts { display: none; }
+#planhead.looks-on .lk-scope { margin-left: auto; }
+.lk-left { grid-row: 1; }
+.lk-gline { flex: none; display: flex; align-items: center; gap: 6px; padding-right: 6px; }
+.lk-gline > .anum { margin-left: 14px; }
+.lk-gline > .lk-ghead { flex: 1; min-width: 0; padding-left: 4px; padding-top: 0; align-items: center; }

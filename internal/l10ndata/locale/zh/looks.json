@@ -154,5 +154,7 @@
   "which texture": "哪张贴图",
   "worn": "穿着",
   "worn condition": "穿着状态",
-  "your choice": "你的选择"
+  "your choice": "你的选择",
+  "search looks; filter Mods: tags:, source:, content:": "搜索外观；筛选 Mod：tags:、source:、content:",
+  "no Mod with textures passes the filter": "没有带贴图的 Mod 符合筛选条件"
 }

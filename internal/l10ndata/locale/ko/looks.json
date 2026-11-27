@@ -154,5 +154,7 @@
   "which texture": "어느 텍스처",
   "worn": "착용",
   "worn condition": "착용 상태",
-  "your choice": "내 선택"
+  "your choice": "내 선택",
+  "search looks; filter Mods: tags:, source:, content:": "외형 검색, Mod 필터: tags:, source:, content:",
+  "no Mod with textures passes the filter": "텍스처가 있는 Mod 중 필터에 맞는 것이 없습니다"
 }

@@ -72,7 +72,7 @@ export function createBar(opts) {
     (data().groups || [])
       .filter((g) => g.key !== "location")
       .sort((a, b) => {
-        const order = ["files", "lists", "tag", "source", "category", "content"];
+        const order = ["files", "looks", "lists", "tag", "source", "category", "content"];
         return (order.includes(a.key) ? order.indexOf(a.key) : 9) - (order.includes(b.key) ? order.indexOf(b.key) : 9);
       });
   // Derive completion from the active query span without changing stored conditions.
@@ -429,7 +429,7 @@ export function createBar(opts) {
     const ordered = groups();
     ordered.forEach((g) => {
       const gi = (d.groups || []).indexOf(g);
-      if (!["files", "lists", "tag", "source", "category", "content"].includes(g.key)) {
+      if (!["files", "looks", "lists", "tag", "source", "category", "content"].includes(g.key)) {
         return;
       }
       const vals = lineOf(g);

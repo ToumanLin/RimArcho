@@ -154,5 +154,7 @@
   "which texture": "какая текстура",
   "worn": "надето",
   "worn condition": "в надетом виде",
-  "your choice": "ваш выбор"
+  "your choice": "ваш выбор",
+  "search looks; filter Mods: tags:, source:, content:": "поиск: виды; фильтр модов: tags:, source:, content:",
+  "no Mod with textures passes the filter": "нет модов с текстурами, проходящих фильтр"
 }

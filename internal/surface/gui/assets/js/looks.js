@@ -4,14 +4,15 @@
 // (2), the editor's own load-order rules card (3) and the _Archo_Looks card (4). A look
 // opens the looks editor (lookseditor.js). Every winner, state, count and prediction comes
 // from Go (internal/view/looks.go); nothing of them is worked out here.
-import { S, $, el, esc, api, T, Tf, say, errText, keyCaps, cur, ROW_H } from "./state.js";
+import { S, $, el, esc, api, T, Tf, say, errText, cur, ROW_H } from "./state.js";
 import { icon, sourceIcon } from "./icons.js";
-import { choiceControl } from "./choices.js";
 import { wireSeparator } from "./separator.js";
 import { copyablePath } from "./fields.js";
 import { progress } from "./feedbacksemantics.js";
 import * as pop from "./popups.js";
 import { setRulesNumber, showRules } from "./rules.js";
+import { createBar } from "./filterbar.js";
+import { queryParts } from "./searchsuggest.js";
 import { GRID, gridLayout, visibleRows, stepCard, scrollFor, texURL } from "./looksgrid.js";
 import { applyGate, CONFIRMED_KEY } from "./looksconfirm.js";
 import * as editor from "./lookseditor.js";
@@ -30,6 +31,11 @@ const L = {
   pick: null,     // what the gallery shows: { pos } a Mod, { chosen: true } the choices
   modCursor: 0,   // the Mods card's cursor (an index into mods())
   filter: "", search: "",
+  bar: null,      // the filter bar (filterbar.js), a card of its own over the gallery
+  barData: null,  // what the bar's panel lists: the look states, then the editor's groups (view.BarFilter)
+  modQuery: "",   // the part of the query that filters Mods, as in the editor
+  modSet: null,   // the plan positions that pass it; null: every Mod
+  barSeq: 0,
   rows: [], layout: null, drawn: new Map(),
   sel: new Set(), cursor: -1, anchor: -1,
   seq: 0, galSeq: 0,
@@ -75,23 +81,25 @@ function build() {
   const l1 = el("div", "lk-l1");
   const gal = el("section", "area lk-gal");
   gal.dataset.area = "looks-1";
-  const bar = el("div", "fbar-row lk-bar");
-  const box = el("div", "fbar-search");
-  const input = el("input");
-  input.spellcheck = false;
-  input.autocomplete = "off";
-  box.append(input);
   const refresh = el("button", "icon lk-refresh");
   refresh.type = "button";
   refresh.innerHTML = icon.rescan;
   refresh.onclick = () => load(true);
-  bar.append(el("span", "anum", "1"), box, el("span", "lk-filter"), refresh);
+  // the editor's filter bar, a card of its own: the same query, plus the look states
+  L.bar = createBar({
+    cls: "lk-fbar", data: () => L.barData, change: () => barChanged(), splitKey: "ui.gui.filter.split:looks",
+    column: () => $("#looks .lk-left"), resized: () => relayout(true), leave: () => focusCard(1),
+    placeholder: () => T("search looks; filter Mods: tags:, source:, content:") + "  /",
+  });
+  const ghead = el("div", "lk-ghead");
+  const gline = el("div", "lk-gline");
+  gline.append(el("span", "anum", "1"), ghead, refresh);
   const sc = el("div", "lk-scroll");
   sc.tabIndex = -1;
   sc.setAttribute("role", "listbox");
   sc.setAttribute("aria-multiselectable", "true");
   sc.append(el("div", "lk-space"));
-  gal.append(bar, el("div", "lk-ghead"), sc, el("div", "lk-note"), el("div", "lk-act"));
+  gal.append(gline, sc, el("div", "lk-note"), el("div", "lk-act"));
   $(".lk-note", gal).hidden = true;
   $(".lk-act", gal).hidden = true;
 
@@ -108,7 +116,9 @@ function build() {
   pref.dataset.area = "looks-4";
   pref.append(el("div", "head"), el("div", "lk-prefbody"));
   side.append(mods, pref);
-  l1.append(gal, split, side);
+  const left = el("div", "fcol lk-left");
+  left.append(L.bar.el, gal);
+  l1.append(left, split, side);
   const l2 = el("div", "lk-l2");
   l2.hidden = true;
   r.append(l1, l2);
@@ -124,18 +134,6 @@ function build() {
     changed: () => relayout(true),
   });
 
-  let typed = 0;
-  input.addEventListener("input", () => {
-    clearTimeout(typed);
-    typed = setTimeout(() => { L.search = input.value.trim(); clearPicked(); loadGallery(); }, 160);
-  });
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      e.preventDefault(); e.stopPropagation();
-      if (input.value) { input.value = ""; L.search = ""; loadGallery(); }
-      focusCard(1);
-    } else if (e.key === "ArrowDown" || e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusCard(1); }
-  });
   let frame = 0;
   sc.addEventListener("scroll", () => { if (!frame) frame = requestAnimationFrame(() => { frame = 0; drawRows(); }); }, { passive: true });
   let resized = 0;
@@ -234,6 +232,7 @@ function leave() {
 
 function drop() {
   L.ov = null; L.gal = null; L.rows = []; L.layout = null; L.pick = null; L.error = ""; L.warn = null;
+  L.modSet = null; L.barEditor = null; L.modQuery = "";
   for (const e of L.drawn.values()) e.remove();
   L.drawn.clear();
 }
@@ -303,6 +302,7 @@ async function load(fresh) {
   drawSide();
   if (L.layer === 2) return editor.reload();
   await loadGallery(fresh);
+  barChanged(); // the panel's groups, and the Mods the query passes
 }
 
 function setOverview(ov) {
@@ -321,9 +321,9 @@ function setOverview(ov) {
 }
 
 // the Mods the Mods card lists: load order, without _Archo_Looks (it has its own card)
-const mods = () => (L.ov ? L.ov.mods.filter((m) => !m.generated) : []);
+const mods = () => (L.ov ? L.ov.mods.filter((m) => !m.generated && (!L.modSet || L.modSet.has(m.pos))) : []);
 const modAt = (pos) => (L.ov ? L.ov.mods.find((m) => m.pos === pos) : null) || null;
-const pickedMod = () => (L.pick && !L.pick.chosen && !L.search ? modAt(L.pick.pos) : null);
+const pickedMod = () => (L.pick && !L.pick.chosen && !L.pick.none && !L.search ? modAt(L.pick.pos) : null);
 
 async function setScope(v) {
   if (v === L.scope) return;
@@ -338,9 +338,60 @@ async function setScope(v) {
 
 // ---- the gallery ----
 
+// barQuery splits the bar's query (16 §2.5 Looks view): looks:<state> filters the looks, bare
+// words search the looks of the whole list, and everything else filters the Mods as in the
+// editor. One look state at a time: the last one stays in the query.
+function barQuery() {
+  const parts = queryParts(L.bar.search);
+  const states = parts.filter((p) => p.key === "looks");
+  const state = states.filter((p) => !p.negative && FILTERS.includes(p.value.toLowerCase())).pop();
+  if (states.length > (state ? 1 : 0)) L.bar.setText(parts.filter((p) => p.key !== "looks" || p === state).map((p) => p.raw).join(" "));
+  return {
+    filter: state ? state.value.toLowerCase() : "",
+    search: parts.filter((p) => !p.key && !p.negative).map((p) => p.value).join(" "),
+    mods: parts.filter((p) => p.key !== "looks" && (p.key || p.negative)).map((p) => p.raw).join(" "),
+  };
+}
+
+function barGroups(editor) {
+  const counts = (L.gal && L.gal.counts) || {};
+  const label = { overridden: T("overridden"), overriding: T("overriding"), mixed: T("mixed"), chosen: T("chosen"), nodef: T("no def") };
+  const values = FILTERS.map((f) => ({ filter: "looks:" + f, label: label[f], count: counts[f] || 0, on: L.filter === f ? 1 : 0 }));
+  return [{ key: "looks", title: T("looks"), values }, ...((editor && editor.groups) || [])];
+}
+
+// barChanged: the bar's query or panel changed. The Mods card keeps the Mods the query
+// passes, the gallery the looks.
+async function barChanged() {
+  if (!L.on || !L.ov) return;
+  const n = ++L.barSeq, q = barQuery();
+  const fresh = q.filter !== L.filter || q.search !== L.search || q.mods !== L.modQuery;
+  L.filter = q.filter; L.search = q.search; L.modQuery = q.mods;
+  let d = null;
+  try { d = await api.BarFilter(q.mods, [], true); } catch { d = null; }
+  if (n !== L.barSeq || !L.on) return;
+  L.barEditor = d;
+  L.modSet = q.mods && d ? new Set((d.rows || [])[1] || []) : null;
+  const list = mods();
+  if (L.pick && !L.pick.chosen && !list.some((m) => m.pos === L.pick.pos)) {
+    L.pick = list.length ? { pos: list[0].pos } : { none: true };
+    L.modCursor = 0;
+  } else if (L.pick?.none && list.length) { L.pick = { pos: list[0].pos }; L.modCursor = 0; }
+  drawSide();
+  if (fresh) { clearPicked(); await loadGallery(); }
+  if (n !== L.barSeq) return;
+  L.barData = { groups: barGroups(d), conds: (d && d.conds) || [], complete: d ? d.complete : "" };
+  L.bar.draw();
+}
+
 async function loadGallery(keep = false) {
   if (!L.on || !L.ov) return;
   const n = ++L.galSeq, top = scroller().scrollTop, at = L.rows[L.cursor]?.id;
+  if (L.pick?.none && !L.search) { // no Mod passes the bar's conditions
+    L.galSeq++; L.error = ""; L.gal = { groups: [], counts: {}, rows: 0, stamp: L.ov.stamp }; L.rows = [];
+    drawFilter(); drawHead(); relayout(false); drawNote(); drawAct(); L.ui.renderWhere();
+    return;
+  }
   const args = L.search ? ["", L.filter, L.search] : L.pick?.chosen ? ["chosen", L.filter, ""] : [String(L.pick ? L.pick.pos : ""), L.filter, ""];
   let g;
   try { g = await reading(() => api.LooksGallery(...args)); } catch (e) {
@@ -467,17 +518,8 @@ function revive(img) {
 }
 
 function drawFilter() {
-  const host = $("#looks .lk-filter"), counts = (L.gal && L.gal.counts) || {};
-  const label = { overridden: T("overridden"), overriding: T("overriding"), mixed: T("mixed"), chosen: T("chosen"), nodef: T("no def") };
-  const options = [{ value: "", label: T("all") + "  " + num(counts.all) },
-    ...FILTERS.map((f) => ({ value: f, label: label[f] + "  " + num(counts[f]), disabled: !counts[f] && f !== L.filter }))];
-  const c = choiceControl(T("filter"), options, L.filter);
-  c.classList.add("lk-filter-choice");
-  c.onchange = () => { L.filter = c.value; clearPicked(); loadGallery(); };
-  host.replaceChildren(el("span", "lk-lbl", T("filter")), c, keyCaps("\\"));
-  const input = $("#looks .fbar-search input");
-  input.placeholder = T("search Mods, defs, labels, texture paths") + "  /";
-  input.setAttribute("aria-label", T("search"));
+  L.barData = { groups: barGroups(L.barEditor), conds: (L.barEditor && L.barEditor.conds) || [], complete: L.barEditor ? L.barEditor.complete : "" };
+  L.bar.draw();
   const refresh = $("#looks .lk-refresh");
   refresh.title = T("refresh: read the Mod folders again");
   refresh.setAttribute("aria-label", refresh.title);
@@ -514,6 +556,7 @@ function drawNote() {
   else if (L.gal && !L.rows.length) {
     const m = pickedMod();
     if (L.search) text = Tf("no look matches “%s”", L.search);
+    else if (L.pick?.none) text = T("no Mod with textures passes the filter");
     else if (L.filter && m) text = Tf("%s has no look under this filter", m.name);
     else if (L.filter) text = T("no look under this filter");
     else if (L.pick?.chosen) text = T("no choice yet: open a look, select a Mod and apply");
@@ -530,7 +573,7 @@ function drawNote() {
     box.append(b);
   } else if (L.filter && L.ov.looks) {
     const b = el("button", "btn small", T("clear the filter"));
-    b.onclick = () => { L.filter = ""; loadGallery(); };
+    b.onclick = () => L.bar.set("looks:" + L.filter, 0);
     box.append(b);
   }
 }
@@ -583,7 +626,7 @@ function drawMods(reset = false) {
     box.replaceChildren();
     pad = el("div", "pad");
     box.append(pad);
-    if (!list.length) box.append(el("div", "empty", T("no Mod of this list ships textures")));
+    if (!list.length) box.append(el("div", "empty", L.modSet ? T("no Mod with textures passes the filter") : T("no Mod of this list ships textures")));
   }
   pad.style.height = list.length * ROW_H + "px";
   box.style.setProperty("--pw", Math.max(3, String(list.length ? list[list.length - 1].no : 0).length) + "ch");
@@ -629,8 +672,7 @@ function showMod(i, soon = false) {
   if (!list[i]) return;
   L.modCursor = i;
   L.pick = { pos: list[i].pos };
-  L.search = "";
-  $("#looks .fbar-search input").value = "";
+  dropWords();
   clearPicked();
   modIntoView();
   drawMods();
@@ -658,8 +700,7 @@ export function ruleTarget() {
 
 function showChosen() {
   L.pick = { chosen: true };
-  L.search = "";
-  $("#looks .fbar-search input").value = "";
+  dropWords();
   clearPicked();
   drawMods();
   drawPref();
@@ -980,8 +1021,14 @@ function focusCard(n) {
   L.ui.renderHints();
 }
 
-function openFilter() { markFocus(1); $("#looks .lk-filter-choice")?.focus(); $("#looks .lk-filter-choice")?.click(); }
-function openSearch() { markFocus(1); const i = $("#looks .fbar-search input"); i.focus(); i.select(); }
+// dropWords takes the search words out of the bar: a Mod was picked, its looks show
+function dropWords() {
+  if (!L.search) return;
+  L.search = "";
+  L.bar.setText(queryParts(L.bar.search).filter((p) => p.key || p.negative).map((p) => p.raw).join(" "));
+}
+function openFilter() { L.bar.toggle(); }
+function openSearch() { L.bar.focus(); }
 
 // key handles a key of the looks view; false leaves it to the editor's list-level keys
 // (save, launch, the pages). The arrows only move; enter opens; space selects.
@@ -997,7 +1044,7 @@ export function key(e) {
   if (k === "Escape") {
     if (L.warn) { L.warn = null; drawAct(); }
     else if (L.sel.size) { clearPicked(); paintPicked(); }
-    else if (L.filter || L.search) { L.filter = ""; L.search = ""; $("#looks .fbar-search input").value = ""; loadGallery(); }
+    else if (L.filter || L.search) { L.bar.clear(); }
     return take();
   }
   if (L.focus === 2) {
