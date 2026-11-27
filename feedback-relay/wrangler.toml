@@ -13,7 +13,7 @@ PER_IP_DAY = "5"       # reports a day from one sender
 PER_DAY = "30"         # reports a day from everyone; 0 stops sending
 # slow-check timings (README step 8): the one issue they are added to as comments; empty
 # answers 404, which RimArcho takes quietly
-TIMINGS_ISSUE = ""
+TIMINGS_ISSUE = "34"
 TIMINGS_PER_IP_DAY = "2"  # timings a day from one sender
 TIMINGS_PER_DAY = "100"   # timings a day from everyone
 
