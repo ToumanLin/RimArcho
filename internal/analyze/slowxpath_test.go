@@ -47,7 +47,7 @@ func TestSlowXPathNotSimulated(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d := time.Since(t0); d > 30*time.Second {
+	if d := time.Since(t0); d > timingLimit(30*time.Second) {
 		t.Errorf("the check took %v: the budget did not stop the slow evaluations", d)
 	}
 	for seq, want := range map[int]string{1: ResultUnknown, 2: ResultOK, 3: ResultUnknown, 4: ResultFailed} {

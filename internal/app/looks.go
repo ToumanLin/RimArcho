@@ -92,9 +92,6 @@ func volumeRoot(path string) string {
 	return filepath.VolumeName(path) + string(filepath.Separator)
 }
 
-// looksModDir is the folder of RimArcho Looks Preference in the looks directory dir.
-func looksModDir(dir string) string { return looksGen.dir(dir) }
-
 // looksDirReady checks a looks directory like the Monitor folder (19 §6): it must not
 // contain or be contained by the data directory or another source root.
 func (a *App) looksDirReady(dir string) error {

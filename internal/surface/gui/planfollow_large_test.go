@@ -147,7 +147,7 @@ func TestCatchUpLargeCollectionTiming(t *testing.T) {
 		b, _ := json.Marshal(f)
 		t.Fatalf("after catching up: %s", b)
 	}
-	if total := sync + ws + pm; total > time.Second {
+	if total := sync + ws + pm; total > timingLimit(time.Second) {
 		t.Fatalf("catching up and reading the page again took %v", total)
 	}
 }
