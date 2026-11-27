@@ -439,5 +439,13 @@
   "caches %s": "кэши %s",
   "proxy: %s": "прокси: %s",
   "mirror: %s": "зеркало: %s",
-  "development version": "версия для разработки"
+  "development version": "версия для разработки",
+  "changelog": "список изменений",
+  "unreleased": "не выпущено",
+  "Aerospace Engineering, UCLA, class of 2027": "UCLA, аэрокосмическая инженерия, выпуск 2027 года",
+  "Looking for full-time aerospace roles from spring 2027": "Ищу постоянную работу в аэрокосмической отрасли с весны 2027 года",
+  "Website": "сайт",
+  "older versions": "более ранние версии",
+  "the version you are running": "версия, которую вы используете",
+  "%d versions: read them in the window (archo gui) or in CHANGELOG.md": "версий: %d; читайте их в окне (archo gui) или в CHANGELOG.md"
 }

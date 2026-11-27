@@ -232,6 +232,25 @@ func settingsText(b *strings.Builder, g view.SettingGroup, in string) {
 	if g.Note != "" {
 		fmt.Fprintf(b, "%s  %s\n", in, g.Note)
 	}
+	// About's author: every line and link in full (16 §2.14)
+	if c := g.Author; c != nil {
+		fmt.Fprintf(b, "%s  %s  %s\n", in, c.Name, c.Handle)
+		for _, l := range append(slices.Clone(c.Lines), c.Seeking) {
+			fmt.Fprintf(b, "%s  %s\n", in, l)
+		}
+		for _, link := range c.Links {
+			fmt.Fprintf(b, "%s    %s: %s\n", in, link.Label, link.URL)
+		}
+	}
+	// the changelog is long: the running version's heading here, the text in the window
+	if c := g.Changelog; c != nil && len(c.Versions) > 0 {
+		for _, v := range c.Versions {
+			if v.Current {
+				fmt.Fprintf(b, "%s  %s  %s\n", in, v.Title, v.Note)
+			}
+		}
+		fmt.Fprintf(b, "%s    %s\n", in, Tf("%d versions: read them in the window (archo gui) or in CHANGELOG.md", len(c.Versions)))
+	}
 	for _, it := range g.Items {
 		value := it.Value
 		if it.URL != "" {

@@ -439,5 +439,13 @@
   "caches %s": "缓存 %s",
   "proxy: %s": "代理：%s",
   "mirror: %s": "镜像：%s",
-  "development version": "开发版"
+  "development version": "开发版",
+  "changelog": "更新日志",
+  "unreleased": "未发布",
+  "Aerospace Engineering, UCLA, class of 2027": "加州大学洛杉矶分校 航空航天工程 2027 届",
+  "Looking for full-time aerospace roles from spring 2027": "正在寻找航空航天方向的全职工作（2027 年春起）",
+  "Website": "个人网站",
+  "older versions": "更早的版本",
+  "the version you are running": "正在使用的版本",
+  "%d versions: read them in the window (archo gui) or in CHANGELOG.md": "共 %d 个版本：在窗口（archo gui）或 CHANGELOG.md 中查看"
 }

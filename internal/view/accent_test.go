@@ -49,12 +49,13 @@ func TestAppearanceThemeRow(t *testing.T) {
 	defer view.SetLang("en")
 	for _, lang := range []string{"en", "zh"} {
 		view.SetLang(lang)
+		// About's sections (RimArcho, author, changelog), then Interface
 		groups := view.SettingSections(view.SettingsPage(e.App, nil))
-		if groups[0].Title != view.T("about") || groups[1].Title != view.T("interface") {
+		if groups[0].Key != view.GroupAbout || groups[3].Title != view.T("interface") {
 			t.Fatalf("first group: %s", groups[0].Title)
 		}
 		found := 0
-		for _, item := range groups[1].Items {
+		for _, item := range groups[3].Items {
 			if strings.Join(item.Argv, " ") != "config set ui.theme {}" {
 				continue
 			}

@@ -3648,6 +3648,33 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .folder-fold-warn svg { width: 14px; height: 14px; }
 .folder-fold-rows { border-top: var(--hairline) solid var(--line-2); }
 .folder-fold-rows .set { padding-left: 42px; }
+/* Settings › About (16 §2.14): the author, then the changelog's versions as Folders' folds */
+.about-author { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 24px; padding: 14px; }
+.aa-text { flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.aa-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; }
+.aa-n { font-size: 13px; font-weight: 600; color: var(--fg); }
+.aa-seek { color: var(--accent); font-weight: 500; }
+.aa-links { flex: none; }
+.cl-head .cl-v { font-weight: 500; }
+.cl-head .cl-v.current { color: var(--accent); }
+.cl-older > .cl-head { color: var(--muted); }
+.cl-body { border-top: var(--hairline) solid var(--line-2); }
+.cl-body[hidden] { display: none; }
+.cl-body > .folder-fold:first-child { border-top: 0; }
+/* a folded version inside "older versions": its own chevron, one step in */
+.cl .folder-fold:not(.open) > .cl-head .fold-chev { transform: none; }
+.cl-older > .cl-body > .cl-ver > .cl-head { padding-left: 38px; }
+.cl-older > .cl-body > .cl-ver > .cl-body > .cl-md { padding-left: 66px; }
+.cl-md { padding: 6px 18px 12px 42px; max-width: 860px; overflow-wrap: anywhere; font-size: 13px; line-height: 1.55; color: var(--fg-2); -webkit-user-select: text; user-select: text; }
+.cl-md ul { margin: 4px 0; padding-left: 18px; }
+.cl-md li { margin: 3px 0; }
+.cl-md li::marker { color: var(--faint); }
+.cl-md p { margin: 6px 0; }
+.cl-md .cl-h { margin: 14px 0 4px; font-size: 13px; font-weight: 600; color: var(--fg); }
+.cl-md strong { font-weight: 600; color: var(--fg); }
+.cl-md code { font: 12px var(--code); color: var(--fg); }
+.cl-md a { color: var(--accent); text-decoration: none; }
+.cl-md a:hover { text-decoration: underline; }
 
 /* over a result: the counts card and the buttons at the left, inset a little, Archo at her
    full size at the right; shown with a result only */

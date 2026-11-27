@@ -170,7 +170,7 @@ func TestAboutSettingsOrderAndUniqueControls(t *testing.T) {
 	for _, lang := range []string{"en", "zh"} {
 		view.SetLang(lang)
 		groups := view.SettingSections(view.SettingsPage(e.App, nil))
-		if groups[0].Title != view.T("about") || len(groups[0].Items) != 2 { // feedback moved to the sidebar (16 §2.1), community to Feedback (§2.14)
+		if groups[0].Key != view.GroupAbout || groups[0].Title != "RimArcho" || len(groups[0].Items) != 2 { // feedback moved to the sidebar (16 §2.1), community to Feedback (§2.14)
 			t.Fatal(groups[0])
 		}
 		counts := map[string]int{}
@@ -184,7 +184,7 @@ func TestAboutSettingsOrderAndUniqueControls(t *testing.T) {
 				}
 				if strings.Join(it.Argv, " ") == "config set updates.auto {}" {
 					counts["auto"]++
-					if g.Title != view.T("about") {
+					if g.Key != view.GroupAbout {
 						t.Fatal(g)
 					}
 				}

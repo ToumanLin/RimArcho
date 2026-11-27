@@ -11,6 +11,7 @@ import (
 // The frontend behavior suites under testdata (dom.mjs is their shared helper).
 // One node process runs them all; node --test still isolates each file.
 var frontendNodeSuites = []string{
+	"testdata/about.mjs",
 	"testdata/accent.mjs",
 	"testdata/archo.mjs",
 	"testdata/badgepop.mjs",

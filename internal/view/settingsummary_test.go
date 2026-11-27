@@ -45,7 +45,7 @@ func TestSettingsGroupsHaveSummaries(t *testing.T) {
 		seen[s.Key] = true
 		order = append(order, s.Key)
 	}
-	sections := strings.Join([]string{view.GroupAbout, view.GroupInterface, view.GroupUpdates, view.GroupData, view.GroupAccounts, view.GroupNetwork,
+	sections := strings.Join([]string{view.GroupAbout, view.GroupAuthor, view.GroupChangelog, view.GroupInterface, view.GroupUpdates, view.GroupData, view.GroupAccounts, view.GroupNetwork,
 		view.GroupFolders, view.GroupStorage, view.GroupTools, view.GroupLog}, " ")
 	if got := strings.Join(order, " "); got != sections+" "+view.GroupUninstall && got != sections+" "+view.GroupAgent+" "+view.GroupUninstall {
 		t.Errorf("sections %s", got)

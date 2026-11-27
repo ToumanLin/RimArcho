@@ -164,6 +164,9 @@ type SettingGroup struct {
 	// Sections: a Settings group made of several (Accounts and network…), each under its own
 	// heading with its own key, note and rows; such a group has no Items of its own.
 	Sections []SettingGroup `json:"sections,omitempty"`
+	// Author and Changelog are About's own sections (16 §2.14), drawn instead of rows.
+	Author    *AuthorCard `json:"author,omitempty"`
+	Changelog *Changelog  `json:"changelog,omitempty"`
 }
 
 // SettingSections are the groups' sections in order: a merged group's sections, any other
@@ -349,10 +352,10 @@ func FolderGroup(a *app.App) SettingGroup {
 	return g
 }
 
-// SettingsPage is the settings page's groups (16 §2.14): About, Interface, Updates (with
-// community data), Accounts and network, Folders and storage, Tools (external tools, game log,
-// Archo Agent) and, last, Uninstall. The GUI and the TUI show them in this order. Game launch
-// and save options are on the environment page.
+// SettingsPage is the settings page's groups (16 §2.14): About (RimArcho, its author and the
+// changelog), Interface, Updates (with community data), Accounts and network, Folders and
+// storage, Tools (external tools, game log, Archo Agent) and, last, Uninstall. The GUI and the
+// TUI show them in this order. Game launch and save options are on the environment page.
 func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	gpuNote := ""
 	if cmds.Setting(a, "ui.gpu") == "off" {
@@ -364,7 +367,9 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	gpu := onOff(T("GPU acceleration"), "ui.gpu")
 	gpu.Hover, gpu.ValueNote = T("uses about 20–35 MB less memory and draws in software"), gpuNote
 	// Start page background closes this card in the GUI (it is not a setting command).
-	out := []SettingGroup{AboutGroup(a), {Key: GroupInterface, Title: T("interface"), Items: []SettingItem{
+	about := AboutGroup(a)
+	about.Title = "RimArcho"
+	out := []SettingGroup{mergeGroups(T("about"), about.Summary, about, AuthorGroup(), ChangelogGroup()), {Key: GroupInterface, Title: T("interface"), Items: []SettingItem{
 		{Label: T("language"), Value: cmds.Setting(a, "ui.lang"), Edit: "choice", Choices: languageChoices(), ChoiceLabels: languageLabels(), Argv: []string{"config", "set", "ui.lang", "{}"}},
 		{Label: T("day/night theme"), Value: cmds.Setting(a, "ui.theme"), Edit: "segments", Choices: cmds.SettingChoices("ui.theme"),
 			ChoiceLabels: []string{T("follow system"), T("light"), T("dark")}, Argv: []string{"config", "set", "ui.theme", "{}"}},

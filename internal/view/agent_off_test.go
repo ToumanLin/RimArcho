@@ -26,6 +26,8 @@ func agentVisible(t *testing.T, e *testkit.Env) []string {
 	for _, lang := range []string{"en", "zh"} {
 		view.SetLang(lang)
 		for _, g := range view.SettingSections(view.SettingsPage(e.App, nil)) {
+			// the changelog is history: CHANGELOG.md names Archo Agent where it was changed
+			g.Changelog = nil
 			b, err := json.Marshal(g)
 			if err != nil {
 				t.Fatal(err)

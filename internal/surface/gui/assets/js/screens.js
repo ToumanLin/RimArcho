@@ -28,6 +28,7 @@ import { memBars, countBar, countMark, stepMeter, visTip, diskMeter } from "./me
 import { setVersionRunner } from "./versionwarnings.js";
 import { folderFolds, headMeters, settingValue } from "./folderfolds.js";
 import { drawSettings, openingGroup } from "./settingspage.js";
+import { authorCard, changelogView } from "./about.js";
 import { openVersionList } from "./versionpanel.js";
 
 let ui = null;
@@ -1923,6 +1924,10 @@ export async function settings() {
     body: (box, g) => {
       restyle = renderGroupRows(box, g, settings, ids) || restyle;
       if (g.items?.some(it => it.edit === "swatches")) box.append(bg);
+      // About's author and changelog (16 §2.14): drawn in place of rows
+      const open = (url) => api.OpenURL(url).catch(e => say("fail", errText(e)));
+      if (g.author) box.append(authorCard(g.author, { pill: button, open }));
+      if (g.changelog) box.append(changelogView(g.changelog, { open }));
     },
   });
   if (restyle) ui.reaccent();

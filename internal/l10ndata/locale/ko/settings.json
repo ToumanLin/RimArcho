@@ -439,5 +439,13 @@
   "caches %s": "캐시 %s",
   "proxy: %s": "프록시: %s",
   "mirror: %s": "미러: %s",
-  "development version": "개발 버전"
+  "development version": "개발 버전",
+  "changelog": "변경 내역",
+  "unreleased": "미출시",
+  "Aerospace Engineering, UCLA, class of 2027": "UCLA 항공우주공학과 2027년 졸업 예정",
+  "Looking for full-time aerospace roles from spring 2027": "2027년 봄부터 항공우주 분야 정규직을 찾고 있습니다",
+  "Website": "웹사이트",
+  "older versions": "이전 버전",
+  "the version you are running": "사용 중인 버전",
+  "%d versions: read them in the window (archo gui) or in CHANGELOG.md": "버전 %d개: 창(archo gui) 또는 CHANGELOG.md에서 볼 수 있습니다"
 }
