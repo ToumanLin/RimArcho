@@ -36,7 +36,7 @@ func AssemblyKey(m *Mod, folders []string, skip []string) string {
 
 // harmonyLayer reads every effective DLL of the active mods (05 §5.3). It is independent
 // of the Def/Patch layers: a failure only affects its own facts.
-func harmonyLayer(active []*Mod, folders map[string][]string, skip []string, workers int) []*AssemblyFacts {
+func harmonyLayer(active []*Mod, folders map[string][]string, skip []string, workers int, cache AssemblyCache) []*AssemblyFacts {
 	type job struct {
 		m *Mod
 		a content.Asset
@@ -57,7 +57,7 @@ func harmonyLayer(active []*Mod, folders map[string][]string, skip []string, wor
 			for i := range next {
 				j := jobs[i]
 				f := &AssemblyFacts{Instance: j.m.Instance, File: j.a.Rel, Skipped: harmony.SkippedFor(filepath.Base(j.a.Path), j.m.Pkg, skip)}
-				r, err := harmony.Read(j.a.Path, f.Skipped)
+				r, err := readAssembly(cache, j.a.Path, f.Skipped)
 				if err != nil {
 					f.Err = err.Error()
 					f.Assembly = &harmony.Assembly{}

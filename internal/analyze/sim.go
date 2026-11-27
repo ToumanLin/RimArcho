@@ -67,6 +67,10 @@ type sim struct {
 	targets  map[*topOp]map[string]bool   // top-level defs touched
 	// openTouch: the operation touched a def from outside any guard (ReasonGuarded)
 	openTouch map[*topOp]bool
+
+	// read: files readOnce kept, readBytes their size
+	read      map[string][]byte
+	readBytes int
 }
 
 var errRuntime = errors.New("runtime exception")

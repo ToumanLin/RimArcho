@@ -22,6 +22,7 @@
 | GUI: a single interaction, including the call and redraw | ≤ 50 ms |
 | GUI: launch background (§2.3, §2.14) | No change in Go idle memory |
 | GUI: process-tree CPU at rest, no work running, window visible, over 20 seconds | ≤ 2% of one core |
+| Mod check, repeated, of a 720-Mod list on the reference desktop (18 §2), check and save | ≤ 4 seconds and ≤ 10 seconds of CPU; automatic (two threads) ≤ 6 seconds and ≤ 8 seconds of CPU; the first check ≤ 15 seconds |
 
 - The GUI's 80 MB target covers only the Go process, because WebView2 cannot fit within it; the total has its own target. The TUI figure excludes the player's terminal process (§9.2).
 - TUI page measurements include the key's Update and View, every page command, and each reply's Update and View. Each key/frame and reply/frame must meet the response target; first-time background reads may finish later while existing data remains interactive. Record their complete time separately in 18 §2. Repeat visits with unchanged state must also complete their page commands within 50 ms on the 1354-Mod fixture. Cursor debounce, idle timers, automatic file analysis and memory estimation are separate operations; report an estimate started by a page in its complete background time.
