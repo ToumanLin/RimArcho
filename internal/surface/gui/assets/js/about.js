@@ -44,7 +44,11 @@ export function changelogView(c, { open }) {
 function versionFold(v, c, open) {
   const f = fold("cl-ver", async (body) => {
     const text = v.text ?? await api.ChangelogText(v.key).catch(() => "");
-    body.append(renderMarkdown(text || "", { source: c.source, open, leads: true }));
+    const md = renderMarkdown(text || "", { source: c.source, open, leads: true });
+    body.append(md);
+    // measured once it has a width: About may be hidden behind another group when drawn
+    const ro = new ResizeObserver(() => { if (md.clientWidth) { ro.disconnect(); wrapWhenCut(md); } });
+    ro.observe(md);
   }, v.current);
   f.box.dataset.version = v.key;
   const title = span("cl-v" + (v.current ? " current" : ""), v.title);
@@ -162,7 +166,8 @@ export function linkURL(url, source) {
 }
 
 // renderMarkdown draws parseMarkdown's blocks with createElement and text nodes only.
-// With leads, each bullet shows its lead (bulletLead) and a "more" that shows it whole.
+// With leads, each bullet is one line, its lead (bulletLead) as plain text, with a "more"
+// that shows it whole underneath.
 export function renderMarkdown(text, { source = "", open = () => {}, leads = false } = {}) {
   const box = el("div", "cl-md");
   const runs = (parent, list) => {
@@ -186,29 +191,34 @@ export function renderMarkdown(text, { source = "", open = () => {}, leads = fal
     const ul = document.createElement("ul");
     for (const it of l.items) {
       const li = document.createElement("li");
-      const lead = leads ? bulletLead(it.inl) : null;
-      if (!lead?.length) {
+      if (!leads) {
         runs(li, it.inl);
         if (it.sub) li.append(list(it.sub));
+        ul.append(li);
+        continue;
+      }
+      // one line of primary text: the lead as plain words (no code, bold or links), cut by
+      // CSS when it is long; "more" shows the whole bullet under it, in secondary text
+      const lead = bulletLead(it.inl);
+      const row = document.createElement("div");
+      row.className = "cl-row";
+      const short = document.createElement("span");
+      short.className = "cl-lead";
+      short.append(document.createTextNode(plainText(lead || it.inl)));
+      row.append(short);
+      li.append(row);
+      if (!lead && !it.sub) {
+        // one sentence: whole in its hover; once drawn, a line cut short gets a "more" that
+        // lets it wrap (wrapWhenCut)
+        short.title = plainText(it.inl);
+        short.dataset.whole = "1";
       } else {
-        // the lead, then a muted "more" that shows the whole bullet in place
-        const short = document.createElement("span"), full = document.createElement("span");
-        short.className = "cl-lead";
-        runs(short, lead);
+        const full = document.createElement("div");
+        full.className = "cl-full";
         runs(full, it.inl);
         if (it.sub) full.append(list(it.sub));
-        full.hidden = true;
-        const more = document.createElement("button");
-        more.type = "button";
-        more.className = "cl-more";
-        const flip = (on) => {
-          short.hidden = on; full.hidden = !on;
-          more.replaceChildren(document.createTextNode(T(on ? "hide" : "more")));
-          more.setAttribute("aria-expanded", String(on));
-        };
-        flip(false);
-        more.onclick = (e) => { e.stopPropagation(); flip(full.hidden); };
-        li.append(short, full, more);
+        row.append(moreToggle((on) => { full.hidden = !on; }));
+        li.append(full);
       }
       ul.append(li);
     }
@@ -222,6 +232,31 @@ export function renderMarkdown(text, { source = "", open = () => {}, leads = fal
     box.append(n);
   }
   return box;
+}
+
+// moreToggle is the muted "more" / "hide" after a lead; set(on) shows or hides the rest.
+function moreToggle(set) {
+  const more = document.createElement("button");
+  more.type = "button";
+  more.className = "cl-more";
+  const flip = (on) => {
+    set(on);
+    more.replaceChildren(document.createTextNode(T(on ? "hide" : "more")));
+    more.setAttribute("aria-expanded", String(on));
+  };
+  flip(false);
+  more.onclick = (e) => { e.stopPropagation(); flip(more.getAttribute("aria-expanded") !== "true"); };
+  return more;
+}
+
+// wrapWhenCut gives each one-sentence lead in box that its line cuts short a "more" that lets
+// it wrap; it reads the layout once, when the fold first has a width.
+export function wrapWhenCut(box) {
+  for (const s of box.querySelectorAll(".cl-lead[data-whole]")) {
+    if (s.scrollWidth <= s.clientWidth) continue;
+    delete s.dataset.whole;
+    s.parentNode.append(moreToggle((on) => s.classList.toggle("wrap", on)));
+  }
 }
 
 // bulletLead is a bullet's lead: the bold phrase it starts with, else its first sentence, cut
@@ -247,4 +282,9 @@ export function bulletLead(inl) {
     out.push(r);
   }
   return null;
+}
+
+// plainText is runs' words without their marks: code, bold and links read as text.
+export function plainText(inl) {
+  return (inl || []).map(r => r.text ?? plainText(r.kids)).join("");
 }

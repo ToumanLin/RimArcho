@@ -3648,16 +3648,19 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .folder-fold-warn svg { width: 14px; height: 14px; }
 .folder-fold-rows { border-top: var(--hairline) solid var(--line-2); }
 .folder-fold-rows .set { padding-left: 42px; }
-/* Settings › About (16 §2.14): the author, then the changelog's versions as Folders' folds */
-.about-author { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 24px; padding: 14px; }
-.aa-text { flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.aa-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; }
-.aa-n { font-size: 13px; font-weight: 600; color: var(--fg); }
-.aa-seek { color: var(--accent); font-weight: 500; }
+/* Settings › About (16 §2.14): three text levels, as the other sections: the heading (.st-title);
+   primary text as a row's label (13 px, 500, --fg): the name, the version rows, the bullet
+   leads, and the job line in the accent; secondary as a row's description (12 px, --muted):
+   the handle, the study line, dates, "more" and an opened bullet. Nothing else. */
+.about-author { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 24px; padding: 12px 14px; }
+.aa-text { flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.aa-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; }
+.aa-n, .cl-v, .cl-lead, .cl-md .cl-h { font-size: 13px; font-weight: 500; color: var(--fg); }
+.aa-seek { font-size: 13px; font-weight: 500; color: var(--accent); }
+.aa-h, .aa-line, .cl-note, .cl-older-head .num, .cl-more, .cl-md p, .cl-full { font-size: 12px; font-weight: 400; color: var(--muted); }
+.aa-line { margin: 0; }
 .aa-links { flex: none; }
-.cl-head .cl-v { font-weight: 500; }
-.cl-head .cl-v.current { color: var(--accent); }
-.cl-older > .cl-head { color: var(--muted); }
+.cl-v.current { color: var(--accent); }
 .cl-body { border-top: var(--hairline) solid var(--line-2); }
 .cl-body[hidden] { display: none; }
 .cl-body > .folder-fold:first-child { border-top: 0; }
@@ -3665,17 +3668,23 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .cl .folder-fold:not(.open) > .cl-head .fold-chev { transform: none; }
 .cl-older > .cl-body > .cl-ver > .cl-head { padding-left: 38px; }
 .cl-older > .cl-body > .cl-ver > .cl-body > .cl-md { padding-left: 66px; }
-.cl-md { padding: 6px 18px 12px 42px; max-width: 860px; overflow-wrap: anywhere; font-size: 13px; line-height: 1.55; color: var(--fg-2); -webkit-user-select: text; user-select: text; }
-.cl-md ul { margin: 4px 0; padding-left: 18px; }
-.cl-md li { margin: 3px 0; }
-.cl-md li::marker { color: var(--faint); }
-.cl-md p { margin: 6px 0; }
-.cl-md .cl-h { margin: 14px 0 4px; font-size: 13px; font-weight: 600; color: var(--fg); }
-.cl-md strong { font-weight: 600; color: var(--fg); }
-.cl-md code { font: inherit; font-family: var(--code); padding: 0 3px; border-radius: var(--r-sm); background: var(--pill); }
-.cl-md .cl-more { margin-left: 8px; padding: 0; color: var(--muted); font: inherit; }
-.cl-md .cl-more:hover { color: var(--fg); }
-.cl-md [hidden] { display: none; }
+.cl-md { padding: 6px 18px 10px 42px; max-width: 860px; line-height: 1.5; -webkit-user-select: text; user-select: text; }
+.cl-md ul { margin: 0; padding-left: 16px; }
+.cl-md li { margin: 2px 0; }
+.cl-md li::marker { color: var(--faint); font-size: 12px; }
+.cl-md p { margin: 4px 0; }
+.cl-md .cl-h { margin: 12px 0 2px; }
+.cl-row { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.cl-lead { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-more { flex: none; padding: 0; }
+.cl-lead.wrap { white-space: normal; }
+.cl-more:hover { color: var(--fg); }
+.cl-full { margin: 2px 0 6px; overflow-wrap: anywhere; }
+.cl-full[hidden] { display: none; }
+.cl-full ul { margin-top: 2px; }
+/* inside the secondary text: marks never louder than the words around them */
+.cl-md strong { font-weight: inherit; color: inherit; }
+.cl-md code { font: inherit; padding: 0 2px; border-radius: var(--r-sm); background: var(--pill); color: inherit; }
 .cl-md a { color: var(--accent); text-decoration: none; }
 .cl-md a:hover { text-decoration: underline; }
 
