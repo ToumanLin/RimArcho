@@ -17,7 +17,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// The generated Mod _Archo_Looks (21 §4): About/About.xml and, for every slot whose choice
+// The generated Mod RimArcho Looks Preference (21 §4): About/About.xml and, for every slot whose choice
 // is applied, the chosen file under its key's path. It is built beside itself and swapped
 // in, never edited in place, and never written through a link into a Mod.
 

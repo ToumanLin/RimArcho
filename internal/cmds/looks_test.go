@@ -86,17 +86,17 @@ func TestLooksCommands(t *testing.T) {
 	// The dry run says what would be written and writes nothing.
 	dir := filepath.Join(e.Root, "LocalAppData", "RimArcho", "looks")
 	dry := e.MustRun("looks", "apply", "things/item/gun", "--from", "pkg:looks.a", "--dry-run")
-	wantAll(t, dry, "would apply look things/item/gun from ", " A (plan:", "entire look", "would add _Archo_Looks as the last entry", "folder: ", "(would be chosen: looks.dir)", "would write 2 files in ", "2 hard links, 0 copies", "Textures/Things/Item/Gun_south.png  hard link to ")
+	wantAll(t, dry, "would apply look things/item/gun from ", " A (plan:", "entire look", "would add RimArcho Looks Preference as the last entry", "folder: ", "(would be chosen: looks.dir)", "would write 2 files in ", "2 hard links, 0 copies", "Textures/Things/Item/Gun_south.png  hard link to ")
 	if out := e.MustRun("looks", "--filter", "chosen"); !strings.Contains(out, "0 looks") {
 		t.Fatalf("the dry run wrote a choice:\n%s", out)
 	}
-	if out := e.MustRun("list", "--active"); strings.Contains(out, "_Archo_Looks") {
+	if out := e.MustRun("list", "--active"); strings.Contains(out, "RimArcho Looks Preference") {
 		t.Fatalf("the dry run changed the plan:\n%s", out)
 	}
 
 	applied := e.MustRun("looks", "apply", "things/item/gun", "--from", "pkg:looks.a")
-	wantAll(t, applied, "applied look things/item/gun from ", "added _Archo_Looks as the last entry", "(chosen now: looks.dir)", "wrote 2 files in ", "2 hard links, 0 copies")
-	wantAll(t, e.MustRun("looks"), "choices: 1 applied, 0 not needed, 0 asleep, 0 broken", "_Archo_Looks: position 4, the plan's last entry", "chosen: applied")
+	wantAll(t, applied, "applied look things/item/gun from ", "added RimArcho Looks Preference as the last entry", "(chosen now: looks.dir)", "wrote 2 files in ", "2 hard links, 0 copies")
+	wantAll(t, e.MustRun("looks"), "choices: 1 applied, 0 not needed, 0 asleep, 0 broken", "RimArcho Looks Preference: position 4, the plan's last entry", "chosen: applied")
 	wantAll(t, e.MustRun("looks", "show", "things/item/gun"), "south: in game ", " A (by choice)", "choices:", "entire look from ", "applied")
 	wantAll(t, e.MustRun("looks", "rebuild"), "unchanged: nothing written")
 	wantAll(t, e.MustRun("ops", "--op", "looks"), "looks.choice", "looks.build", "apply from A")

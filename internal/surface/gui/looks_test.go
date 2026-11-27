@@ -143,8 +143,8 @@ func TestLooksIndexIsBuiltOncePerPlanState(t *testing.T) {
 		t.Fatalf("the dry run wrote: %+v", now)
 	}
 
-	// an apply: the board goes (the plan gained _Archo_Looks), the choices are read again,
-	// and the index stays: _Archo_Looks is no provider, so the plan's textures are the same
+	// an apply: the board goes (the plan gained RimArcho Looks Preference), the choices are read again,
+	// and the index stays: RimArcho Looks Preference is no provider, so the plan's textures are the same
 	done, err := api.LooksApply("things/item/gun", o.Mods[0].Ref, nil, "plan")
 	if err != nil || !done.Added || done.Overview == nil || done.Overview.Chosen != 1 || done.Text != "the look gun now comes from Alpha" {
 		t.Fatalf("apply %+v %v", done, err)
@@ -192,7 +192,7 @@ func TestLooksIndexIsBuiltOncePerPlanState(t *testing.T) {
 	// the plan changes: another key, another index
 	e.MustRun("disable", "pkg:looks.c")
 	changed, err := api.LooksOverview()
-	if err != nil || changed.Stamp == o.Stamp || len(changed.Mods) != 3 || changed.Mods[2].Name != "_Archo_Looks" {
+	if err != nil || changed.Stamp == o.Stamp || len(changed.Mods) != 3 || changed.Mods[2].Name != "RimArcho Looks Preference" {
 		t.Fatalf("overview after the plan changed %+v %v", changed, err)
 	}
 	if again, key := api.looks.current(); again == idx || key != changed.Stamp || api.flight.started("LooksIndex|"+changed.Stamp) != 1 {

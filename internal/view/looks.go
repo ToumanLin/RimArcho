@@ -55,15 +55,15 @@ type LooksMod struct {
 	Looks      int    `json:"looks"`
 	Overridden int    `json:"overridden"`
 	Overriding int    `json:"overriding"`
-	// Generated: the row is _Archo_Looks; its Looks is the number of looks with a choice,
+	// Generated: the row is RimArcho Looks Preference; its Looks is the number of looks with a choice,
 	// and the gallery shows them with the Mod "chosen".
 	Generated bool `json:"generated,omitempty"`
 }
 
-// LooksGenerated is the facts of the _Archo_Looks card.
+// LooksGenerated is the facts of the RimArcho Looks Preference card.
 type LooksGenerated struct {
 	Name string `json:"name"`
-	// Entry is the 1-based position of _Archo_Looks in the plan; 0: not in it, so applied
+	// Entry is the 1-based position of RimArcho Looks Preference in the plan; 0: not in it, so applied
 	// choices do not reach the game until an apply or a rebuild adds it.
 	Entry int `json:"entry"`
 	// Choices by state (21 §3.4).
@@ -99,7 +99,7 @@ type LooksOverview struct {
 	Generated LooksGenerated `json:"generated"`
 	Warnings  int            `json:"warnings"` // files the index could not read
 	// GameRunning: a game runs, so an apply or undo keeps the choice and does not rebuild
-	// _Archo_Looks until the next write to the game.
+	// RimArcho Looks Preference until the next write to the game.
 	GameRunning bool `json:"gameRunning"`
 	// Confirmed: the first apply's confirmation is not shown again (LooksConfirmedKey).
 	Confirmed bool `json:"confirmed"`
@@ -336,7 +336,7 @@ type LooksDone struct {
 	Items  []LooksOutcome `json:"items,omitempty"`
 	Done   int            `json:"done"`  // looks applied or undone
 	Mixed  int            `json:"mixed"` // of them, with a mixed result
-	// Added: _Archo_Looks was added to the plan (one undoable edit).
+	// Added: RimArcho Looks Preference was added to the plan (one undoable edit).
 	Added bool `json:"added,omitempty"`
 	// Dir is the looks directory; DirChosen: this call chose it (the first apply).
 	Dir       string `json:"dir,omitempty"`
@@ -594,7 +594,7 @@ func BuildLooksGallery(a *app.App, ls *app.LooksState, mod, filter, search strin
 			return nil, fmt.Errorf("mod %q: a position, chosen or nothing", mod)
 		}
 		if m := ls.St.Ix.ByID[instanceAt(ls.St, pos)]; app.IsLooks(m) {
-			g.Chosen = true // the _Archo_Looks row shows the choices
+			g.Chosen = true // the RimArcho Looks Preference row shows the choices
 		} else {
 			g.Mod = pos
 		}
@@ -998,7 +998,7 @@ func (d *LooksDone) tail() {
 		d.Text += "  " + Tf("%d looks have a mixed result", d.Mixed)
 	}
 	if d.BuildError != "" && !d.DryRun {
-		d.Text += "  " + T("the choice is kept; _Archo_Looks is rebuilt at the next write to the game")
+		d.Text += "  " + T("the choice is kept; RimArcho Looks Preference is rebuilt at the next write to the game")
 	}
 }
 
@@ -1083,7 +1083,7 @@ func LooksUndo(ctx context.Context, a *app.App, ids []string, scope string, dryR
 	return d, nil
 }
 
-// LooksRebuild rebuilds _Archo_Looks for the current plan (21 §4).
+// LooksRebuild rebuilds RimArcho Looks Preference for the current plan (21 §4).
 func LooksRebuild(ctx context.Context, a *app.App, dryRun bool) (*LooksDone, error) {
 	r, err := a.LooksRebuild(ctx, dryRun)
 	if err != nil {
@@ -1097,9 +1097,9 @@ func LooksRebuild(ctx context.Context, a *app.App, dryRun bool) (*LooksDone, err
 	case d.BuildError != "":
 		d.Text = d.BuildError
 	case d.Unchanged || r.Build == nil:
-		d.Text = T("_Archo_Looks is up to date")
+		d.Text = T("RimArcho Looks Preference is up to date")
 	default:
-		d.Text = Tf("_Archo_Looks rebuilt: %d files", d.Files)
+		d.Text = Tf("RimArcho Looks Preference rebuilt: %d files", d.Files)
 	}
 	return d, nil
 }

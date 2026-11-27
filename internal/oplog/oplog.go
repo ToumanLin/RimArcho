@@ -35,7 +35,7 @@ const (
 	Launch             = "launch"
 	PlanSync           = "plan.sync"    // a plan caught up with a followed collection
 	LooksChoice        = "looks.choice" // a look was applied from a Mod, or that choice undone (21 §3.3)
-	LooksBuild         = "looks.build"  // the generated Mod _Archo_Looks was rebuilt (21 §4)
+	LooksBuild         = "looks.build"  // the generated Mod RimArcho Looks Preference was rebuilt (21 §4)
 )
 
 // Codes lists every op code, in the order the filters show them.

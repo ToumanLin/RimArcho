@@ -24,14 +24,14 @@ func init() {
 			{Name: "all", Help: "every look (default: the first 30)"},
 		}})
 	register(&Command{Name: "looks show", Args: "<look-id>", Summary: "one look: its Defs, its slots with every Mod's texture in load order, what the game shows, and the choices", MinArgs: 1, MaxArgs: 1, Run: looksShowCmd})
-	register(&Command{Name: "looks apply", Args: "<look-id>", Summary: "show a look, or some of its slots, from a Mod of the plan: writes the choice and rebuilds the generated Mod _Archo_Looks; the load order stays", MinArgs: 1, MaxArgs: 1, Run: looksApplyCmd,
+	register(&Command{Name: "looks apply", Args: "<look-id>", Summary: "show a look, or some of its slots, from a Mod of the plan: writes the choice and rebuilds the generated Mod RimArcho Looks Preference; the load order stays", MinArgs: 1, MaxArgs: 1, Run: looksApplyCmd,
 		Flags: []Flag{
 			{Name: "from", Value: "<ref>", Help: "the Mod whose textures the game should show"},
 			{Name: "slot", Value: "<slot>", Multi: true, Help: "only this slot (repeatable; default: the entire look)"},
 			scope, dry}})
 	register(&Command{Name: "looks undo", Args: "<look-id>", Summary: "remove a look's choices in one scope; the game shows the load-order result again", MinArgs: 1, MaxArgs: 1, Run: looksUndoCmd,
 		Flags: []Flag{scope, dry}})
-	register(&Command{Name: "looks rebuild", Summary: "rebuild the generated Mod _Archo_Looks from the current plan's choices (also done before every write to the game)", MaxArgs: 0, Run: looksRebuildCmd,
+	register(&Command{Name: "looks rebuild", Summary: "rebuild the generated Mod RimArcho Looks Preference from the current plan's choices (also done before every write to the game)", MaxArgs: 0, Run: looksRebuildCmd,
 		Flags: []Flag{dry}})
 }
 
@@ -188,7 +188,7 @@ func looksCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	return d, nil
 }
 
-// looksSummary adds the choice counts and where _Archo_Looks is in the plan.
+// looksSummary adds the choice counts and where RimArcho Looks Preference is in the plan.
 func looksSummary(root *render.Node, ls *app.LooksState) {
 	total := ls.Applied + ls.NotNeeded + ls.Asleep + ls.Broken
 	if total == 0 && ls.Entry == 0 {

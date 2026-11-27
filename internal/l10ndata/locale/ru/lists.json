@@ -51,7 +51,7 @@
   "The load order is sorted for the pack (%d moved); your list does not change.": "Порядок загрузки отсортирован для сборки (перемещено: %d); ваш список не меняется.",
   "The pack is about %s after, up to %s while converting.": "Сборка займёт около %s, при конвертации — до %s.",
   "Video memory about %s → %s.": "Видеопамять: около %s → %s.",
-  "_Archo_Looks": "_Archo_Looks",
+  "RimArcho Looks Preference": "RimArcho Looks Preference",
   "a development build: the program is not removed": "версия для разработки: программа не удаляется",
   "a pack of this name exists": "сборка с таким названием уже есть",
   "a save file": "файл сохранения",

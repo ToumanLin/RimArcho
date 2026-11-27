@@ -29,7 +29,7 @@ func DeployName(m *store.Mod) string {
 		return envLinkPrefix + m.ID
 	}
 	if IsLooks(m) { // the generated Mod has one fixed name (21 §4)
-		return LooksName
+		return LooksLink
 	}
 	r := strings.NewReplacer("/", "_", `\`, "_", ":", "_")
 	return DeployPrefix + r.Replace(m.SourceLabel) + "_" + r.Replace(m.Rel)

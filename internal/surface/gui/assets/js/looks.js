@@ -1,7 +1,7 @@
 // The plan editor's looks view (16 §2.5 Looks view, 21): which Mod's textures the game
 // shows, for the list being edited. This file is the view's shell and its first layer: the
 // editor | looks switch in the editor's head, the gallery (1), the Mods that supply textures
-// (2), the editor's own load-order rules card (3) and the _Archo_Looks card (4). A look
+// (2), the editor's own load-order rules card (3) and the RimArcho Looks Preference card (4). A look
 // opens the looks editor (lookseditor.js). Every winner, state, count and prediction comes
 // from Go (internal/view/looks.go); nothing of them is worked out here.
 import { S, $, el, esc, api, T, Tf, say, errText, cur, ROW_H } from "./state.js";
@@ -10,7 +10,7 @@ import { wireSeparator } from "./separator.js";
 import { copyablePath } from "./fields.js";
 import { progress } from "./feedbacksemantics.js";
 import * as pop from "./popups.js";
-import { setRulesNumber, showRules } from "./rules.js";
+import { setRulesNumber, setRulesPlace, showRules } from "./rules.js";
 import { createBar } from "./filterbar.js";
 import { queryParts } from "./searchsuggest.js";
 import { GRID, gridLayout, visibleRows, stepCard, scrollFor, texURL } from "./looksgrid.js";
@@ -186,11 +186,13 @@ function placeRules(here) {
     $("#looks .lk-side").insertBefore(card, $("#looks .lk-pref"));
     card.dataset.area = "looks-3";
     setRulesNumber("3");
+    setRulesPlace(true);
   } else if (rulesHome) {
     rulesHome.parent.insertBefore(card, rulesHome.next);
     delete card.dataset.area;
     card.classList.remove("focus");
     setRulesNumber("");
+    setRulesPlace(false);
     rulesHome = null;
   }
 }
@@ -320,7 +322,7 @@ function setOverview(ov) {
   } else if (!L.pick.chosen) L.modCursor = Math.max(0, list.findIndex((m) => m.pos === L.pick.pos));
 }
 
-// the Mods the Mods card lists: load order, without _Archo_Looks (it has its own card)
+// the Mods the Mods card lists: load order, without RimArcho Looks Preference (it has its own card)
 const mods = () => (L.ov ? L.ov.mods.filter((m) => !m.generated && (!L.modSet || L.modSet.has(m.pos))) : []);
 const modAt = (pos) => (L.ov ? L.ov.mods.find((m) => m.pos === pos) : null) || null;
 const pickedMod = () => (L.pick && !L.pick.chosen && !L.pick.none && !L.search ? modAt(L.pick.pos) : null);
@@ -537,11 +539,11 @@ function drawHead() {
     src.innerHTML = sourceIcon(m.kind);
     h.append(src, el("b", "mname", m.name), el("span", "pos", "#" + m.no));
     h.lastChild.previousSibling.title = m.name;
-  } else h.append(el("b", "mname lk-code", (L.ov && L.ov.generated.name) || "_Archo_Looks"));
+  } else h.append(el("b", "mname", (L.ov && L.ov.generated.name) || "RimArcho Looks Preference"));
   h.append(el("span", "gcnt", shown));
   if (m && m.overridden) h.append(el("span", "gov", Tf("%s overridden", num(m.overridden))));
   if (g.more) h.append(el("span", "gov", Tf("the first %s are shown: search or filter to see the rest", num(g.rows))));
-  $("#looks .lk-scroll").setAttribute("aria-label", (m ? m.name : L.search || "_Archo_Looks") + ", " + shown);
+  $("#looks .lk-scroll").setAttribute("aria-label", (m ? m.name : L.search || "RimArcho Looks Preference") + ", " + shown);
 }
 
 // drawNote: what the gallery says in the place of its cards: the index being built, a read
@@ -707,7 +709,7 @@ function showChosen() {
   loadGallery();
 }
 
-// drawPref: the _Archo_Looks card: its choices by state, what RimArcho wrote there, the folder.
+// drawPref: the RimArcho Looks Preference card: its choices by state, what RimArcho wrote there, the folder.
 function drawPref() {
   const card = $("#looks .lk-pref");
   if (!card) return;
@@ -747,9 +749,9 @@ function drawPref() {
     b.onclick = () => doRebuild();
     return b;
   };
-  if (ov.gameRunning) note(T("a game is running: a choice is stored now, and _Archo_Looks is rebuilt at the next write to the game"), "warn");
-  if (L.buildError) note(Tf("_Archo_Looks was not rebuilt: %s", L.buildError), "warn", ov.gameRunning ? null : rebuild());
-  else if (!g.entry && g.applied > 0) note(T("_Archo_Looks is not in this list, so its choices do not reach the game"), "warn", rebuild());
+  if (ov.gameRunning) note(T("a game is running: a choice is stored now, and RimArcho Looks Preference is rebuilt at the next write to the game"), "warn");
+  if (L.buildError) note(Tf("RimArcho Looks Preference was not rebuilt: %s", L.buildError), "warn", ov.gameRunning ? null : rebuild());
+  else if (!g.entry && g.applied > 0) note(T("RimArcho Looks Preference is not in this list, so its choices do not reach the game"), "warn", rebuild());
   if (ov.warnings) note(Tf("%s texture files could not be read", num(ov.warnings)), "dim");
 }
 
@@ -936,9 +938,9 @@ function confirmApply(title, facts, done, go) {
     : done.copied && done.linked ? Tf("%s linked, %s copied (%s)", num(done.linked), num(done.copied), done.size)
       : done.copied ? Tf("%s, copied (%s)", num(done.files), done.size) : Tf("%s, linked (no copies)", num(done.files));
   const lines = [...facts.map(([k, v]) => k + ": " + v), T("folder") + ": " + done.dir, T("files") + ": " + files, "",
-    T("RimArcho keeps a local Mod, _Archo_Looks, last in the list. It holds links to the textures you chose and no Defs."),
+    T("RimArcho keeps a local Mod, RimArcho Looks Preference, last in the list. It holds links to the textures you chose and no Defs."),
     T("Your Mods and the load order are not changed, and saves do not depend on it. Undo removes a choice again.")];
-  if (done.added) lines.push(T("This list gains _Archo_Looks as its last Mod: one step of the list's undo."));
+  if (done.added) lines.push(T("This list gains RimArcho Looks Preference as its last Mod: one step of the list's undo."));
   if (done.dirChosen) lines.push(T("The folder is created now."));
   if (done.mixed) lines.push(T("Mixed result: some textures of the look still come from another Mod."));
   if (done.buildError) lines.push(done.buildError);
@@ -958,7 +960,7 @@ function confirmApply(title, facts, done, go) {
 }
 
 // wrote: an apply, undo or rebuild answered. Its sentence goes to the status line; a rebuild
-// that did not run says why and stays on the _Archo_Looks card (the choice is kept).
+// that did not run says why and stays on the RimArcho Looks Preference card (the choice is kept).
 function wrote(d) {
   const failed = (d.items || []).filter((it) => it.error);
   L.buildError = d.buildError || "";
@@ -966,7 +968,7 @@ function wrote(d) {
   if (d.overview) setOverview(d.overview);
   drawSide();
   if (L.layer === 1) loadGallery(true);
-  // the list may have gained its _Archo_Looks entry: the editor's rows follow
+  // the list may have gained its RimArcho Looks Preference entry: the editor's rows follow
   if (d.added) L.ui.reload();
 }
 
@@ -1098,7 +1100,7 @@ export function hintList() {
 export function where() {
   if (L.layer === 2) return editor.where();
   const m = pickedMod();
-  let s = `${T("looks")}    ${L.search ? "“" + L.search + "”" : m ? m.name : "_Archo_Looks"}    ${L.rows.length ? Math.max(0, L.cursor) + 1 : 0} / ${L.rows.length}`;
+  let s = `${T("looks")}    ${L.search ? "“" + L.search + "”" : m ? m.name : "RimArcho Looks Preference"}    ${L.rows.length ? Math.max(0, L.cursor) + 1 : 0} / ${L.rows.length}`;
   if (L.sel.size) s += "  " + Tf("%d selected", L.sel.size);
   return s;
 }

@@ -51,7 +51,7 @@
   "The load order is sorted for the pack (%d moved); your list does not change.": "加载顺序为这个包单独排好（移动 %d 项），你的列表不变。",
   "The pack is about %s after, up to %s while converting.": "创建后包约 %s，转换时最多占 %s。",
   "Video memory about %s → %s.": "显存约 %s → %s。",
-  "_Archo_Looks": "_Archo_Looks",
+  "RimArcho Looks Preference": "RimArcho Looks Preference",
   "a development build: the program is not removed": "开发版：不删程序",
   "a pack of this name exists": "已经有同名的整合包",
   "a save file": "照一个存档",

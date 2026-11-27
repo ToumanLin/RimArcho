@@ -51,7 +51,7 @@
   "The load order is sorted for the pack (%d moved); your list does not change.": "MODパック向けに読み込み順を整理しました（%d件移動）。元のリストは変更されません。",
   "The pack is about %s after, up to %s while converting.": "作成後のパック容量は約%s、変換中は最大%sです。",
   "Video memory about %s → %s.": "推定VRAM：%s → %s",
-  "_Archo_Looks": "_Archo_Looks",
+  "RimArcho Looks Preference": "RimArcho Looks Preference",
   "a development build: the program is not removed": "開発ビルドのためプログラムは削除しません",
   "a pack of this name exists": "同じ名前のMODパックがすでにあります",
   "a save file": "セーブファイル",

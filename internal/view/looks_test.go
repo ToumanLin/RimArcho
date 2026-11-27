@@ -120,7 +120,7 @@ func TestLooksOverviewAndGallery(t *testing.T) {
 	if got := strings.Join(mods, " "); got != want {
 		t.Fatalf("mods\n got %s\nwant %s", got, want)
 	}
-	if g := o.Generated; g.Name != "_Archo_Looks" || g.Entry != 0 || g.Files != 0 || !g.DirChosen || g.Dir == "" {
+	if g := o.Generated; g.Name != "RimArcho Looks Preference" || g.Entry != 0 || g.Files != 0 || !g.DirChosen || g.Dir == "" {
 		t.Fatalf("generated %+v", g)
 	}
 
@@ -357,7 +357,7 @@ func TestLooksApplyManyIsOneUndoStep(t *testing.T) {
 	if want := "2 looks now come from Bravo  1 left out: it has no texture of them  2 looks have a mixed result"; d.Text != want {
 		t.Fatalf("text %q", d.Text)
 	}
-	if got := looksPlan(t, e); got != "Core, Alpha, Bravo, Charlie, _Archo_Looks" {
+	if got := looksPlan(t, e); got != "Core, Alpha, Bravo, Charlie, RimArcho Looks Preference" {
 		t.Fatalf("plan after the apply: %s", got)
 	}
 	// gun south from Bravo is the one file to write: north is Bravo's by load order, and so is the shirt
@@ -415,7 +415,7 @@ func TestLooksApplyManyIsOneUndoStep(t *testing.T) {
 		t.Fatalf("apply one %+v %v", one, err)
 	}
 	r, err := view.LooksRebuild(ctx, e.App, false)
-	if err != nil || r.Text != "_Archo_Looks is up to date" {
+	if err != nil || r.Text != "RimArcho Looks Preference is up to date" {
 		t.Fatalf("rebuild %+v %v", r, err)
 	}
 }

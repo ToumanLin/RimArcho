@@ -46,7 +46,7 @@ func looksIDs(ids []string) []string {
 
 // LooksApplyMany chooses that every look of ids comes, whole, from the Mod modRef names. A
 // look the Mod has no texture of is reported in Items and left as it is; when no look can
-// be applied the call fails. The plan gains _Archo_Looks as one undoable edit, and the
+// be applied the call fails. The plan gains RimArcho Looks Preference as one undoable edit, and the
 // generated Mod is rebuilt once. dryRun writes nothing.
 func (a *App) LooksApplyMany(ctx context.Context, ids []string, modRef, scope string, dryRun bool) (*LooksManyResult, error) {
 	st, err := a.Loadout()

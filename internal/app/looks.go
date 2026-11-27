@@ -23,13 +23,15 @@ import (
 
 // Looks (21): which Mod's textures the game shows, chosen per look without changing the
 // load order. The index is internal/looks; this file holds the choices and their states,
-// looksbuild.go the generated Mod _Archo_Looks.
+// looksbuild.go the generated Mod RimArcho Looks Preference.
 
 const (
 	// LooksPackage is the packageId of the generated Mod.
 	LooksPackage = "rimarcho.looks"
-	// LooksName is the generated Mod's name and its link name in Mods/.
-	LooksName = DeployPrefix + "Looks"
+	// LooksName is the generated Mod's name, as the game and RimArcho show it.
+	LooksName = "RimArcho Looks Preference"
+	// LooksLink is its link name in Mods/ (09 §3: RimArcho's links start with DeployPrefix).
+	LooksLink = DeployPrefix + "Looks"
 	// LooksLabel is the label of the looks directory's source.
 	LooksLabel  = "looks"
 	looksFolder = "Looks"
@@ -51,7 +53,7 @@ const (
 	LookBroken    = "broken"
 )
 
-// IsLooks reports whether m is the generated Mod _Archo_Looks.
+// IsLooks reports whether m is the generated Mod RimArcho Looks Preference.
 func IsLooks(m *store.Mod) bool {
 	return m != nil && m.Kind == source.Extra && strings.EqualFold(m.PackageID, LooksPackage)
 }
@@ -137,7 +139,7 @@ func (a *App) ensureLooksDir(gameRoot string) (dir string, chosen bool, err erro
 	return dir, true, a.Store.SetMeta("cfg:looks.dir", dir)
 }
 
-// looksInstance is the environment's usable _Archo_Looks instance (nil before the first apply).
+// looksInstance is the environment's usable RimArcho Looks Preference instance (nil before the first apply).
 func looksInstance(ix *Index) *store.Mod {
 	for _, m := range ix.Mods {
 		if IsLooks(m) && m.Status == identity.Live && !m.Residue && m.Unloadable == "" {
@@ -210,7 +212,7 @@ func (a *App) LooksIndexJob(st *LoadoutState) (func(ctx context.Context, progres
 }
 
 // LooksKey names what the looks index of st's plan is built from (21 §2.5): the game
-// version and every entry's position, Instance and snapshot. The _Archo_Looks entry is no
+// version and every entry's position, Instance and snapshot. The RimArcho Looks Preference entry is no
 // provider and is left out, so adding it last keeps the key. An interface keeps the index
 // in memory under this key and drops it when the key changes.
 func (a *App) LooksKey(st *LoadoutState) string {
@@ -281,7 +283,7 @@ type LooksState struct {
 	Index *looks.Index
 	Mods  map[int]*store.Mod    // the plan's Mods by position (looks.Provider.Pos)
 	Looks map[string]*LookState // the looks that have a choice, by id
-	// Entry is the 1-based position of _Archo_Looks in the plan; 0: not in it, so applied
+	// Entry is the 1-based position of RimArcho Looks Preference in the plan; 0: not in it, so applied
 	// choices do not reach the game.
 	Entry int
 	// Counts of choices by state (overruled ones are not counted).
@@ -481,7 +483,7 @@ func slotState(l *looks.Look, pos int, slot string, wins, base map[string]looks.
 	return LookNotNeeded
 }
 
-// takeLooks takes the _Archo_Looks entry out of l: a sort orders the rest and puts it back last.
+// takeLooks takes the RimArcho Looks Preference entry out of l: a sort orders the rest and puts it back last.
 func takeLooks(st *LoadoutState, l loadout.List) (rest, entry loadout.List) {
 	for i, e := range l {
 		if IsLooks(st.Ix.ByID[e.Instance]) {
@@ -502,7 +504,7 @@ type LooksResult struct {
 	Set     []store.LookChoice // apply: the choices written
 	Removed int                // undo: the choices removed
 	Mixed   bool               // apply: the in-game result takes slots from more than one Mod
-	// Added: _Archo_Looks was added to the plan, or moved to its end, as one undoable edit.
+	// Added: RimArcho Looks Preference was added to the plan, or moved to its end, as one undoable edit.
 	Added bool
 	// Dir is the looks directory; DirChosen: this call chose it (the first apply).
 	Dir       string
@@ -607,7 +609,7 @@ func withRows(rows, set []store.LookChoice, scope, look string, whole bool) []st
 
 // LooksApply chooses that look, or the given slots of it, comes from the Mod modRef names
 // (21 §3.3): it writes choices only and never changes the plan's order, except that
-// _Archo_Looks becomes the current plan's last entry as one undoable edit (21 §4). The
+// RimArcho Looks Preference becomes the current plan's last entry as one undoable edit (21 §4). The
 // generated Mod is then rebuilt. scope is LooksPlan or LooksAll. dryRun writes nothing.
 func (a *App) LooksApply(ctx context.Context, lookID, modRef string, slots []string, scope string, dryRun bool) (*LooksResult, error) {
 	st, err := a.Loadout()
@@ -676,7 +678,7 @@ func (a *App) looksPreview(r *LooksResult, ls *LooksState, rows []store.LookChoi
 	return r, nil
 }
 
-// looksLast makes _Archo_Looks the current plan's last entry as one undoable edit; added
+// looksLast makes RimArcho Looks Preference the current plan's last entry as one undoable edit; added
 // reports a change.
 func (a *App) looksLast() (added bool, err error) {
 	r, err := a.edit(LooksAddOp, func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
@@ -721,7 +723,7 @@ func (a *App) looksAfter(ctx context.Context, r *LooksResult) error {
 }
 
 // LooksUndo removes look's choices in one scope only (21 §3.3): never another look's, never
-// the other scope's. The plan keeps its _Archo_Looks entry. dryRun writes nothing.
+// the other scope's. The plan keeps its RimArcho Looks Preference entry. dryRun writes nothing.
 func (a *App) LooksUndo(ctx context.Context, lookID, scope string, dryRun bool) (*LooksResult, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -760,7 +762,7 @@ func (a *App) LooksUndo(ctx context.Context, lookID, scope string, dryRun bool) 
 }
 
 // LooksRebuild rebuilds the generated Mod for the current plan (21 §4 "Rebuild"). When the
-// plan has applied choices and no _Archo_Looks entry, it adds the entry like an apply.
+// plan has applied choices and no RimArcho Looks Preference entry, it adds the entry like an apply.
 func (a *App) LooksRebuild(ctx context.Context, dryRun bool) (*LooksResult, error) {
 	st, err := a.Loadout()
 	if err != nil {

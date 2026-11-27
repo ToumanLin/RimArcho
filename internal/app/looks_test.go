@@ -266,7 +266,7 @@ func TestLooksRebuildLinks(t *testing.T) {
 		}
 	}
 	about, err := os.ReadFile(filepath.Join(dir, "About", "About.xml"))
-	if err != nil || !strings.Contains(string(about), "<packageId>rimarcho.looks</packageId>") || !strings.Contains(string(about), "<name>_Archo_Looks</name>") {
+	if err != nil || !strings.Contains(string(about), "<packageId>rimarcho.looks</packageId>") || !strings.Contains(string(about), "<name>RimArcho Looks Preference</name>") {
 		t.Fatalf("About.xml: %s %v", about, err)
 	}
 
@@ -374,7 +374,7 @@ func TestLooksUndoOneLookOneScope(t *testing.T) {
 	}
 }
 
-// 21 §4 "In the plan": the first apply adds _Archo_Looks as the last entry in one undoable
+// 21 §4 "In the plan": the first apply adds RimArcho Looks Preference as the last entry in one undoable
 // edit; a sort keeps it last and does not report it; its Mods/ link is _Archo_Looks.
 func TestLooksEntryLastAndLinkName(t *testing.T) {
 	t.Parallel()
@@ -416,7 +416,7 @@ func TestLooksEntryLastAndLinkName(t *testing.T) {
 	}
 	for _, nd := range sr.Input.Nodes {
 		if nd.PackageID == app.LooksPackage {
-			t.Fatal("the sort orders _Archo_Looks")
+			t.Fatal("the sort orders RimArcho Looks Preference")
 		}
 	}
 	if sr2, err := e.App.Sort(true); err != nil || len(sr2.Changes) != 0 {
@@ -493,7 +493,7 @@ func TestLooksFailedRebuildLeavesEntryOut(t *testing.T) {
 	if rows, _ := e.App.Store.LookChoices(); len(rows) != 2 {
 		t.Fatalf("the choices did not stay: %+v", rows)
 	}
-	if out := e.MustRun("save", "--dry-run"); !strings.Contains(out, "looks: _Archo_Looks left out of this write") {
+	if out := e.MustRun("save", "--dry-run"); !strings.Contains(out, "looks: RimArcho Looks Preference left out of this write") {
 		t.Fatalf("archo save does not say why:\n%s", out)
 	}
 	rows, _ := e.App.Operations(oplog.Query{Op: oplog.LooksBuild, Failed: true})
@@ -658,7 +658,7 @@ func TestLooksModIsLeftAlone(t *testing.T) {
 	}
 	for _, tt := range ts {
 		if tt.Mod.Name == app.LooksName {
-			t.Fatal("texture optimisation takes _Archo_Looks")
+			t.Fatal("texture optimisation takes RimArcho Looks Preference")
 		}
 	}
 	all, err := e.App.TextureTargets(nil, app.TexAll)
@@ -667,7 +667,7 @@ func TestLooksModIsLeftAlone(t *testing.T) {
 	}
 	for _, tt := range all {
 		if tt.Mod.Name == app.LooksName {
-			t.Fatal("texture optimisation --all takes _Archo_Looks")
+			t.Fatal("texture optimisation --all takes RimArcho Looks Preference")
 		}
 	}
 	if out, code := e.Run("folder", "remove", app.LooksLabel); code == 0 {
@@ -677,7 +677,7 @@ func TestLooksModIsLeftAlone(t *testing.T) {
 	ls := looksOf(t, e)
 	for pos, m := range ls.Mods {
 		if app.IsLooks(m) {
-			t.Fatalf("_Archo_Looks is a provider at %d", pos)
+			t.Fatalf("RimArcho Looks Preference is a provider at %d", pos)
 		}
 	}
 	if l := ls.Index.ByID[gunLook]; len(l.Providers) != 3 {

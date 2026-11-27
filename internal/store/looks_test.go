@@ -66,7 +66,7 @@ func TestLookChoices(t *testing.T) {
 	}
 }
 
-// 21 §4: look_file is the whole set of files in _Archo_Looks, replaced at once.
+// 21 §4: look_file is the whole set of files in RimArcho Looks Preference, replaced at once.
 func TestLookFiles(t *testing.T) {
 	t.Parallel()
 	s, err := Open(filepath.Join(t.TempDir(), "archo.db"))

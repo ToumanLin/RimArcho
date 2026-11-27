@@ -8,7 +8,7 @@ import (
 )
 
 // Looks (21 §3.1, §4): the player's choices of which Mod a look comes from, and the files
-// RimArcho wrote into the generated Mod _Archo_Looks.
+// RimArcho wrote into the generated Mod RimArcho Looks Preference.
 const looksSchema = `CREATE TABLE IF NOT EXISTS look_choice (
 	scope TEXT NOT NULL,
 	look TEXT NOT NULL,
@@ -106,7 +106,7 @@ func (s *Store) DeleteLookChoices(scope, look string) (n int64, err error) {
 	return r.RowsAffected()
 }
 
-// LookFile is one file RimArcho wrote into _Archo_Looks (21 §4).
+// LookFile is one file RimArcho wrote into RimArcho Looks Preference (21 §4).
 type LookFile struct {
 	Rel    string // relative to the generated Mod's folder, forward slashes
 	Source string // the Mod's file it links to or was copied from

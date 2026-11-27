@@ -54,9 +54,21 @@ export function initRules(u) {
   });
 }
 
+// The fold is remembered per place: folded by default in the editor, open by default in the
+// looks view (16 §2.5 Looks view), where the card is one of four and has the room.
+let openKey = "archo.rules.open";
+export function setRulesPlace(looks) {
+  openKey = looks ? "archo.rules.open.looks" : "archo.rules.open";
+  let v = null;
+  try { v = localStorage.getItem(openKey); } catch { /* the default */ }
+  R.open = looks ? v !== "0" : v === "1";
+  draw();
+  if (R.open) refreshRules();
+}
+
 function setOpen(v) {
   R.open = v;
-  try { localStorage.setItem("archo.rules.open", v ? "1" : "0"); } catch { /* not kept */ }
+  try { localStorage.setItem(openKey, v ? "1" : "0"); } catch { /* not kept */ }
   draw();
   if (v) refreshRules();
 }

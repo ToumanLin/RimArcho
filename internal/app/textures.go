@@ -213,7 +213,7 @@ const (
 )
 
 // textureMods are the mods a command acts on: never Core or a DLC (the game's own folder),
-// never a mod that is gone, never _Archo_Looks.
+// never a mod that is gone, never RimArcho Looks Preference.
 func (a *App) textureMods(refs []string, scope string) (*LoadoutState, []*store.Mod, error) {
 	st, err := a.Loadout()
 	if err != nil {

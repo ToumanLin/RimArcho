@@ -70,7 +70,7 @@ var opWhat = map[string]string{
 	oplog.Launch:             "started the game",
 	oplog.PlanSync:           "caught a list up with a collection",
 	oplog.LooksChoice:        "chose which Mod's textures the game shows",
-	oplog.LooksBuild:         "rebuilt _Archo_Looks",
+	oplog.LooksBuild:         "rebuilt RimArcho Looks Preference",
 }
 
 var opIcon = map[string]string{

@@ -213,7 +213,7 @@ func (s *API) looksStateLocked(st *app.LoadoutState, key string, idx *looks.Inde
 	return ls, nil
 }
 
-// LooksOverview is the looks view's Mods, totals and _Archo_Looks card.
+// LooksOverview is the looks view's Mods, totals and RimArcho Looks Preference card.
 func (s *API) LooksOverview() (*view.LooksOverview, error) {
 	return withLooks(s, func(ls *app.LooksState) (*view.LooksOverview, error) { return view.BuildLooksOverview(s.a, ls) })
 }
@@ -254,7 +254,7 @@ func (s *API) LookPreview(lookID string, mod int, slots []string, scope string) 
 }
 
 // looksWrite runs an apply, undo or rebuild under the page lock. The plan may have gained
-// its _Archo_Looks entry, so the board is dropped.
+// its RimArcho Looks Preference entry, so the board is dropped.
 func (s *API) looksWrite(dryRun bool, fn func() (*view.LooksDone, error)) (*view.LooksDone, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -315,7 +315,7 @@ func (s *API) LooksUndoMany(lookIDs []string, scope string) (*view.LooksDone, er
 	})
 }
 
-// LooksRebuild rebuilds _Archo_Looks for the current plan.
+// LooksRebuild rebuilds RimArcho Looks Preference for the current plan.
 func (s *API) LooksRebuild() (*view.LooksDone, error) {
 	return s.looksWrite(false, func() (*view.LooksDone, error) { return view.LooksRebuild(s.branchCtx, s.a, false) })
 }

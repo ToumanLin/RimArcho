@@ -38,7 +38,7 @@ const (
 	UnTextures   = "textures"   // the DDS RimArcho wrote next to mods' PNGs (Texture optimisation)
 	UnLocked     = "locked"     // the lock library's copies
 	UnMonitor    = "monitor"    // Archo Monitor's folder
-	UnLooks      = "looks"      // the generated Mod _Archo_Looks in the looks directory (21 §4)
+	UnLooks      = "looks"      // the generated Mod RimArcho Looks Preference in the looks directory (21 §4)
 	UnPacks      = "packs"      // packs and the saves inside them
 	UnSaves      = "saves"      // the "own" save folders and save backups in the data folder
 	UnGames      = "games"      // game folders downloaded with SteamCMD
@@ -596,7 +596,7 @@ func (pl *uninstallPlanner) monitorItems() []*UninstallItem {
 	return mon
 }
 
-// looksItems lists the generated Mod _Archo_Looks and what an interrupted rebuild left
+// looksItems lists the generated Mod RimArcho Looks Preference and what an interrupted rebuild left
 // beside it (RimArcho's own; its textures are hard links and copies, the Mods' files stay).
 func (pl *uninstallPlanner) looksItems() []*UninstallItem {
 	var out []*UninstallItem

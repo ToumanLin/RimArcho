@@ -53,7 +53,7 @@ type LoadoutState struct {
 	// localize reads another game's own entries by packageId (nil: as stored).
 	localize func(loadout.List) loadout.List
 	// leaveOut: instances this write to the game leaves out of ModsConfig.xml and Mods/
-	// although the list has them (_Archo_Looks when its rebuild failed, 21 §4). Never
+	// although the list has them (RimArcho Looks Preference when its rebuild failed, 21 §4). Never
 	// carried by the cached copy.
 	leaveOut map[string]bool
 }
@@ -1040,7 +1040,7 @@ func (a *App) sortList(st *LoadoutState, l loadout.List) (*SortResult, error) {
 		l = append(l.Clone(), loadout.Entry{Instance: core})
 	}
 	l, monitorSkipped := a.sortMonitor(st, l)
-	// _Archo_Looks is no part of the order: it stays the last entry (08 §1.1, 21 §4).
+	// RimArcho Looks Preference is no part of the order: it stays the last entry (08 §1.1, 21 §4).
 	l, looksEntry := takeLooks(st, l)
 	in, err := a.SortInput(st, l)
 	if err != nil {
@@ -1137,7 +1137,7 @@ type SaveResult struct {
 	// Running is a game that reads this ModsConfig.xml and is running now (save only): it
 	// reads the new list on its next start.
 	Running *RunningGame
-	// LooksError: why _Archo_Looks was left out of this write although the list has it: its
+	// LooksError: why RimArcho Looks Preference was left out of this write although the list has it: its
 	// rebuild failed (21 §4 "Failure"). The choices and the list entry stay.
 	LooksError string
 }

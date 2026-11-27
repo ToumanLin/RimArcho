@@ -427,7 +427,7 @@ function wireSlider(body) {
 const CHOICE = { applied: "applied", "not needed": "not needed", asleep: "asleep", broken: "broken" };
 
 // drawChain: the Mods that supply the look, in load order; a row only selects its Mod. Then
-// _Archo_Looks with this look's choices and their states.
+// RimArcho Looks Preference with this look's choices and their states.
 function drawChain() {
   const card = $(".lk-chain", host()), d = E.d, body = $(".lk-chainbody", card);
   $(".head", card).innerHTML = `<span class="n">3</span><span class="t" id="lk-chain-t">${esc(T("override chain"))}</span><span class="q">${esc(T("load order"))}</span>` +
@@ -454,7 +454,7 @@ function drawChain() {
   body.innerHTML = (d.mixed ? `<p class="lk-warn">${icon.warn}<span>${esc(T("in game now: the look takes textures from more than one Mod"))}</span></p>` : "") +
     rows + `<div class="lk-sep"></div>` +
     `<div class="lk-cr gen">${by ? thumb(s, s.inGame, 32, E.west) : `<span class="lk-t none" style="width:32px;height:32px"></span>`}` +
-    `<div class="who"><div class="nm lk-code">${esc((ov && ov.generated.name) || "_Archo_Looks")}</div>${lines}</div><span class="act"></span></div>`;
+    `<div class="who"><div class="nm">${esc((ov && ov.generated.name) || "RimArcho Looks Preference")}</div>${lines}</div><span class="act"></span></div>`;
   body.scrollTop = top;
   const at = $(".lk-cr.sel", body);
   if (at) body.setAttribute("aria-activedescendant", at.id); else body.removeAttribute("aria-activedescendant");
@@ -509,7 +509,7 @@ function drawOps() {
   else if (out === "overruled") say1(T("A choice for this list decides these textures: one for all lists would not show."), "warn");
   else if (out === "mixed") say1(p.text || T("Mixed result: some textures of the look still come from another Mod."), "warn");
   if (d.kind === "folder" && m) say1(T("A folder's files are merged across Mods: this replaces the files both Mods name alike, and files only other Mods add stay."), "quiet");
-  if (ov && ov.gameRunning) say1(T("A game is running: the choice is stored now, and _Archo_Looks is rebuilt at the next write to the game."), "warn");
+  if (ov && ov.gameRunning) say1(T("A game is running: the choice is stored now, and RimArcho Looks Preference is rebuilt at the next write to the game."), "warn");
   body.append(op);
 
   const last = el("div", "lk-op");
