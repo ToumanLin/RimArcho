@@ -24,6 +24,8 @@ const writesGame = new Set([
   // Saves (16 §2.11): fixes edit the save's list, the file actions change its folder;
   // SaveChoose and SaveCopyTo act for the current Game Config
   "SaveFix", "SaveNewList", "SaveRename", "ColonyRename", "SaveCopy", "SaveCopyTo", "SaveChoose", "SaveTrash",
+  // Looks (21 §3.3, §4): a choice, its undo and the rebuild write _Archo_Looks and may add its entry to the list
+  "LooksApply", "LooksApplyMany", "LooksUndo", "LooksUndoMany", "LooksRebuild",
 ]);
 on("environment", (result) => {
   const p = pending.get(result.request);

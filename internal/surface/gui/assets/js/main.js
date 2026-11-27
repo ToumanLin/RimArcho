@@ -59,6 +59,7 @@ import * as modSettings from "./modsettings.js";
 import * as savesPage from "./saves.js";
 import * as reviewPage from "./review.js";
 import { initRules, refreshRules, startRule, showRules } from "./rules.js";
+import * as looksView from "./looks.js";
 import { setMode as setArchoMode, bootLive, bootDone } from "./archo.js";
 
 blockNativeMenu(document);
@@ -279,6 +280,7 @@ async function reaccent() {
 function render() {
   const done = perfPhase("editor-render");
   renderTop();
+  looksView.sync(); // the editor | looks switch, and the looks view when it is the one shown (16 §2.5)
   renderLists();
   renderWhere();
   renderHints();
@@ -369,6 +371,8 @@ function renderWhere() {
     s = fullPage.fullName();
     const sec = scr.fullSection();
     if (sec) s += " › " + sec;
+  } else if (looksView.active()) {
+    s = looksView.where();
   } else if (S.focus === 3) {
     const sc = $(".detail .scroll");
     const pct = sc.scrollHeight > sc.clientHeight ? Math.round(100 * sc.scrollTop / (sc.scrollHeight - sc.clientHeight)) : 100;
@@ -452,10 +456,11 @@ function renderHints() {
   else if (S.screen === "plan-import") list = importHints();
   else if (S.screen === "plans" || S.screen === "plan-export") list = planManage.hintList();
   else if (S.screen) list = [{ key: "shift+1–8", label: T("pages") }, { key: "ctrl+k", label: T("commands") }, { key: "?", label: T("all keys") }];
+  else if (looksView.active()) list = looksView.hintList();
   if (scr.changesFiltered()) list = [{ key: "esc", label: T("every mod") }, ...list];
   list = foldShortcuts(list);
   const c = S.focus < 3 ? col() : null;
-  const selected = c && c.sel.size && !S.screen;
+  const selected = c && c.sel.size && !S.screen && !looksView.active();
   if (selected) h.append(el("span", "accent", Tf("%d selected", c.sel.size)));
   if (!keyboardMode) return;
   hintLine(list, selected ? [{ key: "esc", label: T("clear the selection") }] : []).forEach((a) => {
@@ -903,6 +908,8 @@ async function cmd(id) {
   if (pages[id]) return go(pages[id]);
   // the list's own actions show the list; the rest work on any page
   if (["filter", "details", "tech", "tags", "rules"].includes(id) && scr.closeScreen()) renderWhere();
+  // the lists' own commands act on the lists: the looks view gives way to the editor
+  if (["filter", "details", "tech", "tags"].includes(id) && looksView.active()) await looksView.setView("editor");
   switch (id) {
     // from the editor, launch checks the RAM estimate as its L does (16 §2.5)
     case "launch": return S.screen ? run(id) : launchHere();
@@ -928,7 +935,7 @@ async function cmd(id) {
     case "export": return exportCurrent();
     // the RimArcho row of settings › About, its check or install focused (as the TUI's panel)
     case "update": return selfUpdate.goSelfUpdate();
-    case "help": return pop.help(S.screen || "plan");
+    case "help": return !S.screen && looksView.active() ? looksView.help() : pop.help(S.screen || "plan");
     case "quit": return window.close();
   }
 }
@@ -985,6 +992,11 @@ async function paletteChoice(o) {
   if (o.kind === 3) return go(o.id);
   if (o.kind === 2) {
     return useEnv(o.id);
+  }
+  // in the looks view a Mod that supplies textures shows its looks; another one is shown in the editor
+  if (looksView.active()) {
+    if (looksView.showModByID(o.id)) return;
+    await looksView.setView("editor");
   }
   // a mod: go to its list and row; a filter that hides it is cleared (16 §3.5)
   for (const k of [1, 0, 2]) {
@@ -1245,6 +1257,26 @@ function onKey(e) {
   }
   const ctrl = e.ctrlKey || e.metaKey;
   const handled = () => e.preventDefault();
+  // The looks view stands in the board's place (16 §2.5): its keys come first, and the lists'
+  // own verbs do not act on lists it hides. The list's and the window's keys stay.
+  if (looksView.active()) {
+    if (looksView.key(e)) return;
+    const again = (name) => verb(name).then(() => looksView.sync());
+    if (ctrl) {
+      const m = { k: () => pop.palette(), z: () => again("undo"), y: () => again("redo"), r: () => again("redo") }[k.toLowerCase()];
+      if (m) { handled(); m(); }
+      return;
+    }
+    if (e.altKey) return;
+    const keep = {
+      w: () => run("save"), L: () => launchHere(), u: () => again("undo"), p: () => problems.toggle(), c: () => go("changes"), l: () => go("log"),
+      R: () => cmd("rescan"), A: () => cmd("analyze"), E: () => go("env"), P: () => plans.chooser(), i: () => exchange(), e: () => exportCurrent(),
+      r: () => startRule(looksView.ruleTarget()), "?": () => looksView.help(), ":": () => commandLine(),
+    };
+    const kk = e.shiftKey && /^[a-z]$/.test(k) ? k.toUpperCase() : k;
+    if (keep[kk]) { handled(); keep[kk](); }
+    return;
+  }
   // navigation
   if (k === "ArrowDown" || k === "ArrowUp") {
     handled();
@@ -1400,7 +1432,7 @@ const ui = {
   manageLists: (id = 0) => { planManage.select(id); return go("plans"); },
   edited: (call, undoable = true) => edited(call, undoable),
   showMod: (id, name) => showDetail({ id, name }), // the sort steps' Mod names (16 §6.1)
-  ruleTarget: () => actionContext().sel[0],
+  ruleTarget: () => (looksView.active() ? looksView.ruleTarget() : actionContext().sel[0]),
   afterImport: null, // the first-run guide's next step once an import is applied
 };
 
@@ -1446,6 +1478,7 @@ async function start() {
   loadView().then((tags) => { if (tags) { regroup(); if (!S.screen) viewChanged(); } });
   initRules(ui);
   wireSplits();
+  looksView.initLooks(ui); // after the splits: the rules card it borrows keeps its gap in the editor
   document.addEventListener("keydown", onKey);
   wireKeyboardMode();
   wireZoom(); // ctrl+wheel, ctrl+'+' / '-' / '0': interface size on every page (16 §2.14)

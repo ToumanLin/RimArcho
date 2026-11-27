@@ -27,6 +27,7 @@ var frontendNodeSuites = []string{
 	"testdata/feedback.mjs",
 	"testdata/guide.mjs",
 	"testdata/hints.mjs",
+	"testdata/looks.mjs",
 	"testdata/home-memory.mjs",
 	"testdata/home-reads.mjs",
 	"testdata/nativemenu.mjs",

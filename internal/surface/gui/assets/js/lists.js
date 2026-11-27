@@ -36,6 +36,7 @@ export async function openEditor(load, replace = false, ready = () => {}) {
     $("#screen").replaceChildren();
     $("#screen").hidden = true;
     if (board) board.inert = false;
+    if ($("#looks")) $("#looks").inert = false;
     if ($("#planhead")) $("#planhead").inert = false;
     ready();
     return true;

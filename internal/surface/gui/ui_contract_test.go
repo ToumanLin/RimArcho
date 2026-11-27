@@ -102,20 +102,7 @@ var bridgeUncalled = map[string]string{
 	"PreviewManagerImport":       "unused; open question",
 	"ApplyManagerImport":         "unused; open question (api.js still lists it in writesGame)",
 	"ApplyManagerImportProfiles": "unused; open question (api.js still lists it in writesGame)",
-	"LooksOverview":              "looks view, front end follows",
-	"LooksRefresh":               "looks view, front end follows",
-	"LooksLeave":                 "looks view, front end follows",
-	"LooksProgress":              "looks view, front end follows",
-	"LooksGallery":               "looks view, front end follows",
-	"LookDetail":                 "looks view, front end follows",
-	"LookPreview":                "looks view, front end follows",
-	"LookShow":                   "looks view, front end follows",
-	"LooksApply":                 "looks view, front end follows",
-	"LooksApplyMany":             "looks view, front end follows",
-	"LooksApplyPreview":          "looks view, front end follows",
-	"LooksUndo":                  "looks view, front end follows",
-	"LooksUndoMany":              "looks view, front end follows",
-	"LooksRebuild":               "looks view, front end follows",
+	"LookPreview":                "one prediction on its own: the looks editor shows the ones LookDetail carries per target (16 §2.5 Looks view)",
 }
 
 // Go text that reads the same in every language.
@@ -520,7 +507,7 @@ var stableScrollers = map[string][]string{
 	"tasks":            {".tk-rows"},
 	"updates":          {".subs-list > .scroll", ".subs-detail > .scroll"},
 	"saves":            {".sv-body"},
-	"Mod options":     {".ms-body"},
+	"Mod options":      {".ms-body"},
 	"All lists":        {".pm-list .scroll"},
 }
 

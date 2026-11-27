@@ -16,8 +16,14 @@ try {
   R.all = localStorage.getItem("archo.rules.scope") === "all";
 } catch { /* folded, the current list */ }
 let ui = null;
+// the card's number before its heading where its page numbers its cards (the looks view
+// shows this same card as its card 3, 16 §2.5); "" in the editor
+let number = "";
 
 const area = () => $(".rulesarea");
+
+// setRulesNumber: the looks view moves the card into its right column and numbers it.
+export function setRulesNumber(n) { number = n || ""; draw(); }
 
 function setAll(v) {
   R.all = v;
@@ -112,7 +118,7 @@ function draw() {
   const n = rows.length;
   const bar = $(".hbar", a);
   bar.setAttribute("aria-expanded", String(R.open));
-  bar.replaceChildren(el("span", "t", T("load-order rules")));
+  bar.replaceChildren(...(number ? [el("span", "n", number)] : []), el("span", "t", T("load-order rules")));
   if (n) bar.append(el("span", "num", String(n)));
   const chev = el("span", "fold-chev"); chev.innerHTML = icon.chev; bar.append(chev);
   const body = $(".rulesbody", a);

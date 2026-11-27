@@ -71,13 +71,16 @@ export function syncPageAccessibility() {
   const screen = $("#screen"), board = $("#board");
   if (!screen || !board) return;
   const covered = !screen.hidden;
-  if (covered && !editorCovered && (board.contains(document.activeElement) || $("#planhead")?.contains(document.activeElement))) editorFocus = document.activeElement;
+  // the looks view stands in the board's place (looks.js): covered and exposed with it
+  const looks = $("#looks");
+  if (covered && !editorCovered && (board.contains(document.activeElement) || looks?.contains(document.activeElement) || $("#planhead")?.contains(document.activeElement))) editorFocus = document.activeElement;
   board.inert = covered;
+  if (looks) looks.inert = covered;
   if ($("#planhead")) $("#planhead").inert = covered;
   if (covered) screen.setAttribute("role", "main");
   else screen.removeAttribute("role");
   if (!covered && editorCovered && !S.screen && editorFocus) {
-    const target = editorFocus.isConnected ? editorFocus : board;
+    const target = editorFocus.isConnected ? editorFocus : board.hidden && looks ? looks : board;
     target.focus({ preventScroll: true });
     editorFocus = null;
   }

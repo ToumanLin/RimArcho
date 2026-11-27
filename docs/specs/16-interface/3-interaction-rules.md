@@ -138,6 +138,19 @@ Editor only:
 | `←` `→`, `enter` on a tag group's header | GUI: close or open the group in Disabled's tags view (§2.5); elsewhere `←→` change areas |
 | `F2` `n` `M` `Del` on a tag group's header | GUI: rename the tag, edit its note, merge it, delete it (the Tag manager in the details, §2.5, §2.9) |
 
+Looks view only (GUI, §2.5 Looks view). Arrows, `enter` and `space` never apply or undo a choice:
+
+| Key | Action |
+| --- | --- |
+| `1`–`4` | Focus a card. Gallery: gallery, Mods, load-order rules, preference. Looks editor: which texture, compare, override chain, operation |
+| `↑↓←→`, `PgUp` `PgDn` `Home` `End` | Gallery: move the cursor. Mods card: show the next or previous Mod. Looks editor: `←→` the facing, `↑↓` the body type or file; in the override chain `↑↓` selects a Mod; in a zoomed compare the arrows scroll |
+| `space`, `shift`+arrows, `ctrl+a` | Gallery: toggle the cursor's look, select a range, select all shown |
+| `enter` | Gallery: open the cursor's look in the looks editor. Mods card: go to the gallery |
+| `/`, `ctrl+f`, `\` | Gallery: search, open the filter |
+| `esc` | Return one level: the looks editor → the gallery; the mixed warning → the selection → the search and filter |
+| `r` | Add a load-order rule for the Mod the Mods card shows |
+| `w`, `L`, `u`, `ctrl+z` / `ctrl+y`, `ctrl+r`, `R`, `A`, `l`, `c`, `p`, `i`, `e`, `?`, `:`, `ctrl+k` | As in the editor; `?` lists this view's keys |
+
 Global:
 
 | Key | Action |
