@@ -153,35 +153,29 @@ test("the history's bar says 1 step, 2 steps (VM 2026-11-23: \"1 steps\")", asyn
   assert.match($(".hbar").innerHTML, /2 steps</);
 });
 
-test("the details' tags view: every tag of Enabled's Mods with how many carry it, no tag last; a row toggles its filter, the pencil opens the Tag manager", async () => {
-  const doc = { documentElement: { lang: "en" } };
-  const tv = await loadModules("./tagview.js", {
-    "./state.js": { el: (tag, cls = "", text) => { const e = new Element(tag); e.className = cls; if (text != null) e.textContent = text; return e; }, T: (s) => s, Tf: (s, ...a) => s + " " + a.join(","), factText: () => {} },
-    "./tagcolor.js": { tagCSS: (v) => (v ? "var(--tag-" + v + ")" : ""), tagColors: () => ({}), markOf: () => "", paintMark: () => {}, TAG_PRESETS: [] },
-    "./icons.js": { icon: { edit: "<svg></svg>" } },
-  }, { document: doc });
-  const items = [{ tags: ["visuals"] }, { tags: ["QoL", "visuals"] }, { tags: ["qol"] }, {}, { tags: [] }, { tags: ["QoL", "qol"] }];
-  const sums = tv.tally(items, { qol: "grass" });
-  // a Mod counts once for each tag it carries anywhere, as tag:<tag> filters
-  assert.deepEqual(JSON.parse(JSON.stringify(sums.tags.map((t) => [t.tag, t.n, t.color]))), [["QoL", 3, "var(--tag-grass)"], ["visuals", 2, ""]]);
-  assert.equal(sums.none, 2);
-  const sets = [], edits = [];
-  const act = { filter: (f, on) => sets.push([f, on]), edit: (t) => edits.push(t) };
-  const box = tv.tagView(items, { qol: "grass" }, "", act);
-  const lines = box.children;
-  assert.deepEqual(lines.map((l) => l.className), ["tv-line", "tv-line plain", "tv-line none"]);
-  assert.equal(lines[2].children.length, 2, "no tag has no pencil, only its place");
-  lines[0].children[0].onclick();
-  lines[2].children[0].onclick();
-  lines[1].children[1].onclick();
-  assert.deepEqual(sets, [["tag:QoL", 1], ["has:notag", 1]]);
-  assert.deepEqual(edits, ["visuals"]);
-  assert.equal(tv.tagView(items, { qol: "grass" }, "", act), box, "unchanged numbers keep the element");
-  // a filter in the query marks its row; a click takes it away
-  const on = tv.tagView(items, { qol: "grass" }, "tags:qol has:notag -tags:visuals", act);
-  assert.notEqual(on, box);
-  assert.deepEqual(on.children.map((l) => l.children[0].className), ["tv-row on", "tv-row", "tv-row on"]);
-  on.children[0].children[0].onclick();
-  assert.deepEqual(sets.at(-1), ["tag:QoL", 0]);
-  assert.deepEqual([...tv.filtersOn('tags:"Big Pack" -has:notag').tags], ["big pack"]);
+test("tags on the details switch: the Tag manager with nothing picked lists all tags, then no tag with the enabled untagged Mods, toggling has:notag", async () => {
+  const el = (tag, cls = "", text) => { const e = new Element(tag); e.className = cls; if (text != null) e.textContent = text; return e; };
+  const tm = await loadModules("./tagmanager.js", {
+    "./state.js": { el, api: {}, T: (s) => s, Tf: (s, ...a) => s + " " + a.join(","), errText: String, say: () => {}, keyCaps: (k) => el("kbd", "", k), factText: () => {} },
+    "./icons.js": { icon: {} },
+    "./detail.js": { noteEl: () => el("div") },
+    "./popups.js": {},
+    "./tagcolor.js": { tagCSS: (v) => (v ? "var(--tag-" + v + ")" : ""), TAG_PRESETS: [] },
+  }, { localStorage: { getItem: () => null, setItem: () => {} } });
+  const toggles = [];
+  const ctx = { tags: () => [{ tag: "QoL", n: 3, color: "grass" }, { tag: "visuals", n: 2 }], picked: new Set(), goTo: () => {}, redraw: () => {},
+    noTag: () => ({ n: 4, on: false, toggle: () => toggles.push(1) }) };
+  const d = tm.tagPanel(null, ctx);
+  const kids = d.children.map((c) => c.className);
+  assert.ok(!kids.includes("tm-hint"), "tags exist: the top is empty, no hint");
+  const chips = d.children.find((c) => c.className === "tm-cloud").children;
+  assert.deepEqual(chips.map((c) => c.className), ["tm-chip", "tm-chip", "tm-chip notag"]);
+  assert.equal(chips[2].children.map((c) => c.textContent).join(" "), "no tag 4");
+  chips[2].onclick({});
+  assert.equal(toggles.length, 1);
+  // none untagged: no chip; nothing tagged at all: the hint and no chip
+  ctx.noTag = () => ({ n: 0, on: false, toggle() {} });
+  assert.equal(tm.tagPanel(null, ctx).children.find((c) => c.className === "tm-cloud").children.length, 2);
+  const empty = tm.tagPanel(null, { ...ctx, tags: () => [] });
+  assert.deepEqual(empty.children.map((c) => c.className), ["tm-hint"]);
 });

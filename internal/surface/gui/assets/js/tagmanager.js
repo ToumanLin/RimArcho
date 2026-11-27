@@ -15,6 +15,8 @@
 //   editing()   a field in the panel takes the keyboard (rename)
 //   shown(g, info)  optional: the facts line's second fact (default: how many of the group's
 //               rows the filter shows, when not all)
+//   noTag()     optional: {n, on, toggle} for a no tag chip last in all tags (the editor's
+//               enabled Mods without a tag, 16 §2.5)
 //   recolor(tag, colour)  shows a tag's new colour at once (rows, headers, the panel); Go
 //               saves it meanwhile, and a failure reads the page again
 import { el, api, T, Tf, errText, say, keyCaps } from "./state.js";
@@ -29,7 +31,7 @@ export function tagPanel(g, ctx) {
   const d = el("div", "mod-detail tag-detail");
   if (info) tagHead(d, g, info, ctx);
   else if (g) d.append(el("h1", "", T("no tag")), el("div", "facts", Tf("%d mods", g.rows.length)), el("p", "tm-hint", T("mods without tags: select them and press g to tag them")));
-  else d.append(el("p", "tm-hint", T("no tags yet: select mods and press g to tag them")));
+  else if (!ctx.tags().some((t) => t.n)) d.append(el("p", "tm-hint", T("no tags yet: select mods and press g to tag them")));
   allTags(d, g ? g.key : null, ctx);
   return d;
 }
@@ -158,6 +160,14 @@ function allTags(d, curKey, ctx) {
       picked.clear();
       ctx.goTo(k);
     };
+    cloud.append(c);
+  }
+  const none = ctx.noTag ? ctx.noTag() : null;
+  if (none && none.n) {
+    const c = el("button", "tm-chip notag" + (none.on ? " cur" : ""));
+    c.append(el("span", "", T("no tag")), el("span", "n", String(none.n)));
+    c.setAttribute("aria-pressed", String(none.on));
+    c.onclick = () => none.toggle();
     cloud.append(c);
   }
   d.append(sub, cloud);

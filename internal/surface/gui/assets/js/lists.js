@@ -10,7 +10,6 @@ import { beginPageRead, pageLoading } from "./screens.js";
 import { markOf, paintMark, tagCSS, tagColors } from "./tagcolor.js";
 import { G, grouped, shape, curKey, headOf, findEntry, matched, foldAll, setView, setSort } from "./disabledgroups.js";
 import { choiceControl } from "./choices.js";
-import { tagView } from "./tagview.js";
 
 const rowID = (k, it) => `editor-${k}-${encodeURIComponent(key(it))}`;
 const rowsEl = (k) => $(`.area[data-area="${k}"] .rows`);
@@ -171,7 +170,7 @@ export function renderHeads() {
     const a = $(`.area[data-area="${k}"]`);
     a.classList.toggle("focus", S.focus === k && !S.popup);
     const h = $(".head", a);
-    if (k === 3) { detailHead(h); renderTagView(); continue; }
+    if (k === 3) { detailHead(h); continue; }
     const c = S.cols[k];
     const filtered = k < 2 ? barOn() : !!c.query.trim();
     const n = filtered ? Tf("%d / %d", matched(c), c.items.length) : `${c.items.length}`;
@@ -206,18 +205,20 @@ export function renderHeads() {
   }
 }
 
-// The details area's view (16 §2.5): details, or tags (tagview.js). Kept per browser, as
-// the folds are.
+// The details area's view (16 §2.5): details, or tags (the Tag manager). The player's choice,
+// kept per browser as the folds are; the switch shows tags too whenever the details show the
+// Tag manager for another reason (S.tagView: a tag group's header in Disabled, a tag clicked).
 let dview = (() => { try { return localStorage.getItem("archo.detailview") === "tags" ? "tags" : "details"; } catch { return "details"; } })();
 export const detailView = () => dview;
 let onDetailView = () => {};
 export function setOnDetailView(fn) { onDetailView = fn; }
+// setDetailView: the switch was clicked (again on the shown view: it still asks, so details
+// leaves a tag clicked in a Mod's details)
 export function setDetailView(v) {
-  if (v === dview) return;
-  dview = v;
-  try { localStorage.setItem("archo.detailview", v); } catch { /* not kept */ }
-  detailHead();
-  renderTagView();
+  if (v !== dview) {
+    dview = v;
+    try { localStorage.setItem("archo.detailview", v); } catch { /* not kept */ }
+  }
   onDetailView(v);
 }
 
@@ -241,7 +242,7 @@ function detailSwitch() {
   for (const b of dswitch.querySelectorAll("button")) {
     const label = T(b.dataset.view);
     if (b.textContent !== label) b.textContent = label;
-    const on = b.dataset.view === dview;
+    const on = b.dataset.view === (S.tagView ? "tags" : "details");
     b.classList.toggle("on", on);
     b.setAttribute("aria-pressed", String(on));
   }
@@ -252,11 +253,11 @@ const syncSwitch = () => {
   if (dswitch?.isConnected && on && on.offsetWidth) slideThumb(dswitch, on);
 };
 
-// detailHead: the details area's head: its number and the details | tags switch; in details,
-// view full details, or on a tag group's header in Disabled (S.tagHead) the Tag manager's
-// tag and a filter to it, as on Mod library (16 §2.9).
+// detailHead: the details area's head: its number and the details | tags switch; with the
+// Mod's details, view full details; with the Tag manager on a tag, the tag and a filter to it,
+// as on Mod library (16 §2.9).
 export function detailHead(h = $('.area[data-area="3"] .head')) {
-  const g = dview === "details" ? S.tagHead : null;
+  const g = S.tagView ? S.tagHead : null;
   const link = (label, run) => {
     const b = el("button", "editor-full-link", label);
     b.onmousedown = (e) => e.stopPropagation();
@@ -264,34 +265,17 @@ export function detailHead(h = $('.area[data-area="3"] .head')) {
     return b;
   };
   const sw = detailSwitch();
-  const sig = dview + "|" + (g ? JSON.stringify([!!g.none, g.tag]) : "") + "|" + document.documentElement.lang;
+  const sig = !!S.tagView + "|" + (g ? JSON.stringify([!!g.none, g.tag]) : "") + "|" + document.documentElement.lang;
   if (h.detailSig === sig && sw.parentNode === h) return syncSwitch();
   h.detailSig = sig;
   h.innerHTML = `<span class="n">4</span>`;
   h.append(sw);
-  if (dview === "tags") return syncSwitch();
-  if (!g) {
-    h.append(link(T("view full details") + "  Enter ↵", () => document.dispatchEvent(new CustomEvent("editor-full"))));
-    return syncSwitch();
+  if (!S.tagView) h.append(link(T("view full details") + "  Enter ↵", () => document.dispatchEvent(new CustomEvent("editor-full"))));
+  else if (g) {
+    h.insertAdjacentHTML("beforeend", `<span class="q word-facts">${esc(g.none ? T("no tag") : g.tag)}</span>`);
+    if (!g.none) h.append(link(T("filter to this tag"), () => document.dispatchEvent(new CustomEvent("filter-tag", { detail: g.tag }))));
   }
-  h.insertAdjacentHTML("beforeend", `<span class="q word-facts">${esc(g.none ? T("no tag") : g.tag)}</span>`);
-  if (!g.none) h.append(link(T("filter to this tag"), () => document.dispatchEvent(new CustomEvent("filter-tag", { detail: g.tag }))));
   syncSwitch();
-}
-
-// renderTagView shows the tags view in place of the details (16 §2.5), or the details again.
-export function renderTagView() {
-  const box = $("#tagview"), det = $("#detail");
-  if (!box || !det) return;
-  const on = dview === "tags";
-  box.hidden = !on;
-  det.hidden = on;
-  if (!on || !S.cols[1]) return;
-  const v = tagView(S.cols[1].items, tagColors(), S.bar?.search || "", {
-    filter: (f, set) => S.bar?.set(f, set),
-    edit: (tag) => { setDetailView("details"); document.dispatchEvent(new CustomEvent("open-tag", { detail: tag })); },
-  });
-  if (v.parentNode !== box) box.replaceChildren(v);
 }
 
 // viewControls: the Disabled column's view switch, individual | tags (v), and in the tags

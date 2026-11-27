@@ -17,7 +17,7 @@ import "./activity.js";
 import "./fulltitle.js";
 import { applyAccent } from "./accent.js";
 import { factText, S, $, $$, el, esc, T, Tf, errText, say, clearSay, undoStatus, busyStart, col, cur, selection, key, idsOf, refsOf, named, AREAS, keyCaps } from "./state.js";
-import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, pageDelta, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn, setOnViewChange, setOnSortChange, detailHead, detailView, setDetailView, setOnDetailView } from "./lists.js";
+import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, pageDelta, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn, setOnViewChange, setOnSortChange, detailHead, detailView, setOnDetailView } from "./lists.js";
 import { G, grouped, headOf, curKey, shownItems, shape, findEntry, setGroupOpen, reveal, setView, loadView, refreshOrder, regroup } from "./disabledgroups.js";
 import { createBar } from "./filterbar.js";
 import { followDetail, showDetail, scrollDetail, refreshCopies, showPanel } from "./detail.js";
@@ -119,38 +119,44 @@ async function reload(snapshot = null, read = null) {
   if (!current()) return;
   if (!read) { render(); detailFollow(); }
   // the tags view follows the Tag manager's order, read again when the data changed
-  if (grouped()) refreshOrder().then((changed) => { if (changed && current()) { regroup(); renderLists(); } });
+  if (grouped() || S.tagView) refreshOrder().then((changed) => { if (changed && current()) { if (grouped()) regroup(); renderLists(); if (S.tagView) detailFollow(true); } });
   refreshRules();
   await scr.logEnvironmentChanged();
   return true;
 }
 
 let detailKey = "";
-// detailTarget: the row the details follow (the focused list's cursor, else the last list's).
+// detailTarget: what the details show: the Tag manager on a tag clicked (pinned) or on a tag
+// group's header in Disabled, the Tag manager on no tag when the switch is on tags, else the
+// row of the focused list's cursor (else the last list's).
 function detailTarget() {
   const k = Math.min(S.focus, 2) === S.focus ? S.focus : lastList;
-  // a tag clicked in a Mod's details: that tag, until the cursor moves (16 §2.9)
-  if (pinned && pinned.sig === pinSig(k)) {
-    const g = (col(0).groups || []).find((x) => x.key === pinned.key) || { key: pinned.key, tag: pinned.tag, rows: null };
-    return { group: g, k, id: "tags:" + g.key + "|pinned|" + S.board.stamp };
+  const head = k === 0 ? headOf(col(0), col(0).view[col(0).cursor]) : null;
+  const q = "|" + (S.bar?.search || ""); // the no tag chip marks has:notag
+  // a tag clicked (a Mod's details, all tags): that tag until the cursor moves; with the switch
+  // on tags, until the cursor lands on a tag's header (16 §2.5, §2.9)
+  if (pinned && pinned.sig !== pinSig(k)) {
+    if (detailView() === "tags" && !head) pinned.sig = pinSig(k);
+    else pinned = null;
   }
-  pinned = null;
+  if (pinned) {
+    const g = (col(0).groups || []).find((x) => x.key === pinned.key) || { key: pinned.key, tag: pinned.tag, rows: null };
+    return { group: g, tags: true, k, id: "tags:" + g.key + "|pinned|" + S.board.stamp + q };
+  }
   // a tag group's header in Disabled: its tag in the Tag manager (16 §2.5)
-  const g = k === 0 ? headOf(col(0), col(0).view[col(0).cursor]) : null;
-  if (g) return { group: g, k, id: "tags:" + g.key + "|" + g.rows.length + "|" + S.board.stamp };
+  if (head) return { group: head, tags: true, k, id: "tags:" + head.key + "|" + head.rows.length + "|" + S.board.stamp + q };
+  if (detailView() === "tags") return { group: null, tags: true, k, id: "tags:|" + S.board.stamp + q };
   const it = cur(k);
   return { it, k, id: it ? key(it) + "|" + (it.pos || 0) + "|" + S.board.stamp : "" };
 }
 function detailFollow(force) {
-  // the tags view stands in for the details: they follow again when the switch comes back
-  if (detailView() === "tags") { detailKey = ""; return; }
   const t = detailTarget();
   if (!force && t.id === detailKey) return;
   detailKey = t.id;
-  const was = S.tagHead;
   S.tagHead = t.group || null;
-  if (was || S.tagHead) detailHead();
-  if (t.group) return showTagPanel(t.group);
+  S.tagView = !!t.tags;
+  detailHead();
+  if (t.tags) return showTagPanel(t.group);
   followDetail(t.it, t.k === 2);
 }
 
@@ -159,9 +165,9 @@ function detailFollow(force) {
 // showTagPanel draws group g's tag as Mod library's Tags view does; a redraw never takes
 // text the player is typing in it.
 function showTagPanel(g) {
-  const box = $("#detail"), ref = "tags:" + g.key, ae = document.activeElement;
+  const box = $("#detail"), ref = "tags:" + (g ? g.key : ""), ae = document.activeElement;
   if (box.dataset.ref === ref && box.contains(ae) && ae.matches("input, textarea")) return;
-  const info = !g.none && G.tags.find((t) => t.tag.toLowerCase() === g.key);
+  const info = g && !g.none && G.tags.find((t) => t.tag.toLowerCase() === g.key);
   showPanel(ref, tagPanel(info ? { ...g, info } : g, tagCtx));
 }
 // pinned: the tag a click in a Mod's details opened ({key, tag, sig}); it stays while the
@@ -191,7 +197,9 @@ const tagCtx = {
     detailFollow(true);
   },
   goTo: (key) => {
-    const c = col(0), at = pinned ? -1 : c.view.findIndex((vi) => headOf(c, vi)?.key === key);
+    // on Disabled's cursor: its header; otherwise shown in its place
+    const c = col(0), k = Math.min(S.focus, 2) === S.focus ? S.focus : lastList;
+    const at = pinned || k !== 0 ? -1 : c.view.findIndex((vi) => headOf(c, vi)?.key === key);
     // shown from a Mod's details, or a tag with no header in Disabled: shown in its place
     if (at < 0) return openTag(G.tags.find((t) => t.tag.toLowerCase() === key)?.tag || key);
     c.cursor = at;
@@ -202,6 +210,12 @@ const tagCtx = {
     detailFollow();
   },
   redraw: () => detailFollow(true),
+  // the editor's no tag chip (16 §2.5): the enabled Mods without a tag, has:notag on Enabled
+  noTag: () => {
+    const n = col(1).items.filter((it) => !it.tags || !it.tags.length).length;
+    const on = /(^|\s)has:notag(\s|$)/i.test(S.bar?.search || "");
+    return { n, on, toggle: () => S.bar.set("has:notag", on ? 0 : 1) };
+  },
   // back to the list the details follow (a pinned tag stays)
   leave: () => focusArea(Math.min(S.focus, 2) === S.focus ? S.focus : lastList),
   editing: () => {},
@@ -1249,7 +1263,6 @@ function onKey(e) {
     const kk = e.shiftKey && k === "m" ? "M" : k;
     if (g && !g.none && ["F2", "n", "M", "Delete"].includes(kk)) {
       handled();
-      setDetailView("details"); // the Tag manager they act on is the details'
       if (kk === "F2") return startRename(tagBox(), g, tagCtx);
       if (kk === "n") return editTagNote(tagBox(), tagCtx);
       if (kk === "M") return pickMerge(g.tag, tagCtx);
@@ -1447,7 +1460,12 @@ async function start() {
   document.addEventListener("mod-player-data-changed", () => reload());
   document.addEventListener("filter-tag", (e) => S.bar.set("tags:" + e.detail, 1));
   document.addEventListener("open-tag", (e) => openTag(e.detail));
-  setOnDetailView(() => detailFollow(true));
+  // the details | tags switch: details leaves a tag clicked; tags reads the tags first
+  setOnDetailView(async (v) => {
+    if (v === "details") pinned = null;
+    else await refreshOrder(true);
+    detailFollow(true);
+  });
   document.addEventListener("editor-use-copy", async (e) => {
     if(environmentReason())return say("busy",environmentReason());
     const id = e.detail;
