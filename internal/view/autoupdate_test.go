@@ -179,7 +179,7 @@ func TestAboutSettingsOrderAndUniqueControls(t *testing.T) {
 				t.Fatal("duplicate community group", g)
 			}
 			for _, it := range g.Items {
-				if it.Label == "RimArcho" {
+				if it.Key == "archo.version" {
 					counts["version"]++
 				}
 				if strings.Join(it.Argv, " ") == "config set updates.auto {}" {

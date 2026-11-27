@@ -44,7 +44,7 @@ export function changelogView(c, { open }) {
 function versionFold(v, c, open) {
   const f = fold("cl-ver", async (body) => {
     const text = v.text ?? await api.ChangelogText(v.key).catch(() => "");
-    body.append(renderMarkdown(text || "", { source: c.source, open }));
+    body.append(renderMarkdown(text || "", { source: c.source, open, leads: true }));
   }, v.current);
   f.box.dataset.version = v.key;
   const title = span("cl-v" + (v.current ? " current" : ""), v.title);
@@ -162,7 +162,8 @@ export function linkURL(url, source) {
 }
 
 // renderMarkdown draws parseMarkdown's blocks with createElement and text nodes only.
-export function renderMarkdown(text, { source = "", open = () => {} } = {}) {
+// With leads, each bullet shows its lead (bulletLead) and a "more" that shows it whole.
+export function renderMarkdown(text, { source = "", open = () => {}, leads = false } = {}) {
   const box = el("div", "cl-md");
   const runs = (parent, list) => {
     for (const r of list) {
@@ -185,8 +186,30 @@ export function renderMarkdown(text, { source = "", open = () => {} } = {}) {
     const ul = document.createElement("ul");
     for (const it of l.items) {
       const li = document.createElement("li");
-      runs(li, it.inl);
-      if (it.sub) li.append(list(it.sub));
+      const lead = leads ? bulletLead(it.inl) : null;
+      if (!lead?.length) {
+        runs(li, it.inl);
+        if (it.sub) li.append(list(it.sub));
+      } else {
+        // the lead, then a muted "more" that shows the whole bullet in place
+        const short = document.createElement("span"), full = document.createElement("span");
+        short.className = "cl-lead";
+        runs(short, lead);
+        runs(full, it.inl);
+        if (it.sub) full.append(list(it.sub));
+        full.hidden = true;
+        const more = document.createElement("button");
+        more.type = "button";
+        more.className = "cl-more";
+        const flip = (on) => {
+          short.hidden = on; full.hidden = !on;
+          more.replaceChildren(document.createTextNode(T(on ? "hide" : "more")));
+          more.setAttribute("aria-expanded", String(on));
+        };
+        flip(false);
+        more.onclick = (e) => { e.stopPropagation(); flip(full.hidden); };
+        li.append(short, full, more);
+      }
       ul.append(li);
     }
     return ul;
@@ -199,4 +222,29 @@ export function renderMarkdown(text, { source = "", open = () => {} } = {}) {
     box.append(n);
   }
   return box;
+}
+
+// bulletLead is a bullet's lead: the bold phrase it starts with, else its first sentence, cut
+// at the first ". " or "; " outside code and quotes. null when the lead is the whole bullet.
+export function bulletLead(inl) {
+  if (inl[0]?.t === "b") return inl.length > 1 && !(inl.length === 2 && inl[1].t === "text" && !inl[1].text.trim()) ? [inl[0]] : null;
+  const out = [];
+  let quotes = 0;
+  for (const [i, r] of inl.entries()) {
+    if (r.t === "text") {
+      let m = null;
+      for (const c of r.text.matchAll(/[.;] |"/g)) {
+        if (c[0] === '"') quotes++;
+        else if (quotes % 2 === 0) { m = c; break; }
+      }
+      if (m) {
+        const cut = r.text.slice(0, m.index + (r.text[m.index] === "." ? 1 : 0));
+        if (cut.trim()) out.push({ t: "text", text: cut });
+        const rest = r.text.slice(m.index + 1).trim() || inl.slice(i + 1).length;
+        return rest ? out : null;
+      }
+    }
+    out.push(r);
+  }
+  return null;
 }

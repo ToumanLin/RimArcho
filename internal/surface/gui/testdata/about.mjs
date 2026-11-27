@@ -64,3 +64,23 @@ test("the current version is open; another reads its text once, when opened; old
   await flush();
   assert.ok(folds[2].textContent.includes("1.1.3"));
 });
+
+test("a bullet shows its lead: the bold phrase, else the first sentence; more shows it whole", async () => {
+  const { mod } = await setup();
+  const lead = (s) => { const l = mod.bulletLead(mod.inline(s)); return l && l.map(r => r.text ?? r.kids.map(k => k.text).join("")).join(""); };
+  assert.equal(lead("**Settings in seven groups.** The list is down"), "Settings in seven groups.");
+  assert.equal(lead("Fixed: `a; b` broke. Now it works"), "Fixed: a; b broke.");
+  assert.equal(lead("CLI / MCP: `archo x` adds this; and that"), "CLI / MCP: archo x adds this");
+  assert.equal(lead("Only one sentence."), null);
+  assert.equal(lead('It reads "a = b; c" now. Then more'), 'It reads "a = b; c" now.');
+  assert.equal(lead("**Bold** only"), "Bold");
+  const box = mod.renderMarkdown("- **Lead.** Rest with `code`.\n- Short one.", { leads: true });
+  const [first, second] = box.children[0].children;
+  const [short, full, more] = first.children;
+  assert.equal(short.textContent, "Lead.");
+  assert.ok(full.hidden && !short.hidden);
+  more.onclick({ stopPropagation() {} });
+  assert.ok(!full.hidden && short.hidden);
+  assert.equal(full.textContent, "Lead. Rest with code.");
+  assert.equal(second.textContent, "Short one.");
+});

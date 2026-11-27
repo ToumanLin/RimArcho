@@ -3672,7 +3672,10 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .cl-md p { margin: 6px 0; }
 .cl-md .cl-h { margin: 14px 0 4px; font-size: 13px; font-weight: 600; color: var(--fg); }
 .cl-md strong { font-weight: 600; color: var(--fg); }
-.cl-md code { font: 12px var(--code); color: var(--fg); }
+.cl-md code { font: inherit; font-family: var(--code); padding: 0 3px; border-radius: var(--r-sm); background: var(--pill); }
+.cl-md .cl-more { margin-left: 8px; padding: 0; color: var(--muted); font: inherit; }
+.cl-md .cl-more:hover { color: var(--fg); }
+.cl-md [hidden] { display: none; }
 .cl-md a { color: var(--accent); text-decoration: none; }
 .cl-md a:hover { text-decoration: underline; }
 
