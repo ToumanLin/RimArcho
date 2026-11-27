@@ -133,7 +133,7 @@ ${li(known)}
 `);
   // A save left from an earlier run must not load instead of the quicktest map (dev mode loads one named "autostart").
   fs.rmSync(path.join(userdata, 'Saves'), {recursive: true, force: true});
-  fs.rmSync(path.join(userdata, 'probe.png'), {force: true});
+  for (const f of fs.readdirSync(userdata)) if (/^probe(-.*)?\.png$/.test(f)) fs.rmSync(path.join(userdata, f), {force: true});
 }
 
 async function cmdRun(o) {
@@ -194,8 +194,7 @@ async function cmdRun(o) {
   for (const l of lines) console.log('  ' + l);
   if (!lines.length) console.log('  (no [Probe] lines: check the log for load errors, or raise --seconds)');
   if (errors.length) console.log(`log has ${errors.length} error lines, first: ${errors[0].slice(0, 200)}`);
-  const shot = path.join(userdata, 'probe.png');
-  if (fs.existsSync(shot)) { fs.copyFileSync(shot, path.join(run, 'probe.png')); console.log(`screenshot ${path.join(run, 'probe.png')}`); }
+  for (const f of fs.readdirSync(userdata).filter(f => /^probe(-.*)?\.png$/.test(f)).sort()) { fs.copyFileSync(path.join(userdata, f), path.join(run, f)); console.log(`screenshot ${path.join(run, f)}`); }
   if (hash(realPrefs()) !== before) console.log(`WARNING: the real ${realPrefs()} changed during this run. Report it; do not edit it.`);
   process.exit(lines.some(l => l.includes('[Probe] RESULT')) ? 0 : 1);
 }

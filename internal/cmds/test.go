@@ -271,6 +271,9 @@ func testProbe(root *render.Node, p *app.TestRunProbe) {
 	if p.Screenshot != "" {
 		n.KV("screenshot", p.Screenshot)
 	}
+	if len(p.Screenshots) > 0 {
+		n.KV("screenshots", fmt.Sprintf("%d named, probe-<name>.png in %s", len(p.Screenshots), filepath.Dir(p.Screenshots[0])))
+	}
 	title := fmt.Sprintf("[Probe] lines: %d", p.LinesTotal)
 	if p.LinesTotal > len(p.Lines) {
 		title += fmt.Sprintf(", first %d and last %d shown", min(10, len(p.Lines)), max(0, len(p.Lines)-10))

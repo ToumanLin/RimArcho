@@ -55,6 +55,23 @@ namespace RimProbe
         /// <summary>What the final screenshot centers on and selects. Null: no selection, camera stays.</summary>
         public Thing ScreenshotTarget;
 
+        /// <summary>Save the game window as probe-&lt;name&gt;.png beside the final screenshot, at the end of this frame.
+        /// One per frame. target: select it and center the camera on it first.</summary>
+        public static void Screenshot(string name, Thing target = null)
+        {
+            if (target != null && target.Spawned)
+            {
+                Find.Selector.ClearSelection();
+                Find.Selector.Select(target);
+                Find.CameraDriver.SetRootPosAndSize(target.TrueCenter(), 9f);
+            }
+            var safe = new System.Text.StringBuilder();
+            foreach (char c in name ?? "") safe.Append(char.IsLetterOrDigit(c) || c == '-' || c == '_' ? c : '_');
+            string path = Path.Combine(GenFilePaths.SaveDataFolderPath, "probe-" + safe + ".png");
+            ScreenCapture.CaptureScreenshot(path);
+            Log("shot " + path);
+        }
+
         /// <summary>End the run at the next frame, from any hook.</summary>
         public void EndNow() { endRequested = true; }
         internal bool endRequested;

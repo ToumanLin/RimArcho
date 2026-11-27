@@ -90,6 +90,9 @@ func TestAppGameHelper(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(os.Getenv("ARCHO_TEST_DATA"), "probe.png"), []byte("png"), 0o644); err != nil {
 			os.Exit(96)
 		}
+		if err := os.WriteFile(filepath.Join(os.Getenv("ARCHO_TEST_DATA"), "probe-pawn.png"), []byte("named"), 0o644); err != nil {
+			os.Exit(96)
+		}
 		os.Exit(0)
 	}
 	time.Sleep(30 * time.Second)

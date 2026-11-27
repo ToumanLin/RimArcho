@@ -62,12 +62,15 @@ func TestTestRunProbe(t *testing.T) {
 		} else {
 			active = cfg.Active
 		}
-		if _, err := os.Stat(filepath.Join(data, "probe.png")); !os.IsNotExist(err) {
-			t.Errorf("an earlier screenshot reached the launch: %v", err)
+		for _, old := range []string{"probe.png", "probe-old.png"} {
+			if _, err := os.Stat(filepath.Join(data, old)); !os.IsNotExist(err) {
+				t.Errorf("an earlier screenshot %s reached the launch: %v", old, err)
+			}
 		}
 		return start(cmd)
 	}
 	e.WriteFile(filepath.Join(data, "probe.png"), "stale")
+	e.WriteFile(filepath.Join(data, "probe-old.png"), "stale")
 	before := e.ReadModsConfig()
 	r, err := e.App.TestRun(context.Background(), app.TestRunOptions{
 		Probe: probe, ProbeAfter: "test.a", Timeout: 5 * time.Second, Settle: time.Second,
@@ -99,6 +102,10 @@ func TestTestRunProbe(t *testing.T) {
 	}
 	if p.Screenshot != filepath.Join(r.RunDir, "probe.png") {
 		t.Fatalf("screenshot %q", p.Screenshot)
+	}
+	// the scenario's named screenshots move with it; an earlier run's are gone
+	if !slices.Equal(p.Screenshots, []string{filepath.Join(r.RunDir, "probe-pawn.png")}) {
+		t.Fatalf("named screenshots %v", p.Screenshots)
 	}
 	if b, err := os.ReadFile(p.Screenshot); err != nil || string(b) != "png" {
 		t.Fatalf("screenshot %q, %v", b, err)

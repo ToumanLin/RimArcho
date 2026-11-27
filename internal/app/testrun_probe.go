@@ -24,12 +24,14 @@ type TestRunProbe struct {
 	PackageID string `json:"package_id"`
 	Position  int    `json:"position"` // 1-based in the tested load order, official content included
 	// Outcome: result, exception, or none when no last line arrived.
-	Outcome     string   `json:"outcome"`
-	Result      string   `json:"result,omitempty"`
-	Exception   string   `json:"exception,omitempty"`
-	Lines       []string `json:"lines"`
-	LinesTotal  int      `json:"lines_total"`
-	Screenshot  string   `json:"screenshot,omitempty"`
+	Outcome    string   `json:"outcome"`
+	Result     string   `json:"result,omitempty"`
+	Exception  string   `json:"exception,omitempty"`
+	Lines      []string `json:"lines"`
+	LinesTotal int      `json:"lines_total"`
+	Screenshot string   `json:"screenshot,omitempty"`
+	// Screenshots are the named ones the scenario took (probe-<name>.png), by name.
+	Screenshots []string `json:"screenshots,omitempty"`
 	MissingDeps []string `json:"missing_dependencies,omitempty"`
 }
 
@@ -180,10 +182,19 @@ func (p *probeSetup) probeTokens(tokens []string) []string {
 
 // clearProbeShot removes an earlier run's screenshot from the reused user data.
 func clearProbeShot(data string) error {
-	if err := os.Remove(filepath.Join(data, probeShot)); err != nil && !os.IsNotExist(err) {
-		return err
+	for _, shot := range append(probeNamedShots(data), filepath.Join(data, probeShot)) {
+		if err := os.Remove(shot); err != nil && !os.IsNotExist(err) {
+			return err
+		}
 	}
 	return nil
+}
+
+// probeNamedShots lists the scenario's own screenshots (probe-<name>.png) in dir, by name.
+func probeNamedShots(dir string) []string {
+	shots, _ := filepath.Glob(filepath.Join(dir, "probe-*.png"))
+	slices.Sort(shots)
+	return shots
 }
 
 // finishProbe reads the probe's lines from the run's log and moves its screenshot into the run directory.
@@ -197,6 +208,14 @@ func finishProbe(p *TestRunProbe, logPath, data, runDir string) error {
 		} else {
 			p.Screenshot = dst
 		}
+	}
+	for _, shot := range probeNamedShots(data) {
+		dst := filepath.Join(runDir, filepath.Base(shot))
+		if err := os.Rename(shot, dst); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		p.Screenshots = append(p.Screenshots, dst)
 	}
 	if err := readProbeLines(p, logPath); err != nil {
 		errs = append(errs, err)

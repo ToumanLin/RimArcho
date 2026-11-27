@@ -21,11 +21,12 @@ A probe is a tiny test mod. It loads with the mods under test, sets up a situati
 1. **Locate** the game folder (has `Version.txt`; `RimWorldWin64.exe` in 1.6, `RimWorld.exe` and `Waylith.dll` in 1.7), the Harmony mod folder (packageId `brrainz.harmony`) and each mod under test (folder with `About/About.xml`; read its packageId and `modDependencies`).
 2. **Create** the probe outside the game and mod folders: `node scripts/probe.mjs new <work>/probe`.
 3. **Smoke test first.** Build and run the unchanged probe with only Harmony. Expect `[Probe] RESULT smoke ok ...`. If this fails, fix the environment before writing any scenario.
-4. **Write the scenario** in `Scenario.cs` (see the next section), then `build`. `build` reads the game version and builds for it; to test both versions, build once against each game.
+4. **Write the scenario** in `Scenario.cs` (see the next section), then `build`. `build` reads the game version and builds for it; to test both versions, build once against each game. The game that runs the probe may be on another machine: build against any copy of the same version.
 5. **Run each configuration** with its own `--name`:
    `node scripts/probe.mjs run --game <game> --work <work> --name <cfg> --mods "brrainz.harmony=<dir>,<pkg>=<dir>,probe.scenario=<work>/probe"`.
    `--mods` is the load order of the non-official mods; official content comes first.
-6. **Read the output**: the `[Probe]` lines print to the console and go to `<work>/runs/<name>/probe-lines.txt`. The full log is `Player.log` next to it, and the screenshot `probe.png`. Look at the screenshot when the claim is visual.
+6. **Read the output**: the `[Probe]` lines print to the console and go to `<work>/runs/<name>/probe-lines.txt`. The full log is `Player.log` next to it, and the screenshots `probe.png` (the end) and `probe-<name>.png` (yours). Look at them when the claim is visual.
+   **Where node or a second game copy is missing** (a test VM, a player's machine with RimArcho): build here, copy the probe folder there, and run `archo test run --probe <probe folder> --json` in a signed-in desktop session; it follows the same line contract and keeps the run's files in its run folder.
 7. **Clean up**: `node scripts/probe.mjs clean --work <work>` removes the sandbox junctions safely and keeps the run logs.
 
 A run takes 1 to 3 minutes; the first 1.7 run in a work folder takes longer while the game builds its shader and texture caches in the sandbox user data. Run commands in the background if your tool has a short timeout.
@@ -51,7 +52,7 @@ The run ends when `Done` returns true, a hook calls `EndNow()`, or `MaxTicks` / 
 
 **Steps and errors.** Call `Step("name")` before each part of the scenario. Every error and exception the game logs from then on counts against that step, and the RESULT line ends with `errors=[setup:0 open-card:2 ...]`, with the first lines of each listed above it. `ErrorCount(step)` and `Errors(step)` read them inside the scenario. Steps before your first call are `startup` (from the probe's load), `setup` and `run`. Errors logged before the probe loads, such as XML load errors, are only in `Player.log`.
 
-Helpers on the base class: `Log`, `Patches(method)` (Harmony owners on a method), `Colonists(map, n)` (spawned colonists, generates more if needed), `SpawnBuilding(map, defName, stuff)`, `ClearSpot`, `CompNamed(thing, typeName)` (a comp from another mod without referencing it), `Call` / `Get` / `Set` (private members by name), `LoadOrder()`, and `ScreenshotTarget` (what the final screenshot selects and centers on). A window still open at the end shows in the screenshot.
+Helpers on the base class: `Log`, `Patches(method)` (Harmony owners on a method), `Colonists(map, n)` (spawned colonists, generates more if needed), `SpawnBuilding(map, defName, stuff)`, `ClearSpot`, `CompNamed(thing, typeName)` (a comp from another mod without referencing it), `Call` / `Get` / `Set` (private members by name), `LoadOrder()`, `Screenshot(name, target)` (saves `probe-<name>.png` at the end of the frame, one per frame; with a target, selects and centers on it), and `ScreenshotTarget` (what the final screenshot selects and centers on). A window still open at the end shows in the screenshot.
 
 Do not reference the assemblies of the mods under test. Reach their types by name with `CompNamed`, `Call`, `Get`, `Set`, `AccessTools.TypeByName`. The probe then builds with the game alone and runs in every configuration.
 
