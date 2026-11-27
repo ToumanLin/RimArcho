@@ -163,7 +163,7 @@ func stylesAddCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	e := r.Entry
 	d, root := render.New(fmt.Sprintf("%s look %s as %s (all plans)", verb, e.Look, styleKind(e.Kind, e.Target, e.Random)))
-	if e.ID > 0 {
+	if e.ID > 0 && !r.DryRun {
 		root.KV("entry", strconv.FormatInt(e.ID, 10))
 	}
 	root.KV("things", strings.Join(e.Things, ", "))
@@ -191,7 +191,9 @@ func stylesRemoveCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		verb = "would remove"
 	}
 	d, root := render.New(fmt.Sprintf("%s entry %d: look %s as %s", verb, r.Entry.ID, r.Entry.Look, styleKind(r.Entry.Kind, r.Entry.Target, r.Entry.Random)))
-	root.KV("note", "a save that has items with a removed style logs a missing Def when it loads and shows them in their default look")
+	if r.Entry.Kind == app.StyleKindStyle {
+		root.KV("note", "a save that has items with a removed style logs a missing Def when it loads and shows them in their default look")
+	}
 	stylesResult(root, r)
 	return d, err
 }

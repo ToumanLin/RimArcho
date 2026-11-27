@@ -579,6 +579,11 @@ func (a *App) StyleAdd(ctx context.Context, in StyleAddInput, dryRun bool) (*Sty
 	}
 	r := &StylesResult{DryRun: dryRun, Plan: st.Plan.Name, Entry: &entry}
 	if dryRun {
+		// the ID the add would get: the style's texture folder is named by it
+		if row.ID, err = a.Store.NextLookStyleID(); err != nil {
+			return nil, err
+		}
+		entry.ID = row.ID
 		return a.stylesPreview(r, ls, append(rows, row), true)
 	}
 	if _, r.Dir, r.DirChosen, err = a.ensureGenMod(stylesGen, st.Ix.Env.GameRoot); err != nil {

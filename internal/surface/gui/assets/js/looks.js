@@ -160,6 +160,23 @@ function build() {
   });
 }
 
+// relang: the language changed (16 §2.14). The words built once are set again, and what Go
+// worded (the overview, the gallery, the look in the looks editor) is read again; the view,
+// the layer, the selected Mod and the look stay.
+export function relang() {
+  if (!viewSwitch) return;
+  const lbl = $("#planhead .lk-scope .lk-lbl");
+  if (lbl) lbl.textContent = T("set preference to");
+  viewSwitch.setAttribute("aria-label", T("view"));
+  scopeSwitch.setAttribute("aria-label", T("set preference to"));
+  L.bar.showGhost?.();
+  if (!L.on) return;
+  // the gallery's own words now, also under an open look (it is not read again there)
+  L.bar.draw?.();
+  if (L.gal) { drawFilter(); drawHead(); drawAct(); }
+  load(false);
+}
+
 // sync runs with every drawing of the editor (main.js render): the switch follows the view,
 // and the remembered view is applied the first time the editor shows.
 export function sync() {
@@ -775,6 +792,19 @@ function drawPref() {
   if (ov.gameRunning) note(T("a game is running: a choice is stored now, and RimArcho Looks Preference is rebuilt at the next write to the game"), "warn");
   if (L.buildError) note(Tf("RimArcho Looks Preference was not rebuilt: %s", L.buildError), "warn", ov.gameRunning ? null : rebuild());
   else if (!g.entry && g.applied > 0) note(T("RimArcho Looks Preference is not in this list, so its choices do not reach the game"), "warn", rebuild());
+  // choices whose look is not in the list now: no gallery row can show them
+  for (const x of g.absent || []) {
+    const b = el("button", "btn small", T("undo"));
+    b.dataset.envWrite = "looks";
+    b.onclick = async () => {
+      let d;
+      try { d = await api.LooksUndo(x.id, x.scope); } catch (e) { return say("fail", errText(e)); }
+      wrote(d);
+    };
+    const why = x.mod ? Tf(x.state === "broken" ? "%s no longer has this look" : "%s is not in this list", x.mod) : T("its Mod is not installed");
+    note(x.id + "    " + T(x.state) + "    " + why, "dim lk-pabsent", b);
+  }
+  if (g.absentMore) note(Tf("… %d more", g.absentMore), "dim");
   if (L.stylesError) note(Tf("RimArcho Styles Preference was not rebuilt: %s", L.stylesError), "warn lk-pstyleserr");
   else if (st && !st.entry && st.active > 0) note(T("RimArcho Styles Preference is not in this list, so its styles and random variants do not reach the game; adding one in this list puts it in"), "warn");
   if (ov.warnings) note(Tf("%s texture files could not be read", num(ov.warnings)), "dim");

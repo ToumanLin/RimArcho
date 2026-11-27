@@ -94,6 +94,17 @@ func (s *Store) AddLookStyle(e LookStyle) (LookStyle, error) {
 	return e, err
 }
 
+// NextLookStyleID is the ID the next entry gets (IDs are never reused), so a dry run can
+// name the paths the add would write.
+func (s *Store) NextLookStyleID() (int64, error) {
+	var n sql.NullInt64
+	err := s.DB.QueryRow(`SELECT seq FROM sqlite_sequence WHERE name='look_style'`).Scan(&n)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 1, nil
+	}
+	return n.Int64 + 1, err
+}
+
 // DeleteLookStyle removes one entry; ok is false when there is none with that ID.
 func (s *Store) DeleteLookStyle(id int64) (ok bool, err error) {
 	r, err := s.DB.Exec(`DELETE FROM look_style WHERE id=?`, id)

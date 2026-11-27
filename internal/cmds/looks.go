@@ -182,11 +182,39 @@ func looksCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if len(rows) == 0 {
 		root.Children = root.Children[:len(root.Children)-1]
 	}
+	if f := a.Str("filter"); (f == "" || f == "chosen") && a.Str("mod") == "" && a.Str("search") == "" {
+		looksAbsent(root, ls)
+	}
 	for _, w := range ls.Index.Warnings {
 		root.KV("warning", w)
 	}
 	d.AddNext("archo looks show <look-id>", "archo looks apply <look-id> --from <mod> --dry-run")
 	return d, nil
+}
+
+// looksAbsent lists the choices whose look is not in the plan now: the list of looks cannot
+// show them, and undo is the only thing to do with them.
+func looksAbsent(root *render.Node, ls *app.LooksState) {
+	var rows [][]string
+	for _, s := range ls.Absent() {
+		for _, c := range s.Choices {
+			if c.Overruled {
+				continue
+			}
+			scope := app.LooksAll
+			if c.Plan {
+				scope = app.LooksPlan
+			}
+			name := ls.LineageName(c.Lineage)
+			if name == "" {
+				name = "a Mod that is not installed"
+			}
+			rows = append(rows, []string{s.ID, c.State, "from " + name, "archo looks undo " + s.ID + " --scope " + scope})
+		}
+	}
+	if len(rows) > 0 {
+		root.Section("choices whose look is not in this plan now").AddColumns(rows)
+	}
 }
 
 // looksSummary adds the choice counts and where RimArcho Looks Preference is in the plan.

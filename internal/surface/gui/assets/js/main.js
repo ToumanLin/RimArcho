@@ -261,6 +261,7 @@ async function relang() {
   await tasksPage.relang();
   selfUpdate.draw();
   S.bar.showGhost(); // the editor's bar: its placeholder in the new language
+  looksView.relang();
   if (screen) $("#screen").scrollTop = top;
   render();
 }

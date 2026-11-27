@@ -85,6 +85,22 @@ type LooksGenerated struct {
 	// choose this one.
 	Dir       string `json:"dir"`
 	DirChosen bool   `json:"dirChosen,omitempty"`
+	// Absent are the choices whose look is not in the plan now (the Mod that supplied it
+	// left, or its update dropped the textures): the gallery cannot show them, so the card
+	// lists them with undo. AbsentMore counts those left out.
+	Absent     []LooksAbsent `json:"absent,omitempty"`
+	AbsentMore int           `json:"absentMore,omitempty"`
+}
+
+// LooksAbsentLimit is the most absent choices the card lists.
+const LooksAbsentLimit = 6
+
+// LooksAbsent is one choice whose look is not in the plan.
+type LooksAbsent struct {
+	ID    string `json:"id"`
+	State string `json:"state"` // asleep or broken
+	Mod   string `json:"mod"`   // the chosen Mod's name; "" when no copy is installed
+	Scope string `json:"scope"` // plan or all: what an undo names
 }
 
 // LooksOverview is the looks view's right column and its totals.
@@ -493,6 +509,22 @@ func BuildLooksOverview(a *app.App, ls *app.LooksState) (*LooksOverview, error) 
 	g := LooksGenerated{Name: app.LooksName, Entry: ls.Entry, Applied: ls.Applied, NotNeeded: ls.NotNeeded, Asleep: ls.Asleep, Broken: ls.Broken, Dir: a.LooksDir()}
 	if g.Dir == "" {
 		g.Dir, g.DirChosen = a.LooksDirDefault(st.Ix.Env.GameRoot), true
+	}
+	for _, s := range ls.Absent() {
+		for _, c := range s.Choices {
+			if c.Overruled {
+				continue
+			}
+			if len(g.Absent) == LooksAbsentLimit {
+				g.AbsentMore++
+				continue
+			}
+			scope := app.LooksAll
+			if c.Plan {
+				scope = app.LooksPlan
+			}
+			g.Absent = append(g.Absent, LooksAbsent{ID: s.ID, State: c.State, Mod: ls.LineageName(c.Lineage), Scope: scope})
+		}
 	}
 	files, err := a.Store.LookFiles()
 	if err != nil {

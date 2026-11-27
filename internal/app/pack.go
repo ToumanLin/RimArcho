@@ -336,7 +336,7 @@ func (a *App) planPack(name string, update bool) (*PackPlan, error) {
 		// Mods/ holds now (leftover links, two folders of one mod): launching the pack deals
 		// with it, and the build only writes to the packs folder.
 		if p.Severity == finding.Error && !strings.HasPrefix(p.Code, "order.") && p.Code != "official.order" && p.Code != CodeCoreMissing && p.Code != CodePackLinks && p.Code != CodeModsDuplicate {
-			r.Blockers = append(r.Blockers, p.Claim)
+			r.Blockers = append(r.Blockers, finding.Expand(p.Claim, st.Ix.Ref)) // a Claim names Mods as tokens
 		} else if p.Code == "version.unsupported" && len(p.Subjects) > 0 {
 			line := p.Claim
 			if m := st.Ix.ByID[finding.InstID(p.Subjects[0])]; m != nil {

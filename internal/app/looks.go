@@ -247,6 +247,36 @@ type LooksState struct {
 	Applied, NotNeeded, Asleep, Broken int
 }
 
+// Absent lists the looks that have a choice and are not in the plan's index (the chosen
+// Mod, the only one that supplied the look under that id, left the plan, or its update
+// dropped the textures), by id. Their choices count as asleep or broken and no list of the
+// plan's looks shows them.
+func (ls *LooksState) Absent() []*LookState {
+	var out []*LookState
+	for _, s := range ls.Looks {
+		if s.Look == nil {
+			out = append(out, s)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out
+}
+
+// LineageName names a Lineage: its Instance in the plan, else an installed copy, else "".
+func (ls *LooksState) LineageName(lineage string) string {
+	for _, m := range ls.Mods {
+		if m.LineageID == lineage {
+			return m.DisplayName()
+		}
+	}
+	for _, m := range ls.St.Ix.Mods {
+		if m.LineageID == lineage {
+			return m.DisplayName()
+		}
+	}
+	return ""
+}
+
 // ChoiceOf returns the choice map of a look for looks.Look.InGame (nil: no choice).
 func (ls *LooksState) ChoiceOf(look string) map[string]int {
 	if s := ls.Looks[look]; s != nil {

@@ -122,6 +122,17 @@ func TestLooksCommands(t *testing.T) {
 	}
 	wantAll(t, e.MustRun("looks", "undo", "things/item/gun", "--scope", "all"), "removed 1 choice", "(all plans)")
 	wantAll(t, e.MustRun("looks", "--filter", "chosen"), "0 looks")
+
+	// A choice whose look left the plan with its Mods is asleep, and still listed with its undo.
+	e.MustRun("looks", "apply", "things/item/gun", "--from", "pkg:looks.a")
+	e.MustRun("disable", "pkg:looks.a")
+	e.MustRun("disable", "pkg:looks.b")
+	gone := e.MustRun("looks", "--filter", "chosen")
+	wantAll(t, gone, "0 looks", "1 asleep", "choices whose look is not in this plan now", "things/item/gun  asleep  from A  archo looks undo things/item/gun --scope plan")
+	wantAll(t, e.MustRun("looks", "undo", "things/item/gun", "--scope", "plan"), "removed 1 choice")
+	if out := e.MustRun("looks"); strings.Contains(out, "not in this plan now") {
+		t.Fatalf("an undone absent choice is still listed:\n%s", out)
+	}
 }
 
 // 13 §4.2 `looks style`: choices, add with its dry run, list, remove, and the shared
@@ -146,7 +157,7 @@ func TestLooksStyleCommands(t *testing.T) {
 	dry := e.MustRun("looks", "style", "add", "things/item/gun", "--from", "pkg:looks.a", "--category", "Rustic", "--random", "--dry-run")
 	wantAll(t, dry, "would add look things/item/gun as style in Rustic (also at random) (all plans)", "things: A_Gun",
 		"would put RimArcho Styles Preference at the end of plan:", "(would be chosen: looks.dir)", "would write 2 textures and 2 Def files in ", "2 hard links, 0 copies",
-		"Defs/RimArchoStyles.xml  generated", "Textures/RimArchoStyles/Style/0/Gun_south.png  hard link to ")
+		"Defs/RimArchoStyles.xml  generated", "Textures/RimArchoStyles/Style/1/Gun_south.png  hard link to ")
 	wantAll(t, e.MustRun("looks", "style", "list"), "0 entries")
 	if out := e.MustRun("list", "--active"); strings.Contains(out, "RimArcho Styles Preference") {
 		t.Fatalf("the dry run changed the plan:\n%s", out)
@@ -160,7 +171,10 @@ func TestLooksStyleCommands(t *testing.T) {
 	if out, code := e.Run("looks", "style", "remove", "x"); code != 2 {
 		t.Fatalf("remove x: %d\n%s", code, out)
 	}
-	wantAll(t, e.MustRun("looks", "style", "remove", "1", "--dry-run"), "would remove entry 1: look things/item/gun as style in Rustic")
+	rmDry := e.MustRun("looks", "style", "remove", "1", "--dry-run")
+	wantAll(t, rmDry, "would remove entry 1: look things/item/gun as style in Rustic", "logs a missing Def")
 	wantAll(t, e.MustRun("looks", "style", "remove", "1"), "removed entry 1", "wrote 0 textures and 0 Def files")
 	wantAll(t, e.MustRun("looks", "style", "list"), "0 entries")
+	// IDs are not reused, and the dry run names the folder the add would write.
+	wantAll(t, e.MustRun("looks", "style", "add", "things/item/gun", "--from", "pkg:looks.a", "--category", "Rustic", "--dry-run"), "Style/2/Gun_south.png")
 }
