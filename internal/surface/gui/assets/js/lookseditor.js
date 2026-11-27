@@ -332,7 +332,7 @@ function info(s, p, f) {
   return `<div class="lk-info">${head}` +
     (same ? `<span class="lk-nt" title="${esc(same.name)}">${esc(Tf("same file as #%d", same.no))}</span>` : "") +
     (from ? `<span class="lk-nt warn" title="${esc(from.name)}">${esc(Tf("mask from #%d", from.no))}</span>` : "") + `</div>` +
-    `<div class="l2">${esc(file.rel)}${E.west ? ` <span class="mirn">${esc(T("mirrored for west"))}</span>` : ""}</div>` +
+    `<div class="l2">${esc(file.rel).split("/").join("/<wbr>")}${E.west ? ` <span class="mirn">${esc(T("mirrored for west"))}</span>` : ""}</div>` +
     `<div class="l3"><span>${file.w}×${file.h}</span><span class="lk-chip">${esc(file.format)}</span>` +
     (file.alt ? `<span class="lk-chip" title="${esc(Tf("this Mod also ships it as %s", file.alt))}">+${esc(file.alt)}</span>` : "") +
     `<span>${esc(bytes(file.bytes))}</span><button type="button" class="btn small lk-show" data-pos="${f.pos}" data-slot="${esc(f.slot)}">${esc(T("show in explorer"))}</button></div></div>`;
