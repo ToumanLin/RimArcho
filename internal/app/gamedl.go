@@ -440,6 +440,13 @@ func (a *App) SteamCMDSignsOutSteam(account string) bool {
 // SteamSignOutNote is the note a SteamCMD download carries when SteamCMDSignsOutSteam.
 const SteamSignOutNote = "SteamCMD signs in as %s, the account the Steam client is signed in with: Steam is signed out until you restart it"
 
+// WorkshopSignOutNote is SteamSignOutNote for a Workshop download that signs in only for
+// the items anonymous download is denied (11 §3).
+const WorkshopSignOutNote = "Workshop items download anonymously; if one needs your account, SteamCMD signs in as %s, the account the Steam client is signed in with: Steam is signed out until you restart it"
+
+// WorkshopAccountNote says which items a Workshop download signed in for (11 §3).
+const WorkshopAccountNote = "%d items need the Steam account: anonymous download was denied, so SteamCMD signs in as %s for them: %s"
+
 // CheckDownloadDir: the new game folder may not be inside RimArcho's data directory, nor
 // inside or around any source (another game, a mod folder).
 func (a *App) CheckDownloadDir(dir string) (string, error) {

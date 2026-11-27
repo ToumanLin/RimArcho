@@ -14,6 +14,10 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/env"
 )
 
+// WorkshopNeedsAccount is why an item failed that anonymous download was denied when no
+// account is saved (11 §3).
+const WorkshopNeedsAccount = "anonymous download was denied; this item needs a Steam account (Settings › accounts)"
+
 // SteamCMD handles commands serially; limit each process's queue and lifetime.
 const workshopBatchSize = 25
 
@@ -38,6 +42,9 @@ func (o workshopOutcome) why() string {
 	}
 	if o.kind == "missing" {
 		return workshopMissing
+	}
+	if o.kind == "account" {
+		return WorkshopNeedsAccount
 	}
 	if o.kind == "crash" {
 		return "SteamCMD exited before confirming the download"

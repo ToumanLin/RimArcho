@@ -189,7 +189,18 @@ func (w *workshopTransfer) outcome(id string, outcome workshopOutcome) {
 }
 
 func workshopPermanent(kind string) bool {
-	return kind == "missing" || kind == "permission" || kind == "ownership" || kind == "disk"
+	return kind == "missing" || kind == "permission" || kind == "ownership" || kind == "disk" || kind == "account"
+}
+
+// again puts the items back to waiting: the signed-in retry downloads them (11 §3).
+func (w *workshopTransfer) again(ids []string) {
+	for i := range w.items {
+		it := &w.items[i]
+		if slices.Contains(ids, strings.TrimPrefix(it.Ref, "ws:")) {
+			it.State, it.Why, it.FailureKind, it.Permanent = ItemWait, "", "", false
+		}
+	}
+	w.publish()
 }
 
 // SubscribeWorkshop prechecks both download routes and reports titles and live results.

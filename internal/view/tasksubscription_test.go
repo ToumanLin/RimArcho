@@ -1,10 +1,12 @@
 package view
 
 import (
-	"github.com/ToumanLin/RimArcho/internal/app"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/ToumanLin/RimArcho/internal/app"
 )
 
 func TestSubscriptionTaskTextAndActions(t *testing.T) {
@@ -88,5 +90,21 @@ func TestSourceCheckTaskNamesItsSource(t *testing.T) {
 	}
 	if objs["1"] != "Steam Workshop (client)" || objs["2"] != "SteamCMD" {
 		t.Fatalf("objects %v", objs)
+	}
+}
+
+// 11 §3: an item anonymous download was denied, with no account saved, says it needs one.
+func TestSubscriptionNeedsAccountReason(t *testing.T) {
+	SetLang("zh")
+	defer SetLang("en")
+	it := app.TaskItem{Ref: "ws:5", Name: "Denied Mod", State: app.ItemFail, FailureKind: "account", Permanent: true}
+	if got := subscriptionReason(it, false); got != "需要 Steam 账号" {
+		t.Fatalf("short %q", got)
+	}
+	if got := subscriptionReason(it, true); got != "匿名下载被拒绝，这个条目需要 Steam 账号（设置 › 账号）" {
+		t.Fatalf("full %q", got)
+	}
+	if got := Text("note: " + fmt.Sprintf(app.WorkshopAccountNote, 2, "player", "8200, 8300")); got != "注意：2 个条目匿名下载被拒绝，需要 Steam 账号，SteamCMD 为它们用 player 登录：8200, 8300" {
+		t.Fatalf("note %q", got)
 	}
 }

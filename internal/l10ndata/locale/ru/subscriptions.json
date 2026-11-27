@@ -263,5 +263,11 @@
   "install it": "установить",
   "installed as a local Mod": "установлен как локальный мод",
   "Local mods need no subscription: copy them into the Mods folder and the next scan finds them.": "Локальным модам подписка не нужна: скопируйте их в папку Mods, и следующее сканирование их найдёт.",
-  "Not recognised. Paste a GitHub or GitLab repository, a LoversLab file page, a web page with a download, Workshop links or IDs.": "Не распознано. Вставьте репозиторий GitHub или GitLab, страницу файла LoversLab, веб-страницу с загрузкой, ссылки или ID Мастерской."
+  "Not recognised. Paste a GitHub or GitLab repository, a LoversLab file page, a web page with a download, Workshop links or IDs.": "Не распознано. Вставьте репозиторий GitHub или GitLab, страницу файла LoversLab, веб-страницу с загрузкой, ссылки или ID Мастерской.",
+  "Workshop items download anonymously; if one needs your account, SteamCMD signs in as %s, the account the Steam client is signed in with: Steam is signed out until you restart it": "Моды Мастерской сначала загружаются анонимно; если для какого-то нужен аккаунт, SteamCMD входит как %s — тот же аккаунт, что и в клиенте Steam: Steam будет отключён до перезапуска",
+  "%d items need the Steam account: anonymous download was denied, so SteamCMD signs in as %s for them: %s": "%d элементов требуют аккаунт Steam: анонимная загрузка запрещена, поэтому SteamCMD входит для них как %s: %s",
+  "anonymous download was denied; this item needs a Steam account (Settings › accounts)": "анонимная загрузка запрещена; этому элементу нужен аккаунт Steam (Настройки › аккаунты)",
+  "needs a Steam account": "нужен аккаунт Steam",
+  "note: Workshop items download anonymously; if one needs your account, SteamCMD signs in as %s, the account the Steam client is signed in with: Steam is signed out until you restart it": "внимание: моды Мастерской сначала загружаются анонимно; если для какого-то нужен аккаунт, SteamCMD входит как %s — тот же аккаунт, что и в клиенте Steam: Steam будет отключён до перезапуска",
+  "note: %d items need the Steam account: anonymous download was denied, so SteamCMD signs in as %s for them: %s": "внимание: %d элементов требуют аккаунт Steam: анонимная загрузка запрещена, поэтому SteamCMD входит для них как %s: %s"
 }

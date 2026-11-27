@@ -263,5 +263,11 @@
   "install it": "安装",
   "installed as a local Mod": "已作为本地 Mod 安装",
   "Local mods need no subscription: copy them into the Mods folder and the next scan finds them.": "本地 Mod 不用在这里添加：复制进 Mods 文件夹，下次扫描就认得",
-  "Not recognised. Paste a GitHub or GitLab repository, a LoversLab file page, a web page with a download, Workshop links or IDs.": "认不出这个地址。支持 GitHub / GitLab 仓库、LoversLab 文件页、有下载的网页、工坊链接或 ID"
+  "Not recognised. Paste a GitHub or GitLab repository, a LoversLab file page, a web page with a download, Workshop links or IDs.": "认不出这个地址。支持 GitHub / GitLab 仓库、LoversLab 文件页、有下载的网页、工坊链接或 ID",
+  "Workshop items download anonymously; if one needs your account, SteamCMD signs in as %s, the account the Steam client is signed in with: Steam is signed out until you restart it": "工坊 Mod 先匿名下载；只有需要账号的条目才让 SteamCMD 用 %s 登录，也就是 Steam 客户端正在用的账号：Steam 会被挤下线，重启后才回来",
+  "%d items need the Steam account: anonymous download was denied, so SteamCMD signs in as %s for them: %s": "%d 个条目匿名下载被拒绝，需要 Steam 账号，SteamCMD 为它们用 %s 登录：%s",
+  "anonymous download was denied; this item needs a Steam account (Settings › accounts)": "匿名下载被拒绝，这个条目需要 Steam 账号（设置 › 账号）",
+  "needs a Steam account": "需要 Steam 账号",
+  "note: Workshop items download anonymously; if one needs your account, SteamCMD signs in as %s, the account the Steam client is signed in with: Steam is signed out until you restart it": "注意：工坊 Mod 先匿名下载；只有需要账号的条目才让 SteamCMD 用 %s 登录，也就是 Steam 客户端正在用的账号：Steam 会被挤下线，重启后才回来",
+  "note: %d items need the Steam account: anonymous download was denied, so SteamCMD signs in as %s for them: %s": "注意：%d 个条目匿名下载被拒绝，需要 Steam 账号，SteamCMD 为它们用 %s 登录：%s"
 }

@@ -263,5 +263,11 @@
   "install it": "インストール",
   "installed as a local Mod": "ローカルModとしてインストールしました",
   "Local mods need no subscription: copy them into the Mods folder and the next scan finds them.": "ローカルMODにサブスクライブは不要です。Modsフォルダにコピーすると、次回のスキャンで検出されます。",
-  "Not recognised. Paste a GitHub or GitLab repository, a LoversLab file page, a web page with a download, Workshop links or IDs.": "認識できませんでした。GitHub／GitLabリポジトリ、LoversLabのファイルページ、ダウンロード可能なWebページ、ワークショップのリンクまたはIDを入力してください。"
+  "Not recognised. Paste a GitHub or GitLab repository, a LoversLab file page, a web page with a download, Workshop links or IDs.": "認識できませんでした。GitHub／GitLabリポジトリ、LoversLabのファイルページ、ダウンロード可能なWebページ、ワークショップのリンクまたはIDを入力してください。",
+  "Workshop items download anonymously; if one needs your account, SteamCMD signs in as %s, the account the Steam client is signed in with: Steam is signed out until you restart it": "ワークショップのModはまず匿名でダウンロードします。アカウントが必要な項目だけ、SteamCMDはSteamクライアントと同じアカウント%sでログインします。そのため、Steamは再起動するまでログアウト状態になります",
+  "%d items need the Steam account: anonymous download was denied, so SteamCMD signs in as %s for them: %s": "%d件は匿名ダウンロードが拒否され、Steamアカウントが必要です。SteamCMDはこれらのために%sでログインします：%s",
+  "anonymous download was denied; this item needs a Steam account (Settings › accounts)": "匿名ダウンロードが拒否されました。この項目にはSteamアカウントが必要です（設定 › アカウント）",
+  "needs a Steam account": "Steamアカウントが必要",
+  "note: Workshop items download anonymously; if one needs your account, SteamCMD signs in as %s, the account the Steam client is signed in with: Steam is signed out until you restart it": "注意：ワークショップのModはまず匿名でダウンロードします。アカウントが必要な項目だけ、SteamCMDはSteamクライアントと同じアカウント%sでログインします。そのため、Steamは再起動するまでログアウト状態になります",
+  "note: %d items need the Steam account: anonymous download was denied, so SteamCMD signs in as %s for them: %s": "注意：%d件は匿名ダウンロードが拒否され、Steamアカウントが必要です。SteamCMDはこれらのために%sでログインします：%s"
 }

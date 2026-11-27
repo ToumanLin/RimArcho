@@ -20,7 +20,8 @@ func TestSteamCMDSameAccountAndOffline(t *testing.T) {
 	t.Parallel()
 	e := setup(t, false)
 	e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, deps.SteamCMDExecutable()), true }
-	note := fmt.Sprintf(app.SteamSignOutNote, "player")
+	// The saved account signs in only for items anonymous download is denied (11 §3).
+	note := fmt.Sprintf(app.WorkshopSignOutNote, "player")
 	for _, tc := range []struct {
 		account, client string
 		signedIn, want  bool
