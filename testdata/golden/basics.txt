@@ -89,7 +89,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     version                                   print the RimArcho version
     uninstall                                 remove what RimArcho put on this machine and restore what it changed (a dry run; --yes runs it)
     collection <link|ID>                      read a Steam Workshop collection and compare it with the installed mods (uses the network)
-    data update [<dataset>…]                  download the community data (rules, steamdb, replacements); automatic checks can also refresh it while the window is open
+    data update [<dataset>…]                  download the community data (rules, steamdb, replacements, noversionwarning); automatic checks can also refresh it while the window is open
     data status                               the community data: source, version, when it was fetched, entries
     deps                                      show external dependencies: status, version, path and source
     deps install <name>                       download todds or steamcmd into RimArcho's own folder

@@ -27,6 +27,7 @@
   "%d mods' %s warnings are ignored": "%d件のMODで%sの警告を無視しています",
   "%d mods confirmed working on %s by community data (No Version Warning)": "%d件のMODはコミュニティデータ（No Version Warning）で%sでの動作が確認されています",
   "confirmed working on %s by community data (No Version Warning)": "コミュニティデータ（No Version Warning）で%sでの動作が確認されています",
+  "%d more confirmed working by community data": "ほかに%d件はコミュニティデータで動作確認済みです",
   "%d mods' %s warnings are restored": "%d件のMODで%sの警告を再有効化しました",
   "%d more": "ほか%d件",
   "%d more…": "ほか%d件…",

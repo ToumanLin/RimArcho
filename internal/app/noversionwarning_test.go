@@ -129,13 +129,19 @@ func TestNoVersionWarning(t *testing.T) {
 	}
 
 	// Can it run, the version panel and the Mod's version line say it apart.
+	// Can it run: one muted line inside the version item, never an item of its own.
 	n := view.BuildNeeds(e.App, st, ps)
-	var texts []string
-	for _, it := range n.Items {
-		texts = append(texts, it.Text)
+	var version *view.Need
+	for i, it := range n.Items {
+		if it.Kind == "version.confirmed" {
+			t.Fatalf("separate confirmed item beside a warning: %+v", it)
+		}
+		if it.Kind == "version.unsupported" {
+			version = &n.Items[i]
+		}
 	}
-	if !slices.Contains(texts, "1 mods confirmed working on 1.7 by community data (No Version Warning)") {
-		t.Fatalf("needs:\n%s", strings.Join(texts, "\n"))
+	if version == nil || !slices.Contains(version.Also, "1 more confirmed working by community data") || len(version.Mods) != 1 {
+		t.Fatalf("version item %+v", version)
 	}
 	vw, err := view.ReadVersionWarnings(e.App, "1.7", false)
 	if err != nil {
@@ -162,6 +168,41 @@ func TestNoVersionWarning(t *testing.T) {
 	}
 	if out := e.MustRun("problems", "--include-muted", "--code", "version.unsupported"); !strings.Contains(out, "[confirmed working by No Version Warning]") {
 		t.Fatalf("include-muted:\n%s", out)
+	}
+}
+
+// When community data answers every version warning, nothing breaks the game: one quiet,
+// uncounted line worth knowing, with no button (05 §4.2).
+func TestNoVersionWarningAllConfirmed(t *testing.T) {
+	t.Parallel()
+	e := versionMuteEnv(t)
+	src := filepath.Join(e.Root, "sources", "nvw.zip")
+	e.WriteFile(src, string(nvwZip(t, map[string]string{"1.7/ModIdsToFix.xml": nvwList("tester.a", "TESTER.B")})))
+	e.MustRun("config", "set", "data.noversionwarning.url", src)
+	e.MustRun("data", "update", "noversionwarning")
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ps, err := e.App.Problems(false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := view.BuildNeeds(e.App, st, ps)
+	found := 0
+	for _, it := range n.Items {
+		switch it.Kind {
+		case "version.unsupported":
+			t.Fatalf("version item with every warning confirmed: %+v", it)
+		case "version.confirmed":
+			found++
+			if it.Counted || len(it.Actions) != 0 || it.Section != view.SectionHint || it.Text != "2 mods confirmed working on 1.7 by community data (No Version Warning)" {
+				t.Fatalf("quiet line %+v", it)
+			}
+		}
+	}
+	if found != 1 {
+		t.Fatalf("%d confirmed lines", found)
 	}
 }
 

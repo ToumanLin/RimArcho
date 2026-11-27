@@ -137,14 +137,17 @@ func confirmedText(n int, mm string) string {
 	return Tf("%d mods confirmed working on %s by community data (No Version Warning)", n, mm)
 }
 
-// confirmedVersionsNeed: warnings No Version Warning answers (08 §2.3), dimmed and not
-// counted; the version list shows them in their own group, with nothing to ignore.
+// confirmedMoreText is the version item's muted line for the warnings No Version Warning
+// answers (08 §2.3): the item's own "see the list" shows them as the list's last group.
+func confirmedMoreText(n int) string {
+	return Tf("%d more confirmed working by community data", n)
+}
+
+// confirmedVersionsNeed: every version warning is answered by No Version Warning, so no item
+// breaks the game; one quiet line worth knowing, not counted, with no button (05 §4.2).
 func confirmedVersionsNeed(st *app.LoadoutState, ps []*app.Problem) Need {
-	mm := st.GameMM()
-	text := confirmedText(len(ps), mm)
-	return Need{rank: 5, Group: GroupList, Text: text, Dim: true, code: "version.confirmed",
-		Evidence: evidence(EvCommunity, app.NoVersionWarningName),
-		Actions:  []Action{{Kind: ActVersionList, Key: "enter", Label: T("see the list"), Title: Tf("does not list %s as supported", mm), GameVersion: mm}}}
+	return Need{rank: 5, Group: GroupList, Text: confirmedText(len(ps), st.GameMM()), Dim: true, Status: StatusHint,
+		code: "version.confirmed", Evidence: evidence(EvCommunity, app.NoVersionWarningName), Actions: []Action{}}
 }
 
 // confirmedReason is a Mod's version line when community data answers its warning.
