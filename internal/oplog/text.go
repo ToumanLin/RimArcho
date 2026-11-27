@@ -51,6 +51,8 @@ func Where(r Row) string {
 		return "the plan's history (archo history)"
 	case UpdateApply:
 		return "the previous release on GitHub"
+	case PlanSync:
+		return "the plan's history (archo undo while it is the current plan)"
 	}
 	return ""
 }

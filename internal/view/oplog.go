@@ -68,12 +68,13 @@ var opWhat = map[string]string{
 	oplog.UpdateRollback:     "put RimArcho back",
 	oplog.Uninstall:          "uninstalled",
 	oplog.Launch:             "started the game",
+	oplog.PlanSync:           "caught a list up with a collection",
 }
 
 var opIcon = map[string]string{
 	oplog.Trash: "bin", oplog.Delete: "bin", oplog.SubscriptionRemove: "bin", oplog.Unsubscribe: "workshop", oplog.ModsConfigWrite: "plan", oplog.LinkCreate: "link", oplog.LinkRemove: "unlink",
 	oplog.SaveRename: "saves", oplog.SaveCopy: "saves", oplog.SaveBackup: "saves", oplog.SaveTrash: "bin",
-	oplog.UpdateApply: "rescan", oplog.UpdateRollback: "rescan", oplog.Uninstall: "close", oplog.Launch: "play",
+	oplog.UpdateApply: "rescan", oplog.UpdateRollback: "rescan", oplog.Uninstall: "close", oplog.Launch: "play", oplog.PlanSync: "workshop",
 }
 
 var opResult = map[string]string{
@@ -200,6 +201,8 @@ func opBack(r oplog.Row) string {
 	switch r.Op {
 	case oplog.Trash, oplog.SaveTrash, oplog.SubscriptionRemove:
 		return T("in the system recycle bin")
+	case oplog.PlanSync:
+		return T("in the list's history")
 	case oplog.ModsConfigWrite:
 		if v := oplog.VersionOf(r.Detail); v != "" {
 			return Tf("in the list's history, as %s", v)

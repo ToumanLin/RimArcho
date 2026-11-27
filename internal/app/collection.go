@@ -105,6 +105,13 @@ func (a *App) workshopTitles(ids []string) (map[string]string, error) {
 
 // ReadCollection reads a collection and matches its items with the installed mods.
 func (a *App) ReadCollection(ref string) (*Collection, error) {
+	return a.readCollection(ref, nil)
+}
+
+// readCollection is ReadCollection asking Steam only for the titles known lacks: a
+// followed collection's check knows the titles of what it held before, so a check of 900
+// items is two requests instead of eleven paced ones (11 §2.1).
+func (a *App) readCollection(ref string, known map[string]string) (*Collection, error) {
 	id, err := CollectionID(ref)
 	if err != nil {
 		return nil, err
@@ -152,11 +159,18 @@ func (a *App) ReadCollection(ref string) (*Collection, error) {
 	}
 	for _, k := range kids {
 		c.Items = append(c.Items, CollectionItem{WorkshopID: k.ID, Sub: k.FileType == 2, Mod: installed[k.ID]})
-		ids = append(ids, k.ID)
+		if known[k.ID] == "" {
+			ids = append(ids, k.ID)
+		}
 	}
 	titles, err := a.workshopTitles(ids)
 	if err != nil && len(titles) == 0 {
 		titles = map[string]string{} // names are a convenience; the comparison stands
+	}
+	for k, t := range known {
+		if titles[k] == "" {
+			titles[k] = t
+		}
 	}
 	c.Title = titles[id]
 	for i := range c.Items {

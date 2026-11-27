@@ -6,11 +6,14 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // The operation log (02 §1, 04 §4, 13 §1.3). The App owns one *oplog.Log (Ops); the
@@ -322,4 +325,58 @@ func (a *App) logLaunchCopy(r *LaunchCopyResult, envID, name string) {
 	}
 	a.Ops.Add(oplog.Row{Op: oplog.SaveBackup, EnvID: envID, Subject: name, Target: r.Dir,
 		Result: opResult(r.Err, false), Detail: joinDetail(detail, errText(r.Err))})
+}
+
+// logSync records catching a plan up with a followed collection (07 §7.6): the plan, the
+// collection, and what was enabled, disabled and moved. A catch-up that changes nothing
+// still writes its row, so "I caught up and nothing happened" is on the record too. The
+// plan's history holds the edit itself (one undo).
+func (a *App) logSync(r *SyncResult, err error) {
+	names := func(ms []*store.Mod) string {
+		out := make([]string, 0, len(ms))
+		for _, m := range ms {
+			out = append(out, m.DisplayName())
+		}
+		return strings.Join(out, ", ")
+	}
+	counts := fmt.Sprintf("%d enabled, %d disabled, %d moved", len(r.Enabled), len(r.Disabled), movedCount(r.Before, r.After))
+	if n := len(r.NotInstalled); n > 0 {
+		counts += fmt.Sprintf(", %d not installed", n)
+	}
+	detail := joinDetail(r.Collection.Title+": "+counts, errText(err))
+	if len(r.Enabled) > 0 {
+		detail += "; enabled: " + names(r.Enabled)
+	}
+	if len(r.Disabled) > 0 {
+		detail += "; disabled: " + names(r.Disabled)
+	}
+	a.Ops.Add(oplog.Row{Op: oplog.PlanSync, EnvID: a.opEnv(), Subject: r.Plan.Name, Target: "workshop:" + r.Collection.WorkshopID, Result: opResult(err, false), Detail: detail})
+}
+
+// movedCount is how many entries in both lists changed their order relative to the others:
+// those outside the longest run kept in order.
+func movedCount(before, after loadout.List) int {
+	at := map[string]int{}
+	for i, e := range before {
+		if e.Instance != "" {
+			at[e.Instance] = i
+		}
+	}
+	var seq []int
+	for _, e := range after {
+		if i, ok := at[e.Instance]; ok && e.Instance != "" {
+			seq = append(seq, i)
+		}
+	}
+	// longest increasing subsequence, patience sorting
+	var tails []int
+	for _, v := range seq {
+		k := sort.SearchInts(tails, v)
+		if k == len(tails) {
+			tails = append(tails, v)
+		} else {
+			tails[k] = v
+		}
+	}
+	return len(seq) - len(tails)
 }
