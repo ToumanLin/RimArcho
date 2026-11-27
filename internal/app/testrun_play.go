@@ -185,8 +185,9 @@ type TestRunLoaded struct {
 	From string `json:"from"`
 }
 
-// runningModsRe is a line of the game's running Mods list after its new-game or load line.
-var runningModsRe = regexp.MustCompile(`^\s+- (\S+)\s*$`)
+// runningModsRe is a line of the game's running Mods list after its new-game or load line;
+// the game ends the line of a Mod made for another version with " (incompatible version)".
+var runningModsRe = regexp.MustCompile(`^\s+- (\S+)(?:\s+\([^)]*\))?\s*$`)
 
 // runningMods reads the packageIds (normPkg) the game listed after its last new-game or
 // save-load line; nil when the log has neither.

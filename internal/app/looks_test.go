@@ -684,3 +684,29 @@ func TestLooksModIsLeftAlone(t *testing.T) {
 		t.Fatalf("providers: %d", len(l.Providers))
 	}
 }
+
+// 21 §4: the game logs an error for a Mod that loads no content, so a generated Mod
+// carries an empty language file from its first build, and a folder built before it did
+// gets the file with the next build.
+func TestLooksEmptyModCarriesLanguageFile(t *testing.T) {
+	t.Parallel()
+	e := looksEnv(t)
+	stub := filepath.Join(looksModDir(e), "Languages", "English", "Keyed", "RimArcho.xml")
+	applyLook(t, e, gunLook, "pkg:looks.a", app.LooksPlan)
+	if _, err := e.App.LooksUndo(context.Background(), gunLook, app.LooksPlan, false); err != nil {
+		t.Fatal(err)
+	}
+	if data, err := os.ReadFile(stub); err != nil || !strings.Contains(string(data), "<LanguageData />") {
+		t.Fatalf("the empty Mod has no language file: %q %v", data, err)
+	}
+	if _, err := os.Stat(filepath.Join(looksModDir(e), "Textures")); err == nil {
+		t.Fatal("the undone look's texture is still there")
+	}
+	if err := os.RemoveAll(filepath.Join(looksModDir(e), "Languages")); err != nil {
+		t.Fatal(err)
+	}
+	applyLook(t, e, gunLook, "pkg:looks.a", app.LooksPlan)
+	if _, err := os.Stat(stub); err != nil {
+		t.Fatalf("the rebuild left the language file out: %v", err)
+	}
+}

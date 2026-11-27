@@ -109,17 +109,31 @@ func (g *genMod) aboutXML() string {
 	return sb.String()
 }
 
-// skeleton creates the generated Mod's folder with its About.xml when it has none. It
-// touches nothing that exists, so it is allowed while a game runs.
+// genStub is an empty language file every generated Mod carries. The game logs the error
+// "Mod ... did not load any content" for a Mod that has no texture, Def, patch, assembly or
+// file under Languages/ (Verse.ModContentPack.AnyContentLoaded), which is what a generated
+// Mod is after its last choice is undone; the file adds no text to the game.
+const (
+	genStub     = "Languages/English/Keyed/RimArcho.xml"
+	genStubData = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<LanguageData />\n"
+)
+
+// skeleton creates the generated Mod's folder with its About.xml and genStub where they
+// are missing. It touches nothing that exists, so it is allowed while a game runs.
 func (g *genMod) skeleton(dir string) error {
-	about := filepath.Join(dir, "About", "About.xml")
-	if _, err := os.Lstat(about); err == nil {
-		return nil
+	for _, f := range [][2]string{{"About/About.xml", g.aboutXML()}, {genStub, genStubData}} {
+		path := filepath.Join(dir, filepath.FromSlash(f[0]))
+		if _, err := os.Lstat(path); err == nil {
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return err
+		}
+		if err := writeNew(path, []byte(f[1])); err != nil {
+			return err
+		}
 	}
-	if err := os.MkdirAll(filepath.Dir(about), 0o755); err != nil {
-		return err
-	}
-	return writeNew(about, []byte(g.aboutXML()))
+	return nil
 }
 
 // writeNew writes a file that must not exist yet: it never opens an existing path.
@@ -272,6 +286,9 @@ func (a *App) genCurrent(g *genMod, dir string, files []LooksFile, texts []GenTe
 	}
 	if _, err := os.Lstat(filepath.Join(dir, "About", "About.xml")); err != nil || len(rec) != len(files) {
 		return false, nil
+	}
+	if _, err := os.Lstat(filepath.Join(dir, filepath.FromSlash(genStub))); err != nil {
+		return false, nil // built before generated Mods carried the file
 	}
 	for i, f := range files { // both are ordered by Rel
 		r := rec[i]
