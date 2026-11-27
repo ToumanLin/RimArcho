@@ -102,6 +102,9 @@ func packBuildCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	root.KV("folder", r.Dir)
+	if r.Unchecked {
+		root.KV("note", "this list has not been analysed, so Def and patch errors were not checked (archo analyze)")
+	}
 	root.KV("mods", fmt.Sprintf("%d carried, %d from the game (Core and DLCs)", carried, official))
 	root.KV("size", fmt.Sprintf("%s; %s of other game versions left out", mb(bytes), mb(r.Pack.Trimmed)))
 	if r.DryRun && r.Free >= 0 {

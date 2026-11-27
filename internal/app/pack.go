@@ -215,7 +215,10 @@ type PackBuild struct {
 	Dir      string
 	DryRun   bool
 	Blockers []string // why it cannot be built (Can it run)
-	Moved    int      // entries the sort moved
+	// Unchecked: the list's Mod set was never analysed, so Def and patch findings (which a
+	// stored run of another list would supply) were not counted as blockers.
+	Unchecked bool
+	Moved     int // entries the sort moved
 	// Measured: what the copy needs, and what the packs drive has (-1: unknown). A build is
 	// refused when Free < Need + SpaceMargin.
 	Need, Free int64
@@ -289,6 +292,41 @@ func (a *App) WithTextures(pl *PackPlan, o *textures.Options) {
 	pl.R.TexOptions = o
 }
 
+// packFindings adds to r what Can it run says of st's list: the errors that block a
+// build and the Mods that do not list the game's version.
+func (a *App) packFindings(st *LoadoutState, r *PackBuild) error {
+	ps, err := a.Problems(false, nil)
+	if err != nil {
+		return err
+	}
+	// Problems shows the newest run of any list when this list's Mod set has none (05 §3).
+	// Another list's Def and patch errors say nothing about this one and do not block it.
+	own, err := a.analysisOf(st, false)
+	if err != nil {
+		return err
+	}
+	r.Unchecked = own.Run == nil
+	for _, p := range ps.List {
+		if p.Log != nil || (r.Unchecked && (p.Layer == "def" || p.Layer == "patch" || p.Layer == "harmony")) {
+			continue
+		}
+		// Order problems do not block: the pack is sorted on its own below, which also adds
+		// a missing Core (official.core-missing). Nor does what
+		// Mods/ holds now (leftover links, two folders of one mod): launching the pack deals
+		// with it, and the build only writes to the packs folder.
+		if p.Severity == finding.Error && !strings.HasPrefix(p.Code, "order.") && p.Code != "official.order" && p.Code != CodeCoreMissing && p.Code != CodePackLinks && p.Code != CodeModsDuplicate {
+			r.Blockers = append(r.Blockers, finding.Expand(p.Claim, st.Ix.Ref)) // a Claim names Mods as tokens
+		} else if p.Code == "version.unsupported" && len(p.Subjects) > 0 {
+			line := p.Claim
+			if m := st.Ix.ByID[finding.InstID(p.Subjects[0])]; m != nil {
+				line = fmt.Sprintf("%s (%s)", m.DisplayName(), strings.TrimSpace(m.SupportedVersions))
+			}
+			r.Mismatch = append(r.Mismatch, line)
+		}
+	}
+	return nil
+}
+
 // PlanPack checks the list and sorts it for the pack (the first two steps of a build).
 func (a *App) PlanPack(name string) (*PackPlan, error) { return a.planPack(name, false) }
 
@@ -323,27 +361,8 @@ func (a *App) planPack(name string, update bool) (*PackPlan, error) {
 			r.Blockers = append(r.Blockers, "not installed: pkg:"+e.Missing)
 		}
 	}
-	ps, err := a.Problems(false, nil)
-	if err != nil {
+	if err := a.packFindings(st, r); err != nil {
 		return nil, err
-	}
-	for _, p := range ps.List {
-		if p.Log != nil {
-			continue
-		}
-		// Order problems do not block: the pack is sorted on its own below, which also adds
-		// a missing Core (official.core-missing). Nor does what
-		// Mods/ holds now (leftover links, two folders of one mod): launching the pack deals
-		// with it, and the build only writes to the packs folder.
-		if p.Severity == finding.Error && !strings.HasPrefix(p.Code, "order.") && p.Code != "official.order" && p.Code != CodeCoreMissing && p.Code != CodePackLinks && p.Code != CodeModsDuplicate {
-			r.Blockers = append(r.Blockers, finding.Expand(p.Claim, st.Ix.Ref)) // a Claim names Mods as tokens
-		} else if p.Code == "version.unsupported" && len(p.Subjects) > 0 {
-			line := p.Claim
-			if m := st.Ix.ByID[finding.InstID(p.Subjects[0])]; m != nil {
-				line = fmt.Sprintf("%s (%s)", m.DisplayName(), strings.TrimSpace(m.SupportedVersions))
-			}
-			r.Mismatch = append(r.Mismatch, line)
-		}
 	}
 	if len(r.Blockers) > 0 {
 		return pl, nil

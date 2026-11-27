@@ -210,6 +210,7 @@ next:
 > manage_packs {"action":"build","dry_run":true,"name":"first"}
 pack build: dry run, nothing written
   folder: $ROOT/LocalAppData/RimArcho/packs/first
+  note: this list has not been analysed, so Def and patch errors were not checked (archo analyze)
   mods: 2 carried, 1 from the game (Core and DLCs)
   size: 868 B; 0 B of other game versions left out
   space: <free> free on the packs drive
@@ -222,6 +223,7 @@ next:
 > manage_packs {"action":"build","dry_run":true,"name":"first","texture_scale":50}
 pack build: dry run, nothing written
   folder: $ROOT/LocalAppData/RimArcho/packs/first
+  note: this list has not been analysed, so Def and patch errors were not checked (archo analyze)
   mods: 2 carried, 1 from the game (Core and DLCs)
   size: 868 B; 0 B of other game versions left out
   space: <free> free on the packs drive
@@ -242,6 +244,7 @@ error: todds (the DDS encoder) is not installed; archo textures tool --install d
 > manage_packs {"action":"build","name":"first"}
 built pack first
   folder: $ROOT/LocalAppData/RimArcho/packs/first
+  note: this list has not been analysed, so Def and patch errors were not checked (archo analyze)
   mods: 2 carried, 1 from the game (Core and DLCs)
   size: 868 B; 0 B of other game versions left out
   trimmed: nothing (no folders for other game versions)
@@ -414,7 +417,7 @@ gc: removed 0 tombstones (tombstones older than 90 days, before 2026-07-03)
 database maintenance: would remove 6 old file records and compact the database
 
 > maintenance {"action":"vacuum"}
-database compacted: freed 80.5 KB (now 580.0 KB)
+database compacted: freed 80.5 KB (now 616.0 KB)
 
 > edit_loadout {"action":"disable","refs":["#hnyg"]}
 workspace: 2 active, 1 change unsaved (plan:default, env:main)

@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Packs: building a pack of a list that was never checked is no longer refused with the Def and patch errors of another list; `archo pack build` notes that the list has not been analysed.
 - Looks: a style or random variant no longer shows as broken in a list that holds another copy of its Mod without the textures (a pack's copy, a trimmed local copy) while the copy it was added from is still installed; it is asleep in that list, and `archo looks style list` says why.
 - Looks: the game no longer logs “Mod RimArcho Looks Preference did not load any content” (or the same for RimArcho Styles Preference) after the last choice or entry is removed; the generated Mods carry an empty language file.
 - `archo test run`: a Mod the game lists as “(incompatible version)” no longer makes the run report that Mod and every Mod after it as not loaded (`status: incomplete`).
