@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/looks"
 	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/store"
@@ -45,13 +46,14 @@ const (
 	StyleActive  = "active"
 	StyleSkipped = "skipped" // something it needs is not in the plan, or it cannot be built for it
 	StyleBroken  = "broken"  // the Mod no longer supplies the look
-	StyleAsleep  = "asleep"  // the Mod is not in the plan
+	StyleAsleep  = "asleep"  // the Mod is not in the plan, or the plan holds a copy of it without the look
 )
 
 // Reasons an entry is not active, or an add is refused (StyleReason.Code).
 const (
 	StyleWhyAsleep     = "asleep"     // the Mod is not in the plan
 	StyleWhyBroken     = "broken"     // the Mod has no texture of the look
+	StyleWhyCopy       = "copy"       // the plan's copy of the Mod has no texture of the look; another copy is installed
 	StyleWhyNoThing    = "nothing"    // no thing Def of the plan uses the look
 	StyleWhyNoCategory = "category"   // the style category is not in the plan (Arg)
 	StyleWhyNoStyle    = "style"      // the target style is not a style of the look's thing Defs (Arg)
@@ -76,6 +78,8 @@ func (r StyleReason) Text() string {
 		return "that Mod is not in the plan"
 	case StyleWhyBroken:
 		return "that Mod no longer has a texture of the look"
+	case StyleWhyCopy:
+		return "this plan's copy of that Mod has no texture of the look"
 	case StyleWhyNoThing:
 		return "no thing Def of the plan uses the look as its graphic"
 	case StyleWhyNoCategory:
@@ -326,6 +330,11 @@ func (e *StyleEntryState) resolve(ls *LooksState, byLineage map[string]int) {
 	l := idx.ByID[e.Look]
 	if l == nil || lookProviderAt(l, pos) == nil {
 		e.State, e.Why = StyleBroken, StyleReason{Code: StyleWhyBroken}
+		if otherCopy(ls.St.Ix, e.Mod) {
+			// Entries hold for every plan: a plan whose copy of the Mod lacks the look (a
+			// pack's copy, a trimmed local one) says nothing about the copy it was added from.
+			e.State, e.Why = StyleAsleep, StyleReason{Code: StyleWhyCopy}
+		}
 		return
 	}
 	skip := func(code, arg string) { e.State, e.Why = StyleSkipped, StyleReason{code, arg} }
@@ -384,6 +393,17 @@ func (e *StyleEntryState) resolve(ls *LooksState, byLineage map[string]int) {
 	} else {
 		e.Things, e.Shared = nil, false
 	}
+}
+
+// otherCopy reports whether m's Lineage has another usable Instance in another folder.
+func otherCopy(ix *Index, m *store.Mod) bool {
+	for _, o := range ix.Mods {
+		if o.LineageID == m.LineageID && o.ID != m.ID && o.Status == identity.Live && !o.Residue && o.Unloadable == "" &&
+			!strings.EqualFold(o.RealPath, m.RealPath) {
+			return true
+		}
+	}
+	return false
 }
 
 func lineagePositions(ls *LooksState) map[string]int {

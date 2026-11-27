@@ -136,8 +136,8 @@ Computed with the index, never stored (`app.StylesState`, one resolver for the l
 | --- | --- | --- |
 | active | The Mod is in the plan and supplies the look, and the thing Defs and the category or target are there | The Defs, patches and textures of the entry |
 | skipped | The category, the target style or every thing Def is not in the plan, or a reason of §5.1's table holds for this plan | Nothing of the entry |
-| broken | The Mod is in the plan but no longer supplies the look | Nothing; shown until the player removes it or the texture returns |
-| asleep | No Instance of the Lineage is in the plan | Nothing; it wakes when the Mod returns |
+| broken | The Mod is in the plan, its copy there does not supply the look, and no other copy of it is installed | Nothing; shown until the player removes it or the texture returns |
+| asleep | No Instance of the Lineage is in the plan; or the plan's Instance does not supply the look while the Lineage has another usable Instance in another folder (reason `copy`, `otherCopy`): entries hold for every plan, and a plan that holds a pack's copy or a trimmed local copy says nothing about the copy the entry was added from | Nothing; it wakes when the Mod, or a copy with the look, returns |
 
 ### 5.3 The generated Mod
 

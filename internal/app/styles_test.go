@@ -814,3 +814,31 @@ func TestStylesWriteNothingIntoMods(t *testing.T) {
 	}
 	check("uninstall")
 }
+
+// 21 §5 "States": entries hold for every plan, so a plan whose copy of the Mod lacks the
+// look (here a locked copy with the textures taken out) does not make the entry broken
+// while another copy is installed; it sleeps in that plan and nothing is built for it.
+func TestStylesOtherCopySleeps(t *testing.T) {
+	t.Parallel()
+	e := stylesEnv(t, "")
+	addStyle(t, e, app.StyleAddInput{Look: capLook, Mod: "pkg:looks.b", Kind: app.StyleKindStyle, Target: "Bare"})
+	e.MustRun("pin", "ws:1002")
+	ss := stylesOf(t, e)
+	if got := entryStates(ss); got != "active" {
+		t.Fatalf("with the locked copy: %s", got)
+	}
+	copyDir := ss.Entries[0].Mod.RealPath
+	if strings.Contains(copyDir, "1002") && strings.HasPrefix(copyDir, e.Workshop) {
+		t.Fatalf("the plan still holds the Workshop copy: %s", copyDir)
+	}
+	e.Remove(filepath.Join(copyDir, "Textures", "Things", "Worn"))
+	e.Advance(1)
+	scanNow(t, e)
+	ss = stylesOf(t, e)
+	if got := entryStates(ss); got != "asleep(copy)" || ss.Asleep != 1 || ss.Broken != 0 || len(ss.Files()) != 0 {
+		t.Fatalf("the plan's copy lost the cap: %s, %d files", got, len(ss.Files()))
+	}
+	if out := e.MustRun("looks", "style", "list"); !strings.Contains(out, "this plan's copy of that Mod has no texture of the look") {
+		t.Fatalf("archo looks style list:\n%s", out)
+	}
+}

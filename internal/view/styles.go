@@ -126,6 +126,8 @@ func styleWhy(r app.StyleReason) string {
 		return T("that Mod is not in the list")
 	case app.StyleWhyBroken:
 		return T("that Mod no longer has a texture of this look")
+	case app.StyleWhyCopy:
+		return T("this list's copy of that Mod has no texture of this look")
 	case app.StyleWhyNoThing:
 		return T("no thing Def in the list uses this look as its graphic")
 	case app.StyleWhyNoCategory:

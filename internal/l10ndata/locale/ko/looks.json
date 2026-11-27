@@ -158,6 +158,7 @@
   "search looks and Mods; filter Mods: tags:, source:, content:": "외형과 Mod 검색, Mod 필터: tags:, source:, content:",
   "no Mod with textures passes the filter": "텍스처가 있는 Mod 중 필터에 맞는 것이 없습니다",
   "that Mod is not in the list": "그 Mod는 목록에 없습니다",
+  "this list's copy of that Mod has no texture of this look": "이 목록에 있는 그 Mod의 사본에는 이 외형의 텍스처가 없습니다",
   "that Mod no longer has a texture of this look": "그 Mod에는 이제 이 외형의 텍스처가 없습니다",
   "no thing Def in the list uses this look as its graphic": "목록에 이 외형을 그래픽으로 쓰는 사물 Def가 없습니다",
   "the style category %s is not in the list": "스타일 범주 %s이(가) 목록에 없습니다",

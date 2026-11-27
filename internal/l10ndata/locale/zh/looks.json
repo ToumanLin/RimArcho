@@ -158,6 +158,7 @@
   "search looks and Mods; filter Mods: tags:, source:, content:": "搜索外观和 Mod；筛选 Mod：tags:、source:、content:",
   "no Mod with textures passes the filter": "没有带贴图的 Mod 符合筛选条件",
   "that Mod is not in the list": "那个 Mod 不在列表里",
+  "this list's copy of that Mod has no texture of this look": "此列表里那个 Mod 的副本没有这个外观的贴图",
   "that Mod no longer has a texture of this look": "那个 Mod 已不再有这个外观的贴图",
   "no thing Def in the list uses this look as its graphic": "列表里没有物品 Def 用这个外观作图形",
   "the style category %s is not in the list": "风格类别 %s 不在列表里",

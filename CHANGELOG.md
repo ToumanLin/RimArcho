@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Looks: a style or random variant no longer shows as broken in a list that holds another copy of its Mod without the textures (a pack's copy, a trimmed local copy) while the copy it was added from is still installed; it is asleep in that list, and `archo looks style list` says why.
 - Looks: the game no longer logs “Mod RimArcho Looks Preference did not load any content” (or the same for RimArcho Styles Preference) after the last choice or entry is removed; the generated Mods carry an empty language file.
 - `archo test run`: a Mod the game lists as “(incompatible version)” no longer makes the run report that Mod and every Mod after it as not loaded (`status: incomplete`).
 - Looks view: the gaps between the right column's cards can be dragged in both layers (Mods, load-order rules, preference; override chain, operation), and the Mods card gets more of the column; load-order rules no longer keep empty room beside each rule; the preference card shows each Mod's name on its own line with its states and files under it; a search also finds Mods by name and narrows the Mods card to them; the mouse's back button in the looks editor returns to the gallery; in side by side the two textures stand level and meet at the middle. Going to the editor and back no longer reads the list's textures again.
