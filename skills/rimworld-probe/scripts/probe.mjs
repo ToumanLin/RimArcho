@@ -3,12 +3,13 @@
 //
 //   node probe.mjs new   <probeDir> [--id probe.scenario]
 //   node probe.mjs build <probeDir> --game <gameDir> --harmony <harmonyModDir>
-//   node probe.mjs run   --game <gameDir> --work <workDir> --name <run> --mods "<pkgId>=<folder>,..." [--no-dlc ideology,...] [--seconds 600]
+//   node probe.mjs run   --game <gameDir> --work <workDir> --name <run> --mods "<pkgId>=<folder>,..." [--no-dlc ideology,...] [--lang <folder>] [--seconds 600]
 //   node probe.mjs clean --work <workDir>
 //
 // build detects the game version and builds <probeDir>/<version>/Assemblies/Probe.dll.
 // run: --mods lists every non-official mod in load order, Harmony and the probe included. Official content
-// (Core and the DLCs found in <gameDir>/Data) loads first; --no-dlc leaves listed DLCs off.
+// (Core and the DLCs found in <gameDir>/Data) loads first; --no-dlc leaves listed DLCs off; --lang sets the game's
+// language by its folder name, e.g. "ChineseSimplified (简体中文)" (default English).
 // The sandbox is <workDir>/game-<version>: the game's folders and every mod folder are junctions, the game's top-level
 // files are hard links (copies only if the work folder is on another drive). User data (config, saves, the 1.7 shader
 // and texture caches) is <workDir>/userdata-<version>, reused between runs; each run's log, probe lines and screenshot go
@@ -99,7 +100,7 @@ function buildGame(game, g, mods) {
   }
 }
 
-function writeConfig(info, userdata, active, known) {
+function writeConfig(info, userdata, active, known, lang) {
   const cfg = path.join(userdata, 'Config'); fs.mkdirSync(cfg, {recursive: true});
   const li = a => a.map(p => `    <li>${p}</li>`).join('\n');
   fs.writeFileSync(path.join(cfg, 'ModsConfig.xml'), `<?xml version="1.0" encoding="utf-8"?>
@@ -126,7 +127,7 @@ ${li(known)}
   <automaticPauseMode>Never</automaticPauseMode>
   <devMode>True</devMode>
   <adaptiveTrainingEnabled>False</adaptiveTrainingEnabled>
-  <langFolderName>English</langFolderName>
+  <langFolderName>${lang.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</langFolderName>
   <resetModsConfigOnCrash>False</resetModsConfigOnCrash>
   <volumeMaster>0</volumeMaster>
 </PrefsData>
@@ -156,7 +157,7 @@ async function cmdRun(o) {
   const g = path.join(work, `game-${info.version}`);
   buildGame(game, g, mods);
   const userdata = path.join(work, `userdata-${info.version}`);
-  writeConfig(info, userdata, active, known);
+  writeConfig(info, userdata, active, known, typeof o.lang === 'string' ? o.lang : 'English');
   const run = path.join(work, 'runs', name);
   fs.rmSync(run, {recursive: true, force: true}); fs.mkdirSync(run, {recursive: true});
   const log = path.join(run, 'Player.log');

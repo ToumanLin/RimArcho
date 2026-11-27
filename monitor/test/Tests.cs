@@ -45,6 +45,13 @@ static class Tests
         Check(Enrich.QuotedDef("Could not load Texture2D at 'Things/X' for def 'MyThing' in any active texture path.", out var qd) && qd == "MyThing", "quoted def: " + qd);
         Check(!Enrich.QuotedDef("for def '' x", out _) && !Enrich.QuotedDef("no def here", out _), "no quoted def");
 
+        // LanguageInfoFix.Source: read metadata past Monitor only when Monitor's folder is the game's choice.
+        Check(LanguageInfoFix.Source(new[] { false, true, false }, new[] { false, true, true }) == 2, "Monitor first: next Mod");
+        Check(LanguageInfoFix.Source(new[] { false, true }, new[] { true, true }) == -1, "Core first: keep");
+        Check(LanguageInfoFix.Source(new[] { false, true, false, false }, new[] { false, true, false, true }) == 3, "skip Mods without the folder");
+        Check(LanguageInfoFix.Source(new[] { true, false }, new[] { true, false }) == -1, "only Monitor: keep");
+        Check(LanguageInfoFix.Source(new[] { false, true }, new[] { false, false }) == -1, "no folder: keep");
+
         // Writer: rotation, first line with details, a count line, the exit line.
         string dir = Path.Combine(Path.GetTempPath(), "archo-monitor-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
