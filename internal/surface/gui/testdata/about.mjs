@@ -76,11 +76,36 @@ test("a bullet shows its lead: the bold phrase, else the first sentence; more sh
   assert.equal(lead("**Bold** only"), "Bold");
   const box = mod.renderMarkdown("- **Lead.** Rest with `code`.\n- Short one.", { leads: true });
   const [first, second] = box.children[0].children;
-  const [short, full, more] = first.children;
+  const [row, full] = first.children;
+  const [short, more] = row.children;
   assert.equal(short.textContent, "Lead.");
-  assert.ok(full.hidden && !short.hidden);
+  assert.equal(short.children.length, 1); // one text node: no code, bold or link marks
+  assert.ok(full.hidden);
   more.onclick({ stopPropagation() {} });
-  assert.ok(!full.hidden && short.hidden);
+  assert.ok(!full.hidden && !short.hidden);
   assert.equal(full.textContent, "Lead. Rest with code.");
-  assert.equal(second.textContent, "Short one.");
+  // one sentence: the line alone, whole in its hover, no "more"
+  assert.equal(second.children.length, 1);
+  assert.equal(second.children[0].children.length, 1);
+  assert.equal(second.children[0].children[0].title, "Short one.");
+  // code in a lead is plain text
+  const b2 = mod.renderMarkdown("- Fixed: `a b` broke. More here", { leads: true });
+  const lead2 = b2.children[0].children[0].children[0].children[0];
+  assert.equal(lead2.textContent, "Fixed: a b broke.");
+  assert.equal(lead2.children.length, 1);
+});
+
+test("a one-sentence lead cut short gets a more that lets it wrap", async () => {
+  const { mod } = await setup();
+  const box = mod.renderMarkdown("- A long single sentence that does not fit.\n- Short.", { leads: true });
+  const [longRow, shortRow] = box.children[0].children.map(li => li.children[0]);
+  Object.assign(longRow.children[0], { scrollWidth: 500, clientWidth: 300 });
+  Object.assign(shortRow.children[0], { scrollWidth: 100, clientWidth: 300 });
+  mod.wrapWhenCut(box);
+  assert.equal(shortRow.children.length, 1);
+  const more = longRow.children[1];
+  more.onclick({ stopPropagation() {} });
+  assert.ok(longRow.children[0].classList.contains("wrap"));
+  more.onclick({ stopPropagation() {} });
+  assert.ok(!longRow.children[0].classList.contains("wrap"));
 });
