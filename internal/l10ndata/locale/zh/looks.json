@@ -1,0 +1,16 @@
+{
+  "mixed result: %d textures still from %s": "混合结果：仍有 %d 张贴图来自 %s",
+  "mixed result: some of its textures still come from another Mod": "混合结果：它的部分贴图仍来自别的 Mod",
+  "%d looks have a mixed result": "%d 个外观是混合结果",
+  "the choice is kept; _Archo_Looks is rebuilt at the next write to the game": "选择已保留；下次写入游戏时会重建 _Archo_Looks",
+  "no look is selected": "没有选中外观",
+  "the look %s now comes from %s": "外观 %s 现在来自 %s",
+  "%d looks now come from %s": "%d 个外观现在来自 %s",
+  "%d left out: it has no texture of them": "跳过 %d 个：它没有这些外观的贴图",
+  "the choice for the look %s was removed": "已移除外观 %s 的选择",
+  "the choices for %d looks were removed": "已移除 %d 个外观的选择",
+  "_Archo_Looks is up to date": "_Archo_Looks 已是最新",
+  "_Archo_Looks rebuilt: %d files": "已重建 _Archo_Looks：%d 个文件",
+  "the list changed while its looks were read; try again": "读取外观时列表变了；请再试一次",
+  "the texture is no longer there; refresh the looks": "这张贴图已不在；请刷新外观"
+}

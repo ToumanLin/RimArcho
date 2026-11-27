@@ -143,6 +143,7 @@ type API struct {
 	launchMu      sync.Mutex // serializes reads of the current list on Launch
 	needsRead     logReader
 	texRead       logReader
+	looks         looksCache // the looks view's index (looks.go)
 	feedback      feedbackState
 	costMeasure   loadCostMeasurement
 	accountMu     sync.Mutex
@@ -177,6 +178,8 @@ func newAPI(a *app.App) *API {
 	a.SteamCMDSignIn = func(open bool) { s.send("steamcmd-signin", map[string]any{"open": open}) }
 	s.prompts = &steamPrompts{s: s}
 	a.SteamCMDPrompter = s.prompts
+	a.LooksCache = s.looksBuild
+	s.looks.freed = s.free.soon
 	s.startTasks()
 	s.startCreditLocked()
 	return s

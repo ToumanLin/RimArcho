@@ -102,6 +102,20 @@ var bridgeUncalled = map[string]string{
 	"PreviewManagerImport":       "unused; open question",
 	"ApplyManagerImport":         "unused; open question (api.js still lists it in writesGame)",
 	"ApplyManagerImportProfiles": "unused; open question (api.js still lists it in writesGame)",
+	"LooksOverview":              "looks view, front end follows",
+	"LooksRefresh":               "looks view, front end follows",
+	"LooksLeave":                 "looks view, front end follows",
+	"LooksProgress":              "looks view, front end follows",
+	"LooksGallery":               "looks view, front end follows",
+	"LookDetail":                 "looks view, front end follows",
+	"LookPreview":                "looks view, front end follows",
+	"LookShow":                   "looks view, front end follows",
+	"LooksApply":                 "looks view, front end follows",
+	"LooksApplyMany":             "looks view, front end follows",
+	"LooksApplyPreview":          "looks view, front end follows",
+	"LooksUndo":                  "looks view, front end follows",
+	"LooksUndoMany":              "looks view, front end follows",
+	"LooksRebuild":               "looks view, front end follows",
 }
 
 // Go text that reads the same in every language.

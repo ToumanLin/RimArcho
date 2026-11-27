@@ -186,6 +186,7 @@ func handler(api *API, files fs.FS) http.Handler {
 		serveFile(w, r, path, err)
 	})
 	mux.HandleFunc("/bg", api.serveBg)
+	mux.HandleFunc("/looktex/", api.serveLookTex)
 	for path, size := range map[string]int{"/icon.svg": 256, "/icon-small.svg": 16} {
 		svg := []byte(icon.SVG(size))
 		mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {

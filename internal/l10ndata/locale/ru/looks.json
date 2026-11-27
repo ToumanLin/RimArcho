@@ -1,0 +1,16 @@
+{
+  "mixed result: %d textures still from %s": "Смешанный результат: текстур по-прежнему из %[2]s: %[1]d",
+  "mixed result: some of its textures still come from another Mod": "Смешанный результат: часть текстур по-прежнему из другого мода",
+  "%d looks have a mixed result": "Видов со смешанным результатом: %d",
+  "the choice is kept; _Archo_Looks is rebuilt at the next write to the game": "Выбор сохранён; _Archo_Looks будет пересобран при следующей записи в игру",
+  "no look is selected": "Вид не выбран",
+  "the look %s now comes from %s": "Вид %s теперь берётся из %s",
+  "%d looks now come from %s": "Видов теперь из %[2]s: %[1]d",
+  "%d left out: it has no texture of them": "Пропущено: %d (в моде нет их текстур)",
+  "the choice for the look %s was removed": "Выбор для вида %s удалён",
+  "the choices for %d looks were removed": "Удалён выбор для видов: %d",
+  "_Archo_Looks is up to date": "_Archo_Looks актуален",
+  "_Archo_Looks rebuilt: %d files": "_Archo_Looks пересобран: файлов — %d",
+  "the list changed while its looks were read; try again": "Список изменился, пока читались виды; попробуйте ещё раз",
+  "the texture is no longer there; refresh the looks": "Этой текстуры больше нет; обновите виды"
+}

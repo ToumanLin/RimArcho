@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -178,17 +180,48 @@ func (a *App) ensureLooksMod(gameRoot string) (m *store.Mod, dir string, chosen 
 }
 
 // LooksIndex builds the looks index of the plan in st (21 §2): its entries in load order
-// with their effective load folders. The generated Mod itself is no provider.
+// with their effective load folders. The generated Mod itself is no provider. With
+// LooksCache set and no progress wanted, an index already built for the same key is reused.
 func (a *App) LooksIndex(ctx context.Context, st *LoadoutState, progress func(done, total int)) (*looks.Index, error) {
+	job, err := a.LooksIndexJob(st)
+	if err != nil {
+		return nil, err
+	}
+	if a.LooksCache != nil && progress == nil {
+		return a.LooksCache(a.LooksKey(st), func() (*looks.Index, error) { return job(ctx, nil) })
+	}
+	return job(ctx, progress)
+}
+
+// LooksIndexJob prepares the build of st's looks index: it reads the declarations and
+// resolves the load folders now, and returns the build itself, which reads only Mod folders
+// and the header cache and so may run while the App serves other calls (16 §8.4).
+func (a *App) LooksIndexJob(st *LoadoutState) (func(ctx context.Context, progress func(done, total int)) (*looks.Index, error), error) {
 	mods, err := a.looksMods(st)
 	if err != nil {
 		return nil, err
 	}
-	return looks.Build(ctx, mods, looks.Options{
-		CachePath: filepath.Join(a.Home, "cache", "looks-v1.json"),
-		Workers:   min(8, fsscan.Workers(st.Ix.Env.GameRoot)),
-		Progress:  progress,
-	})
+	o := looks.Options{CachePath: filepath.Join(a.Home, "cache", "looks-v1.json"), Workers: min(8, fsscan.Workers(st.Ix.Env.GameRoot))}
+	return func(ctx context.Context, progress func(done, total int)) (*looks.Index, error) {
+		o := o
+		o.Progress = progress
+		return looks.Build(ctx, mods, o)
+	}, nil
+}
+
+// LooksKey names what the looks index of st's plan is built from (21 §2.5): the game
+// version and every entry's position, Instance and snapshot. The _Archo_Looks entry is no
+// provider and is left out, so adding it last keeps the key. An interface keeps the index
+// in memory under this key and drops it when the key changes.
+func (a *App) LooksKey(st *LoadoutState) string {
+	h := sha1.New()
+	fmt.Fprintf(h, "%s|%s", st.Ix.Env.ID, st.GameMM())
+	for i, e := range st.List {
+		if m := st.Ix.ByID[e.Instance]; m != nil && !IsLooks(m) && m.TombstoneAt.IsZero() {
+			fmt.Fprintf(h, "|%d:%s:%d", i, m.ID, m.SnapID)
+		}
+	}
+	return hex.EncodeToString(h.Sum(nil)[:10])
 }
 
 func (a *App) looksMods(st *LoadoutState) ([]looks.Mod, error) {
@@ -269,6 +302,12 @@ func (a *App) LooksState(ctx context.Context, st *LoadoutState, progress func(do
 	if err != nil {
 		return nil, err
 	}
+	return a.LooksStateOf(st, idx)
+}
+
+// LooksStateOf resolves the stored choices against idx, an index built for st's plan
+// (LooksKey). It reads the choices only.
+func (a *App) LooksStateOf(st *LoadoutState, idx *looks.Index) (*LooksState, error) {
 	rows, err := a.Store.LookChoices(store.LookScope(st.Plan.ID), store.LookScopeAll)
 	if err != nil {
 		return nil, err

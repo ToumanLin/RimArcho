@@ -24,6 +24,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/ids"
+	"github.com/ToumanLin/RimArcho/internal/looks"
 	"github.com/ToumanLin/RimArcho/internal/machine"
 	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/perftrace"
@@ -155,6 +156,10 @@ type App struct {
 	// (tests act out a game on another volume, and a volume without hard links).
 	VolumeRoot func(path string) string
 	HardLink   func(oldname, newname string) error
+	// LooksCache keeps a plan's looks index between calls (21 §2.5): given LooksKey and the
+	// build, it returns the index kept under that key or builds and keeps it. nil: every
+	// call builds. The window sets it, so an apply reuses the index the page already has.
+	LooksCache func(key string, build func() (*looks.Index, error)) (*looks.Index, error)
 	// VolumeFS names the file system of a folder's volume; nil means source.VolumeFS
 	// (tests act out exFAT with it).
 	VolumeFS func(dir string) string

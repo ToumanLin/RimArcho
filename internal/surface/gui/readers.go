@@ -398,6 +398,7 @@ func (s *API) Close() {
 	s.texRead.mu.Lock()
 	defer s.texRead.mu.Unlock()
 	s.texRead.release()
+	s.looks.drop()
 }
 
 // beginTextureRead supersedes an older request before it can queue more disk reads.
