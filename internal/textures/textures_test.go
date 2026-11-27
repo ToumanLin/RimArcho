@@ -135,7 +135,7 @@ func TestCollectAndPlan(t *testing.T) {
 	// Own.dds made by RimArcho: its key is planned again unless fresh
 	ours := Owned{Ours: func(p string) bool { return strings.HasSuffix(p, "Own.dds") }}
 	if p := MakePlan(set, Options{}, ours, false); len(p.Jobs) != 5 {
-		t.Fatalf("with our own DDS: %d jobs", len(p.Jobs))
+		t.Fatalf("with RimArcho's own DDS: %d jobs", len(p.Jobs))
 	}
 	ours.Fresh = func(s *Source) bool { return s.Key == "textures/own" }
 	if p := MakePlan(set, Options{}, ours, false); len(p.Jobs) != 4 || p.Skipped[SkipFresh] != 1 {

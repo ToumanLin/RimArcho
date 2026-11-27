@@ -2,7 +2,7 @@
 
 > Status: integrated into the product (G11, `internal/patterns`, `archo pattern`, `analyze_log pattern=`, and the MCP `Instructions` checklist; see 06 §5). The following is the pre-integration draft, retained as a record. Basis: `docs/research/00-log-corpus-design.md` §3 G5, §9; data: `spikes/patterns/patterns-v0.json`; figures: `spikes/patterns/RESULT.txt`.
 
-## 1. What the data tells us
+## 1. What the data tells me
 
 6,734 logs for 1.6, with 610,910 problem clusters:
 
@@ -18,7 +18,7 @@ Reorder step 3, "Classify the failure", by the actual distribution, covering com
 2. **Patch failures** (`patch.op-failed`, `patch.xpath`, `patch.findmod`): keep the existing `get_patches failed=true` route.
 3. **Missing XML fields or types** (`xml.no-field`, `xml.type-missing`): the Mod version does not match the game or framework Mod; first check that the framework Mod is enabled and loads earlier.
 4. **Assembly version mismatch** (`asm.version-mismatch`, `asm.harmony-target`, `asm.dependency-missing`, `asm.static-ctor`, about 3,000 logs in total): add a route — use `get_mod` to inspect assemblies and dependencies; confirm dependencies are enabled, ordered correctly, and that two versions of the same library are not present. The fix is to update or disable, rather than edit XML.
-5. **Save-loading errors** (`save.*`, `rt.post-load`): new. Explain that these usually come from adding or removing Mods during a playthrough. The Mod owning the type in `curParent` tells us whose data remains in the save; it does not mean that Mod has a bug. Fixes: ignore, re-enable the original Mod, or start a new save. Do not disable a Mod on this evidence.
+5. **Save-loading errors** (`save.*`, `rt.post-load`): new. Explain that these usually come from adding or removing Mods during a playthrough. The Mod owning the type in `curParent` shows whose data remains in the save; it does not mean that Mod has a bug. Fixes: ignore, re-enable the original Mod, or start a new save. Do not disable a Mod on this evidence.
 6. **Missing assets** (`asset.texture-missing`, `asset.maintex`, `asset.texture-create`): new. The texture comes from a disabled Mod or DLC, or the file path has a case mismatch.
 7. **Runtime exceptions** (`rt.tick`, `rt.ui`, `rt.ai-job`, `rt.collection-modified`, `rt.nre`): keep the Assembly route and add the connection between `Collection was modified` and the `AllComps` check.
 8. **Noise** (`noise.*`): HugsLib upload failures, Analyzer status lines, and Harmony IL dump fragments; explain directly that these are not problems.

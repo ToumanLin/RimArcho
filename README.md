@@ -413,13 +413,13 @@ administrator does not get past it. In order:
    Extract to a normal folder such as `D:\Games\RimArcho`, not `Program Files`.
 2. **Antivirus.** If your antivirus quarantined or blocked `RimArcho.exe` or `archo.exe`, restore
    them and allow the RimArcho folder. Compare the ZIP with its `.sha256` file first if you want to
-   be sure it is ours.
+   be sure it is mine.
 3. **Smart App Control** (Windows 11: Settings › Privacy & security › Windows Security › App & browser
    control). When it is on, it blocks every unsigned program with no way to allow one, and Windows
-   cannot turn it back on without a reset. We are applying for free code signing so this stops
+   cannot turn it back on without a reset. I am applying for free code signing so this stops
    happening; until then, RimArcho cannot run while it is on.
 
-Still blocked? Send us the exact message (a screenshot is best) and your Windows version on
+Still blocked? Send me the exact message (a screenshot is best) and your Windows version on
 [GitHub issues](https://github.com/ToumanLin/RimArcho/issues) or Discord.
 </details>
 

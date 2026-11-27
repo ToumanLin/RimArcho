@@ -107,7 +107,7 @@ func TestForeignLogExcludedBeforeAnalysis(t *testing.T) {
 		t.Fatalf("foreign analysis slots: %d, %v", count, err)
 	}
 
-	// The latest file is foreign, but the preceding run is ours; find it even if it
+	// The latest file is foreign, but the preceding run is RimArcho's; find it even if it
 	// exists only in the other layout's directory.
 	prev := filepath.Join(e.UserData, "Logs", "Player-prev.log")
 	writeLogAt(t, e, prev, text, e.Now().Add(-20*time.Minute))

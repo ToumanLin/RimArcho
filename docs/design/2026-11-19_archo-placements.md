@@ -7,7 +7,7 @@ Status: the player chose Can it run, Feedback, Import & export, Uninstall and Ba
 Every placement must satisfy all four of the player's rules:
 
 1. **Never take the visual centre.** Archo sits at an edge or in a corner, beside what the page is about.
-2. **Use existing empty space.** Change the page's layout as little as possible: no new rows, columns or margins where we can avoid them.
+2. **Use existing empty space.** Change the page's layout as little as possible: no new rows, columns or margins where I can avoid them.
 3. **Feel alive.** The expression changes with the page's state (and idles between expressions); she is never a fixed picture.
 4. **The whole head, hair included, stays visible.** Never clip her in a box or a grid cell. She ends only at the bottom: by the soft fade (`.archo-slot` mask), or behind a card whose top edge hides her below the chin.
 

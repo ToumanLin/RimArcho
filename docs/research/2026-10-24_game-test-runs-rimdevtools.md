@@ -4,7 +4,7 @@ Purpose: let RimArcho "launch the game with a given plan, reach the main menu, c
 
 ## 1. How RimDevTools works
 
-License: MIT (`LICENSE`, 2026 Platinum trigger (translated)). Its code may be reused, but it is C# and we use Go. We borrowed ideas only; no code was copied.
+License: MIT (`LICENSE`, 2026 Platinum trigger (translated)). Its code may be reused, but it is C# and I use Go. I borrowed ideas only; no code was copied.
 
 | Step | RimDevTools approach | Code location |
 | --- | --- | --- |
@@ -19,7 +19,7 @@ License: MIT (`LICENSE`, 2026 Platinum trigger (translated)). Its code may be re
 
 Ideas worth borrowing: heartbeats/hang detection, conservative cleanup that does not restore configuration if termination fails, one JSON result, and waiting for an existing game to exit.
 
-Not adopted: changing the real `ModsConfig.xml` and restoring it (we isolate everything with `-savedatafolder`, leaving player files untouched and needing no transaction recovery); requiring a tool Mod to detect readiness (it cannot be installed when the game directory is read-only; see the alternative in §2.3).
+Not adopted: changing the real `ModsConfig.xml` and restoring it (I isolate everything with `-savedatafolder`, leaving player files untouched and needing no transaction recovery); requiring a tool Mod to detect readiness (it cannot be installed when the game directory is read-only; see the alternative in §2.3).
 
 ## 2. Local measurements
 
@@ -29,7 +29,7 @@ Two copies: `D:\rimworld16` (1.6.4871 rev590, Unity) and `D:\SteamLibrary\steama
 
 - **1.6**: `-savedatafolder=<dir>` moves only Config/Saves; Unity's Player.log does not follow. Add `-logfile <path>` (two separate arguments; do not quote the path again, or the file will be empty) to write to the specified location.
 - **1.7**: the log location is hardcoded. Decompiled `RimWorld.dll`: `FileLog.SetDirectory(Bootstrap.ResolveEarlyLogRoot())`; the latter returns only `%USERPROFILE%\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios`, **ignoring `-savedatafolder`**. At startup, it rotates `Logs\Player.log` to `Player-prev.log`. Running 1.7 with `-savedatafolder` therefore overwrites the player's real logs (this happened in the first probe: the player's original `Player-prev.log` was replaced).
-  - Solution: add `-NoFileLog` (`FileLog.Disabled`; `SetDirectory` returns immediately without touching any log files). Logs also go to the console (`Microsoft.Extensions.Logging` console logger), so we capture stdout/stderr. `WindowsConsole.OpenIfRequested` leaves an already valid stdout handle alone, allowing the pipe to receive output.
+  - Solution: add `-NoFileLog` (`FileLog.Disabled`; `SetDirectory` returns immediately without touching any log files). Logs also go to the console (`Microsoft.Extensions.Logging` console logger), so I capture stdout/stderr. `WindowsConsole.OpenIfRequested` leaves an already valid stdout handle alone, allowing the pipe to receive output.
   - Console and file formats differ: `HH:MM:SS  LEVEL message`, continuation lines `HH:MM:SS <original text>`, without date or category. Convert to file format (`=== Waylith log ===` header, `Version:` line, `date time  LEVEL message`) for normal parsing by `internal/logs`.
   - This also answers the unverified item in 01 §4.2 / 10 §3: **when a pack runs 1.7 with `-savedatafolder`, logs go to the environment's shared location, not `<pack>/userdata/Logs/Player.log`**. The existing pack code's assumption is wrong (recorded separately as follow-up work).
 
@@ -46,12 +46,12 @@ Test map: `quicktest` runs `Root_Play.SetupForQuickTestPlay`; `Game.InitNewGame`
 ### 2.4 Other findings
 
 - `D:\rimworld16\Mods` contains a dangling link made by RimArcho, `_Archo_env_yvae4hr7j2zwsjepwkqalnykwq` (to the deleted `…\_3700765558_alt_decapitate`). In 1.6, `ModLister` throws `DirectoryNotFoundException` when scanning it; `ModsConfig`/`ModLister` type initialization fails, followed by `Root level exception` every frame, producing 47k log lines. This copy currently **cannot reach the main menu even with Core only**. A test run can report this as failure (it appears in the error clusters), but the root cause is a link-maintenance bug, recorded separately.
-- The 1.7 `ModsConfig` static constructor only renames missing Mods rather than deleting them. The game's rewritten ModsConfig therefore cannot tell us which Mods failed to load. Check "which Mods the game can see" before launch ourselves.
+- The 1.7 `ModsConfig` static constructor only renames missing Mods rather than deleting them. The game's rewritten ModsConfig therefore cannot tell me which Mods failed to load. Check "which Mods the game can see" before launch myself.
 - Memory: 1.7 with Core only peaked at about 1.9 GB working set and settled at 1.4 GB; 1.6 used about 0.36 GB (failed loading). Reading process `PeakWorkingSetSize` is cheap and can be included in the report.
 
 ## 3. Conclusion (design in 20 §2)
 
-Implement our own flow without a tool Mod: isolated data directory + version-specific log arguments (1.6 `-logfile`; 1.7 `-NoFileLog` + stdout capture) + `Knowledge.xml` main-menu marker + timeout/early-exit detection + process termination + existing `internal/logs` and `App.AnalyzeLog` for error clusters and attribution. Never write to the game directory or player data, so Mods invisible to the game (requiring links) are only reported; no links are created.
+Implement my own flow without a tool Mod: isolated data directory + version-specific log arguments (1.6 `-logfile`; 1.7 `-NoFileLog` + stdout capture) + `Knowledge.xml` main-menu marker + timeout/early-exit detection + process termination + existing `internal/logs` and `App.AnalyzeLog` for error clusters and attribution. Never write to the game directory or player data, so Mods invisible to the game (requiring links) are only reported; no links are created.
 
 ## 4. Real-machine run records (`archo test run`, 2026-10-24)
 

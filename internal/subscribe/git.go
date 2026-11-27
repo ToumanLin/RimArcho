@@ -231,7 +231,7 @@ func Dirty(dir string) (bool, error) {
 	}
 	for path, status := range s {
 		// go-billy on Windows cannot read .git/info/exclude's slash-separated
-		// internal path. Keep metadata out of our status even on that platform.
+		// internal path. Keep metadata out of the status even on that platform.
 		if path == ".rimarcho" || strings.HasPrefix(filepath.ToSlash(path), ".rimarcho/") {
 			continue
 		}

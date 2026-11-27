@@ -47,7 +47,7 @@ func TestListArgumentsAcceptStrings(t *testing.T) {
 	}
 }
 
-// The SDK validates a call against the tool's schema before our decoder runs: the schema
+// The SDK validates a call against the tool's schema before RimArcho's decoder runs: the schema
 // must allow a string too, or the call is refused ("in: must be either null or array").
 func TestListArgumentSchemaAllowsStrings(t *testing.T) {
 	t.Parallel()

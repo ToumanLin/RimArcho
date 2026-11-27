@@ -45,7 +45,7 @@ func TestLaunchWritesTheList(t *testing.T) {
 	if len(vs) != 2 || vs[0].Source != "launch" {
 		t.Fatalf("versions: %d, newest %s", len(vs), vs[0].Source)
 	}
-	// Our own write is not an external change.
+	// RimArcho's own write is not an external change.
 	scanNow(t, e)
 	if vs, _ := e.App.Store.Versions(mustPlan(t, e)); len(vs) != 2 {
 		t.Fatalf("rescan after launch made %d versions", len(vs))

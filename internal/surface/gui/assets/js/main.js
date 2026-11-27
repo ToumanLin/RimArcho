@@ -1342,7 +1342,7 @@ function onKey(e) {
   // commands
   if (ctrl) {
     // ctrl+w: the Wails window has no accelerator for it (no app menu, WebView2's
-    // accelerator keys off), so preventDefault keeps it ours
+    // accelerator keys off), so preventDefault keeps it for RimArcho
     const m = { k: () => pop.palette(), f: () => startSearch(), z: () => verb("undo"), y: () => verb("redo"), r: () => verb("redo"),
       o: () => verb("folder"), w: () => verb("workshop-id"), s: () => verb("steam") }[k.toLowerCase()];
     if (m) { handled(); m(); }
@@ -1680,7 +1680,7 @@ async function pollLive() {
     if (l.newLog && !hadNew) readNewLog();
     if (JSON.stringify(l.items) !== before) { scr.liveChanged(); shell.sync(); }
     if (l.running) scr.logLive();
-    // the launch block also says whose game runs: another Game Config's (blocked) or ours
+    // the launch block also says whose game runs: another Game Config's (blocked) or this one's
     if (shown !== liveShown(l)) homePage.liveChanged();
     if (was !== !!l.running) savesPage.liveChanged(!!l.running);
     // the game exited: a session that used SteamCMD mods may make a credit question due;

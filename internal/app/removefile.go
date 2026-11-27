@@ -34,7 +34,7 @@ func (a *App) removeMod(h *oplog.Handle, ix *Index, m *store.Mod, path string, p
 	if err != nil {
 		return nil, err
 	}
-	// Reconcile after the lifecycle is complete so scans never see our own
+	// Reconcile after the lifecycle is complete so scans never see RimArcho's own
 	// transient detached journal as an interrupted operation.
 	report, err := a.scanLinkedEnvironments(ix, m, links)
 	if err != nil {

@@ -190,4 +190,4 @@ GiB. The estimates are the model's working set before `FitTo` keeps it at or bel
 - Smaller GPUs were not tested; their video-memory upper bound is capped by the upload threshold, as explained in the UI.
 - Language files are counted only, not estimated; saves, maps, and growth during play are excluded.
 - Duplicate Def paths (higher-priority load folders overriding same-name XML in lower-priority folders) are not deduplicated, slightly overestimating cost.
-- During startup the game creates and deletes something in its root directory (root mtime changed, no file remained). This is the game's own behavior; we did not write to the game directory.
+- During startup the game creates and deletes something in its root directory (root mtime changed, no file remained). This is the game's own behavior; I did not write to the game directory.

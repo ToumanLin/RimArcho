@@ -83,7 +83,7 @@ func TestPlanIsolationAndSwitch(t *testing.T) {
 	if st.WriterPlan != copyID || st.WriterVersion != 2 {
 		t.Fatalf("writer: %+v", st)
 	}
-	// Our own write is not an external change for the other plans either.
+	// RimArcho's own write is not an external change for the other plans either.
 	e.MustRun("plan", "use", "default")
 	scanNow(t, e)
 	if n := e.App.Store.VersionCount(def); n != 1 {
