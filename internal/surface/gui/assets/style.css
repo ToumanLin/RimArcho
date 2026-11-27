@@ -1863,9 +1863,10 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .st-row { position: relative; width: calc(100% - 12px); flex: none; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .st-row:hover:not(.on) { background: var(--pill); }
 .st-row.on .nt { color: var(--accent-11, var(--accent)); }
-.st-row .st-facts { display: flex; gap: 0 12px; min-width: 0; overflow: hidden; white-space: nowrap; }
-.st-row .st-facts > span { flex: none; }
-.st-row .st-facts > span:last-child { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.st-row .st-facts { display: flex; flex-wrap: wrap; gap: 0 12px; min-width: 0; max-height: 1lh; overflow: hidden; white-space: nowrap; }
+/* a fact that does not fit goes whole to the hidden second line; only a first fact wider than
+   the row ends in "…" (the row's hover has them all) */
+.st-row .st-facts > span { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .st-row .dbar-row { grid-template-columns: minmax(48px, 96px) minmax(0, auto); }
 .st-row .dbar-row .num { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .st-dot { flex: none; align-self: center; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
@@ -1875,6 +1876,10 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .st-head { flex: none; padding: 12px 14px 10px; border-bottom: var(--hairline) solid var(--line-2); }
 .st-title { font-size: 15px; font-weight: 600; color: var(--fg); }
 .settings .st-head .group-note { padding: 4px 0 0; border-bottom: 0; }
+/* a group of sections: each former group under a heading drawn as the head is */
+.st-sec-head { padding: 12px 14px 10px; border-bottom: var(--hairline) solid var(--line-2); }
+.st-sec + .st-sec > .st-sec-head { border-top: var(--hairline) solid var(--line-2); }
+.settings .st-sec-head .group-note { padding: 4px 0 0; border-bottom: 0; }
 .st-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 /* the right card is narrower than the old 960 px column: a fold's drive meter is shorter, so
    its heading keeps one line */

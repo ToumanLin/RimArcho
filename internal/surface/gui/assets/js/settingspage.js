@@ -2,7 +2,8 @@
 // left, each a row with its name, one muted summary line and a dot when something can be done
 // (accent) or needs a look (amber); the picked group at the right, in one card whose head has
 // its name and note. Every group's rows are drawn once and only the picked one is shown, so
-// task updates and deep links find any row. The gap drags (ui.gui.settings.side).
+// task updates and deep links find any row. A group of sections (Accounts and network…) draws
+// each under its own heading, as the head draws the group. The gap drags (ui.gui.settings.side).
 import { S, $, el, T } from "./state.js";
 import { wireSeparator } from "./separator.js";
 import { diskMeter } from "./membar.js";
@@ -11,12 +12,18 @@ const LAST = "archo.settings.group"; // the group last viewed (this window's loc
 const lastViewed = () => { try { return localStorage.getItem(LAST) || ""; } catch { return ""; } };
 const remember = (key) => { try { localStorage.setItem(LAST, key); } catch { /* storage can be off */ } };
 
+// groupOf is the group whose key, or one of whose sections' keys, is key: a key saved before
+// the groups merged (network, storage, log…) finds the group that holds it now.
+export function groupOf(groups, key) {
+  return (groups || []).find(g => g.key === key || (g.sections || []).some(s => s.key === key));
+}
+
 // openingGroup: the first group that needs a look, else the last one viewed, else Interface.
 export function openingGroup(groups) {
   const amber = groups.find(g => g.attention === "amber");
   if (amber) return amber.key;
-  const last = lastViewed();
-  if (groups.some(g => g.key === last)) return last;
+  const last = groupOf(groups, lastViewed());
+  if (last) return last.key;
   return groups.some(g => g.key === "interface") ? "interface" : groups[0]?.key || "";
 }
 
@@ -57,7 +64,18 @@ export function drawSettings(w, groups, shown, { body, area, crumbs: redraw }) {
     const box = el("div", "st-group");
     box.dataset.group = g.key;
     box.hidden = g.key !== shown;
-    body(box, g);
+    if (g.sections?.length) {
+      for (const s of g.sections) {
+        const sec = el("div", "st-sec");
+        sec.dataset.section = s.key;
+        const h = el("div", "st-sec-head");
+        h.append(el("div", "st-title", s.title));
+        if (s.note) h.append(el("div", "group-note", s.note));
+        sec.append(h);
+        body(sec, s);
+        box.append(sec);
+      }
+    } else body(box, g);
     scroll.append(box);
   }
   side.addEventListener("keydown", listKey);
@@ -92,8 +110,9 @@ function groupRow(g, on) {
 // pick shows group key at the right; the row keeps or takes the focus.
 export function pick(key, { focus = true, keepScroll = false } = {}) {
   const sc = $("#screen");
-  const g = (S.settingsGroups || []).find(x => x.key === key);
+  const g = groupOf(S.settingsGroups, key);
   if (!sc || !g) return;
+  key = g.key;
   for (const r of sc.querySelectorAll(".st-row")) {
     const on = r.dataset.group === key;
     r.classList.toggle("on", on);

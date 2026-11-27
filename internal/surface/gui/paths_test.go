@@ -15,7 +15,7 @@ import (
 func TestSettingFilesystemPathMarkers(t *testing.T) {
 	t.Parallel()
 	e, api, _ := fixture(t)
-	groups := append(api.Settings(), api.Environment().Groups...)
+	groups := append(view.SettingSections(api.Settings()), api.Environment().Groups...)
 	var values, notes int
 	for _, g := range groups {
 		for _, item := range g.Items {

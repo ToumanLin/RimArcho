@@ -10,35 +10,45 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 16 §2.14 "Layout": every Settings group is a row of the GUI's list, with a key, a summary
-// line and one of the three attentions; keys are unique, so the last group viewed and deep
-// links find their group.
+// 16 §2.14 "Layout": the seven Settings groups, in order, each a row of the GUI's list with a
+// key, a summary line of one to three facts and one of the three attentions; the former groups
+// are sections with their own keys, so a key saved before the merge and deep links still find
+// their group.
 func TestSettingsGroupsHaveSummaries(t *testing.T) {
 	e := testkit.New(t)
-	seen := map[string]bool{}
 	groups := view.SettingsPage(e.App, nil)
+	var keys []string
 	for _, g := range groups {
-		if g.Key == "" || seen[g.Key] {
-			t.Errorf("group %q: key %q missing or repeated", g.Title, g.Key)
-		}
-		seen[g.Key] = true
-		if len(g.Summary) == 0 || strings.TrimSpace(strings.Join(g.Summary, "")) == "" {
-			t.Errorf("group %q (%s) has no summary", g.Title, g.Key)
+		keys = append(keys, g.Key)
+		if n := len(g.Summary); n == 0 || n > 3 || strings.TrimSpace(strings.Join(g.Summary, "")) == "" {
+			t.Errorf("group %q (%s) summary %q", g.Title, g.Key, g.Summary)
 		}
 		switch g.Attention {
 		case view.AttentionNone, view.AttentionAccent, view.AttentionAmber:
 		default:
 			t.Errorf("group %q: attention %q", g.Title, g.Attention)
 		}
-	}
-	for _, k := range []string{view.GroupAbout, view.GroupInterface, view.GroupAccounts, view.GroupUpdates, view.GroupFolders, view.GroupLog,
-		view.GroupNetwork, view.GroupTools, view.GroupData, view.GroupStorage, view.GroupUninstall} {
-		if !seen[k] {
-			t.Errorf("no %s group", k)
+		if len(g.Sections) > 0 && (len(g.Items) > 0 || g.Note != "" || g.Sections[0].Key != g.Key) {
+			t.Errorf("group %q: a group of sections has rows or a note of its own, or another key", g.Title)
 		}
 	}
-	if last := groups[len(groups)-1]; last.Key != view.GroupUninstall {
-		t.Errorf("uninstall is not last: %s", last.Key)
+	want := []string{view.GroupAbout, view.GroupInterface, view.GroupUpdates, view.GroupAccounts, view.GroupFolders, view.GroupTools, view.GroupUninstall}
+	if strings.Join(keys, " ") != strings.Join(want, " ") {
+		t.Errorf("groups %v, want %v", keys, want)
+	}
+	seen := map[string]bool{}
+	var order []string
+	for _, s := range view.SettingSections(groups) {
+		if s.Key == "" || seen[s.Key] {
+			t.Errorf("section %q: key %q missing or repeated", s.Title, s.Key)
+		}
+		seen[s.Key] = true
+		order = append(order, s.Key)
+	}
+	sections := strings.Join([]string{view.GroupAbout, view.GroupInterface, view.GroupUpdates, view.GroupData, view.GroupAccounts, view.GroupNetwork,
+		view.GroupFolders, view.GroupStorage, view.GroupTools, view.GroupLog}, " ")
+	if got := strings.Join(order, " "); got != sections+" "+view.GroupUninstall && got != sections+" "+view.GroupAgent+" "+view.GroupUninstall {
+		t.Errorf("sections %s", got)
 	}
 }
 

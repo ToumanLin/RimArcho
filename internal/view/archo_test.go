@@ -18,7 +18,7 @@ func TestArchoMotionSettingsRow(t *testing.T) {
 		for _, value := range []string{"live", "still", "off"} {
 			e.MustRun("config", "set", "ui.archo.motion", value)
 			found := 0
-			for _, group := range view.SettingsPage(e.App, nil) {
+			for _, group := range view.SettingSections(view.SettingsPage(e.App, nil)) {
 				for i, item := range group.Items {
 					if strings.Join(item.Argv, " ") != "config set ui.archo.motion {}" {
 						continue
@@ -61,7 +61,7 @@ func TestMotionSettingsRow(t *testing.T) {
 		for _, value := range []string{"auto", "reduced"} {
 			e.MustRun("config", "set", "ui.motion", value)
 			found := 0
-			for _, group := range view.SettingsPage(e.App, nil) {
+			for _, group := range view.SettingSections(view.SettingsPage(e.App, nil)) {
 				for i, item := range group.Items {
 					if strings.Join(item.Argv, " ") != "config set ui.motion {}" {
 						continue

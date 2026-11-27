@@ -18,7 +18,7 @@ func TestExternalToolsSettings(t *testing.T) {
 	for _, lang := range []string{"en", "zh"} {
 		view.SetLang(lang)
 		t.Cleanup(func() { view.SetLang("en") })
-		groups := view.SettingsPage(e.App, nil)
+		groups := view.SettingSections(view.SettingsPage(e.App, nil))
 		found := false
 		for _, g := range groups {
 			if g.Title == view.T("texture optimisation") {

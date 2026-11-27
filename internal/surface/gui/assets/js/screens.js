@@ -1946,7 +1946,7 @@ async function refreshSettingTasks(values = false) {
     if (n === settingTaskRead) markSettingTasks(tasks);
     if (!groups || v !== settingValueRead) return;
     const rows = [...$("#screen").querySelectorAll("[data-setting-row]")];
-    for (const g of groups) for (const it of g.items || []) {
+    for (const g of groups.flatMap(g => g.sections?.length ? g.sections : [g])) for (const it of g.items || []) {
       const row = rows.find(r => r.dataset.settingRow === g.title + "/" + it.label);
       if (!row) continue;
       const note = row.querySelector(".setting-note"), value = row.querySelector(".setting-value");

@@ -150,7 +150,7 @@ func TestSettingsConfirmationsAndRefresh(t *testing.T) {
 	check := func(cleared bool) {
 		t.Helper()
 		confirmed := map[string]bool{}
-		for _, group := range api.Settings() {
+		for _, group := range view.SettingSections(api.Settings()) {
 			for _, item := range group.Items {
 				for _, action := range item.Actions {
 					if action.Task == "" {
@@ -211,7 +211,7 @@ func TestCommunityUpdateTaskRefresh(t *testing.T) {
 			t.Fatalf("status %s: %+v", d.Key, status[d.Key])
 		}
 	}
-	for _, group := range api.Settings() {
+	for _, group := range view.SettingSections(api.Settings()) {
 		for _, item := range group.Items {
 			if len(item.Argv) > 2 && strings.HasPrefix(item.Argv[2], "data.") && !strings.Contains(item.Note, "1") {
 				t.Fatalf("entries not refreshed: %+v", item)

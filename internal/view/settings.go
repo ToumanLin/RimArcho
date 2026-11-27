@@ -3,6 +3,7 @@ package view
 import (
 	"fmt"
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -160,6 +161,41 @@ type SettingGroup struct {
 	// Folds group Folders' directory rows by root in the GUI (16 §2.14); rows in no fold
 	// (adding a folder) follow them.
 	Folds []FolderFold `json:"folds,omitempty"`
+	// Sections: a Settings group made of several (Accounts and network…), each under its own
+	// heading with its own key, note and rows; such a group has no Items of its own.
+	Sections []SettingGroup `json:"sections,omitempty"`
+}
+
+// SettingSections are the groups' sections in order: a merged group's sections, any other
+// group itself. Rows, notes and keys of the former groups live there.
+func SettingSections(groups []SettingGroup) []SettingGroup {
+	var out []SettingGroup
+	for _, g := range groups {
+		if len(g.Sections) > 0 {
+			out = append(out, g.Sections...)
+		} else {
+			out = append(out, g)
+		}
+	}
+	return out
+}
+
+// mergeGroups is one Settings group of sections: its key is the first section's, its dot the
+// strongest of theirs (amber over the accent), its meter the first section's that has one.
+func mergeGroups(title string, summary []string, sections ...SettingGroup) SettingGroup {
+	g := SettingGroup{Key: sections[0].Key, Title: title, Summary: summary, Attention: AttentionNone, Sections: sections}
+	for _, s := range sections {
+		switch {
+		case s.Attention == AttentionAmber:
+			g.Attention = AttentionAmber
+		case s.Attention == AttentionAccent && g.Attention == AttentionNone:
+			g.Attention = AttentionAccent
+		}
+		if g.Disk == nil {
+			g.Disk = s.Disk
+		}
+	}
+	return g
 }
 
 // EnvRow is an environment on the environment page.
@@ -313,9 +349,10 @@ func FolderGroup(a *app.App) SettingGroup {
 	return g
 }
 
-// SettingsPage is the settings page's groups (16 §2.14): About, Interface, Accounts, update,
-// Folders, game log, network, external tools, community data, Storage and, last, uninstall. The GUI and
-// the TUI show them in this order. Game launch and save options are on the environment page.
+// SettingsPage is the settings page's groups (16 §2.14): About, Interface, Updates (with
+// community data), Accounts and network, Folders and storage, Tools (external tools, game log,
+// Archo Agent) and, last, Uninstall. The GUI and the TUI show them in this order. Game launch
+// and save options are on the environment page.
 func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	gpuNote := ""
 	if cmds.Setting(a, "ui.gpu") == "off" {
@@ -353,8 +390,17 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		// the first run, shown again without writing anything (16 §2.15)
 		{Key: "guide.preview", Label: T("first-run guide"), Note: T("nothing you choose is saved"),
 			Actions: []SettingAction{{Label: T("preview…"), Argv: []string{"guide-preview"}}}},
-	}}, AccountGroup(a), AutomaticGroup(a)}
+	}}}
 	out[1].Summary, out[1].Attention = interfaceSummary(out[1]), AttentionNone
+
+	// Each merged group's line leads with its most telling fact; a fact that does not fit the
+	// list's width is left out whole (16 §2.14 "Layout").
+	updates, data := AutomaticGroup(a), CommunityDataGroup(a)
+	updates.Title = T("update checks")
+	out = append(out, mergeGroups(T("updates"), slices.Concat(data.Summary, choicesSummary(updates, "updates.interval")), updates, data))
+
+	accounts, network := AccountGroup(a), NetworkGroup(a)
+	out = append(out, mergeGroups(T("accounts and network"), slices.Concat(accounts.Summary, network.Summary[:1]), accounts, network))
 
 	// RimArcho's folders, each with relocation controls, then adding a mod folder.
 	folders := DirectoryGroup(a)
@@ -364,16 +410,15 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 			folders.Items = append(folders.Items, item)
 		}
 	}
-	out = append(out, folders)
+	storage := StorageGroup(a)
+	out = append(out, mergeGroups(T("folders and storage"), slices.Concat(folders.Summary, storage.Summary[:1]), folders, storage))
 
-	out = append(out, GameLogGroup(a, onOff))
-	out = append(out, NetworkGroup(a))
+	tools, log := DependencyGroup(a), GameLogGroup(a, onOff)
+	toolSections := []SettingGroup{tools, log}
 	if g, ok := AgentGroup(a); ok {
-		out = append(out, g)
+		toolSections = append(toolSections, g)
 	}
-	out = append(out, DependencyGroup(a))
-
-	out = append(out, CommunityDataGroup(a), StorageGroup(a))
+	out = append(out, mergeGroups(T("tools"), slices.Concat(log.Summary, tools.Summary), toolSections...))
 
 	// Last: its own page with the plan (the interfaces open it; archo uninstall is not a
 	// settings command).
@@ -382,17 +427,25 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 			Actions: []SettingAction{{Label: T("uninstall RimArcho…"), Argv: []string{"uninstall"}}}},
 	}})
 	for gi := range out {
-		for ii := range out[gi].Items {
-			for ai := range out[gi].Items[ii].Actions {
-				a := &out[gi].Items[ii].Actions[ai]
-				a.Task = SettingTask(a.Argv)
-				if a.Task != "" {
-					a.Pending = TaskPending(a.Task)
-				}
+		setTasks(&out[gi])
+	}
+	return out
+}
+
+// setTasks marks the group's actions that queue a task, its sections' too.
+func setTasks(g *SettingGroup) {
+	for si := range g.Sections {
+		setTasks(&g.Sections[si])
+	}
+	for ii := range g.Items {
+		for ai := range g.Items[ii].Actions {
+			a := &g.Items[ii].Actions[ai]
+			a.Task = SettingTask(a.Argv)
+			if a.Task != "" {
+				a.Pending = TaskPending(a.Task)
 			}
 		}
 	}
-	return out
 }
 
 // GameLogGroup is Settings › game log: Archo Monitor, the save copy at launch and when the
@@ -425,7 +478,8 @@ func GameLogGroup(a *app.App, onOff func(label, key string) SettingItem) Setting
 	return SettingGroup{Attention: AttentionNone, Key: GroupLog, Title: T("game log"), Summary: facts(Tf("Archo Monitor %s", T("not installed"))), Items: []SettingItem{mon, saveCopy, autoCheck}}
 }
 
-// CommunityDataGroup is Settings › community data: the three datasets' sources and dates.
+// CommunityDataGroup is Settings › updates › community data: each dataset's source and date
+// (one row per app.Datasets entry).
 func CommunityDataGroup(a *app.App) SettingGroup {
 	data := SettingGroup{Key: GroupData, Title: T("community data"), Attention: AttentionNone}
 	status := a.DataStatus()
@@ -459,9 +513,10 @@ func CommunityDataGroup(a *app.App) SettingGroup {
 	}
 	data.Items = append(data.Items, SettingItem{Label: T("update the community data"), Actions: []SettingAction{{Label: T("update now"), Argv: []string{"data", "update"},
 		Confirm: T("RimArcho downloads the four files from their sources (about 50 MB)")}}})
-	data.Summary = facts(T("not downloaded"))
+	// Updates' list row: "community data 11-20", the oldest download
+	data.Summary = facts(T("community data not downloaded"))
 	if !missing && !oldest.IsZero() {
-		data.Summary = facts(Tf("updated %s", ShortDate(oldest)))
+		data.Summary = facts(Tf("community data %s", ShortDate(oldest)))
 	}
 	return data
 

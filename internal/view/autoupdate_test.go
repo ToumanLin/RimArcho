@@ -57,7 +57,7 @@ func TestAutomaticSettingsOnlyControlsAndHumanIntervals(t *testing.T) {
 	if got := view.AboutGroup(e.App).Items[1].ChoiceLabels; !reflect.DeepEqual(got, []string{"开", "关"}) {
 		t.Fatal(got)
 	}
-	for _, g := range view.SettingsPage(e.App, nil) {
+	for _, g := range view.SettingSections(view.SettingsPage(e.App, nil)) {
 		for _, it := range g.Items {
 			if reflect.DeepEqual(it.Choices, []string{"on", "off"}) && !reflect.DeepEqual(it.ChoiceLabels, []string{"开", "关"}) {
 				t.Fatal(it)
@@ -87,7 +87,7 @@ func TestAutomaticDatesBelongToTheirSubjects(t *testing.T) {
 	for _, lang := range []string{"zh", "en"} {
 		view.SetLang(lang)
 		date := view.Tf("last checked %s", e.App.FormatTime(e.Now()))
-		for _, g := range view.SettingsPage(e.App, nil) {
+		for _, g := range view.SettingSections(view.SettingsPage(e.App, nil)) {
 			switch g.Title {
 			case view.T("updates"):
 				if strings.Contains(g.Note, date) || len(g.Items) != 2 {
@@ -169,7 +169,7 @@ func TestAboutSettingsOrderAndUniqueControls(t *testing.T) {
 	defer view.SetLang("en")
 	for _, lang := range []string{"en", "zh"} {
 		view.SetLang(lang)
-		groups := view.SettingsPage(e.App, nil)
+		groups := view.SettingSections(view.SettingsPage(e.App, nil))
 		if groups[0].Title != view.T("about") || len(groups[0].Items) != 2 { // feedback moved to the sidebar (16 §2.1), community to Feedback (§2.14)
 			t.Fatal(groups[0])
 		}
