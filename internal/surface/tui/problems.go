@@ -202,6 +202,7 @@ func (m *model) startAnalyzeOf(background bool) tea.Cmd {
 		return nil
 	}
 	m.analyzing, m.analyzeQuiet = true, false
+	m.analyzeBegan = time.Now()
 	m.status = T("analyzing…")
 	run, name := m.opts.Analyze, m.envName
 	if run == nil {
@@ -247,8 +248,51 @@ func (m *model) analyzeMsg(msg tea.Msg) tea.Cmd {
 		}
 		m.reload()
 		m.loadProblems()
+		if msg.err == nil {
+			m.offerSlowCheck()
+		}
 	}
 	return nil
+}
+
+// offerSlowCheck opens the slow-check prompt (16 §2.14 "Slow checks") after a check that
+// took longer than view.SlowCheckAfter: the question, exactly what would be sent, and its
+// keys. It never replaces a panel the player has open.
+func (m *model) offerSlowCheck() {
+	if m.panel != nil || m.analyzeBegan.IsZero() {
+		return
+	}
+	p := view.SlowCheckOf(m.app, m.analyzeBegan, time.Since(m.analyzeBegan))
+	if p == nil {
+		return
+	}
+	body := p.Preview
+	m.openPanel(T("slow check"), p.Text+"\n\n"+body+"\n\n"+T("enter: send; a: always send; esc: not now"))
+	a := m.app
+	send := func(always bool) func(*model) tea.Cmd {
+		return func(m *model) tea.Cmd {
+			m.panel = nil
+			if always {
+				if err := view.AlwaysSendSlowChecks(a); err != nil {
+					m.say(sayFail, err.Error())
+					return nil
+				}
+			}
+			return func() tea.Msg {
+				err := view.SendSlowCheck(a, body)
+				return bgMsg{apply: func(m *model) tea.Cmd {
+					if err != nil {
+						m.say(sayFail, T("could not send the timings"))
+					} else {
+						m.say(sayOK, T("sent, thank you"))
+					}
+					return nil
+				}}
+			}
+		}
+	}
+	m.panel.onEnter = send(false)
+	m.panel.keys = map[string]func(*model) tea.Cmd{"a": send(true)}
 }
 
 // chooseLog picks Player.log or Player-prev.log; its clusters join the Problems view as

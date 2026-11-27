@@ -262,3 +262,23 @@ func TestOpLogUnsubscribeRefusedWithWorkshopLink(t *testing.T) {
 		t.Fatalf("refused row: %+v", r)
 	}
 }
+
+// A can-it-run check writes one check row with its duration and phases (13 §1.3).
+func TestOpLogCheckRow(t *testing.T) {
+	t.Parallel()
+	e := loadoutEnv(t)
+	scanNow(t, e)
+	e.MustRun("enable", refOf(t, e, "B", ""))
+	if _, err := e.App.Analyze(nil); err != nil {
+		t.Fatal(err)
+	}
+	c := findOp(opRows(t, e), oplog.Check, oplog.OK)
+	if c == nil || c.Ms <= 0 || c.Subject != "default" {
+		t.Fatalf("check row %+v", c)
+	}
+	p, ok := app.ParseCheckPhases(c.Detail)
+	if !ok || p.Total == 0 || p.Active == 0 || p.Active > p.Total || len(p.Phases) < 5 || p.Phases[0].Name != "read" || p.Phases[len(p.Phases)-1].Name != "refs" {
+		t.Fatalf("detail %q: %+v", c.Detail, p)
+	}
+	// the row's duration is on the log's clock, which the test environment holds still
+}

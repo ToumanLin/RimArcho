@@ -38,10 +38,14 @@ const (
 	LooksBuild         = "looks.build"      // the generated Mod RimArcho Looks Preference was rebuilt (21 §4)
 	LooksStyle         = "looks.style"      // a style or random variant entry was added or removed (21 §5)
 	StylesBuild        = "looks.stylebuild" // the generated Mod RimArcho Styles Preference was rebuilt (21 §5)
+	// Check is a can-it-run check: the analysis of a plan's files (05 §3). It changes no
+	// player file; it is recorded for its duration and phases, and only the newest MaxChecks
+	// are kept.
+	Check = "check"
 )
 
 // Codes lists every op code, in the order the filters show them.
-var Codes = []string{Launch, ModsConfigWrite, LinkCreate, LinkRemove, Trash, Delete, Unsubscribe, SubscriptionRemove, SaveRename, SaveCopy, SaveBackup, SaveTrash, UpdateApply, UpdateRollback, Uninstall, PlanSync, LooksChoice, LooksBuild, LooksStyle, StylesBuild}
+var Codes = []string{Launch, ModsConfigWrite, LinkCreate, LinkRemove, Trash, Delete, Unsubscribe, SubscriptionRemove, SaveRename, SaveCopy, SaveBackup, SaveTrash, UpdateApply, UpdateRollback, Uninstall, PlanSync, LooksChoice, LooksBuild, LooksStyle, StylesBuild, Check}
 
 // Permanent begins the detail of a subscription.remove whose folder was deleted for good
 // (quick delete) instead of moved to the recycle bin.
@@ -79,6 +83,9 @@ const EnvVar = "ARCHO_ORIGIN"
 const (
 	MaxAge  = 90 * 24 * time.Hour
 	MaxRows = 500
+	// MaxChecks: only the newest check rows are kept, so automatic checks never push the
+	// file actions out of MaxRows.
+	MaxChecks = 20
 )
 
 // Row is one recorded action.
@@ -93,6 +100,9 @@ type Row struct {
 	Result  string    `json:"result"`
 	Detail  string    `json:"detail,omitempty"`
 	Batch   int64     `json:"batch,omitempty"`
+	// Ms is how long the action took, in milliseconds: set when a Begin row is closed
+	// (Handle.End); 0 for a row written at once (Add) or one that never ended.
+	Ms int64 `json:"ms,omitempty"`
 }
 
 // Log writes and reads op_log. A nil *Log does nothing and reads nothing.
@@ -177,22 +187,29 @@ func (l *Log) Add(r Row) int64 {
 		log.Printf("operation log: cannot record %s: writes are off", r.Op)
 		return 0
 	}
-	res, err := l.db.Exec(`INSERT INTO op_log(at, origin, env_id, op, subject, target, result, detail, batch) VALUES(?,?,?,?,?,?,?,?,?)`,
-		r.At.UnixMilli(), r.Origin, r.EnvID, r.Op, r.Subject, r.Target, r.Result, r.Detail, r.Batch)
+	res, err := l.db.Exec(`INSERT INTO op_log(at, origin, env_id, op, subject, target, result, detail, batch, ms) VALUES(?,?,?,?,?,?,?,?,?,?)`,
+		r.At.UnixMilli(), r.Origin, r.EnvID, r.Op, r.Subject, r.Target, r.Result, r.Detail, r.Batch, r.Ms)
 	if err != nil {
 		log.Printf("operation log: cannot record %s: %v", r.Op, err)
 		return 0
 	}
 	id, _ := res.LastInsertId()
+	if r.Op == Check {
+		// one small delete on a row that is written at most once per check
+		if _, err := l.db.Exec(`DELETE FROM op_log WHERE op = ? AND id <= COALESCE((SELECT id FROM op_log WHERE op = ? ORDER BY id DESC LIMIT 1 OFFSET ?), 0)`, Check, Check, MaxChecks); err != nil {
+			log.Printf("operation log: prune checks: %v", err)
+		}
+	}
 	return id
 }
 
 // Handle is a multi-step action's parent row (launch, uninstall, a batch of saves): its
 // children carry its id in batch. A nil Handle is valid; its children are plain rows.
 type Handle struct {
-	l    *Log
-	id   int64
-	done bool
+	l     *Log
+	id    int64
+	done  bool
+	start time.Time
 }
 
 // Begin writes a parent row with result started; End closes it.
@@ -201,7 +218,19 @@ func (l *Log) Begin(r Row) *Handle {
 		return nil
 	}
 	r.Result = Started
-	return &Handle{l: l, id: l.Add(r)}
+	start := l.now()
+	return &Handle{l: l, id: l.Add(r), start: start}
+}
+
+// SetSubject changes the parent row's subject while it runs (a check learns its plan's name
+// after Begin).
+func (h *Handle) SetSubject(subject string) {
+	if h == nil || h.id == 0 || h.l.Fail {
+		return
+	}
+	if _, err := h.l.db.Exec(`UPDATE op_log SET subject=? WHERE id=?`, subject, h.id); err != nil {
+		log.Printf("operation log: cannot update row %d: %v", h.id, err)
+	}
 }
 
 // ID is the parent row's id (0 when it could not be written).
@@ -221,7 +250,16 @@ func (h *Handle) Child(r Row) int64 {
 	return h.l.Add(r)
 }
 
-// End sets the parent row's result and detail; the first End wins.
+// Elapsed is how long since Begin (0 for a nil Handle).
+func (h *Handle) Elapsed() time.Duration {
+	if h == nil {
+		return 0
+	}
+	return h.l.now().Sub(h.start)
+}
+
+// End sets the parent row's result, detail and duration (since Begin, at least 1 ms); the
+// first End wins.
 func (h *Handle) End(result, detail string) {
 	if h == nil || h.done {
 		return
@@ -230,7 +268,8 @@ func (h *Handle) End(result, detail string) {
 	if h.id == 0 || h.l.Fail {
 		return
 	}
-	if _, err := h.l.db.Exec(`UPDATE op_log SET result=?, detail=? WHERE id=?`, result, clip(detail, 400), h.id); err != nil {
+	ms := max(1, h.Elapsed().Milliseconds())
+	if _, err := h.l.db.Exec(`UPDATE op_log SET result=?, detail=?, ms=? WHERE id=?`, result, clip(detail, 400), ms, h.id); err != nil {
 		log.Printf("operation log: cannot close row %d: %v", h.id, err)
 	}
 }
@@ -258,7 +297,7 @@ func (l *Log) Recent(q Query) ([]Row, error) {
 	if q.Failed {
 		where = append(where, "result IN ('failed','refused','partial')")
 	}
-	text := `SELECT id, at, origin, env_id, op, subject, target, result, detail, batch FROM op_log WHERE ` + strings.Join(where, " AND ") + ` ORDER BY id DESC`
+	text := `SELECT id, at, origin, env_id, op, subject, target, result, detail, batch, ms FROM op_log WHERE ` + strings.Join(where, " AND ") + ` ORDER BY id DESC`
 	if q.Limit > 0 {
 		text += fmt.Sprintf(" LIMIT %d", q.Limit)
 	}
@@ -271,7 +310,7 @@ func (l *Log) Recent(q Query) ([]Row, error) {
 	for rows.Next() {
 		var r Row
 		var at int64
-		if err := rows.Scan(&r.ID, &at, &r.Origin, &r.EnvID, &r.Op, &r.Subject, &r.Target, &r.Result, &r.Detail, &r.Batch); err != nil {
+		if err := rows.Scan(&r.ID, &at, &r.Origin, &r.EnvID, &r.Op, &r.Subject, &r.Target, &r.Result, &r.Detail, &r.Batch, &r.Ms); err != nil {
 			return nil, err
 		}
 		r.At = time.UnixMilli(at)

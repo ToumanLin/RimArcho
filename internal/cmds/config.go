@@ -38,6 +38,9 @@ var configKeys = map[string][]string{
 	"saves.launch_copy": {"on", "off"},
 	// 16 §2.14 Feedback: off stops asking the feedback relay for replies to sent reports
 	"feedback.replies": {"on", "off"},
+	// 16 §2.14 "Slow checks": after a can-it-run check over 30 s, ask to send its timings,
+	// send them without asking, or never
+	"feedback.timings": {"ask", "always", "off"},
 	// 16 §2.14: off starts the window's WebView2 without GPU acceleration (less memory,
 	// software drawing); read when the window opens
 	"ui.gpu":          {"on", "off"},
@@ -200,7 +203,7 @@ var agentSettingsUsage = map[bool]string{true: "agent.api: openai-completions|an
 
 func init() {
 	register(&Command{Name: "config get", Args: "[<key>]", Summary: "show settings", MaxArgs: 1, Run: configGetCmd})
-	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (" + agentSettingsUsage + "local.dir: unused managed-folder root; updates.source: auto|github; updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris or a #rrggbb colour; ui.icons: compat|nerd; ui.mouse: on|off; ui.tui.theme: auto|dark|light; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; ui.archo.motion: off|still|live; ui.motion: auto|reduced; ui.zoom: 100|110|125|150 (the window's interface size in percent); analysis.auto: edit|save|off (when the window checks a list's files by itself); tags.pinned: comma-separated tags; monitor.default: on|off; saves.launch_copy: on|off (copy the newest save before each launch); monitor.dir: a folder; looks.dir: the folder of the generated Mod RimArcho Looks Preference, before the first look is applied; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; network.proxy: system|off|a proxy URL; network.github_mirror: auto|off or a mirror prefix such as https://gh-proxy.org/)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
+	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (" + agentSettingsUsage + "local.dir: unused managed-folder root; updates.source: auto|github; updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris or a #rrggbb colour; ui.icons: compat|nerd; ui.mouse: on|off; ui.tui.theme: auto|dark|light; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; ui.archo.motion: off|still|live; ui.motion: auto|reduced; ui.zoom: 100|110|125|150 (the window's interface size in percent); analysis.auto: edit|save|off (when the window checks a list's files by itself); feedback.replies: on|off; feedback.timings: ask|always|off (the timings of a check over 30 s); tags.pinned: comma-separated tags; monitor.default: on|off; saves.launch_copy: on|off (copy the newest save before each launch); monitor.dir: a folder; looks.dir: the folder of the generated Mod RimArcho Looks Preference, before the first look is applied; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; network.proxy: system|off|a proxy URL; network.github_mirror: auto|off or a mirror prefix such as https://gh-proxy.org/)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
 }
 
 // ConfigValue returns a setting, or its default.

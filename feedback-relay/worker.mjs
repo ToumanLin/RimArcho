@@ -29,7 +29,8 @@ export default {
 // request), or {error} with a code RimArcho turns into words: not_configured, client,
 // bad_json, empty, too_long, slow_down, ip_daily, daily, github. GET /status/<n>?t=<token> is
 // the sender's read of that issue (status); GET /requests lists the open feature requests and
-// POST /plus/<n> adds a +1 to one (requests and plus, below).
+// POST /plus/<n> adds a +1 to one (requests and plus, below); POST /timings appends a slow
+// check's timings to the one issue TIMINGS_ISSUE (timings, below).
 export async function handle(request, env, deps = {}) {
   const fetchFn = deps.fetch || fetch;
   const now = deps.now || Date.now;
@@ -37,6 +38,7 @@ export async function handle(request, env, deps = {}) {
   if (path.startsWith("/status/")) return status(request, env, fetchFn, now, deps.random);
   if (path === "/requests") return requests(request, env, fetchFn, now);
   if (path.startsWith("/plus/")) return plus(request, env, fetchFn, now);
+  if (path === "/timings") return timings(request, env, fetchFn, now);
   if (path !== "/report") return reply(404, { error: "not_found" });
   if (request.method !== "POST") return reply(405, { error: "method" });
   if (!env.APP_ID || !env.GITHUB_APP_KEY || !env.REPO || !env.COUNTS || !env.GATE) {
@@ -208,9 +210,8 @@ export async function sender(ip, day, secret) {
 // count adds a report to today's counter for everyone, or says "daily" when it is full. KV
 // is eventually consistent, so a burst from many senders can pass the cap by a few; each
 // sender's own limits are exact (SendGate).
-export async function count(env, day, n = 1) {
-  const perDay = limit(env.PER_DAY, 30);
-  const all = `all:${day}`;
+export async function count(env, day, n = 1, what = "all", perDay = limit(env.PER_DAY, 30)) {
+  const all = `${what}:${day}`;
   const total = parseInt((await env.COUNTS.get(all)) || "0", 10) || 0;
   if (total + n > perDay) return "daily";
   await env.COUNTS.put(all, String(total + n), { expirationTtl: 2 * 86400 }).catch(() => {});
@@ -218,8 +219,8 @@ export async function count(env, day, n = 1) {
 }
 
 // uncount gives n reports back to today's counter for everyone when they were not filed.
-export async function uncount(env, day, n = 1) {
-  const all = `all:${day}`;
+export async function uncount(env, day, n = 1, what = "all") {
+  const all = `${what}:${day}`;
   const total = parseInt((await env.COUNTS.get(all)) || "0", 10) || 0;
   if (total > 0) await env.COUNTS.put(all, String(Math.max(0, total - n)), { expirationTtl: 2 * 86400 });
 }
@@ -390,6 +391,98 @@ async function plusComment(env, fetchFn, now, n, count) {
   }
   const res = await github(fetchFn, "POST", `/repos/${env.REPO}/issues/${n}/comments`, gh, { body });
   if (res.ok) await env.COUNTS.put("plusc:" + n, String((await res.json()).id));
+}
+
+// TIMINGS_FIELDS is everything a slow check's timings may carry (RimArcho's feedback.Timings,
+// 16 §2.14 "Slow checks"): anything else is dropped, so no name, path or account can reach
+// the issue even from a changed client. Strings are short and plain; numbers are bounded.
+const TIMINGS_FIELDS = {
+  version: "str",
+  os: "str",
+  game: "str",
+  active_mods: "int",
+  total_mods: "int",
+  automatic: "bool",
+  wall_ms: "int",
+  cpu_threads: "int",
+  ram_gb: "int",
+  disk: "str",
+};
+const TIMINGS_PHASE = /^[a-z]{1,16}$/;
+const TIMINGS_PER_IP_DAY = 2; // timings a day from one sender
+const TIMINGS_PER_DAY = 100; // timings a day from everyone
+
+// cleanTimings keeps TIMINGS_FIELDS and up to 12 phases {name, ms}; null when the request is
+// not timings at all (no wall time, or no phases).
+export function cleanTimings(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const out = {};
+  for (const [k, kind] of Object.entries(TIMINGS_FIELDS)) {
+    const v = input[k];
+    if (kind === "str" && typeof v === "string" && v.trim()) out[k] = v.replace(/[^\w .,()+\-]/g, "").trim().slice(0, 80);
+    if (kind === "int" && Number.isInteger(v) && v >= 0 && v < 1e9) out[k] = v;
+    if (kind === "bool" && typeof v === "boolean") out[k] = v;
+  }
+  if (!Array.isArray(input.phases) || !out.wall_ms) return null;
+  out.phases = input.phases
+    .filter((p) => p && TIMINGS_PHASE.test(p.name) && Number.isInteger(p.ms) && p.ms >= 0 && p.ms < 1e9)
+    .slice(0, 12)
+    .map((p) => ({ name: p.name, ms: p.ms }));
+  if (!out.phases.length) return null;
+  return out;
+}
+
+// timingsComment is the comment: one line a maintainer can scan, then the JSON as it came
+// (cleaned).
+export function timingsComment(t) {
+  const s = (ms) => (ms / 1000).toFixed(1) + " s";
+  const top = [...t.phases].sort((a, b) => b.ms - a.ms).slice(0, 3).map((p) => `${p.name} ${s(p.ms)}`).join(", ");
+  const head = `**${s(t.wall_ms)}**${t.automatic ? " (automatic)" : ""}: ${t.active_mods ?? "?"}/${t.total_mods ?? "?"} Mods, game ${t.game || "?"}, RimArcho ${t.version || "?"}; slowest: ${top}`;
+  return defuse(head) + "\n\n```json\n" + JSON.stringify(t, null, 2) + "\n```\n\n<sub>Sent from RimArcho after a slow check.</sub>\n";
+}
+
+// timings answers POST /timings with {ok: true} after appending the timings as a comment on
+// issue TIMINGS_ISSUE; 404 {error: "not_found"} when no issue is set (RimArcho says nothing
+// then). The limits are the report's: one a minute and TIMINGS_PER_IP_DAY a day per sender
+// (a SendGate of its own, so timings never use up a sender's reports) and TIMINGS_PER_DAY a
+// day for everyone (a KV counter).
+async function timings(request, env, fetchFn, now) {
+  const issue = String(env.TIMINGS_ISSUE || "").trim();
+  if (!/^[1-9]\d{0,9}$/.test(issue)) return reply(404, { error: "not_found" });
+  if (request.method !== "POST") return reply(405, { error: "method" });
+  if (!env.APP_ID || !env.GITHUB_APP_KEY || !env.REPO || !env.COUNTS || !env.GATE) return reply(503, { error: "not_configured" });
+  if (!(request.headers.get("user-agent") || "").startsWith("RimArcho/")) return reply(403, { error: "client" });
+  const raw = await request.text();
+  if (raw.length > 8000) return reply(413, { error: "too_long" });
+  let t;
+  try {
+    t = cleanTimings(JSON.parse(raw));
+  } catch {
+    return reply(400, { error: "bad_json" });
+  }
+  if (!t) return reply(400, { error: "empty" });
+
+  const day = new Date(now()).toISOString().slice(0, 10);
+  const who = await sender(request.headers.get("cf-connecting-ip") || "", day, env.GITHUB_APP_KEY);
+  const gate = env.GATE.get(env.GATE.idFromName("timings:" + who));
+  const ask = (op) => gate.fetch(`https://gate/${op}?now=${now()}&perSender=${limit(env.TIMINGS_PER_IP_DAY, TIMINGS_PER_IP_DAY)}&n=1`, { method: "POST" });
+  const claimed = await (await ask("claim")).json();
+  if (claimed.error) return reply(429, { error: claimed.error });
+  const cap = await count(env, day, 1, "timings", limit(env.TIMINGS_PER_DAY, TIMINGS_PER_DAY));
+  if (cap) {
+    await ask("release");
+    return reply(429, { error: cap });
+  }
+  try {
+    const gh = await installationToken(env, fetchFn, now);
+    const res = await github(fetchFn, "POST", `/repos/${env.REPO}/issues/${issue}/comments`, gh, { body: timingsComment(t) });
+    if (!res.ok) throw new Error(`commenting on #${issue}: ${res.status}`);
+  } catch (e) {
+    await ask("release");
+    await uncount(env, day, 1, "timings").catch(() => {});
+    return reply(502, { error: "github", detail: String(e?.message || e).slice(0, 200) });
+  }
+  return reply(200, { ok: true });
 }
 
 let cached = null; // {repo, token, until}: an installation token lasts an hour

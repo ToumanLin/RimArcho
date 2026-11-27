@@ -43,6 +43,7 @@ import * as planManage from "./planmanage.js";
 import { wireZoom } from "./uizoom.js";
 import * as tex from "./textures.js";
 import * as tasksPage from "./tasks.js";
+import { slowCheck } from "./slowcheck.js";
 import * as selfUpdate from "./selfupdate.js";
 import { refreshBackgrounds } from "./bg.js";
 import { environmentReason, withEnvironmentSwitch } from "./environment.js";
@@ -1562,6 +1563,7 @@ async function start() {
   on("uninstall-close-blocked", () => uninst.closeBlocked());
   on("textures", (ev) => tex.event(ev));
   on("tasks", (ev) => tasksPage.event(ev));
+  on("slow-check", (ev) => slowCheck(ev));
   document.addEventListener("task-ended", (e) => {
     if (!S.screen && ["subscribe", "subscription-from", "subscription-check", "subscription-update", "subscription-remove"].includes(e.detail?.kind)) reload();
   });

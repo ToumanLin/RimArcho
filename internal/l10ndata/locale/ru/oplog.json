@@ -39,5 +39,6 @@
   "window": "окно",
   "wrote the list to the game": "список записан в игру",
   "added or removed a style of a look": "добавление или удаление стиля вида",
-  "rebuilt RimArcho Styles Preference": "пересборка RimArcho Styles Preference"
+  "rebuilt RimArcho Styles Preference": "пересборка RimArcho Styles Preference",
+  "checked whether the list can run": "проверка, запустится ли список"
 }

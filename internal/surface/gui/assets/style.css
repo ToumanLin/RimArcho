@@ -1417,6 +1417,23 @@ svg.i.fill { fill: currentColor; }
 .steam-ask-err { color: var(--red); }
 .steam-ask-err:empty { display: none; }
 .steam-hint-card { position: fixed; right: 16px; bottom: 40px; z-index: 30; max-width: 360px; margin: 0; padding: 10px 12px; background: var(--pop-bg); border: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); box-shadow: var(--shadow); animation: pop-in var(--t-enter) var(--ease); }
+/* the slow-check prompt (js/slowcheck.js, 16 §2.14): a corner card like SteamCMD's */
+.slow-check { position: fixed; right: 16px; bottom: 40px; z-index: 30; width: 400px; max-width: calc(100vw - 32px); padding: 10px 12px 10px 14px; display: grid; gap: 8px; background: var(--pop-bg); border: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); box-shadow: var(--shadow); color: var(--fg); animation: pop-in var(--t-enter) var(--ease); }
+.slow-check.open { width: 440px; }
+.slow-check.sent { width: auto; }
+.slow-check-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+.slow-check-took { font-size: 15px; font-weight: 600; color: var(--amber); line-height: 1; }
+.slow-check-ask { color: var(--fg-2); font-size: 13px; }
+.slow-check-close { width: 24px; height: 24px; padding: 0; color: var(--muted); }
+.slow-check-close .i { width: 13px; height: 13px; }
+.slow-check-btns { display: flex; gap: 6px; align-items: center; }
+.slow-check-btns .btn { height: 24px; font-size: 12px; }
+.slow-check-show { margin-left: auto; color: var(--muted); }
+.slow-check-show .i { width: 12px; height: 12px; transition: transform var(--t-press); }
+.slow-check.open .slow-check-show .i { transform: rotate(90deg); }
+.slow-check-preview { margin: 0; max-height: 420px; overflow: auto; padding: 8px 10px; border-radius: var(--r-sm); background: color-mix(in srgb, var(--fg) 5%, transparent); font-family: var(--code); font-size: 12px; line-height: 1.45; color: var(--fg-2); -webkit-user-select: text; user-select: text; white-space: pre; }
+.slow-check-err { color: var(--red); font-size: 12px; }
+.slow-check-sent { color: var(--green); font-size: 13px; }
 .dl-line { margin-top: 8px; font: 12px var(--code); color: var(--muted); overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) { .prog .bar.busy i { animation: none; } ::view-transition-group(*) { animation: none; } }
 :root[data-motion="reduced"] .prog .bar.busy i { animation: none; } :root[data-motion="reduced"]::view-transition-group(*) { animation: none; }
@@ -2066,10 +2083,12 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .op-item { border-radius: var(--r-sm); }
 .op-item.bad { background: color-mix(in srgb, var(--red) 7%, transparent); }
 .op-item + .op-item { margin-top: 2px; }
-.op-row { display: grid; grid-template-columns: 44px 16px minmax(0, 1fr) 16px; align-items: center; gap: 10px; padding: 6px 10px 6px 8px; border-radius: var(--r-sm); cursor: pointer; transition: background var(--t-press); }
+.op-row { display: grid; grid-template-columns: 44px 16px minmax(0, 1fr) 64px 16px; align-items: center; gap: 10px; padding: 6px 10px 6px 8px; border-radius: var(--r-sm); cursor: pointer; transition: background var(--t-press); }
 .op-row:hover { background: var(--pill); }
 .op-row.cur { background: color-mix(in srgb, var(--fg) 6%, transparent); }
 .op-row .tm { color: var(--faint); font-size: 12px; }
+/* how long it took: a muted number at the right, beside the mark column (13 §1.3) */
+.op-row .op-dur { color: var(--faint); font-size: 12px; text-align: right; white-space: nowrap; }
 .op-row .op-ic, .op-step .op-ic { display: inline-flex; color: var(--muted); }
 .op-ic .i, .op-mk .i { width: 15px; height: 15px; }
 .op-row .op-sub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

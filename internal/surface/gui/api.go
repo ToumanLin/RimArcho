@@ -58,6 +58,7 @@ type API struct {
 	indexRead       logReader
 	detailRead      logReader
 	board           *view.Board
+	slowCheck       string // the timings the slow-check prompt previews (slowcheck.go); guarded by mu
 	boardAt         string
 	needs           *view.Needs
 	needsAt         string // the database state the needs were built at
@@ -2030,6 +2031,7 @@ func (s *API) startAnalyzeOf(list string, background bool) bool {
 		from.AnalyzeBackground = background
 	}
 	task := s.tasks.BeginOnce(view.TaskAnalyze, obj, nil) // one row, updated in place (16 §8.9)
+	began := time.Now()                                   // the slow-check prompt's wall time (16 §2.14)
 	// the open list's findings will change: its problems button says so while this runs
 	if c, _ := s.cachedNeedsLocked(); c != nil && c.scope == scope {
 		ev := s.problemsNowLocked(c.n)
@@ -2085,6 +2087,9 @@ func (s *API) startAnalyzeOf(list string, background bool) bool {
 			ev["error"] = failedText(view.TaskAnalyze, obj, err.Error())
 		}
 		s.send("analyze", ev)
+		if err == nil {
+			s.offerSlowCheck(began)
+		}
 	}()
 	return true
 }

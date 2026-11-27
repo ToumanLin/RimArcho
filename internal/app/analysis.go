@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/analyze"
+	"github.com/ToumanLin/RimArcho/internal/oplog"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
@@ -149,16 +150,49 @@ func (a *App) Analyze(progress func(string)) (*AnalyzeReport, error) {
 	return a.AnalyzeContext(context.Background(), progress)
 }
 
-// AnalyzeContext allows cancellation before publishing the completed analysis.
-func (a *App) AnalyzeContext(ctx context.Context, progress func(string)) (*AnalyzeReport, error) {
+// AnalyzeContext allows cancellation before publishing the completed analysis. It is the
+// can-it-run check's primitive: one check row (oplog.Check, 13 §1.3) records its duration and
+// phases (CheckPhases), whichever surface started it.
+func (a *App) AnalyzeContext(ctx context.Context, progress func(string)) (rep *AnalyzeReport, err error) {
+	h := a.Ops.Begin(oplog.Row{Op: oplog.Check, EnvID: a.opEnv()})
+	var ph CheckPhases
+	ph.Automatic = a.AnalyzeBackground
+	mark := time.Now()
+	lap := func() int64 {
+		now := time.Now()
+		d := now.Sub(mark).Milliseconds()
+		mark = now
+		return d
+	}
+	defer func() {
+		if h == nil {
+			return
+		}
+		result := oplog.OK
+		if err != nil {
+			result = oplog.Failed
+		}
+		h.End(result, joinDetail(ph.Detail(), errText(err)))
+	}()
 	st, err := a.Loadout()
 	if err != nil {
 		return nil, err
+	}
+	if st.Plan != nil && h != nil {
+		h.SetSubject(st.Plan.Name)
 	}
 	in, key, err := a.AnalyzeInput(st, "")
 	if err != nil {
 		return nil, err
 	}
+	ph.Game = st.GameMM()
+	for _, m := range in.Mods {
+		ph.Total++
+		if m.Pos > 0 {
+			ph.Active++
+		}
+	}
+	ph.Add("read", lap())
 	in.Progress = progress
 	cache := a.assemblyCache()
 	if cache != nil {
@@ -170,18 +204,27 @@ func (a *App) AnalyzeContext(ctx context.Context, progress func(string)) (*Analy
 		return nil, err
 	}
 	cache.prune()
+	run := lap()
+	ph.Add("defs", out.Stats.DefsMs)
+	ph.Add("patches", out.Stats.PatchMs)
+	ph.Add("harmony", out.Stats.HarmonyMs)
+	if rest := run - out.Stats.DefsMs - out.Stats.PatchMs - out.Stats.HarmonyMs; rest > 0 {
+		ph.Add("cache", rest)
+	}
 	in = analyze.Input{} // release the declarations before writing
 	id, err := a.Store.SaveAnalysisContext(ctx, st.Ix.Env.GameID, SetFingerprint(st.List), key, st.GameMM(), a.planSetKeys(st), out, started, a.Now())
 	if err != nil {
 		return nil, err
 	}
 	a.Store.TruncateWAL() // a first analysis writes ~100 MB through the WAL (04 §4)
+	ph.Add("save", lap())
 	// The log attribution's reference index for this set (06 §5), so the first query on a
 	// new log does not read every mod file.
 	if progress != nil {
 		progress("indexing def references")
 	}
 	a.RefIndex(st)
+	ph.Add("refs", lap())
 	return &AnalyzeReport{ID: id, Key: key, MM: st.GameMM(), Stats: out.Stats}, nil
 }
 
@@ -379,4 +422,5 @@ func (a *App) SetAnalyzeBackground() {
 	lowerPriority()
 	runtime.GOMAXPROCS(BackgroundWorkers)
 	a.AnalyzeWorkers = BackgroundWorkers
+	a.AnalyzeBackground = true // its check row says automatic
 }

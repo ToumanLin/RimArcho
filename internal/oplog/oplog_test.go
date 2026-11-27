@@ -155,3 +155,48 @@ func TestOriginFromEnv(t *testing.T) {
 		t.Fatal("unknown origin taken")
 	}
 }
+
+// End records how long the action took; a row written at once has no duration (13 §1.3).
+func TestDuration(t *testing.T) {
+	_, l, now := open(t)
+	l.Add(oplog.Row{Op: oplog.Trash, Subject: "Mod A"})
+	h := l.Begin(oplog.Row{Op: oplog.Launch, Subject: "default"})
+	*now = now.Add(12400 * time.Millisecond)
+	h.End(oplog.OK, "")
+	q := l.Begin(oplog.Row{Op: oplog.Uninstall})
+	q.End(oplog.OK, "") // no time passed: still a duration
+	l.Begin(oplog.Row{Op: oplog.Launch, Subject: "never ended"})
+	rows, err := l.Recent(oplog.Query{})
+	if err != nil || len(rows) != 4 {
+		t.Fatal(len(rows), err)
+	}
+	if rows[0].Ms != 0 || rows[1].Ms != 1 || rows[2].Ms != 12400 || rows[3].Ms != 0 {
+		t.Fatalf("ms = %d %d %d %d", rows[0].Ms, rows[1].Ms, rows[2].Ms, rows[3].Ms)
+	}
+	head, _ := oplog.Text(rows[2], time.UTC)
+	if !strings.HasSuffix(head, "ok      default  12.4 s") {
+		t.Fatalf("head %q", head)
+	}
+	if head, _ := oplog.Text(rows[3], time.UTC); strings.HasSuffix(head, " ") || strings.Contains(head, " s") {
+		t.Fatalf("head %q", head)
+	}
+	for ms, want := range map[int64]string{1: "1 ms", 850: "850 ms", 1000: "1 s", 12449: "12.4 s", 59900: "59.9 s", 60_000: "1 min", 185_000: "3 min 5 s"} {
+		if got := oplog.Dur(ms); got != want {
+			t.Errorf("Dur(%d) = %q, want %q", ms, got, want)
+		}
+	}
+}
+
+// Only the newest MaxChecks check rows are kept; other rows stay.
+func TestCheckRowsCapped(t *testing.T) {
+	_, l, _ := open(t)
+	l.Add(oplog.Row{Op: oplog.Trash, Subject: "Mod A"})
+	for i := 0; i < oplog.MaxChecks+5; i++ {
+		l.Begin(oplog.Row{Op: oplog.Check}).End(oplog.OK, "")
+	}
+	rows, _ := l.Recent(oplog.Query{Op: oplog.Check})
+	all, _ := l.Recent(oplog.Query{})
+	if len(rows) != oplog.MaxChecks || len(all) != oplog.MaxChecks+1 {
+		t.Fatalf("%d checks, %d rows", len(rows), len(all))
+	}
+}

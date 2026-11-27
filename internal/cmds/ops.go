@@ -17,7 +17,7 @@ func init() {
 	register(&Command{Name: "ops", Summary: "what RimArcho did to your files (the operation log), newest first", MaxArgs: 0, Run: opsCmd,
 		Flags: []Flag{
 			{Name: "since", Value: "<when>", Help: "only rows since <n>h, <n>d or YYYY-MM-DD"},
-			{Name: "op", Value: "<code>", Help: "only one operation (trash, delete, subscription.remove, workshop.unsubscribe, modsconfig.write, link.create, link.remove, save.rename, save.copy, save.backup, save.trash, update.apply, update.rollback, uninstall, launch, plan.sync, looks.choice, looks.build, looks.style, looks.stylebuild) or a family (save, link, update, plan, looks)"},
+			{Name: "op", Value: "<code>", Help: "only one operation (trash, delete, subscription.remove, workshop.unsubscribe, modsconfig.write, link.create, link.remove, save.rename, save.copy, save.backup, save.trash, update.apply, update.rollback, uninstall, launch, plan.sync, looks.choice, looks.build, looks.style, looks.stylebuild, check) or a family (save, link, update, plan, looks)"},
 			{Name: "failed", Help: "only failed, refused and partly done rows"},
 			{Name: "all", Help: "every row kept (default: the newest 20)"},
 		}})
@@ -29,7 +29,7 @@ const OpsDefault = 20
 func opsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	q := oplog.Query{Op: strings.TrimSpace(a.Str("op")), Failed: a.Bool("failed")}
 	if q.Op != "" && !knownOp(q.Op) {
-		return nil, &UsageError{Msg: fmt.Sprintf("unknown --op %q: use %s, or a family: save, link, update", q.Op, strings.Join(oplog.Codes, ", "))}
+		return nil, &UsageError{Msg: fmt.Sprintf("unknown --op %q: use %s, or a family: save, link, update, plan, looks", q.Op, strings.Join(oplog.Codes, ", "))}
 	}
 	if s := a.Str("since"); s != "" {
 		t, err := opsSince(c, s)

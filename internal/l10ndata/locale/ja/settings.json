@@ -447,5 +447,19 @@
   "Personal Website": "個人サイト",
   "older versions": "以前のバージョン",
   "the version you are running": "使用中のバージョン",
-  "%d versions: read them in the window (archo gui) or in CHANGELOG.md": "%d 個のバージョン：ウィンドウ（archo gui）または CHANGELOG.md で読めます"
+  "%d versions: read them in the window (archo gui) or in CHANGELOG.md": "%d 個のバージョン：ウィンドウ（archo gui）または CHANGELOG.md で読めます",
+  "Send the timings to help make it faster?": "高速化のために所要時間を送りますか？",
+  "This check took %s. Send the timings to help make it faster?": "このチェックに %s かかりました。高速化のために所要時間を送りますか？",
+  "after a check over 30 s: the versions, the Mod counts and how long each step took; no names or paths": "30 秒を超えたチェックの後：バージョン、Mod の数、各段階の所要時間。名前やパスは含みません",
+  "always": "常に",
+  "always send": "常に送る",
+  "ask": "確認する",
+  "could not send the timings": "所要時間を送れませんでした",
+  "enter: send; a: always send; esc: not now": "enter：送る；a：常に送る；esc：今はしない",
+  "never": "送らない",
+  "not now": "今はしない",
+  "send the timings of slow checks": "遅いチェックの所要時間を送る",
+  "sent, thank you": "送りました。ありがとうございます",
+  "slow check": "遅いチェック",
+  "what is sent": "送る内容"
 }

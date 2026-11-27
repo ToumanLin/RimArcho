@@ -438,3 +438,80 @@ test("plus: a +1 for an open request, once a day per sender, written in one App 
   const r2 = await handle(post({}, { path: "/plus/9", ip: "192.0.2.80" }), many, { fetch: gh2.fn, now: () => NOW });
   assert.deepEqual({ status: r2.status, data: await r2.json() }, { status: 429, data: { error: "slow_down" } });
 });
+
+// commentHub is a fake GitHub that takes comments on any issue.
+function commentHub(status = 201) {
+  const calls = [];
+  const fn = async (url, init) => {
+    const body = init.body ? JSON.parse(init.body) : null;
+    calls.push({ url, method: init.method, body });
+    const json = (s, data) => new Response(JSON.stringify(data), { status: s });
+    if (url.endsWith("/repos/ToumanLin/RimArcho/installation")) return json(200, { id: 77 });
+    if (url.endsWith("/app/installations/77/access_tokens")) return json(201, { token: "ghs_test", expires_at: new Date(NOW + 3600e3).toISOString() });
+    if (/\/issues\/\d+\/comments$/.test(url) && init.method === "POST") return json(status, { id: 900 });
+    return json(404, {});
+  };
+  return { fn, calls };
+}
+
+const TIMINGS = {
+  version: "1.1.4", os: "Windows 11 Pro 25H2 (26200.6899)", game: "1.6", active_mods: 312, total_mods: 1354, automatic: false, wall_ms: 48200,
+  phases: [{ name: "read", ms: 900 }, { name: "defs", ms: 20100 }, { name: "patches", ms: 19000 }, { name: "harmony", ms: 4100 }, { name: "other", ms: 4100 }],
+  cpu_threads: 8, ram_gb: 16, disk: "hdd",
+};
+
+async function sendTimings(e, gh, data, opts = {}) {
+  const res = await handle(post(data, { path: "/timings", ...opts }), e, { fetch: gh.fn, now: () => opts.at ?? NOW });
+  return { status: res.status, data: await res.json() };
+}
+
+test("timings: a slow check's timings become a comment on the one fixed issue", async () => {
+  forgetToken();
+  const e = env({ TIMINGS_ISSUE: "50" }), gh = commentHub();
+  const r = await sendTimings(e, gh, { ...TIMINGS, mods: ["Combat Extended"], path: "C:\Users\me\Mods", steam_id: "7656119" });
+  assert.deepEqual(r, { status: 200, data: { ok: true } });
+  const c = gh.calls.filter((x) => x.url.endsWith("/repos/ToumanLin/RimArcho/issues/50/comments"));
+  assert.equal(c.length, 1);
+  const body = c[0].body.body;
+  assert.match(body, /^\*\*48\.2 s\*\*: 312\/1354 Mods, game 1\.6, RimArcho 1\.1\.4; slowest: defs 20\.1 s, patches 19\.0 s, harmony 4\.1 s/);
+  assert.ok(body.includes('"wall_ms": 48200') && body.includes('"disk": "hdd"'));
+  for (const s of ["Combat Extended", "Users", "7656119", "203.0.113.9"]) assert.ok(!JSON.stringify(gh.calls).includes(s), s + " stays out of GitHub");
+  assert.equal(gh.calls.filter((x) => x.url.endsWith("/issues")).length, 0, "no new issue");
+});
+
+test("timings: no issue set is 404, which RimArcho takes quietly; bad input is refused", async () => {
+  forgetToken();
+  const gh = commentHub();
+  assert.deepEqual(await sendTimings(env(), gh, TIMINGS), { status: 404, data: { error: "not_found" } });
+  assert.equal(gh.calls.length, 0);
+  const e = env({ TIMINGS_ISSUE: "50" });
+  assert.equal((await sendTimings(e, gh, TIMINGS, { agent: "curl/8" })).status, 403);
+  assert.deepEqual(await sendTimings(e, gh, "{"), { status: 400, data: { error: "bad_json" } });
+  assert.deepEqual(await sendTimings(e, gh, { version: "1" }), { status: 400, data: { error: "empty" } });
+  assert.deepEqual(await sendTimings(e, gh, { ...TIMINGS, phases: [{ name: "Mod Name!", ms: 1 }] }), { status: 400, data: { error: "empty" } });
+  assert.equal((await sendTimings(e, gh, "x".repeat(9000))).status, 413);
+  assert.equal(gh.calls.length, 0);
+});
+
+test("timings: one a minute and a daily cap per sender, apart from reports; a cap for everyone", async () => {
+  forgetToken();
+  const slow = { status: 429, data: { error: "slow_down" } };
+  let e = env({ TIMINGS_ISSUE: "50" }), gh = commentHub();
+  assert.equal((await sendTimings(e, gh, TIMINGS)).status, 200);
+  assert.deepEqual(await sendTimings(e, gh, TIMINGS, { at: NOW + 30e3 }), slow);
+  assert.equal((await sendTimings(e, gh, TIMINGS, { at: NOW + 60e3 })).status, 200);
+  assert.deepEqual(await sendTimings(e, gh, TIMINGS, { at: NOW + 120e3 }), { status: 429, data: { error: "ip_daily" } }, "TIMINGS_PER_IP_DAY is 2");
+  // a report from the same sender right after is not held up by the timings
+  assert.equal((await send(e, github(), { title: "a", body: "x" }, { at: NOW + 121e3 })).status, 200);
+
+  e = env({ TIMINGS_ISSUE: "50", TIMINGS_PER_DAY: "1" });
+  assert.equal((await sendTimings(e, gh, TIMINGS, { ip: "192.0.2.1" })).status, 200);
+  assert.deepEqual(await sendTimings(e, gh, TIMINGS, { ip: "192.0.2.2" }), { status: 429, data: { error: "daily" } });
+  assert.equal(e.COUNTS.m.get("all:2026-10-31"), undefined, "timings never count toward reports");
+
+  // GitHub refuses: nothing is used up
+  e = env({ TIMINGS_ISSUE: "50" });
+  const down = commentHub(500);
+  assert.equal((await sendTimings(e, down, TIMINGS)).status, 502);
+  assert.equal((await sendTimings(e, gh, TIMINGS, { at: NOW + 1e3 })).status, 200, "the minute was given back");
+});

@@ -447,5 +447,19 @@
   "Personal Website": "개인 웹사이트",
   "older versions": "이전 버전",
   "the version you are running": "사용 중인 버전",
-  "%d versions: read them in the window (archo gui) or in CHANGELOG.md": "버전 %d개: 창(archo gui) 또는 CHANGELOG.md에서 볼 수 있습니다"
+  "%d versions: read them in the window (archo gui) or in CHANGELOG.md": "버전 %d개: 창(archo gui) 또는 CHANGELOG.md에서 볼 수 있습니다",
+  "Send the timings to help make it faster?": "더 빠르게 만들 수 있도록 소요 시간을 보낼까요?",
+  "This check took %s. Send the timings to help make it faster?": "이번 검사에 %s 걸렸습니다. 더 빠르게 만들 수 있도록 소요 시간을 보낼까요?",
+  "after a check over 30 s: the versions, the Mod counts and how long each step took; no names or paths": "30초가 넘는 검사 후: 버전, 모드 수, 단계별 소요 시간. 이름과 경로는 없음",
+  "always": "항상",
+  "always send": "항상 보내기",
+  "ask": "묻기",
+  "could not send the timings": "소요 시간을 보내지 못했습니다",
+  "enter: send; a: always send; esc: not now": "enter: 보내기; a: 항상 보내기; esc: 나중에",
+  "never": "안 함",
+  "not now": "나중에",
+  "send the timings of slow checks": "느린 검사의 소요 시간 보내기",
+  "sent, thank you": "보냈습니다. 고맙습니다",
+  "slow check": "느린 검사",
+  "what is sent": "보내는 내용"
 }
