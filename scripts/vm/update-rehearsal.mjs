@@ -16,7 +16,9 @@ const goCall = (c, method, ...args) =>
 // version is the settings row "RimArcho" (view.SelfUpdateItem): the running program's version.
 async function version(c) {
   const groups = await goCall(c, 'Settings');
-  for (const g of groups || []) for (const it of g.items || []) if (it.key === 'archo.version') return it.value;
+  // A group is its own rows or, since the seven groups (16 §2.14), its sections' rows.
+  for (const g of groups || []) for (const part of [g, ...(g.sections || [])])
+    for (const it of part.items || []) if (it.key === 'archo.version') return it.value;
   return '';
 }
 
@@ -56,6 +58,9 @@ try {
   say(v === from, `the candidate's window runs ${from}`, `it runs ${v}`);
   if (v !== from) throw Error('wrong window');
   await c.click('#nav-settings');
+  // Settings opens on the group last shown; the version row is in About (16 §2.14).
+  await until('the settings list', 15000, () => c.evaluate(`!!document.querySelector('.st-row[data-group="about"]')`));
+  await c.click('.st-row[data-group="about"]');
   await until('settings page', 15000, () => c.evaluate(`!!document.querySelector('[data-setting-action="update --check"], [data-setting-action="update"]')`));
   // check for updates (the test release service answers; the Monitor item and Lanzou too)
   if (!(await c.evaluate(`!!document.querySelector('[data-setting-action="update"]')`))) {
