@@ -46,7 +46,7 @@
   "RimArcho keeps a local Mod, RimArcho Looks Preference, last in the list. It holds links to the textures you chose and no Defs.": "RimArcho 会在列表末尾保留一个本地 Mod：RimArcho Looks Preference。它只包含指向你所选贴图的链接，没有 Def。",
   "The folder is created now.": "现在会创建这个文件夹。",
   "The game already shows this.": "游戏里已经是这样了。",
-  "This feature is still in test. If something goes wrong, please report it.": "此功能仍在测试中。如果出了问题，请反馈给我们。",
+  "This feature is still in test. If something goes wrong, please report it.": "此功能仍在测试中。如果出了问题，请反馈给我。",
   "This list gains RimArcho Looks Preference as its last Mod: one step of the list's undo.": "此列表会在末尾加入 RimArcho Looks Preference：算作列表撤销的一步。",
   "Your Mods and the load order are not changed, and saves do not depend on it. Undo removes a choice again.": "你的 Mod 和排序不会改变，存档也不依赖它。撤销可以再把选择去掉。",
   "RimArcho Looks Preference is not in this list, so its choices do not reach the game": "RimArcho Looks Preference 不在此列表里，所以这些选择不会进入游戏",

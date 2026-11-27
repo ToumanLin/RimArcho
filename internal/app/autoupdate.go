@@ -187,7 +187,7 @@ func (a *App) runAutomatic(ctx context.Context, kind string, run func(context.Co
 	}
 	s.Checked, s.Completed, s.Lease = started, a.Now().UTC(), ""
 	b, _ = json.Marshal(s)
-	// The result is written while the lease is still ours: other writers of the record (a
+	// The result is written while this window still holds the lease: other writers of the record (a
 	// pending count after an update) keep the lease, a newer claim from another window
 	// after a long suspension replaces it and wins.
 	_, err = a.Store.DB.Exec(`UPDATE meta SET value=? WHERE key=? AND json_extract(value, '$.lease')=?`, string(b), key, lease)

@@ -20,6 +20,7 @@ settings
   data.rules.url: https://raw.githubusercontent.com/RimSort/Community-Rules-Database/main/communityRules.json
   data.steamdb.url: https://raw.githubusercontent.com/RimSort/Steam-Workshop-Database/main/steamDB.json
   feedback.replies: on
+  feedback.timings: ask
   monitor.default: on
   network.github_mirror: auto
   network.proxy: system
@@ -417,7 +418,7 @@ gc: removed 0 tombstones (tombstones older than 90 days, before 2026-07-03)
 database maintenance: would remove 6 old file records and compact the database
 
 > maintenance {"action":"vacuum"}
-database compacted: freed 80.5 KB (now 616.0 KB)
+database compacted: freed 84.5 KB (now 616.0 KB)
 
 > edit_loadout {"action":"disable","refs":["#hnyg"]}
 workspace: 2 active, 1 change unsaved (plan:default, env:main)

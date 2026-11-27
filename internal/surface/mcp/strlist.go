@@ -72,7 +72,7 @@ func decodeStrings(b []byte) (StrList, error) {
 }
 
 // inputSchema is the argument schema of a tool: the SDK's own, with a StrList property
-// also allowing a string (the SDK validates the call against it before our decoder runs).
+// also allowing a string (the SDK validates the call against it before RimArcho's decoder runs).
 func inputSchema[In any]() (*jsonschema.Schema, error) {
 	return jsonschema.For[In](&jsonschema.ForOptions{TypeSchemas: map[reflect.Type]*jsonschema.Schema{
 		reflect.TypeFor[StrList](): {Types: []string{"null", "array", "string"}, Items: &jsonschema.Schema{Type: "string"}},

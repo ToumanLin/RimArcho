@@ -353,6 +353,7 @@ They cannot be turned off one by one; `updates.interval` only changes how often.
 | Collections: importing one, and re-reading those your lists follow when you open All lists | `api.steampowered.com` | the collection IDs | no switch (unfollow the collection) |
 | Subscribing, downloading Mods or the game | SteamCMD and the Steam client, which talk to Valve themselves; `api.steampowered.com` | Workshop IDs; your Steam account name if you use one (the password only goes into SteamCMD's window on your PC; RimArcho sends nothing of it) | you start each one |
 | Installing SteamCMD, todds or a RimArcho update | Valve's SteamCMD download, GitHub (and Lanzou for updates) | nothing of yours | you start each one |
+| Timings of a slow Can it run check (over 30 s), when you click send, or after each one at most once a day if you chose always send | the feedback relay, which adds them as a comment to one **public** GitHub issue | RimArcho's version, the OS, the game version, active and installed Mod counts, how long each step took, CPU thread count, RAM, SSD or HDD; no Mod names, paths or accounts (the card shows the exact text first) | `feedback.timings off` |
 | A feedback report | the feedback relay, which files it as a **public** GitHub issue | your text, a contact if you give one (kept out of the issue), and only the details you tick: versions, OS, enabled Mods, log errors, paths with your user name replaced | you press Send, after seeing it |
 | The open feature requests, while you write one | the feedback relay | nothing of yours | no switch |
 | Importing a Rentry list | `rentry.co` | the page ID | you start it |
@@ -413,13 +414,13 @@ administrator does not get past it. In order:
    Extract to a normal folder such as `D:\Games\RimArcho`, not `Program Files`.
 2. **Antivirus.** If your antivirus quarantined or blocked `RimArcho.exe` or `archo.exe`, restore
    them and allow the RimArcho folder. Compare the ZIP with its `.sha256` file first if you want to
-   be sure it is ours.
+   be sure it is mine.
 3. **Smart App Control** (Windows 11: Settings › Privacy & security › Windows Security › App & browser
    control). When it is on, it blocks every unsigned program with no way to allow one, and Windows
-   cannot turn it back on without a reset. We are applying for free code signing so this stops
+   cannot turn it back on without a reset. I am applying for free code signing so this stops
    happening; until then, RimArcho cannot run while it is on.
 
-Still blocked? Send us the exact message (a screenshot is best) and your Windows version on
+Still blocked? Send me the exact message (a screenshot is best) and your Windows version on
 [GitHub issues](https://github.com/ToumanLin/RimArcho/issues) or Discord.
 </details>
 

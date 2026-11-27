@@ -39,9 +39,10 @@ type OpRow struct {
 	Mark       string  `json:"mark,omitempty"`
 	Origin     string  `json:"origin"`
 	OriginText string  `json:"originText"`
-	Day        string  `json:"day"`  // today, yesterday, or the date
-	Time       string  `json:"time"` // HH:MM
-	At         int64   `json:"at"`   // Unix milliseconds
+	Day        string  `json:"day"`           // today, yesterday, or the date
+	Time       string  `json:"time"`          // HH:MM
+	At         int64   `json:"at"`            // Unix milliseconds
+	Dur        string  `json:"dur,omitempty"` // how long it took (oplog.Dur), "" when not timed
 	Target     string  `json:"target,omitempty"`
 	Detail     string  `json:"detail,omitempty"`
 	Back       string  `json:"back,omitempty"` // where the item can be got back
@@ -73,6 +74,7 @@ var opWhat = map[string]string{
 	oplog.LooksBuild:         "rebuilt RimArcho Looks Preference",
 	oplog.LooksStyle:         "added or removed a style of a look",
 	oplog.StylesBuild:        "rebuilt RimArcho Styles Preference",
+	oplog.Check:              "checked whether the list can run",
 }
 
 var opIcon = map[string]string{
@@ -80,6 +82,7 @@ var opIcon = map[string]string{
 	oplog.SaveRename: "saves", oplog.SaveCopy: "saves", oplog.SaveBackup: "saves", oplog.SaveTrash: "bin",
 	oplog.UpdateApply: "rescan", oplog.UpdateRollback: "rescan", oplog.Uninstall: "close", oplog.Launch: "play", oplog.PlanSync: "workshop",
 	oplog.LooksChoice: "plan", oplog.LooksBuild: "link", oplog.LooksStyle: "plan", oplog.StylesBuild: "link",
+	oplog.Check: "needs",
 }
 
 var opResult = map[string]string{
@@ -157,6 +160,9 @@ func opRow(r oplog.Row, now time.Time, loc *time.Location) OpRow {
 	o := OpRow{ID: r.ID, Op: r.Op, Icon: opIcon[r.Op], What: OpWhat(r.Op), Subject: opSubject(r), Result: r.Result,
 		ResultText: T(opResult[r.Result]), Bad: oplog.Failure(r.Result), Origin: r.Origin, OriginText: T(opOrigin[r.Origin]),
 		Time: at.Format("15:04"), At: r.At.UnixMilli(), Target: r.Target, Detail: r.Detail, Back: opBack(r)}
+	if r.Ms > 0 {
+		o.Dur = oplog.Dur(r.Ms)
+	}
 	if o.Icon == "" {
 		o.Icon = "log"
 	}

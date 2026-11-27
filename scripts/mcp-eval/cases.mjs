@@ -213,7 +213,7 @@ if (want('h5')) {
 // ---- h7: runtime error with no culprit in the stack — a comp that removes itself from its pawn's comp list mid-tick ----
 // [SSR]Beautiful Body as of June 2026 (the user's local copy; the Workshop version has since dropped the comp). Its
 // TC_ForceBodyShape on Human swaps itself to the end of AllComps and removes itself during CompTick. Vanilla's
-// ThingWithComps.Tick indexes with a cached count, so SSR alone logs nothing. Pawn Comp Profiler (our own small Mod,
+// ThingWithComps.Tick indexes with a cached count, so SSR alone logs nothing. Pawn Comp Profiler (my own small Mod,
 // scripts/mcp-eval/mods) ticks pawn comps with foreach, as the vanilla loop would, timed; the list change then throws
 // "Collection was modified" for every colonist and world pawn, with the profiler in the stack and no SSR frame. With
 // the user's fixed DLL (the comp never touches AllComps) the profiler logs nothing. Needs a map: case.json `runtime`.
@@ -259,7 +259,7 @@ if (want('h7')) {
 // ---- h4: runtime NRE in one Mod's postfix, caused by another Mod's call (stack top names the wrong Mod) -----------
 // Modelled on real 1.6 logs: EcoDialogues builds a one-pawn PlayLogEntry_Interaction (recipient null), and Cyanobot's
 // Genes' postfix on that constructor reads recipient.genes and throws. EcoDialogues is not on disk, so the caller is
-// Colonist Mutterings, our own small Mod of the same shape (scripts/mcp-eval/mods/colonistmutterings). Vanilla's
+// Colonist Mutterings, my own small Mod of the same shape (scripts/mcp-eval/mods/colonistmutterings). Vanilla's
 // PlayLogEntry_Interaction needs both pawns ("has a null pawn reference" when shown); a one-pawn line belongs in its
 // own LogEntry. Reference fix: PlayLogEntry_Mutter derives from LogEntry. Needs a map: case.json `runtime`.
 if (want('h4')) {

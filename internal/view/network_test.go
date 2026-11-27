@@ -32,7 +32,7 @@ func TestNetworkSettings(t *testing.T) {
 		t.Fatalf("the proxy is not in use: %q", got)
 	}
 	net := networkGroup(t, e)
-	if len(net.Items) != 3 || net.Items[2].Key != "feedback.replies" {
+	if len(net.Items) != 4 || net.Items[2].Key != "feedback.replies" || net.Items[3].Key != "feedback.timings" || net.Items[3].Value != "ask" {
 		t.Fatalf("network group: %+v", net)
 	}
 	if p := net.Items[0]; p.Value != "socks5://127.0.0.1:7891" || !strings.Contains(p.ValueNote, "through 127.0.0.1:7891") {

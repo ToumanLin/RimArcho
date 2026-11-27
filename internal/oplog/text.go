@@ -14,6 +14,10 @@ func Text(r Row, loc *time.Location) (string, []string) {
 		loc = time.Local
 	}
 	head := fmt.Sprintf("#%d %s %-5s %-20s %-7s %s", r.ID, r.At.In(loc).Format("2006-01-02 15:04:05"), r.Origin, r.Op, r.Result, r.Subject)
+	head = strings.TrimRight(head, " ")
+	if r.Ms > 0 {
+		head += "  " + Dur(r.Ms)
+	}
 	if r.Batch != 0 {
 		head += fmt.Sprintf("  (part of #%d)", r.Batch)
 	}
@@ -64,4 +68,20 @@ func VersionOf(detail string) string {
 		return f
 	}
 	return ""
+}
+
+// Dur is a duration in milliseconds as the lists show it: "850 ms", "12.4 s", "3 min 5 s".
+// The units are the same in every language.
+func Dur(ms int64) string {
+	switch {
+	case ms < 1000:
+		return fmt.Sprintf("%d ms", ms)
+	case ms < 60_000:
+		return strings.Replace(fmt.Sprintf("%.1f s", float64(ms)/1000), ".0 s", " s", 1)
+	}
+	m, s := ms/60_000, (ms%60_000)/1000
+	if s == 0 {
+		return fmt.Sprintf("%d min", m)
+	}
+	return fmt.Sprintf("%d min %d s", m, s)
 }

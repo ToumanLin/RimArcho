@@ -41,9 +41,9 @@ A stamped Monitor version can precede binary mirror publication: report it, then
 
 Inspected `../../../../RimModManager/backend/managers/mgr_update.py`, `_check_sources`: a four-worker pool, one overall timeout, per-source results, maximum version wins. Its same-version downloads are sorted by latency; RimArcho retains the fixed order in §1. Its Lanzou source infers versions from supported ZIP filenames and supplies `file_hash=None`: the inspected download path has **no checksum verification**.
 
-**Local-code discrepancy:** `LanzouSource.check()` calls `LanzouParser.get_all_files()`, which also calls `get_file()` after selecting a filename and resolves download details. Thus the inspected local code is not strictly listing-only and may fail during a check at the node. Folder metadata alone can reveal the version without that chain. Our `Client.List` deliberately stops before file details, and synthetic tests reject any file/node request during checks.
+**Local-code discrepancy:** `LanzouSource.check()` calls `LanzouParser.get_all_files()`, which also calls `get_file()` after selecting a filename and resolves download details. Thus the inspected local code is not strictly listing-only and may fail during a check at the node. Folder metadata alone can reveal the version without that chain. My `Client.List` deliberately stops before file details, and synthetic tests reject any file/node request during checks.
 
-RimCrow's `_resolve_download_url` stops on non-acw HTML or a second challenge on the same host, including the human-verification page. Its folder parser bounds pagination at 100 pages and also stops on a short page. Ours scans through an empty page/status 2, bounded at 16 pages and shared budgets, never returning an incomplete successful listing. RimCrow code was inspected read-only and not copied.
+RimCrow's `_resolve_download_url` stops on non-acw HTML or a second challenge on the same host, including the human-verification page. Its folder parser bounds pagination at 100 pages and also stops on a short page. Mine scans through an empty page/status 2, bounded at 16 pages and shared budgets, never returning an incomplete successful listing. RimCrow code was inspected read-only and not copied.
 
 ## 3. Download, verification and manual fallback
 

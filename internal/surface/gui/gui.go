@@ -81,7 +81,7 @@ func Run(o Options) error {
 	api.x.native = wailsNative{w}
 	api.quit = w.Quit
 	frame := newWindowTheme(cmds.Setting(a, "ui.theme"))
-	// Composition hosting lets Windows hit-test our maximize button for Snap Layouts.
+	// Composition hosting lets Windows hit-test RimArcho's maximize button for Snap Layouts.
 	frame.options.WebView2CompositionHosting = true
 	winOpts := application.WebviewWindowOptions{
 		Title: "RimArcho", Width: 1440, Height: 880, MinWidth: 720, MinHeight: 480, URL: perfURL(),

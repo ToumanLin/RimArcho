@@ -11,6 +11,7 @@ Until RimArcho has a relay URL, the feedback page offers only "open GitHub".
   - Labels: `LABEL`, then the template's label (`kind` feature → `enhancement`, bug → `bug`, diagnosis → `diagnosis`, data → `data`, l10n (translation fix) → `localization`, other → `question`; anything else none), then `priority` for a bug whose files were changed or lost (`priority: true`). If GitHub refuses a label that does not exist, the Worker retries with `LABEL` and GitHub's own labels (bug, enhancement, question), then with none.
 - Similar requests: `GET /requests` returns `{requests: [{number, title, url, plus}]}`, the open issues labelled `enhancement` (no pull requests, newest 100) with their +1 reactions plus the +1s sent through the relay. Kept 10 minutes in KV (`cache:requests`). Counted with status reads against `STATUS_PER_HOUR`.
 - +1 without an account: `POST /plus/<n>` for an open `enhancement` issue returns `{plus}`. One per sender per issue per day (`plusby:<hash>:<n>`, two days; RimArcho also remembers what it gave), 20 a day per sender (`plusday:<hash>`). The count is `plus:<n>` in KV (no expiry) and one comment by the App on the issue ("+N from RimArcho players without a GitHub account"), created once (`plusc:<n>` holds its id) and edited after. Another number is 404.
+- Slow-check timings (16 §2.14 "Slow checks"): `POST /timings`, the JSON RimArcho previewed to the player (`feedback.Timings`: version, OS, game version, active and total Mod counts, automatic, wall time, phases, CPU threads, RAM, disk type), returns `{ok: true}` after adding it as one comment to the single issue `TIMINGS_ISSUE`; never a new issue. The Worker keeps only those fields (`cleanTimings`: short plain strings, bounded numbers, up to 12 phases named in lower-case letters), so a changed client still cannot put a Mod name, a path or an account into the comment. Limits: one a minute and `TIMINGS_PER_IP_DAY` (default 2) a day per sender, in a `SendGate` of its own (`timings:<hash>`), so timings never use up a sender's reports; `TIMINGS_PER_DAY` (default 100) for everyone, KV counter `timings:<day>`. A GitHub failure gives the minute and the count back. With no `TIMINGS_ISSUE` the route answers 404, which RimArcho takes quietly (it says nothing to the player).
 - Replies: `token` is 24 random bytes that only the sender's RimArcho keeps; KV holds only its HMAC (keyed with the App key) as `reply:<issue number>` for 180 days, and the token never enters the issue. `GET /status/<n>?t=<token>` returns `{state, closed_at, replies:[{body, created_at}]}`, where `replies` are only the comments whose `author_association` is `OWNER` (your replies; nobody else's comment reaches the player). A wrong token is 404, the same as a missing issue. It reads the issue and its comments with the same Issues permission, so the GitHub App needs nothing new. Limit: `STATUS_PER_HOUR` (default 120) per sender per hour, an approximate KV counter (`status:<hash>`, two hours). RimArcho asks only at start-up and when Feedback opens (16 §2.14).
 - Abuse prevention:
   - One report per sender per minute and `PER_IP_DAY` reports per sender per day, exact: a Durable Object per sender (`SendGate`, binding `GATE`), which handles one request at a time and reads its own writes. A report GitHub refuses gives the minute back. Until 1.0.6 the minute limit was Cloudflare's rate-limit binding, which is approximate and per location: it let a second report through 13 s after the first.
@@ -65,12 +66,15 @@ Requires a Cloudflare account (the free plan suffices), Node.js (LTS) and reposi
    6. Reply to the issue on GitHub as ToumanLin, then restart RimArcho: the Feedback entry gets a dot and "my reports" shows the reply (the VM row "Feedback replies").
    7. Close or delete the test issue on GitHub afterwards.
 
-8. **Put it in the program**: set `Relay` in [`internal/feedback/relay.go`](../internal/feedback/relay.go) to this URL (including `/report`), commit and release. The feedback page offers "send" starting with that version.
+8. **Slow-check timings** (once, after the relay works): create one issue on GitHub for them, for example "Slow can-it-run checks: timings from players", put its number into `TIMINGS_ISSUE` in `wrangler.toml`, then `npx wrangler deploy`. Until then `POST /timings` answers 404 and RimArcho drops the timings quietly. Check it by sending timings from the VM's window (the VM row "Slow check"): a comment appears on that issue.
+
+9. **Put it in the program**: set `Relay` in [`internal/feedback/relay.go`](../internal/feedback/relay.go) to this URL (including `/report`), commit and release. The feedback page offers "send" starting with that version.
 
 ## Routine operations
 
 - **Read contact details**: `npx wrangler kv key get --binding COUNTS "contact:<issue number>" --remote`
-- **Change limits**: edit `PER_IP_DAY` and `PER_DAY` in `wrangler.toml`, then `npx wrangler deploy`.
+- **Change limits**: edit `PER_IP_DAY` and `PER_DAY` (and `TIMINGS_PER_IP_DAY`, `TIMINGS_PER_DAY`) in `wrangler.toml`, then `npx wrangler deploy`.
+- **Stop slow-check timings**: empty `TIMINGS_ISSUE` and redeploy; RimArcho gets 404 and says nothing.
 - **Pause intake**: set `PER_DAY` to `"0"` and redeploy. RimArcho reports "RimArcho has had too many reports today; send it tomorrow or open GitHub" and offers GitHub instead.
 - **Disable entirely**: `npx wrangler delete`.
 - **Rotate the private key**: generate a new key on the App page, repeat step 5, then delete the old key.
@@ -92,6 +96,7 @@ Requires a Cloudflare account (the free plan suffices), Node.js (LTS) and reposi
 - JWT verification against the App public key;
 - Installation-token reuse;
 - All three limits: per minute (including a resend after 13 s), per sender per day, total per day; a GitHub failure gives the minute back;
+- Slow-check timings: one comment on `TIMINGS_ISSUE` with only the allowed fields (a Mod name, path or Steam ID in the request never reaches GitHub), 404 without an issue, the per-sender and total limits kept apart from reports, a GitHub failure gives the minute back;
 - Rejection cases;
 - Retry without a label if the label is rejected;
 - PKCS#1, PKCS#8 and single-line private keys.

@@ -416,7 +416,7 @@ func (a *App) linkInstances() (*linkInstances, error) {
 	for _, m := range ms {
 		// An instance found through a RimArcho-named link in a game's Mods/ (another
 		// home's link into its own folders, 02 §2) is that link, not a target proving
-		// the link is ours.
+		// the link is RimArcho's.
 		if m.Status == identity.Live && m.RealPath != "" && !seenThroughLink(m) {
 			li.recorded[env.PathKey(m.RealPath)] = m
 			li.live = append(li.live, m)

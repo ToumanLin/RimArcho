@@ -447,5 +447,19 @@
   "Personal Website": "个人网站",
   "older versions": "更早的版本",
   "the version you are running": "正在使用的版本",
-  "%d versions: read them in the window (archo gui) or in CHANGELOG.md": "共 %d 个版本：在窗口（archo gui）或 CHANGELOG.md 中查看"
+  "%d versions: read them in the window (archo gui) or in CHANGELOG.md": "共 %d 个版本：在窗口（archo gui）或 CHANGELOG.md 中查看",
+  "Send the timings to help make it faster?": "发送耗时，帮助把它变快？",
+  "This check took %s. Send the timings to help make it faster?": "这次检查用了 %s。发送耗时，帮助把它变快？",
+  "after a check over 30 s: the versions, the Mod counts and how long each step took; no names or paths": "检查超过 30 秒后：版本、Mod 数量和每一步的耗时；不含名称和路径",
+  "always": "总是",
+  "always send": "总是发送",
+  "ask": "询问",
+  "could not send the timings": "没能发送耗时",
+  "enter: send; a: always send; esc: not now": "enter：发送；a：总是发送；esc：暂不",
+  "never": "从不",
+  "not now": "暂不",
+  "send the timings of slow checks": "发送慢检查的耗时",
+  "sent, thank you": "已发送，谢谢",
+  "slow check": "检查较慢",
+  "what is sent": "发送的内容"
 }

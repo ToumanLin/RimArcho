@@ -59,7 +59,7 @@ func Worker(action string, ids []uint64, w io.Writer) int {
 			say(ErrorLine(err.Error()))
 			return 3
 		}
-		// The parent holds stdin open. EOF also stops us if the window crashes or exits.
+		// The parent holds stdin open. EOF also stops the worker if the window crashes or exits.
 		stopped := make(chan struct{})
 		if os.Getenv("RIMARCHO_STEAM_WATCH_PIPE") == "1" {
 			go func() { _, _ = io.Copy(io.Discard, os.Stdin); close(stopped) }()

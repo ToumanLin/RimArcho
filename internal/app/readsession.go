@@ -168,7 +168,7 @@ func (b *App) ReadIndex(a *App) {
 	e := *x.Env
 	x.Env = &e
 	b.ixCache, b.stCache = &x, nil
-	// Keep the generation we actually copied. A concurrent writer may have
+	// Keep the generation actually copied. A concurrent writer may have
 	// committed since then; stamping the copy with its newer key would hide it.
 	b.ixKey = a.ixKey
 }

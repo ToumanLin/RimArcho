@@ -35,7 +35,7 @@ Research on 2026-10-22. Basis: decompiled `Assembly-CSharp.dll` / `Waylith.dll` 
 
 - If `1.6/Textures/a.png` (high priority) and `Textures/a.dds` (common folder, low priority) both exist, `a.dds` shadows `a.png`; the game shows the old image from the common folder.
 - This works correctly if every PNG in every load folder has its own DDS (the high-priority `a.dds` beats the low-priority `a.dds`).
-- Rule: **if any PNG at a given relative path fails conversion, none of our generated DDS files at that path may remain in lower-priority folders**. On failure, roll back the whole group rather than skip just that image.
+- Rule: **if any PNG at a given relative path fails conversion, none of RimArcho's generated DDS files at that path may remain in lower-priority folders**. On failure, roll back the whole group rather than skip just that image.
 
 ### 2.4 Texture cache in 1.7 (Waylith)
 
@@ -131,11 +131,11 @@ Video memory estimate (RimCrow's formula): BC1 = width×height×0.5, BC7 = width
 | Source PNG gone | `texture.orphan` | info (DDS still loads) | Clean |
 | DDS deleted or changed | Remove from manifest | — | — |
 
-**Shadowing rule (§2.3).** Collect PNGs across all effective load folders of the Mod, not just the `Textures/` root. If any PNG at a relative path is skipped or fails conversion, delete all lower-priority DDS files we generated at that path.
+**Shadowing rule (§2.3).** Collect PNGs across all effective load folders of the Mod, not just the `Textures/` root. If any PNG at a relative path is skipped or fails conversion, delete all lower-priority DDS files RimArcho generated at that path.
 
 **Scan fingerprint.** The structural manifest now includes all files (04 §1.4); new DDS changes the snapshot hash and makes the Mod look "updated". Exclude manifest-tracked DDS from the structural layer. Authors' own DDS still counts.
 
-**Will Workshop updates delete our DDS?** Unknown; test it (§6). Stale checks cover either outcome.
+**Will Workshop updates delete RimArcho's DDS?** Unknown; test it (§6). Stale checks cover either outcome.
 
 ### 5.2 Pack slimming (copies in the pack, delete PNG)
 

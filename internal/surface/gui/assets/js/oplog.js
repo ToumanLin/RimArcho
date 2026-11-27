@@ -1,6 +1,7 @@
 // What RimArcho did (16 §2.16, 13 §1.3): the operation log, a view of the Background tasks
-// page. Visual first: each row is its time, an icon for the operation and the subject, with
-// one fixed column at the right that holds a mark only when something went wrong. One
+// page. Visual first: each row is its time, an icon for the operation and the subject, then
+// how long it took as a muted number, and one fixed column at the right that holds a mark
+// only when something went wrong. One
 // toggle shows only the problems. Who did it, the steps, the path, the reason and where to
 // get an item back are shown only when a row is opened. Never an undo: the recycle bin and
 // the list's history keep their own routes.
@@ -126,7 +127,9 @@ function row(r, cur) {
   ic.title = r.what;
   const sub = el("span", "op-sub", r.subject || r.what);
   const what = el("span", "vis-hidden", r.what);
-  b.append(el("span", "tm num", r.time), ic, what, sub, mark(r));
+  // how long it took: a muted number, empty for a row written at once
+  const dur = el("span", "op-dur num", r.dur || "");
+  b.append(el("span", "tm num", r.time), ic, what, sub, dur, mark(r));
   b.title = r.what + T("; ") + r.resultText + T("; ") + r.originText;
   e.append(b);
   if (open) e.append(more(r));

@@ -70,7 +70,7 @@ function createControls() {
     runtime.Events.On(event, act(sync));
   }
   act(sync)();
-  // Wails owns dragging and resizing; only a double-click on a drag surface is ours.
+  // Wails owns dragging and resizing; only a double-click on a drag surface is handled here.
   $("#app").addEventListener("dblclick", e => { // keys: win+↑ / win+↓ (Windows)
     if (getComputedStyle(e.target).getPropertyValue("--wails-draggable").trim() !== "drag") return;
     e.preventDefault();

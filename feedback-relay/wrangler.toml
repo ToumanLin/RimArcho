@@ -11,6 +11,11 @@ APP_ID = "5556617"            # the GitHub App's App ID (README step 2)
 LABEL = "feedback"     # put on each issue; dropped when GitHub refuses it
 PER_IP_DAY = "5"       # reports a day from one sender
 PER_DAY = "30"         # reports a day from everyone; 0 stops sending
+# slow-check timings (README step 8): the one issue they are added to as comments; empty
+# answers 404, which RimArcho takes quietly
+TIMINGS_ISSUE = ""
+TIMINGS_PER_IP_DAY = "2"  # timings a day from one sender
+TIMINGS_PER_DAY = "100"   # timings a day from everyone
 
 # daily counters and the contacts senders leave (README step 3)
 [[kv_namespaces]]

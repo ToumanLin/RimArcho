@@ -339,7 +339,7 @@ func (a *App) readTextureMod(ctx context.Context, m *store.Mod, ref, dir string,
 			continue
 		}
 		if !r.Pending && (fi.Size() != r.DDSSize || fi.ModTime().UnixNano() != r.DDSMTime) {
-			gone = append(gone, r.Path) // rewritten by someone else: no longer ours
+			gone = append(gone, r.Path) // rewritten by someone else: no longer RimArcho's
 			continue
 		}
 		t.rows[store.PathKey(r.Path)] = r
@@ -603,7 +603,7 @@ func (a *App) optimizeMod(ctx context.Context, enc textures.Encoder, ix *Index, 
 		for _, j := range js {
 			if _, err := os.Stat(j.DDS()); err == nil {
 				if _, ours := t.rows[store.PathKey(j.DDS())]; !ours {
-					// appeared since the plan (another tool?): never overwrite a DDS that is not ours
+					// appeared since the plan (another tool?): never overwrite a DDS that is not RimArcho's
 					return fmt.Errorf("%s appeared while optimising; stopped so as not to overwrite it", j.DDS())
 				}
 			}
@@ -625,7 +625,7 @@ func (a *App) optimizeMod(ctx context.Context, enc textures.Encoder, ix *Index, 
 				continue
 			}
 			failedKeys[x.Key] = true
-			os.Remove(x.DDS) // ours: recorded before the run (a half-written file goes too)
+			os.Remove(x.DDS) // RimArcho's: recorded before the run (a half-written file goes too)
 			drop = append(drop, x.DDS)
 			delete(t.rows, store.PathKey(x.DDS))
 			// a stop interrupts the batch being written: those are not done, not failed
@@ -906,7 +906,7 @@ func (a *App) deleteTexturesIn(dir string) error {
 		if _, err := os.Stat(r.Path); err == nil && !removeOurs(r) {
 			if !r.Pending {
 				if fi, _ := os.Stat(r.Path); fi != nil && fi.Size() != r.DDSSize {
-					done = append(done, r.Path) // rewritten by something else: not ours to delete
+					done = append(done, r.Path) // rewritten by something else: not RimArcho's to delete
 					continue
 				}
 			}

@@ -12,7 +12,7 @@ $ErrorActionPreference = 'Stop'
 # pwsh -File passes a list as one string ("1,2,3"): split every list
 function Split-List($l) { @($l | ForEach-Object { "$_" -split ',' } | Where-Object { $_ }) }
 $Runs = Split-List $Runs; $Cases = Split-List $Cases; $Groups = Split-List $Groups; $VMs = Split-List $VMs
-# a mutex left by a killed process is abandoned: it is ours now, carry on
+# a mutex left by a killed process is abandoned: it belongs to this run now, carry on
 function Lock($name) { $m = [Threading.Mutex]::new($false, $name); try { [void]$m.WaitOne() } catch [Threading.AbandonedMutexException] {}; $m }
 $repo = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $root = 'D:\RimArcho-test\mcp-eval'; $log = "$root\matrix.log"

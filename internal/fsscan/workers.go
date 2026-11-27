@@ -22,3 +22,15 @@ func Workers(path string) int {
 		return min(8, runtime.GOMAXPROCS(0))
 	}
 }
+
+// DiskType is "ssd" or "hdd" for the disk holding path, "" when Windows does not say (or
+// on other systems): the slow-check report's disk (16 §2.14).
+func DiskType(path string) string {
+	switch storageKind(path) {
+	case diskSSD:
+		return "ssd"
+	case diskRotating:
+		return "hdd"
+	}
+	return ""
+}

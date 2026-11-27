@@ -447,5 +447,19 @@
   "Personal Website": "личный сайт",
   "older versions": "более ранние версии",
   "the version you are running": "версия, которую вы используете",
-  "%d versions: read them in the window (archo gui) or in CHANGELOG.md": "версий: %d; читайте их в окне (archo gui) или в CHANGELOG.md"
+  "%d versions: read them in the window (archo gui) or in CHANGELOG.md": "версий: %d; читайте их в окне (archo gui) или в CHANGELOG.md",
+  "Send the timings to help make it faster?": "Отправить время, чтобы помочь её ускорить?",
+  "This check took %s. Send the timings to help make it faster?": "Эта проверка заняла %s. Отправить время, чтобы помочь её ускорить?",
+  "after a check over 30 s: the versions, the Mod counts and how long each step took; no names or paths": "после проверки дольше 30 с: версии, число модов и время каждого шага; без имён и путей",
+  "always": "всегда",
+  "always send": "отправлять всегда",
+  "ask": "спрашивать",
+  "could not send the timings": "не удалось отправить время",
+  "enter: send; a: always send; esc: not now": "enter: отправить; a: отправлять всегда; esc: не сейчас",
+  "never": "никогда",
+  "not now": "не сейчас",
+  "send the timings of slow checks": "отправлять время медленных проверок",
+  "sent, thank you": "отправлено, спасибо",
+  "slow check": "медленная проверка",
+  "what is sent": "что отправляется"
 }

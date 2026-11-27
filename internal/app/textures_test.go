@@ -211,7 +211,7 @@ func TestTexturesOptimize(t *testing.T) {
 	if r.Converted != 3 {
 		t.Fatalf("at 50%%: %d", r.Converted)
 	}
-	// clean: ours go, the author's stays, the PNGs stay
+	// clean: RimArcho's go, the author's stays, the PNGs stay
 	c, err := e.App.CleanTextures([]string{ref}, app.TexRefs, false)
 	if err != nil || c.Files != 3 {
 		t.Fatalf("clean %+v %v", c, err)

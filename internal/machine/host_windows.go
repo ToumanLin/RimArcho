@@ -27,7 +27,7 @@ func TerminalDrawsTUI() bool {
 	out := windows.Handle(os.Stdout.Fd())
 	var mode uint32
 	if windows.GetConsoleMode(out, &mode) != nil {
-		return true // not a console (a pipe, or a terminal that is not one): not ours to judge
+		return true // not a console (a pipe, or a terminal that is not one): not this check's to judge
 	}
 	if windows.SetConsoleMode(out, mode|windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING) != nil {
 		return false

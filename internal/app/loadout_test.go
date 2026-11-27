@@ -188,7 +188,7 @@ func TestSaveSteamSuffixVersionAndBackup(t *testing.T) {
 	if b, err := os.ReadFile(e.ModsConfig + loadout.BackupSuffix); err != nil || string(b) != orig {
 		t.Fatal("backup is not the original file")
 	}
-	// Our own write is not an external change; the launch goes through now.
+	// RimArcho's own write is not an external change; the launch goes through now.
 	scanNow(t, e)
 	vs, _ := e.App.Store.Versions(mustPlan(t, e))
 	if len(vs) != 2 || vs[0].Source != "user" {

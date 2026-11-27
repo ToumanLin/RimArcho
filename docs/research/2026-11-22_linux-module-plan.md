@@ -126,7 +126,7 @@ Each module can merge on its own. Effort: **S** up to two days, **M** up to a we
 ### L0 · Build and CI foundation (S)
 
 - **Gaps:** CI excludes `upgradewin` though it builds; no job builds the GUI; `TestArchNoCgo` and 17 §1 forbid cgo everywhere; `spikes/internal/procmem` breaks `GOOS=linux go build ./...`.
-- **Work:** drop `upgradewin` from the exclusion; add a `linux-gui` job on `ubuntu-22.04` (oldest glibc and WebKitGTK we target) with `CGO_ENABLED=1 -tags gtk3`, `apt-get install libgtk-3-dev libwebkit2gtk-4.1-dev`, vet and build of `cmd/archo` plus the GUI package's Go tests; give the spike a `_other.go` or a build tag. Scope the cgo rule: allowed only behind the Linux GUI build tag (decision D7, §6).
+- **Work:** drop `upgradewin` from the exclusion; add a `linux-gui` job on `ubuntu-22.04` (oldest glibc and WebKitGTK I target) with `CGO_ENABLED=1 -tags gtk3`, `apt-get install libgtk-3-dev libwebkit2gtk-4.1-dev`, vet and build of `cmd/archo` plus the GUI package's Go tests; give the spike a `_other.go` or a build tag. Scope the cgo rule: allowed only behind the Linux GUI build tag (decision D7, §6).
 - **Tests:** the new CI job; `TestArch*` with the scoped exception.
 - **Player gets:** nothing visible.
 
@@ -185,7 +185,7 @@ Dependency order: L0 → (L1, L2, L3 in any order) → G1 → G2 → G3 → (L4,
 - **GTK 3 or 4.** Wails beta.28 defaults to GTK 4 with WebKitGTK 6.0 and keeps GTK 3 with WebKitGTK 4.1 behind `-tags gtk3` **[C]**. GTK 3 is what built and ran here, and what Ubuntu 22.04 and Debian 12 certainly carry **[C for 24.04, I for the others]**. Recommend `gtk3` for 1.2 and a test build with GTK 4 once a newer Wails release is pinned (17 §7.1): GTK 4 is where Wails is going and where WebKitGTK's newest renderer work lands **[I]**.
 - **Two binaries, as on Windows.** Keep the static `archo` (cgo off; SteamOS, headless and MCP users need no GTK) and add `rimarcho`, the GUI build, linked dynamically. `archo gui` hands over to a sibling `rimarcho` like it does to `RimArcho.exe`; `rimarcho` without a display prints the `archo` hint. Scan and analysis children keep running the GUI's own executable with command arguments, as `RimArcho.exe` does (16 §8.1).
 - **Where it is built.** `release.ps1` runs on Windows with cgo off; the GUI must be built on Linux. Build `rimarcho` in a GitHub Actions job (L0) on `ubuntu-22.04` and download the artifact into the release, or build it in the Linux VM; the publish script (17 §5 step 7) gains one asset either way.
-- **cgo exception.** 17 §1 says `CGO_ENABLED=0` everywhere and `TestArchNoCgo` checks no `import "C"`. Our code needs no `import "C"`; Wails' Linux files do. The rule changes to: no cgo in RimArcho's packages, and only the Linux GUI binary is built with `CGO_ENABLED=1` (D7).
+- **cgo exception.** 17 §1 says `CGO_ENABLED=0` everywhere and `TestArchNoCgo` checks no `import "C"`. My code needs no `import "C"`; Wails' Linux files do. The rule changes to: no cgo in RimArcho's packages, and only the Linux GUI binary is built with `CGO_ENABLED=1` (D7).
 
 ### 4.2 Runtime blockers (G2, M)
 
@@ -199,7 +199,7 @@ Dependency order: L0 → (L1, L2, L3 in any order) → G1 → G2 → G3 → (L4,
 
 Also in G2: the WebKitGTK version check (log it, refuse below the floor in D4 with a message), the web data folder under `<data>/webkit`, `wireNativeDrop` through Wails' `EnableFileDrop`, the Game Config volume label (L2), and SteamCMD login from the GUI through a terminal emulator (`x-terminal-emulator`, `gnome-terminal`, `konsole`, `kgx`) or the `archo` command to copy.
 
-### 4.3 WebKitGTK and our page
+### 4.3 WebKitGTK and my page
 
 The frontend is plain HTML, CSS and ES modules (16 §8.2). A grep of `style.css`, `index.html` and `js/` for features whose support differs between Chromium (WebView2) and WebKit:
 
@@ -213,7 +213,7 @@ The frontend is plain HTML, CSS and ES modules (16 §8.2). A grep of `style.css`
 | `startViewTransition` | 6 | Guarded by a feature test in `shell.js` **[C]**; 2.48+ [I] |
 | `@container` | 2 | Since about 2.40 [I] |
 | `content-visibility`, `text-wrap` | 1 each | Newer [I]; harmless when ignored |
-| HTML `popover` API, `<dialog>` | 0 | — (our popovers are custom elements) **[C]** |
+| HTML `popover` API, `<dialog>` | 0 | — (my popovers are custom elements) **[C]** |
 | Mouse buttons 3/4 (`navigation.js`), `auxclick` | 3 | X11 buttons 8/9 should arrive as 3/4 [I]: test |
 | `contextmenu` cancel (`nativemenu.js`) | — | Needed: without the `production` tag Wails is in debug mode and WebKit's menu includes "Inspect Element" [I]: test |
 | Named Windows fonts (Segoe UI, Microsoft YaHei, Consolas, Cascadia) | 5 | Fall back to the system font (Ubuntu, Cantarell, Noto); Chinese needs Noto CJK, which most desktops install. Widths differ: a visual pass over the static UI rules (16 §3.1 "Checks") is needed **[C: the fallback rendered acceptably on the pages above]** |
@@ -221,7 +221,7 @@ The frontend is plain HTML, CSS and ES modules (16 §8.2). A grep of `style.css`
 - Everything above rendered on 2.52.6. The question is the oldest WebKitGTK players have. Ubuntu and Debian ship WebKitGTK security updates to their stable releases, so 22.04 and Debian 12 should carry 2.4x–2.5x now [I: check `apt-cache policy` on each]. Set the floor at 2.44 (D4) and check it at startup.
 - **No CDP.** `spikes/guidev`'s page checks, the memprobe harness and the jumpiness probe drive Chromium; they keep testing the shared frontend on any OS. Native Linux numbers need `WebKitWebDriver` or the Web Inspector's remote protocol (`WEBKIT_INSPECTOR_HTTP_SERVER`); decision D5 (manual at release) stands for 1.2.
 - **Memory baselines.** 16 §10 is written in Windows terms: Go private working set ≤ 80 MB and Task Manager's total ≤ 200 MB. On Linux the GTK and WebKit UI side lives in RimArcho's own process, so "Go memory" cannot be separated from the toolkit. Proposal: on Linux measure the process tree's summed Pss (`/proc/<pid>/smaps_rollup`) after 10 idle minutes, report RssAnon of the main process beside it, and record them in 18 as Linux rows that do not gate releases while the GUI is experimental. First data point (§1): RssAnon ≈ 50 + 49 + 8 MB, with software GL. The 10-minute idle and 1,354-Mod numbers are G4 work.
-- **Minimised and background memory** (M08): WebKitGTK offers `WebKitMemoryPressureSettings`; Wails does not expose it, so it needs cgo in our code or a Wails change. Leave M08 Windows-only in 1.2.
+- **Minimised and background memory** (M08): WebKitGTK offers `WebKitMemoryPressureSettings`; Wails does not expose it, so it needs cgo in my code or a Wails change. Leave M08 Windows-only in 1.2.
 
 ### 4.4 Packaging
 

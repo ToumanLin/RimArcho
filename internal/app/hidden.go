@@ -229,7 +229,7 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 	case !own && m.Unloadable != scan.UnloadableAboutDisabled && !m.Residue:
 		return nil, fmt.Errorf("%w: %s is a subscribed, loadable mod; unsubscribe it in Steam instead", ErrNotTrashable, st.Ix.Ref(m.ID))
 	case st.Ix.ModIsLink(m):
-		// another tool's link (RimCrow `_Link_`): never ours to delete (09 §3); say whose it
+		// another tool's link (RimCrow `_Link_`): never RimArcho's to delete (09 §3); say whose it
 		// is and where, so the player can remove it there (16 §2.9 "a link")
 		link := st.Ix.LinkEntry(m)
 		if link == "" {

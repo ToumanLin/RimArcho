@@ -29,6 +29,7 @@ namespace ArchoMonitor
 
         public ArchoMonitorMod(ModContentPack content) : base(content)
         {
+            LanguageInfoFix.Install(content);
             try { Settings = GetSettings<MonitorSettings>(); }
             catch { Settings = new MonitorSettings(); }
             Monitor.Start(Settings);

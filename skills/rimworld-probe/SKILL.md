@@ -24,7 +24,7 @@ A probe is a tiny test mod. It loads with the mods under test, sets up a situati
 4. **Write the scenario** in `Scenario.cs` (see the next section), then `build`. `build` reads the game version and builds for it; to test both versions, build once against each game. The game that runs the probe may be on another machine: build against any copy of the same version.
 5. **Run each configuration** with its own `--name`:
    `node scripts/probe.mjs run --game <game> --work <work> --name <cfg> --mods "brrainz.harmony=<dir>,<pkg>=<dir>,probe.scenario=<work>/probe"`.
-   `--mods` is the load order of the non-official mods; official content comes first.
+   `--mods` is the load order of the non-official mods; official content comes first, after Harmony. `--before-core <pkgId>,...` loads those mods before the official content, where mods with `loadBefore Ludeon.RimWorld` sit for players (Archo Monitor). `--lang <folder>` starts the game in that language, by its folder name, e.g. `"ChineseSimplified (简体中文)"`.
 6. **Read the output**: the `[Probe]` lines print to the console and go to `<work>/runs/<name>/probe-lines.txt`. The full log is `Player.log` next to it, and the screenshots `probe.png` (the end) and `probe-<name>.png` (yours). Look at them when the claim is visual.
    **Where node or a second game copy is missing** (a test VM, a player's machine with RimArcho): build here, copy the probe folder there, and run `archo test run --probe <probe folder> --json` in a signed-in desktop session; it follows the same line contract and keeps the run's files in its run folder.
 7. **Clean up**: `node scripts/probe.mjs clean --work <work>` removes the sandbox junctions safely and keeps the run logs.

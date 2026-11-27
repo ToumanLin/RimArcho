@@ -1,7 +1,7 @@
 # Community log corpus research · top-level design (draft v1)
 
 > Status: draft; open questions in §10. v1 adds G5 (error pattern library for agent repair workflows). v2 records decisions, processing methods, and cleaning requirements (§10).
-> Scope: use publicly shared HugsLib logs to test and improve RimArcho analysis and supply data-driven error patterns for agent diagnosis and repair over MCP. This document answers only "what are the goals, and what must we collect?", not implementation.
+> Scope: use publicly shared HugsLib logs to test and improve RimArcho analysis and supply data-driven error patterns for agent diagnosis and repair over MCP. This document answers only "what are the goals, and what must I collect?", not implementation.
 
 ## 1. Why do this
 
@@ -29,13 +29,13 @@ According to `PrepareLogData()` in HugsLib `Source/Logs/LogPublisher.cs`, upload
 | `Platform information:` | CPU, OS, memory, hidden by default | Not needed; discard |
 | Player.log | Sanitized: RimWorld paths, user directories, Steam IDs, connection information, GPU information, and useless lines removed | Truncated to 10,000 lines by default |
 
-Upload method: by default creates a **public gist** through HugsLib's built-in account; players supplying their own token create private gists, which we cannot obtain.
+Upload method: by default creates a **public gist** through HugsLib's built-in account; players supplying their own token create private gists, which I cannot obtain.
 
 Data characteristics (affecting interpretation):
 
 - **Self-selected sample**: players share voluntarily, usually after a problem. Problem logs are far more common than in actual play.
 - **HugsLib users only**: players without HugsLib are absent.
-- **No causal labels**: we know "these Mods, this order, these errors", not the true cause.
+- **No causal labels**: I know "these Mods, this order, these errors", not the true cause.
 - **Possible truncation**: logs exceeding 10,000 lines include only the beginning.
 - **Mixed versions**: from 1.0 to the current version.
 - **Duplicates**: one player may upload repeatedly with nearly identical Mod lists.
@@ -149,7 +149,7 @@ Parse each log into a record:
 
 `ErrorCluster` directly reuses `internal/logs` splitting and normalization so research and product share rules.
 
-For `Resolution` from `Session`, exclude cases with too many simultaneous changes: if dozens of Mods changed, we cannot tell which change mattered. Determine rules in P1 from actual data.
+For `Resolution` from `Session`, exclude cases with too many simultaneous changes: if dozens of Mods changed, I cannot tell which change mattered. Determine rules in P1 from actual data.
 
 ### L2 Association with local Mod files (local only)
 
@@ -224,7 +224,7 @@ Each workflow or pattern-library change can then be measured on the same evaluat
 
 | Route | Description | P0 conclusion |
 | --- | --- | --- |
-| A. Public gists of the HugsLib account | Account `HugsLibRecordKeeper` | **GitHub API (with our own token) lists all history**: about 7,041 pages × 100 ≈ **704,000 logs**, back to 2016-11-17 (`hugslogs probe`). Download raw content from `gist.githubusercontent.com`. Web listing stops at 100 pages (about 1,000 recent logs, about 2.6 days); rapid paging triggers 429 rate limits. Fallback only without a token |
+| A. Public gists of the HugsLib account | Account `HugsLibRecordKeeper` | **GitHub API (with my own token) lists all history**: about 7,041 pages × 100 ≈ **704,000 logs**, back to 2016-11-17 (`hugslogs probe`). Download raw content from `gist.githubusercontent.com`. Web listing stops at 100 pages (about 1,000 recent logs, about 2.6 days); rapid paging triggers 429 rate limits. Fallback only without a token |
 | B. gist links in Steam discussion threads | Mod bug-report threads usually request HugsLib logs | Thread pages can be scraped directly, with gist links (wrapped in `steamcommunity.com/linkfilter` redirects) and replies. Also the only source of older historical logs |
 
 **Inference:** route A can **backfill by time range**, rather than only collect a rolling window. Volume is now the constraint: about 370–450 logs daily recently, estimated 170,000–200,000 since 1.6 released; about 600 KB each, roughly 100 GB total, too much for git. Thus **sample** by goal (§6.3); periodic incremental collection only keeps up with new logs, and missing a day loses no data.
@@ -235,7 +235,7 @@ Each workflow or pattern-library change can then be measured on the same evaluat
 
 Rules:
 
-- Use our own GitHub token and respect rate limits.
+- Use my own GitHub token and respect rate limits.
 - **Never use the token embedded in HugsLib source.**
 
 ## 8. Compliance and privacy

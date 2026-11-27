@@ -590,6 +590,10 @@ func NetworkGroup(a *app.App) SettingGroup {
 			{Key: "feedback.replies", Label: T("check for replies to my reports"), Value: cmds.Setting(a, "feedback.replies"), Edit: "choice", Choices: []string{"on", "off"}, ChoiceLabels: []string{T("on"), T("off")},
 				Argv: []string{"config", "set", "feedback.replies", "{}"},
 				Note: T("asks the feedback relay when RimArcho starts and when Feedback opens; nothing else is sent")},
+			// 16 §2.14 "Slow checks": the prompt's "always send" sets always
+			{Key: "feedback.timings", Label: T("send the timings of slow checks"), Value: cmds.Setting(a, "feedback.timings"), Edit: "choice", Choices: []string{"ask", "always", "off"}, ChoiceLabels: []string{T("ask"), T("always"), T("never")},
+				Argv: []string{"config", "set", "feedback.timings", "{}"},
+				Note: T("after a check over 30 s: the versions, the Mod counts and how long each step took; no names or paths")},
 		}}
 }
 
