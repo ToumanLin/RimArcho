@@ -127,6 +127,63 @@ GiB. "—": the private-working-set sampler started after that run. Peak private
 
 **Not covered.** One PC and one GPU vendor; the emulated cards cap the heap but keep the 4090's bandwidth and driver; the payload of the heaviest measured list was 2.7 GiB; saves and play (Monitor's play records will cover them); the 1.7 VRAM baseline (1.2 GB from 1.7.4985; 0.39 GiB dedicated here) was left unchanged.
 
+> Superseded, 2026-11-27: the texture term above (0.5–1.6 × payload) and #31's 11.2–21.0 GB were extrapolated past 2.7 GiB of payload. §4.6 measured lists up to 18.8 GiB: the term saturates, and #31's shape now gives 1.9–7.2 GiB.
+
+### 4.6 Texture-heavy lists, 0.9–18.8 GiB of payload (2026-11-27, GitHub #31)
+
+§4.5's lists stopped at 2.7 GiB of payload; #31's list is about 18.7 GiB. This round asks how 1.7's private working set and private bytes grow with payload, on lists clean enough to load and play.
+
+**Method.** Same host, game and sampler as §4.5 (1.7.5021 rev1365, RTX 4090, 64 GiB RAM; private working set from `Win32_PerfFormattedData_PerfProc_Process.WorkingSetPrivate`, working set, private bytes, `GPU Process Memory … Dedicated Usage`, every 4–5 s; the real LocalLow `Player.log` / `Player-prev.log` backed up and restored after each run).
+- **Mods.** 130 texture-heavy Workshop items that list 1.6 or 1.7, picked by size through the anonymous Steam Web API from searches for HD, upscaled, hair, apparel, face, race and faction Mods, downloaded with SteamCMD `+login anonymous` into a test folder; 52 were dropped (a dependency not on the host, or no 1.7 payload). The 78 kept give 20.8 GiB of estimated payload: pawn-render Mods (races, hair, apparel, faces, mechanoid skins) 13.5 GiB, world and item Mods (upscaled terrain, floors, furniture, food, plants, vanilla retextures) 5.2 GiB, other 2.1 GiB. Payload per downloaded byte was about 3.5 (upscaled PNGs compress well).
+- **Lists.** Each level is a prefix of one order that alternates pawn and world Mods, with Harmony, Core, the five DLCs and the dependencies the Mods name (Humanoid Alien Races, Vanilla Expanded Framework and others, read in place from the host's Workshop folder). Payload measured with RimArcho's own estimator (`loadcost.Measure` / `Estimate`, LoadFolders for 1.7). Every level loaded all its Mods (the game's "Initializing new game with mods" list matched) with 6–73 ERROR lines. A first attempt built on the host's own list (§4.5's 724 entries) was dropped: two of its Mods break play on 1.7 (an `OnGUI` exception every frame, map layers that fail to build), so its play samples were not valid.
+- **Launch.** The game cannot read Mods from a folder outside its own `Mods` and the Workshop, and the real install's `Mods` was not to be written to, so the runs used a copy of the 1.7 install (without `Mods`) in the test folder, whose `Mods` held junctions to the real local Mods and to the downloads. Started directly from the exe, `-savedatafolder` per level, `-NoFileLog`, a 1280 × 720 window.
+- **Runs.** Per level: a first launch with the texture cache deleted ("first"), a repeat launch ("repeat"), and a repeat launch with `-quicktest` (a new colony of three pawns on screen, the game running; "play"). Menu figures are medians 45–75 s after `Config/Knowledge.xml` appeared; play figures 45–75 s and 165–195 s after "Initializing new game" (equal within 0.05 GiB; the first is shown). Two Mod notice dialogs paused some play runs: the map and pawns were still drawn. The 18.8 GiB level also ran with `WAYLITH_VRAM_BUDGET_MB` 8192 and 16384 (first launch and play).
+
+| Payload (non-official Mods) | Launch, card | State | Private WS | WS | Private bytes | Peak private WS | Peak private bytes | GPU dedicated (peak) |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 0 (vanilla, §4.5 + this round) | repeat, 24 GB | menu / play | 1.15 / 1.86 | 1.35 / 2.09 | 1.74 / 2.60 | — / 1.86 | 1.84 / 2.61 | 0.39 / 0.51 |
+| 0.91 (7) | first, 24 GB | menu | 1.48 | 1.72 | 2.30 | 3.04 | 4.23 | 0.62 (0.80) |
+| 0.91 (7) | repeat, 24 GB | menu / play | 1.22 / 1.98 | 1.46 / 2.25 | 1.82 / 2.76 | 1.98 | 1.83 / 2.76 | 0.43 / 0.55 |
+| 2.11 (11) | first, 24 GB | menu | 2.01 | 2.27 | 3.14 | 5.00 | 7.61 | 0.91 (2.03) |
+| 2.11 (11) | repeat, 24 GB | menu / play | 1.24 / 1.98 | 1.47 / 2.25 | 1.87 / 2.84 | 2.04 | 1.95 / 2.84 | 0.47 / 0.66 |
+| 6.06 (22) | first, 24 GB | menu | 2.16 | 2.44 | 3.91 | 8.86 | 14.76 | 1.41 (5.15) |
+| 6.06 (22) | repeat, 24 GB | menu / play | 1.32 / 2.05 | 1.57 / 2.35 | 1.98 / 2.88 | 2.12 | 2.05 / 2.96 | 0.47 / 0.60 |
+| 12.27 (44) | first, 24 GB | menu | 3.75 | 4.03 | 6.75 | 12.26 | 20.25 | 2.48 (9.70) |
+| 12.27 (44) | repeat, 24 GB | menu / play | 1.56 / 2.55 | 1.83 / 2.85 | 2.22 / 3.53 | 2.55 | 2.29 / 3.53 | 0.47 / 0.66 |
+| 18.75 (72) | first, 24 GB | menu | 4.36 | 4.70 | 8.67 | 15.13 | 25.78 | 3.77 (14.38) |
+| 18.75 (72) | first, 16 GB (emulated) | menu | 2.97 | 3.28 | 6.42 | 15.17 | 23.19 | 3.21 (12.75) |
+| 18.75 (72) | first, 8 GB (emulated) | menu | 2.84 | 3.15 | 4.84 | 17.71 | 25.22 | 1.77 (6.81) |
+| 18.75 (72) | repeat, 24 GB | menu / play | 2.31 / 3.72 | 2.62 / 4.09 | 3.32 / 5.07 | 3.78 | 3.34 / 5.14 | 0.82 / 1.06 |
+| 18.75 (72) | repeat, 16 GB (emulated) | play | 3.34 | 3.68 | 4.54 | 3.34 | 4.63 | 1.00 |
+| 18.75 (72) | repeat, 8 GB (emulated) | play | 3.61 | 3.95 | 4.86 | 3.67 | 4.92 | 1.06 |
+
+GiB. Peaks are the sampled maxima from launch to the end of the run (menu runs: menu + 150 s; play runs: play + 200 s); a single peak private WS on a menu / play row is the higher of the two runs. The texture cache (`TextureCache/`) held 0.21 / 0.58 / 1.23 / 1.72 / 2.52 GiB for the five levels. Two levels of the host's own list, measured before it was dropped for play (369 and 380 non-official Mods, 0.57 and 2.39 GiB of payload): menu 1.83 / 1.93 GiB repeat, 2.81 / 4.84 GiB first.
+
+**Findings.**
+
+1. **Settled, the working set hardly follows the payload.** From 0.9 to 18.8 GiB of payload, 20 times more, the repeat launch's menu figure went from 1.22 to 2.31 GiB and play from 1.98 to 3.72 GiB, and part of that rise is the Mods' code and Defs (7 → 72 Mods, many races). Dedicated VRAM stayed at 0.4–1.1 GiB: at the menu and in a young colony 1.7 uploads only what is drawn, and keeps no CPU copy. A first launch settles 0.3–2 GiB higher (2.84–4.36 GiB at 18.8 GiB of payload). Neither depends on the card.
+2. **The first launch's peak is large, follows the payload, and not the card.** While encoding every texture into the cache, a first launch uploaded up to 14.4 GiB to the card and peaked at 25.8 GiB of private bytes (15.1 GiB private working set) at 18.8 GiB of payload; on emulated 16 and 8 GB cards the peak was the same (23.2 / 25.2 GiB; 15.2 / 17.7 GiB private working set). Beyond the baseline, the peak was 2.8× the payload at 0.9 GiB, falling to 1.3× at 18.8 GiB. A repeat launch peaked within 1.6 GiB of vanilla.
+3. **What drives the working set is not the payload.** §4.5's 724 list (2.7 GiB of payload, 665 Mods) settled at 4.5–5.1 GiB, twice the 18.8 GiB heavy list. Its first 380 entries (2.4 GiB of payload) settled at 1.9 GiB: the rest of that list's Mods add 2.5 GiB with little payload. Code, Defs and Mods that load or build textures themselves weigh more than texture files.
+4. **`Cap17` does not hold for the loading commit.** On an 8 GB card `Cap17` cut the 18.8 GiB level's loading budget to 6.7–11.2 GiB; the first launch peaked at 25.2 GiB on that card. The resident range it cuts is still above what was measured (8 GB card, first launch settled at 4.8 GiB of private bytes; model 6.2–10.3), so it stays for that range and for VRAM.
+
+**Model** (`loadcost.WS`, `WorkingSet`; `LoadingBudget`; `TestWorkingSet17Calibration`):
+- Working set: 1.15 GiB + 0.4–2 MiB per non-official Mod + the other categories' private-bytes range, plus a texture term of 0 (lower bound) to `min(1.6 × payload, 3.5 GiB)` (upper bound, `WS.Tex17Cap`). The cap is the largest texture share any measured list needed: the #31 part's first launch (5.29 GiB) less its other terms.
+- Loading budget (private bytes, the severe level's comparison): the lower bound is a repeat launch (no texture term), the upper bound a first launch (the texture and DDS RAM range capped at the payload + 8 GiB, `Coef.Tex17LoadHighOver`), plus the XML / decode reserve, on any card (`LoadCost.FitTo` no longer applies `Cap17` to it). It holds every measured repeat and first-launch peak, the 724 list's first launch within 3% (12.42 against 12.09–12.27 GiB, short before this change too) and the 250 list's first launch excepted (3.72 against 3.3 GiB, as before).
+
+| Payload | Measured private WS (menu, repeat – first; play) | Old estimate (§4.5) | New estimate | Measured peak private bytes (repeat / first) | Old loading budget (24 / 16 / 8 GB card) | New loading budget (any card) |
+| ---: | --- | ---: | ---: | --- | --- | ---: |
+| 0.91 | 1.22–1.48; 1.98 | 1.62–2.65 | 1.17–2.65 | 1.83 / 4.23 | 3.1–5.0 (all) | 1.75–4.96 |
+| 2.11 | 1.24–2.01; 1.98 | 2.22–4.58 | 1.17–4.58 | 1.95 / 7.61 | 5.2–9.5 (all) | 1.75–9.15 |
+| 6.06 | 1.32–2.16; 2.05 | 4.24–11.01 | 1.21–4.81 | 2.05 / 14.76 | 11.2–23.5 / 11.2–20.7 / 6.3–10.2 | 1.80–15.96 |
+| 12.27 | 1.56–3.75; 2.55 | 7.41–21.14 | 1.27–4.99 | 2.29 / 20.25 | 17.4–31.5 / 11.9–21.0 / 6.4–10.6 | 1.90–22.45 |
+| 18.75 | 2.31–4.36; 3.34–3.72 | 10.85–31.98 | 1.47–5.43 | 3.34 / 23.2–25.8 | 17.7–32.2 / 12.2–21.7 / 6.7–11.2 | 2.16–29.58 |
+
+GiB. The estimates are the model's working set before `FitTo` keeps it at or below the resident range; §4.5's lists still hold (250 → 1.31–2.36, 724 → 1.65–6.54, #31 part → 1.36–5.37). The loading budgets here leave out the languages and PNG-decode reserves (under 0.1 GiB for these lists).
+
+**#31's shape** (615 Mods, about 18.7 GiB of payload, `TestMemoryIssue31Shape`): the working set goes from 11.2–21.0 to **1.9–7.2 GiB**, so with 8 GB free there is no "RAM is tight" (below about 7.2 GiB free it returns); the loading budget goes from 11.9–22.0 GiB (16 GB card) to 2.2–29.7 GiB: a repeat launch needs little, a first launch with every texture new may reserve up to about 30 GiB of RAM plus page file.
+
+**Not covered.** One PC, one GPU vendor; emulated cards keep the 4090's driver and bandwidth. Play was a three-pawn colony for three minutes: a large colony, raids with many modded pawns, or the world map can draw far more textures than that, and Archo Monitor's play records are the way to see it. The heavy lists hold 7–72 Mods; lists of several hundred code-heavy Mods (like §4.5's 724) settle higher for reasons other than textures, which the per-Mod and other-category terms only roughly cover. Whether #31's list behaves like these lists can only be told by a Monitor record from the player.
+
 ### 4.4 Not implemented / known deviations
 
 - 1.6 could not be calibrated in this round (2026-10-24): `D:\rimworld16` cannot currently reach the main menu (a `_Archo_env_*` junction in Mods points to a deleted directory; see the game-test session record).

@@ -33,6 +33,7 @@ var Coef = struct {
 	Tex17Budget             float64
 	Tex17RAMPerVRAMLow      float64
 	Tex17RAMPerVRAMHigh     float64
+	Tex17LoadHighOver       int64
 	TextureRAM16Low         float64
 	TextureRAM16High        float64
 	TextureRAM16Knee        int64
@@ -75,6 +76,11 @@ var Coef = struct {
 	Tex17Budget:         0.78,
 	Tex17RAMPerVRAMLow:  1.1,
 	Tex17RAMPerVRAMHigh: 2.1,
+	// A first launch on 1.7.5021 peaked at 1.3–2.8× the payload in private bytes (beyond the
+	// baseline), less per byte as the payload grows, and the same on 8, 16 and 24 GB cards;
+	// a repeat launch stayed within 1.6 GiB of vanilla. LoadingBudget caps the texture RAM of
+	// its upper bound at the payload plus this; its lower bound has none (research §4.6).
+	Tex17LoadHighOver: 8 << 30,
 	// Unity 1.6 VM calibration: 2026-10-31 baseline and light/texture groups,
 	// extended on 2026-11-01 to 7.5 GiB combined texture payload. Above the
 	// original 3 GiB coverage, retained private bytes grow more slowly.
