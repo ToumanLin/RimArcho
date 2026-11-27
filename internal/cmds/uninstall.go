@@ -176,6 +176,8 @@ func UninstallStepText(p *app.UninstallPlan, s *app.UninstallStep) string {
 		add(app.DoMove, "lock library copy", "{n} into env:"+p.LockedTo+"'s Mods/ as ordinary mods"+size)
 	case app.UnMonitor:
 		add(app.DoDelete, "folder", "delete Archo Monitor ({n})"+size)
+	case app.UnLooks:
+		add(app.DoDelete, "folder", "delete "+app.LooksName+" ({n}): its textures are hard links and copies, the Mods' own files stay"+size)
 	case app.UnPacks:
 		add(app.DoKeep, "pack", "keep {n} where they are (--remove-packs: recycle bin)")
 		add(app.DoMove, "pack", "keep {n}: moved to "+p.PacksTo+size+" (--remove-packs: recycle bin)")

@@ -28,6 +28,8 @@ var opPrimitives = map[string][]string{
 	"internal/app/launch.go":         {"LaunchWith"},
 	"internal/app/pack.go":           {"LaunchPackWith", "launchPackWith"},
 	"internal/app/planfollow.go":     {"syncCollection"},
+	"internal/app/looks.go":          {"LooksApply", "LooksUndo"},
+	"internal/app/looksbuild.go":     {"looksRebuild"},
 }
 
 // permanentDeletes are the functions that delete a player's folder for good, skipping the

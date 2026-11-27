@@ -119,8 +119,8 @@ func (s *Store) RenamePlan(id int64, name string) error {
 	return err
 }
 
-// DeletePlan removes a plan with its workspace, undo stack, versions, staging list and
-// Archo Monitor mark.
+// DeletePlan removes a plan with its workspace, undo stack, versions, staging list, Archo
+// Monitor mark and the looks chosen for it (21 §3.1).
 // Launch records and the ModsConfig.xml writer keep pointing at its (now unknown) ID.
 func (s *Store) DeletePlan(id int64) error {
 	return s.inTx(func(tx *sql.Tx) error {
@@ -138,6 +138,9 @@ func (s *Store) DeletePlan(id int64) error {
 			}
 		}
 		// Plan IDs are reused, so a new plan must not inherit these.
+		if _, err := tx.Exec(`DELETE FROM look_choice WHERE scope=?`, LookScope(id)); err != nil {
+			return err
+		}
 		_, err := tx.Exec(`DELETE FROM meta WHERE key IN (?, ?)`, StageKey(id), MonitorAddedKey(id))
 		return err
 	})

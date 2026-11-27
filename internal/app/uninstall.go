@@ -38,6 +38,7 @@ const (
 	UnTextures   = "textures"   // the DDS RimArcho wrote next to mods' PNGs (Texture optimisation)
 	UnLocked     = "locked"     // the lock library's copies
 	UnMonitor    = "monitor"    // Archo Monitor's folder
+	UnLooks      = "looks"      // the generated Mod _Archo_Looks in the looks directory (21 §4)
 	UnPacks      = "packs"      // packs and the saves inside them
 	UnSaves      = "saves"      // the "own" save folders and save backups in the data folder
 	UnGames      = "games"      // game folders downloaded with SteamCMD
@@ -48,7 +49,7 @@ const (
 )
 
 // UninstallSteps lists every step in order.
-var UninstallSteps = []string{UnAccounts, UnLinks, UnModsConfig, UnTextures, UnLocked, UnMonitor, UnPacks, UnSaves, UnGames, UnSteamCMD, UnSource, UnData, UnProgram}
+var UninstallSteps = []string{UnAccounts, UnLinks, UnModsConfig, UnTextures, UnLocked, UnMonitor, UnLooks, UnPacks, UnSaves, UnGames, UnSteamCMD, UnSource, UnData, UnProgram}
 
 // What happens to an item.
 const (
@@ -263,17 +264,18 @@ func (a *App) PlanUninstallPreview(o UninstallOptions, sizes *UninstallSizeCache
 
 // uninstallPlanner holds what the steps of planUninstall share while the plan is built.
 type uninstallPlanner struct {
-	a        *App
-	o        UninstallOptions
-	p        *UninstallPlan
-	envs     []*env.Environment
-	sizeOf   func(string) int64
-	byName   map[string]*env.Environment // environments with a game folder
-	lockEnv  *env.Environment            // where kept lock library copies go (nil: none)
-	gone     map[string]map[string]bool  // user data key → package IDs only reached through a removed link
-	keptPkgs map[string]bool             // package IDs of the lock library copies that are kept
-	monRoot  string
-	keep     []string // folders that hold the player's things and must stay
+	a         *App
+	o         UninstallOptions
+	p         *UninstallPlan
+	envs      []*env.Environment
+	sizeOf    func(string) int64
+	byName    map[string]*env.Environment // environments with a game folder
+	lockEnv   *env.Environment            // where kept lock library copies go (nil: none)
+	gone      map[string]map[string]bool  // user data key → package IDs only reached through a removed link
+	keptPkgs  map[string]bool             // package IDs of the lock library copies that are kept
+	monRoot   string
+	looksRoot string   // the looks directory ("" when none was ever chosen)
+	keep      []string // folders that hold the player's things and must stay
 }
 
 func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*UninstallPlan, error) {
@@ -325,6 +327,8 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 
 	pl.monRoot = a.MonitorDir()
 	pl.add(UnMonitor, pl.monitorItems())
+	pl.looksRoot = a.LooksDir()
+	pl.add(UnLooks, pl.looksItems())
 	pl.add(UnPacks, pl.packItems())
 	pl.add(UnSaves, pl.saveItems())
 	pl.add(UnGames, pl.gameItems())
@@ -548,7 +552,7 @@ func (pl *uninstallPlanner) modsConfigItem(e *env.Environment, k string) (*Unins
 		it.Do, it.Note = DoRestore, "the list from before RimArcho's last save"
 		return it, nil
 	}
-	drop := map[string]bool{MonitorPackage: true}
+	drop := map[string]bool{MonitorPackage: true, LooksPackage: true}
 	for pkg := range pl.gone[k] {
 		drop[pkg] = true
 	}
@@ -590,6 +594,22 @@ func (pl *uninstallPlanner) monitorItems() []*UninstallItem {
 		}
 	}
 	return mon
+}
+
+// looksItems lists the generated Mod _Archo_Looks and what an interrupted rebuild left
+// beside it (RimArcho's own; its textures are hard links and copies, the Mods' files stay).
+func (pl *uninstallPlanner) looksItems() []*UninstallItem {
+	var out []*UninstallItem
+	if pl.looksRoot == "" {
+		return nil
+	}
+	for _, name := range []string{looksFolder, looksFolder + TmpSuffix, looksFolder + looksOldSuffix} {
+		path := filepath.Join(pl.looksRoot, name)
+		if fi, err := os.Lstat(path); err == nil && fi.IsDir() {
+			out = append(out, &UninstallItem{Path: path, Do: DoDelete, Bytes: pl.sizeOf(path)})
+		}
+	}
+	return out
 }
 
 // packItems lists the packs: kept where they are, or moved out of the data folder, or to
@@ -675,13 +695,13 @@ func (pl *uninstallPlanner) gameItems() []*UninstallItem {
 	return games
 }
 
-// keptSources lists the roots of the sources other than the lock library and Monitor: they
+// keptSources lists the roots of the sources other than the lock library, Monitor and looks: they
 // never go, since they hold the player's mods.
 func (pl *uninstallPlanner) keptSources() []string {
 	var keep []string
 	if all, err := pl.a.Store.AllSources(); err == nil {
 		for _, s := range all {
-			if s.Status == source.StatusRetired || s.Root == "" || pl.a.IsLockSource(s) || env.PathKey(s.Root) == env.PathKey(pl.monRoot) {
+			if s.Status == source.StatusRetired || s.Root == "" || pl.a.IsLockSource(s) || env.PathKey(s.Root) == env.PathKey(pl.monRoot) || pl.looksRoot != "" && env.PathKey(s.Root) == env.PathKey(pl.looksRoot) {
 				continue
 			}
 			keep = append(keep, s.Root)
@@ -1058,6 +1078,13 @@ func (a *App) Uninstall(o UninstallOptions, progress func(UninstallProgress)) (p
 			removeIfEmpty(a.LockDir())
 		case UnMonitor:
 			removeIfEmpty(a.MonitorDir())
+		case UnLooks:
+			if dir := a.LooksDir(); dir != "" {
+				removeIfEmpty(dir)
+				if up := filepath.Dir(dir); filepath.Base(up) == "RimArcho" { // <volume root>/RimArcho/looks
+					removeIfEmpty(up)
+				}
+			}
 		case UnSteamCMD:
 			// the junctions a non-English profile path needed to start SteamCMD (17 §2.1)
 			removeSteamCMDAliases(a.LocalDir())

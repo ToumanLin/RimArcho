@@ -33,11 +33,13 @@ const (
 	UpdateRollback     = "update.rollback"
 	Uninstall          = "uninstall"
 	Launch             = "launch"
-	PlanSync           = "plan.sync" // a plan caught up with a followed collection
+	PlanSync           = "plan.sync"    // a plan caught up with a followed collection
+	LooksChoice        = "looks.choice" // a look was applied from a Mod, or that choice undone (21 §3.3)
+	LooksBuild         = "looks.build"  // the generated Mod _Archo_Looks was rebuilt (21 §4)
 )
 
 // Codes lists every op code, in the order the filters show them.
-var Codes = []string{Launch, ModsConfigWrite, LinkCreate, LinkRemove, Trash, Delete, Unsubscribe, SubscriptionRemove, SaveRename, SaveCopy, SaveBackup, SaveTrash, UpdateApply, UpdateRollback, Uninstall, PlanSync}
+var Codes = []string{Launch, ModsConfigWrite, LinkCreate, LinkRemove, Trash, Delete, Unsubscribe, SubscriptionRemove, SaveRename, SaveCopy, SaveBackup, SaveTrash, UpdateApply, UpdateRollback, Uninstall, PlanSync, LooksChoice, LooksBuild}
 
 // Permanent begins the detail of a subscription.remove whose folder was deleted for good
 // (quick delete) instead of moved to the recycle bin.

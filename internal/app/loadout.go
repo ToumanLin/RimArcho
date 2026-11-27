@@ -52,6 +52,10 @@ type LoadoutState struct {
 	op *opWrite
 	// localize reads another game's own entries by packageId (nil: as stored).
 	localize func(loadout.List) loadout.List
+	// leaveOut: instances this write to the game leaves out of ModsConfig.xml and Mods/
+	// although the list has them (_Archo_Looks when its rebuild failed, 21 §4). Never
+	// carried by the cached copy.
+	leaveOut map[string]bool
 }
 
 // readList is a stored list as this game reads it: another game's Core, DLCs and Mods/
@@ -231,6 +235,7 @@ func (a *App) Loadout() (*LoadoutState, error) {
 	if a.stCache != nil && a.stKey == key && a.stCache.Ix == ix {
 		c := *a.stCache
 		c.op = nil
+		c.leaveOut = nil
 		c.MM = a.GameVersion
 		c.Notices = nil
 		c.List = c.List.Clone()
@@ -1035,6 +1040,8 @@ func (a *App) sortList(st *LoadoutState, l loadout.List) (*SortResult, error) {
 		l = append(l.Clone(), loadout.Entry{Instance: core})
 	}
 	l, monitorSkipped := a.sortMonitor(st, l)
+	// _Archo_Looks is no part of the order: it stays the last entry (08 §1.1, 21 §4).
+	l, looksEntry := takeLooks(st, l)
 	in, err := a.SortInput(st, l)
 	if err != nil {
 		return nil, err
@@ -1049,6 +1056,7 @@ func (a *App) sortList(st *LoadoutState, l loadout.List) (*SortResult, error) {
 	for _, i := range r.Order {
 		sorted = append(sorted, l[i])
 	}
+	sorted = append(sorted, looksEntry...)
 	out := &SortResult{Input: in, Result: r, Sorted: sorted, Changes: loadout.Diff(before, sorted, st.LineageOf), MonitorSkipped: monitorSkipped, Contests: contests, ContestNote: contestNote, Unsorted: l}
 	state := *st
 	state.List = sorted
@@ -1129,6 +1137,9 @@ type SaveResult struct {
 	// Running is a game that reads this ModsConfig.xml and is running now (save only): it
 	// reads the new list on its next start.
 	Running *RunningGame
+	// LooksError: why _Archo_Looks was left out of this write although the list has it: its
+	// rebuild failed (21 §4 "Failure"). The choices and the list entry stay.
+	LooksError string
 }
 
 // Save writes the workspace to ModsConfig.xml without starting the game (09 §2 "writegame":
@@ -1189,6 +1200,7 @@ func (a *App) writeGameOnce(st *LoadoutState, dryRun, launch, move bool, creditF
 	if err := a.checkGameWritable(st, dryRun); err != nil {
 		return nil, err
 	}
+	looksErr := a.looksForWrite(st, dryRun)
 	copies := a.ModsCopies(st.Ix)
 	mods, links, dups, err := planLinks(st, copies)
 	if err != nil {
@@ -1212,6 +1224,7 @@ func (a *App) writeGameOnce(st *LoadoutState, dryRun, launch, move bool, creditF
 	if err != nil {
 		return nil, err
 	}
+	r.LooksError = looksErr
 	settings := a.listSettings(st, nil, filepath.Dir(st.FilePath))
 	if dryRun {
 		r.Settings = planModSettings(settings)
@@ -1350,7 +1363,16 @@ func newSaveResult(st *LoadoutState, dryRun, launch bool, moved []DuplicateMove,
 	e := st.Ix.Env
 	r := &SaveResult{State: st, Path: st.FilePath, DryRun: dryRun, Changes: st.Changes(), Moved: moved}
 	r.Links = links
-	r.Tokens = st.Reg.Tokens(st.List, func(id string) string {
+	written := st.List
+	if len(st.leaveOut) > 0 {
+		written = nil
+		for _, en := range st.List {
+			if !st.leaveOut[en.Instance] {
+				written = append(written, en)
+			}
+		}
+	}
+	r.Tokens = st.Reg.Tokens(written, func(id string) string {
 		if m := st.Ix.ByID[id]; m != nil {
 			return m.PackageID
 		}

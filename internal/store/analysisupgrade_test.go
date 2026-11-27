@@ -132,8 +132,8 @@ func TestUpgradeAnalysisStagePreservesPublishedRuns(t *testing.T) {
 	e, runs := analysisAt44(t)
 	e.Open()
 	s := e.App.Store
-	if got := s.Meta("schema_version"); got != "45" {
-		t.Fatalf("schema = %s, want 45", got)
+	if got := s.Meta("schema_version"); got != fmt.Sprint(store.SchemaVersion) {
+		t.Fatalf("schema = %s, want %d", got, store.SchemaVersion)
 	}
 	for _, run := range runs {
 		assertLegacyAnalysis(t, e, run)

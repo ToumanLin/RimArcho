@@ -1,6 +1,6 @@
 # 21 · Looks
 
-> Status: in test (the interface says so and asks for reports, §6). §5 (styles and random variants) and the MCP tool are not implemented.
+> Status: in test (the interface says so and asks for reports, §6). Implemented: the index (§2), choices (§3), `_Archo_Looks` (§4) and the CLI (13 §4.2 `looks`). Not implemented: the page (16 §2.5) and its first-apply confirmation (§6), §5 (styles and random variants), and the MCP tool.
 > Basis: 05 §1 (effective content), 07 §4 (writing to the game), 09 §3 (link deployment), 02 §1 (file writes).
 
 When several Mods ship a texture at the same path, the game shows the file of the Mod that loads last. Looks lets the player see every such case in a plan and choose which Mod's textures the game shows, without changing the load order and without touching any Mod.
@@ -58,16 +58,17 @@ Targets and measurements: 18 §2. Header reads and hashes are cached in `<data d
 
 ### 3.1 Storage
 
-Table `look_choice` (04 §4): scope (`all`, or a plan ID), look id, slot (`all` for the whole look, else a slot name), the chosen Mod's Lineage, and the time. One row per scope, look and slot. A choice names the Lineage (00a §4.3: player data attaches to Lineage), so it survives an update, a locked version or a rename; it applies when an Instance of that Lineage is in the plan.
+Table `look_choice` (04 §4; `internal/store/looks.go`): scope (`all`, or a plan ID), look id, slot (`all` for the whole look, else a slot name), the chosen Mod's Lineage, and the time. One row per scope, look and slot. A choice names the Lineage (00a §4.3: player data attaches to Lineage), so it survives an update, a locked version or a rename; it applies when an Instance of that Lineage is in the plan (the first such entry in load order). Deleting a plan deletes its choices, since plan IDs are reused; the choices for all plans stay.
 
 ### 3.2 Resolution
 
-For a slot: the plan's choice for that slot, else the plan's choice for `all`, else the same two for scope `all`. It applies when the chosen Mod is in the plan and supplies the slot; otherwise the load-order result stands. A mask slot comes from the Mod that wins its texture when that Mod has the mask; otherwise from the last provider that has the mask. A second format (`.dds` beside `.png`) always follows its texture.
+For a slot: the plan's choice for that slot, else the plan's choice for `all`, else the same two for scope `all` (`app.LookState`). The first of these that exists decides the slot, and the others are **overruled** for it: when the deciding choice does not apply, the load-order result stands, not the next choice. It applies when the chosen Mod is in the plan and supplies the slot; otherwise the load-order result stands. A mask slot comes from the Mod that wins its texture when that Mod has the mask; otherwise from the last provider that has the mask. A second format (`.dds` beside `.png`) always follows its texture.
 
 ### 3.3 Operations
 
-- **apply** (look, Mod, what, scope): `what` is the entire look or a list of slots. Writes choices only. Never changes the plan's order. Warns, without refusing, when the result is mixed.
-- **undo** (look, scope): removes that look's choices in that scope only: never another look's, never the other scope's.
+- **apply** (look, Mod, what, scope; `app.LooksApply`): `what` is the entire look or a list of slots. Writes choices only. Never changes the plan's order (except the `_Archo_Looks` entry, §4). Warns, without refusing, when the result is mixed. Refused when the Mod is not in the current plan, has no texture of the look, or lacks a named slot, and for a mask slot. Choosing the entire look replaces that look's slot choices in the same scope; choosing slots leaves its other choices.
+- **undo** (look, scope; `app.LooksUndo`): removes that look's choices in that scope only: never another look's, never the other scope's. Refused when there is none. The plan keeps its `_Archo_Looks` entry.
+- Both take a dry run that writes nothing and returns the choices, the states and the rebuild as they would be. Both are operation-log rows (`looks.choice`, 13 §1.3).
 - The plan editor's rules card is the only place that changes load order.
 
 ### 3.4 States of a choice
@@ -81,20 +82,23 @@ Computed whenever the index is built; never stored:
 | asleep | No Instance of the chosen Lineage is in the plan | The load-order result; the choice wakes when the Mod returns |
 | broken | The Mod is in the plan but no longer supplies that slot | The load-order result; shown with a count until the player undoes it or the texture returns |
 
-A choice is never deleted automatically.
+The state of a slot is one of the four. The state of a choice (what the lists count): asleep when its Mod is not in the plan; else applied when any slot it decides is applied, else not needed when any is not needed, else broken. A choice of the whole look by a Mod that has only some of its slots is not broken: the other slots keep the load-order result. "Not needed" also requires that the mask the game would show is the same. A choice overruled for every slot it names (§3.2) has no state and is not counted.
+
+A choice is never deleted automatically (except with its plan, §3.1).
 
 ## 4. `_Archo_Looks`
 
-A generated Mod: `About/About.xml` (package ID `rimarcho.looks`, name `_Archo_Looks`, the game versions RimArcho supports) and `Textures/…`. No Defs, no assemblies. Saves do not depend on it.
+A generated Mod (`internal/app/looksbuild.go`): `About/About.xml` (package ID `rimarcho.looks`, name `_Archo_Looks`, supported versions 1.5, 1.6 and 1.7 as Archo Monitor's) and `Textures/…`. No Defs, no assemblies. Saves do not depend on it.
 
-- **Where**: `<looks directory>/Looks/`: a shared extra source like Archo Monitor's (03 §2). The game reaches it through the link `_Archo_Looks` in `Mods/` (09 §3), made by the ordinary link deployment. The looks directory is `looks.dir` (config). When it is unset, the first apply chooses it and stores it there: on the volume of the current game installation, so that files can be hard links to Workshop and local Mods: `<local folder>/looks` (17 §3) when that is the game's volume, else `<volume root>/RimArcho/looks` (for example `D:\RimArcho\looks`); when that folder cannot be created, `<local folder>/looks`. The confirmation of the first apply shows the folder. It must not contain or be contained by the data directory or a source root.
-- **Contents**: for every slot whose state is "applied", the chosen file under its key's path, with its second format and its mask. Each file is a hard link to the Mod's file when both are on one volume, else a copy. RimArcho records every file it writes there (`look_file`: path, source path, size, modification time, linked or copied) and never writes through a link into a Mod.
+- **Where**: `<looks directory>/Looks/`: a shared extra source like Archo Monitor's (03 §2). The game reaches it through the link `_Archo_Looks` in `Mods/` (09 §3), made by the ordinary link deployment. The looks directory is `looks.dir` (config). When it is unset, the first apply chooses it and stores it there: on the volume of the current game installation, so that files can be hard links to Workshop and local Mods: `<local folder>/looks` (17 §3) when that is the game's volume, else `<volume root>/RimArcho/looks` (for example `D:\RimArcho\looks`); when that folder cannot be created, `<local folder>/looks`. The confirmation of the first apply shows the folder. It must not contain or be contained by the data directory or a source root. Once the source `src:looks` is registered, its folder is the looks directory whatever `looks.dir` says, as with the Monitor folder. The first apply creates the folder with the Mod's `About.xml`, registers the source and scans that source alone, so the plan can name the Instance. `app.DeployName` gives this Instance the fixed link name `_Archo_Looks`.
+- **Contents**: for every slot whose state is "applied", the chosen file under its key's path (`Textures/<path below the Mod's Textures folder>`, with the Mod's own file name, letter case and extension), with its second format and, when the chosen Mod has one, its mask. Each file is a hard link to the Mod's file when both are on one volume, else a copy; a read-only file is always copied, because deleting a link to it would clear the attribute the Mod's file shares. RimArcho records every file it writes there (`look_file`: path, source path, size, modification time, linked or copied) and never writes through a link into a Mod: every destination is a new path in a new folder, and no existing file is opened for writing.
 - **Folder looks**: a file can replace one the load order gives, not hide one. Applying a Mod to a folder look replaces the files both Mods name alike; files that only other Mods add stay. The interface says so.
-- **Rebuild**: from the choices, never edited in place: build beside it, then swap. It runs after apply or undo for the current plan, and before every write to the game (07 §4) for the plan being written, so a Mod update that replaced a linked file is picked up. A rebuild whose result equals what is on disk writes nothing. Refused while a game runs (09 §4).
-- **In the plan**: an ordinary entry, always last. The first apply adds it to the plan as part of the same undoable edit; a sort keeps it last (08 §1.1). An empty `_Archo_Looks` loads nothing.
+- **Rebuild**: from the choices, never edited in place: build beside it (`Looks.archo-tmp`), then swap (the folder before goes through `Looks.archo-old`). It runs after apply or undo for the current plan, on `archo looks rebuild`, and before every write to the game (07 §4) of a plan that has the entry, for the plan being written, so a Mod update that replaced a linked file is picked up. A rebuild whose result equals what is on disk (the planned files' path, source, size and modification time equal `look_file`, and every file is there) writes nothing. Otherwise it is refused while a game runs in any environment (09 §4): after an apply or undo the choices are kept and the result says so. A rebuild that writes, is refused or fails is an operation-log row (`looks.build`, 13 §1.3).
+- **In the plan**: an ordinary entry, always last. An apply makes it the current plan's last entry as one undoable edit (`app.LooksAddOp`); the choice itself is not in the plan's history and is undone with **undo** (§3.3). A sort keeps it last (08 §1.1). An empty `_Archo_Looks` loads nothing. A plan that has applied choices for all plans but no entry does not show them in the game: the state reports the entry's position (`LooksState.Entry`, 0 when absent), `archo looks` says so, and an apply or `archo looks rebuild` in that plan adds the entry.
 - **One folder for all plans and games**: the folder holds the result for the plan last written to a game. Two games that run at the same time on different plans would share it; the second write is refused while the first game runs.
-- **Failure**: when a rebuild fails, the write to the game proceeds without the `_Archo_Looks` entry, the result says why, and the choices stay.
+- **Failure**: when a rebuild fails or is refused, the write to the game proceeds without the `_Archo_Looks` entry in ModsConfig.xml, the result says why (`SaveResult.LooksError`; `looks:` in `archo save` and `archo launch`), and the choices and the plan's entry stay. The link in `Mods/` is left as it is, neither made nor removed: a link change is refused while that game runs (09 §3), and without the entry the game does not load the folder. The next write rebuilds.
 - **Texture optimisation** (10 §2) never writes into the looks directory.
+- **Uninstall** deletes the generated Mod and the looks directory (02 §1 `looks`).
 
 ## 5. `_Archo_Styles` (not implemented)
 
@@ -107,10 +111,10 @@ A generated Mod with Defs that keeps a Mod's version of a look beside the one in
 
 ## 6. Interface
 
-Page design: 16 §2.5. CLI: 13 §4.2 `looks`. The first apply in a home opens a confirmation that says what will be written (§4), that the feature is in test, and how to report a problem; "do not show this again" is the setting `ui.gui.looks.confirmed`.
+Page design: 16 §2.5 (not implemented). CLI: 13 §4.2 `looks`; its `--dry-run` shows what the confirmation would. The interface calls `app.LooksState` (the index with the choices resolved), `LooksApply`, `LooksUndo` and `LooksRebuild`. The first apply in a home opens a confirmation that says what will be written (§4), that the feature is in test, and how to report a problem; "do not show this again" is the setting `ui.gui.looks.confirmed`.
 
 ## 7. Acceptance
 
 - `internal/looks` tests on synthetic Mods (`internal/testkit`): grouping of facings, masks, worn body types and folder looks; load-folder priority inside a Mod; identical copies; overridden, overriding and mixed; Def and style references through `ParentName`.
-- `internal/app` tests: choice resolution order (plan over all, slot over `all`); the four states; a rebuild writes hard links on one volume and records them; an unchanged rebuild writes nothing; undo touches one look and one scope; a failed rebuild leaves the game write without the entry; nothing is written into a Mod folder.
+- `internal/app` tests (`looks_test.go`): choice resolution order (plan over all, slot over `all`; `TestLooksResolutionOrder`); the four states (`TestLooksStates`); a rebuild writes hard links on one volume and records them, an unchanged rebuild writes nothing, an updated Mod file is relinked, and files are copies without hard links (`TestLooksRebuildLinks`); undo touches one look and one scope (`TestLooksUndoOneLookOneScope`); the entry is added last in one undo step, a sort keeps it last, and the link is `_Archo_Looks` (`TestLooksEntryLastAndLinkName`); a refused rebuild leaves the game write without the entry (`TestLooksFailedRebuildLeavesEntryOut`); nothing is written into a Mod folder, uninstall included (`TestLooksWritesNothingIntoMods`); the looks directory on the game's volume and its fallback (`TestLooksDirOnGameVolume`); texture optimisation and `folder remove` leave it alone (`TestLooksModIsLeftAlone`). `internal/store`: `TestLookChoices`, `TestLookFiles`, `TestUpgradeLooksAndPlanDelete`. `internal/cmds`: `TestLooksCommands`.
 - Real game, in the VM (UserGuide/release-vm-tests.md): apply a look from an earlier Mod, launch, see it in the game; undo, launch, see the load-order result.

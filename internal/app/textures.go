@@ -213,7 +213,7 @@ const (
 )
 
 // textureMods are the mods a command acts on: never Core or a DLC (the game's own folder),
-// never a mod that is gone.
+// never a mod that is gone, never _Archo_Looks.
 func (a *App) textureMods(refs []string, scope string) (*LoadoutState, []*store.Mod, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -222,7 +222,8 @@ func (a *App) textureMods(refs []string, scope string) (*LoadoutState, []*store.
 	var out []*store.Mod
 	seen := map[string]bool{}
 	add := func(m *store.Mod) {
-		if m == nil || seen[m.ID] || m.Kind == source.Official || !m.TombstoneAt.IsZero() {
+		// never the generated Mod: its files are links into other Mods (21 §4, 10 §2)
+		if m == nil || seen[m.ID] || m.Kind == source.Official || !m.TombstoneAt.IsZero() || IsLooks(m) {
 			return
 		}
 		seen[m.ID] = true

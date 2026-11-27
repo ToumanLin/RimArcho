@@ -150,6 +150,11 @@ type App struct {
 	// MonitorBundle is the bundled Archo Monitor folder (19 §6): "" searches the usual
 	// places, MonitorNone turns it off (tests).
 	MonitorBundle string
+	// VolumeRoot is the root folder of a path's volume and HardLink makes a hard link (the
+	// looks directory and its files, 21 §4); nil means the path's volume name and os.Link
+	// (tests act out a game on another volume, and a volume without hard links).
+	VolumeRoot func(path string) string
+	HardLink   func(oldname, newname string) error
 	// VolumeFS names the file system of a folder's volume; nil means source.VolumeFS
 	// (tests act out exFAT with it).
 	VolumeFS func(dir string) string

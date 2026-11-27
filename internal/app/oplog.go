@@ -380,3 +380,12 @@ func movedCount(before, after loadout.List) int {
 	}
 	return len(seq) - len(tails)
 }
+
+// logLooksChoice records an apply or an undo (13 §1.3).
+func (a *App) logLooksChoice(st *LoadoutState, r *LooksResult, detail string) {
+	target := "plan:" + st.Plan.Name
+	if r.Scope == LooksAll {
+		target = "all plans"
+	}
+	a.Ops.Add(oplog.Row{Op: oplog.LooksChoice, EnvID: st.Ix.Env.ID, Subject: r.Look, Target: target, Result: oplog.OK, Detail: detail})
+}

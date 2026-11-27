@@ -71,6 +71,7 @@ type Provider struct {
 // File is one texture file a provider supplies for a slot.
 type File struct {
 	Rel    string // relative to the Mod root, original case, forward slashes
+	Tex    string // relative to the load folder's Textures/, original case, forward slashes
 	Path   string // absolute
 	Format string // png, jpg, psd, dds:DXT1, dds:DX10, …
 	W, H   int
@@ -220,6 +221,14 @@ func parallel(ctx context.Context, n, workers int, fn func(i int) error) error {
 
 // IsMask reports whether slot is a mask slot.
 func IsMask(slot string) bool { return strings.HasSuffix(slot, maskSuffix) }
+
+// MaskOf names the mask slot of a texture slot.
+func MaskOf(slot string) string { return slot + maskSuffix }
+
+// Identical reports whether two files are the same texture: the same file, or extension,
+// size and content hash match (21 §2.1). Only files another provider also supplies with the
+// same extension and size are hashed, so unhashed files are never identical.
+func Identical(a, b *File) bool { return identical(a, b) }
 
 // textureOf returns the texture slot a mask slot belongs to.
 func textureOf(mask string) string { return strings.TrimSuffix(mask, maskSuffix) }

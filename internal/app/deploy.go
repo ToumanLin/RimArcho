@@ -28,6 +28,9 @@ func DeployName(m *store.Mod) string {
 	if m.Kind == source.Elsewhere { // another game's Mods/ (07 §1.7), named as on switching games
 		return envLinkPrefix + m.ID
 	}
+	if IsLooks(m) { // the generated Mod has one fixed name (21 §4)
+		return LooksName
+	}
 	r := strings.NewReplacer("/", "_", `\`, "_", ":", "_")
 	return DeployPrefix + r.Replace(m.SourceLabel) + "_" + r.Replace(m.Rel)
 }
@@ -209,21 +212,36 @@ type LinkChange struct {
 	Mod    string // instance ID ("" for a link to nothing RimArcho knows)
 }
 
-// planLinks compares the RimArcho links in Mods/ with the deployed instances of the list.
-func planLinks(st *LoadoutState, copies []ModsCopy) (string, []LinkChange, []DuplicateMove, error) {
-	mods := modsDir(st.Ix)
+// deployWant is the instances a write links into Mods/, by lower-case link name: the
+// list's deployable ones, except those this write leaves out, and the Workshop Mods of a
+// launch without Steam.
+func deployWant(st *LoadoutState) map[string]*store.Mod {
 	want := map[string]*store.Mod{}
 	for _, e := range st.List {
-		if m := st.Ix.ByID[e.Instance]; m != nil && st.Deployable(m) {
+		if m := st.Ix.ByID[e.Instance]; m != nil && st.Deployable(m) && !st.leaveOut[m.ID] {
 			want[strings.ToLower(DeployName(m))] = m
 		}
 	}
 	for _, m := range st.workshopDeploy() {
 		want[strings.ToLower(DeployName(m))] = m
 	}
+	return want
+}
+
+// planLinks compares the RimArcho links in Mods/ with the deployed instances of the list.
+func planLinks(st *LoadoutState, copies []ModsCopy) (string, []LinkChange, []DuplicateMove, error) {
+	mods := modsDir(st.Ix)
+	want := deployWant(st)
 	keep := map[string]*store.Mod{} // Workshop links a running game may use (save only)
 	if st.keepWorkshopLinks {
 		for _, m := range st.workshopMods() {
+			keep[strings.ToLower(DeployName(m))] = m
+		}
+	}
+	// An instance this write leaves out keeps the link it has and gets none (21 §4): a link
+	// change is refused while that game runs, and the next write links or unlinks it.
+	for id := range st.leaveOut {
+		if m := st.Ix.ByID[id]; m != nil {
 			keep[strings.ToLower(DeployName(m))] = m
 		}
 	}

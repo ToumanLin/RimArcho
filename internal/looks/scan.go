@@ -144,7 +144,7 @@ func (s *modScan) walkTextures(ctx context.Context, folder string, old map[strin
 			return nil
 		}
 		rel, _ := filepath.Rel(s.mod.Root, p)
-		found[key] = append(found[key], &File{Rel: filepath.ToSlash(rel), Path: p, Size: info.Size(),
+		found[key] = append(found[key], &File{Rel: filepath.ToSlash(rel), Tex: filepath.ToSlash(in), Path: p, Size: info.Size(),
 			MTime: info.ModTime().UnixNano(), SameAs: -1, ext: ext})
 		return nil
 	})

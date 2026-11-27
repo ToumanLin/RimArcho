@@ -73,7 +73,7 @@ type UnItem struct {
 var unTitles = map[string]string{
 	app.UnAccounts: "account sessions", app.UnTextures: "optimized textures",
 	app.UnLinks: "RimArcho's links", app.UnModsConfig: "the games' mod lists", app.UnLocked: "lock library copies",
-	app.UnMonitor: "Archo Monitor", app.UnPacks: "packs", app.UnSaves: "own saves", app.UnGames: "downloaded games",
+	app.UnMonitor: "Archo Monitor", app.UnLooks: app.LooksName, app.UnPacks: "packs", app.UnSaves: "own saves", app.UnGames: "downloaded games",
 	app.UnSteamCMD: "SteamCMD", app.UnData: "RimArcho's data", app.UnProgram: "the program",
 	app.UnSource: "source library",
 }
@@ -210,6 +210,8 @@ func uninstallText(p *app.UninstallPlan, s *app.UninstallStep) string {
 		add(app.DoMove, "%d copies into %s's Mods folder, as ordinary mods", p.LockedTo)
 	case app.UnMonitor:
 		add(app.DoDelete, "delete it (%d versions)")
+	case app.UnLooks:
+		add(app.DoDelete, "delete it; the Mods' own textures stay")
 	case app.UnPacks:
 		add(app.DoKeep, "keep %d where they are")
 		add(app.DoMove, "keep %d: moved to the folder below")

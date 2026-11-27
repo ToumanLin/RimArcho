@@ -28,10 +28,10 @@ func SharedKind(k source.Kind) bool {
 }
 
 // OwnFolder reports whether a shared folder is one RimArcho keeps itself (the monitor
-// folder, the lock library and its older per-environment folders): the player does not
-// add or remove those.
+// folder, the looks directory, the lock library and its older per-environment folders): the
+// player does not add or remove those.
 func OwnFolder(s *source.Source) bool {
-	return s.Kind == source.Extra && (s.Label == MonitorLabel || s.Label == SubscribedLabel || s.Label == LockLabel || strings.HasPrefix(s.Label, LockLabel+"-"))
+	return s.Kind == source.Extra && (s.Label == MonitorLabel || s.Label == LooksLabel || s.Label == SubscribedLabel || s.Label == LockLabel || strings.HasPrefix(s.Label, LockLabel+"-"))
 }
 
 // Folders lists the shared mod folders, retired ones last.

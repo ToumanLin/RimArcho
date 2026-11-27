@@ -14,7 +14,7 @@ const cp = require('node:child_process');
 
 const root = path.resolve(__dirname, '../..');
 const SPEC_DIR = 'docs/specs';
-const REF = /(?:(?<![\w/.\-])(0\d|1\d|00a) )?§(\d+(?:\.\d+)*)/gu;
+const REF = /(?:(?<![\w/.\-])(0\d|1\d|2\d|00a) )?§(\d+(?:\.\d+)*)/gu;
 const CONT_GAP = /^\s*(?:,|;|\/|–|—|\u3001|\uff0c|&|and|or|, and|, or)\s*$/u;
 // A bare § right after a document name (`x.md`, decisions-corpus, research …) points into
 // that document, not into a spec.

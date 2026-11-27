@@ -69,12 +69,15 @@ var opWhat = map[string]string{
 	oplog.Uninstall:          "uninstalled",
 	oplog.Launch:             "started the game",
 	oplog.PlanSync:           "caught a list up with a collection",
+	oplog.LooksChoice:        "chose which Mod's textures the game shows",
+	oplog.LooksBuild:         "rebuilt _Archo_Looks",
 }
 
 var opIcon = map[string]string{
 	oplog.Trash: "bin", oplog.Delete: "bin", oplog.SubscriptionRemove: "bin", oplog.Unsubscribe: "workshop", oplog.ModsConfigWrite: "plan", oplog.LinkCreate: "link", oplog.LinkRemove: "unlink",
 	oplog.SaveRename: "saves", oplog.SaveCopy: "saves", oplog.SaveBackup: "saves", oplog.SaveTrash: "bin",
 	oplog.UpdateApply: "rescan", oplog.UpdateRollback: "rescan", oplog.Uninstall: "close", oplog.Launch: "play", oplog.PlanSync: "workshop",
+	oplog.LooksChoice: "plan", oplog.LooksBuild: "link",
 }
 
 var opResult = map[string]string{

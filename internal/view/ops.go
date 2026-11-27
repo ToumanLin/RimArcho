@@ -331,7 +331,7 @@ func (f copyFacts) copyOps(ks []string) []string {
 func (f copyFacts) diskOps(ks []string) []string {
 	i, m, live, linked, url := f.i, f.m, f.live, f.linked, f.url
 	// Texture optimisation: a copy with PNG textures (not RimArcho's own mod)
-	if f.page != LibraryPage && live && !f.foreign && i.PNG && i.Path != "" && !app.IsMonitor(m) && !f.has(app.LibHidden) && !f.has(app.LibResidue) {
+	if f.page != LibraryPage && live && !f.foreign && i.PNG && i.Path != "" && !app.IsMonitor(m) && !app.IsLooks(m) && !f.has(app.LibHidden) && !f.has(app.LibResidue) {
 		ks = append(ks, OpTextures)
 	}
 	if i.Textures != nil && i.Textures.Files > 0 {
