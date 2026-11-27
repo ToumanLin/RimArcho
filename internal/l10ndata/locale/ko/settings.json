@@ -422,5 +422,17 @@
   "the wording you suggest": "제안하는 문구",
   "(no text)": "(텍스트 없음)",
   "press %s on that page first": "먼저 그 페이지에서 %s를 누르세요",
-  "remove this line": "이 줄 삭제"
+  "remove this line": "이 줄 삭제",
+  "anonymous": "익명",
+  "external": "외부",
+  "%s available": "%s 사용 가능",
+  "%d unavailable": "%d개 사용 불가",
+  "remove RimArcho from this computer": "이 컴퓨터에서 RimArcho 제거",
+  "Archo Monitor %s": "Archo Monitor %s",
+  "updated %s": "%s 업데이트",
+  "database %s": "데이터베이스 %s",
+  "caches %s": "캐시 %s",
+  "proxy: %s": "프록시: %s",
+  "mirror: %s": "미러: %s",
+  "development version": "개발 버전"
 }

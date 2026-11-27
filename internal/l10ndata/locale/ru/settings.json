@@ -422,5 +422,17 @@
   "the wording you suggest": "ваш вариант",
   "(no text)": "(без текста)",
   "press %s on that page first": "сначала нажмите %s на той странице",
-  "remove this line": "удалить строку"
+  "remove this line": "удалить строку",
+  "anonymous": "анонимно",
+  "external": "внешний",
+  "%s available": "доступна %s",
+  "%d unavailable": "недоступно: %d",
+  "remove RimArcho from this computer": "удалить RimArcho с этого компьютера",
+  "Archo Monitor %s": "Archo Monitor %s",
+  "updated %s": "обновлено %s",
+  "database %s": "база данных %s",
+  "caches %s": "кэши %s",
+  "proxy: %s": "прокси: %s",
+  "mirror: %s": "зеркало: %s",
+  "development version": "версия для разработки"
 }

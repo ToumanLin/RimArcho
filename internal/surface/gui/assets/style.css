@@ -515,8 +515,8 @@ body.row-dragging, body.row-dragging * { cursor: grabbing !important; -webkit-us
 .page.fill { height: 100%; min-height: 0; padding-bottom: 8px; }
 /* page width by shape (16 §7.3 rule 12): list-and-detail pages fill the window like the
    editor and the library; one-column pages share one reading width */
-.page:is(.logs, .pm-page, .packs, .subs-page, .needs, .modsettings, .saves, .review, .fb-page) { padding-left: 12px; padding-right: 12px; }
-.page:is(.env, .textures, .settings) { padding-left: max(20px, calc(50% - 480px)); padding-right: max(20px, calc(50% - 480px)); }
+.page:is(.logs, .pm-page, .packs, .subs-page, .needs, .modsettings, .saves, .review, .fb-page, .st-page) { padding-left: 12px; padding-right: 12px; }
+.page:is(.env, .textures) { padding-left: max(20px, calc(50% - 480px)); padding-right: max(20px, calc(50% - 480px)); }
 @keyframes view-in { from { opacity: 0; transform: translateY(4px); } }
 .head-right { display: flex; align-items: center; gap: 8px; }
 .note { padding: 0 4px; font-size: 12px; }
@@ -1849,6 +1849,44 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
   .fb-lay { display: flex; flex-direction: column; gap: var(--card-gap); }
   .fb-split { display: none; }
   .fb-body { overflow: visible; }
+}
+/* Settings' two panes (16 §2.14 "Layout"; 16 §7.3 item 12): the groups at the left, 30% by
+   default, the picked group at the right in one card whose head names it. Both cards fill the
+   page's height and start on one line; a long group scrolls inside its card. The gap drags
+   (ui.gui.settings.side) and comes after the right card in the tab order. */
+.page.fill.st-page { display: flex; flex-direction: column; }
+.st-lay { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(220px, var(--st-side, 30fr)) var(--card-gap) minmax(420px, 70fr); grid-template-rows: minmax(0, 1fr); }
+.st-lay > .st-list { grid-area: 1 / 1; }
+.st-lay > .st-split { grid-area: 1 / 2; align-self: stretch; margin: 0; }
+.st-lay > .st-card { grid-area: 1 / 3; }
+.st-list { min-width: 0; }
+.st-row { position: relative; width: calc(100% - 12px); flex: none; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.st-row:hover:not(.on) { background: var(--pill); }
+.st-row.on .nt { color: var(--accent-11, var(--accent)); }
+.st-row .st-facts { display: flex; gap: 0 12px; min-width: 0; overflow: hidden; white-space: nowrap; }
+.st-row .st-facts > span { flex: none; }
+.st-row .st-facts > span:last-child { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.st-row .dbar-row { grid-template-columns: minmax(48px, 96px) minmax(0, auto); }
+.st-row .dbar-row .num { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-dot { flex: none; align-self: center; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.st-dot.amber { background: var(--amber); }
+.st-list > .st-apart { margin-top: 8px; }
+.st-card { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.st-head { flex: none; padding: 12px 14px 10px; border-bottom: var(--hairline) solid var(--line-2); }
+.st-title { font-size: 15px; font-weight: 600; color: var(--fg); }
+.settings .st-head .group-note { padding: 4px 0 0; border-bottom: 0; }
+.st-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+/* the right card is narrower than the old 960 px column: a fold's drive meter is shorter, so
+   its heading keeps one line */
+.st-card .folder-fold-head .dbar-row { grid-template-columns: minmax(48px, 110px) auto; }
+.st-group[hidden] { display: none; }
+/* a deep link's row: marked until another group is picked */
+.settings .set.st-landed { background: var(--accent-soft); }
+@media (max-width: 900px) {
+  .page.fill.st-page { height: auto; }
+  .st-lay { display: flex; flex-direction: column; gap: var(--card-gap); }
+  .st-split { display: none; }
+  .st-list, .st-body { overflow: visible; }
 }
 .fb-kinds { overflow-y: auto; }
 .fb-kind { position: relative; width: calc(100% - 12px); border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }

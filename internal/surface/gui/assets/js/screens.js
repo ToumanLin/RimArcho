@@ -27,6 +27,7 @@ import { getChoices } from "./credit.js";
 import { memBars, countBar, countMark, stepMeter, visTip, diskMeter } from "./membar.js";
 import { setVersionRunner } from "./versionwarnings.js";
 import { folderFolds, headMeters, settingValue } from "./folderfolds.js";
+import { drawSettings, openingGroup } from "./settingspage.js";
 import { openVersionList } from "./versionpanel.js";
 
 let ui = null;
@@ -1902,19 +1903,33 @@ export async function settings() {
   try { [groups, bg, tasks] = await Promise.all([api.Settings(), bgSection(read.current), api.Tasks()]); } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
   groups = groups || [];
+  for (const g of groups) g.key ||= g.title;
+  // a visit starts on the first group that needs a look; a redraw (a command ran, the
+  // language changed) keeps the group, the scroll and the focus (16 §2.14 "Layout")
+  const again = S.screen === "settings" && groups.some(g => g.key === S.settingsGroup);
+  const shown = again ? S.settingsGroup : openingGroup(groups);
   const sc = S.screen === "settings" ? $("#screen") : openScreen("settings");
-  const top = sc.scrollTop;
+  const top = sc.querySelector(".st-body")?.scrollTop || 0;
+  const focused = again ? document.activeElement?.closest?.("[data-group].st-row")?.dataset.group : null;
   sc.innerHTML = "";
-  const w = page("settings", "");
+  const w = page("st-page fill", "");
   sc.append(w);
-  // Groups in view.SettingsPage's order (the TUI's too); Start page background closes the card that
-  // holds the accent colour.
-  for (const g of groups) {
-    renderGroups(w, [g], settings);
-    if (g.items?.some(it => it.edit === "swatches")) w.lastElementChild.append(bg);
-  }
+  // Groups in view.SettingsPage's order (the TUI's too); Start page background closes the
+  // group that holds the accent colour.
+  let restyle = false;
+  const ids = new Set();
+  drawSettings(w, groups, shown, {
+    area, crumbs: () => ui.renderWhere?.(),
+    body: (box, g) => {
+      restyle = renderGroupRows(box, g, settings, ids) || restyle;
+      if (g.items?.some(it => it.edit === "swatches")) box.append(bg);
+    },
+  });
+  if (restyle) ui.reaccent();
   markSettingTasks(tasks);
-  sc.scrollTop = top;
+  const body = sc.querySelector(".st-body");
+  if (body) body.scrollTop = top;
+  if (focused) sc.querySelector(`.st-row[data-group="${focused}"]`)?.focus({ preventScroll: true });
   read.finish();
   if (taskVersion !== settingTaskRead) refreshSettingTasks(true);
 }
@@ -2040,117 +2055,126 @@ function settingRunner(again) {
   };
 }
 
-// renderGroups draws setting groups (view.SettingGroup) as labelled cards.
+// renderGroups draws setting groups (view.SettingGroup) as labelled cards (the Game Config page).
 function renderGroups(w, groups, again) {
-  const run = settingRunner(again);
-  const ids = new Set();
   // the window's accent or theme differs from the one set: one reaccent after drawing
   let restyle = false;
+  const ids = new Set();
   for (const g of groups) {
     const lab = el("div", "label section", g.title);
     w.append(lab);
     const card = el("section", "card settings");
     area(card, lab);
     if (g.note) card.append(el("div", "group-note", g.note));
-    // Folders: the rows go into their folds after the loop (16 §2.14)
-    const rows = g.folds?.length ? [] : null, meters = headMeters(g);
-    for (const [ii, it] of (g.items || []).entries()) {
-      const row = el("div", "set");
-      row.dataset.settingRow = g.title + "/" + it.label;
-      // The row's record: its key, directory, command or link; the label only as a last resort.
-      const identity = it.key || it.directory || JSON.stringify(it.argv || it.actions?.[0]?.argv) || it.url || JSON.stringify(it.links?.map(l => l.url)) || row.dataset.settingRow;
-      row.id = "setting-row-" + encodeURIComponent(identity);
-      for (let n = 2; ids.has(row.id); n++) row.id = "setting-row-" + encodeURIComponent(identity) + "-" + n;
-      ids.add(row.id);
-      row.setAttribute("role", "group");
-      row.dataset.settingActions = JSON.stringify(it.actions || []);
-      row.title = it.hover || "";
-      const left = el("div", "l");
-      const label = el("div", "name", it.label);
-      label.id = row.id + "-label";
-      row.setAttribute("aria-labelledby", label.id);
-      left.append(label);
-      const note = factText(el("div", "sub setting-note"), { text: it.note || "", paths: it.notePaths });
-      note.hidden = !it.note;
-      left.append(note);
-      if (it.disk && !meters.has(ii)) left.append(diskMeter(it.disk)); // the folder's drive (V10)
-      const right = el("div", "r");
-      if (it.edit === "swatches" || it.edit === "segments") {
-        row.classList.add("appearance-row");
-        // Set outside the window (archo config set): the window takes it when Settings shows it,
-        // so the selected swatch and the colours agree (VM round 2026-11-10).
-        const key = it.argv?.[2], shown = String(it.value || "").toLowerCase();
-        const applied = String((key === "ui.accent" ? S.start?.accent || "default" : key === "ui.theme" ? S.start?.theme || "auto" : shown) || "").toLowerCase();
-        if ((key === "ui.accent" || key === "ui.theme") && shown && shown !== applied) restyle = true;
-        right.append(appearanceControl(it, () => ui.reaccent()));
-      } else if (it.edit === "choice") {
-        const s = choiceControl(it.label, it.choices.map((c, i) => ({ value: c, label: it.choiceLabels?.[i] || c })), it.value);
-        if (it.note) {
-          note.id = s.id + "-note";
-          s.setAttribute("aria-describedby", note.id);
-        }
-        // A new language: the page's text again, in place (main.js relang).
-        s.onchange = () => {
-          // a Game Config's saves in a folder the player chooses: pick it, then env set
-          // --user-data; the choice shows what is set until then (16 §2.8)
-          if (it.key === "environment.saves" && s.value === "custom") {
-            s.value = it.value;
-            return chooseLocalPath(it.note || "", (path) => run(["env", "set", it.argv[2], "--user-data", "{}"], path));
-          }
-          run(it.argv, s.value, it.argv[2] === "ui.lang" ? () => ui.relang() : it.argv[2] === "ui.accent" ? () => ui.reaccent() : null);
-        };
-        right.append(s);
-      } else if (it.edit === "directory") {
-        const value = settingValue(el("span", "muted setting-value"), it);
-        const d = { id: it.directory, label: it.label, path: it.value };
-        const after = async () => { await ui.reload(); again(); };
-        right.append(value, button(T("locate"), "", () => directoryPrompt(d, false, after), "", "apply-setting"),
-          button(T("move to…"), "", () => directoryPrompt(d, true, after), "", "apply-setting"));
-      } else if (it.edit === "path") {
-        right.append(factText(el("span", "muted setting-value"), { text: it.value || "", paths: it.valuePath ? [it.value] : [] }));
-        const adding = it.argv[0] === "folder" && it.argv[1] === "add";
-        right.append(button(T(adding ? "add…" : "change…"), "", () => chooseLocalPath(it.editValue ?? it.value ?? "",
-          value => applyPathSetting(it, value, again), { file: !!it.file }), "", "apply-setting"));
-      } else if (it.edit === "url") {
-        right.append(factText(el("span", "muted setting-value"), { text: it.value, paths: [it.value] }),
-          button(T("change…"), "", () => urlPrompt(it.label, it.value, value => run(it.argv, value)), "", "apply-setting"));
-      } else if (it.links?.length) {
-        for (const link of it.links) right.append(button(link.label, "", () => api.OpenURL(link.url).catch(e => say("fail", errText(e))), "community-link"));
-      } else if (it.edit) {
-        const inp = el("input", "field");
-        // a secret (Archo Agent's API key) is typed into a password field and never shown back
-        if (it.edit === "secret") { inp.type = "password"; inp.autocomplete = "off"; }
-        inp.value = it.editValue ?? it.value ?? "";
-        inp.spellcheck = false;
-        inp.setAttribute("aria-labelledby", label.id);
-        const ok = button(T("apply"), "", () => run(it.argv, inp.value.trim(), null, false, inp), "", "apply-setting");
-        inp.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); ok.click(); } };
-        if (it.editValue !== undefined) right.append(factText(el("span", "muted setting-value"), { text: it.value || "", paths: it.valuePath ? [it.value] : [] }));
-        right.append(inp);
-        right.append(ok);
-      } else if (it.url) {
-        // Community: a web page, opened in the browser (16 §2.14)
-        const value = document.createElement("span"); value.textContent = it.value || it.url;
-        const b = button("↗", "", () => api.OpenURL(it.url).catch(e => say("fail", errText(e))), "link");
-        b.title = T("open the web page"); b.setAttribute("aria-label", T("open the web page"));
-        right.append(copyablePath(value, it.url), b);
-      } else {
-        right.append(factText(el("span", "muted setting-value"), { text: it.value || "", paths: it.valuePath ? [it.value] : [] }));
-      }
-      const valueNote = el("span", "muted word-facts setting-value-note", it.valueNote || "");
-      valueNote.hidden = !it.valueNote;
-      right.append(valueNote);
-      renderSettingActions(right, it.actions, run, it);
-      row.append(left, right);
-      settingPathPicker(row, it, again);
-      const els = [row];
-      if (it.details) els.push(settingDetails(it.details));
-      if (rows) rows.push(els); else card.append(...els);
-    }
-    if (rows) folderFolds(card, g, rows);
+    restyle = renderGroupRows(card, g, again, ids) || restyle;
     w.append(card);
   }
   if (restyle) ui.reaccent();
+}
+
+// renderGroupRows draws one group's rows into box; true when the window's accent or theme
+// differs from the one set, so the caller restyles once.
+// ids holds the row ids of the whole page, so each is unique.
+function renderGroupRows(card, g, again, ids) {
+  const run = settingRunner(again);
+  let restyle = false;
+  // Folders: the rows go into their folds after the loop (16 §2.14)
+  const rows = g.folds?.length ? [] : null, meters = headMeters(g);
+  for (const [ii, it] of (g.items || []).entries()) {
+    const row = el("div", "set");
+    row.dataset.settingRow = g.title + "/" + it.label;
+    // The row's record: its key, directory, command or link; the label only as a last resort.
+    const identity = it.key || it.directory || JSON.stringify(it.argv || it.actions?.[0]?.argv) || it.url || JSON.stringify(it.links?.map(l => l.url)) || row.dataset.settingRow;
+    row.id = "setting-row-" + encodeURIComponent(identity);
+    for (let n = 2; ids.has(row.id); n++) row.id = "setting-row-" + encodeURIComponent(identity) + "-" + n;
+    ids.add(row.id);
+    row.setAttribute("role", "group");
+    row.dataset.settingActions = JSON.stringify(it.actions || []);
+    row.title = it.hover || "";
+    const left = el("div", "l");
+    const label = el("div", "name", it.label);
+    label.id = row.id + "-label";
+    row.setAttribute("aria-labelledby", label.id);
+    left.append(label);
+    const note = factText(el("div", "sub setting-note"), { text: it.note || "", paths: it.notePaths });
+    note.hidden = !it.note;
+    left.append(note);
+    if (it.disk && !meters.has(ii)) left.append(diskMeter(it.disk)); // the folder's drive (V10)
+    const right = el("div", "r");
+    if (it.edit === "swatches" || it.edit === "segments") {
+      row.classList.add("appearance-row");
+      // Set outside the window (archo config set): the window takes it when Settings shows it,
+      // so the selected swatch and the colours agree (VM round 2026-11-10).
+      const key = it.argv?.[2], shown = String(it.value || "").toLowerCase();
+      const applied = String((key === "ui.accent" ? S.start?.accent || "default" : key === "ui.theme" ? S.start?.theme || "auto" : shown) || "").toLowerCase();
+      if ((key === "ui.accent" || key === "ui.theme") && shown && shown !== applied) restyle = true;
+      right.append(appearanceControl(it, () => ui.reaccent()));
+    } else if (it.edit === "choice") {
+      const s = choiceControl(it.label, it.choices.map((c, i) => ({ value: c, label: it.choiceLabels?.[i] || c })), it.value);
+      if (it.note) {
+        note.id = s.id + "-note";
+        s.setAttribute("aria-describedby", note.id);
+      }
+      // A new language: the page's text again, in place (main.js relang).
+      s.onchange = () => {
+        // a Game Config's saves in a folder the player chooses: pick it, then env set
+        // --user-data; the choice shows what is set until then (16 §2.8)
+        if (it.key === "environment.saves" && s.value === "custom") {
+          s.value = it.value;
+          return chooseLocalPath(it.note || "", (path) => run(["env", "set", it.argv[2], "--user-data", "{}"], path));
+        }
+        run(it.argv, s.value, it.argv[2] === "ui.lang" ? () => ui.relang() : it.argv[2] === "ui.accent" ? () => ui.reaccent() : null);
+      };
+      right.append(s);
+    } else if (it.edit === "directory") {
+      const value = settingValue(el("span", "muted setting-value"), it);
+      const d = { id: it.directory, label: it.label, path: it.value };
+      const after = async () => { await ui.reload(); again(); };
+      right.append(value, button(T("locate"), "", () => directoryPrompt(d, false, after), "", "apply-setting"),
+        button(T("move to…"), "", () => directoryPrompt(d, true, after), "", "apply-setting"));
+    } else if (it.edit === "path") {
+      right.append(factText(el("span", "muted setting-value"), { text: it.value || "", paths: it.valuePath ? [it.value] : [] }));
+      const adding = it.argv[0] === "folder" && it.argv[1] === "add";
+      right.append(button(T(adding ? "add…" : "change…"), "", () => chooseLocalPath(it.editValue ?? it.value ?? "",
+        value => applyPathSetting(it, value, again), { file: !!it.file }), "", "apply-setting"));
+    } else if (it.edit === "url") {
+      right.append(factText(el("span", "muted setting-value"), { text: it.value, paths: [it.value] }),
+        button(T("change…"), "", () => urlPrompt(it.label, it.value, value => run(it.argv, value)), "", "apply-setting"));
+    } else if (it.links?.length) {
+      for (const link of it.links) right.append(button(link.label, "", () => api.OpenURL(link.url).catch(e => say("fail", errText(e))), "community-link"));
+    } else if (it.edit) {
+      const inp = el("input", "field");
+      // a secret (Archo Agent's API key) is typed into a password field and never shown back
+      if (it.edit === "secret") { inp.type = "password"; inp.autocomplete = "off"; }
+      inp.value = it.editValue ?? it.value ?? "";
+      inp.spellcheck = false;
+      inp.setAttribute("aria-labelledby", label.id);
+      const ok = button(T("apply"), "", () => run(it.argv, inp.value.trim(), null, false, inp), "", "apply-setting");
+      inp.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); ok.click(); } };
+      if (it.editValue !== undefined) right.append(factText(el("span", "muted setting-value"), { text: it.value || "", paths: it.valuePath ? [it.value] : [] }));
+      right.append(inp);
+      right.append(ok);
+    } else if (it.url) {
+      // Community: a web page, opened in the browser (16 §2.14)
+      const value = document.createElement("span"); value.textContent = it.value || it.url;
+      const b = button("↗", "", () => api.OpenURL(it.url).catch(e => say("fail", errText(e))), "link");
+      b.title = T("open the web page"); b.setAttribute("aria-label", T("open the web page"));
+      right.append(copyablePath(value, it.url), b);
+    } else {
+      right.append(factText(el("span", "muted setting-value"), { text: it.value || "", paths: it.valuePath ? [it.value] : [] }));
+    }
+    const valueNote = el("span", "muted word-facts setting-value-note", it.valueNote || "");
+    valueNote.hidden = !it.valueNote;
+    right.append(valueNote);
+    renderSettingActions(right, it.actions, run, it);
+    row.append(left, right);
+    settingPathPicker(row, it, again);
+    const els = [row];
+    if (it.details) els.push(settingDetails(it.details));
+    if (rows) rows.push(els); else card.append(...els);
+  }
+  if (rows) folderFolds(card, g, rows);
+  return restyle;
 }
 
 // settingDetails folds text under its row (16 §3.1 rule 7): RimArcho's release notes.

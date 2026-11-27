@@ -43,6 +43,7 @@ func DirectoryGroup(a *app.App) SettingGroup {
 	dirs, err := a.ManagedDirectories()
 	if err != nil {
 		g.Items = append(g.Items, SettingItem{Key: "directory.error", Label: T("directory check failed"), Note: err.Error()})
+		g.Key, g.Summary, g.Attention = GroupFolders, facts(T("directory check failed")), AttentionAmber
 		return g
 	}
 	// One note for the whole group; a row only says what is different about it.
@@ -79,6 +80,22 @@ func DirectoryGroup(a *app.App) SettingGroup {
 		shown = append(shown, d)
 	}
 	g.Folds = folderFolds(a, g.Items, shown)
+	// The Settings list's row (16 §2.14 "Layout"): "6 folders  1 unavailable" and the drive
+	// with the least room; amber while a folder is unavailable or a drive has under 10 GB.
+	missing := 0
+	for _, d := range shown {
+		if DirectoryNeedsLocation(d) {
+			missing++
+		}
+	}
+	g.Key, g.Attention, g.Disk = GroupFolders, AttentionNone, lowestDisk(g.Items)
+	g.Summary = facts(folderCount(len(shown)))
+	if missing > 0 {
+		g.Summary, g.Attention = append(g.Summary, Tf("%d unavailable", missing)), AttentionAmber
+	}
+	if g.Disk != nil && g.Disk.Low {
+		g.Attention = AttentionAmber
+	}
 	return g
 }
 

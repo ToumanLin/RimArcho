@@ -5,6 +5,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/buildinfo"
@@ -144,7 +145,15 @@ func TaskPending(kind string) string {
 
 // SettingGroup is a heading and its rows.
 type SettingGroup struct {
+	// Key names the group whatever the language (GroupAbout…); Settings groups only.
+	Key   string `json:"key,omitempty"`
 	Title string `json:"title"`
+	// Summary is the GUI list row's muted line (16 §2.14 "Layout"), its facts drawn 12 px
+	// apart (§7.3 rule 5); Attention its dot (AttentionNone, AttentionAccent, AttentionAmber);
+	// Disk an optional meter under it.
+	Summary   []string   `json:"summary,omitempty"`
+	Attention string     `json:"attention,omitempty"`
+	Disk      *DiskMeter `json:"disk,omitempty"`
 	// Note is said once under the heading instead of on every row.
 	Note  string        `json:"note,omitempty"`
 	Items []SettingItem `json:"items"`
@@ -318,7 +327,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	gpu := onOff(T("GPU acceleration"), "ui.gpu")
 	gpu.Hover, gpu.ValueNote = T("uses about 20–35 MB less memory and draws in software"), gpuNote
 	// Start page background closes this card in the GUI (it is not a setting command).
-	out := []SettingGroup{AboutGroup(a), {Title: T("interface"), Items: []SettingItem{
+	out := []SettingGroup{AboutGroup(a), {Key: GroupInterface, Title: T("interface"), Items: []SettingItem{
 		{Label: T("language"), Value: cmds.Setting(a, "ui.lang"), Edit: "choice", Choices: languageChoices(), ChoiceLabels: languageLabels(), Argv: []string{"config", "set", "ui.lang", "{}"}},
 		{Label: T("day/night theme"), Value: cmds.Setting(a, "ui.theme"), Edit: "segments", Choices: cmds.SettingChoices("ui.theme"),
 			ChoiceLabels: []string{T("follow system"), T("light"), T("dark")}, Argv: []string{"config", "set", "ui.theme", "{}"}},
@@ -345,6 +354,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		{Key: "guide.preview", Label: T("first-run guide"), Note: T("nothing you choose is saved"),
 			Actions: []SettingAction{{Label: T("preview…"), Argv: []string{"guide-preview"}}}},
 	}}, AccountGroup(a), AutomaticGroup(a)}
+	out[1].Summary, out[1].Attention = interfaceSummary(out[1]), AttentionNone
 
 	// RimArcho's folders, each with relocation controls, then adding a mod folder.
 	folders := DirectoryGroup(a)
@@ -356,6 +366,38 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	}
 	out = append(out, folders)
 
+	out = append(out, GameLogGroup(a, onOff))
+	out = append(out, NetworkGroup(a))
+	if g, ok := AgentGroup(a); ok {
+		out = append(out, g)
+	}
+	out = append(out, DependencyGroup(a))
+
+	out = append(out, CommunityDataGroup(a), StorageGroup(a))
+
+	// Last: its own page with the plan (the interfaces open it; archo uninstall is not a
+	// settings command).
+	out = append(out, SettingGroup{Key: GroupUninstall, Title: T("uninstall"), Summary: facts(T("remove RimArcho from this computer")), Attention: AttentionNone, Items: []SettingItem{
+		{Label: T("uninstall RimArcho"), Note: T("remove what RimArcho put on this machine and put back what it changed"),
+			Actions: []SettingAction{{Label: T("uninstall RimArcho…"), Argv: []string{"uninstall"}}}},
+	}})
+	for gi := range out {
+		for ii := range out[gi].Items {
+			for ai := range out[gi].Items[ii].Actions {
+				a := &out[gi].Items[ii].Actions[ai]
+				a.Task = SettingTask(a.Argv)
+				if a.Task != "" {
+					a.Pending = TaskPending(a.Task)
+				}
+			}
+		}
+	}
+	return out
+}
+
+// GameLogGroup is Settings › game log: Archo Monitor, the save copy at launch and when the
+// window checks a list's files (16 §2.14).
+func GameLogGroup(a *app.App, onOff func(label, key string) SettingItem) SettingGroup {
 	// 16 §8.9: when the window checks a list's files by itself
 	autoCheck := SettingItem{Label: T("check files automatically"), Value: cmds.Setting(a, "analysis.auto"), Edit: "segments", Choices: cmds.SettingChoices("analysis.auto"),
 		ChoiceLabels: []string{T("after edits"), T("when saved"), T("off")},
@@ -377,17 +419,15 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		} else if len(s.Installed) > 0 {
 			v = s.Installed[0]
 		}
-		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon, {Key: "monitor.installed", Label: T("Archo Monitor installed"), Value: v, Note: path, NotePaths: []string{path}}, saveCopy, autoCheck}})
-	} else {
-		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon, saveCopy, autoCheck}})
+		return SettingGroup{Attention: AttentionNone, Key: GroupLog, Title: T("game log"), Summary: facts(Tf("Archo Monitor %s", v)),
+			Items: []SettingItem{mon, {Key: "monitor.installed", Label: T("Archo Monitor installed"), Value: v, Note: path, NotePaths: []string{path}}, saveCopy, autoCheck}}
 	}
-	out = append(out, NetworkGroup(a))
-	if g, ok := AgentGroup(a); ok {
-		out = append(out, g)
-	}
-	out = append(out, DependencyGroup(a))
+	return SettingGroup{Attention: AttentionNone, Key: GroupLog, Title: T("game log"), Summary: facts(Tf("Archo Monitor %s", T("not installed"))), Items: []SettingItem{mon, saveCopy, autoCheck}}
+}
 
-	data := SettingGroup{Title: T("community data")}
+// CommunityDataGroup is Settings › community data: the three datasets' sources and dates.
+func CommunityDataGroup(a *app.App) SettingGroup {
+	data := SettingGroup{Key: GroupData, Title: T("community data"), Attention: AttentionNone}
 	status := a.DataStatus()
 	checked := a.AutomaticStatus("data").Checked
 	for _, info := range status {
@@ -401,21 +441,36 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		}
 	}
 	data.Note = lastChecked(a, checked)
+	// the list row: the oldest download's date, or "not downloaded" while one is missing
+	var oldest time.Time
+	missing := false
 	for _, d := range app.Datasets {
 		v := T("not downloaded")
 		if di := status[d.Key]; di != nil {
 			v = Tf("%d entries  %s", di.Entries, ShortDate(di.Fetched))
+			if oldest.IsZero() || di.Fetched.Before(oldest) {
+				oldest = di.Fetched
+			}
+		} else {
+			missing = true
 		}
 		data.Items = append(data.Items, SettingItem{Label: T(d.Desc), Value: a.DataSource(d), Edit: "url", Argv: []string{"config", "set", "data." + d.Key + ".url", "{}"},
 			Note: v})
 	}
 	data.Items = append(data.Items, SettingItem{Label: T("update the community data"), Actions: []SettingAction{{Label: T("update now"), Argv: []string{"data", "update"},
 		Confirm: T("RimArcho downloads the three files from their sources (about 50 MB)")}}})
-	out = append(out, data)
+	data.Summary = facts(T("not downloaded"))
+	if !missing && !oldest.IsZero() {
+		data.Summary = facts(Tf("updated %s", ShortDate(oldest)))
+	}
+	return data
 
-	// Storage: the database and the caches, what takes room on the disk.
+}
+
+// StorageGroup is Settings › storage: the database and the caches, what takes room on the disk.
+func StorageGroup(a *app.App) SettingGroup {
 	db, _ := a.DBInfo()
-	storage := SettingGroup{Title: T("storage"), Items: []SettingItem{
+	storage := SettingGroup{Key: GroupStorage, Title: T("storage"), Attention: AttentionNone, Items: []SettingItem{
 		{Label: T("database"), Value: SizeText(db.Bytes), Note: db.Path, NotePaths: []string{db.Path}, Actions: []SettingAction{
 			{Label: T("back up"), Argv: []string{"db", "backup"}},
 			{Label: T("compact"), Argv: []string{"db", "vacuum"}},
@@ -423,30 +478,16 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		}},
 		{Key: "import.managers", Label: T("import from RimSort, RimCrow, RimPy or RimStack"), Actions: []SettingAction{{Label: T("import…"), Argv: []string{"import-managers"}}}},
 	}}
+	var caches int64
 	for _, c := range a.Caches() {
+		caches += c.Bytes
 		storage.Items = append(storage.Items, SettingItem{Label: T(c.Desc), Value: Tf("%s  %d items", SizeText(c.Bytes), c.Files),
 			Actions: []SettingAction{{Label: T("clear"), Argv: []string{"cache", "clear", c.Kind}}}})
 	}
-	out = append(out, storage)
+	// "database 6.3 MB  caches 250 KB"
+	storage.Summary = facts(Tf("database %s", SizeText(db.Bytes)), Tf("caches %s", SizeText(caches)))
+	return storage
 
-	// Last: its own page with the plan (the interfaces open it; archo uninstall is not a
-	// settings command).
-	out = append(out, SettingGroup{Title: T("uninstall"), Items: []SettingItem{
-		{Label: T("uninstall RimArcho"), Note: T("remove what RimArcho put on this machine and put back what it changed"),
-			Actions: []SettingAction{{Label: T("uninstall RimArcho…"), Argv: []string{"uninstall"}}}},
-	}})
-	for gi := range out {
-		for ii := range out[gi].Items {
-			for ai := range out[gi].Items[ii].Actions {
-				a := &out[gi].Items[ii].Actions[ai]
-				a.Task = SettingTask(a.Argv)
-				if a.Task != "" {
-					a.Pending = TaskPending(a.Task)
-				}
-			}
-		}
-	}
-	return out
 }
 
 // NetworkGroup: the proxy and the GitHub mirror for RimArcho's own downloads (17 §2.2),
@@ -478,17 +519,18 @@ func NetworkGroup(a *app.App) SettingGroup {
 	for _, m := range netcfg.AutoMirrors {
 		hosts = append(hosts, netcfg.MirrorHost(m))
 	}
-	return SettingGroup{Title: T("network"), Items: []SettingItem{
-		{Label: T("proxy"), Value: proxy, Edit: "text", Argv: []string{"config", "set", "network.proxy", "{}"},
-			ValueNote: now,
-			Hover:     T("system follows the Windows proxy (Clash, v2rayN) and goes direct when it is not running; Steam goes direct first, so game accelerators keep working; off goes direct only; or a proxy such as http://127.0.0.1:7890 or socks5://127.0.0.1:7891")},
-		{Label: T("GitHub mirror"), Value: mv, EditValue: &mirror, Edit: "text", Argv: []string{"config", "set", "network.github_mirror", "{}"},
-			ValueNote: mnow,
-			Hover:     Tf("automatic tries GitHub first, then %s; off never uses a mirror; or one mirror tried first, such as https://gh-proxy.org/. RimArcho's own updates are checked against GitHub's checksum, never one from an automatic mirror", strings.Join(hosts, ", "))},
-		{Key: "feedback.replies", Label: T("check for replies to my reports"), Value: cmds.Setting(a, "feedback.replies"), Edit: "choice", Choices: []string{"on", "off"}, ChoiceLabels: []string{T("on"), T("off")},
-			Argv: []string{"config", "set", "feedback.replies", "{}"},
-			Note: T("asks the feedback relay when RimArcho starts and when Feedback opens; nothing else is sent")},
-	}}
+	return SettingGroup{Key: GroupNetwork, Title: T("network"), Attention: AttentionNone,
+		Summary: facts(Tf("proxy: %s", proxy), Tf("mirror: %s", mv)), Items: []SettingItem{
+			{Label: T("proxy"), Value: proxy, Edit: "text", Argv: []string{"config", "set", "network.proxy", "{}"},
+				ValueNote: now,
+				Hover:     T("system follows the Windows proxy (Clash, v2rayN) and goes direct when it is not running; Steam goes direct first, so game accelerators keep working; off goes direct only; or a proxy such as http://127.0.0.1:7890 or socks5://127.0.0.1:7891")},
+			{Label: T("GitHub mirror"), Value: mv, EditValue: &mirror, Edit: "text", Argv: []string{"config", "set", "network.github_mirror", "{}"},
+				ValueNote: mnow,
+				Hover:     Tf("automatic tries GitHub first, then %s; off never uses a mirror; or one mirror tried first, such as https://gh-proxy.org/. RimArcho's own updates are checked against GitHub's checksum, never one from an automatic mirror", strings.Join(hosts, ", "))},
+			{Key: "feedback.replies", Label: T("check for replies to my reports"), Value: cmds.Setting(a, "feedback.replies"), Edit: "choice", Choices: []string{"on", "off"}, ChoiceLabels: []string{T("on"), T("off")},
+				Argv: []string{"config", "set", "feedback.replies", "{}"},
+				Note: T("asks the feedback relay when RimArcho starts and when Feedback opens; nothing else is sent")},
+		}}
 }
 
 // RouteText is a route as netcfg names it (direct, proxy host:port, mirror host) in the

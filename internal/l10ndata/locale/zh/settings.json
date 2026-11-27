@@ -422,5 +422,17 @@
   "the wording you suggest": "你建议的说法",
   "(no text)": "（无文字）",
   "press %s on that page first": "先在那个页面按 %s",
-  "remove this line": "删除这一行"
+  "remove this line": "删除这一行",
+  "anonymous": "匿名",
+  "external": "外部",
+  "%s available": "%s 可更新",
+  "%d unavailable": "%d 个不可用",
+  "remove RimArcho from this computer": "从这台电脑移除 RimArcho",
+  "Archo Monitor %s": "Archo Monitor %s",
+  "updated %s": "更新于 %s",
+  "database %s": "数据库 %s",
+  "caches %s": "缓存 %s",
+  "proxy: %s": "代理：%s",
+  "mirror: %s": "镜像：%s",
+  "development version": "开发版"
 }

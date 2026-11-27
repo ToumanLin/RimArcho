@@ -6,6 +6,7 @@
 import { $, el, api, T, Tf, say } from "./state.js";
 import { on } from "./api.js";
 import { icon } from "./icons.js";
+import { revealSetting } from "./settingspage.js";
 
 const HIDDEN_KEY = "ui.gui.update.hidden";
 let ui = null;
@@ -53,11 +54,9 @@ export function draw() {
   box.replaceChildren(go, x);
 }
 
-// goSelfUpdate opens the RimArcho row in settings › About, the install button focused.
+// goSelfUpdate opens the RimArcho row in settings › About, marked, the install button focused.
 export async function goSelfUpdate() {
   await ui.go("settings");
-  const row = document.querySelector('[data-setting-action="update"]')?.closest("[data-setting-row]")
-    || document.querySelector('[data-setting-action="update --check"]')?.closest("[data-setting-row]");
-  row?.scrollIntoView({ block: "center" });
-  row?.querySelector("button")?.focus({ preventScroll: true });
+  revealSetting('#screen [data-setting-action="update"]') || revealSetting('#screen [data-setting-action="update --check"]') ||
+    revealSetting('#screen [id="setting-row-archo.version"]');
 }

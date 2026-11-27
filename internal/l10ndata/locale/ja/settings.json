@@ -422,5 +422,17 @@
   "the wording you suggest": "提案する言い回し",
   "(no text)": "（テキストなし）",
   "press %s on that page first": "先にそのページで %s を押してください",
-  "remove this line": "この行を削除"
+  "remove this line": "この行を削除",
+  "anonymous": "匿名",
+  "external": "外部",
+  "%s available": "%s が利用可能",
+  "%d unavailable": "%d 件が使用不可",
+  "remove RimArcho from this computer": "このコンピューターから RimArcho を削除",
+  "Archo Monitor %s": "Archo Monitor %s",
+  "updated %s": "%s に更新",
+  "database %s": "データベース %s",
+  "caches %s": "キャッシュ %s",
+  "proxy: %s": "プロキシ: %s",
+  "mirror: %s": "ミラー: %s",
+  "development version": "開発版"
 }

@@ -42,7 +42,7 @@ func AgentGroup(a *app.App) (SettingGroup, bool) {
 		key = T("stored in Windows Credential Manager")
 	}
 	empty := ""
-	return SettingGroup{Title: T("Archo Agent"),
+	return SettingGroup{Key: GroupAgent, Title: T("Archo Agent"), Summary: facts(status), Attention: AttentionNone,
 		Note: T("Archo as an AI agent in a console window of its own. It works through RimArcho's MCP tools, asks you before anything that changes your game, and sends your model provider no user name or Steam account."),
 		Items: []SettingItem{
 			{Label: T("Archo Agent"), Value: status, Actions: actions},
