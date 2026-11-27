@@ -10,11 +10,12 @@ const NewFor = 7 * 24 * time.Hour
 
 // Added is when each Mod (lineage) was first found: its earliest copy's first scan. A
 // locked version or another copy of a Mod already there does not make the Mod newer.
-// Archo Monitor is left out (zero): RimArcho installs it, the player did not add it.
+// Archo Monitor and the generated Mods (IsGenerated) are left out (zero): RimArcho installs
+// them, the player did not add them.
 func Added(st *LoadoutState) map[string]time.Time {
 	out := make(map[string]time.Time, len(st.Ix.ByLineage))
 	for id, mods := range st.Ix.ByLineage {
-		if slices.ContainsFunc(mods, IsMonitor) {
+		if slices.ContainsFunc(mods, IsMonitor) || slices.ContainsFunc(mods, IsGenerated) {
 			continue
 		}
 		var first time.Time

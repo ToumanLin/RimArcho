@@ -1,7 +1,8 @@
 // The plan editor's looks view (16 §2.5 Looks view, 21): which Mod's textures the game
 // shows, for the list being edited. This file is the view's shell and its first layer: the
 // editor | looks switch in the editor's head, the gallery (1), the Mods that supply textures
-// (2), the editor's own load-order rules card (3) and the RimArcho Looks Preference card (4). A look
+// (2), the editor's own load-order rules card (3) and the Preference card (4: RimArcho Looks
+// Preference and RimArcho Styles Preference). A look
 // opens the looks editor (lookseditor.js). Every winner, state, count and prediction comes
 // from Go (internal/view/looks.go); nothing of them is worked out here.
 import { S, $, el, esc, api, T, Tf, say, errText, cur, ROW_H } from "./state.js";
@@ -14,7 +15,7 @@ import { setRulesNumber, setRulesPlace, showRules } from "./rules.js";
 import { createBar } from "./filterbar.js";
 import { queryParts } from "./searchsuggest.js";
 import { GRID, gridLayout, visibleRows, stepCard, scrollFor, texURL } from "./looksgrid.js";
-import { applyGate, CONFIRMED_KEY } from "./looksconfirm.js";
+import { applyGate, CONFIRMED_KEY, STYLES_CONFIRMED_KEY, applyLines, addLines } from "./looksconfirm.js";
 import * as editor from "./lookseditor.js";
 
 const VIEW_KEY = "ui.gui.plan.view", SCOPE_KEY = "ui.gui.looks.scope";
@@ -43,6 +44,7 @@ const L = {
   error: "",
   warn: null,     // the dry run that found mixed results, until the player answers
   buildError: "", // why the last rebuild did not run (the choice is kept)
+  stylesError: "", // the same for RimArcho Styles Preference after an add or a remove (the entry is kept)
   top: 0,
 };
 
@@ -154,7 +156,7 @@ function build() {
     scope: () => L.scope || "plan",
     overview: () => L.ov,
     setOverview: (ov) => { if (ov) { L.ov = ov; drawSide(); } },
-    reading, gate, wrote, back: () => closeLook(), scopeWord, modAt,
+    reading, gate, wrote, styleGate, wroteStyle, back: () => closeLook(), scopeWord, modAt,
   });
 }
 
@@ -709,7 +711,9 @@ function showChosen() {
   loadGallery();
 }
 
-// drawPref: the RimArcho Looks Preference card: its choices by state, what RimArcho wrote there, the folder.
+// drawPref: the Preference card: RimArcho Looks Preference with its choices by state and
+// RimArcho Styles Preference with its entries by state, what RimArcho wrote in each, and the
+// folder that holds both.
 function drawPref() {
   const card = $("#looks .lk-pref");
   if (!card) return;
@@ -717,27 +721,40 @@ function drawPref() {
   const body = $(".lk-prefbody", card), ov = L.ov;
   body.replaceChildren();
   if (!ov) return;
-  const g = ov.generated;
-  const row = el("button", "lk-prow" + (L.pick?.chosen && !L.search ? " sel" : ""));
+  const g = ov.generated, st = ov.styles;
+  const states = (parts, none) => {
+    const box = el("span", "pv");
+    const shown = parts.filter(([n]) => n > 0);
+    if (!shown.length) box.append(el("span", "", none));
+    for (const [n, f, cls] of shown) box.append(el("span", cls, Tf(f, num(n))));
+    return box;
+  };
+  const facts = (x) => {
+    const box = el("div", "lk-pfacts");
+    const how = !x.files ? "" : x.copied && x.linked ? Tf("%s linked, %s copied", num(x.linked), num(x.copied)) : x.copied ? T("copied") : T("linked, not copied");
+    box.append(el("span", "", x.files === 1 ? T("1 file") : Tf("%s files", num(x.files))));
+    if (x.files) box.append(el("span", "", x.size), el("span", "", how));
+    return box;
+  };
+  const row = el("button", "lk-prow lk-plooks" + (L.pick?.chosen && !L.search ? " sel" : ""));
   row.type = "button";
   row.title = T("show the looks that have a choice");
   row.setAttribute("aria-pressed", String(!!L.pick?.chosen && !L.search));
   row.onclick = () => showChosen();
-  const states = el("span", "pv");
-  const parts = [[g.applied, "%s applied", ""], [g.notNeeded, "%s not needed", ""], [g.asleep, "%s asleep", "dim"], [g.broken, "%s broken", "bad"]].filter(([n]) => n > 0);
-  if (!parts.length) states.append(el("span", "", T("no choice yet")));
-  for (const [n, f, cls] of parts) states.append(el("span", cls, Tf(f, num(n))));
-  row.append(el("span", "pn", g.name), states);
-  body.append(row);
-  const facts = el("div", "lk-pfacts");
-  const how = !g.files ? "" : g.copied && g.linked ? Tf("%s linked, %s copied", num(g.linked), num(g.copied)) : g.copied ? T("copied") : T("linked, not copied");
-  facts.append(el("span", "", g.files === 1 ? T("1 file") : Tf("%s files", num(g.files))));
-  if (g.files) facts.append(el("span", "", g.size), el("span", "", how));
-  body.append(facts);
+  row.append(el("span", "pn", g.name), states([[g.applied, "%s applied", ""], [g.notNeeded, "%s not needed", ""], [g.asleep, "%s asleep", "dim"], [g.broken, "%s broken", "bad"]], T("no choice yet")));
+  body.append(row, facts(g));
+  if (st) {
+    // the styles row only states: Go has no gallery of the looks that have an entry
+    const srow = el("div", "lk-prow lk-pstyles");
+    srow.append(el("span", "pn", st.name), states([[st.active, "%s active", ""], [st.skipped, "%s skipped", "dim"], [st.asleep, "%s asleep", "dim"], [st.broken, "%s broken", "bad"]], T("no style or random variant yet")));
+    const sfacts = facts(st);
+    sfacts.classList.add("lk-psfacts");
+    body.append(srow, sfacts);
+  }
   const dir = el("div", "lk-pdir");
   copyablePath(dir, g.dir);
   body.append(dir);
-  if (g.dirChosen) body.append(el("p", "lk-pnote", T("the first apply creates this folder")));
+  if (g.dirChosen) body.append(el("p", "lk-pnote", T("the first apply or add creates this folder")));
   const note = (text, cls, button) => {
     const p = el("p", "lk-pnote " + cls, text);
     if (button) p.append(button);
@@ -752,6 +769,8 @@ function drawPref() {
   if (ov.gameRunning) note(T("a game is running: a choice is stored now, and RimArcho Looks Preference is rebuilt at the next write to the game"), "warn");
   if (L.buildError) note(Tf("RimArcho Looks Preference was not rebuilt: %s", L.buildError), "warn", ov.gameRunning ? null : rebuild());
   else if (!g.entry && g.applied > 0) note(T("RimArcho Looks Preference is not in this list, so its choices do not reach the game"), "warn", rebuild());
+  if (L.stylesError) note(Tf("RimArcho Styles Preference was not rebuilt: %s", L.stylesError), "warn lk-pstyleserr");
+  else if (st && !st.entry && st.active > 0) note(T("RimArcho Styles Preference is not in this list, so its styles and random variants do not reach the game; adding one in this list puts it in"), "warn");
   if (ov.warnings) note(Tf("%s texture files could not be read", num(ov.warnings)), "dim");
 }
 
@@ -920,30 +939,37 @@ async function undoPicked() {
   wrote(d);
 }
 
+// what the confirmations' line builders (looksconfirm.js) word with
+const WORDS = { T, Tf, num };
+const fail = (e) => say("fail", errText(e));
+
 // gate: an apply, behind the first apply's confirmation until the player turns it off.
 function gate({ preview, facts, title, run }) {
   return applyGate({
     confirmed: () => !!(L.ov && L.ov.confirmed),
     preview,
-    ask: (done, go) => confirmApply(title, facts(done), done, go),
+    ask: (done, go) => confirmWrite(title, applyLines(facts(done), done, WORDS), T("apply"), go),
     remember: async () => { await api.SetSetting(CONFIRMED_KEY, "1"); if (L.ov) L.ov.confirmed = true; },
-    fail: (e) => say("fail", errText(e)),
+    fail,
   })(run);
 }
 
-// confirmApply: what the apply writes, that the feature is in test, and "do not show this
-// again" (21 §6). A modal confirmation (popups.js panel); nothing is written before its yes.
-function confirmApply(title, facts, done, go) {
-  const files = !done.files ? T("none: the load order already gives these textures")
-    : done.copied && done.linked ? Tf("%s linked, %s copied (%s)", num(done.linked), num(done.copied), done.size)
-      : done.copied ? Tf("%s, copied (%s)", num(done.files), done.size) : Tf("%s, linked (no copies)", num(done.files));
-  const lines = [...facts.map(([k, v]) => k + ": " + v), T("folder") + ": " + done.dir, T("files") + ": " + files, "",
-    T("RimArcho keeps a local Mod, RimArcho Looks Preference, last in the list. It holds links to the textures you chose and no Defs."),
-    T("Your Mods and the load order are not changed, and saves do not depend on it. Undo removes a choice again.")];
-  if (done.added) lines.push(T("This list gains RimArcho Looks Preference as its last Mod: one step of the list's undo."));
-  if (done.dirChosen) lines.push(T("The folder is created now."));
-  if (done.mixed) lines.push(T("Mixed result: some textures of the look still come from another Mod."));
-  if (done.buildError) lines.push(done.buildError);
+// styleGate: an add of a style or random variant, behind the first add's confirmation; its
+// "do not show this again" is a setting of its own (21 §6).
+function styleGate({ preview, facts, kind, title, run }) {
+  return applyGate({
+    confirmed: () => !!(L.ov && L.ov.styles && L.ov.styles.confirmed),
+    preview,
+    ask: (done, go) => confirmWrite(title, addLines(facts(done), done, kind, WORDS), T("add"), go),
+    remember: async () => { await api.SetSetting(STYLES_CONFIRMED_KEY, "1"); if (L.ov && L.ov.styles) L.ov.styles.confirmed = true; },
+    fail,
+  })(run);
+}
+
+// confirmWrite: what the apply or add writes (lines), that the feature is in test, and "do
+// not show this again" (21 §6). A modal confirmation (popups.js panel); nothing is written
+// before its yes.
+function confirmWrite(title, lines, goLabel, go) {
   const body = el("div", "lk-ask");
   body.append(pop.confirmBody(lines));
   const test = el("div", "lk-test");
@@ -956,7 +982,7 @@ function confirmApply(title, facts, done, go) {
   box.type = "checkbox";
   again.append(box, document.createTextNode(T("do not show this again")));
   body.append(test, again);
-  pop.panel(title, body, T("apply"), () => go(box.checked), "", "looks");
+  pop.panel(title, body, goLabel, () => go(box.checked), "", "looks");
 }
 
 // wrote: an apply, undo or rebuild answered. Its sentence goes to the status line; a rebuild
@@ -969,6 +995,17 @@ function wrote(d) {
   drawSide();
   if (L.layer === 1) loadGallery(true);
   // the list may have gained its RimArcho Looks Preference entry: the editor's rows follow
+  if (d.added) L.ui.reload();
+}
+
+// wroteStyle: an add or a remove of a style or random variant answered (view.LookStyleDone).
+// The entry is kept even when the rebuild did not run; why stays on the Preference card.
+function wroteStyle(d) {
+  L.stylesError = d.buildError || "";
+  say(d.buildError ? "fail" : "ok", [d.text, d.buildError || d.note].filter(Boolean).join("  "));
+  if (d.overview) setOverview(d.overview);
+  drawSide();
+  // the list may have gained its RimArcho Styles Preference entry: the editor's rows follow
   if (d.added) L.ui.reload();
 }
 

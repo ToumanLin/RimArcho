@@ -102,9 +102,6 @@ var bridgeUncalled = map[string]string{
 	"PreviewManagerImport":       "unused; open question",
 	"ApplyManagerImport":         "unused; open question (api.js still lists it in writesGame)",
 	"ApplyManagerImportProfiles": "unused; open question (api.js still lists it in writesGame)",
-	"LookStyleAdd":               "looks view, add row follows",
-	"LookStyleAddPreview":        "looks view, add row follows",
-	"LookStyleRemove":            "looks view, add row follows",
 	"LookPreview":                "one prediction on its own: the looks editor shows the ones LookDetail carries per target (16 §2.5 Looks view)",
 }
 

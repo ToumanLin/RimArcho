@@ -128,6 +128,9 @@ func (a *App) MoveToLockedFor(ref string, dryRun bool, reason string) (*MoveResu
 	if err != nil {
 		return nil, err
 	}
+	if err := generatedRefusal(st.Ix, m, "moved into the lock library"); err != nil {
+		return nil, err
+	}
 	switch {
 	case m.Status != identity.Live:
 		return nil, fmt.Errorf("%s is no longer on disk", st.Ix.Ref(m.ID))

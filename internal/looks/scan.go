@@ -140,10 +140,14 @@ func (s *modScan) walkTextures(ctx context.Context, folder string, old map[strin
 		}
 		in, _ := filepath.Rel(dir, p)
 		key := strings.ToLower(filepath.ToSlash(strings.TrimSuffix(in, filepath.Ext(in))))
-		if s.tex[key] != nil {
+		rel, _ := filepath.Rel(s.mod.Root, p)
+		if top := s.tex[key]; top != nil {
+			// a higher-priority load folder supplies the key: this file is never shown, and
+			// only its place is kept (a pack removes it with the Mod's texture, 10 §2)
+			top.Under = append(top.Under, &File{Rel: filepath.ToSlash(rel), Tex: filepath.ToSlash(in), Path: p, Size: info.Size(),
+				MTime: info.ModTime().UnixNano(), SameAs: -1, ext: ext})
 			return nil
 		}
-		rel, _ := filepath.Rel(s.mod.Root, p)
 		found[key] = append(found[key], &File{Rel: filepath.ToSlash(rel), Tex: filepath.ToSlash(in), Path: p, Size: info.Size(),
 			MTime: info.ModTime().UnixNano(), SameAs: -1, ext: ext})
 		return nil

@@ -56,6 +56,9 @@ func (a *App) UpdateToWorkshop(ref string, dryRun bool) (*WorkshopCopyUpdate, er
 	if err != nil {
 		return nil, err
 	}
+	if err := generatedRefusal(st.Ix, m, "replaced by a Workshop copy"); err != nil {
+		return nil, err
+	}
 	up := st.Ix.WorkshopUpdateSource(m)
 	if up == nil {
 		return nil, fmt.Errorf("%s: no installed Workshop or SteamCMD copy to update this local copy from", st.Ix.Ref(m.ID))

@@ -1,14 +1,19 @@
 // The looks editor (16 §2.5 Looks view, layer 2): one look, opened from a gallery card.
 // Four numbered cards, each doing one thing: 1 which texture (the only place that selects the
 // slot), 2 compare (the selected Mod beside what is in game; selects nothing), 3 override
-// chain (the only place that selects the Mod), 4 operation (apply and undo for that Mod).
+// chain (the only place that selects the Mod; under it the look's choices and its styles and
+// random variants, each with a remove control), 4 operation (for that Mod: apply, add as a
+// style or random variant, undo).
 // The view model is view.LookDetail: the axes, each slot's chain, the provider in game, the
-// targets an apply can name and their predictions all come from Go.
+// targets an apply can name and their predictions, and what can be added and why not
+// (view.LookAdd) all come from Go.
 import { $, el, esc, api, T, Tf, say, errText, slideThumb } from "./state.js";
 import { icon } from "./icons.js";
 import { choiceControl } from "./choices.js";
 import { wireSeparator } from "./separator.js";
 import { texURL } from "./looksgrid.js";
+import { addPick } from "./looksconfirm.js";
+import * as pop from "./popups.js";
 
 const E = {
   ctx: null, shown: false,
@@ -17,6 +22,10 @@ const E = {
   slot: "", west: false, // the texture shown; west: the east slot drawn mirrored
   view: "side", zoom: "fit", layer: "texture", split: 50,
   target: 0,           // index into d.targets
+  addKind: "style",    // the add row: a style or a random variant ("variant")
+  addTarget: { style: "", variant: "" }, // the target chosen per kind ("": Go's first that can be added)
+  addRandom: false,    // a style: also at random on new items
+  entry: 0,            // the override chain's cursor when it is on a style or variant entry (its id)
   focus: 1, seq: 0,
   changed: false,      // a choice was written: the gallery reads again on the way back
   error: "",
@@ -98,8 +107,12 @@ export function initEditor(ctx) {
     if (t) setSlot(t.dataset.slot, t.dataset.west === "1");
   });
   chain.addEventListener("click", (e) => {
+    const rm = e.target.closest(".lk-rm");
+    if (rm) return removeEntry(+rm.dataset.rm);
+    const en = e.target.closest(".lk-entry");
+    if (en) return setEntry(+en.dataset.entry);
     const r = e.target.closest(".lk-cr[data-pos]");
-    if (r) selectMod(+r.dataset.pos);
+    if (r) { setEntry(0); selectMod(+r.dataset.pos); }
   });
   cmp.addEventListener("click", (e) => {
     const b = e.target.closest(".lk-show");
@@ -113,7 +126,8 @@ export function initEditor(ctx) {
 // ---- opening, reading, leaving ----
 
 export function open(id, pos) {
-  Object.assign(E, { id, pos, d: null, slot: "", west: false, target: 0, changed: false, error: "", shown: true, focus: 1 });
+  Object.assign(E, { id, pos, d: null, slot: "", west: false, target: 0, changed: false, error: "", shown: true, focus: 1,
+    addTarget: { style: "", variant: "" }, addRandom: false, entry: 0 });
   draw();
   reload();
 }
@@ -424,10 +438,49 @@ function wireSlider(body) {
   };
 }
 
-const CHOICE = { applied: "applied", "not needed": "not needed", asleep: "asleep", broken: "broken" };
+const CHOICE = { applied: "applied", "not needed": "not needed", asleep: "asleep", broken: "broken", skipped: "skipped" };
+
+const entries = () => (E.d && E.d.add && E.d.add.entries) || [];
+
+// entryRows: RimArcho Styles Preference and this look's entries (view.LookStyleEntry): what
+// it is, from which Mod, its state in words when it is not active, and its remove control.
+function entryRows() {
+  const ov = E.ctx.overview(), list = entries();
+  const rows = list.map((e) => {
+    const what = e.label + (e.random ? ", " + T("also at random on new items") : ""), rm = Tf("remove %s", e.label);
+    const state = e.state !== "active" ? `<span class="st ${e.state === "broken" ? "bad" : "dim"}">${esc(T(CHOICE[e.state] || e.state) + (e.why ? ": " + e.why : ""))}</span>`
+      : e.shared ? `<span class="st dim">${esc(T("its category has another style for the thing"))}</span>` : "";
+    return `<div class="lk-cr st lk-entry${e.id === E.entry ? " cur" : ""}" role="option" aria-selected="${e.id === E.entry}" id="lk-en-${e.id}" data-entry="${e.id}" title="${esc(what)}">` +
+      `<span></span><div class="who"><div class="nm">${esc(what)}</div>` +
+      `<div class="ln2"><span class="dec">${esc(Tf("from %s", e.mod || "—"))}</span>${state}</div></div>` +
+      `<span class="act"><button type="button" class="icon lk-rm" data-rm="${e.id}" title="${esc(rm)}  del" aria-label="${esc(rm)}">${icon.close}</button></span></div>`;
+  }).join("");
+  return `<div class="lk-cr gen lk-sgen"><span class="lk-t none" style="width:32px;height:32px"></span>` +
+    `<div class="who"><div class="nm">${esc((ov && ov.styles && ov.styles.name) || "RimArcho Styles Preference")}</div>` +
+    (list.length ? "" : `<div class="ln2"><span class="sub">${esc(T("no style or random variant from this look"))}</span></div>`) +
+    `</div><span class="act"></span></div>` + rows;
+}
+
+// setEntry moves the chain's cursor onto an entry (0: back to the selected Mod). It selects
+// nothing: the Mod the other cards show stays.
+function setEntry(id) {
+  E.entry = id;
+  const body = $(".lk-chainbody", host());
+  for (const r of body.querySelectorAll(".lk-entry")) {
+    const on = +r.dataset.entry === id;
+    r.classList.toggle("cur", on);
+    r.setAttribute("aria-selected", String(on));
+  }
+  body.classList.toggle("enc", !!id);
+  const at = id ? $(`#lk-en-${id}`, body) : $(".lk-cr.sel", body);
+  if (at) body.setAttribute("aria-activedescendant", at.id); else body.removeAttribute("aria-activedescendant");
+  if (id && at) at.scrollIntoView({ block: "nearest" });
+  E.ctx.ui.renderHints();
+}
 
 // drawChain: the Mods that supply the look, in load order; a row only selects its Mod. Then
-// RimArcho Looks Preference with this look's choices and their states.
+// RimArcho Looks Preference with this look's choices and their states, and RimArcho Styles
+// Preference with its styles and random variants.
 function drawChain() {
   const card = $(".lk-chain", host()), d = E.d, body = $(".lk-chainbody", card);
   $(".head", card).innerHTML = `<span class="n">3</span><span class="t" id="lk-chain-t">${esc(T("override chain"))}</span><span class="q">${esc(T("load order"))}</span>` +
@@ -451,12 +504,15 @@ function drawChain() {
       `<span class="st ${c.state === "broken" ? "bad" : c.state === "asleep" || c.overruled ? "dim" : ""}">${esc(state)}</span></div>`;
   }).join("") : `<div class="ln2"><span class="sub">${esc(T("no choice: the load order decides"))}</span></div>`;
   const ov = E.ctx.overview(), by = s && s.byChoice;
+  if (E.entry && !entries().some((e) => e.id === E.entry)) E.entry = 0;
   body.innerHTML = (d.mixed ? `<p class="lk-warn">${icon.warn}<span>${esc(T("in game now: the look takes textures from more than one Mod"))}</span></p>` : "") +
     rows + `<div class="lk-sep"></div>` +
     `<div class="lk-cr gen">${by ? thumb(s, s.inGame, 32, E.west) : `<span class="lk-t none" style="width:32px;height:32px"></span>`}` +
-    `<div class="who"><div class="nm">${esc((ov && ov.generated.name) || "RimArcho Looks Preference")}</div>${lines}</div><span class="act"></span></div>`;
+    `<div class="who"><div class="nm">${esc((ov && ov.generated.name) || "RimArcho Looks Preference")}</div>${lines}</div><span class="act"></span></div>` +
+    entryRows();
   body.scrollTop = top;
-  const at = $(".lk-cr.sel", body);
+  body.classList.toggle("enc", !!E.entry);
+  const at = E.entry ? $(`#lk-en-${E.entry}`, body) : $(".lk-cr.sel", body);
   if (at) body.setAttribute("aria-activedescendant", at.id); else body.removeAttribute("aria-activedescendant");
 }
 
@@ -469,7 +525,9 @@ function targetLabel(t) {
 }
 
 // drawOps: the operation card: apply the selected Mod's textures in game, for what the
-// dropdown names, with Go's prediction under it; undo this look's choice in the scope.
+// dropdown names, with Go's prediction under it; add the Mod's version beside the one in game,
+// as a style or a random variant of what Go offers, with Go's note or reason under it; undo
+// this look's choice in the scope.
 function drawOps() {
   const card = $(".lk-ops", host()), d = E.d, body = $(".lk-opsbody", card), scope = E.ctx.scope();
   $(".head", card).innerHTML = `<span class="n">4</span><span class="t">${esc(T("operation"))}</span>` +
@@ -497,11 +555,11 @@ function drawOps() {
   go.onclick = () => apply();
   row.append(pick, go);
   op.append(row);
-  const say1 = (text, cls) => {
+  const say1 = (text, cls, box = op) => {
     const w = el("p", "ow " + cls);
     if (cls === "warn") w.innerHTML = icon.warn;
     w.append(el("span", "", text));
-    op.append(w);
+    box.append(w);
   };
   if (!m) say1(T("select a Mod in the override chain"), "quiet");
   else if (out === "none") say1(Tf("%s has no texture for it.", m.name), "warn");
@@ -511,6 +569,41 @@ function drawOps() {
   if (d.kind === "folder" && m) say1(T("A folder's files are merged across Mods: this replaces the files both Mods name alike, and files only other Mods add stay."), "quiet");
   if (ov && ov.gameRunning) say1(T("A game is running: the choice is stored now, and RimArcho Looks Preference is rebuilt at the next write to the game."), "warn");
   body.append(op);
+
+  // add in game as: a [style | random variant] in / of [target]  add
+  const A = addPick(d.add, E.addKind, E.addTarget[E.addKind]), c = A.choice;
+  const more = el("div", "lk-op lk-addop");
+  more.append(el("div", "oh", T("add in game as")));
+  const arow = el("div", "or");
+  const words = el("div", "lk-addrow");
+  const kind = choiceControl(T("add in game as"), [{ value: "style", label: T("style") }, { value: "variant", label: T("random variant") }], A.style ? "style" : "variant");
+  kind.classList.add("lk-addkind");
+  kind.onchange = () => { E.addKind = kind.value; drawOps(); $(".lk-addkind", host())?.focus(); };
+  const named = (x) => (!A.style && x.target === "default" ? T("the default look") : x.target);
+  const where = choiceControl(A.style ? T("style category") : T("random variant of"), A.list.map((x) => ({ value: x.target, label: named(x) })), c ? c.target : "");
+  where.classList.add("lk-addtarget");
+  where.disabled = !A.list.length;
+  where.onchange = () => { E.addTarget[E.addKind] = where.value; drawOps(); $(".lk-addtarget", host())?.focus(); };
+  const add = el("button", "btn lk-add", T("add"));
+  add.type = "button";
+  add.dataset.envWrite = "looks";
+  add.disabled = !m || !A.can;
+  add.onclick = () => addStyle();
+  words.append(el("span", "w", T("a")), kind, el("span", "w", A.style ? T("in") : T("of")), where);
+  arow.append(words, add);
+  more.append(arow);
+  if (A.style) {
+    const lab = el("label", "check-row lk-addrandom");
+    const box = el("input");
+    box.type = "checkbox";
+    box.checked = E.addRandom;
+    box.onchange = () => { E.addRandom = box.checked; };
+    lab.append(box, document.createTextNode((d.add && d.add.randomLabel) || T("allow new items to receive this style at random")));
+    more.append(lab);
+  }
+  if (A.note) say1(A.note, "quiet lk-addnote", more);
+  if (ov && ov.gameRunning) say1(T("A game is running: the style or random variant is stored now, and RimArcho Styles Preference is rebuilt at the next write to the game."), "warn", more);
+  body.append(more);
 
   const last = el("div", "lk-op");
   const line = el("div", "or");
@@ -553,6 +646,46 @@ async function undoChoice() {
   E.changed = true;
   E.ctx.wrote(r);
   reload();
+}
+
+// addStyle: add the selected Mod's version as what the add row names, for all lists (21 §5).
+function addStyle() {
+  const d = E.d, m = provider(d.selected), A = addPick(d.add, E.addKind, E.addTarget[E.addKind]), c = A.choice;
+  if (!m || !A.can) return;
+  const random = A.style && E.addRandom, args = [d.id, m.ref, c.kind, c.target, random];
+  E.ctx.styleGate({
+    preview: () => api.LookStyleAddPreview(...args),
+    title: T("add this look in game?"),
+    kind: c.kind,
+    facts: () => [[T("look"), d.title], [T("from"), m.name], [T("as"), c.label + (random ? ", " + T("also at random on new items") : "")],
+      [T("for"), T("all lists (styles are shared)")]],
+    run: async () => {
+      let r;
+      try { r = await api.LookStyleAdd(...args); } catch (e) { return say("fail", errText(e)); }
+      if (r.added) E.changed = true;
+      E.ctx.wroteStyle(r);
+      reload();
+    },
+  });
+}
+
+// removeEntry: remove one style or random variant. A random variant comes back as it was by
+// adding it again, so it goes at once; a style does not (its Def gets a new name, and items in
+// a save that had it lose it), so RimArcho asks first (16 §6).
+function removeEntry(id) {
+  const e = entries().find((x) => x.id === id);
+  if (!e) return;
+  const run = async () => {
+    let r;
+    try { r = await api.LookStyleRemove(id); } catch (err) { return say("fail", errText(err)); }
+    if (E.entry === id) E.entry = 0;
+    E.ctx.wroteStyle(r);
+    reload();
+  };
+  if (e.kind !== "style") return run();
+  pop.confirm(Tf("remove %s?", e.label), [T("from") + ": " + (e.mod || "—"), T("for") + ": " + T("all lists (styles are shared)"), "",
+    T("Items in a save that have this style go back to their default look, and the save logs a missing Def when it loads."),
+    T("Adding it again makes a new style: those items do not get it back.")], T("remove"), run, "looks");
 }
 
 // ---- focus and keys (16 §3.5) ----
@@ -603,13 +736,17 @@ export function key(e) {
   const take = () => { e.preventDefault(); return true; };
   if (k === "Escape") { E.ctx.back(); return take(); }
   if (!ctrl && !e.altKey && "1234".includes(k) && k.length === 1) { focusCard(+k); return take(); }
+  if (k === "Delete" && !ctrl && !e.altKey && E.focus === 3) { if (E.entry) removeEntry(E.entry); return take(); }
   if (!E.d || !k.startsWith("Arrow")) return k === "Enter" || k === " " || k === "Home" || k === "End" || k.startsWith("Page");
   const d = k === "ArrowDown" || k === "ArrowRight" ? 1 : -1, vertical = k === "ArrowDown" || k === "ArrowUp";
   if (E.focus === 4) return true;
   if (E.focus === 3) {
     if (!vertical) return take();
-    const list = E.d.providers, next = step(list, list.findIndex((p) => p.pos === E.pos), d);
-    if (next) { selectMod(next.pos, true); $(`#lk-cr-${next.pos}`, host())?.scrollIntoView({ block: "nearest" }); }
+    // the Mods, then the look's styles and random variants: the cursor moves, nothing is removed
+    const list = [...E.d.providers.map((p) => ({ pos: p.pos })), ...entries().map((x) => ({ entry: x.id }))];
+    const next = step(list, E.entry ? list.findIndex((x) => x.entry === E.entry) : list.findIndex((x) => x.pos === E.pos), d);
+    if (next && next.entry) setEntry(next.entry);
+    else if (next) { setEntry(0); selectMod(next.pos, true); $(`#lk-cr-${next.pos}`, host())?.scrollIntoView({ block: "nearest" }); }
     return take();
   }
   if (E.focus === 2 && E.zoom !== "fit") {
@@ -622,7 +759,7 @@ export function key(e) {
 
 export function hintList() {
   if (E.focus === 3) return [
-    { key: "↑↓", label: T("select a Mod") }, { key: "1–4", label: T("cards") }, { key: "esc", label: T("gallery") }, { key: "?", label: T("all keys") },
+    { key: "↑↓", label: T("select a Mod") }, ...(E.entry ? [{ key: "del", label: T("remove") }] : []), { key: "1–4", label: T("cards") }, { key: "esc", label: T("gallery") }, { key: "?", label: T("all keys") },
   ];
   return [
     { key: "←→", label: T("facing") }, { key: "↑↓", label: T("body type or file") }, { key: "1–4", label: T("cards") },
@@ -640,7 +777,8 @@ export function helpRows() {
     ["1–4", T("focus a card: which texture, compare, override chain, operation")],
     ["←→", T("the next or previous facing")],
     ["↑↓", T("the next or previous body type or file; in the override chain: select a Mod")],
-    ["tab", T("reach the switches, the list of what to apply, apply and undo")],
+    ["del", T("in the override chain: remove the style or random variant under the cursor")],
+    ["tab", T("reach the switches, the lists of what to apply and add, apply, add, remove and undo")],
     ["esc", T("back to the gallery")],
     ["w  L  u", T("save, launch, undo the list's last edit")],
   ];

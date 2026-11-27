@@ -3757,6 +3757,8 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .lk-prow .pv { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0 12px; margin-left: auto; color: var(--fg-2); font-size: 12px; font-variant-numeric: tabular-nums; }
 .lk-prow .pv .dim { color: var(--faint); }
 .lk-prow .pv .bad { color: var(--red); }
+.lk-prow.lk-pstyles { margin-top: 4px; cursor: default; }
+.lk-prow.lk-pstyles:hover { background: none; }
 .lk-pfacts { display: flex; flex-wrap: wrap; gap: 0 12px; padding: 0 8px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .lk-pdir { max-width: 100%; padding: 0 8px; color: var(--muted); font-size: 12px; }
 .lk-pnote { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 2px 0 0; padding: 0 8px; color: var(--muted); font-size: 12px; line-height: 1.4; }
@@ -3853,17 +3855,27 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .lk-cr.gen:hover { background: none; }
 .lk-cr.gen .nm { color: var(--fg-2); }
 .lk-sep { height: var(--hairline); margin: 6px 8px; background: var(--line-2); }
+/* a style or random variant of the look, under RimArcho Styles Preference: the chain's cursor
+   can stand on it (it selects no Mod), and its remove control is at the right */
+.lk-cr.st { min-height: 36px; cursor: default; }
+.lk-cr.st .nm { color: var(--fg-2); }
+.lk-cr.st.cur { background: var(--pill); }
+.lk-chain.focus .lk-cr.st.cur { background: var(--accent-soft); }
+.lk-chain.focus .lk-chainbody.enc .lk-cr.sel { background: color-mix(in srgb, var(--sel) 70%, transparent); }
 .lk-warn { display: flex; align-items: flex-start; gap: 6px; margin: 4px 6px 6px; padding: 5px 8px; border-radius: var(--r-sm); background: var(--amber-soft); color: var(--amber); font-size: 12px; line-height: 1.35; }
 .lk-warn svg.i { flex: none; margin-top: 2px; }
-/* the operation: the selected Mod, apply with what it names and Go's prediction, undo */
-.lk-opsbody { padding: 4px 12px 12px; }
+/* the operation: the selected Mod, apply with what it names and Go's prediction, add as a
+   style or random variant, undo. The three actions share the card's two columns (what, and
+   the button), so apply, add and undo stand in one column. */
+.lk-opsbody { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 6px; padding: 4px 12px 12px; }
+.lk-opsbody > *, .lk-op > * { grid-column: 1 / -1; }
 .lk-osel { display: flex; align-items: baseline; gap: 8px; min-width: 0; padding: 6px 0 2px; }
 .lk-osel .k { flex: none; color: var(--muted); font-size: 12px; }
 .lk-osel .v { min-width: 0; color: var(--fg); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lk-op { display: grid; gap: 6px; padding: 8px 0 10px; border-bottom: var(--hairline) solid var(--line-2); }
+.lk-op { display: grid; grid-template-columns: subgrid; gap: 6px; padding: 8px 0 10px; border-bottom: var(--hairline) solid var(--line-2); }
 .lk-op:last-child { padding-bottom: 0; border-bottom: 0; }
 .lk-op .oh { color: var(--fg-2); }
-.lk-op .or { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px; }
+.lk-op .or { display: grid; grid-template-columns: subgrid; align-items: center; gap: 6px; }
 .lk-op .or .btn { min-width: 68px; }
 .lk-op .or .btn:not(.primary) { background: var(--pill); color: var(--fg); }
 .lk-op .or .btn:not(.primary):hover { background: var(--pill-hover); }
@@ -3873,6 +3885,14 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .lk-op .ow.warn { color: var(--amber); }
 .lk-op .ow.quiet { color: var(--faint); }
 .lk-op .ow svg.i { flex: none; margin-top: 2px; }
+/* add in game as: a [style | random variant] in / of [target]; the controls are the apply row's */
+.lk-addrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.lk-addrow .w { flex: none; color: var(--muted); }
+.lk-op .lk-addkind, .lk-op .lk-addtarget { height: 26px; border-radius: var(--r-sm); }
+.lk-op .lk-addkind { flex: 0 1 auto; }
+.lk-op .lk-addtarget { flex: 1 1 72px; }
+.lk-op .check-row { color: var(--fg-2); }
+.lk-op .ow.lk-addnote { color: var(--muted); }
 /* the first apply's confirmation (21 §6): the in-test line is plain to see */
 .lk-ask { display: flex; flex-direction: column; gap: 12px; }
 .lk-test { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 10px; border-radius: var(--r-sm); background: var(--amber-soft); color: var(--amber); }

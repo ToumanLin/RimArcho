@@ -427,6 +427,9 @@ func (ix *Index) CanSeparate(m *store.Mod) bool {
 
 // SplitLineage gives an instance a lineage of its own; returns the new lineage ID.
 func (a *App) SplitLineage(ix *Index, m *store.Mod) (string, error) {
+	if err := generatedRefusal(ix, m, "regrouped"); err != nil {
+		return "", err
+	}
 	if len(ix.ByLineage[m.LineageID]) == 1 {
 		return "", fmt.Errorf("%s is already alone in %s", ix.Ref(m.ID), ix.LRef(m.LineageID))
 	}
@@ -438,6 +441,13 @@ func (a *App) SplitLineage(ix *Index, m *store.Mod) (string, error) {
 func (a *App) MergeLineages(ix *Index, into, from string) error {
 	if into == from {
 		return fmt.Errorf("both references are %s", ix.LRef(into))
+	}
+	for _, id := range []string{into, from} {
+		for _, m := range ix.ByLineage[id] {
+			if err := generatedRefusal(ix, m, "regrouped"); err != nil {
+				return err
+			}
+		}
 	}
 	return a.Store.MergeLineages(ix.Env.ID, into, from)
 }

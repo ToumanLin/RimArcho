@@ -33,6 +33,7 @@ const (
 	StepCheck    = "check"    // the list: nothing left to fix (Can it run)
 	StepMeasure  = "measure"  // sizes, free space
 	StepCopy     = "copy"     // the mods, without other game versions' folders
+	StepLooks    = "looks"    // the textures the game would not show leave the copies
 	StepTextures = "textures" // the copies' PNGs to DDS (when asked)
 	StepWrite    = "write"    // pack.json
 	StepDone     = "done"
@@ -55,8 +56,8 @@ type BuildProgress struct {
 	Bytes      int64     `json:"bytes"`
 	BytesTotal int64     `json:"bytes_total"`
 	Mod        string    `json:"mod,omitempty"`         // being copied
-	Files      int       `json:"files,omitempty"`       // textures converted (StepTextures)
-	FilesTotal int       `json:"files_total,omitempty"` // to convert
+	Files      int       `json:"files,omitempty"`       // textures converted (StepTextures), removed (StepLooks)
+	FilesTotal int       `json:"files_total,omitempty"` // to convert, to remove
 	PID        int       `json:"pid,omitempty"`
 	Started    time.Time `json:"started"`
 	Beat       time.Time `json:"beat"` // last written

@@ -69,6 +69,9 @@ type Pack struct {
 	Trimmed  int64       `json:"trimmed_bytes,omitempty"`
 	// Textures: the copies' PNGs were converted to DDS and deleted (10 §2).
 	Textures *PackTextures `json:"textures,omitempty"`
+	// Looks: the textures removed from the copies because the game would not show them
+	// with this list and the plan's looks choices (10 §2 step 6, 21 §4 "In a pack").
+	Looks *PackLooks `json:"looks,omitempty"`
 	// Settings: the Mod settings the pack (or list) carries, by package and class.
 	Settings *PackSettings `json:"settings,omitempty"`
 }
@@ -226,6 +229,9 @@ type PackBuild struct {
 	Final      int64
 	Tool       *TextureTool
 	Diff       *PackDiff // a new revision (--update): what changed from the pack's last one
+	// Warnings: what the build could not do and went on without (the looks step skipped).
+	// What the looks step removes, or with DryRun would remove, is Pack.Looks.
+	Warnings []string
 }
 
 // BuildOptions for BuildPackWith.
@@ -263,7 +269,8 @@ func (a *App) BuildPack(name string, dryRun bool) (*PackBuild, error) {
 type PackPlan struct {
 	St    *LoadoutState
 	R     *PackBuild
-	roots []string // per entry: the folder copied ("" for Core and the DLCs)
+	roots []string     // per entry: the folder copied ("" for Core and the DLCs)
+	mods  []*store.Mod // per entry: its Instance (the looks index of the pack's list)
 	free  func(string) int64
 	tex   *textures.Options
 	gen   []map[string]bool // per entry: RimArcho's DDS in the mod (not copied, not the mod's)
@@ -345,10 +352,13 @@ func (a *App) planPack(name string, update bool) (*PackPlan, error) {
 	r.Moved = len(sr.Changes)
 	var mods []*store.Mod
 	for _, e := range sr.Sorted {
-		if m := st.Ix.ByID[e.Instance]; m != nil {
+		// RimArcho Looks Preference never goes into a pack: the pack carries its result, the
+		// copies without the textures the game would not show (10 §2 step 6)
+		if m := st.Ix.ByID[e.Instance]; m != nil && !IsLooks(m) {
 			mods = append(mods, m)
 		}
 	}
+	pl.mods = mods
 	if err := a.Store.LoadDecls(mods); err != nil {
 		return nil, err
 	}
@@ -505,7 +515,13 @@ func (a *App) BuildPackWith(name string, o BuildOptions) (*PackBuild, error) {
 	}
 	bs.update(func(p *BuildProgress) { p.Step, p.Env, p.ModsTotal = StepMeasure, r.Pack.Env, carriedCount(r.Pack) })
 	pl.Measure(a.PacksDir())
+	lp, err := a.planPackLooks(pl)
+	if err != nil {
+		cleanup()
+		return nil, err
+	}
 	if o.DryRun {
+		lp.expect(r)
 		return r, nil
 	}
 	var enc textures.Encoder
@@ -532,8 +548,14 @@ func (a *App) BuildPackWith(name string, o BuildOptions) (*PackBuild, error) {
 		cleanup()
 		return nil, err
 	}
+	if err := a.packLooks(r, lp, tmp, bs); err != nil {
+		cleanup()
+		return nil, err
+	}
 	if r.TexOptions != nil {
-		bs.update(func(p *BuildProgress) { p.Step, p.Mod, p.Mods, p.FilesTotal = StepTextures, "", 0, r.TexEst.Files })
+		bs.update(func(p *BuildProgress) {
+			p.Step, p.Mod, p.Mods, p.Files, p.FilesTotal = StepTextures, "", 0, 0, r.TexEst.Files
+		})
 		if err := a.packTextures(r, tmp, enc, bs); err != nil {
 			cleanup()
 			return nil, err

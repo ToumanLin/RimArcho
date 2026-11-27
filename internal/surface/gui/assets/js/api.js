@@ -26,6 +26,8 @@ const writesGame = new Set([
   "SaveFix", "SaveNewList", "SaveRename", "ColonyRename", "SaveCopy", "SaveCopyTo", "SaveChoose", "SaveTrash",
   // Looks (21 §3.3, §4): a choice, its undo and the rebuild write RimArcho Looks Preference and may add its entry to the list
   "LooksApply", "LooksApplyMany", "LooksUndo", "LooksUndoMany", "LooksRebuild",
+  // Styles (21 §5): an add or a remove writes RimArcho Styles Preference and may add its entry to the list
+  "LookStyleAdd", "LookStyleRemove",
 ]);
 on("environment", (result) => {
   const p = pending.get(result.request);

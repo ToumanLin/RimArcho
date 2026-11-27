@@ -164,6 +164,10 @@ func ProgressOf(p *app.BuildProgress) PackProgress {
 		if p.BytesTotal > 0 {
 			out.Frac = float64(p.Bytes) / float64(p.BytesTotal)
 		}
+	case app.StepLooks:
+		// part of the copy step of the diagram: the copies lose what the game would not show
+		out.Step, out.Frac = 2, 1
+		out.Text = Tf("removing %d of %d textures the game would not show", p.Files, p.FilesTotal)
 	case app.StepTextures:
 		out.Step = 3
 		out.Text = Tf("converting %d of %d textures", p.Files, p.FilesTotal)

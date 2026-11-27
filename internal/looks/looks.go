@@ -78,8 +78,11 @@ type File struct {
 	Format string // png, jpg, psd, dds:DXT1, dds:DX10, …
 	W, H   int
 	Size   int64
-	MTime  int64  // unix nanoseconds
-	Alt    *File  // second format of the same key
+	MTime  int64 // unix nanoseconds
+	Alt    *File // second format of the same key
+	// Under: the files of the same key in the Mod's lower-priority load folders, which the
+	// game never shows while this one is there (Rel, Tex, Path, Size and MTime only).
+	Under  []*File
 	Hash   string // set only when hashed
 	SameAs int    // Pos of an earlier provider with identical content, -1 if none
 

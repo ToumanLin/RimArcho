@@ -216,6 +216,9 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := generatedRefusal(st.Ix, m, "moved to the recycle bin"); err != nil {
+		return nil, err
+	}
 	// Steam would download a subscribed, loadable Workshop folder again.
 	own := m.Kind.Managed()
 	switch {

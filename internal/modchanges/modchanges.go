@@ -339,6 +339,9 @@ func (b *changeBuilder) build(evs []*store.Event) ([]Row, *Group) {
 	var rows []Row
 	var arrived, gone []Row
 	for _, id := range order {
+		if app.IsGenerated(ix.ByID[id]) {
+			continue // RimArcho rebuilt its own generated Mod (21 §4, §5): not a Mod's change
+		}
 		r, kind := b.mod(id, by[id], info)
 		if kind == "" && b.corpusOnly(ix.ByID[id], r) {
 			continue // a weekly data update of Archo Monitor (19 §6): not a change to show

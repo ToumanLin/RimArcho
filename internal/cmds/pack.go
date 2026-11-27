@@ -45,6 +45,8 @@ func BuildProgressLine(p app.BuildProgress) string {
 			l += " · " + p.Mod
 		}
 		return l
+	case app.StepLooks:
+		return fmt.Sprintf("looks: %d/%d textures the game would not show removed from the copies", p.Files, p.FilesTotal)
 	case app.StepTextures:
 		l := fmt.Sprintf("textures %d/%d", p.Files, p.FilesTotal)
 		if p.Mod != "" {
@@ -118,6 +120,20 @@ func packBuildCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	if r.Skipped > 0 {
 		root.KV("skipped", fmt.Sprintf("%d links that leave their mod's folder", r.Skipped))
+	}
+	if pk := r.Pack.Looks; pk != nil {
+		did := "removed"
+		if r.DryRun {
+			did = "would remove"
+		}
+		line := fmt.Sprintf("%s %s the game would not show (%s) from the copies", did, render.Plural(pk.Removed, "texture"), mb(pk.Bytes))
+		if pk.Choices > 0 {
+			line += fmt.Sprintf("; the pack carries the choice of %s", render.Plural(pk.Choices, "look"))
+		}
+		root.KV("looks", line)
+	}
+	for _, w := range r.Warnings {
+		root.KV("warning", w)
 	}
 	if r.TexOptions != nil {
 		n := root.KV("textures", app.TextureLabel(*r.TexOptions))

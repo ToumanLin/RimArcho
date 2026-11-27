@@ -46,12 +46,13 @@ const (
 	LibSteamCMD = "steamcmd"
 	LibExtra    = "extra"
 	LibMonitor  = "monitor" // Archo Monitor's folder (19 §6)
+	LibLooks    = "looks"   // the looks directory: the generated Mods (21 §4, §5)
 	LibGit      = "git"
 	LibPage     = "page"
 )
 
 // LibSources is the source order (rows and filters).
-var LibSources = []string{LibWorkshop, LibLocal, LibLocked, LibSteamCMD, LibGit, LibPage, LibExtra, LibMonitor}
+var LibSources = []string{LibWorkshop, LibLocal, LibLocked, LibSteamCMD, LibGit, LibPage, LibExtra, LibMonitor, LibLooks}
 
 // Library filter keys (LibQuery Include / Exclude are "key:value").
 var LibKeys = []string{"lists", "tag", "source", "location", "version", "state", "used", "updated", "added", "content", "has", "name", "author", "id"}
@@ -1563,6 +1564,8 @@ func (a *App) libSourceKinds(ix *Index) map[string]string {
 			srcKind[s.ID] = LibLocked
 		case s.Kind == source.Extra && s.Label == MonitorLabel:
 			srcKind[s.ID] = LibMonitor
+		case s.Kind == source.Extra && s.Label == LooksLabel:
+			srcKind[s.ID] = LibLooks
 		case s.Kind == source.Extra:
 			srcKind[s.ID] = LibExtra
 		}

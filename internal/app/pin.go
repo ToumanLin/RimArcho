@@ -125,6 +125,9 @@ func (a *App) PinFor(ref, name string, git, dryRun bool, reason string) (*PinRes
 	if err != nil {
 		return nil, err
 	}
+	if err := generatedRefusal(st.Ix, m, "locked or copied"); err != nil {
+		return nil, err
+	}
 	res := &PinResult{From: m, DryRun: dryRun, Reason: reason}
 	if st.List.Index(m.ID) >= 0 {
 		res.Replaced = m
@@ -148,6 +151,9 @@ func (a *App) PinUpdateFor(ref, name string, git, dryRun bool, reason string) (*
 	}
 	m, err := st.Ix.ResolveOne(ref)
 	if err != nil {
+		return nil, err
+	}
+	if err := generatedRefusal(st.Ix, m, "locked or copied"); err != nil {
 		return nil, err
 	}
 	l, err := st.lockFor(m)

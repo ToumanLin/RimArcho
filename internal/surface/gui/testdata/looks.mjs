@@ -6,7 +6,7 @@ import { loadModules } from "./dom.mjs";
 // the DOM, and the first apply's confirmation with its remembered "do not show this again".
 const { GRID, gridColumns, spanOf, gridLayout, visibleRows, cardTop, stepCard, scrollFor, texURL } =
   await loadModules("./looksgrid.js", {}, {});
-const { applyGate, CONFIRMED_KEY } = await loadModules("./looksconfirm.js", {}, {});
+const { applyGate, CONFIRMED_KEY, STYLES_CONFIRMED_KEY, filesText, applyLines, addLines, addPick } = await loadModules("./looksconfirm.js", {}, {});
 
 const ones = (n) => ({ spans: Array(n).fill(1) });
 
@@ -189,4 +189,94 @@ test("a second press while the dry run is on its way does nothing", async () => 
   const first = p.apply(), second = p.apply();
   await Promise.all([first, second]);
   assert.deepEqual(p.take(), ["preview", ["ask", 3]]);
+});
+
+// ---- styles and random variants (21 §5): the add row's model and the first add's confirmation ----
+
+const W = { T: (s) => s, Tf: (f, ...a) => { let i = 0; return f.replace(/%s/g, () => String(a[i++])); }, num: (n) => String(n) };
+const ADD = {
+  styles: [
+    { kind: "style", target: "Animalist", label: "style in Animalist", ok: true, note: "an ideoligion gives it" },
+    { kind: "style", target: "Rustic", label: "style in Rustic", ok: true, shared: true, note: "this category already has a style" },
+    { kind: "style", target: "Morbid", label: "style in Morbid", ok: false, why: "already added", code: "exists" },
+  ],
+  variants: [
+    { kind: "variant", target: "default", label: "random variant of the default look", ok: false, why: "the graphic class Graphic_StackCount cannot be turned into a random set", code: "class" },
+  ],
+  variantsNone: "the graphic class Graphic_StackCount cannot be turned into a random set",
+  entries: [],
+};
+
+test("the two confirmations are remembered apart", () => {
+  assert.notEqual(STYLES_CONFIRMED_KEY, CONFIRMED_KEY);
+  assert.equal(STYLES_CONFIRMED_KEY, "ui.gui.styles.confirmed");
+});
+
+test("the add row takes the wanted target, else Go's first that can be added; the note and add follow Go", () => {
+  let p = addPick(ADD, "style", "");
+  assert.equal(p.choice.target, "Animalist");
+  assert.equal(p.note, "an ideoligion gives it");
+  assert.equal(p.can, true);
+  p = addPick(ADD, "style", "Rustic");
+  assert.equal(p.choice.shared, true);
+  assert.equal(p.note, "this category already has a style", "a shared category keeps Go's note");
+  assert.equal(p.can, true);
+  p = addPick(ADD, "style", "Morbid");
+  assert.equal(p.note, "already added", "what cannot be added shows Go's reason");
+  assert.equal(p.can, false);
+  p = addPick(ADD, "style", "Gone");
+  assert.equal(p.choice.target, "Animalist", "a target that left the list falls back");
+  p = addPick(ADD, "variant", "");
+  assert.equal(p.style, false);
+  assert.equal(p.choice.target, "default");
+  assert.equal(p.can, false);
+  assert.match(p.note, /Graphic_StackCount/);
+});
+
+test("an empty list shows why nothing of that kind can be added and disables add", () => {
+  const none = { styles: [], stylesNone: "select a Mod to add its version", variants: [], variantsNone: "select a Mod to add its version", entries: [] };
+  for (const kind of ["style", "variant"]) {
+    const p = addPick(none, kind, "");
+    assert.equal(p.choice, null);
+    assert.equal(p.can, false);
+    assert.equal(p.note, "select a Mod to add its version");
+    assert.equal(p.list.length, 0);
+  }
+  const absent = addPick(undefined, "style", "");
+  assert.deepEqual([absent.choice, absent.can, absent.note], [null, false, ""], "a detail without the add row");
+});
+
+test("the files line says links, copies or both", () => {
+  assert.equal(filesText({ files: 0 }, W, "none"), "none");
+  assert.equal(filesText({ files: 3, linked: 3, copied: 0, size: "1 MB" }, W, "none"), "3, linked (no copies)");
+  assert.equal(filesText({ files: 3, linked: 0, copied: 3, size: "1 MB" }, W, "none"), "3, copied (1 MB)");
+  assert.equal(filesText({ files: 3, linked: 2, copied: 1, size: "1 MB" }, W, "none"), "2 linked, 1 copied (1 MB)");
+});
+
+test("the first add says what is written and what it does to saves, per kind", () => {
+  const facts = [["look", "flak jacket"], ["from", "Retexture"], ["as", "style in Animalist"], ["for", "all lists (styles are shared)"]];
+  const done = { dryRun: true, dir: "D:/Looks", files: 2, linked: 2, copied: 0, size: "8 KB", note: "an ideoligion gives it", added: true, dirChosen: true };
+  const style = addLines(facts, done, "style", W);
+  assert.deepEqual(Array.from(style.slice(0, 6)), ["look: flak jacket", "from: Retexture", "as: style in Animalist", "for: all lists (styles are shared)", "folder: D:/Looks", "files: 2, linked (no copies)"]);
+  assert.ok(style.some((l) => /RimArcho Styles Preference, near the end of the list/.test(l) && /small Def file/.test(l)));
+  assert.ok(style.some((l) => /new style in an existing style category/.test(l) && /skipped/.test(l)));
+  assert.ok(style.some((l) => /go back to their default look/.test(l)));
+  assert.ok(style.includes("an ideoligion gives it"), "Go's note for the target");
+  assert.ok(style.some((l) => /gains RimArcho Styles Preference/.test(l)));
+  assert.ok(style.includes("The folder is created now."));
+  const variant = addLines(facts, { ...done, added: false, dirChosen: false, note: "", buildError: "a game is running" }, "variant", W);
+  assert.ok(variant.some((l) => /pick one of the textures for each item/.test(l) && /may change look/.test(l)));
+  assert.ok(variant.includes("Saves do not depend on a random variant."));
+  assert.ok(!variant.some((l) => /new style in an existing/.test(l) || /gains RimArcho/.test(l) || /folder is created/.test(l)));
+  assert.equal(variant.at(-1), "a game is running", "a rebuild that would not run is said");
+});
+
+test("the first apply's lines are the same builder's: no Defs, no save dependency", () => {
+  const lines = applyLines([["look", "flak jacket"]], { dir: "D:/Looks", files: 0, added: true, mixed: 1 }, W);
+  assert.equal(lines[0], "look: flak jacket");
+  assert.equal(lines[2], "files: none: the load order already gives these textures");
+  assert.ok(lines.some((l) => /RimArcho Looks Preference, last in the list/.test(l) && /no Defs/.test(l)));
+  assert.ok(lines.some((l) => /saves do not depend on it/.test(l)));
+  assert.ok(lines.some((l) => /gains RimArcho Looks Preference as its last Mod/.test(l)));
+  assert.ok(lines.some((l) => /^Mixed result/.test(l)));
 });

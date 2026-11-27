@@ -215,7 +215,10 @@ type copyFacts struct {
 	// another manager's link into the game (RimCrow `_Link_`) is not a copy: no copy
 	// actions (separate, keep this version, textures), whatever the page (04 §1.3)
 	foreign bool
-	others  int // the other loadable copies
+	// a Mod RimArcho generates (app.IsGenerated): no action on its folder or identity, which
+	// the app refuses (16 §2.9 "Generated Mods"); the plan ops, tags, a note and open stay
+	generated bool
+	others    int // the other loadable copies
 }
 
 // newCopyFacts reads the copy's facts.
@@ -232,6 +235,7 @@ func newCopyFacts(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page 
 	}
 	f.loadable = f.live && !f.has(app.LibUnloadable) && !f.has(app.LibHidden) && !f.has(app.LibResidue)
 	f.foreign = i.Link != ""
+	f.generated = app.IsGenerated(m)
 	if l != nil {
 		copies := l.Instances
 		if page != LibraryPage {
@@ -300,7 +304,7 @@ func (f copyFacts) copyOps(ks []string) []string {
 	if m != nil {
 		ks = append(ks, OpTags, OpNote) // the editor: the mod's note; Mod library: this copy's
 	}
-	if live && f.others > 0 && !f.foreign {
+	if live && f.others > 0 && !f.foreign && !f.generated {
 		ks = append(ks, OpSeparate)
 	}
 	if live && i.Path != "" {
@@ -309,16 +313,16 @@ func (f copyFacts) copyOps(ks []string) []string {
 	if f.url {
 		ks = append(ks, OpWorkshop, OpSteam)
 	}
-	if f.loadable && (f.workshop || f.own) && !f.foreign {
+	if f.loadable && (f.workshop || f.own) && !f.foreign && !f.generated {
 		ks = append(ks, OpPin)
 	}
-	if live && f.own && !f.workshop && !f.linked && f.ix() != nil && f.ix().WorkshopUpdateSource(m) != nil {
+	if live && f.own && !f.workshop && !f.linked && !f.generated && f.ix() != nil && f.ix().WorkshopUpdateSource(m) != nil {
 		ks = append(ks, OpPinUpdate)
 	}
 	if i.Locked != nil {
 		ks = append(ks, OpUnpin)
 	}
-	if live && i.Spare {
+	if live && i.Spare && !f.generated {
 		ks = append(ks, OpMove)
 	}
 	if live && f.has(app.LibHidden) {
@@ -331,7 +335,7 @@ func (f copyFacts) copyOps(ks []string) []string {
 func (f copyFacts) diskOps(ks []string) []string {
 	i, m, live, linked, url := f.i, f.m, f.live, f.linked, f.url
 	// Texture optimisation: a copy with PNG textures (not RimArcho's own mod)
-	if f.page != LibraryPage && live && !f.foreign && i.PNG && i.Path != "" && !app.IsMonitor(m) && !app.IsGenerated(m) && !f.has(app.LibHidden) && !f.has(app.LibResidue) {
+	if f.page != LibraryPage && live && !f.foreign && i.PNG && i.Path != "" && !app.IsMonitor(m) && !f.generated && !f.has(app.LibHidden) && !f.has(app.LibResidue) {
 		ks = append(ks, OpTextures)
 	}
 	if i.Textures != nil && i.Textures.Files > 0 {
@@ -361,7 +365,7 @@ func (f copyFacts) diskOps(ks []string) []string {
 		if i.Subscription.Kind == "page" {
 			ks = append(ks, OpSubPage)
 		}
-	} else if live && (f.own || f.workshop && (f.has(app.LibResidue) || f.has(app.LibHidden))) && !linked {
+	} else if live && (f.own || f.workshop && (f.has(app.LibResidue) || f.has(app.LibHidden))) && !linked && !f.generated {
 		ks = append(ks, OpDelete)
 	}
 	// a link cannot go to the recycle bin (02 §3), and another tool's is not RimArcho's to
