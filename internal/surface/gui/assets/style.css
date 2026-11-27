@@ -1873,6 +1873,7 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .st-dot.amber { background: var(--amber); }
 .st-list > .st-apart { margin-top: 8px; }
 .st-card { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.st-head[hidden] { display: none; }
 .st-head { flex: none; padding: 12px 14px 10px; border-bottom: var(--hairline) solid var(--line-2); }
 .st-title { font-size: 15px; font-weight: 600; color: var(--fg); }
 .settings .st-head .group-note { padding: 4px 0 0; border-bottom: 0; }

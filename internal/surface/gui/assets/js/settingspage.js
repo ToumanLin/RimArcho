@@ -3,7 +3,7 @@
 // (accent) or needs a look (amber); the picked group at the right, in one card whose head has
 // its name and note. Every group's rows are drawn once and only the picked one is shown, so
 // task updates and deep links find any row. A group of sections (Accounts and network…) draws
-// each under its own heading, as the head draws the group. The gap drags (ui.gui.settings.side).
+// each under its own heading, as the head draws a group, and has no head of its own. The gap drags (ui.gui.settings.side).
 import { S, $, el, T } from "./state.js";
 import { wireSeparator } from "./separator.js";
 import { diskMeter } from "./membar.js";
@@ -129,11 +129,14 @@ export function pick(key, { focus = true, keepScroll = false } = {}) {
 }
 
 // showHead: the right card's head names the group and says its note; the breadcrumb follows.
+// A group of sections has no head: the breadcrumb and the picked row name it, and its first
+// section's heading stands where the head would.
 function showHead(g) {
   const head = $("#screen .st-head");
   if (!head || !g) return;
   head.replaceChildren(el("div", "st-title", g.title));
   if (g.note) head.append(el("div", "group-note", g.note));
+  head.hidden = !!g.sections?.length;
   S.settingsGroup = g.key;
   remember(g.key);
   if (S.settingsCrumb !== g.title) { S.settingsCrumb = g.title; crumbs(); }
