@@ -10,6 +10,10 @@ import (
 func init() {
 
 	interfaceFormats = append(interfaceFormats, interfaceFormatFor(app.SteamSignOutNote), interfaceFormatFor("note: "+app.SteamSignOutNote))
+	// A Workshop download that signs in only for the items anonymous download is denied (11 §3).
+	for _, note := range []string{app.WorkshopSignOutNote, app.WorkshopAccountNote} {
+		interfaceFormats = append(interfaceFormats, interfaceFormatFor("note: "+note), interfaceFormatFor(note)) // "note: " first: "%d" at the start would take it
+	}
 }
 
 // SteamCMDPasswordHint is the password hints in one line (11 §3): the TUI's status line.

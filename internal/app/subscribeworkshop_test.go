@@ -185,7 +185,13 @@ func TestSubscribeWorkshopFallback(t *testing.T) {
 		e.MkdirAll(filepath.Dir(exe))
 		e.App.FindTool = func(string) (string, bool) { return exe, true }
 		e.App.Store.SetMeta("cfg:steamcmd.account", "example-player")
-		e.App.SteamCMDRun = func(string, []string) (string, error) { t.Fatal("named account ran hidden"); return "", nil }
+		// Anonymous first (hidden); the item it is denied is retried signed in (11 §3).
+		e.App.SteamCMDRun = func(_ string, args []string) (string, error) {
+			if args[3] != "anonymous" {
+				t.Fatalf("named account ran hidden: %v", args)
+			}
+			return "ERROR! Download item 8100 failed (No subscription)", nil
+		}
 		e.App.SteamCMDStart = func(_ string, args []string, console bool) (app.SteamCMDProc, error) {
 			if !console || args[3] != "example-player" {
 				t.Fatalf("account args %v console %v", args, console)
@@ -315,7 +321,7 @@ func TestWorkshopRetryClassification(t *testing.T) {
 		{"split connection", "Connecting anonymously to Steam Public...\nFAILED (No Connection)", "could not be reached", 3},
 		{"password", "Logging in user 'player'...FAILED (Invalid Password)", "password", 1},
 		{"guard", "ERROR! InvalidAuthCode", "Steam Guard", 1},
-		{"permission", "ERROR! Download item 8100 failed (AccessDenied).", "access was denied", 1},
+		{"permission", "ERROR! Download item 8100 failed (AccessDenied).", "needs a Steam account", 1},
 		{"invisible", "ERROR! Download item 8100 failed (FileNotFound).", "removed from the Workshop", 1},
 		{"disk", "ERROR! Download item 8100 failed (Not enough disk space).", "disk is full", 1},
 		{"unconfirmed failure", "ERROR! Download item 8100 failed (Failure).", "not confirmed", 3},

@@ -17,6 +17,9 @@ func subscriptionReason(it app.TaskItem, full bool) string {
 	if kind == "" && (it.Why == "the Steam client is offline" || strings.Contains(it.Why, "(code 3)")) {
 		kind = "offline"
 	}
+	if kind == "account" && full {
+		return T(app.WorkshopNeedsAccount)
+	}
 	if kind == "password" && full {
 		return T(app.SteamPasswordRefused)
 	}
@@ -31,6 +34,7 @@ func subscriptionReason(it app.TaskItem, full bool) string {
 		"disk": "not enough disk space or unable to write", "network": "connection failed or timed out",
 		"crash": "SteamCMD exited before confirming the download", "password": "check the Steam password",
 		"guard": "Steam Guard verification required", "login": "Steam login failed", "anonymous-login": "Steam login failed",
+		"account": "needs a Steam account",
 	}[kind]
 	if key != "" {
 		return T(key)

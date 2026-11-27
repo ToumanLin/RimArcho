@@ -540,7 +540,10 @@ func (u *subscriptionUpdate) updateGit(i int) error {
 }
 
 // steamCMDGroupKey is one SteamCMD run: a content root and an account.
-type steamCMDGroupKey struct{ root, account string }
+type steamCMDGroupKey struct {
+	root  string
+	login workshopAccount
+}
 
 // steamCMDGroup is the Workshop IDs one SteamCMD run downloads, and the subscriptions they
 // are.
@@ -555,7 +558,7 @@ type steamCMDGroup struct {
 // failures so far.
 func (u *subscriptionUpdate) updateSteamCMD(i, end int) error {
 	ss := u.ss
-	account, accountErr := u.a.SteamCMDAccount("")
+	login, accountErr := u.a.workshopLogin("")
 	if accountErr != nil {
 		for j := i; j < end; j++ {
 			if ss[j].Record.Kind == "steamcmd" {
@@ -571,10 +574,10 @@ func (u *subscriptionUpdate) updateSteamCMD(i, end int) error {
 			continue
 		}
 		root := realOrAbs(filepath.Dir(ss[j].Folder))
-		key := steamCMDGroupKey{env.PathKey(root), account}
+		key := steamCMDGroupKey{env.PathKey(root), login}
 		g := byKey[key]
 		if g == nil {
-			g = &steamCMDGroup{key: steamCMDGroupKey{root, account}}
+			g = &steamCMDGroup{key: steamCMDGroupKey{root, login}}
 			groups = append(groups, g)
 			byKey[key] = g
 		}
@@ -638,7 +641,7 @@ func (u *subscriptionUpdate) downloadGroup(g *steamCMDGroup) {
 	}
 	reported := map[int]bool{}
 	transfer := u.groupTransfer(ctx, g, byID, reported)
-	download, err := u.a.downloadWorkshopGroup(g.ids, g.key.root, g.key.account, false, false, transfer)
+	download, err := u.a.downloadWorkshopGroup(g.ids, g.key.root, g.key.login, false, false, transfer)
 	close(watched)
 	halted := ctx.Err() != nil
 	cancel()

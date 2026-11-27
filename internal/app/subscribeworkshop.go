@@ -3,9 +3,11 @@ package app
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -159,21 +161,47 @@ func (a *App) subscribeWorkshop(inputs []string, forceSteamCMD, dryRun bool, w *
 			return op, w.ctx.Err()
 		}
 	}
-	account, err := a.SteamCMDAccount("")
+	login, err := a.workshopLogin("")
 	if err != nil {
 		return nil, err
 	}
-	return a.downloadWorkshopGroup(ids, "", account, false, true, w)
+	return a.downloadWorkshopGroup(ids, "", login, false, true, w)
 }
 
 // downloadWorkshop uses the same runner/account policy as game downloads. root is
 // the existing source during updates; new subscriptions use the configured root.
 func (a *App) downloadWorkshop(ids []string, root string, dryRun bool) (result *SubscribeOp, downloadErr error) {
-	account, err := a.SteamCMDAccount("")
+	login, err := a.workshopLogin("")
 	if err != nil {
 		return nil, err
 	}
-	return a.downloadWorkshopGroup(ids, root, account, dryRun, true)
+	return a.downloadWorkshopGroup(ids, root, login, dryRun, true)
+}
+
+// workshopAccount is how a Workshop download through SteamCMD signs in (11 §3).
+type workshopAccount struct {
+	account string // the resolved account; "anonymous" when none
+	// anonymousFirst: the account is the saved one. The download runs anonymously and
+	// signs in only for the items anonymous download is denied.
+	anonymousFirst bool
+}
+
+// workshopLogin resolves a Workshop download's account like SteamCMDAccount. An explicit
+// account (anonymous included) is used as it is; a saved one signs in only for the items
+// that anonymous download is denied.
+func (a *App) workshopLogin(override string) (workshopAccount, error) {
+	account, err := a.SteamCMDAccount(override)
+	if err != nil {
+		return workshopAccount{}, err
+	}
+	return workshopAccount{account, strings.TrimSpace(override) == "" && account != "anonymous"}, nil
+}
+
+// workshopNeedsAccount: anonymous download was refused an item for want of an account
+// (access denied, not owned), so the saved account may get it. File Not Found (removed),
+// disk and network failures never sign in.
+func workshopNeedsAccount(o workshopOutcome) bool {
+	return !o.confirmed && o.err == nil && (o.kind == "permission" || o.kind == "ownership")
 }
 
 // workshopDownload is one downloadWorkshopGroup run: where SteamCMD downloads, where the
@@ -194,7 +222,7 @@ type workshopDownload struct {
 	settled          map[string]bool
 }
 
-func (a *App) downloadWorkshopGroup(ids []string, root, account string, dryRun, refresh bool, transfer ...*workshopTransfer) (result *SubscribeOp, downloadErr error) {
+func (a *App) downloadWorkshopGroup(ids []string, root string, login workshopAccount, dryRun, refresh bool, transfer ...*workshopTransfer) (result *SubscribeOp, downloadErr error) {
 	if err := a.refuseSubscriptionGameRunning(); err != nil {
 		return nil, err
 	}
@@ -220,8 +248,12 @@ func (a *App) downloadWorkshopGroup(ids []string, root, account string, dryRun, 
 	for _, id := range ids {
 		op.Items = append(op.Items, SubscribeItem{Name: "Workshop " + id, Folder: filepath.Join(d.root, id), Record: &subscribe.Record{Kind: "steamcmd", WorkshopID: id}, Result: "would download with SteamCMD"})
 	}
-	if a.SteamCMDSignsOutSteam(account) {
-		op.Notes = append(op.Notes, fmt.Sprintf(SteamSignOutNote, account))
+	if a.SteamCMDSignsOutSteam(login.account) {
+		note := SteamSignOutNote
+		if login.anonymousFirst {
+			note = WorkshopSignOutNote // only if an item needs the account
+		}
+		op.Notes = append(op.Notes, fmt.Sprintf(note, login.account))
 	}
 	var incoming *LinkLifecyclePlan
 	if d.existing {
@@ -264,7 +296,7 @@ func (a *App) downloadWorkshopGroup(ids []string, root, account string, dryRun, 
 			downloadErr = a.abortLinkLifecycle(incoming, downloadErr)
 		}
 	}()
-	d.run(exe, account, transfer)
+	d.run(exe, login, transfer)
 	if err := d.register(refresh); err != nil {
 		return op, err
 	}
@@ -333,8 +365,10 @@ func (d *workshopDownload) checkSources() error {
 }
 
 // run downloads the items with SteamCMD and settles each: as soon as SteamCMD confirms
-// it, or with its outcome once the run ends.
-func (d *workshopDownload) run(exe, account string, transfer []*workshopTransfer) {
+// it, or with its outcome once the run ends. With a saved account the items download
+// anonymously first; only those anonymous download is denied are retried signed in, in
+// one more run (11 §3).
+func (d *workshopDownload) run(exe string, login workshopAccount, transfer []*workshopTransfer) {
 	w := workshopObserver(transfer)
 	d.settled = map[string]bool{}
 	index := make(map[string]int, len(d.ids))
@@ -350,15 +384,56 @@ func (d *workshopDownload) run(exe, account string, transfer []*workshopTransfer
 			d.settle(w, i, workshopOutcome{confirmed: true})
 		}
 	}
-	outcomes, runErr := d.a.runWorkshopBatches(exe, d.base, account, d.ids, w)
-	w.confirmed = before
+	first := login.account
+	if login.anonymousFirst {
+		first = "anonymous"
+	}
+	outcomes, runErr := d.a.runWorkshopBatches(exe, d.base, first, d.ids, w)
 	if runErr != nil {
 		d.errs = append(d.errs, runErr)
 	}
+	if first == "anonymous" && w.ctx.Err() == nil {
+		d.signInFor(exe, login, outcomes, w)
+	}
+	w.confirmed = before
 	for i, id := range d.ids {
 		if !d.settled[id] {
 			d.settle(w, i, outcomes[id])
 		}
+	}
+}
+
+// signInFor retries, signed in, the items anonymous download was denied, or says they need
+// an account when none is saved. outcomes takes the retry's outcomes.
+func (d *workshopDownload) signInFor(exe string, login workshopAccount, outcomes map[string]workshopOutcome, w *workshopTransfer) {
+	var denied []string
+	for _, id := range d.ids {
+		if workshopNeedsAccount(outcomes[id]) && !d.settled[id] && !slices.Contains(denied, id) {
+			denied = append(denied, id)
+		}
+	}
+	if len(denied) == 0 {
+		return
+	}
+	if !login.anonymousFirst {
+		for _, id := range denied {
+			outcomes[id] = workshopOutcome{kind: "account"}
+			w.outcome(id, outcomes[id])
+		}
+		return
+	}
+	log.Printf("workshop: anonymous download was denied %d items; retrying them signed in: %s", len(denied), strings.Join(denied, ", "))
+	d.op.Notes = append(d.op.Notes, fmt.Sprintf(WorkshopAccountNote, len(denied), login.account, strings.Join(denied, ", ")))
+	if d.a.SteamCMDSignsOutSteam(login.account) {
+		d.op.Notes = append(d.op.Notes, fmt.Sprintf(SteamSignOutNote, login.account))
+	}
+	w.again(denied)
+	retried, err := d.a.runWorkshopBatches(exe, d.base, login.account, denied, w)
+	if err != nil {
+		d.errs = append(d.errs, err)
+	}
+	for _, id := range denied {
+		outcomes[id] = retried[id]
 	}
 }
 
