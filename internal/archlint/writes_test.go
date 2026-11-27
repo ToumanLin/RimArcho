@@ -63,6 +63,7 @@ var readOnlyDirs = map[string]string{
 	"internal/order":    "constraint graph and sorting",
 	"internal/deps":     "discovery does not download or modify files (17 §2.1); installing is app.InstallDep",
 	"internal/savefile": "save reading; save actions are in app/saveactions.go (12 §4)",
+	"internal/looks":    "the looks index reads Mods; its header cache is written by fsscan.Cache, and _Archo_Looks by app (21 §2, §4)",
 }
 
 // readOnlyAllowed: existing writes in read-only code. Key: writeKey.
