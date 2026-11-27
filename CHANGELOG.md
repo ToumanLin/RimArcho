@@ -4,6 +4,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+## 1.1.5 — 2026-11-27
+
 - Packs: building a pack of a list that was never checked is no longer refused with the Def and patch errors of another list; `archo pack build` notes that the list has not been analysed.
 - Archo Monitor 0.13.1: the main menu's translation panel lists the translators again in every language other than English. Since 0.12.0 Monitor's own translation folders, loaded before Core, hid the language's details from the game: no translator names, the folder name in place of the language's own name, and the game's default grammar in place of the language's own (articles and plurals in English, particles in Korean, cases in Russian).
 - RimWorld probe skill: `run --lang <folder>` starts the sandbox game in another language, and `--before-core <pkgId>,...` loads mods before the official content, as players load Archo Monitor.
