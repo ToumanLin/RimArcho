@@ -1,6 +1,8 @@
 package view
 
 import (
+	"strings"
+
 	"github.com/ToumanLin/RimArcho/internal/accounts"
 	"github.com/ToumanLin/RimArcho/internal/app"
 )
@@ -87,5 +89,20 @@ func AccountGroup(a *app.App) SettingGroup {
 	if signedIn {
 		ll.Actions = append(ll.Actions, action("loverslab", "forget", "log out", "Forget the local LoversLab session. Other devices are unaffected."))
 	}
-	return SettingGroup{Title: T("accounts"), Items: []SettingItem{steam, ll}}
+	g := SettingGroup{Key: GroupAccounts, Title: T("accounts"), Attention: AttentionNone, Items: []SettingItem{steam, ll}}
+	// "SteamCMD: anonymous", then LoversLab when it is set up; a session to confirm is amber
+	who := T("anonymous")
+	if !s.Managed && s.Path != "" {
+		who = T("external")
+	} else if s.LoggedIn && s.Account != "anonymous" {
+		who = s.Account
+	}
+	g.Summary = facts(Tf("SteamCMD: %s", who))
+	if line != "" {
+		g.Summary = append(g.Summary, "LoversLab")
+		if strings.HasPrefix(line, T("session needs confirmation; log in again")) {
+			g.Attention = AttentionAmber
+		}
+	}
+	return g
 }

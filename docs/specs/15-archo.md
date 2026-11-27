@@ -150,7 +150,7 @@ Archo Agent is Archo as a separate program: Node, the Pi coding agent and Archo'
 
 1.1 ships without Archo Agent: it is not ready. The code and this section stay, behind one build switch, `buildinfo.Agent` (`buildinfo.AgentOn()`), which is off unless the build is linked with `-X github.com/ToumanLin/RimArcho/internal/buildinfo.Agent=1`. `scripts/release.ps1` does not set it. With it off:
 
-- Settings has no Archo Agent group (16 §2.14), and the GUI refuses its settings commands, its install task and `API.SetAgentKey`.
+- Settings has no Archo Agent section under Tools (16 §2.14), and the GUI refuses its settings commands, its install task and `API.SetAgentKey`.
 - The `agent …` commands (13 §4.2) stay registered but `cmds.Commands()` and command lookup skip them (`featureOff`, `internal/cmds/feature.go`), so `archo help`, the CLI, the TUI and the GUI's command palette, completion and MCP neither list nor run them. The `agent.*` settings keys are not listed by `config get` or completion and `config set` refuses them.
 - Nothing contacts the `ToumanLin/ArchoAgent` release service: only installing does (§7.1), and nothing can start it.
 - A bundle, settings or key an earlier development build left stay untouched and unused. Uninstall still removes them with the rest (02 §2): the stored key, when there is one, still has its line in the preview.

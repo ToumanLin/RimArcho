@@ -693,16 +693,19 @@ func (b *itemBuilder) orderItem() {
 func (b *itemBuilder) versionItem() {
 	versions, st := b.versions, b.st
 	n := len(versions)
-	if n == 0 {
-		return
-	}
 	warn := 0
 	for _, v := range versions {
 		if v.Severity == finding.Warning {
 			warn++
 		}
 	}
+	confirmed := len(b.ps.Confirmed)
 	if warn == 0 {
+		// Every warning is confirmed (or only older versions are left, which stay quiet):
+		// nothing breaks the game; one quiet line under worth knowing, no button (05 §4.2).
+		if confirmed > 0 {
+			b.add(confirmedVersionsNeed(st, b.ps.Confirmed))
+		}
 		return
 	}
 	mm := st.GameMM()
@@ -718,8 +721,13 @@ func (b *itemBuilder) versionItem() {
 		versionMods = append(versionMods, id)
 		reasons[id] = reasonOf(st.Ix.ByID[id])
 	}
+	var also []string
+	if confirmed > 0 {
+		// what community data answers is not a problem: a muted line, the list's last group
+		also = []string{confirmedMoreText(confirmed)}
+	}
 	b.add(Need{rank: 5, Group: GroupList, Text: text, Counted: true, Status: StatusWarn, Mods: versionMods, Fold: true,
-		code: "version.unsupported", rowReasons: reasons,
+		code: "version.unsupported", rowReasons: reasons, Also: also,
 		Why: Tf("They may still work; their authors have not marked %s.", mm), Evidence: evidence(EvDeclared, T("About.xml supportedVersions")),
 		Actions: []Action{{Kind: ActVersionList, Key: "enter", Label: T("see the list"), Title: Tf("does not list %s as supported", mm), GameVersion: mm}, versionBatch(st, versions, false)}})
 }

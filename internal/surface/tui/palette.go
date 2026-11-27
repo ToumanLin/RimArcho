@@ -205,64 +205,96 @@ func (m *model) packsPanel() tea.Cmd {
 }
 
 // settingsTextPanel shows the settings page as text (16 §2.14); each value says the
-// command that changes it.
+// command that changes it. A group of sections names each section under it, one step in.
 func (m *model) settingsTextPanel() tea.Cmd {
 	var b strings.Builder
 	groups := view.SettingsPage(m.app, m.st)
 	groups = slices.Insert(groups, 1, view.EnvGroups(m.app, m.st)...)
 	for _, g := range groups {
 		b.WriteString(g.Title + "\n")
-		if g.Note != "" {
-			fmt.Fprintf(&b, "  %s\n", g.Note)
-		}
-		for _, it := range g.Items {
-			value := it.Value
-			if it.URL != "" {
-				value = it.URL
-			}
-			for i, choice := range it.Choices {
-				if choice == value && i < len(it.ChoiceLabels) {
-					value = it.ChoiceLabels[i]
-					break
-				}
-			}
-			fmt.Fprintf(&b, "  %s: %s", it.Label, value)
-			if it.ValueNote != "" {
-				fmt.Fprintf(&b, "  %s", it.ValueNote)
-			}
+		if len(g.Sections) == 0 {
+			settingsText(&b, g, "")
 			b.WriteString("\n")
-			for _, link := range it.Links {
-				fmt.Fprintf(&b, "    %s: %s\n", link.Label, link.URL)
-			}
-			if it.Note != "" {
-				fmt.Fprintf(&b, "    %s\n", it.Note)
-			}
-			if len(it.Argv) > 0 {
-				fmt.Fprintf(&b, "    : archo %s\n", strings.Join(it.Argv, " "))
-			}
-			if len(it.MoveArgv) > 0 {
-				fmt.Fprintf(&b, "    : archo %s\n", strings.Join(it.MoveArgv, " "))
-			}
-			for _, a := range it.Actions {
-				if a.Argv[0] == "import-managers" || a.Argv[0] == "guide-preview" {
-					fmt.Fprintf(&b, "    %s  : archo gui\n", a.Label)
-					continue
-				}
-				if a.Argv[0] == "feedback" { // a panel, not a command (16 §2.14)
-					fmt.Fprintf(&b, "    %s  ctrl+k %s\n", a.Label, T("feedback"))
-					continue
-				}
-				argv := strings.Join(a.Argv, " ")
-				if a.Argv[len(a.Argv)-1] == "" {
-					argv += strconv.Quote("")
-				}
-				fmt.Fprintf(&b, "    %s  : archo %s\n", a.Label, argv)
-			}
+			continue
 		}
-		b.WriteString("\n")
+		for _, s := range g.Sections {
+			b.WriteString("  " + s.Title + "\n")
+			settingsText(&b, s, "  ")
+			b.WriteString("\n")
+		}
 	}
 	m.openPanel(T("settings"), b.String())
 	return nil
+}
+
+// settingsText writes a group's note and rows, each line after in.
+func settingsText(b *strings.Builder, g view.SettingGroup, in string) {
+	if g.Note != "" {
+		fmt.Fprintf(b, "%s  %s\n", in, g.Note)
+	}
+	// About's author: every line and link in full (16 §2.14)
+	if c := g.Author; c != nil {
+		fmt.Fprintf(b, "%s  %s  %s\n", in, c.Name, c.Handle)
+		for _, l := range append(slices.Clone(c.Lines), c.Seeking) {
+			fmt.Fprintf(b, "%s  %s\n", in, l)
+		}
+		for _, link := range c.Links {
+			fmt.Fprintf(b, "%s    %s: %s\n", in, link.Label, link.URL)
+		}
+	}
+	// the changelog is long: the running version's heading here, the text in the window
+	if c := g.Changelog; c != nil && len(c.Versions) > 0 {
+		for _, v := range c.Versions {
+			if v.Current {
+				fmt.Fprintf(b, "%s  %s  %s\n", in, v.Title, v.Note)
+			}
+		}
+		fmt.Fprintf(b, "%s    %s\n", in, Tf("%d versions: read them in the window (archo gui) or in CHANGELOG.md", len(c.Versions)))
+	}
+	for _, it := range g.Items {
+		value := it.Value
+		if it.URL != "" {
+			value = it.URL
+		}
+		for i, choice := range it.Choices {
+			if choice == value && i < len(it.ChoiceLabels) {
+				value = it.ChoiceLabels[i]
+				break
+			}
+		}
+		fmt.Fprintf(b, "%s  %s: %s", in, it.Label, value)
+		if it.ValueNote != "" {
+			fmt.Fprintf(b, "  %s", it.ValueNote)
+		}
+		b.WriteString("\n")
+		for _, link := range it.Links {
+			fmt.Fprintf(b, "%s    %s: %s\n", in, link.Label, link.URL)
+		}
+		if it.Note != "" {
+			fmt.Fprintf(b, "%s    %s\n", in, it.Note)
+		}
+		if len(it.Argv) > 0 {
+			fmt.Fprintf(b, "%s    : archo %s\n", in, strings.Join(it.Argv, " "))
+		}
+		if len(it.MoveArgv) > 0 {
+			fmt.Fprintf(b, "%s    : archo %s\n", in, strings.Join(it.MoveArgv, " "))
+		}
+		for _, a := range it.Actions {
+			if a.Argv[0] == "import-managers" || a.Argv[0] == "guide-preview" {
+				fmt.Fprintf(b, "%s    %s  : archo gui\n", in, a.Label)
+				continue
+			}
+			if a.Argv[0] == "feedback" { // a panel, not a command (16 §2.14)
+				fmt.Fprintf(b, "%s    %s  ctrl+k %s\n", in, a.Label, T("feedback"))
+				continue
+			}
+			argv := strings.Join(a.Argv, " ")
+			if a.Argv[len(a.Argv)-1] == "" {
+				argv += strconv.Quote("")
+			}
+			fmt.Fprintf(b, "%s    %s  : archo %s\n", in, a.Label, argv)
+		}
+	}
 }
 
 // palCommands: every command of the main screen.

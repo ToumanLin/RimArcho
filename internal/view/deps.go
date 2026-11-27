@@ -9,7 +9,8 @@ import (
 
 // DependencyGroup shows the selected copies and commands for managing downloaded tools.
 func DependencyGroup(a *app.App) SettingGroup {
-	g := SettingGroup{Title: T("external tools"), Note: lastChecked(a, a.AutomaticStatus("tools").Checked)}
+	g := SettingGroup{Key: GroupTools, Title: T("external tools"), Attention: AttentionNone, Note: lastChecked(a, a.AutomaticStatus("tools").Checked)}
+	var parts []string
 	labels := map[string]string{deps.Todds: "todds", deps.SteamCMD: "SteamCMD"}
 	for _, i := range a.Deps().All() {
 		item := SettingItem{Key: "tool." + i.Name, Label: labels[i.Name], Value: T("not installed"), Note: i.Path, NotePaths: []string{i.Path}}
@@ -23,6 +24,14 @@ func DependencyGroup(a *app.App) SettingGroup {
 		}
 		item.Note = strings.TrimSpace(item.Note)
 		update := a.ToolUpdate(i.Name)
+		// the list row (16 §2.14 "Layout"): "todds 7.0.2  SteamCMD not installed"; a tool found
+		// but unusable is amber, an update the accent
+		parts = append(parts, labels[i.Name]+" "+item.Value)
+		if i.Err != "" && i.Path != "" {
+			g.Attention = AttentionAmber
+		} else if update.Pending && i.Own && g.Attention == AttentionNone {
+			g.Attention = AttentionAccent
+		}
 		if update.Pending && i.Own {
 			item.ValueNote = Tf("new version available: %s", update.Latest)
 			if !update.Compatible {
@@ -54,5 +63,6 @@ func DependencyGroup(a *app.App) SettingGroup {
 		}
 		g.Items = append(g.Items, item)
 	}
+	g.Summary = facts(parts...)
 	return g
 }

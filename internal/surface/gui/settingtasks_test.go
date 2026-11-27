@@ -150,7 +150,7 @@ func TestSettingsConfirmationsAndRefresh(t *testing.T) {
 	check := func(cleared bool) {
 		t.Helper()
 		confirmed := map[string]bool{}
-		for _, group := range api.Settings() {
+		for _, group := range view.SettingSections(api.Settings()) {
 			for _, item := range group.Items {
 				for _, action := range item.Actions {
 					if action.Task == "" {
@@ -190,6 +190,7 @@ func TestCommunityUpdateTaskRefresh(t *testing.T) {
 		`{"timestamp":1789239946,"rules":{"tester.b":{"loadAfter":{"tester.a":{"name":["A"]}}}}}`,
 		`{"version":1790337009,"database":{"1001":{"packageId":"tester.a","name":"Alpha"}}}`,
 		`{"version":"2026-10-19T06:29:54Z","rules":[{"oldWorkshopId":"1001","oldPackageId":"tester.a","newWorkshopId":"9999","newPackageId":"tester.a2"}]}`,
+		`<ModIdsToFix><li>tester.a</li></ModIdsToFix>`,
 	}
 	for i, d := range app.Datasets {
 		path := filepath.Join(t.TempDir(), d.Key+".json")
@@ -200,7 +201,7 @@ func TestCommunityUpdateTaskRefresh(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := endedTask(t, api, view.TaskData)
-	if r.State != app.TaskDone || r.Pct != 100 || r.Count != "3 / 3" {
+	if r.State != app.TaskDone || r.Pct != 100 || r.Count != "4 / 4" {
 		t.Fatalf("community update %+v", r)
 	}
 	waitSettingEnd(t, events, r.ID)
@@ -210,7 +211,7 @@ func TestCommunityUpdateTaskRefresh(t *testing.T) {
 			t.Fatalf("status %s: %+v", d.Key, status[d.Key])
 		}
 	}
-	for _, group := range api.Settings() {
+	for _, group := range view.SettingSections(api.Settings()) {
 		for _, item := range group.Items {
 			if len(item.Argv) > 2 && strings.HasPrefix(item.Argv[2], "data.") && !strings.Contains(item.Note, "1") {
 				t.Fatalf("entries not refreshed: %+v", item)

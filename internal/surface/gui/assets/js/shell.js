@@ -369,6 +369,8 @@ export function crumbs() {
   }
   if (S.screen === "full" && S.fullName) out = out.concat([{ label: S.fullName, id: "full" }]);
   if (S.screen === "uninstall" || S.screen === "uninstall-progress") out = out.concat([{ label: T("uninstall RimArcho"), id: "uninstall" }]);
+  // Settings: the group shown at the right is its second level (16 §2.14 "Layout")
+  if (S.screen === "settings" && S.settingsCrumb) out = out.concat([{ label: S.settingsCrumb, id: "settings" }]);
   // Feedback is its own sidebar row since 2026-11-18 (16 §2.1); the template or My reports
   // shown is its second level, as a list is the editor's (16 §2.2)
   if (S.screen === "feedback") out = [{ label: T("feedback"), id: "feedback" }].concat(S.feedbackCrumb ? [{ label: S.feedbackCrumb, id: "feedback" }] : []);

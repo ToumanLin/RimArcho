@@ -15,7 +15,7 @@ func TestSettingsMonitor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, g := range view.SettingsPage(e.App, st) {
+	for _, g := range view.SettingSections(view.SettingsPage(e.App, st)) {
 		if g.Title != "game log" {
 			continue
 		}
@@ -43,7 +43,7 @@ func TestSettingsWording(t *testing.T) {
 	for _, lang := range []string{"en", "zh"} {
 		view.SetLang(lang)
 		found := 0
-		for _, group := range view.SettingsPage(e.App, st) {
+		for _, group := range view.SettingSections(view.SettingsPage(e.App, st)) {
 			for _, it := range group.Items {
 				if len(it.Argv) < 3 {
 					continue

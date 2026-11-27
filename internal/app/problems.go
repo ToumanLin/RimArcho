@@ -17,11 +17,14 @@ import (
 // Problem is a finding as shown to the player: with a stable ref and its ignore state.
 type Problem struct {
 	*finding.Finding
-	Ref           string // p:<hex>
-	Ignored       bool
-	VersionMuted  bool    // global package + game minor preference; survives updates
-	IgnoreExpired bool    // ignored once, but the subject changed since (05 §4.2)
-	Log           *LogRun // the log of a log.* problem
+	Ref          string // p:<hex>
+	Ignored      bool
+	VersionMuted bool // global package + game minor preference; survives updates
+	// VersionConfirmed: community data (No Version Warning, 08 §2.3) confirms the Mod works
+	// on this game version although it does not list it. Never a declaration (05 §4.2).
+	VersionConfirmed bool
+	IgnoreExpired    bool    // ignored once, but the subject changed since (05 §4.2)
+	Log              *LogRun // the log of a log.* problem
 }
 
 // ProblemSet is every current problem of the environment.
@@ -31,6 +34,7 @@ type ProblemSet struct {
 	List      []*Problem // neither ignored nor version-muted, sorted by severity then subject
 	Ignored   []*Problem
 	Muted     []*Problem // version warnings muted by the player, never counted
+	Confirmed []*Problem // version warnings community data answers (No Version Warning), never counted
 	// Stale holds the problems of stale logs (LogRun.Stale): shown apart, never counted.
 	Stale    []*Problem
 	Logs     []*LogRun // the logs whose clusters joined the problems
@@ -314,6 +318,13 @@ func (a *App) finishProblems(ps *ProblemSet, all []*finding.Finding, fromLog map
 		if f.Code == "version.unsupported" {
 			if m := st.Ix.ByID[f.SubjectInstance()]; m != nil {
 				p.VersionMuted = mutes[store.VersionMuteKey(m.PackageID)]
+				if a.VersionConfirmed(m.PackageID, f.Key) {
+					p.VersionConfirmed = true
+					confirmed := *f
+					confirmed.Evidence = append(slices.Clone(f.Evidence), finding.Evidence{Source: finding.Community, Ref: "noVersionWarning.zip",
+						Text: fmt.Sprintf("%s lists it as working on %s", NoVersionWarningName, f.Key)})
+					p.Finding = &confirmed
+				}
 			}
 		}
 		if g := ig[igKey{lin, f.Code, f.Key}]; g != nil {
@@ -324,6 +335,8 @@ func (a *App) finishProblems(ps *ProblemSet, all []*finding.Finding, fromLog map
 			}
 		}
 		switch {
+		case p.VersionConfirmed:
+			ps.Confirmed = append(ps.Confirmed, p)
 		case p.VersionMuted:
 			ps.Muted = append(ps.Muted, p)
 		case p.Ignored:
@@ -355,6 +368,7 @@ func (a *App) finishProblems(ps *ProblemSet, all []*finding.Finding, fromLog map
 	sortProblems(ps.List, order)
 	sortProblems(ps.Ignored, order)
 	sortProblems(ps.Muted, order)
+	sortProblems(ps.Confirmed, order)
 	sortProblems(ps.Stale, order)
 	return nil
 }
@@ -372,9 +386,9 @@ func sortProblems(ps []*Problem, order func(*finding.Finding) string) {
 	}
 }
 
-// All is every problem: current, ignored, version-muted and from stale logs.
+// All is every problem: current, ignored, version-muted, community-confirmed and from stale logs.
 func (ps *ProblemSet) All() []*Problem {
-	return append(append(append(append([]*Problem{}, ps.List...), ps.Ignored...), ps.Stale...), ps.Muted...)
+	return append(append(append(append(append([]*Problem{}, ps.List...), ps.Ignored...), ps.Stale...), ps.Muted...), ps.Confirmed...)
 }
 
 // IgnoreProblems records the ignores together using the current problem set.

@@ -2138,6 +2138,10 @@ func (s *API) Palette(query, page string, parts []string) []view.PalEntry {
 	return out
 }
 
+// ChangelogText is one version's text from the built-in CHANGELOG.md, read when its fold in
+// Settings › About opens (16 §2.14); never from the network.
+func (s *API) ChangelogText(version string) string { return view.ChangelogText(version) }
+
 // OpenURL opens an http(s) link in the system browser (links in descriptions, the
 // Workshop page).
 func (s *API) OpenURL(raw string) error {

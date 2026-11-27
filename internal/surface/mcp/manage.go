@@ -267,7 +267,7 @@ type HiddenIn struct {
 type MaintenanceIn struct {
 	Env                  string  `json:"env,omitempty" jsonschema:"Game Config (default: current)"`
 	Action               string  `json:"action" jsonschema:"data_update, import_rimcrow, import_rimstack, vacuum, gc, trim_log or delete_log"`
-	Datasets             StrList `json:"datasets,omitempty" jsonschema:"data_update: rules, steamdb, replacements (default: all)"`
+	Datasets             StrList `json:"datasets,omitempty" jsonschema:"data_update: rules, steamdb, replacements, noversionwarning (default: all)"`
 	DB                   string  `json:"db,omitempty" jsonschema:"import_rimcrow: RimCrow's data\\mod_manager.db"`
 	Rules                string  `json:"rules,omitempty" jsonschema:"import_rimcrow: RimCrow's user_rules.json (default: next to the database)"`
 	IncludeDisabledRules bool    `json:"include_disabled_rules,omitempty" jsonschema:"import_rimcrow: also import rules switched off in RimCrow"`

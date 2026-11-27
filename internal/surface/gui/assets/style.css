@@ -515,8 +515,8 @@ body.row-dragging, body.row-dragging * { cursor: grabbing !important; -webkit-us
 .page.fill { height: 100%; min-height: 0; padding-bottom: 8px; }
 /* page width by shape (16 §7.3 rule 12): list-and-detail pages fill the window like the
    editor and the library; one-column pages share one reading width */
-.page:is(.logs, .pm-page, .packs, .subs-page, .needs, .modsettings, .saves, .review, .fb-page) { padding-left: 12px; padding-right: 12px; }
-.page:is(.env, .textures, .settings) { padding-left: max(20px, calc(50% - 480px)); padding-right: max(20px, calc(50% - 480px)); }
+.page:is(.logs, .pm-page, .packs, .subs-page, .needs, .modsettings, .saves, .review, .fb-page, .st-page) { padding-left: 12px; padding-right: 12px; }
+.page:is(.env, .textures) { padding-left: max(20px, calc(50% - 480px)); padding-right: max(20px, calc(50% - 480px)); }
 @keyframes view-in { from { opacity: 0; transform: translateY(4px); } }
 .head-right { display: flex; align-items: center; gap: 8px; }
 .note { padding: 0 4px; font-size: 12px; }
@@ -1849,6 +1849,50 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
   .fb-lay { display: flex; flex-direction: column; gap: var(--card-gap); }
   .fb-split { display: none; }
   .fb-body { overflow: visible; }
+}
+/* Settings' two panes (16 §2.14 "Layout"; 16 §7.3 item 12): the groups at the left, 30% by
+   default, the picked group at the right in one card whose head names it. Both cards fill the
+   page's height and start on one line; a long group scrolls inside its card. The gap drags
+   (ui.gui.settings.side) and comes after the right card in the tab order. */
+.page.fill.st-page { display: flex; flex-direction: column; }
+.st-lay { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(220px, var(--st-side, 30fr)) var(--card-gap) minmax(420px, 70fr); grid-template-rows: minmax(0, 1fr); }
+.st-lay > .st-list { grid-area: 1 / 1; }
+.st-lay > .st-split { grid-area: 1 / 2; align-self: stretch; margin: 0; }
+.st-lay > .st-card { grid-area: 1 / 3; }
+.st-list { min-width: 0; }
+.st-row { position: relative; width: calc(100% - 12px); flex: none; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.st-row:hover:not(.on) { background: var(--pill); }
+.st-row.on .nt { color: var(--accent-11, var(--accent)); }
+.st-row .st-facts { display: flex; flex-wrap: wrap; gap: 0 12px; min-width: 0; max-height: 1lh; overflow: hidden; white-space: nowrap; }
+/* a fact that does not fit goes whole to the hidden second line; only a first fact wider than
+   the row ends in "…" (the row's hover has them all) */
+.st-row .st-facts > span { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.st-row .dbar-row { grid-template-columns: minmax(48px, 96px) minmax(0, auto); }
+.st-row .dbar-row .num { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-dot { flex: none; align-self: center; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.st-dot.amber { background: var(--amber); }
+.st-list > .st-apart { margin-top: 8px; }
+.st-card { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.st-head[hidden] { display: none; }
+.st-head { flex: none; padding: 12px 14px 10px; border-bottom: var(--hairline) solid var(--line-2); }
+.st-title { font-size: 15px; font-weight: 600; color: var(--fg); }
+.settings .st-head .group-note { padding: 4px 0 0; border-bottom: 0; }
+/* a group of sections: each former group under a heading drawn as the head is */
+.st-sec-head { padding: 12px 14px 10px; border-bottom: var(--hairline) solid var(--line-2); }
+.st-sec + .st-sec > .st-sec-head { border-top: var(--hairline) solid var(--line-2); }
+.settings .st-sec-head .group-note { padding: 4px 0 0; border-bottom: 0; }
+.st-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+/* the right card is narrower than the old 960 px column: a fold's drive meter is shorter, so
+   its heading keeps one line */
+.st-card .folder-fold-head .dbar-row { grid-template-columns: minmax(48px, 110px) auto; }
+.st-group[hidden] { display: none; }
+/* a deep link's row: marked until another group is picked */
+.settings .set.st-landed { background: var(--accent-soft); }
+@media (max-width: 900px) {
+  .page.fill.st-page { height: auto; }
+  .st-lay { display: flex; flex-direction: column; gap: var(--card-gap); }
+  .st-split { display: none; }
+  .st-list, .st-body { overflow: visible; }
 }
 .fb-kinds { overflow-y: auto; }
 .fb-kind { position: relative; width: calc(100% - 12px); border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
@@ -3604,6 +3648,36 @@ button:hover > .xc-cb:not(.on):not(.part), .xc-cb:hover:not(.on):not(.part):not(
 .folder-fold-warn svg { width: 14px; height: 14px; }
 .folder-fold-rows { border-top: var(--hairline) solid var(--line-2); }
 .folder-fold-rows .set { padding-left: 42px; }
+/* Settings › About (16 §2.14): the author, then the changelog's versions as Folders' folds */
+.about-author { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 24px; padding: 14px; }
+.aa-text { flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.aa-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; }
+.aa-n { font-size: 13px; font-weight: 600; color: var(--fg); }
+.aa-seek { color: var(--accent); font-weight: 500; }
+.aa-links { flex: none; }
+.cl-head .cl-v { font-weight: 500; }
+.cl-head .cl-v.current { color: var(--accent); }
+.cl-older > .cl-head { color: var(--muted); }
+.cl-body { border-top: var(--hairline) solid var(--line-2); }
+.cl-body[hidden] { display: none; }
+.cl-body > .folder-fold:first-child { border-top: 0; }
+/* a folded version inside "older versions": its own chevron, one step in */
+.cl .folder-fold:not(.open) > .cl-head .fold-chev { transform: none; }
+.cl-older > .cl-body > .cl-ver > .cl-head { padding-left: 38px; }
+.cl-older > .cl-body > .cl-ver > .cl-body > .cl-md { padding-left: 66px; }
+.cl-md { padding: 6px 18px 12px 42px; max-width: 860px; overflow-wrap: anywhere; font-size: 13px; line-height: 1.55; color: var(--fg-2); -webkit-user-select: text; user-select: text; }
+.cl-md ul { margin: 4px 0; padding-left: 18px; }
+.cl-md li { margin: 3px 0; }
+.cl-md li::marker { color: var(--faint); }
+.cl-md p { margin: 6px 0; }
+.cl-md .cl-h { margin: 14px 0 4px; font-size: 13px; font-weight: 600; color: var(--fg); }
+.cl-md strong { font-weight: 600; color: var(--fg); }
+.cl-md code { font: inherit; font-family: var(--code); padding: 0 3px; border-radius: var(--r-sm); background: var(--pill); }
+.cl-md .cl-more { margin-left: 8px; padding: 0; color: var(--muted); font: inherit; }
+.cl-md .cl-more:hover { color: var(--fg); }
+.cl-md [hidden] { display: none; }
+.cl-md a { color: var(--accent); text-decoration: none; }
+.cl-md a:hover { text-decoration: underline; }
 
 /* over a result: the counts card and the buttons at the left, inset a little, Archo at her
    full size at the right; shown with a result only */

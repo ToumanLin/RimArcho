@@ -36,7 +36,7 @@ func TestSourceLibrarySettingTaskStopRetryAndHistory(t *testing.T) {
 		t.Fatal("task did not start")
 	}
 	settings := make(chan []view.SettingGroup, 1)
-	go func() { settings <- api.Settings() }()
+	go func() { settings <- view.SettingSections(api.Settings()) }()
 	select {
 	case groups := <-settings:
 		found := 0

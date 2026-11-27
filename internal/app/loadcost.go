@@ -58,7 +58,8 @@ type LoadCost struct {
 
 // LoadFit is a LoadCost on one machine: baseline-included ranges after the hardware
 // adjustments, 1.6 VRAM the card cannot hold (loadcost.Spill) and 1.7 textures above
-// the card's upload watermark (loadcost.Cap17).
+// the card's upload watermark (loadcost.Cap17; resident RAM and VRAM only: the loading
+// budget is a first-launch peak, which does not follow the card).
 type LoadFit struct {
 	// WSLow / WSHigh: the expected working set a minute after the main menu (what Task
 	// Manager shows; loadcost.WorkingSet), the held VRAM included. The other RAM ranges
@@ -81,7 +82,8 @@ func (r *LoadCost) FitTo(dedicated int64) LoadFit {
 	cutRAMLow, cutRAMHigh, cutVRAMLow, cutVRAMHigh := loadcost.Cap17(r.Game, r.Report, dedicated)
 	f := LoadFit{
 		RAMLow: r.RAMLow - cutRAMLow + r.Baseline.RAM, RAMHigh: r.RAMHigh - cutRAMHigh + r.Baseline.RAM,
-		LoadingLow: r.LoadingRAMLow - cutRAMLow + r.Baseline.RAM, LoadingHigh: r.LoadingRAMHigh - cutRAMHigh + r.Baseline.RAM,
+		// a first launch peaks the same on any card (research 2026-10-24 §4.6): no cut
+		LoadingLow: r.LoadingRAMLow + r.Baseline.RAM, LoadingHigh: r.LoadingRAMHigh + r.Baseline.RAM,
 		VRAMLow: r.VRAMLow - cutVRAMLow + r.Baseline.VRAM, VRAMHigh: r.VRAMHigh - cutVRAMHigh + r.Baseline.VRAM,
 		OnDemand: cutVRAMLow,
 	}

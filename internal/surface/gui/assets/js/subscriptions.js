@@ -12,6 +12,7 @@ import { stateMark, fileMarks } from "./membar.js";
 import { wireSeparator } from "./separator.js";
 import { addForm, pageUpdate } from "./subscribe.js";
 import { libraryLink, openLibraryInstance } from "./librarylink.js";
+import { revealSetting } from "./settingspage.js";
 
 let ui = null;
 // the page helpers of screens.js (given at init: screens.js re-exports this module)
@@ -336,11 +337,10 @@ function sourcesDetail(card) {
   card.append(box);
 }
 
+// goAccounts opens settings › accounts at its first account, marked, its button focused.
 async function goAccounts() {
   await ui.go("settings");
-  const heading = document.querySelector('[data-setting-action^="account "]')?.closest("[data-area]");
-  heading?.scrollIntoView({ block: "start" });
-  heading?.querySelector("button, input")?.focus({ preventScroll: true });
+  revealSetting('#screen [data-setting-action^="account "]');
 }
 
 // ---- the detail ----

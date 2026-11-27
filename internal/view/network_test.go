@@ -58,7 +58,7 @@ func TestNetworkSettings(t *testing.T) {
 
 func networkGroup(t *testing.T, e *testkit.Env) *view.SettingGroup {
 	t.Helper()
-	for _, g := range view.SettingsPage(e.App, nil) {
+	for _, g := range view.SettingSections(view.SettingsPage(e.App, nil)) {
 		if g.Title == "network" {
 			return &g
 		}

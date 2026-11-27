@@ -3,6 +3,7 @@ package view
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -77,6 +78,10 @@ func VersionReason(a *app.App, st *app.LoadoutState, m *store.Mod) (*Reason, err
 	if mm == "" || m.Kind == source.Official {
 		return nil, nil
 	}
+	if !declaresVersion(m, mm) && a.VersionConfirmed(m.PackageID, mm) {
+		r := confirmedReason(mm)
+		return &r, nil
+	}
 	mutes, err := a.Store.VersionMutes(mm)
 	if err != nil {
 		return nil, err
@@ -95,6 +100,12 @@ func VersionReason(a *app.App, st *app.LoadoutState, m *store.Mod) (*Reason, err
 	}
 	r := versionReasonBuilder(mm, muted)(m)
 	return &r, nil
+}
+
+// declaresVersion: the Mod lists mm, or lists no versions at all (no warning either way).
+func declaresVersion(m *store.Mod, mm string) bool {
+	vs := strings.Fields(strings.ReplaceAll(m.SupportedVersions, ",", " "))
+	return len(vs) == 0 || slices.Contains(vs, mm)
 }
 
 func versionBatch(st *app.LoadoutState, ps []*app.Problem, muted bool) Action {
@@ -119,6 +130,30 @@ func mutedVersionsNeed(st *app.LoadoutState, ps []*app.Problem) Need {
 	text := Tf("%d mods' %s warnings are ignored", len(ps), mm)
 	return Need{rank: 5, Group: GroupList, Text: text, Dim: true, code: "version.muted",
 		Actions: []Action{{Kind: ActVersionList, Key: "enter", Label: T("view or restore"), Title: text, GameVersion: mm, VersionMuted: true}}}
+}
+
+// confirmedText names what community data says, apart from the player's own ignores.
+func confirmedText(n int, mm string) string {
+	return Tf("%d mods confirmed working on %s by community data (No Version Warning)", n, mm)
+}
+
+// confirmedMoreText is the version item's muted line for the warnings No Version Warning
+// answers (08 §2.3): the item's own "see the list" shows them as the list's last group.
+func confirmedMoreText(n int) string {
+	return Tf("%d more confirmed working by community data", n)
+}
+
+// confirmedVersionsNeed: every version warning is answered by No Version Warning, so no item
+// breaks the game; one quiet line worth knowing, not counted, with no button (05 §4.2).
+func confirmedVersionsNeed(st *app.LoadoutState, ps []*app.Problem) Need {
+	return Need{rank: 5, Group: GroupList, Text: confirmedText(len(ps), st.GameMM()), Dim: true, Status: StatusHint,
+		code: "version.confirmed", Evidence: evidence(EvCommunity, app.NoVersionWarningName), Actions: []Action{}}
+}
+
+// confirmedReason is a Mod's version line when community data answers its warning.
+func confirmedReason(mm string) Reason {
+	return Reason{Status: StatusNone, Text: Tf("confirmed working on %s by community data (No Version Warning)", mm),
+		Evidence: evidence(EvCommunity, app.NoVersionWarningName)}
 }
 
 func ReadVersionWarnings(a *app.App, mm string, muted bool) (*VersionWarnings, error) {
@@ -204,6 +239,20 @@ func ReadVersionWarnings(a *app.App, mm string, muted bool) (*VersionWarnings, e
 				supported = ""
 			}
 			g.Rows = append(g.Rows, VersionEntry{ID: m.ID, Name: m.DisplayName(), Supported: supported, Action: action})
+		}
+		sort.SliceStable(g.Rows, func(i, j int) bool { return g.Rows[i].Name < g.Rows[j].Name })
+		out.Groups = append(out.Groups, g)
+	}
+	// What community data answers comes last, apart from the player's ignores and with
+	// nothing to ignore or restore: the Mod's own declaration is unchanged (05 §4.2).
+	if !muted && len(ps.Confirmed) > 0 {
+		g := VersionGroup{Title: fmt.Sprintf("%s  %d", Tf("confirmed working on %s by community data (No Version Warning)", mm), len(ps.Confirmed))}
+		for _, p := range ps.Confirmed {
+			m := st.Ix.ByID[p.SubjectInstance()]
+			if m == nil {
+				continue
+			}
+			g.Rows = append(g.Rows, VersionEntry{ID: m.ID, Name: m.DisplayName(), Supported: Tf("lists %s", supportedText(m))})
 		}
 		sort.SliceStable(g.Rows, func(i, j int) bool { return g.Rows[i].Name < g.Rows[j].Name })
 		out.Groups = append(out.Groups, g)

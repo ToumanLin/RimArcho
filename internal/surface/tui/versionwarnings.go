@@ -19,14 +19,23 @@ func (m *model) openVersionWarnings(a view.Action) tea.Cmd {
 		p.choices = append(p.choices, label)
 		actions = append(actions, run)
 	}
-	if len(data.Groups) > 0 {
+	if len(data.All.Refs) > 0 {
 		add(data.All.Label, m.actionKey(data.All, data.Title).run)
 	}
 	for _, group := range data.Groups {
-		add(group.Title+"  "+group.Action.Label, m.actionKey(group.Action, data.Title).run)
+		// A group community data answers (No Version Warning) has nothing to ignore.
+		if group.Action.Kind != "" {
+			add(group.Title+"  "+group.Action.Label, m.actionKey(group.Action, data.Title).run)
+		} else {
+			add(group.Title, func(*model) tea.Cmd { return nil })
+		}
 		for _, row := range group.Rows {
 			add(strings.TrimSpace(row.Name+"  "+row.Supported), func(m *model) tea.Cmd {
-				m.panel = &panel{title: row.Name, choices: []string{view.T("show in list"), row.Action.Label},
+				choices := []string{view.T("show in list")}
+				if row.Action.Kind != "" {
+					choices = append(choices, row.Action.Label)
+				}
+				m.panel = &panel{title: row.Name, choices: choices,
 					onPick: func(m *model, choice string) tea.Cmd {
 						if choice == view.T("show in list") {
 							return m.jumpTo(row.ID)

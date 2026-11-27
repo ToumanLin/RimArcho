@@ -23,7 +23,8 @@ func issue31Cost() *LoadCost {
 		r.VRAMLow += p.VRAMLow
 		r.VRAMHigh += p.VRAMHigh
 	}
-	c := &LoadCost{Report: r, Game: loadcost.Game17, Mods: 615, LoadingRAMLow: r.RAMLow + gib/4, LoadingRAMHigh: r.RAMHigh + gib}
+	c := &LoadCost{Report: r, Game: loadcost.Game17, Mods: 615}
+	c.LoadingRAMLow, c.LoadingRAMHigh = loadcost.LoadingBudget(loadcost.Game17, r, nil)
 	c.Baseline.RAM, c.Baseline.VRAM = loadcost.Baseline(loadcost.Game17)
 	return c
 }
@@ -45,9 +46,21 @@ func TestMemoryIssue31Shape(t *testing.T) {
 	if c.WorkingSetLow <= 0 || c.WorkingSetHigh > c.RAMHigh || c.WorkingSetLow > c.RAMLow || c.WorkingSetHigh >= c.RAMHigh && c.WorkingSetLow >= c.RAMLow {
 		t.Fatalf("working set %d–%d against commit %d–%d", c.WorkingSetLow, c.WorkingSetHigh, c.RAMLow, c.RAMHigh)
 	}
-	// at 8 GB free the warning stands only because the working set itself exceeds it
-	if (c.RAMSeverity == "warning") != (c.WorkingSetHigh > 8*gib) || c.RAMSeverity == "severe" {
+	// research §4.6: the texture term saturates, so the fitted working set is about 1.9–7.2 GiB
+	// and 8 GB free is enough. While loading it commits 2.2 GiB (repeat launch) to 29.7 GiB
+	// (first launch, textures encoded into the cache), on any card
+	near := func(v int64, want float64) bool {
+		return float64(v) > (want-0.1)*float64(gib) && float64(v) < (want+0.1)*float64(gib)
+	}
+	if !near(c.WorkingSetLow, 1.9) || !near(c.WorkingSetHigh, 7.2) {
+		t.Fatalf("working set %.2f–%.2f GiB, want about 1.9–7.2", float64(c.WorkingSetLow)/float64(gib), float64(c.WorkingSetHigh)/float64(gib))
+	}
+	if c.RAMSeverity != "ok" {
 		t.Fatalf("8 GB free: %s with working set up to %d", c.RAMSeverity, c.WorkingSetHigh)
+	}
+	// 7 GB free is below the fitted upper bound: the warning returns
+	if w := AssessMemory(hw(7*gib, 40*gib), cost); w.RAMSeverity != "warning" {
+		t.Fatalf("7 GB free: %s", w.RAMSeverity)
 	}
 	// free RAM between the working set and the commit: the old rule warned, this one does not
 	c = AssessMemory(hw(c.WorkingSetHigh, 40*gib), cost)

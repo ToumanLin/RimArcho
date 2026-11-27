@@ -86,7 +86,7 @@ Each plan records **allowed game versions** (major.minor, such as 1.5, 1.6, 1.7)
   - Exported RimArcho lists include `versions` (§7.3).
   - `version.unsupported` (05 §4.3) still checks the current game version, independently.
 - **Commands**: `archo plan versions [<name>]` shows the allowed versions and, for each, how many Mods do not declare it; `archo plan versions <name> <versions…>` sets them, for example `1.5 1.6 1.7` or `1.5-1.7`; `archo plan versions <name> default` resets them. Version settings are not list edits and do not enter undo stacks; the UI status offers "undo", which restores the previous value. MCP has corresponding tools.
-- **Warning counts**: `PlanVersions.Missing` and the version notices in all lists leave out ignored version warnings and list them separately as `Muted` (05 §4.2). If all are ignored, say "no version warnings", never "every Mod supports it". `Common`, defaults, allowed versions and player selections still use the actual declarations: ignoring a warning does not count as support.
+- **Warning counts**: `PlanVersions.Missing` and the version notices in all lists leave out ignored version warnings and list them separately as `Muted`, and those No Version Warning confirms for that version as `Confirmed` (05 §4.2). If all are ignored or confirmed, say "no version warnings", never "every Mod supports it". `Common`, defaults, allowed versions and player selections still use the actual declarations: ignoring a warning, or community confirmation, does not count as support.
 
 ### 1.7 Plans shared across all games
 

@@ -5,8 +5,11 @@ package loadcost
 // textures up to 7.5 GiB payload. The resident curve also shapes this budget.
 // See docs/research/2026-11-01_unity16-heavy-texture-memory.md for fit and limits.
 // 1.6 excludes the texture VRAM, like Estimate; add Spill for the share held in RAM.
-// 1.7 retains the uncalibrated XML/decode reserve. Arbitrary Mod allocations,
-// AssetBundles, saves and play growth can exceed either model.
+// 1.7 spans a repeat launch (low: textures come from the cache and upload on demand, so
+// no texture term) and a first launch (high: every texture is encoded; the texture and
+// DDS RAM range capped at the payload plus Coef.Tex17LoadHighOver), neither following the
+// card (research 2026-10-24 §4.6), plus the uncalibrated XML/decode reserve. Arbitrary Mod
+// allocations, AssetBundles, saves and play growth can exceed either model.
 func LoadingBudget(g Game, r Report, mods []Mod) (low, high int64) {
 	var m Mod
 	for _, mod := range mods {
@@ -26,7 +29,17 @@ func LoadingBudget(g Game, r Report, mods []Mod) (low, high int64) {
 		return r.RAMLow + (9*(1<<30))/10 + int64(payloadLow*0.15) + m.MaxPNGDecode,
 			r.RAMHigh + (13*(1<<30))/10 + int64(payloadHigh*0.45) + m.MaxPNGDecode + xml*4 + m.Languages.Bytes*3
 	}
-	return r.RAMLow + xml*4 + m.MaxPNGDecode, r.RAMHigh + xml*12 + m.MaxPNGDecode + m.Languages.Bytes*3
+	var texLow, texHigh int64
+	var payload float64
+	for _, p := range r.Parts {
+		if p.Key == "textures" || p.Key == "dds" {
+			texLow += p.RAMLow
+			texHigh += p.RAMHigh
+			payload += float64(p.VRAMHigh) / Coef.Tex17VRAMHigh
+		}
+	}
+	cutHigh := max(texHigh-int64(payload)-Coef.Tex17LoadHighOver, 0)
+	return r.RAMLow - texLow + xml*4 + m.MaxPNGDecode, r.RAMHigh - cutHigh + xml*12 + m.MaxPNGDecode + m.Languages.Bytes*3
 }
 
 // Spill returns how much of a VRAM estimate (baseline included) the game holds in

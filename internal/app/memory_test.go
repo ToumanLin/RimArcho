@@ -111,7 +111,12 @@ func TestMemoryTokenDedicatedVRAMIsUnknown(t *testing.T) {
 	}
 	c := assess(2 * gib)
 	_, ramHigh, _, vramHigh := loadcost.Cap17(loadcost.Game17, r, 2*gib)
-	if ramHigh == 0 || c.RAMHigh != unknown.RAMHigh-ramHigh || c.VRAMHigh != unknown.VRAMHigh-vramHigh || c.TexturesOnDemand == 0 || c.VRAMSeverity != "ok" {
+	// the loading budget (RAMLow / RAMHigh here) is a first-launch peak, the same on any card
+	// (research 2026-10-24 §4.6); the resident range and the VRAM keep the watermark cap
+	if ramHigh == 0 || c.RAMHigh != unknown.RAMHigh || c.VRAMHigh != unknown.VRAMHigh-vramHigh || c.TexturesOnDemand == 0 || c.VRAMSeverity != "ok" {
 		t.Fatalf("2 GiB card not capped as before: %+v", c)
+	}
+	if f := cost.FitTo(2 * gib); f.RAMHigh != r.RAMHigh-ramHigh+cost.Baseline.RAM {
+		t.Fatalf("resident range not capped: %d", f.RAMHigh)
 	}
 }
