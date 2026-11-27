@@ -329,6 +329,28 @@ namespace ArchoMonitor
             }
         }
 
+        // WriteMemory writes the memory record (19 §2): one line, kind memory, with
+        // context.memory holding the phase, the seconds since it began and the process's
+        // memory in bytes. vram is left out where the game reports none (1.5, 1.6).
+        internal static void WriteMemory(string at, int after, MemoryRecord.Sample s, int mods)
+        {
+            var j = new Json().Head(DateTime.Now, "INFO", "[Archo Monitor] memory " + at);
+            j.Str("details", "").Num("count", 1);
+            j.Raw("context").Open().Raw("memory").Open().Str("phase", at).Num("after", after).Num("mods", mods)
+                .Num("workingSet", s.WorkingSet).Num("private", s.Private).Num("peakWorkingSet", s.PeakWorkingSet);
+            if (s.PrivateWorkingSet > 0) j.Num("privateWorkingSet", s.PrivateWorkingSet);
+            if (s.PeakPrivate > 0) j.Num("peakPrivate", s.PeakPrivate);
+            if (s.VRAM > 0) j.Num("vram", s.VRAM);
+            j.Close().Close().Kind("memory");
+            lock (sync)
+            {
+                if (closed || w == null) return;
+                FlushDirty(true);
+                WriteLine(j.End(), force: true);
+                Flush();
+            }
+        }
+
         // WriteSettings writes the settings record (19 §2): one line, kind settings, with
         // context.settings listing each Mod class's settings file.
         internal static void WriteSettings(IList<SettingsFile> files)

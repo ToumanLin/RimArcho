@@ -14,9 +14,10 @@ import (
 func TestChineseMemoryPunctuation(t *testing.T) {
 	table := Locales["zh"]()
 	for _, key := range []string{
-		"RAM: loading needs %s; available now %s of %s",
-		"RAM: loading needs %s; available memory and total capacity are unavailable",
-		"RAM: loading needs %s; available memory is unavailable; total capacity %s",
+		"RAM: about %s in Task Manager (estimated); available now %s of %s",
+		"RAM: the game uses about %s (estimated); available now %s of %s",
+		"RAM: the game uses about %s (estimated); available memory and total capacity are unavailable",
+		"RAM: the game uses about %s (estimated); available memory is unavailable; total capacity %s",
 		"VRAM: estimated %s; dedicated capacity %s",
 		"VRAM: estimated %s; dedicated capacity is unknown",
 	} {

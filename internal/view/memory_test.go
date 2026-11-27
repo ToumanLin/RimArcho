@@ -106,17 +106,17 @@ func TestMemoryNeedUnknownWording(t *testing.T) {
 				t.Fatalf("unknown capacity warned: %+v", c)
 			}
 			if runtime.GOOS == "windows" {
-				if hardware.TotalRAM == 0 && !strings.Contains(n.Text, view.Tf("RAM: loading needs %s; available now %s of %s", view.T("not measured"), view.T("unavailable"), view.T("unavailable"))) {
+				if hardware.TotalRAM == 0 && !strings.Contains(n.Text, view.Tf("RAM: about %s in Task Manager (estimated); available now %s of %s", view.T("not measured"), view.T("unavailable"), view.T("unavailable"))) {
 					t.Fatalf("Windows text changed: %s", n.Text)
 				}
 			} else {
 				if !strings.Contains(n.Text, view.Tf("VRAM: estimated %s; dedicated capacity is unknown", view.T("not measured"))) {
 					t.Fatal(n.Text)
 				}
-				if hardware.TotalRAM == 0 && !strings.Contains(n.Text, view.Tf("RAM: loading needs %s; available memory and total capacity are unavailable", view.T("not measured"))) {
+				if hardware.TotalRAM == 0 && !strings.Contains(n.Text, view.Tf("RAM: the game uses about %s (estimated); available memory and total capacity are unavailable", view.T("not measured"))) {
 					t.Fatal(n.Text)
 				}
-				if hardware.RAMAvailableUnknown && !strings.Contains(n.Text, view.Tf("RAM: loading needs %s; available memory is unavailable; total capacity %s", view.T("not measured"), view.SizeText(hardware.TotalRAM))) {
+				if hardware.RAMAvailableUnknown && !strings.Contains(n.Text, view.Tf("RAM: the game uses about %s (estimated); available memory is unavailable; total capacity %s", view.T("not measured"), view.SizeText(hardware.TotalRAM))) {
 					t.Fatal(n.Text)
 				}
 			}
@@ -129,26 +129,28 @@ func TestMemoryNeedUnknownWording(t *testing.T) {
 func TestMemoryNeedBarsKeepTheSentences(t *testing.T) {
 	view.SetLang("en")
 	t.Cleanup(func() { view.SetLang("en") })
-	r := &app.LoadCost{LoadingRAMLow: 2 << 30, LoadingRAMHigh: 4 << 30}
+	r := &app.LoadCost{LoadingRAMLow: 2 << 30, LoadingRAMHigh: 4 << 30, Baseline: app.LoadCostBaseline{RAM: 1 << 30}}
 	r.VRAMLow, r.VRAMHigh = 1<<30, 3<<30
 	m := machine.Memory{TotalRAM: 8 << 30, AvailableRAM: 3 << 30, SampledAt: time.Now(), Adapters: []machine.Adapter{{Name: "fixture GPU", Dedicated: 2 << 30}}}
-	n := view.MemoryNeed(app.AssessMemory(m, r), 1)
+	c := app.AssessMemory(m, r)
+	n := view.MemoryNeed(c, 1)
 	if len(n.Bars) != 2 {
 		t.Fatalf("bars: %+v", n.Bars)
 	}
 	ram, vram := n.Bars[0], n.Bars[1]
-	if ram.Total != 8<<30 || ram.Used != 5<<30 || len(ram.Parts) != 1 || ram.Parts[0].Low != 2<<30 || ram.Parts[0].High != 4<<30 {
+	// the RAM bar is the expected working set (#31), not the loading commit
+	if ram.Total != 8<<30 || ram.Used != 5<<30 || len(ram.Parts) != 1 || ram.Parts[0].Low != c.WorkingSetLow || ram.Parts[0].High != c.WorkingSetHigh || c.WorkingSetHigh == 0 {
 		t.Fatalf("RAM bar: %+v", ram)
 	}
 	if vram.Total != 2<<30 || vram.Used != 0 || vram.Note != "fixture GPU" || vram.Parts[0].High != 3<<30 {
 		t.Fatalf("VRAM bar: %+v", vram)
 	}
 	lines := strings.Split(n.Why, "\n")
-	if ram.Text != lines[0] || !strings.HasPrefix(vram.Text, lines[1]) || !strings.Contains(vram.Text, "GPU: fixture GPU") {
+	if !strings.HasPrefix(ram.Text, lines[0]) || !strings.HasPrefix(vram.Text, lines[1]) || !strings.Contains(vram.Text, "GPU: fixture GPU") {
 		t.Fatalf("bars not named by their sentences: %q / %q; why %q", ram.Text, vram.Text, n.Why)
 	}
 	for _, l := range lines[2:] {
-		if !strings.HasPrefix(l, "GPU:") && !strings.Contains(n.BarsWhy, l) {
+		if !strings.HasPrefix(l, "GPU:") && !strings.Contains(n.BarsWhy, l) && !strings.Contains(ram.Text, l) {
 			t.Errorf("%q neither drawn nor shown: barsWhy %q", l, n.BarsWhy)
 		}
 	}

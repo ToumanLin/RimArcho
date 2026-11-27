@@ -9,13 +9,18 @@ namespace ArchoMonitor
         internal static void Menu()
         {
             Change("menu");
+            MemoryRecord.At("menu");
             SettingsRecord.Write();
             HugsLibRecord.Queue();
         }
 
         internal static void Save(string __0) { Change("save", __0); }
         internal static void New() { Change("new"); }
-        internal static void Play() { Change("play"); }
+        internal static void Play()
+        {
+            Change("play");
+            MemoryRecord.At("play");
+        }
 
         static void Change(string phase, string save = null)
         {

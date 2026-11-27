@@ -15,7 +15,7 @@ func MemoryNeed(c app.MemoryAssessment, plan int64) Need {
 		Actions: []Action{{Kind: ActView, Key: "v", Label: T("refresh memory estimate"), Argv: []string{"plan", "cost", fmt.Sprint(plan)}}}}
 	ram, vram := T("not measured"), T("not measured")
 	if c.Estimated {
-		ram = costRange(c.RAMLow, c.RAMHigh)
+		ram = costRange(c.WorkingSetLow, c.WorkingSetHigh)
 		vram = costRange(c.VRAMLow, c.VRAMHigh)
 	}
 	available, total := T("unavailable"), T("unavailable")
@@ -27,18 +27,39 @@ func MemoryNeed(c app.MemoryAssessment, plan int64) Need {
 	if c.Hardware.VRAM() > 0 {
 		video = SizeText(c.Hardware.VRAM())
 	}
+	// The headline is the expected working set, the figure Task Manager shows (#31); the
+	// commit the loading budget needs follows in the details.
 	lines := []string{
-		Tf("RAM: loading needs %s; available now %s of %s", ram, available, total),
+		Tf("RAM: about %s in Task Manager (estimated); available now %s of %s", ram, available, total),
 		Tf("VRAM: estimated %s; dedicated capacity %s", vram, video),
 	}
 	if runtime.GOOS != "windows" {
 		if c.Hardware.TotalRAM <= 0 {
-			lines[0] = Tf("RAM: loading needs %s; available memory and total capacity are unavailable", ram)
+			lines[0] = Tf("RAM: the game uses about %s (estimated); available memory and total capacity are unavailable", ram)
 		} else if c.Hardware.RAMAvailableUnknown {
-			lines[0] = Tf("RAM: loading needs %s; available memory is unavailable; total capacity %s", ram, total)
+			lines[0] = Tf("RAM: the game uses about %s (estimated); available memory is unavailable; total capacity %s", ram, total)
+		} else {
+			lines[0] = Tf("RAM: the game uses about %s (estimated); available now %s of %s", ram, available, total)
 		}
 		if c.Hardware.VRAM() <= 0 {
 			lines[1] = Tf("VRAM: estimated %s; dedicated capacity is unknown", vram)
+		}
+	}
+	// the commit line: in the text and the tooltip always, under the bars only when RAM is
+	// short (16 §7 principle 9: the bars carry the normal case)
+	commitAt := len(lines)
+	if c.Estimated && c.Hardware.CommitAvailable > 0 {
+		lines = append(lines, Tf("While loading, the game reserves %s of RAM and page file; this computer can still reserve %s.", costRange(c.RAMLow, c.RAMHigh), SizeText(c.Hardware.CommitAvailable)))
+	} else if c.Estimated {
+		lines = append(lines, Tf("While loading, the game reserves %s of RAM and page file.", costRange(c.RAMLow, c.RAMHigh)))
+	}
+	// What the game itself used in the newest recorded run of a list this size (Archo
+	// Monitor, 19 §2): the check the estimate can be held to.
+	if r := c.LastRun; r != nil && r.SameCount && r.Menu != nil {
+		if r.Play != nil {
+			lines = append(lines, Tf("Last run: the game used %s at the main menu and %s in play (Archo Monitor).", SizeText(r.Menu.InTaskManager()), SizeText(r.Play.InTaskManager())))
+		} else {
+			lines = append(lines, Tf("Last run: the game used %s at the main menu (Archo Monitor).", SizeText(r.Menu.InTaskManager())))
 		}
 	}
 	if c.Estimated && c.VRAMInRAMHigh > 0 {
@@ -64,7 +85,15 @@ func MemoryNeed(c app.MemoryAssessment, plan int64) Need {
 		lines = append(lines, T("VRAM may be insufficient: optimize textures or reduce texture mods."))
 	}
 	// the GUI draws lines[0], lines[1] and the GPU as bars and shows the rest (16 §7 principle 9)
-	shown := append([]string(nil), lines[2:]...)
+	var shown []string
+	ramText := lines[0]
+	for i, l := range lines[2:] {
+		if i+2 != commitAt || c.RAMSeverity == "warning" || c.RAMSeverity == "severe" {
+			shown = append(shown, l)
+		} else { // hidden under the bars: the RAM bar's name says it
+			ramText = lines[0] + "\n" + l
+		}
+	}
 	gpu := ""
 	if len(c.Hardware.Adapters) > 0 {
 		gpu = Tf("GPU: %s (by the system's preference)", c.Hardware.Adapters[0].Name)
@@ -77,7 +106,7 @@ func MemoryNeed(c app.MemoryAssessment, plan int64) Need {
 	}
 	it.Evidence = evidence(EvInferred, T("file estimates and OS memory snapshot"))
 	it.Why = strings.Join(lines, "\n")
-	it.Bars = []MemoryBar{ramBar(c, lines[0]), vramBar(c, joinSentences(nonEmpty(lines[1], gpu)))}
+	it.Bars = []MemoryBar{ramBar(c, ramText), vramBar(c, joinSentences(nonEmpty(lines[1], gpu)))}
 	it.BarsWhy = strings.Join(shown, "\n")
 	it.Text = Tf("%s: %s", it.Title, joinSentences(lines))
 	identifyNeed(&it)
@@ -141,7 +170,7 @@ func ramBar(c app.MemoryAssessment, text string, parts ...BarPart) MemoryBar {
 		}
 	}
 	if parts == nil && c.Estimated {
-		b.Parts = []BarPart{{Kind: "need", Low: c.RAMLow, High: c.RAMHigh}}
+		b.Parts = []BarPart{{Kind: "need", Low: c.WorkingSetLow, High: c.WorkingSetHigh}}
 	}
 	return b.sized()
 }
@@ -181,9 +210,9 @@ type MemoryLaunch struct {
 	Plan       int64                `json:"plan"`
 	Token      string               `json:"token"`
 	Assessment app.MemoryAssessment `json:"assessment"`
-	Needed     string               `json:"needed"`
-	Available  string               `json:"available"`
-	// RAM: the launch warning's bar, named by Can it run's RAM sentence
+	Needed     string               `json:"needed"`    // the loading budget (commit)
+	Available  string               `json:"available"` // what can still be committed
+	// RAM: the launch warning's bar, the loading commit against the commit room
 	RAM MemoryBar `json:"ram"`
 }
 
@@ -192,8 +221,24 @@ func BuildMemoryLaunch(a *app.App, st *app.LoadoutState) *MemoryLaunch {
 		return nil
 	}
 	c := a.CachedMemoryAssessment(st)
-	return &MemoryLaunch{Env: st.Ix.Env.Name, Plan: st.Plan.ID, Token: app.MemoryFingerprint(st), Assessment: c, Needed: costRange(c.RAMLow, c.RAMHigh), Available: SizeText(c.RAMBudget),
-		RAM: MemoryNeed(c, st.Plan.ID).Bars[0]}
+	// The launch warning is the severe level: commit, so it names the commit and its room.
+	return &MemoryLaunch{Env: st.Ix.Env.Name, Plan: st.Plan.ID, Token: app.MemoryFingerprint(st), Assessment: c, Needed: costRange(c.RAMLow, c.RAMHigh), Available: SizeText(app.CommitBudget(c.Hardware)),
+		RAM: commitBar(c)}
+}
+
+// commitBar draws the severe comparison: the loading budget against what the system can
+// still commit (RAM plus page file), named by the details' commit sentence.
+func commitBar(c app.MemoryAssessment) MemoryBar {
+	room := app.CommitBudget(c.Hardware)
+	text := Tf("While loading, the game reserves %s of RAM and page file; this computer can still reserve %s.", costRange(c.RAMLow, c.RAMHigh), SizeText(room))
+	b := MemoryBar{Label: T("RAM"), Total: room, Text: text}
+	if room > 0 {
+		b.Size = SizeText(room)
+	}
+	if c.Estimated {
+		b.Parts = []BarPart{{Kind: "need", Low: c.RAMLow, High: c.RAMHigh}}
+	}
+	return b.sized()
 }
 
 // joinSentences puts the lines on one line, for the TUI's item text: the language's "; "

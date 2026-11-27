@@ -34,6 +34,32 @@ type settingsSeen struct {
 	Files    []SeenSettingsFile   `json:"files"`
 	Windows  []SeenSettingsWindow `json:"windows,omitempty"`
 	HugsLib  []SeenHugsLibPack    `json:"hugslib,omitempty"`
+	Memory   []RunMemory          `json:"memory,omitempty"` // the newest runs' memory records, oldest first
+}
+
+// RunMemory is one run's Archo Monitor memory records (19 §2, 16 §2.17).
+type RunMemory struct {
+	Session string              `json:"session"`
+	Game    string              `json:"game,omitempty"`
+	Started time.Time           `json:"started"`
+	Samples []logs.MemorySample `json:"samples"`
+}
+
+// seenMemoryMax bounds the runs whose memory records are kept.
+const seenMemoryMax = 5
+
+func (s *settingsSeen) mergeMemory(mr *logs.MonitorRecords) {
+	for i := range s.Memory {
+		if s.Memory[i].Session == mr.Session {
+			s.Memory[i].Samples = append(s.Memory[i].Samples, mr.Memory...)
+			return
+		}
+	}
+	s.Memory = append(s.Memory, RunMemory{Session: mr.Session, Game: mr.Game, Started: mr.Started, Samples: mr.Memory})
+	sort.SliceStable(s.Memory, func(i, j int) bool { return s.Memory[i].Started.Before(s.Memory[j].Started) })
+	if n := len(s.Memory); n > seenMemoryMax {
+		s.Memory = s.Memory[n-seenMemoryMax:]
+	}
 }
 
 // SeenSettingsFile is a settings file Archo Monitor recorded, with the newest run it was
@@ -101,6 +127,9 @@ func (a *App) monitorSeen(root string) settingsSeen {
 		}
 		for _, p := range mr.HugsLib {
 			seen.mergePack(p, mr.Game, mr.Started)
+		}
+		if len(mr.Memory) > 0 {
+			seen.mergeMemory(mr)
 		}
 		seen.Read[mr.Session] = mr.End
 		changed = true

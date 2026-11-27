@@ -130,9 +130,17 @@ static class Tests
         Check(withWarnings.Count == 3 && withWarnings[2].Id == "" && withWarnings[2].Kinds[0].Key == "Warning", "warnings without a Mod last");
         string copy = ErrorSummary.CopyText(va, null);
         Check(copy.Contains("mod: a.mod — xml") && copy.Contains(@"file: D:\Mods\A\Defs\X.xml") && copy.Contains("def: Foo") && copy.Contains("Foo.Bar.Baz") && copy.Contains("2 after the game stopped logging"), "copy text: " + copy);
+        // Memory record (19 §2): this process's own counters, then one line before exit.
+        var sample = MemoryRecord.Read();
+        Check(sample.WorkingSet > 0 && sample.Private > 0 && sample.PeakWorkingSet >= sample.WorkingSet && sample.PrivateWorkingSet > 0 && sample.PrivateWorkingSet <= sample.WorkingSet, "memory sample: " + sample.PrivateWorkingSet + " " + sample.WorkingSet + " " + sample.Private);
+        Writer.WriteMemory("menu", 60, new MemoryRecord.Sample { PrivateWorkingSet = 2, WorkingSet = 3, Private = 4, PeakWorkingSet = 5, PeakPrivate = 6 }, 7);
         Writer.Close();
         var lines = File.ReadAllLines(Path.Combine(dir, "ArchoMonitor.log"));
-        Check(lines.Length == 14, "14 lines, got " + lines.Length);
+        Check(lines.Length == 15, "15 lines, got " + lines.Length);
+        var mem = JsonDocument.Parse(lines[13]).RootElement;
+        var mc = mem.GetProperty("context").GetProperty("memory");
+        Check(mem.GetProperty("kind").GetString() == "memory" && mc.GetProperty("phase").GetString() == "menu" && mc.GetProperty("after").GetInt32() == 60 && mc.GetProperty("mods").GetInt32() == 7, "memory line: " + lines[13]);
+        Check(mc.GetProperty("privateWorkingSet").GetInt64() == 2 && mc.GetProperty("workingSet").GetInt64() == 3 && mc.GetProperty("private").GetInt64() == 4 && mc.GetProperty("peakPrivate").GetInt64() == 6 && !mc.TryGetProperty("vram", out _), "memory values: " + lines[13]);
         var first = JsonDocument.Parse(lines[0]).RootElement;
         Check(first.GetProperty("message").GetString() == c.Message, "message round trip");
         Check(first.GetProperty("count").GetInt32() == 1 && first.GetProperty("total").GetInt32() == 1, "first count");

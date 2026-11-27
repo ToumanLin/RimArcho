@@ -92,6 +92,41 @@ Add the measured vanilla + DLC baseline (1.7: RAM 2.3 GB, video memory 1.2 GB; 1
 
 > Correction, 2026-11-07: players with 8 GB cards were shown 10–28 GB of VRAM and 18–41 GB of RAM for 270 Mods that load fine. Waylith 1.7.5000 (decompiled `TextureResidency`, `Texture2D`, `RimWorldWaylith.Bootstrap`) uploads on demand unless `-EagerTextureUpload` is passed. Above `HighWatermark(budget) = max(budget/2, min(0.8·budget, budget − 512 MiB))` of the VMA device heap budget it evicts textures to the disk cache, or, without a valid cache, moves them to a host heap capped at a quarter of that heap's budget. The 15,283 MB above is that watermark for a budget of 0.78 × 24 GB. The ×0.9–2.6 and ×1.5–3.5 rates therefore hold only below the watermark. Mod RAM was 1.1–1.5× the resident mod VRAM on repeat launches (100 / 250 / 484) and 2.1× on the 484 first launch. `loadcost.Cap17` caps both at the card's watermark (16 §2.17). No run on a smaller card has been made.
 
+### 4.5 Working set and 1.7.5021 (2026-11-26, GitHub #31)
+
+A player with 621 Mods, an RTX 5080 (16 GB) and 32 GB RAM (8 GB free) was told "RAM: loading needs 13.0 GB–23.8 GB … RAM is tight" and called it wildly too high. The figure was private bytes (commit) compared with free physical RAM, while players read Task Manager's **Memory** column, which is the **private working set**. One calibration on this host answers what the game actually keeps in RAM.
+
+**Method.** 1.7.5021 rev1365, RTX 4090 24 GB, 64 GB RAM, Windows 11. `RimWorld.exe` launched directly (Steam client running, not used to launch), `-savedatafolder=D:\RimArcho-test\mem17\data-<list>` and `-NoFileLog` (console captured), a 1280 × 720 window, Mods read in place. The 1.7 bootstrap deletes the Unity-era `Player.log` / `Player-prev.log` in the real LocalLow root (`Bootstrap.DeleteOldUnityLogs`): they were copied aside and restored after each run. Every 3 s: working set, private bytes, peak working set (process), private working set (`Win32_PerfFormattedData_PerfProc_Process.WorkingSetPrivate`) and `GPU Process Memory … Dedicated Usage`. Main menu = `Config/Knowledge.xml` written; figures are medians 60–150 s after it. Lists: Core + 5 DLCs; the first 250 and all 724 entries of the host's Mod list in load order (235 and 665 non-official Mods found); and the #31 list as posted (621 entries, about 200 of its Mods installed here). Smaller cards were emulated with Waylith's `WAYLITH_VRAM_BUDGET_MB` (caps the device-local heap). The 724 list restarts itself once at start-up (a Mod restarts the game after patching); the sampler followed the new process.
+
+| List (non-official Mods) | Launch, card | Menu s | Private WS (Task Manager) | WS | Private bytes | Peak private | GPU dedicated |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Vanilla + DLC | first / repeat, 24 GB | 11 / 11 | 1.15 / 1.15 | 1.35 / 1.35 | 1.74 / 1.74 | 1.84 | 0.39 |
+| First 250 (235) | first, 24 GB | 27 | 2.38 | 3.01 | 3.47 | 3.72 | 0.62 |
+| First 250 (235) | repeat, 24 GB | 19 | 1.66 | 2.27 | 2.39 | 2.46 | 0.55 |
+| All 724 (665) | first, 24 GB | 164 | — | 12.35 | 10.20 | 12.42 | 3.43 |
+| All 724 (665) | repeat, 24 GB | 103 | 4.47 | 10.09 | 8.00 | 9.11 | 3.35 |
+| All 724 (665) | repeat, 16 GB (emulated 15,974 MB) | 87 | 4.85 | 10.48 | 8.45 | 9.73 | 3.36 |
+| All 724 (665) | repeat, 8 GB (emulated) | 87 | 5.12 | 10.73 | 8.80 | 10.75 | 3.42 |
+| All 724 (665) | repeat, 4 GB (emulated) | 87 | 5.06 | 10.67 | 8.60 | 9.23 | 3.22 |
+| All 724 (665) | repeat, 2 GB (emulated) | 87 | 5.02 | 10.62 | 8.14 | 8.30 | 2.94 |
+| #31 list (≈200 present) | first, 24 GB | 108 | 4.07–5.29 | 4.79 | 6.35 | 8.12 | 1.71 |
+| #31 list (≈200 present) | repeat, 24 GB | 47 | 2.67–3.16 | 3.33 | 4.66–5.09 | 5.09 | 1.78 |
+
+GiB. "—": the private-working-set sampler started after that run. Peak private is the sampled maximum from launch.
+
+**Findings.**
+
+1. **Working set ≠ what Task Manager shows.** On 1.7 the process working set includes several GiB of shared pages (the memory-mapped texture cache): 10.1 GiB working set but 4.5 GiB private working set for the 724 list. Private working set is the figure to show.
+2. **1.7.5021 commits much less than 1.7.4985.** Vanilla private bytes fell from 2.30 to 1.74 GiB; the 484-Mod repeat launches of §4.2 reached 22 GB, the 724-Mod ones here 8.0–8.8 GiB. Private working set / private bytes: vanilla 0.66, 250 0.69, 724 0.56–0.62, #31 part 0.57–0.62 (§4.2's 0.33–0.55 on 1.7.4985).
+3. **Neither figure follows the card.** From 24 GiB down to an emulated 2 GiB card, private working set stayed at 4.5–5.1 GiB and private bytes at 8.0–8.8 GiB while dedicated VRAM fell from 3.35 to 2.94 GiB. Textures above the watermark go to the disk cache (shared pages) or to a host heap; the private figures do not shrink. So the working set has no card term. The private-bytes cap (`Cap17`, fitted on 1.7.4985) is not supported by these runs; it is kept for the commit range until a list heavy enough to pass a real card's watermark is measured (none of these lists did on 24 GB).
+4. **Texture payload explains most, loosely.** The 724 list and the #31 part have about the same estimated payload (2.68 / 2.56 GiB) but settled at 4.5–5.1 vs 2.7–3.2 GiB; their measured mod VRAM differed the same way (2.96 vs 1.39 GiB): the payload estimate overstates what the #31 part actually uploads by about 1.7×. Per Mod the private working set is small (the 250 lightest-first Mods: 0.5 GiB). First launches (textures encoded into the cache) settle 0.7–2 GiB higher than repeats.
+
+**Model** (`loadcost.WS`, `WorkingSet`): 1.15 GiB + 0.5–1.6 × payload + 0.4–2 MiB per non-official Mod + the other categories' private-bytes range, no card term, and never above the resident private range. On the measured lists: 250 → 1.49–2.36 (measured 1.66–2.38), 724 → 2.99–7.35 (4.47–5.12), #31 part → 2.64–5.99 (2.67–5.29) GiB (`TestWorkingSet17Calibration`). The 1.7 RAM baseline (private bytes) is now 1.73 GiB. 1.6: the RAM estimate is CPU-side memory on a real card; the VM breakdown (2026-11-01) put its working set at 0.75–0.95 of it (`Other16Low`–`High`); not measured on a real card.
+
+**#31's shape.** Its report (9.7 GB VRAM kept on a 15.6 GB card, 8.3 GB on demand) implies an estimated payload of about 18.7 GiB. The headline becomes "about 11.2–21.0 GB in Task Manager" (`TestMemoryIssue31Shape`); the commit while loading is 11.9–22.0 GB; with 8 GB free the warning stays, because the working-set estimate itself exceeds it. Whether that list really uploads 18.7 GiB cannot be told here: for the ≈200 of its Mods installed on this host the payload estimate was 1.7× what the game uploaded. Archo Monitor 0.13.0 records the game's own private working set, private bytes and VRAM at the menu and in play (19 §2); a report from such a run would settle it.
+
+**Not covered.** One PC and one GPU vendor; the emulated cards cap the heap but keep the 4090's bandwidth and driver; the payload of the heaviest measured list was 2.7 GiB; saves and play (Monitor's play records will cover them); the 1.7 VRAM baseline (1.2 GB from 1.7.4985; 0.39 GiB dedicated here) was left unchanged.
+
 ### 4.4 Not implemented / known deviations
 
 - 1.6 could not be calibrated in this round (2026-10-24): `D:\rimworld16` cannot currently reach the main menu (a `_Archo_env_*` junction in Mods points to a deleted directory; see the game-test session record).

@@ -13,10 +13,10 @@ func TestLoadingBudget720SyntheticMods(t *testing.T) {
 	}
 	resident := Estimate(Game17, mods)
 	low, high := LoadingBudget(Game17, resident, mods)
-	// 720 XML-heavy synthetic mods produce about 3–5 GiB resident including
+	// 720 XML-heavy synthetic mods produce about 2.5–5 GiB resident including
 	// baseline, but loading reserves must not be mistaken for resident bytes.
 	baseline, _ := Baseline(Game17)
-	if resident.RAMLow+baseline < 3<<30 || resident.RAMHigh+baseline > 6<<30 {
+	if resident.RAMLow+baseline < 5<<29 || resident.RAMHigh+baseline > 6<<30 {
 		t.Fatalf("unexpected resident fixture: %+v", resident)
 	}
 	if low != resident.RAMLow+(720*512<<10)*4+16<<20 || high != resident.RAMHigh+(720*512<<10)*12+16<<20 {

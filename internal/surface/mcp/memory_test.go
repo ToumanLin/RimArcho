@@ -43,22 +43,25 @@ func TestMemoryToolRAMLevels(t *testing.T) {
 	e := testkit.New(t)
 	e.AddEnv(false)
 	e.MustRun("scan")
-	available, total := int64(1), int64(16<<30)
+	available, commit, total := int64(1), int64(0), int64(16<<30)
 	e.App.MemoryProbe = func() machine.Memory {
-		return machine.Memory{TotalRAM: total, AvailableRAM: available, SampledAt: time.Now()}
+		return machine.Memory{TotalRAM: total, AvailableRAM: available, CommitAvailable: commit, SampledAt: time.Now()}
 	}
 	r, err := e.App.PlanLoadCost(context.Background(), 0, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	cs := connect(t, e)
+	// severe: commit below the loading budget; warning: physical RAM below the expected
+	// working set while the commit has room (#31)
+	ws := r.Capacity.WorkingSetHigh
 	for _, tc := range []struct {
-		available int64
-		want      string
+		available, commit int64
+		want              string
 	}{
-		{r.Capacity.RAMLow - 1, "severe"}, {r.Capacity.RAMLow, "warning"}, {r.Capacity.RAMHigh, "ok"},
+		{r.Capacity.RAMLow - 1, 0, "severe"}, {ws - 1, r.Capacity.RAMHigh, "warning"}, {ws, r.Capacity.RAMHigh, "ok"}, {r.Capacity.RAMHigh, 0, "ok"},
 	} {
-		available = tc.available
+		available, commit = tc.available, tc.commit
 		cli := e.MustRun("plan", "cost")
 		got, isErr := call(t, cs, "estimate_memory", nil)
 		if isErr || got != cli {

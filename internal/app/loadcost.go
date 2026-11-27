@@ -60,6 +60,10 @@ type LoadCost struct {
 // adjustments, 1.6 VRAM the card cannot hold (loadcost.Spill) and 1.7 textures above
 // the card's upload watermark (loadcost.Cap17).
 type LoadFit struct {
+	// WSLow / WSHigh: the expected working set a minute after the main menu (what Task
+	// Manager shows; loadcost.WorkingSet), the held VRAM included. The other RAM ranges
+	// are private bytes (commit).
+	WSLow, WSHigh           int64
 	RAMLow, RAMHigh         int64 // resident
 	LoadingLow, LoadingHigh int64
 	VRAMLow, VRAMHigh       int64
@@ -89,6 +93,11 @@ func (r *LoadCost) FitTo(dedicated int64) LoadFit {
 	f.RAMHigh += f.HeldHigh
 	f.LoadingLow += f.HeldLow
 	f.LoadingHigh += f.HeldHigh
+	f.WSLow, f.WSHigh = loadcost.WorkingSet(r.Game, r.Report, r.Mods)
+	f.WSLow += f.HeldLow
+	f.WSHigh += f.HeldHigh
+	// The private working set is part of the private bytes: never above the resident range.
+	f.WSLow, f.WSHigh = min(f.WSLow, f.RAMLow), min(f.WSHigh, f.RAMHigh)
 	return f
 }
 
@@ -154,6 +163,7 @@ func (a *App) PlanLoadCost(ctx context.Context, planID int64, progress func(done
 	r.Report = loadcost.Estimate(g, run.measured)
 	r.LoadingRAMLow, r.LoadingRAMHigh = loadcost.LoadingBudget(g, r.Report, run.measured)
 	r.Capacity = AssessMemory(a.measuredMemory(), r)
+	r.Capacity.LastRun = a.lastRunMemory(ps)
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}

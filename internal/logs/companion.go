@@ -135,6 +135,7 @@ type companionLine struct {
 		Settings      []SettingsFile    `json:"settings"`
 		Window        *SettingsWindow   `json:"window"`
 		HugsLib       []HugsLibPack     `json:"hugslib"`
+		Memory        *MemorySample     `json:"memory"`
 	} `json:"context"`
 	Source string `json:"source"`
 	Schema int    `json:"schema"`
@@ -211,7 +212,7 @@ func (c *Companion) line(b []byte) *CompanionEntry {
 			c.Settings = j.Context.Settings
 		}
 		return nil
-	case "settings-window", "hugslib": // records (ReadMonitorRecords), not entries
+	case "settings-window", "hugslib", "memory": // records (ReadMonitorRecords), not entries
 		return nil
 	case "phase":
 		if j.Source == "archo-monitor" && ValidPhase(j.Context.Phase) {
@@ -433,7 +434,35 @@ type MonitorRecords struct {
 	Files   []SettingsFile // nil while the record is not past the offset (or not written yet)
 	HugsLib []HugsLibPack  // nil likewise, and without HugsLib
 	Windows []RecordedWindow
-	End     int64 // the offset after the last whole line: where the next read starts
+	Memory  []MemorySample // the memory records (Monitor >= 0.13.0)
+	End     int64          // the offset after the last whole line: where the next read starts
+}
+
+// MemorySample is one Archo Monitor memory record (19 §2): the game process's memory when
+// the menu or play phase began (After 0) or After seconds later, in bytes. VRAM is the
+// device-local usage 1.7 reports, 0 on 1.5 / 1.6. Mods counts the running Mods.
+// PrivateWorkingSet is Task Manager's Memory column (0 when Windows did not report it);
+// WorkingSet also counts shared pages, such as 1.7's memory-mapped texture cache.
+type MemorySample struct {
+	Phase             string    `json:"phase"`
+	After             int       `json:"after"`
+	Mods              int       `json:"mods"`
+	PrivateWorkingSet int64     `json:"privateWorkingSet,omitempty"`
+	WorkingSet        int64     `json:"workingSet"`
+	Private           int64     `json:"private"`
+	PeakWorkingSet    int64     `json:"peakWorkingSet"`
+	PeakPrivate       int64     `json:"peakPrivate,omitempty"`
+	VRAM              int64     `json:"vram,omitempty"`
+	At                time.Time `json:"at"`
+}
+
+// InTaskManager is the figure Task Manager shows: the private working set, or the working
+// set where it is unknown.
+func (m MemorySample) InTaskManager() int64 {
+	if m.PrivateWorkingSet > 0 {
+		return m.PrivateWorkingSet
+	}
+	return m.WorkingSet
 }
 
 // RecordedWindow is a settings window record and when it was written.
@@ -474,7 +503,7 @@ func ReadMonitorRecords(path string, from map[string]int64) (*MonitorRecords, er
 			return mr, nil
 		}
 		mr.End += int64(len(l))
-		if !bytes.Contains(l, []byte(`"kind":"settings"`)) && !bytes.Contains(l, []byte(`"kind":"settings-window"`)) && !bytes.Contains(l, []byte(`"kind":"hugslib"`)) {
+		if !bytes.Contains(l, []byte(`"kind":"settings"`)) && !bytes.Contains(l, []byte(`"kind":"settings-window"`)) && !bytes.Contains(l, []byte(`"kind":"hugslib"`)) && !bytes.Contains(l, []byte(`"kind":"memory"`)) {
 			continue
 		}
 		var j companionLine
@@ -486,6 +515,10 @@ func ReadMonitorRecords(path string, from map[string]int64) (*MonitorRecords, er
 			mr.Files = append([]SettingsFile{}, j.Context.Settings...)
 		case j.Kind == "hugslib":
 			mr.HugsLib = append([]HugsLibPack{}, j.Context.HugsLib...)
+		case j.Kind == "memory" && j.Context.Memory != nil && j.Context.Memory.WorkingSet > 0:
+			m := *j.Context.Memory
+			m.At, _ = time.ParseInLocation("2006-01-02 15:04:05.000", j.Timestamp, time.Local)
+			mr.Memory = append(mr.Memory, m)
 		case j.Kind == "settings-window" && j.Context.Window != nil:
 			at, _ := time.ParseInLocation("2006-01-02 15:04:05.000", j.Timestamp, time.Local)
 			mr.Windows = append(mr.Windows, RecordedWindow{SettingsWindow: *j.Context.Window, At: at})

@@ -51,18 +51,21 @@ func PlanLoadCost(r *app.LoadCost) *PlanCost {
 	// 1.7: textures beyond the card's upload watermark stay in the disk cache.
 	f := r.Fit()
 	heldLow, heldHigh := f.HeldLow, f.HeldHigh
+	// RAM is the expected working set (what Task Manager shows, #31); the loading budget is
+	// commit and says so.
+	wsBase, _ := loadcost.WorkingSet(r.Game, loadcost.Report{}, 0)
 	p := &PlanCost{
-		Summary: Tf("RAM about %s  VRAM about %s", costRange(f.RAMLow, f.RAMHigh), costRange(f.VRAMLow, f.VRAMHigh)),
-		Loading: Tf("Loading RAM budget %s", costRange(f.LoadingLow, f.LoadingHigh)),
-		Detail:  Tf("Vanilla and DLC about %s / %s; mods about %s / %s", SizeText(r.Baseline.RAM), SizeText(r.Baseline.VRAM), costRange(f.RAMLow-heldLow-r.Baseline.RAM, f.RAMHigh-heldHigh-r.Baseline.RAM), costRange(f.VRAMLow-r.Baseline.VRAM, f.VRAMHigh-r.Baseline.VRAM)),
+		Summary: Tf("RAM about %s in Task Manager  VRAM about %s", costRange(f.WSLow, f.WSHigh), costRange(f.VRAMLow, f.VRAMHigh)),
+		Loading: Tf("Reserved while loading (RAM + page file) %s", costRange(f.LoadingLow, f.LoadingHigh)),
+		Detail:  Tf("Vanilla and DLC about %s / %s; mods about %s / %s", SizeText(wsBase), SizeText(r.Baseline.VRAM), costRange(max(0, f.WSLow-heldLow-wsBase), max(0, f.WSHigh-heldHigh-wsBase)), costRange(f.VRAMLow-r.Baseline.VRAM, f.VRAMHigh-r.Baseline.VRAM)),
 		Mods:    Tf("%d mods", r.Mods),
 		Parts:   []LoadCostRow{}, Top: []LoadCostTop{},
 	}
 	c := r.Capacity
 	p.Bars = []MemoryBar{
-		ramBar(c, joinSentences([]string{p.Loading, p.Detail}),
-			BarPart{Kind: "game", Low: r.Baseline.RAM, High: r.Baseline.RAM},
-			BarPart{Kind: "mods", Low: max(0, f.LoadingLow-r.Baseline.RAM), High: max(0, f.LoadingHigh-r.Baseline.RAM)}),
+		ramBar(c, joinSentences([]string{p.Summary, p.Detail, p.Loading}),
+			BarPart{Kind: "game", Low: wsBase, High: wsBase},
+			BarPart{Kind: "mods", Low: max(0, f.WSLow-wsBase), High: max(0, f.WSHigh-wsBase)}),
 		vramBar(c, p.Summary,
 			BarPart{Kind: "game", Low: r.Baseline.VRAM, High: r.Baseline.VRAM},
 			BarPart{Kind: "mods", Low: max(0, f.VRAMLow-r.Baseline.VRAM), High: max(0, f.VRAMHigh-r.Baseline.VRAM)}),
@@ -107,7 +110,7 @@ func PlanLoadCost(r *app.LoadCost) *PlanCost {
 	p.Notes = append(p.Notes,
 		T("Def and Patch XML estimates cover objects retained after loading; peak RAM during loading is higher."),
 		T("Assemblies stay in RAM after loading."),
-		T("RAM is the game's committed private memory; Task Manager's Memory column shows only the part in physical memory, usually less."),
+		T("RAM is the expected working set, what Task Manager shows a minute after the main menu. The game reserves more (private bytes: the category rows and the loading line), which needs RAM plus page file, not free RAM."),
 		T("Excludes saves, maps and growth during play."),
 		T("JPG/PSD dimensions and audio without readable WAV headers are approximated; DDS disk size excludes its header."),
 	)

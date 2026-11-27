@@ -102,8 +102,8 @@ func (m *model) currentLaunchMemory() *view.MemoryLaunch {
 func (m *model) confirmMemoryLaunch(c *view.MemoryLaunch) tea.Cmd {
 	no, yes := T("cancel"), T("launch anyway")
 	m.panel = &panel{title: T("RAM may be insufficient"), lines: []string{
-		T("loading RAM needed") + ": " + c.Needed,
-		T("RAM available now") + ": " + c.Available,
+		T("reserved while loading") + ": " + c.Needed,
+		T("RAM and page file free now") + ": " + c.Available,
 		T("close other apps or reduce the list before launching."),
 	}, choices: []string{no, yes}, onPick: func(m *model, value string) tea.Cmd {
 		if value != yes {

@@ -99,7 +99,7 @@ const descTextures = `Convert mods' PNG textures to DDS next to them for lighter
 
 const descUninstall = `Preview what uninstalling RimArcho would delete, move or keep (read-only). No tool uninstalls: that is the player's decision alone.`
 
-const descMemory = `Estimate resident RAM, loading RAM and VRAM for a plan. Commit room below loading low is severe, free RAM below high warning, else ok; unknown stays unknown. 1.7 textures cap at the card (texturesOnDemand); only 1.6 warns on VRAM. Reads headers, caches estimates. Limits: guide estimate_memory.`
+const descMemory = `Estimate working set (Task Manager), commit and VRAM for a plan. Commit room below loading low is severe, free RAM below workingSetHigh warning, else ok; unknown stays unknown. 1.7 textures cap at the card (texturesOnDemand); only 1.6 warns on VRAM. Reads headers, caches estimates. Limits: guide estimate_memory.`
 
 const descListSaves = `Saves of every game and pack by colony, newest first: sv: reference, day, matched list, whether it loads. mod=<ref>: saves using a Mod; attention=true: with warnings or errors; review=true: what Mods add, how much saves show. Read-only.`
 

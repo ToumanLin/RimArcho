@@ -1,9 +1,10 @@
 $ archo plan cost
 plan:default load cost (estimate)
   mods: 1 (1 measured, 0 cached)
-  RAM, baseline + mods: 790.3 MB–791.0 MB
+  RAM, working set: 592.7 MB–751.4 MB (estimated; what Task Manager shows a minute after the main menu; compared with RAM available now)
+  RAM, baseline + mods: 790.3 MB–791.0 MB (private bytes, commit)
   VRAM, baseline + mods: 675.8 MB–675.8 MB
-  RAM, loading budget: 1.7 GB–2.1 GB
+  RAM, loading budget: 1.7 GB–2.1 GB (private bytes, commit)
   RAM, available now: 1.0 GB / total 8.0 GB [severe]
   VRAM, dedicated capacity: 1.0 GB [ok]
   GPU candidate: Fixture GPU (OS adapter preference; game selection unverified)
@@ -27,9 +28,10 @@ plan:default load cost (estimate)
 $ archo plan cost
 plan:default load cost (estimate)
   mods: 2 (1 measured, 1 cached)
-  RAM, baseline + mods: 6.6 GB–7.5 GB
+  RAM, working set: 6.1 GB–7.4 GB (estimated; what Task Manager shows a minute after the main menu; compared with RAM available now)
+  RAM, baseline + mods: 6.6 GB–7.5 GB (private bytes, commit)
   VRAM, baseline + mods: 5.5 GB–5.5 GB
-  RAM, loading budget: 9.5 GB–12.0 GB
+  RAM, loading budget: 9.5 GB–12.0 GB (private bytes, commit)
   RAM, VRAM held in RAM: 4.6 GB–4.6 GB (included above: VRAM beyond the dedicated capacity, or all of it without one)
   RAM, available now: 1.0 GB / total 8.0 GB [severe]
   VRAM, dedicated capacity: 1.0 GB [warning]

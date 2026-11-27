@@ -755,7 +755,7 @@ export function memoryConfirm(memory, go) {
     pop.classList.add("memory-confirm");
     pop.append(el("div", "ttl", T("RAM may be insufficient")));
     const values = el("div", "memory-values");
-    for (const [label, value] of [["loading RAM needed", memory.needed], ["RAM available now", memory.available]]) {
+    for (const [label, value] of [["reserved while loading", memory.needed], ["RAM and page file free now", memory.available]]) {
       const cell = el("div");
       cell.append(el("div", "muted", T(label)), el("strong", "num", value));
       values.append(cell);

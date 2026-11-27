@@ -12,9 +12,9 @@ import (
 func TestHomeMemoryUsesCurrentListAndInvalidatesEdits(t *testing.T) {
 	t.Parallel()
 	e, api, _ := fixture(t)
-	available := int64(1)
+	available, commit := int64(1), int64(0)
 	e.App.MemoryProbe = func() machine.Memory {
-		return machine.Memory{TotalRAM: 8 << 30, AvailableRAM: available, SampledAt: time.Now()}
+		return machine.Memory{TotalRAM: 8 << 30, AvailableRAM: available, CommitAvailable: commit, SampledAt: time.Now()}
 	}
 	first, err := api.HomeMemory()
 	if err != nil || first == nil || first.Assessment.Estimated {
@@ -28,7 +28,8 @@ func TestHomeMemoryUsesCurrentListAndInvalidatesEdits(t *testing.T) {
 	if err != nil || severe.Assessment.RAMSeverity != "severe" {
 		t.Fatalf("%+v %v", severe, err)
 	}
-	available = (r.Capacity.RAMLow + r.Capacity.RAMHigh) / 2
+	// the commit has room; physical RAM below the expected working set warns (#31)
+	commit, available = r.Capacity.RAMHigh, r.Capacity.WorkingSetHigh-1
 	warning, err := api.HomeMemory()
 	if err != nil || warning.Assessment.RAMSeverity != "warning" {
 		t.Fatalf("%+v %v", warning, err)

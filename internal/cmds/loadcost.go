@@ -41,9 +41,10 @@ func planCost(c *Ctx, args *Args) (*render.Doc, error) {
 	d, root := render.New("plan:" + p.Name + " load cost (estimate)")
 	root.KV("mods", fmt.Sprintf("%d (%d measured, %d cached)", r.Mods, r.Measured, r.Cached))
 	f := r.Fit()
-	root.KV("RAM, baseline + mods", rangeText(f.RAMLow, f.RAMHigh))
+	root.KV("RAM, working set", rangeText(f.WSLow, f.WSHigh)+" (estimated; what Task Manager shows a minute after the main menu; compared with RAM available now)")
+	root.KV("RAM, baseline + mods", rangeText(f.RAMLow, f.RAMHigh)+" (private bytes, commit)")
 	root.KV("VRAM, baseline + mods", rangeText(f.VRAMLow, f.VRAMHigh))
-	root.KV("RAM, loading budget", rangeText(f.LoadingLow, f.LoadingHigh))
+	root.KV("RAM, loading budget", rangeText(f.LoadingLow, f.LoadingHigh)+" (private bytes, commit)")
 	if f.HeldHigh > 0 {
 		root.KV("RAM, VRAM held in RAM", rangeText(f.HeldLow, f.HeldHigh)+" (included above: VRAM beyond the dedicated capacity, or all of it without one)")
 	}

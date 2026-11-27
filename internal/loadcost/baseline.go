@@ -8,7 +8,9 @@ package loadcost
 func Baseline(g Game) (ram, vram int64) {
 	const gib = int64(1 << 30)
 	if g == Game17 {
-		return gib * 23 / 10, gib * 12 / 10
+		// RAM: private bytes at the main menu, 1.7.5021 (2026-11-26; 1.7.4985 measured 2.3 GB).
+		// VRAM: the 1.7.4985 figure, kept (research 2026-10-24 §4.5).
+		return gib * 173 / 100, gib * 12 / 10
 	}
 	return gib * 77 / 100, gib * 66 / 100
 }

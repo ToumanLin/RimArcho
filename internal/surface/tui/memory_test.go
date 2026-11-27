@@ -59,7 +59,7 @@ func TestMemoryLaunchCancelApproveAndStale(t *testing.T) {
 	if m.panel == nil || m.panel.choice != 0 || m.panel.choices[0] != T("cancel") {
 		t.Fatal("red launch did not default to cancel")
 	}
-	if text := strings.Join(m.panelLines(30), "\n"); !strings.Contains(text, T("loading RAM needed")) || !strings.Contains(text, T("RAM available now")) {
+	if text := strings.Join(m.panelLines(30), "\n"); !strings.Contains(text, T("reserved while loading")) || !strings.Contains(text, T("RAM and page file free now")) {
 		t.Fatal(text)
 	}
 	m.panelKey("enter")
