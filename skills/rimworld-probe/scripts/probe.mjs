@@ -9,7 +9,7 @@
 // build detects the game version and builds <probeDir>/<version>/Assemblies/Probe.dll.
 // run: --mods lists every non-official mod in load order, Harmony and the probe included. Official content
 // (Core and the DLCs found in <gameDir>/Data) loads first; --no-dlc leaves listed DLCs off; --lang sets the game's
-// language by its folder name, e.g. "ChineseSimplified (简体中文)" (default English); --before-core loads the listed
+// language by its folder name, e.g. the Simplified Chinese folder "ChineseSimplified (...)" (default English); --before-core loads the listed
 // mods right after Harmony and before the official content, as mods with loadBefore Ludeon.RimWorld sit for players.
 // The sandbox is <workDir>/game-<version>: the game's folders and every mod folder are junctions, the game's top-level
 // files are hard links (copies only if the work folder is on another drive). User data (config, saves, the 1.7 shader
