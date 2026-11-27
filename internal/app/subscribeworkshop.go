@@ -102,7 +102,7 @@ func (a *App) subscribeWorkshop(inputs []string, forceSteamCMD, dryRun bool, w *
 				break
 			}
 			part := ids[start:min(start+50, len(ids))]
-			if w != nil {
+			if w != nil && !w.wait {
 				w.line("Downloading item " + part[0])
 			}
 			var got *steamworks.Report
@@ -111,7 +111,7 @@ func (a *App) subscribeWorkshop(inputs []string, forceSteamCMD, dryRun bool, w *
 				break
 			}
 			report.Items = append(report.Items, got.Items...)
-			if w != nil {
+			if w != nil && !w.wait {
 				for _, it := range got.Items {
 					if it.Result == "ok" {
 						w.line("Success. Downloaded item " + strconv.FormatUint(it.ID, 10))
@@ -150,6 +150,9 @@ func (a *App) subscribeWorkshop(inputs []string, forceSteamCMD, dryRun bool, w *
 					}
 					op.Items[i].Permanent = workshopPermanent(op.Items[i].FailureKind)
 				}
+			}
+			if w != nil && w.wait {
+				return op, errors.Join(append(failures, a.waitInstalled(op, w)...)...)
 			}
 			op.Notes = append(op.Notes, "Steam downloads it; it appears after the next scan.")
 			return op, errors.Join(failures...)

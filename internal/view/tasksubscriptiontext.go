@@ -35,6 +35,7 @@ func subscriptionReason(it app.TaskItem, full bool) string {
 		"crash": "SteamCMD exited before confirming the download", "password": "check the Steam password",
 		"guard": "Steam Guard verification required", "login": "Steam login failed", "anonymous-login": "Steam login failed",
 		"account": "needs a Steam account",
+		"stalled": "Steam stopped downloading it (no progress for 2 minutes)", "slow": "Steam did not finish downloading it within 6 hours",
 	}[kind]
 	if key != "" {
 		return T(key)
@@ -57,6 +58,9 @@ func subscriptionTaskText(t *app.Task, r *TaskRow, c map[string]int) {
 	r.Title, r.Obj = Tf("subscribe %s", TaskObj(names)), ""
 	if t.State == app.TaskRunning {
 		r.Line = Tf("downloading %s", t.Phase)
+		if strings.HasPrefix(t.Phase, "Steam is downloading ") {
+			r.Line = taskPhase(t) // the Steam client's download after the subscription (11 §2.2)
+		}
 		if t.Phase == "" {
 			r.Line = T("finishing the subscription")
 		}
@@ -103,7 +107,8 @@ func subscriptionTaskText(t *app.Task, r *TaskRow, c map[string]int) {
 	r.Say = strings.Join(lines, "\n")
 	if r.Say == "" {
 		r.Say = r.Line
-		if t.Result == T("Steam downloads it; it appears after the next scan") {
+		// "Steam downloads it…", or what went into a list (11 §2.2)
+		if t.Result != "" && t.Result != T("subscription finished") {
 			r.Say += "\n" + t.Result
 		}
 	}

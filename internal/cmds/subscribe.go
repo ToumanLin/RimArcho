@@ -2,6 +2,7 @@ package cmds
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/render"
@@ -70,8 +71,23 @@ func init() {
 			return subscriptionDoc(op, err)
 		}})
 	register(&Command{Name: "subscribe workshop", Args: "<id|url…>", Summary: "subscribe through Steam, with SteamCMD fallback when Steam is unavailable", MinArgs: 1, MaxArgs: -1,
-		Flags: []Flag{{Name: "steamcmd", Help: "download with SteamCMD directly"}, dry[0]}, Run: func(c *Ctx, a *Args) (*render.Doc, error) {
-			op, err := c.App.SubscribeWorkshop(a.Pos, a.Bool("steamcmd"), a.Bool("dry-run"))
+		Flags: []Flag{{Name: "steamcmd", Help: "download with SteamCMD directly"},
+			{Name: "wait", Help: "wait until Steam has downloaded and installed them, then rescan the Workshop folder"},
+			{Name: "add-to", Value: "plan", Help: "then enable them in this plan where sorting puts them (implies --wait)"},
+			{Name: "add", Value: "id,…", Help: "with --add-to: enable only these of them"},
+			{Name: "collection", Value: "id", Help: "with --add-to: place them in the order of this collection the plan follows"}, dry[0]},
+		Run: func(c *Ctx, a *Args) (*render.Doc, error) {
+			calls := app.WorkshopCalls{Wait: a.Bool("wait"), AddTo: a.Str("add-to"), Collection: a.Str("collection")}
+			if a.Bool("add-to") && calls.AddTo == "" {
+				return nil, fmt.Errorf("--add-to needs a plan")
+			}
+			if (a.Bool("add") || a.Bool("collection")) && calls.AddTo == "" {
+				return nil, fmt.Errorf("--add and --collection need --add-to")
+			}
+			if a.Bool("add") {
+				calls.Add = strings.FieldsFunc(a.Str("add"), func(r rune) bool { return r == ',' || r == ' ' })
+			}
+			op, err := c.App.SubscribeWorkshop(a.Pos, a.Bool("steamcmd"), a.Bool("dry-run"), calls)
 			return subscriptionDoc(op, err)
 		}})
 	register(&Command{Name: "subscribe check", Args: "[ref…]", Summary: "check upstream references for updates (default: all subscriptions)", MaxArgs: -1, Run: func(c *Ctx, a *Args) (*render.Doc, error) {
@@ -195,6 +211,16 @@ func subscriptionDoc(op *app.SubscribeOp, err error) (*render.Doc, error) {
 		}
 		if len(it.UsedBy) > 0 {
 			n.KV("warning", usedByWarning(it.UsedBy))
+		}
+	}
+	if op.AddedTo != "" {
+		names := make([]string, len(op.Added))
+		for i, m := range op.Added {
+			names[i] = m.DisplayName()
+		}
+		n := root.KV("added to plan:"+op.AddedTo, render.Plural(len(op.Added), "mod"))
+		for _, name := range names {
+			n.Add("+ " + name)
 		}
 	}
 	for _, note := range op.Notes {

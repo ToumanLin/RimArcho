@@ -60,9 +60,11 @@ type FollowRow struct {
 	Changes      string   `json:"changes,omitempty"` // "3 new, 1 dropped"; "" unchanged
 	Added        []string `json:"added,omitempty"`
 	Removed      []string `json:"removed,omitempty"`
-	Mode         string   `json:"mode"`
-	Link         string   `json:"link"`
-	Checked      bool     `json:"checked,omitempty"`
+	// Arrived: installed since the last catch-up, not in the list yet (07 §7.6)
+	Arrived []string `json:"arrived,omitempty"`
+	Mode    string   `json:"mode"`
+	Link    string   `json:"link"`
+	Checked bool     `json:"checked,omitempty"`
 }
 
 // PlanDetail is the right column.
@@ -225,12 +227,18 @@ func planDetail(a *app.App, st *app.LoadoutState, r *PlanRow) (*PlanDetail, erro
 		if n := len(f.Removed); n > 0 {
 			parts = append(parts, Tf("%d dropped", n))
 		}
+		if n := len(f.Arrived); n > 0 {
+			parts = append(parts, Tf("%d installed, not enabled", n))
+		}
 		fr.Changes = strings.Join(parts, T(", "))
 		for _, it := range f.Added {
 			fr.Added = append(fr.Added, itemTitle(it))
 		}
 		for _, it := range f.Removed {
 			fr.Removed = append(fr.Removed, itemTitle(it))
+		}
+		for _, it := range f.Arrived {
+			fr.Arrived = append(fr.Arrived, itemTitle(it))
 		}
 		d.Follows = append(d.Follows, fr)
 	}

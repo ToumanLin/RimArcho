@@ -51,8 +51,11 @@ type SortStep struct {
 	Preview bool `json:"preview,omitempty"`
 	// Moved: other enabled Mods that change place (enable sorts after enabling).
 	Moved int `json:"moved,omitempty"`
-	// WorkshopIDs: what the Workshop step subscribes, deduplicated.
+	// WorkshopIDs: what the Workshop step subscribes, deduplicated. AddIDs: those of them the
+	// list takes once Steam has installed them (not a recommended replacement, which the
+	// replace step swaps in), 11 §2.2.
 	WorkshopIDs []string `json:"workshopIds,omitempty"`
+	AddIDs      []string `json:"addIds,omitempty"`
 	// Error: the dry run failed; the step cannot apply now.
 	Error string `json:"error,omitempty"`
 }
@@ -220,6 +223,11 @@ func (f sortFixes) step(kind string) SortStep {
 	case StepSubscribe:
 		s.Items = append(s.Items, f.get...)
 		s.WorkshopIDs = f.wsIDs
+		for _, it := range f.get {
+			if it.Old == "" {
+				s.AddIDs = append(s.AddIDs, it.WorkshopID)
+			}
+		}
 	}
 	return s
 }

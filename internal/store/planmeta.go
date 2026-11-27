@@ -17,6 +17,10 @@ type CollectionItem struct {
 	WorkshopID string `json:"id"`
 	Title      string `json:"title,omitempty"`
 	Sub        bool   `json:"sub,omitempty"` // a nested collection
+	// Missing (Snapshot only): no installed copy had the item when the snapshot was taken,
+	// so it was never enabled by following the collection; catching up enables it once it
+	// is installed (07 §7.6). nil: a snapshot from before this was recorded.
+	Missing *bool `json:"missing,omitempty"`
 }
 
 // PlanCollection is a Workshop collection a plan follows (07 §7.6).

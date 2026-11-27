@@ -129,7 +129,7 @@ test("the Workshop step offers Steam and SteamCMD and subscribes its IDs; then a
   assert.equal(go.textContent, "get with Steamenter");
   assert.equal(go.title, "from Steam");
   go.onclick(); await settle();
-  assert.equal(JSON.stringify(p.calls.find((c) => c[0] === "Subscribe")[1]), JSON.stringify({ kind: "workshop", url: "7002", steamcmd: false, batch: true }));
+  assert.equal(JSON.stringify(p.calls.find((c) => c[0] === "Subscribe")[1]), JSON.stringify({ kind: "workshop", url: "7002", steamcmd: false, batch: true, addTo: "current", add: [] }));
   // every chip done says it: no card repeats the list of what was done
   assert.equal(h.popup.querySelector(".ss-card"), null);
   assert.deepEqual(chips(h), ["sort:done", "subscribe:done"]);

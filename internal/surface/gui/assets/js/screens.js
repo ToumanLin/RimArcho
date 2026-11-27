@@ -1146,7 +1146,7 @@ async function runAction(it, act, here = false) {
     case "subscribe":
       // a background task (16 §2.16): the mods take their place in the list once downloaded
       return pop.choose(act.label, getChoices(), async (i) => {
-        try { say("ok", await api.Subscribe({ kind: "workshop", url: act.refs.join(" "), steamcmd: i === 1, batch: true })); } catch (e) { say("fail", errText(e)); }
+        try { say("ok", await api.Subscribe({ kind: "workshop", url: act.refs.join(" "), steamcmd: i === 1, batch: true, addTo: "current" })); } catch (e) { say("fail", errText(e)); }
       });
   }
   if (act.confirm) {

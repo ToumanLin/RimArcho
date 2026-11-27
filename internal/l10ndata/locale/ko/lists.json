@@ -349,5 +349,8 @@
   "show the file": "파일 보기",
   "hide the file": "파일 숨기기",
   "%d of %d enabled mods have a tag, %d have none": "활성 모드 %[2]d개 중 %[1]d개에 태그 있음, %[3]d개는 없음",
-  "click a colour: that tag; the stripes or enter: the mods with no tag": "색 클릭: 그 태그 보기, 빗금 또는 Enter: 태그 없는 모드만 보기"
+  "click a colour: that tag; the stripes or enter: the mods with no tag": "색 클릭: 그 태그 보기, 빗금 또는 Enter: 태그 없는 모드만 보기",
+  "%d installed, not enabled": "%d개 설치됨, 아직 켜지 않음",
+  "ready to catch up: %s": "따라잡을 수 있어요: %s",
+  "no list is open": "열린 목록이 없어요"
 }

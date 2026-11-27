@@ -479,14 +479,14 @@ func taskResult(t *app.Task, r *TaskRow, c map[string]int) string {
 // taskPhase is the running step in words, by lane.
 func taskPhase(t *app.Task) string {
 	phase := t.Phase
+	if strings.HasPrefix(phase, "Steam is downloading ") {
+		// a resubscribe, or a subscription that follows Steam's download (16 §2.16)
+		return Tf("Steam is downloading %d of %d", min(t.Done+1, t.Total), t.Total)
+	}
 	if phase != "" && t.Lane == app.LaneFiles {
 		phase = Tf("on %s", phase)
 	} else if phase != "" && t.Lane == app.LaneSteam {
-		if strings.HasPrefix(phase, "Steam is downloading ") {
-			phase = Tf("Steam is downloading %d of %d", min(t.Done+1, t.Total), t.Total)
-		} else {
-			phase = Tf("waiting for Steam: %s", phase)
-		}
+		phase = Tf("waiting for Steam: %s", phase)
 	}
 	return phase
 }
@@ -551,7 +551,7 @@ func taskItemRow(t *app.Task, it app.TaskItem) TaskItemRow {
 			row.StateText = T("cancelled")
 		}
 	}
-	if it.State == app.ItemRun && t.Lane == app.LaneSteam && t.Kind == LibResub {
+	if it.State == app.ItemRun && (t.Lane == app.LaneSteam && t.Kind == LibResub || it.Steam) {
 		row.StateText = T("waiting for Steam")
 		if it.Size > 0 && it.Got > 0 {
 			row.StateText = Tf("downloading %d%%", min(int(float64(it.Got)*100/float64(it.Size)), 100))

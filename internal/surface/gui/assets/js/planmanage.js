@@ -822,7 +822,8 @@ function collection(p, f) {
     // the ones not installed, got as the import page gets them: Steam or SteamCMD, all at once
     const ids = workshopIDs((f.missing || []).map((url) => ({ url })));
     if (ids.length) {
-      const sub = button(Tf("subscribe all %d", ids.length), "", () => getAll(ids, sub), "small", "subscribe");
+      // once installed they are enabled in the collection's order (07 §7.6)
+      const sub = button(Tf("subscribe all %d", ids.length), "", () => getAll(ids, sub, { addTo: p.name, collection: f.id }), "small", "subscribe");
       sub.type = "button";
       meta.append(sub);
     } else {
@@ -837,7 +838,9 @@ function collection(p, f) {
   if (f.changes) {
     const key = p.id + ":" + f.id;
     const chg = el("div", "chg");
-    chg.append(el("b", "", Tf("the collection changed: %s", f.changes)));
+    // only Mods installed since the last catch-up: the collection itself is the same
+    const moved = (f.added || []).length + (f.removed || []).length;
+    chg.append(el("b", "", moved ? Tf("the collection changed: %s", f.changes) : Tf("ready to catch up: %s", f.changes)));
     const see = el("button", "btn link", M.open.has(key) ? T("hide the changes") : T("see the changes"));
     see.onclick = () => { M.open.has(key) ? M.open.delete(key) : M.open.add(key); draw(); };
     const sync = el("button", "btn primary small", T("catch up"));
@@ -860,6 +863,7 @@ function collection(p, f) {
       const diff = el("div", "diff");
       for (const a of f.added || []) diff.append(el("div", "a", a));
       for (const x of f.removed || []) diff.append(el("div", "d", x));
+      for (const x of f.arrived || []) diff.append(el("div", "a", x));
       c.append(diff);
     }
   } else if (f.checked) {

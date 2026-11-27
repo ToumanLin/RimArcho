@@ -269,5 +269,9 @@
   "anonymous download was denied; this item needs a Steam account (Settings › accounts)": "匿名ダウンロードが拒否されました。この項目にはSteamアカウントが必要です（設定 › アカウント）",
   "needs a Steam account": "Steamアカウントが必要",
   "note: Workshop items download anonymously; if one needs your account, SteamCMD signs in as %s, the account the Steam client is signed in with: Steam is signed out until you restart it": "注意：ワークショップのModはまず匿名でダウンロードします。アカウントが必要な項目だけ、SteamCMDはSteamクライアントと同じアカウント%sでログインします。そのため、Steamは再起動するまでログアウト状態になります",
-  "note: %d items need the Steam account: anonymous download was denied, so SteamCMD signs in as %s for them: %s": "注意：%d件は匿名ダウンロードが拒否され、Steamアカウントが必要です。SteamCMDはこれらのために%sでログインします：%s"
+  "note: %d items need the Steam account: anonymous download was denied, so SteamCMD signs in as %s for them: %s": "注意：%d件は匿名ダウンロードが拒否され、Steamアカウントが必要です。SteamCMDはこれらのために%sでログインします：%s",
+  "installed; %s added to %s": "インストール完了。%s を %s に追加しました",
+  "Steam stopped downloading it (no progress for 2 minutes)": "Steam がダウンロードを止めました（2 分間進捗なし）",
+  "Steam did not finish downloading it within 6 hours": "Steam が 6 時間以内にダウンロードを終えませんでした",
+  "Steam did not finish downloading it; check Steam": "Steam のダウンロードが終わっていません。Steam を確認してください"
 }

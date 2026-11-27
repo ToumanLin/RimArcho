@@ -254,7 +254,7 @@ replacements reuses Use This Instead data and version filters, downloaded throug
 | use copies (`use-installed`) | List entries with no folder take the installed copy, in place (`App.UseInstalled`) | missingMods with canEnable |
 | replace (`replace`) | Enabled Mods give way to their installed recommended replacement, each at its own place; no sort (`App.ReplaceRecommended`) | replacements that canReplace, installed and not enabled |
 | enable (`enable`) | Installed required Mods are enabled, transitively, then the list is sorted (`App.CompleteDependencies`) | missingDependencies of kind installed |
-| download (`subscribe`) | The Workshop IDs are subscribed after Steam or SteamCMD is picked on the step's own buttons (`api.Subscribe({kind:"workshop", url: ids, steamcmd, batch:true})`); not a list edit, no undo | missingDependencies of kind workshop; missingMods not installed with a Workshop ID; replacements not installed with one; never a Workshop ID the last Workshop check found removed from the Workshop (`SourceFailure.Gone`: delisted, deleted or private) |
+| download (`subscribe`) | The Workshop IDs are subscribed after Steam or SteamCMD is picked on the step's own buttons (`api.Subscribe({kind:"workshop", url: ids, steamcmd, batch:true, addTo:"current", add: addIds})`); the task follows Steam's download, and once the Mods are installed it enables `addIds` (all but recommended replacements, which the replace step swaps in) in this list where the sort puts them, one undoable edit, so the player does not sort again (11 §2.2); the subscription itself has no undo | missingDependencies of kind workshop; missingMods not installed with a Workshop ID; replacements not installed with one; never a Workshop ID the last Workshop check found removed from the Workshop (`SourceFailure.Gone`: delisted, deleted or private) |
 
 What no step can fix (a dependency or entry with no known source, such as a local Mod, a Mod removed from the Workshop, an installed copy or replacement that cannot load) is listed under a folded "N cannot be fixed here", each with its reason. A broken cycle is settled by the sort and noted on Can it run, not here. A sort with nothing to fix and nothing to know opens no dialog: the status line says what it did.
 
@@ -278,10 +278,10 @@ type SortStepItem = {
 type SortSteps = {
   steps: { kind: "use-installed" | "replace" | "enable" | "subscribe";
            items: SortStepItem[]; preview?: boolean; moved?: number;
-           workshopIds?: string[]; error?: string }[];
+           workshopIds?: string[]; addIds?: string[]; error?: string }[];
   current: number;              // -1: nothing left
   unfixable?: SortStepItem[];
 };
 ```
 
-`api.CompleteDependencies()` (Can it run's automatic fix, §5) is the enable step without the dialog: it returns `{text, undo?, enabled?: string[], workshopIds?: string[], missingDependencies?: MissingDependency[]}`. The replace step revalidates the current suggestions and replaces enabled originals at their original positions, deduplicating already enabled targets; it is all-or-nothing, does not sort, subscribe or edit Mod files, and rejects chains within one batch. After downloading and scanning, sort again to place the new Mods. Subscription never automatically replaces the original.
+`api.CompleteDependencies()` (Can it run's automatic fix, §5) is the enable step without the dialog: it returns `{text, undo?, enabled?: string[], workshopIds?: string[], missingDependencies?: MissingDependency[]}`. The replace step revalidates the current suggestions and replaces enabled originals at their original positions, deduplicating already enabled targets; it is all-or-nothing, does not sort, subscribe or edit Mod files, and rejects chains within one batch. A download queued with a list to add to (`addTo`) places its Mods once Steam has installed them, so no second sort is needed (11 §2.2). Subscription never automatically replaces the original.

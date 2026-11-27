@@ -269,5 +269,9 @@
   "anonymous download was denied; this item needs a Steam account (Settings › accounts)": "анонимная загрузка запрещена; этому элементу нужен аккаунт Steam (Настройки › аккаунты)",
   "needs a Steam account": "нужен аккаунт Steam",
   "note: Workshop items download anonymously; if one needs your account, SteamCMD signs in as %s, the account the Steam client is signed in with: Steam is signed out until you restart it": "внимание: моды Мастерской сначала загружаются анонимно; если для какого-то нужен аккаунт, SteamCMD входит как %s — тот же аккаунт, что и в клиенте Steam: Steam будет отключён до перезапуска",
-  "note: %d items need the Steam account: anonymous download was denied, so SteamCMD signs in as %s for them: %s": "внимание: %d элементов требуют аккаунт Steam: анонимная загрузка запрещена, поэтому SteamCMD входит для них как %s: %s"
+  "note: %d items need the Steam account: anonymous download was denied, so SteamCMD signs in as %s for them: %s": "внимание: %d элементов требуют аккаунт Steam: анонимная загрузка запрещена, поэтому SteamCMD входит для них как %s: %s",
+  "installed; %s added to %s": "установлено; %s добавлено в %s",
+  "Steam stopped downloading it (no progress for 2 minutes)": "Steam перестал загружать (нет прогресса 2 минуты)",
+  "Steam did not finish downloading it within 6 hours": "Steam не закончил загрузку за 6 часов",
+  "Steam did not finish downloading it; check Steam": "Steam не закончил загрузку; проверьте Steam"
 }

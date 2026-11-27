@@ -55,6 +55,13 @@ func followedNode(c *Ctx, n *render.Node, f *app.Followed) {
 		}
 		r.Truncate(render.DefaultLimit, "")
 	}
+	if len(f.Arrived) > 0 {
+		r := k.KV("installed since", fmt.Sprintf("%d, not in the plan yet (catching up enables them)", len(f.Arrived)))
+		for _, it := range f.Arrived {
+			r.Add("+ " + itemName(it))
+		}
+		r.Truncate(render.DefaultLimit, "")
+	}
 	if len(f.NotInstalled) > 0 {
 		m := k.KV("not installed", fmt.Sprintf("%d (subscribe in the Workshop)", len(f.NotInstalled)))
 		for _, it := range f.NotInstalled {

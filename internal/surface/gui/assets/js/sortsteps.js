@@ -275,7 +275,8 @@ async function subscribe(flow, node, step, steamcmd) {
   flow.busy = true; flow.error = "";
   draw(flow, node);
   try {
-    const text = await api.Subscribe({ kind: "workshop", url: step.workshopIds.join(" "), steamcmd, batch: true });
+    // once installed, the Mods go into this list where the sort puts them (11 §2.2)
+    const text = await api.Subscribe({ kind: "workshop", url: step.workshopIds.join(" "), steamcmd, batch: true, addTo: "current", add: step.addIds || [] });
     say("ok", text);
     flow.done.push({ kind: step.kind, n: step.items.length, text, undo: false });
   } catch (e) { flow.error = errText(e); }

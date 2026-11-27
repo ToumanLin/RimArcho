@@ -30,12 +30,15 @@ const (
 type Followed struct {
 	*store.PlanCollection
 	Added, Removed []store.CollectionItem // mods (not nested collections)
+	// Arrived are the items no installed copy had at the last catch-up (or the link) that
+	// are installed now and that the plan does not hold: catching up enables them.
+	Arrived []store.CollectionItem
 	// NotInstalled are the collection's mods no installed copy has (Seen, else Snapshot).
 	NotInstalled []store.CollectionItem
 }
 
 // Changed says whether the collection changed since the snapshot.
-func (f *Followed) Changed() bool { return len(f.Added) > 0 || len(f.Removed) > 0 }
+func (f *Followed) Changed() bool { return len(f.Added)+len(f.Removed)+len(f.Arrived) > 0 }
 
 // Items is the newest list RimArcho has of the collection.
 func (f *Followed) Items() []store.CollectionItem {
@@ -78,8 +81,60 @@ func installedByWorkshop(st *LoadoutState) map[string]*store.Mod {
 	return out
 }
 
-// followedOf adds the changes and the uninstalled items to a stored collection.
-func followedOf(st *LoadoutState, c *store.PlanCollection) *Followed {
+// installedFor is the installed copy of each Workshop ID that the plan can enable.
+func installedFor(st *LoadoutState) map[string]*store.Mod {
+	out := installedByWorkshop(st)
+	for w, m := range out {
+		if whyNotLoadable(st, m) != "" {
+			delete(out, w)
+		}
+	}
+	return out
+}
+
+// snapshotOf is the collection's items as a snapshot: each records whether an installed
+// copy the plan can enable was missing (07 §7.6).
+func snapshotOf(st *LoadoutState, items []store.CollectionItem) []store.CollectionItem {
+	inst := installedFor(st)
+	out := make([]store.CollectionItem, len(items))
+	for i, it := range items {
+		it.Missing = nil
+		if !it.Sub {
+			missing := inst[it.WorkshopID] == nil
+			it.Missing = &missing
+		}
+		out[i] = it
+	}
+	return out
+}
+
+// planPackages are the lower-cased packages a plan holds, in any copy or as a missing entry.
+func planPackages(st *LoadoutState, l loadout.List) map[string]bool {
+	out := make(map[string]bool, len(l))
+	for _, e := range l {
+		if m := st.Ix.ByID[e.Instance]; m != nil {
+			out[strings.ToLower(m.PackageID)] = true
+		}
+		if e.Missing != "" {
+			out[strings.ToLower(strings.TrimSuffix(e.Missing, "_steam"))] = true
+		}
+	}
+	return out
+}
+
+// waited says whether a snapshot item was missing when the snapshot was taken, so following
+// the collection never enabled it. A snapshot from before that was recorded counts the
+// copies first seen after the collection was linked.
+func waited(it store.CollectionItem, m *store.Mod, linked time.Time) bool {
+	if it.Missing != nil {
+		return *it.Missing
+	}
+	return m.FirstSeen.After(linked)
+}
+
+// followedOf adds the changes and the uninstalled items to a stored collection; list is
+// the plan's (for what arrived).
+func followedOf(st *LoadoutState, list loadout.List, c *store.PlanCollection) *Followed {
 	f := &Followed{PlanCollection: c}
 	if !c.Checked.IsZero() {
 		had, now := map[string]bool{}, map[string]bool{}
@@ -104,7 +159,29 @@ func followedOf(st *LoadoutState, c *store.PlanCollection) *Followed {
 			f.NotInstalled = append(f.NotInstalled, it)
 		}
 	}
+	snap := make(map[string]store.CollectionItem, len(c.Snapshot))
+	for _, it := range c.Snapshot {
+		snap[it.WorkshopID] = it
+	}
+	ready, have := installedFor(st), planPackages(st, list)
+	for _, it := range f.Items() {
+		s, ok := snap[it.WorkshopID]
+		m := ready[it.WorkshopID]
+		if it.Sub || !ok || m == nil || have[strings.ToLower(m.PackageID)] || !waited(s, m, c.Linked) {
+			continue
+		}
+		f.Arrived = append(f.Arrived, it)
+	}
 	return f
+}
+
+// followList is the list of plan p (st's own when p is st's plan).
+func (a *App) followList(st *LoadoutState, p *store.Plan) loadout.List {
+	ps, err := a.PlanState(st, p)
+	if err != nil {
+		return nil
+	}
+	return ps.List
 }
 
 // PlanFollowed lists what a plan follows, from what RimArcho stored (no network).
@@ -114,8 +191,12 @@ func (a *App) PlanFollowed(st *LoadoutState, p *store.Plan) ([]*Followed, error)
 		return nil, err
 	}
 	out := make([]*Followed, 0, len(cs))
+	var list loadout.List
+	if len(cs) > 0 {
+		list = a.followList(st, p)
+	}
 	for _, c := range cs {
-		out = append(out, followedOf(st, c))
+		out = append(out, followedOf(st, list, c))
 	}
 	return out, nil
 }
@@ -163,7 +244,7 @@ func (a *App) FollowCollection(planName, ref, mode string) (*Followed, error) {
 		if err := a.Store.SetPlanCollection(c); err != nil {
 			return nil, err
 		}
-		return followedOf(st, c), nil
+		return followedOf(st, a.followList(st, p), c), nil
 	}
 	col, err := a.ReadCollection(ref)
 	if err != nil {
@@ -192,11 +273,11 @@ func (a *App) followRead(st *LoadoutState, p *store.Plan, col *Collection, mode 
 		title = "ws:" + col.ID
 	}
 	items := itemsOf(col)
-	c := &store.PlanCollection{PlanID: p.ID, WorkshopID: col.ID, Title: title, Mode: mode, Linked: now, Checked: now, Snapshot: items, Seen: items}
+	c := &store.PlanCollection{PlanID: p.ID, WorkshopID: col.ID, Title: title, Mode: mode, Linked: now, Checked: now, Snapshot: snapshotOf(st, items), Seen: items}
 	if err := a.Store.SetPlanCollection(c); err != nil {
 		return nil, err
 	}
-	return followedOf(st, c), nil
+	return followedOf(st, a.followList(st, p), c), nil
 }
 
 // UnfollowCollection unlinks a collection; the plan is unchanged.
@@ -250,6 +331,7 @@ func (a *App) checkFollowed(st *LoadoutState, p *store.Plan, ref string, force b
 	now := a.Now().UTC()
 	var errs []error
 	out := make([]*Followed, 0, len(cs))
+	list := a.followList(st, p)
 	for _, c := range cs {
 		if force || c.Checked.IsZero() || now.Sub(c.Checked) >= CheckEvery {
 			col, err := a.readCollection(c.WorkshopID, knownTitles(c))
@@ -265,7 +347,7 @@ func (a *App) checkFollowed(st *LoadoutState, p *store.Plan, ref string, force b
 				}
 			}
 		}
-		out = append(out, followedOf(st, c))
+		out = append(out, followedOf(st, list, c))
 	}
 	return out, errors.Join(errs...)
 }
@@ -336,6 +418,10 @@ func (a *App) syncCollection(planName, ref string, dryRun, read bool) (*SyncResu
 			return nil, fmt.Errorf("%s follows %d collections: name one (archo plan sync %s <ID>)", PlanRef(p), len(cs), quoteName(p.Name))
 		}
 	}
+	ps, err := a.PlanState(st, p)
+	if err != nil {
+		return nil, err
+	}
 	var f *Followed
 	if read {
 		fs, err := a.checkFollowed(st, p, ref, false)
@@ -348,38 +434,25 @@ func (a *App) syncCollection(planName, ref string, dryRun, read bool) (*SyncResu
 		if err != nil {
 			return nil, err
 		}
-		f = followedOf(st, c)
-	}
-	ps, err := a.PlanState(st, p)
-	if err != nil {
-		return nil, err
+		f = followedOf(st, ps.List, c)
 	}
 	r := &SyncResult{Plan: p, Collection: f, Before: ps.List.Clone(), DryRun: dryRun}
-	added, removed := map[string]bool{}, map[string]bool{}
+	enable, removed := map[string]bool{}, map[string]bool{}
 	for _, it := range f.Added {
-		added[it.WorkshopID] = true
+		enable[it.WorkshopID] = true
+	}
+	for _, it := range f.Arrived {
+		enable[it.WorkshopID] = true
 	}
 	for _, it := range f.Removed {
 		removed[it.WorkshopID] = true
 	}
-	// The collection in its order, so a new mod goes next to its neighbours there.
-	il := newList("collection")
-	for _, it := range f.Seen {
-		if !it.Sub {
-			il.WorkshopOnly = append(il.WorkshopOnly, it.WorkshopID)
-		}
-	}
+	after := collectionMerge(st, ps, f, enable, r)
 	wsOf := func(e loadout.Entry) string {
 		if m := st.Ix.ByID[e.Instance]; m != nil {
 			return m.WorkshopID()
 		}
 		return ""
-	}
-	after := mergeEntries(ps, il, func(e loadout.Entry) bool { return added[wsOf(e)] })
-	for _, e := range after {
-		if added[wsOf(e)] && r.Before.Index(e.Instance) < 0 {
-			r.Enabled = append(r.Enabled, st.Ix.ByID[e.Instance])
-		}
 	}
 	if f.Mode == FollowFollow && len(removed) > 0 {
 		kept := after[:0:0]
@@ -410,8 +483,89 @@ func (a *App) syncCollection(planName, ref string, dryRun, read bool) (*SyncResu
 	if ps == st {
 		st.List = after
 	}
-	f.Snapshot = f.Seen
+	f.Snapshot = snapshotOf(st, f.Seen)
 	if err := a.Store.SetPlanCollection(f.PlanCollection); err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+// collectionMerge enables the installed items of enable in the collection's order, each
+// next to its neighbours there, and records them in r.Enabled.
+func collectionMerge(st, ps *LoadoutState, f *Followed, enable map[string]bool, r *SyncResult) loadout.List {
+	il := newList("collection")
+	for _, it := range f.Items() {
+		if !it.Sub {
+			il.WorkshopOnly = append(il.WorkshopOnly, it.WorkshopID)
+		}
+	}
+	wsOf := func(e loadout.Entry) string {
+		if m := st.Ix.ByID[e.Instance]; m != nil {
+			return m.WorkshopID()
+		}
+		return ""
+	}
+	after := mergeEntries(ps, il, func(e loadout.Entry) bool { return enable[wsOf(e)] })
+	for _, e := range after {
+		if enable[wsOf(e)] && r.Before.Index(e.Instance) < 0 {
+			r.Enabled = append(r.Enabled, st.Ix.ByID[e.Instance])
+		}
+	}
+	return after
+}
+
+// CatchUpDownloaded enables, in plan planName, the items of a followed collection that a
+// finished download brought (ids): those that arrived since the last catch-up (07 §7.6),
+// in the collection's order. Nothing else changes: the other changes still wait for the
+// player's catch-up, and only these items' snapshot records say they are no longer missing.
+// The player's own "subscribe all" on the collection's card asks for it (16 §2.17).
+func (a *App) CatchUpDownloaded(planName, ref string, ids []string) (*SyncResult, error) {
+	st, err := a.Loadout()
+	if err != nil {
+		return nil, err
+	}
+	p, err := a.findPlan(planName)
+	if err != nil {
+		return nil, err
+	}
+	c, err := a.planFollow(st, p, ref)
+	if err != nil {
+		return nil, err
+	}
+	ps, err := a.PlanState(st, p)
+	if err != nil {
+		return nil, err
+	}
+	f := followedOf(st, ps.List, c)
+	r := &SyncResult{Plan: p, Collection: f, Before: ps.List.Clone()}
+	want := map[string]bool{}
+	for _, id := range ids {
+		want[id] = true
+	}
+	enable := map[string]bool{}
+	for _, it := range f.Arrived {
+		if want[it.WorkshopID] {
+			enable[it.WorkshopID] = true
+		}
+	}
+	if len(enable) == 0 {
+		return r, nil
+	}
+	after := collectionMerge(st, ps, f, enable, r)
+	r.After = after
+	if err := a.editPlan(p, ps.WS, r.Before, after, "add downloaded from "+f.Title); err != nil {
+		return nil, err
+	}
+	if ps == st {
+		st.List = after
+	}
+	f2 := snapshotOf(st, c.Snapshot)
+	for i := range c.Snapshot {
+		if enable[c.Snapshot[i].WorkshopID] {
+			c.Snapshot[i].Missing = f2[i].Missing
+		}
+	}
+	if err := a.Store.SetPlanCollection(c); err != nil {
 		return nil, err
 	}
 	return r, nil

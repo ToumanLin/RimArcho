@@ -269,5 +269,9 @@
   "anonymous download was denied; this item needs a Steam account (Settings › accounts)": "匿名下载被拒绝，这个条目需要 Steam 账号（设置 › 账号）",
   "needs a Steam account": "需要 Steam 账号",
   "note: Workshop items download anonymously; if one needs your account, SteamCMD signs in as %s, the account the Steam client is signed in with: Steam is signed out until you restart it": "注意：工坊 Mod 先匿名下载；只有需要账号的条目才让 SteamCMD 用 %s 登录，也就是 Steam 客户端正在用的账号：Steam 会被挤下线，重启后才回来",
-  "note: %d items need the Steam account: anonymous download was denied, so SteamCMD signs in as %s for them: %s": "注意：%d 个条目匿名下载被拒绝，需要 Steam 账号，SteamCMD 为它们用 %s 登录：%s"
+  "note: %d items need the Steam account: anonymous download was denied, so SteamCMD signs in as %s for them: %s": "注意：%d 个条目匿名下载被拒绝，需要 Steam 账号，SteamCMD 为它们用 %s 登录：%s",
+  "installed; %s added to %s": "已装好；%s 已加入 %s",
+  "Steam stopped downloading it (no progress for 2 minutes)": "Steam 停止下载了（2 分钟没有进度）",
+  "Steam did not finish downloading it within 6 hours": "Steam 6 小时内没下载完",
+  "Steam did not finish downloading it; check Steam": "Steam 没下载完；请看看 Steam"
 }

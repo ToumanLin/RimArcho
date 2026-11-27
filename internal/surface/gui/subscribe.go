@@ -54,6 +54,17 @@ func (s *API) Subscribe(r SubscriptionRequest) (string, error) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if r.Kind == "workshop" && r.AddTo == "current" {
+		// the list open now, not the one open when the download ends
+		p, err := s.a.CurrentPlan()
+		if err != nil || p == nil {
+			return "", errors.New(view.T("no list is open"))
+		}
+		r.AddTo = p.Name
+		if args, err = subscriptionArgs(r); err != nil {
+			return "", err
+		}
+	}
 	if r.Kind == "workshop" && r.SteamCMD && r.Batch {
 		args = append(args, "--credit-batch")
 	}
@@ -101,19 +112,29 @@ func (s *API) runSubscriptionTask(a *app.App, id, kind string, args []string) (s
 		s.tasks.SetStop(id, func() error { cancel(); return nil })
 		var inputs []string
 		steamcmd, batch := false, false
+		calls := app.WorkshopCalls{Context: ctx,
+			Changed: func(items []app.TaskItem) { s.tasks.Update(id, func(t *app.Task) { t.SetWorkshopProgress(items) }) },
+		}
 		for _, arg := range args[2:] {
-			switch arg {
+			name, val, _ := strings.Cut(arg, "=")
+			switch name {
 			case "--steamcmd":
 				steamcmd = true
 			case "--credit-batch":
 				batch = true
+			case "--wait":
+				calls.Wait = true
+			case "--add-to":
+				calls.AddTo = val
+			case "--add":
+				calls.Add = strings.Split(val, ",")
+			case "--collection":
+				calls.Collection = val
 			default:
 				inputs = append(inputs, arg)
 			}
 		}
-		op, err := a.SubscribeWorkshopBatch(inputs, steamcmd, batch, false, app.WorkshopCalls{Context: ctx,
-			Changed: func(items []app.TaskItem) { s.tasks.Update(id, func(t *app.Task) { t.SetWorkshopProgress(items) }) },
-		})
+		op, err := a.SubscribeWorkshopBatch(inputs, steamcmd, batch, false, calls)
 		if op != nil {
 			for _, it := range op.Items {
 				if it.Ref != "" {
@@ -130,6 +151,9 @@ func (s *API) runSubscriptionTask(a *app.App, id, kind string, args []string) (s
 			return "cancelled", ctx.Err()
 		}
 		if op != nil {
+			if len(op.Added) > 0 {
+				return view.Tf("installed; %s added to %s", view.Plural(len(op.Added), "mod"), op.AddedTo), err
+			}
 			for _, note := range op.Notes {
 				if strings.HasPrefix(note, "Steam downloads it;") {
 					return view.T("Steam downloads it; it appears after the next scan"), err

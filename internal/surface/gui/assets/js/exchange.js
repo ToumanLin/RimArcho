@@ -1173,11 +1173,12 @@ export const workshopIDs = rows => [...new Set(rows.map(r => /[?&]id=(\d+)/.exec
 
 // getAll asks how to get the Workshop items ids (Steam or SteamCMD), then gets them all as one
 // background task (16 §2.16); btn stays disabled once it started. The import page's "subscribe
-// all" and a followed collection's mods that are not installed share it.
-export function getAll(ids, btn) {
+// all" and a followed collection's mods that are not installed share it. to: where the
+// installed Mods go ({addTo, collection}, 11 §2.2); without it, missing entries heal in place.
+export function getAll(ids, btn, to) {
   pop.choose(Tf("get %d mods", ids.length), getChoices(), async (i) => {
     if (btn) btn.disabled = true;
-    try { say("ok", await api.Subscribe({ kind: "workshop", url: ids.join(" "), steamcmd: i === 1, batch: true })); }
+    try { say("ok", await api.Subscribe({ kind: "workshop", url: ids.join(" "), steamcmd: i === 1, batch: true, ...(to || {}) })); }
     catch (e) { if (btn) btn.disabled = false; say("fail", errText(e)); }
   });
 }

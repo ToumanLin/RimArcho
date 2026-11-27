@@ -66,6 +66,9 @@ type TaskItem struct {
 	FailureKind string `json:"failureKind,omitempty"`
 	Permanent   bool   `json:"permanent,omitempty"`
 	Again       string `json:"again,omitempty"` // the task that took this item over (retry, continue the rest)
+	// Steam: the Steam client is downloading it after confirming the subscription (Got and
+	// Size are its bytes so far and in all, 16 §2.16).
+	Steam bool `json:"steam,omitempty"`
 }
 
 // Task is one background task.

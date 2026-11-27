@@ -22,6 +22,14 @@ const workshopMissing = "removed from the Workshop (the author deleted it or mad
 type WorkshopCalls struct {
 	Context context.Context
 	Changed func([]TaskItem)
+	// Wait: through the Steam client, follow each confirmed subscription's download until
+	// Steam has installed it, then read the Workshop folder again (11 §2.2).
+	Wait bool
+	// AddTo: then enable what was installed in this plan, where the sort constraints put it
+	// (07 §2.1); Add limits that to these Workshop IDs; with Collection, a collection the
+	// plan follows, its order places them instead (07 §7.6).
+	AddTo, Collection string
+	Add               []string
 }
 
 type workshopDetail struct {
@@ -80,6 +88,7 @@ func (a *App) preflightWorkshop(ctx context.Context, ids []string) map[string]wo
 
 type workshopTransfer struct {
 	ctx     context.Context
+	wait    bool // WorkshopCalls.Wait
 	items   []TaskItem
 	changed func([]TaskItem)
 	// confirmed is told when SteamCMD's output confirms an item and moves on to the next
@@ -217,8 +226,10 @@ func (a *App) SubscribeWorkshop(inputs []string, forceSteamCMD, dryRun bool, cal
 		return a.subscribeWorkshop(ids, forceSteamCMD, true, nil)
 	}
 	w := &workshopTransfer{ctx: context.Background()}
+	var c WorkshopCalls
 	if len(calls) > 0 {
-		w.changed = calls[0].Changed
+		c = calls[0]
+		w.changed, w.wait = c.Changed, c.Wait || c.AddTo != ""
 		if calls[0].Context != nil {
 			w.ctx = calls[0].Context
 		}
@@ -286,6 +297,17 @@ func (a *App) SubscribeWorkshop(inputs []string, forceSteamCMD, dryRun bool, cal
 		ti.FailureKind, ti.Permanent = it.FailureKind, it.Permanent
 	}
 	w.publish()
+	if c.AddTo != "" && w.ctx.Err() == nil {
+		var got []string
+		for i, id := range ids {
+			if w.items[i].State == ItemOK {
+				got = append(got, id)
+			}
+		}
+		if addErr := a.addSubscribed(op, c, got); addErr != nil {
+			failures = append(failures, addErr)
+		}
+	}
 	if len(failures) > 0 {
 		return op, errors.Join(append(failures, w.ctx.Err())...)
 	}
@@ -336,7 +358,17 @@ func (t *Task) SetWorkshopProgress(items []TaskItem) {
 		}
 		if it.State == ItemRun {
 			t.Phase = it.Name
+			if it.Steam && it.Size > 0 {
+				done += weight * min(float64(it.Got)/float64(it.Size), 0.99)
+			}
 		}
+	}
+	steam := false
+	for _, it := range items {
+		steam = steam || it.Steam && it.State == ItemRun
+	}
+	if steam {
+		t.Phase = fmt.Sprintf("Steam is downloading %d of %d", min(t.Done+1, t.Total), t.Total)
 	}
 	if total > 0 {
 		t.Frac = max(t.Frac, done/total)

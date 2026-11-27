@@ -42,6 +42,10 @@ type SubscribeOp struct {
 	DryRun bool
 	Items  []SubscribeItem
 	Notes  []string
+	// AddedTo and Added: the plan the installed items were added to (WorkshopCalls.AddTo)
+	// and the Mods that went in.
+	AddedTo string
+	Added   []*store.Mod
 }
 
 type SubscribeItem struct {

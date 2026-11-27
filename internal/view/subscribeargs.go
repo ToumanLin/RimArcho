@@ -22,6 +22,12 @@ type SubscribeRequest struct {
 	From     string `json:"from"`
 	SteamCMD bool   `json:"steamcmd"`
 	Batch    bool   `json:"batch"`
+	// AddTo: once installed, the Mods go into this list ("current": the list open when the
+	// request is queued); Add limits that to these Workshop IDs, and Collection, a
+	// collection that list follows, places them in its order (11 §2.2, 07 §7.6).
+	AddTo      string   `json:"addTo,omitempty"`
+	Add        []string `json:"add,omitempty"`
+	Collection string   `json:"collection,omitempty"`
 }
 
 // SubscribeArgv is the archo subscribe command of a request (its preview adds --dry-run).
@@ -47,6 +53,17 @@ func SubscribeArgv(r SubscribeRequest) ([]string, error) {
 		args = append(args, strings.Fields(r.URL)...)
 		if r.SteamCMD {
 			args = append(args, "--steamcmd")
+		}
+		// a task follows Steam's download to the end (11 §2.2)
+		args = append(args, "--wait")
+		if r.AddTo != "" {
+			args = append(args, "--add-to="+r.AddTo)
+			if len(r.Add) > 0 {
+				args = append(args, "--add="+strings.Join(r.Add, ","))
+			}
+			if r.Collection != "" {
+				args = append(args, "--collection="+r.Collection)
+			}
 		}
 	default:
 		return nil, fmt.Errorf("unknown subscription kind %q", r.Kind)

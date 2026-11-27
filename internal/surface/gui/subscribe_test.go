@@ -3,6 +3,7 @@
 package gui
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -237,13 +238,38 @@ func TestWorkshopSubscriptionTaskMessage(t *testing.T) {
 		}
 		return steamworks.ItemLine(1234, "ok", steamworks.ItemSubscribed|steamworks.ItemDownloadPending) + "\n" + steamworks.DoneLine(steamworks.Subscribe, 1), nil
 	}
-	if _, err := api.Subscribe(SubscriptionRequest{Kind: "workshop", URL: "1234"}); err != nil {
+	// 11 §2.2: the task follows Steam's download to the end, then the Mod is in the list
+	// that was open when it was queued, without a sort.
+	e.App.SteamWorkerStream = func(_ context.Context, _ string, args []string, line func(string)) error {
+		if strings.Join(args, " ") != "watch 1234" {
+			t.Errorf("watch args: %v", args)
+		}
+		line(steamworks.ProgressLine(steamworks.Progress{ID: 1234, Got: 10, Total: 100, State: steamworks.ItemSubscribed | steamworks.ItemDownloading}))
+		e.AddWorkshop("1234", testkit.Sample("tester.late", "Late Mod"))
+		line(steamworks.ItemLine(1234, "ok", steamworks.ItemSubscribed|steamworks.ItemInstalled))
+		line(steamworks.DoneLine(steamworks.Watch, 1))
+		return nil
+	}
+	if _, err := api.Subscribe(SubscriptionRequest{Kind: "workshop", URL: "1234", AddTo: "current"}); err != nil {
 		t.Fatal(err)
 	}
 	task := endedTask(t, api, view.TaskSubscribe)
 	waitSettingEnd(t, events, task.ID)
-	if task.State != app.TaskDone || !strings.Contains(task.Say, "next scan") || len(task.Items) != 1 || task.Items[0].State != app.ItemOK {
+	if task.State != app.TaskDone || !strings.Contains(task.Say, "added to") || len(task.Items) != 1 || task.Items[0].State != app.ItemOK {
 		t.Fatalf("Steam result: %+v", task)
+	}
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, en := range st.List {
+		if m := st.Ix.ByID[en.Instance]; m != nil && m.WorkshopID() == "1234" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("the Mod is not in the list: %v", st.List)
 	}
 }
 
