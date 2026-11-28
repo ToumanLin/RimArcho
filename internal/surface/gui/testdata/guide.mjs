@@ -239,13 +239,13 @@ test("found: the language row names the system's language and applies a pick in 
 
 test("found: a language pick rereads the game cards' chips and keeps the picks", async () => {
   let chip = "started directly";
-  const h = await setup({ found: () => { const f = two(); f.games[1].source = chip; return f; }, lang: { value: "auto", codes: ["en", "ja"], labels: ["English", "日本語"], system: "English" } });
+  const h = await setup({ found: () => { const f = two(); f.games[1].source = chip; return f; }, lang: { value: "auto", codes: ["en", "ja"], labels: ["English", "Japanese"], system: "English" } });
   const box = h.screen.querySelectorAll(".game")[0].querySelector("input");
   box.checked = false; box.onchange(); await flush();
-  chip = "直接起動しました";
+  chip = "started directly (ja)";
   await h.segs.find(s => s.names[0] === "follow system (%s)").action(2); await flush();
   const cards = h.screen.querySelectorAll(".game");
-  assert.match(cards[1].textContent, /直接起動しました/);
+  assert.ok(cards[1].textContent.includes("started directly (ja)"));
   assert.equal(cards[0].querySelector("input").checked, false, "the unticked game stays unticked");
 });
 
