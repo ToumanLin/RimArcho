@@ -66,21 +66,24 @@ var gameVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+$`)
 
 // Tags reads a Mod folder's About.xml: Mod, then each supported game version.
 func Tags(folder string) ([]string, error) {
-	d := scan.ReadDecl(folder, false)
+	return tagsOf(scan.ReadDecl(folder, false), "Archo Monitor")
+}
+
+func tagsOf(d scan.Decl, what string) ([]string, error) {
 	if d.ParseError != "" {
-		return nil, fmt.Errorf("Archo Monitor About.xml: %s", d.ParseError)
+		return nil, fmt.Errorf("%s About.xml: %s", what, d.ParseError)
 	}
 	tags := []string{"Mod"}
 	for _, v := range d.SupportedVersions {
 		if !gameVersion.MatchString(v) {
-			return nil, fmt.Errorf("Archo Monitor About.xml: supported version %q is not a game version like 1.6", v)
+			return nil, fmt.Errorf("%s About.xml: supported version %q is not a game version like 1.6", what, v)
 		}
 		if !slices.Contains(tags, v) {
 			tags = append(tags, v)
 		}
 	}
 	if len(tags) == 1 {
-		return nil, errors.New("Archo Monitor About.xml lists no supported game versions")
+		return nil, fmt.Errorf("%s About.xml lists no supported game versions", what)
 	}
 	return tags, nil
 }
@@ -200,7 +203,9 @@ func Assemble(root, version string, o Options) (*Item, error) {
 // CheckContent refuses a folder that holds anything but a Mod: a program (.exe), an archive
 // or checksum (.zip, .sha256, .tar.gz, .gz), or a .dll outside a game version's Assemblies
 // folder. Steam removed item 3835688284 for carrying a program (17 §5.1).
-func CheckContent(folder string) error {
+func CheckContent(folder string) error { return checkContent(folder, "the Archo Monitor Mod") }
+
+func checkContent(folder, what string) error {
 	var bad []string
 	err := filepath.WalkDir(folder, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
@@ -226,7 +231,7 @@ func CheckContent(folder string) error {
 		return err
 	}
 	if len(bad) > 0 {
-		return fmt.Errorf("the Workshop item may hold only the Archo Monitor Mod, but the staging folder has %s", strings.Join(bad, ", "))
+		return fmt.Errorf("the Workshop item may hold only %s, but the staging folder has %s", what, strings.Join(bad, ", "))
 	}
 	return nil
 }

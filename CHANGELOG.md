@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- `archo workshop publish --mod <folder>` uploads one of your own Mods to its Workshop item through the signed-in Steam client, like the game's uploader without starting the game: title from About.xml, tags `Mod` and its game versions, `About/Preview.png`, and the Steam description kept unless `--description` / `--description-zh`. Dot-entries (`.git`, `.vs`), `obj/` and `bin/` are left out, `--exclude <path>` leaves out more, and a stray `.dll`, `.exe` or archive is refused. `--dry-run` shows what would go up. CLI only; no MCP tool.
 - `archo test run` / MCP `test_run`: menu, map and probe runs no longer freeze while the game window is unfocused. Every run now writes its own `Prefs.xml` with `runInBackground` (dev mode still only in a save run). When the log stops growing for a minute or more while the game loads, or until a timeout, the report has `stalled` ("the log did not grow for N s; the game window may have been paused"), and a timeout's `not_tested` says it.
 
 ## 1.1.5 — 2026-11-27

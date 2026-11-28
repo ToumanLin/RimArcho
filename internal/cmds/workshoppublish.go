@@ -15,8 +15,10 @@ import (
 )
 
 var workshopPublishCommand = &Command{
-	Name: "workshop publish", Summary: "maintainer only: publish the Archo Monitor Workshop item (the built Mod, stamped with the release) from the repository root through the signed-in Steam client",
+	Name: "workshop publish", Summary: "publish the Archo Monitor Workshop item from the repository root (maintainer), or with --mod one of your own Mods, through the signed-in Steam client",
 	Flags: []Flag{
+		{Name: "mod", Value: "<folder>", Help: "publish this Mod folder to its item (About/PublishedFileId.txt) instead of Archo Monitor; title from About.xml, description kept unless --description"},
+		{Name: "exclude", Value: "<path>", Multi: true, Help: "with --mod: leave out this file or folder, relative to the Mod (repeatable; dot-entries, obj/ and bin/ are always left out)"},
 		{Name: "version", Value: "X.Y.Z", Help: "stable release version (default: this program's version)"},
 		{Name: "item", Value: "<id>", Help: "Archo Monitor item ID (default: monitor/About/PublishedFileId.txt; absent creates an item; never the retired 3835688284)"},
 		{Name: "new-item", Help: "create the Archo Monitor item, ignoring PublishedFileId.txt (once, when it still names the retired item)"},
@@ -53,6 +55,12 @@ func WorkshopPublishOffline(argv []string) bool {
 }
 
 func publishOptions(a *Args) (steamworks.PublishRequest, error) {
+	if a.Bool("mod") {
+		return modPublishOptions(a)
+	}
+	if a.Bool("exclude") {
+		return steamworks.PublishRequest{}, &UsageError{Msg: "--exclude works only with --mod"}
+	}
 	r := steamworks.PublishRequest{Version: buildinfo.Version, Title: workshoppublish.Title, Note: a.Str("note")}
 	if v := a.Str("version"); v != "" {
 		r.Version = v
@@ -62,28 +70,8 @@ func publishOptions(a *Args) (steamworks.PublishRequest, error) {
 	if err := workshoppublish.ValidateVersion(r.Version); err != nil {
 		return r, &UsageError{Msg: err.Error()}
 	}
-	if a.Bool("item") {
-		id, err := workshoppublish.ParseID(a.Str("item"))
-		if err != nil {
-			return r, &UsageError{Msg: err.Error()}
-		}
-		if id == workshoppublish.RetiredItem {
-			return r, &UsageError{Msg: "3835688284 is the retired RimArcho item; pass the Archo Monitor item"}
-		}
-		if a.Bool("new-item") {
-			return r, &UsageError{Msg: "--item and --new-item cannot be used together"}
-		}
-		r.ID = id
-	}
-	if a.Bool("visibility") {
-		v, ok := map[string]uint32{"public": 0, "friends": 1, "private": 2, "unlisted": 3}[a.Str("visibility")]
-		if !ok {
-			return r, &UsageError{Msg: "--visibility must be public, unlisted, private or friends"}
-		}
-		r.Visibility = &v
-	}
-	if strings.ContainsRune(r.Note, 0) || len(r.Note) > 8000 {
-		return r, &UsageError{Msg: "--note must be at most 8000 bytes and contain no NUL characters"}
+	if err := commonPublishOptions(a, &r); err != nil {
+		return r, err
 	}
 	// Every publish sets the descriptions: the last line of each names the release, and
 	// the update check reads it there (17 §5.1).
@@ -108,10 +96,68 @@ func publishOptions(a *Args) (steamworks.PublishRequest, error) {
 			return r, &UsageError{Msg: fmt.Sprintf("a Workshop description with its version line is %d bytes; Steam allows at most %d", len(*d), steamworks.DescriptionMax)}
 		}
 	}
+	return r, nil
+}
+
+// commonPublishOptions reads the flags Archo Monitor and --mod share.
+func commonPublishOptions(a *Args, r *steamworks.PublishRequest) error {
+	if a.Bool("item") {
+		id, err := workshoppublish.ParseID(a.Str("item"))
+		if err != nil {
+			return &UsageError{Msg: err.Error()}
+		}
+		if id == workshoppublish.RetiredItem {
+			return &UsageError{Msg: "3835688284 is the retired RimArcho item; it cannot be published to"}
+		}
+		if a.Bool("new-item") {
+			return &UsageError{Msg: "--item and --new-item cannot be used together"}
+		}
+		r.ID = id
+	}
+	if a.Bool("visibility") {
+		v, ok := map[string]uint32{"public": 0, "friends": 1, "private": 2, "unlisted": 3}[a.Str("visibility")]
+		if !ok {
+			return &UsageError{Msg: "--visibility must be public, unlisted, private or friends"}
+		}
+		r.Visibility = &v
+	}
+	if strings.ContainsRune(r.Note, 0) || len(r.Note) > 8000 {
+		return &UsageError{Msg: "--note must be at most 8000 bytes and contain no NUL characters"}
+	}
 	if a.Bool("preview") {
+		var err error
 		if r.Preview, err = previewFile(a.Str("preview")); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// modPublishOptions: an author's own Mod. No release stamp and no default description:
+// without --description the item keeps its Steam description, as RimWorld's uploader does.
+func modPublishOptions(a *Args) (steamworks.PublishRequest, error) {
+	r := steamworks.PublishRequest{Version: "mod", Note: a.Str("note")}
+	if a.Str("mod") == "" {
+		return r, &UsageError{Msg: "--mod needs a Mod folder"}
+	}
+	if a.Bool("version") {
+		return r, &UsageError{Msg: "--version applies to Archo Monitor only; a Mod's version is in its About.xml"}
+	}
+	if err := commonPublishOptions(a, &r); err != nil {
+		return r, err
+	}
+	var err error
+	if a.Bool("description") {
+		if r.Description, err = descriptionFile(a, "description", ""); err != nil {
 			return r, err
 		}
+	}
+	if a.Bool("description-zh") {
+		zh, err := descriptionFile(a, "description-zh", "")
+		if err != nil {
+			return r, err
+		}
+		r.Translations = []steamworks.PublishTranslation{{Language: "schinese", Description: zh}}
 	}
 	return r, nil
 }
@@ -176,6 +222,9 @@ func workshopPublishCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
+	if a.Bool("mod") {
+		return modPublishCmd(c, a, r)
+	}
 	root, err := os.Getwd()
 	if err != nil {
 		return nil, err
@@ -234,6 +283,77 @@ func workshopPublishCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		n.KV("description "+t.Language, fmt.Sprintf("%d bytes, set in a second update, ending %q", len(t.Description), lastLine(t.Description)))
 	}
 	return d, nil
+}
+
+// modPublishCmd stages and publishes an author's own Mod (13 §4.4, --mod).
+func modPublishCmd(c *Ctx, a *Args, r steamworks.PublishRequest) (*render.Doc, error) {
+	item, err := workshoppublish.AssembleMod(a.Str("mod"), workshoppublish.ModOptions{ID: r.ID, New: a.Bool("new-item"), Exclude: a.List("exclude")})
+	if err != nil {
+		return nil, err
+	}
+	r.ID, r.Tags, r.Title = item.ID, item.Tags, item.Title
+	r.Content, r.IDFile = item.Folder, item.IDFile
+	if r.Preview == "" {
+		r.Preview = item.Preview
+	}
+	if !a.Bool("dry-run") {
+		defer item.Remove()
+		id, legal, err := c.App.WorkshopPublish(c.Context, r, Progress)
+		if err != nil {
+			return nil, err
+		}
+		d, n := render.New(fmt.Sprintf("ws:%d %s published", id, r.Title))
+		n.KV("item", fmt.Sprintf("https://steamcommunity.com/sharedfiles/filedetails/?id=%d", id))
+		if legal {
+			n.KV("action", "accept the Steam Workshop legal agreement on the item page; the item stays hidden until accepted")
+		}
+		if a.Bool("new-item") {
+			n.KV("id file", "saved to "+item.IDFile)
+		}
+		return d, nil
+	}
+	d, n := render.New(r.Title + " Workshop dry run: staged and validated; Steam was not contacted")
+	n.KV("content", fmt.Sprintf("%s (%d files, %s, from %s)", item.Folder, item.Files, sizeText(item.Bytes), item.Source))
+	if len(item.Excluded) > 0 {
+		n.KV("left out", strings.Join(item.Excluded, ", "))
+	}
+	n.KV("title", r.Title)
+	if r.ID == 0 {
+		n.KV("item", "would create a RimWorld Workshop item (app 294100)")
+		n.KV("new ID", "would save to "+item.IDFile)
+	} else {
+		n.KV("item", fmt.Sprintf("would update ws:%d", r.ID))
+	}
+	n.KV("tags", strings.Join(r.Tags, ", ")+" (replaces all tags)")
+	visibility := "leave Steam's current/default value"
+	if r.Visibility != nil {
+		visibility = a.Str("visibility")
+	}
+	n.KV("visibility", visibility)
+	if r.Note != "" {
+		n.KV("change note", r.Note)
+	}
+	preview := "leave the item page's preview"
+	if r.Preview != "" {
+		preview = r.Preview
+	}
+	n.KV("preview", preview)
+	description := "leave the item's description"
+	if r.Description != "" {
+		description = fmt.Sprintf("%d bytes (replaces the current one)", len(r.Description))
+	}
+	n.KV("description", description)
+	for _, t := range r.Translations {
+		n.KV("description "+t.Language, fmt.Sprintf("%d bytes, set in a second update", len(t.Description)))
+	}
+	return d, nil
+}
+
+func sizeText(b int64) string {
+	if b < 1<<20 {
+		return fmt.Sprintf("%.1f KB", float64(b)/1024)
+	}
+	return fmt.Sprintf("%.1f MB", float64(b)/(1<<20))
 }
 
 func lastLine(s string) string { return s[strings.LastIndexByte(s, '\n')+1:] }

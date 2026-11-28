@@ -180,3 +180,48 @@ func TestWorkshopPublishDescriptionAndPreview(t *testing.T) {
 		}
 	}
 }
+
+// --mod publishes an author's own Mod: no release stamp, no Monitor description, and the
+// item keeps its Steam description unless --description is given (13 §4.4).
+func TestWorkshopPublishModArguments(t *testing.T) {
+	publishRoot(t, "Monitor description", "Monitor zh")
+	a, _ := parse(workshopPublishCommand, []string{"--mod", "Beds", "--item", "4242", "--note", "fixes", "--exclude", "Backups", "--exclude", "Notes"})
+	r, err := publishOptions(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Description != "" || len(r.Translations) != 0 || r.ID != 4242 || r.Note != "fixes" || r.Version != "mod" {
+		t.Fatalf("options: %+v", r)
+	}
+	if got := a.List("exclude"); len(got) != 2 {
+		t.Fatalf("exclude %q", got)
+	}
+	if err := os.WriteFile("page.txt", append([]byte{0xEF, 0xBB, 0xBF}, "[h1]Beds[/h1]"...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	a, _ = parse(workshopPublishCommand, []string{"--mod", "Beds", "--description", "page.txt", "--description-zh", "page.txt"})
+	if r, err = publishOptions(a); err != nil || r.Description != "[h1]Beds[/h1]" || len(r.Translations) != 1 {
+		t.Fatalf("description: %+v %v", r, err)
+	}
+	for _, args := range [][]string{
+		{"--mod", "Beds", "--version", "1.2.3"},
+		{"--mod", ""},
+		{"--mod", "Beds", "--item", "3835688284"},
+		{"--mod", "Beds", "--description", "absent.txt"},
+		{"--version", "1.2.3", "--exclude", "Backups"},
+	} {
+		a, err := parse(workshopPublishCommand, args)
+		if err == nil {
+			_, err = publishOptions(a)
+		}
+		if err == nil {
+			t.Fatalf("accepted %q", args)
+		}
+	}
+	if !WorkshopPublishOffline([]string{"workshop", "publish", "--mod", "Beds", "--dry-run"}) {
+		t.Fatal("a Mod dry run would open a player home")
+	}
+	if WorkshopPublishOffline([]string{"workshop", "publish", "--mod", "Beds"}) {
+		t.Fatal("a real Mod publish bypasses the configured Game Config")
+	}
+}
