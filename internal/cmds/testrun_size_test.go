@@ -95,4 +95,3 @@ func TestTestRunJSONSize(t *testing.T) {
 		t.Fatalf("text report does not fold:\n%s", text)
 	}
 }
-

@@ -83,7 +83,7 @@ func TestMCPHintsInText(t *testing.T) {
 		"changes: 1 (archo changes iqmu)\n" +
 		"hidden: 2 informational clusters (archo log --all)\n" +
 		"stale (archo analyze)\n"
-	want :="log:E2 exception x1  → #iqmu (source)\n" +
+	want := "log:E2 exception x1  → #iqmu (source)\n" +
 		"  fixes: nothing archo can run here\n" +
 		"next:\n" +
 		"  read_source ref=iqmu type=ModA.CompBroken\n" +
