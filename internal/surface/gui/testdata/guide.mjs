@@ -20,7 +20,7 @@ async function setup({ folder = { done: true }, space = (path) => ({ path, free:
     "./fields.js": { copyablePath: (n) => n, editablePath: (n) => n, pathContent: (n) => n },
     "./state.js": { S, $: () => screen, el, api: {
       GuideFind: async () => [], GuideAdd: async (games) => { writes.push("add"); added.push(games); return games.map((g) => g.name); }, GuideScan: (names) => { writes.push("scan"); return scan(names); }, GuideDownloadInfo: async () => { calls++; return await response; },
-      GuideFirstRun: async () => found || { games: [], managers: [], libraries: 1, folders: [] }, GuideLanguages: async () => lang,
+      GuideFirstRun: async () => (typeof found === "function" ? found() : found) || { games: [], managers: [], libraries: 1, folders: [] }, GuideLanguages: async () => lang,
       GuideHold: async () => {}, GuideChoices: async () => ({ updates: true, monitor: true }), GuideChoicesDone: async (names) => { if (names.length) writes.push("choices"); },
       ApplySetting: async (argv, value) => { settings.push([argv[2], value]); writes.push("setting"); return ["ok"]; },
       GuideCopyPlan: async (from, dir, name, mods) => ({ dir: dir || "D:\\Games\\RimWorld " + from + "-copy", name: name || from + "-copy", bytes: mods ? 5e9 : 1e9, modBytes: 4e9, free: 50e9, low: false }),
@@ -235,6 +235,18 @@ test("found: the language row names the system's language and applies a pick in 
   await row.action(2); await flush();
   assert.deepEqual(h.settings, [["ui.lang", "zh"]]);
   assert.ok(h.writes.includes("relang"));
+});
+
+test("found: a language pick rereads the game cards' chips and keeps the picks", async () => {
+  let chip = "started directly";
+  const h = await setup({ found: () => { const f = two(); f.games[1].source = chip; return f; }, lang: { value: "auto", codes: ["en", "ja"], labels: ["English", "日本語"], system: "English" } });
+  const box = h.screen.querySelectorAll(".game")[0].querySelector("input");
+  box.checked = false; box.onchange(); await flush();
+  chip = "直接起動しました";
+  await h.segs.find(s => s.names[0] === "follow system (%s)").action(2); await flush();
+  const cards = h.screen.querySelectorAll(".game");
+  assert.match(cards[1].textContent, /直接起動しました/);
+  assert.equal(cards[0].querySelector("input").checked, false, "the unticked game stays unticked");
 });
 
 for (const way of ["throws", "refuses"]) test(`a first scan that ${way} gives back the scan flag and ends the step`, async () => {

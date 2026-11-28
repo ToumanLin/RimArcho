@@ -516,6 +516,13 @@ function languageRow(card) {
     try { await api.ApplySetting(["config", "set", "ui.lang", "{}"], values[k]); } catch (e) { G.error = errText(e); return draw(); }
     await ui.relang();
     try { G.lang = await api.GuideLanguages(); } catch { /* the row keeps the pick */ }
+    // the game cards' chips ("started directly") come translated from detection
+    // (view.gameSource): read them again in the new language, keeping every pick
+    try {
+      const f = await api.GuideFirstRun();
+      const chips = new Map((f?.games || []).map((g) => [g.game, g.source]));
+      for (const g of G.games || []) if (chips.has(g.game)) g.source = chips.get(g.game);
+    } catch { /* the chips keep the old language */ }
     draw();
   }));
   box.append(r);
