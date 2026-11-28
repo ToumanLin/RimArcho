@@ -45,8 +45,13 @@ async function main() {
 
   // A space with this name left by an earlier run holds an upload in progress.
   const spaceName = `RimArcho Lanzou publish ${name}`;
-  const earlier = (await listTaskSpaces()).find((s) => s.name === spaceName && s.ownership === "agent");
-  const task = await taskSpace(earlier ? earlier.id : spaceName);
+  // One handed to the maintainer (exit 2, or the start button was not found) holds none:
+  // running the command again is the maintainer's word to go on, so control is taken back
+  // and the run starts over in that space.
+  const spaces = (await listTaskSpaces()).filter((s) => s.name === spaceName);
+  const earlier = spaces.find((s) => s.ownership === "agent");
+  const handed = earlier ? null : spaces.find((s) => s.ownership === "agentDelegatedToUser");
+  const task = earlier ? await taskSpace(earlier.id) : handed ? await takeOverTaskSpace(handed.id) : await taskSpace(spaceName);
   const page = task.page("p1");
   if (earlier) {
     console.log(`resuming: an upload started earlier in task space ${task.spaceId}; waiting up to ${waitMinutes} minutes`);
