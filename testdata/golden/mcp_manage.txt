@@ -50,7 +50,7 @@ community data
   noversionwarning: not downloaded (No Version Warning: Mods known to work on game versions they do not list)
   automatic checks: on; nothing waiting (not checked yet)
 next:
-  archo data update
+  maintenance action=data_update
 
 > scan {}
 scan:3  env:main  0s
@@ -61,10 +61,10 @@ scan:3  env:main  0s
   instances: 8 live, 1 tombstones
   files: 40 (3.9 KB), semantic hashed 4, reused 24
   changes: 1 discovered
-  questions: 1 new (archo identity list)
+  questions: 1 new (resolve_identity action=list)
 next:
   list_changes
-  archo identity list
+  resolve_identity action=list
 
 > resolve_identity {"action":"list"}
 questions: 1 open
@@ -80,7 +80,7 @@ questions: 1 open
     matching file: defs/thingdefs/leftover.xml
     matching file: patches/leftover.xml
 next:
-  archo identity resolve q:1 same|copy|unrelated
+  resolve_identity action=resolve question=q:1 answer="same|copy|unrelated"
 
 > resolve_identity {"action":"why","question":"q:1"}
 q:1 comparison
@@ -154,7 +154,7 @@ tester.a  # A
 exported 655 bytes to $ROOT/list.txt
   format: rml
 next:
-  archo loadout import $ROOT/list.txt
+  exchange_list action=import from="$ROOT/list.txt"
 
 > exchange_list {"action":"collection","from":"3000000001"}
 collection Title 3000000001: 3 items
@@ -164,7 +164,7 @@ collection Title 3000000001: 3 items
   not installed: 1
     Title 5550001  https://steamcommunity.com/sharedfiles/filedetails/?id=5550001
 next:
-  archo collection 3000000001 --import
+  exchange_list action=collection from=3000000001 import=true
 
 > exchange_list {"action":"collection","from":"3000000001","import":true}
 workspace: 3 active, saved (plan:default, env:main)
@@ -185,7 +185,7 @@ dry run, nothing changed: would be renamed
   from: $ROOT/Steam/steamapps/workshop/content/294100/4300/About/About.xml.disabled
   to: $ROOT/Steam/steamapps/workshop/content/294100/4300/About/About.xml
 next:
-  archo unhide ws:4300
+  manage_hidden action=unhide ref=ws:4300
 
 > manage_hidden {"action":"unhide","ref":"ws:4300"}
 renamed
@@ -197,7 +197,7 @@ renamed
 dry run, nothing changed: would be moved to the recycle bin
   folder: $ROOT/Steam/steamapps/workshop/content/294100/4200
 next:
-  archo trash ws:4200
+  manage_hidden action=trash ref=ws:4200
 
 > manage_hidden {"action":"trash","ref":"ws:4200"}
 moved to the recycle bin
@@ -206,12 +206,12 @@ moved to the recycle bin
 > manage_packs {"action":"list"}
 packs: 0 ($ROOT/LocalAppData/RimArcho/packs)
 next:
-  archo pack build <name>
+  manage_packs action=build name=<name>
 
 > manage_packs {"action":"build","dry_run":true,"name":"first"}
 pack build: dry run, nothing written
   folder: $ROOT/LocalAppData/RimArcho/packs/first
-  note: this list has not been analysed, so Def and patch errors were not checked (archo analyze)
+  note: this list has not been analysed, so Def and patch errors were not checked (archo analyze, CLI only)
   mods: 2 carried, 1 from the game (Core and DLCs)
   size: 868 B; 0 B of other game versions left out
   space: <free> free on the packs drive
@@ -219,40 +219,40 @@ pack build: dry run, nothing written
   game: 1.6.4633 rev1261
   Mod options: none carried
 next:
-  archo pack build first
+  manage_packs action=build name=first
 
 > manage_packs {"action":"build","dry_run":true,"name":"first","texture_scale":50}
 pack build: dry run, nothing written
   folder: $ROOT/LocalAppData/RimArcho/packs/first
-  note: this list has not been analysed, so Def and patch errors were not checked (archo analyze)
+  note: this list has not been analysed, so Def and patch errors were not checked (archo analyze, CLI only)
   mods: 2 carried, 1 from the game (Core and DLCs)
   size: 868 B; 0 B of other game versions left out
   space: <free> free on the packs drive
   textures: slim to 50%
     0 PNGs: 0 B of PNG → about 0 B of DDS; video memory about 0 B → 0 B
     pack size about 868 B after; up to 868 B while converting
-    encoder: todds (the DDS encoder) is not installed; archo textures tool --install downloads it — the build is refused
+    encoder: todds (the DDS encoder) is not installed; archo textures tool --install downloads it — the build is refused (CLI only)
   trimmed: nothing (no folders for other game versions)
   game: 1.6.4633 rev1261
   Mod options: none carried
 next:
-  archo pack build first
+  manage_packs action=build name=first
 
 > manage_packs {"action":"build","name":"first","textures":true}
-error: todds (the DDS encoder) is not installed; archo textures tool --install downloads it
+error: todds (the DDS encoder) is not installed; archo textures tool --install downloads it (CLI only)
 [isError]
 
 > manage_packs {"action":"build","name":"first"}
 built pack first
   folder: $ROOT/LocalAppData/RimArcho/packs/first
-  note: this list has not been analysed, so Def and patch errors were not checked (archo analyze)
+  note: this list has not been analysed, so Def and patch errors were not checked (archo analyze, CLI only)
   mods: 2 carried, 1 from the game (Core and DLCs)
   size: 868 B; 0 B of other game versions left out
   trimmed: nothing (no folders for other game versions)
   game: 1.6.4633 rev1261
   Mod options: none carried
 next:
-  archo pack launch first
+  manage_packs action=launch name=first
 
 > manage_packs {"action":"check","name":"first"}
 pack first: checked
@@ -293,16 +293,16 @@ problems: 0 error, 1 warning, 0 info
   list:
     warning pack.links-left  Mods/ still has 1 links of pack first: a game started from Steam, not from RimArcho, loads the pack's copies instead of this plan's mods  (p:9a4df2)
       evidence: inferred Mods/!ArchoPack_first_2009463077
-      fix: archo pack unlink
+      fix: manage_packs action=unlink
 next:
-  archo pack unlink
+  manage_packs action=unlink
 
 > manage_packs {"action":"unlink","dry_run":true}
 pack unlink: dry run, would remove 1 links of pack first
   links: $ROOT/Steam/steamapps/common/RimWorld/Mods
     - !ArchoPack_first_2009463077
 next:
-  archo pack unlink
+  manage_packs action=unlink
 
 > manage_packs {"action":"unlink"}
 removed 1 links of pack first from Mods/ (the pack is unchanged)
@@ -318,7 +318,7 @@ problems: 0 error, 0 warning, 0 info
 > manage_packs {"action":"export","file":"$ROOT/first.archolist.json","list":true,"name":"first"}
 exported the list of pack first to $ROOT/first.archolist.json
 next:
-  archo loadout import $ROOT/first.archolist.json
+  exchange_list action=import from="$ROOT/first.archolist.json"
 
 > manage_packs {"action":"import","file":"$ROOT/first.archolist.json"}
 list first: 3 mods
@@ -346,7 +346,7 @@ moved $ROOT/LocalAppData/RimArcho/packs/first to the recycle bin
 > manage_packs {"action":"list"}
 packs: 0 ($ROOT/LocalAppData/RimArcho/packs)
 next:
-  archo pack build <name>
+  manage_packs action=build name=<name>
 
 > maintenance {"action":"data_update","datasets":["rules"],"dry_run":true}
 data update: dry run, nothing downloaded
@@ -375,7 +375,7 @@ import rimcrow
   conflicts: 0 (RimArcho's value kept)
 next:
   archo tag list
-  archo rule list
+  manage_rules action=list
 
 > maintenance {"action":"import_rimstack","dir":"$ROOT/RimStack","dry_run":true}
 import rimstack (dry run: nothing written)
@@ -403,7 +403,7 @@ import rimstack
     tester.b  note: RimArcho has "a note", RimStack "from RimStack" (kept RimArcho's)
 next:
   archo tag list
-  archo rule list
+  manage_rules action=list
   archo loadout import $ROOT/RimStack/lists/<name>.json --new
 
 > maintenance {"action":"gc","dry_run":true}
@@ -436,7 +436,7 @@ history: 1 edit to undo, 0 redoable, 1 version
   now: workspace: 2 active, 1 change unsaved (plan:default, env:main)
   undo: archo undo <n> returns to before step n
     1    disable    removed #hnyg Harmony was 2
-  versions: archo loadout checkout v<n>
+  versions: edit_loadout action=checkout version=v<n>
     v1   2026-10-01  import   3 mods  ModsConfig.xml
 
 > plan_history {"action":"diff"}
@@ -458,35 +458,35 @@ history: 2 edits to undo, 0 redoable, 1 version
   undo: archo undo <n> returns to before step n
     1    checkout   added #hnyg Harmony at 2
     2    disable    removed #hnyg Harmony was 2
-  versions: archo loadout checkout v<n>
+  versions: edit_loadout action=checkout version=v<n>
     v1   2026-10-01  import   3 mods  ModsConfig.xml
 
 > manage_plans {}
 plans: 1 (env:main)
   plan:default  3 active  1 version  never played  [current]
 next:
-  archo plan new <name> --from current
+  manage_plans action=new name=<name> from=current
 
 > manage_plans {"action":"new","from":"current","name":"copy"}
 plan:copy created: 3 active
   v1: import, copied from default v1
   current: plan:default (unchanged)
 next:
-  archo plan use copy
+  manage_plans action=use name=copy
 
 > manage_plans {"action":"new","from":"v1","name":"first"}
 plan:first created: 3 active
   v1: import, copied from default v1
   current: plan:default (unchanged)
 next:
-  archo plan use first
+  manage_plans action=use name=first
 
 > manage_plans {"action":"new","name":"empty"}
 plan:empty created: 0 active
   v1: import, empty
   current: plan:default (unchanged)
 next:
-  archo plan use empty
+  manage_plans action=use name=empty
 
 > manage_plans {"action":"use","name":"copy"}
 current plan: plan:copy (env:main)
@@ -506,7 +506,7 @@ plan:from file created: 3 active
   game: 1.6.4633 rev1261
   current: plan:raid night (unchanged)
 next:
-  archo plan use "from file"
+  manage_plans action=use name="from file"
 
 > manage_plans {"action":"list"}
 plans: 4 (env:main)
@@ -515,7 +515,7 @@ plans: 4 (env:main)
   plan:first       3 active  1 version  never played
   plan:from file   3 active  1 version  never played
 next:
-  archo plan use <name>
+  manage_plans action=use name=<name>
 
 > manage_plans {"action":"use","name":"raid night"}
 current plan: plan:raid night (env:main)
@@ -535,7 +535,7 @@ launch: dry run (direct), nothing written
       why: patches that find nothing usually fail with red errors: such mods were error sources in 37% of logs (4.5% by chance)
       fix: get_patches mod=iqmu
 next:
-  archo launch
+  launch_game
 
 > launch_game {}
 launched RimWorld via direct
@@ -572,7 +572,7 @@ library: 4 of 5 mods match (used:none)
   marker: .rimarcho/origin.json would be written (the folder has none)
   plans: plan:raid night, plan:default, plan:first, plan:from file keep it: the same instance; affected game links are restored during the move
 next:
-  archo library move-to-locked iqmu
+  manage_library action=move_to_locked refs=[iqmu]
 
 > manage_library {"action":"move_to_locked","refs":["#iqmu"]}
 #iqmu A moved to the lock library
@@ -623,7 +623,7 @@ next:
 > set_player_data {"action":"copy_note","refs":["#iqmu"],"text":"kept for the 1.5 save"}
 copy note set for #iqmu A
   note: kept for the 1.5 save
-  copy: this instance only (src:locked A Local); the mod's note is archo note iqmu
+  copy: this instance only (src:locked A Local); the mod's note is set_player_data action=note refs=iqmu
 
 > set_player_data {"action":"tag_add","refs":["#iqmu"],"tags":["visual","looks"]}
 tagged #iqmu A: visual, looks

@@ -123,6 +123,14 @@ func TestHintsAreValidToolCalls(t *testing.T) {
 		{cli: `archo pattern pattern:g:rt.tick`},
 		{cli: `archo workshop resubscribe 6olp --dry-run`},
 		{cli: `archo workshop subscribe nyh3`},
+		{cli: `archo env list`},
+		{cli: `archo loadout diff`},
+		{cli: `archo plan use default`},
+		{cli: `archo saves show sv:703d94 --mods`},
+		{cli: `archo library move-to-locked iqmu --dry-run`},
+		{cli: `archo links check --all`, argv: `links check --all --json`},
+		{cli: `archo identity list`},
+		{cli: `archo pack build first`},
 	} {
 		call, ok := cmds.MCPCall(c.cli)
 		if !ok {

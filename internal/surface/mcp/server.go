@@ -89,7 +89,8 @@ func (s *Server) executeMode(ctx context.Context, env string, argv []string, rea
 	}
 	if env != "" {
 		prev := s.app.EnvName
-		s.app.EnvName = env
+		// env="1.7" selects the only Game Config of that game version (13 §2).
+		s.app.EnvName = s.app.ResolveEnvName(env)
 		defer func() { s.app.EnvName = prev }()
 	}
 	out, code := cmds.ExecuteContext(cmds.ForMCP(ctx), s.app, argv)

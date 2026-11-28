@@ -45,6 +45,14 @@ func TestMCPCall(t *testing.T) {
 		{`archo workshop resubscribe 6olp --dry-run`, `manage_library action=resubscribe dry_run=true refs=[6olp]`},
 		{`archo workshop subscribe nyh3`, `manage_library action=subscribe refs=[nyh3]`},
 		{`archo plan list`, `manage_plans action=list`},
+		// The 2026-11-27 agent session: hints it had to translate itself.
+		{`archo plan use default`, `manage_plans action=use name=default`},
+		{`archo loadout diff`, `plan_history action=diff`},
+		{`archo env list`, `status show=envs`},
+		{`archo source search "<pattern>" --in 3zqn`, `read_source search=<pattern> in=[3zqn]`},
+		{`archo source search "AllComps.Remove(" --in <refs>`, `read_source search="AllComps.Remove(" in=[<refs>]`},
+		{`archo saves show sv:703d94 --mods`, `get_save save=sv:703d94 mods=true`},
+		{`archo library move-to-locked iqmu --dry-run`, `manage_library action=move_to_locked dry_run=true refs=[iqmu]`},
 	} {
 		got, ok := cmds.MCPCall(c.cli)
 		if !ok || got != c.want {
@@ -53,9 +61,9 @@ func TestMCPCall(t *testing.T) {
 	}
 	// No tool, an unknown flag, a missing argument, a placeholder: kept as written.
 	for _, cli := range []string{
-		`archo plan use default`, `archo source clean`, `archo log --nonsense`, `archo source`,
+		`archo source clean`, `archo log --nonsense`, `archo source`,
 		`archo source search`, `archo mod`, `archo enable`, `archo pattern --mod <packageId>`,
-		`archo source search "AllComps.Remove(" --in <refs>`, `archo files search`, `plan use`,
+		`archo source search … --in x`, `archo files search`, `plan use`,
 	} {
 		if got, ok := cmds.MCPCall(cli); ok {
 			t.Errorf("%s translated to %q", cli, got)
@@ -71,16 +79,20 @@ func TestMCPHintsInText(t *testing.T) {
 		"  archo source iqmu --type ModA.CompBroken\n" +
 		"  archo source search \"AllComps.Remove(\" --in iqmu --in gpto\n" +
 		"  archo plan use default\n" +
+		"  archo source clean\n" +
 		"changes: 1 (archo changes iqmu)\n" +
-		"hidden: 2 informational clusters (archo log --all)\n"
-	want := "log:E2 exception x1  → #iqmu (source)\n" +
+		"hidden: 2 informational clusters (archo log --all)\n" +
+		"stale (archo analyze)\n"
+	want :="log:E2 exception x1  → #iqmu (source)\n" +
 		"  fixes: nothing archo can run here\n" +
 		"next:\n" +
 		"  read_source ref=iqmu type=ModA.CompBroken\n" +
 		"  read_source search=\"AllComps.Remove(\" in=[iqmu,gpto]\n" +
-		"  archo plan use default\n" +
+		"  manage_plans action=use name=default\n" +
+		"  archo source clean (CLI only)\n" +
 		"changes: 1 (list_changes ref=iqmu)\n" +
-		"hidden: 2 informational clusters (analyze_log all=true)\n"
+		"hidden: 2 informational clusters (analyze_log all=true)\n" +
+		"stale (archo analyze, CLI only)\n"
 	if got := cmds.MCPHints(in); got != want {
 		t.Errorf("got:\n%s\nwant:\n%s", got, want)
 	}

@@ -79,7 +79,8 @@ func envList(c *Ctx, a *Args) (*render.Doc, error) {
 			if err != nil {
 				return nil, err
 			}
-			group = root.Add(g.Name + "  " + versionText(e.GameVersion))
+			// Version.txt, not the last scan's: Steam may have updated the game since (03 §1).
+			group = root.Add(g.Name + "  " + versionText(app.LiveGameVersion(e)))
 			groups[e.GameID] = group
 			group.KV("game", e.GameRoot)
 			srcs, err := c.App.Store.Sources(e.GameID)

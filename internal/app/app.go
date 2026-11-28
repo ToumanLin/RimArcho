@@ -385,12 +385,9 @@ var ErrNoEnv = errors.New("no Game Config configured (archo env detect, then arc
 // Env returns the environment for this invocation: --env, else the current one.
 func (a *App) Env() (*env.Environment, error) {
 	if a.EnvName != "" {
-		e, err := a.Store.EnvByName(a.EnvName)
+		e, err := a.envNamed(a.EnvName)
 		if err != nil {
 			return nil, err
-		}
-		if e == nil {
-			return nil, fmt.Errorf("no Game Config named %q (archo env list)", a.EnvName)
 		}
 		a.CorpusFor(e)
 		return e, nil

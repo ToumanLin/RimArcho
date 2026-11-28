@@ -236,6 +236,9 @@ func statusCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			root.KV("warning", fmt.Sprintf("%s re-binding pending (archo env rebind %s yes|no)", s.Ref(), s.Ref()))
 		}
 	}
+	if err := envsStatus(c, root, e); err != nil {
+		return nil, err
+	}
 	loadoutStatus(c, root, d)
 	automaticStatus(c, root)
 	// Status never parses the log: it uses the stored report (logs are a problems command).
@@ -975,4 +978,22 @@ func loadoutStatus(c *Ctx, root *render.Node, d *render.Doc) {
 	if st.FileErr != nil {
 		root.KV("warning", "ModsConfig.xml unreadable: "+st.FileErr.Error())
 	}
+}
+
+// envsStatus lists every Game Config when there is more than one: name, game version (from
+// Version.txt) and game folder, so an agent can pass env= to another tool (14 §2).
+func envsStatus(c *Ctx, root *render.Node, cur *env.Environment) error {
+	envs, err := c.App.Store.Envs()
+	if err != nil || len(envs) < 2 {
+		return err
+	}
+	n := root.Section(fmt.Sprintf("game configs: %d (env=<name> or env=<game version> in other calls)", len(envs)))
+	for _, e := range envs {
+		line := fmt.Sprintf("%s  RimWorld %s  %s", e.Name, versionText(app.LiveGameVersion(e)), e.GameRoot)
+		if e.ID == cur.ID {
+			line += "  [this call]"
+		}
+		n.Add(line)
+	}
+	return nil
 }

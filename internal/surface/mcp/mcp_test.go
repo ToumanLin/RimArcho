@@ -349,8 +349,8 @@ func TestTruncation(t *testing.T) {
 	}{{"find_mods", map[string]any{"active": true}}, {"find_mods", map[string]any{"query": "many"}}, {"find_mods", nil}} {
 		out, _ := call(t, cs, c.tool, c.args)
 		n := strings.Count(strings.TrimRight(out, "\n"), "\n") + 1
-		if n > 40 || !strings.Contains(out, "--all") {
-			t.Errorf("%s %v: %d lines, expansion hint present=%v\n%s", c.tool, c.args, n, strings.Contains(out, "--all"), out)
+		if n > 40 || !strings.Contains(out, "all=true)") {
+			t.Errorf("%s %v: %d lines, expansion hint present=%v\n%s", c.tool, c.args, n, strings.Contains(out, "all=true)"), out)
 		}
 		all := map[string]any{"all": true}
 		for k, v := range c.args {

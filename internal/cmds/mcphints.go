@@ -7,6 +7,7 @@ package cmds
 // exactly as it is.
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/render"
@@ -95,11 +96,32 @@ func MCPHints(text string) string {
 			sb.WriteString(call)
 		} else {
 			sb.WriteString(text[sp[0]:sp[1]])
+			if cliOnly(text[sp[0]:sp[1]]) {
+				if sp[1] < len(text) && text[sp[1]] == ')' {
+					sb.WriteString(", CLI only")
+				} else {
+					sb.WriteString(" (CLI only)")
+				}
+			}
 		}
 		last = sp[1]
 	}
 	sb.WriteString(text[last:])
 	return sb.String()
+}
+
+// cliOnly reports whether a printed command is one no MCP tool does (cliOnlyHints).
+func cliOnly(cmdline string) bool {
+	toks, _ := hintTokens(cmdline)
+	if len(toks) < 2 || toks[0] != "archo" {
+		return false
+	}
+	c, _ := lookup(toks[1:])
+	if c == nil {
+		return false
+	}
+	_, ok := cliOnlyHints[c.Name]
+	return ok
 }
 
 // MCPCall translates one printed command ("archo source search \"X\" --in fi7x") into the MCP
@@ -163,7 +185,9 @@ func MCPCall(cmdline string) (string, bool) {
 	if len(pos) < minPos(sp) || !sp.posList && len(pos) > len(sp.pos) {
 		return "", false
 	}
-	var head []hintKV
+	// The implied parameters (action=…) first, then the positional ones.
+	head := slices.Clone(out[:len(sp.fixed)])
+	out = out[len(sp.fixed):]
 	for i, p := range pos {
 		switch {
 		case sp.posList && i >= len(sp.pos)-1:
@@ -234,7 +258,8 @@ func minPos(sp *hintSpec) int {
 }
 
 // hintTokens splits a printed command into words; a word in double quotes keeps its spaces.
-// A placeholder (<ref>, …) means the command is a pattern, not a call.
+// A placeholder (<pattern>) is a value like any other: the call it gives is a pattern the
+// agent fills in, as the command was. An ellipsis means the words are not all there.
 func hintTokens(s string) ([]string, bool) {
 	var toks []string
 	var cur strings.Builder
@@ -265,7 +290,7 @@ func hintTokens(s string) ([]string, bool) {
 		toks = append(toks, cur.String())
 	}
 	for _, t := range toks {
-		if strings.ContainsAny(t, "<>…") || t == "..." {
+		if strings.Contains(t, "…") || t == "..." {
 			return nil, false
 		}
 	}
@@ -276,7 +301,7 @@ func hintTokens(s string) ([]string, bool) {
 // double quotes.
 func hintValue(v string) string {
 	if v != "" && strings.IndexFunc(v, func(r rune) bool {
-		return !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("_.:/-+@#", r))
+		return !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("_.:/-+@#<>", r))
 	}) < 0 {
 		return v
 	}

@@ -120,6 +120,7 @@ func TestSaveToolsCLIParity(t *testing.T) {
 	got, _ := call(t, cs, "list_saves", map[string]any{"env": "main"})
 	e.App.EnvName = "main"
 	want, _ := e.Run("saves", "list")
+	want = cmds.MCPHints(want)
 	e.App.EnvName = ""
 	if got != want || !strings.Contains(got, "(env:main)") {
 		t.Errorf("list_saves env=main:\n--- mcp\n%s\n--- cli\n%s", got, want)
