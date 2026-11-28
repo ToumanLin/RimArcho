@@ -4,6 +4,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+## 1.1.6 — 2026-11-27
+
 - A Mod's full details › Harmony for a Mod outside the current list shows its earlier Harmony analysis, muted under a short note naming the list it came from ("from an earlier analysis in Raid night"), instead of "not analysed". The page still never reads a Mod's DLLs; a Mod never analysed keeps "not analysed". `archo harmony --mod <ref> --list-only` does the same, and `archo harmony --mod` (MCP `get_harmony mod=`) names the lists that hold the copy in its `scope:` line.
 - Importing a list (Import page, `archo plan new --from`, `archo loadout import`, MCP `manage_plans new from=`) links a Mod the game has no copy of from another game install's `Mods/` folder, a SteamCMD folder or another registered Mod folder, when that copy lists the game's version or is the only copy. On a 1.7 Game Config, a list's Mod that only the 1.6 install has is now linked from there instead of "not installed". The result names each one (`linked from other folders: N`, `<name> (<packageId>) linked from 1.6's Mods folder`); nothing is copied or moved, and a save or launch makes the link.
 - A list that was never analysed gets its first analysis (Can it run, MCP `get_harmony`, `list_problems`, …) while a test run in another RimArcho process holds the launch lock, instead of `busy:`. The analysis reads the stored list. It still waits for the run when it would read a `Mods/` folder the run moved aside (`…, which the test run moved aside until it ends`); importing an outside ModsConfig.xml change also still waits.
