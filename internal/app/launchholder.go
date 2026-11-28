@@ -15,9 +15,14 @@ import (
 
 const busyFile = "busy.json"
 
+// busyTestRun is the Kind of a test run's record: it changes only its temporary links and the
+// entries it moves aside, so an analysis of a stored list may run beside it (14 §1 "Busy").
+const busyTestRun = "test-run"
+
 // LockHolder is the busy.json record of the process that holds the launch lock.
 type LockHolder struct {
-	Task    string    `json:"task"` // such as "a test run of plan:Colony (Game Config 1.6)"
+	Task    string    `json:"task"`           // such as "a test run of plan:Colony (Game Config 1.6)"
+	Kind    string    `json:"kind,omitempty"` // busyTestRun: what an analysis may run beside (analysisLoadout)
 	PID     int       `json:"pid"`
 	Started time.Time `json:"started"`
 	Until   time.Time `json:"until,omitzero"` // the latest it should end (a test run's time limit)
@@ -25,12 +30,12 @@ type LockHolder struct {
 
 // markBusy records this process as the lock holder until the returned clear runs. Errors
 // are ignored: the record only improves another call's message.
-func (a *App) markBusy(task string, until time.Time) func() {
+func (a *App) markBusy(kind, task string, until time.Time) func() {
 	if a.Home == "" {
 		return func() {}
 	}
 	path := filepath.Join(a.Home, busyFile)
-	h := LockHolder{Task: task, PID: os.Getpid(), Started: time.Now(), Until: until}
+	h := LockHolder{Task: task, Kind: kind, PID: os.Getpid(), Started: time.Now(), Until: until}
 	if b, err := json.Marshal(h); err != nil || os.WriteFile(path, b, 0o644) != nil {
 		return func() {}
 	}
@@ -39,6 +44,12 @@ func (a *App) markBusy(task string, until time.Time) func() {
 			_ = os.Remove(path)
 		}
 	}
+}
+
+// liveBusy is readBusy without a record past its time limit by a minute (a killed holder).
+func liveBusy(home string) (LockHolder, bool) {
+	h, ok := readBusy(home)
+	return h, ok && (h.Until.IsZero() || time.Since(h.Until) < time.Minute)
 }
 
 func readBusy(home string) (LockHolder, bool) {
@@ -78,7 +89,7 @@ func busyError(home string, err error) error {
 		return err
 	}
 	e := &ErrBusy{cause: err}
-	if h, ok := readBusy(home); ok && (h.Until.IsZero() || time.Since(h.Until) < time.Minute) {
+	if h, ok := liveBusy(home); ok {
 		e.Holder = &h
 	}
 	return e

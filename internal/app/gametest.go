@@ -258,7 +258,7 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, 
 		c.timeout = testRunTimeout(c.runs, c.runDir, c.mode, c.o.Ticks)
 	}
 	// Other processes' calls that need the lock say what holds it until when (14 §1).
-	clearBusy = a.markBusy(fmt.Sprintf("a test run of %s (Game Config %s)", PlanRef(st.Plan), e.Name), time.Now().Add(c.timeout+time.Minute))
+	clearBusy = a.markBusy(busyTestRun, fmt.Sprintf("a test run of %s (Game Config %s)", PlanRef(st.Plan), e.Name), time.Now().Add(c.timeout+time.Minute))
 	if o.Progress != nil {
 		o.Progress(fmt.Sprintf("starting test run; waiting for the game to load (at most %s)", c.timeout))
 	}

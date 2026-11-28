@@ -17,7 +17,8 @@ func TestReadToolsWhileLocked(t *testing.T) {
 	e.MustRun("scan")
 	cs := connect(t, e)
 	// The analysis exists, as in a session that ran get_harmony before the test run started;
-	// a new analysis syncs the list in its own process and needs the lock (14 §1 "Busy").
+	// a new analysis syncs the list and, without a test run's busy.json, needs the lock (14 §1
+	// "Busy"; TestFirstAnalysisDuringTestRun covers the test run).
 	for _, tool := range []string{"status", "get_harmony"} {
 		if out, isErr := call(t, cs, tool, nil); isErr {
 			t.Fatalf("%s: %s", tool, out)

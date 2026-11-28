@@ -180,7 +180,7 @@ func (a *App) AnalyzeContext(ctx context.Context, progress func(string)) (rep *A
 		}
 		h.End(result, joinDetail(ph.Detail(), errText(err)))
 	}()
-	st, err := a.Loadout()
+	st, err := a.analysisLoadout()
 	if err != nil {
 		return nil, err
 	}

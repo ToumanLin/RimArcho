@@ -126,7 +126,7 @@ func TestBusyMessage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	clear := a.markBusy("a test run of plan:Colony (Game Config main)", time.Now().Add(10*time.Minute))
+	clear := a.markBusy(busyTestRun, "a test run of plan:Colony (Game Config main)", time.Now().Add(10*time.Minute))
 	cmd := testhide.Cmd(exec.Command(os.Args[0], "-test.run=^TestBusyMessageHelper$", "-test.count=1"))
 	cmd.Env = append(os.Environ(), "RIMARCHO_TEST_BUSY="+a.Home, "RIMARCHO_TEST_BUSY_PID="+strconv.Itoa(os.Getpid()))
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -139,7 +139,7 @@ func TestBusyMessage(t *testing.T) {
 	}
 	// A record of a killed holder, past its limit, is not shown.
 	stale := &App{Home: a.Home}
-	stale.markBusy("a test run of plan:Old", time.Now().Add(-time.Hour))
+	stale.markBusy(busyTestRun, "a test run of plan:Old", time.Now().Add(-time.Hour))
 	if err := busyError(a.Home, os.ErrExist); !strings.HasPrefix(err.Error(), "busy: another launch") {
 		t.Fatalf("stale record: %v", err)
 	}
