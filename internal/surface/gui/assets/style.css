@@ -1385,6 +1385,46 @@ svg.i.fill { fill: currentColor; }
 .scanrow .env { font-weight: 500; flex: none; }
 .scanrow .t { color: var(--muted); overflow-wrap: anywhere; min-width: 0; }
 .scanrow.ok .n { color: var(--green); } .scanrow.bad .n, .scanrow.bad .t { color: var(--red); } .scanrow.cur .n { color: var(--accent-11, var(--accent)); }
+/* The first run's "found" and "read the mods" (16 §2.15): sections of rows like Settings'
+   cards, game cards with the build muted, counts as a bold number and a muted unit. */
+.guide-sec { margin: 12px 0 6px; font-size: 12px; color: var(--muted); }
+.guide-q + .guide-sec { margin-top: 4px; }
+.guide-card .fbox { border: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); background: var(--card-2); }
+.guide-card .fbox .set { min-height: 40px; padding-top: 6px; padding-bottom: 6px; }
+.guide-card .fbox .set .l { flex: 1 1 auto; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.guide-card .fbox .set .r { flex: none; }
+.guide-card .fbox .t { font-weight: 500; white-space: nowrap; }
+.guide-card .fbox .p { font: 12px var(--code); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.guide-card .fbox .d { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.guide-card .fbox input[type=checkbox] { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); flex: none; }
+.guide-card .fbox.lang .set { min-height: 0; padding: 4px 8px; }
+.guide-card .fic { display: inline-flex; width: 16px; height: 16px; color: var(--muted); flex: none; }
+.guide-card .fic svg { width: 16px; height: 16px; }
+.guide-card .okmark { display: inline-flex; width: 15px; justify-content: center; color: var(--green); flex: none; }
+.guide-card .okmark svg { width: 14px; height: 14px; }
+.guide-card .cnt { display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.guide-card .cnt .num { font-weight: 600; color: var(--fg); }
+.guide-card .cnt .u { font-size: 12px; color: var(--muted); }
+.game.found { align-items: center; }
+.game.found .top .v { font-size: 15px; }
+.game.found .top .rev { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.game.found .top .grow { flex: 1; }
+.game.found .path { margin-top: 2px; }
+.game .saves { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.guide-foot .btn.quiet { color: var(--muted); }
+.guide-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: var(--card-gap); }
+.guide-tile { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 26px 16px 22px; border: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); background: var(--card-2); color: var(--fg); cursor: pointer; }
+.guide-tile:first-child { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: var(--accent-soft); }
+.guide-tile:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.guide-tile .fic, .guide-tile .fic svg { width: 28px; height: 28px; color: var(--fg-2); }
+.guide-tile .t { font-weight: 600; font-size: 13px; }
+.guide-tile .s { font-size: 12px; }
+.guide-tried { margin-top: 10px; font-size: 12px; }
+.scanlist + .prog + .guide-sec { margin-top: 18px; }
+/* the first run keeps the sidebar empty until the guide ends (16 §2.15) */
+body.first-run :is(#nav, #nav-settings, #nav-feedback) { visibility: hidden; }
+.xc-page .page-head > .steps { margin-right: 8px; }
+.xc-else[hidden], .xc-dorow .sub[hidden] { display: none; }
 .prog .bar.busy i { position: relative; overflow: hidden; min-width: 12%; }
 .prog .bar.busy i::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--card) 45%, transparent), transparent); transform: translateX(-100%); animation: shimmer 1.4s linear infinite; }
 .ways { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--card-gap); }

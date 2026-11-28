@@ -5,7 +5,6 @@ package gui
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -353,6 +352,17 @@ func (s *API) GuideFind() []view.GameFound {
 	return view.FindGames(r)
 }
 
+// GuideFirstRun is what the first run's "found" step confirms (16 §2.15): the games, their
+// Mod folders counted, other managers' Mod folders and where detection looked.
+func (s *API) GuideFirstRun() view.FirstRunFound {
+	r, err := s.detachedReader()
+	if err != nil {
+		return view.FirstRunFound{Games: []view.GameFound{}, Managers: []view.ManagerFolderFound{}, Folders: []string{}}
+	}
+	defer r.Close()
+	return view.FirstRun(r, app.FindManagerModFolders())
+}
+
 // GuideGame checks a game folder the player typed; pending are the names the page already
 // proposes for games not added yet, so the suggested name differs from them.
 func (s *API) GuideGame(path string, pending []string) (*view.GameFound, error) {
@@ -433,7 +443,8 @@ func (s *API) GuideScan(names []string) bool {
 				ok = false
 				ev["error"] = view.Humanize(nil, firstLine(out)+" "+err.Error())
 			} else {
-				ev["text"] = fmt.Sprintf("%s: %s", n, scanLine(out))
+				// the row already names the game (16 §2.15): only what was read
+				ev["text"] = scanLine(out)
 			}
 			s.endSelf(task, err, scanLine(out))
 			s.send("guide", ev)

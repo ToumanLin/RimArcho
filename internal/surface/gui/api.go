@@ -119,6 +119,7 @@ type API struct {
 	watchOnce        sync.Once // watchDownloads (04 §1.6)
 	repliesOnce      sync.Once // checkFeedbackReplies (16 §2.14)
 	autoOnce         sync.Once
+	guideHold        atomic.Bool // the first run has not passed "read the mods" (GuideHold)
 	maintenanceOnce  sync.Once
 	maintenanceYield func() // called when the idle monitor cancels a pass (tests; nil otherwise)
 	autoWG           sync.WaitGroup

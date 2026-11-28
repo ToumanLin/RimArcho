@@ -107,7 +107,7 @@ func TestGuide(t *testing.T) {
 	// reading, then checking the files (the analysis' own lines), then the count
 	checking := slices.ContainsFunc(texts, func(s string) bool { return strings.HasPrefix(s, "checking the files of 1.6") })
 	if last["ok"] != true || len(texts) < 3 || !strings.HasPrefix(texts[0], "reading the mods of 1.6") || !checking ||
-		!strings.Contains(texts[len(texts)-1], "mods found") {
+		!strings.Contains(texts[len(texts)-1], "mods found") || strings.HasPrefix(texts[len(texts)-1], "1.6") { // the row names the game already
 		t.Fatalf("end %v, texts %q", last, texts)
 	}
 	if b := api.Board(); b.Never || b.EnvName != "1.6" {

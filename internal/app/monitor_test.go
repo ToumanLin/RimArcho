@@ -617,3 +617,27 @@ func TestMonitorUpdateAfterLaunch(t *testing.T) {
 		t.Fatalf("a real change since the launch: %+v", r)
 	}
 }
+
+// 16 §2.15: the first-run guide's "Archo Monitor: off" after the scan added it takes it out
+// of the list again, as one undoable edit; with none there it changes nothing.
+func TestDropMonitor(t *testing.T) {
+	t.Parallel()
+	e := loadoutEnv(t)
+	scanNow(t, e)
+	e.App.MonitorBundle = monitorBundle(t, e, "0.9.0")
+	e.MustRun("monitor", "install")
+	if !contains(active(t, e), monName) {
+		t.Fatal("the install did not add Archo Monitor")
+	}
+	before := active(t, e)
+	removed, err := e.App.DropMonitor()
+	if err != nil || !removed || contains(active(t, e), monName) {
+		t.Fatalf("drop: %v %v %v", removed, err, active(t, e))
+	}
+	if again, err := e.App.DropMonitor(); err != nil || again {
+		t.Fatalf("second drop: %v %v", again, err)
+	}
+	if _, _, err := e.App.UndoRedo(false); err != nil || strings.Join(active(t, e), ",") != strings.Join(before, ",") {
+		t.Fatalf("undo: %v %v", err, active(t, e))
+	}
+}

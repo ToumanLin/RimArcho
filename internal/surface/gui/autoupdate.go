@@ -23,7 +23,8 @@ func (s *API) startAutomatic() {
 }
 
 func (s *API) automaticCycle(parent context.Context) {
-	if parent.Err() != nil {
+	// the first run decides on updates first (16 §2.15): the next minute's cycle tries again
+	if parent.Err() != nil || s.guideHold.Load() {
 		return
 	}
 	r, err := s.detachedReader()

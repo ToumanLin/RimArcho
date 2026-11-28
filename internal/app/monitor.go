@@ -686,6 +686,28 @@ func (a *App) AddMonitor() (*store.Mod, error) {
 	return added, nil
 }
 
+// MonitorDropOp names DropMonitor's step in the undo stack.
+const MonitorDropOp = "remove Archo Monitor (first-run guide: Archo Monitor off)"
+
+// DropMonitor takes every Archo Monitor out of the current plan as one undoable edit: the
+// first-run guide's "Archo Monitor: off" after its scan already added it (16 §2.15). It
+// reports whether one was there.
+func (a *App) DropMonitor() (bool, error) {
+	removed := false
+	_, err := a.edit(MonitorDropOp, func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
+		out := make(loadout.List, 0, len(l))
+		for _, e := range l {
+			if IsMonitor(st.Ix.ByID[e.Instance]) {
+				removed = true
+				continue
+			}
+			out = append(out, e)
+		}
+		return out, nil, nil
+	})
+	return removed, err
+}
+
 // editPlan replaces a plan's list as one undoable edit of that plan (current or not).
 func (a *App) editPlan(p *store.Plan, ws *store.Workspace, before, after loadout.List, op string) error {
 	unlock, err := a.lockLaunch()

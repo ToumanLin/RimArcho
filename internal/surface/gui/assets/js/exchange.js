@@ -12,6 +12,7 @@ import { archoSpot, ARCHO_PAGE } from "./archo.js";
 import { wireSeparator } from "./separator.js";
 import { orderDiff, orderView, legend } from "./listdiff.js";
 import { on } from "./api.js";
+import { guideSteps } from "./guide.js";
 
 let ui = null;
 export function initExchange(u) {
@@ -67,6 +68,8 @@ export async function exchange(first = false) {
   // the lead says the page's one gesture: drop it anywhere; the first run asks instead
   const w = page("plans pm-import xc-page", firstRun ? T("Where does your first list come from?") : T("Drop files or folders anywhere on this window; RimArcho tells what they are."),
     firstRun ? button(T("skip"), "esc", cancel) : null);
+  // the first run: this page is the guide's step 3, so its step bar leads the head (16 §2.15)
+  if (firstRun) w.querySelector(".page-head")?.prepend(guideSteps(2));
   const grid = el("div", "xc-lay");
   const side = el("div", "xc-side");
   const card = el("section", "card settings xc-do");
@@ -95,11 +98,11 @@ export async function exchange(first = false) {
   sc.append(w);
   area(card, null); area(rcard, null);
   M = freshM();
-  M.looking = !firstRun; // the survey below starts at once
+  M.looking = true; // the survey below starts at once, on the first run too (16 §2.18)
   drawDo();
   placeArcho();
   read.finish(); ui.renderWhere(); ui.renderHints();
-  if (!firstRun) survey();
+  survey();
 }
 
 const live = (active) => session === active && S.screen === "plan-import";
@@ -457,8 +460,13 @@ function drawRows() {
   const rows = $("#screen .xc-mrows");
   if (!rows) return;
   rows.textContent = "";
-  // the first run does not look for managers (16 §2.18): the row offers it instead of
-  // saying it is looking (VM 2026-11-23: "looking for…" stayed for good)
+  // "Not found? Choose its .exe" and the row's long line give way to the managers found
+  // (16 §2.18): the choice comes back when there are none
+  const found = !!M.managers?.length;
+  const card = rows.closest(".xc-do");
+  const elsewhere = card?.querySelector(".xc-else"), sub = [...(card?.querySelectorAll(".xc-dorow") || [])].find((r) => r.dataset.do === "db")?.querySelector(".sub");
+  if (elsewhere) elsewhere.hidden = found;
+  if (sub) sub.hidden = found;
   if (!M.managers && !M.looking) { rows.append(button(T("look for RimSort, RimCrow, RimPy and RimStack"), "", () => survey())); return; }
   if (!M.managers) { rows.append(el("div", "xc-hint", T("looking for RimSort, RimCrow, RimPy and RimStack…"))); return; }
   if (M.error) rows.append(el("div", "xc-note warn", M.error));

@@ -216,6 +216,11 @@ func FindManagerImports(gameMods []string) []ManagerImport {
 		// RimPy keeps its data beside Roaming, in LocalLow
 		loc.RimPy = append(loc.RimPy, filepath.Join(filepath.Dir(roaming), "LocalLow", "RimPy Mod Manager"))
 	}
+	// Testing only (17 §4): a sandboxed window reads only the data folders above, which
+	// follow %APPDATA% and %LOCALAPPDATA%: no install folders, processes, registry or shortcuts.
+	if os.Getenv("RIMARCHO_DISCOVERY") == "appdata" {
+		return DiscoverManagerImports(loc)
+	}
 	home, _ := os.UserHomeDir()
 	roots := []string{os.Getenv("ProgramFiles"), os.Getenv("ProgramFiles(x86)"), filepath.Join(local, "Programs"), local, filepath.Join(home, "Downloads"), filepath.Join(home, "Desktop"), filepath.Join(home, "Games")}
 	if exe, err := os.Executable(); err == nil {

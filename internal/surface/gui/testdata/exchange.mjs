@@ -19,7 +19,7 @@ async function setup(api = {}) {
     get(t, k) { return (...a) => { calls.push([k, ...a]); return k in t ? t[k](...a) : Promise.resolve(null); }; },
   });
   const button = (text, key, run, cls = "") => Object.assign(el("button", "btn " + cls, text), { onclick: run });
-  const page = (cls, lead) => { const w = el("div", cls); w.append(el("p", "lead", lead)); return w; };
+  const page = (cls, lead) => { const w = el("div", cls), head = el("div", "page-head"); head.append(el("p", "lead", lead)); w.append(head); return w; };
   const docEl = new Element("html"), body = new Element("body"), listeners = {};
   const document = { documentElement: docEl, body, createElement: (t) => new Element(t), querySelector: (s) => body.querySelector(s), addEventListener: (t, f) => { listeners[t] = f; } };
   const m = await loadModules("./exchange.js", {
@@ -35,6 +35,7 @@ async function setup(api = {}) {
     "./motion.js": { still: () => true },
     "./separator.js": { wireSeparator() {} },
     "./api.js": { on() {} },
+    "./guide.js": { guideSteps: (cur) => el("div", "steps", "step " + (cur + 1)) },
     "./membar.js": { splitBar: () => el("div", "sbar-row"), diffMarks: () => el("span", "dmarks") },
   }, { document, location: { search: "" }, URLSearchParams, navigator: {}, setTimeout: () => 0 });
   const went = [];
@@ -258,20 +259,29 @@ test("a drop a form already took is left to it", async () => {
   assert.ok(h.screen.querySelector(".xc-preview").hidden);
 });
 
-test("the first run does not look for managers; its row offers to, and then lists them (VM 2026-11-23)", async () => {
+test("the first run is the guide's step 3: its step bar, and the managers looked for at once (16 §2.18)", async () => {
   let surveys = 0;
-  const h = await setup({ ImportSurvey: async () => { surveys++; return []; } });
+  const rimsort = { name: "RimSort", groups: [{ kind: "rules", path: "R", parts: [{ id: "r", part: "rules", state: "new", new: 31, default: true }] }] };
+  const h = await setup({ ImportSurvey: async () => { surveys++; return [rimsort]; } });
   h.S.screen = "guide";
   await h.m.exchange(true);
   await flush();
-  assert.equal(surveys, 0);
-  assert.match(h.screen.textContent, /Where does your first list come from/);
-  assert.doesNotMatch(h.screen.textContent, /looking for RimSort/);
-  const look = h.screen.querySelectorAll(".xc-mrows button").find((b) => /look for RimSort/.test(b.textContent));
-  assert.ok(look, "a button looks for them");
-  look.onclick(); await flush();
   assert.equal(surveys, 1);
+  assert.match(h.screen.textContent, /step 3/);
+  assert.match(h.screen.textContent, /Where does your first list come from/);
+  assert.ok(!h.screen.querySelectorAll(".xc-mrows button").some((b) => /look for/.test(b.textContent)));
+  // a manager found: its row, and neither "Not found? Choose its .exe" nor the row's long line
+  assert.ok(h.screen.querySelectorAll(".xc-mrow").some((b) => /RimSort/.test(b.textContent)));
+  assert.equal(h.screen.querySelector(".xc-else").hidden, true);
+});
+
+test("with no manager found the choice of an .exe comes back", async () => {
+  const h = await setup({ ImportSurvey: async () => [] });
+  h.S.screen = "guide";
+  await h.m.exchange(true);
+  await flush();
   assert.match(h.screen.textContent, /No RimSort, RimCrow, RimPy or RimStack data found/);
+  assert.equal(h.screen.querySelector(".xc-else").hidden, false);
 });
 
 test("outside the first run the page looks for managers at once, with no button for it", async () => {

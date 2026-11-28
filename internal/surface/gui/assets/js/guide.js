@@ -19,6 +19,7 @@ import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { choiceControl } from "./choices.js";
 import { steamHint } from "./steamhint.js";
 import { page, button, seg, chooseLocalPath, beginPageRead } from "./screens.js";
+import { icon } from "./icons.js";
 import { withEnvironmentSwitch } from "./environment.js";
 import { on } from "./api.js";
 import { archoFigure, archoMode, bootDone } from "./archo.js";
@@ -34,12 +35,17 @@ let session = 0, activeSession = null;
 export const historySession = () => activeSession;
 export const previewing = () => S.guideFrom === "preview";
 
-// Two steps: where the first list comes from is the Import page, which the guide
-// opens after the scan (A1, 16 §2.15).
-const STEPS = ["find the game", "read the mods"];
+// The first run's three steps: "found", "read the mods", and "first list", which is the
+// Import page the guide opens after the scan (A1, 16 §2.15); Add Game Config has two.
+const FIRST_STEPS = ["found", "read the mods", "first list"];
+const ADD_STEPS = ["find the game", "read the mods"];
 // G.folder: the managed folder (FirstRunFolder) while the first run still has to choose it;
-// it is then step -1, before "find the game" (16 §2.15).
-const G = { folder: null, folderBusy: false, step: 0, way: 0, games: [], picked: new Set(), added: [], scan: null, typed: "", error: "", errorFrom: null };
+// it is then step -1, before "found" (16 §2.15). On the first run G.found holds what the
+// "found" step confirms beside the games (view.FirstRunFound), G.off the other managers'
+// folders unticked, G.saves each shared game's saves ("own" or "shared"), G.lang the
+// language row and G.choices step 2's switches.
+const G = { folder: null, folderBusy: false, step: 0, way: 0, games: [], picked: new Set(), added: [], scan: null, typed: "", error: "", errorFrom: null,
+  found: null, off: new Set(), saves: new Map(), lang: null, choices: null };
 // The download way: SteamCMD's info (DownloadInfo), the choices, and a run's progress.
 const D = { info: null, loading: false, branch: "", dir: "", dirTyped: false, account: "", run: null };
 const C = { id: "", row: null, submitting: false };
@@ -83,6 +89,11 @@ export async function start(from = "first") {
   G.scan = null;
   G.error = "";
   G.picked.clear();
+  G.off.clear(); G.saves.clear(); G.choices = null;
+  // the first run keeps the sidebar empty until the guide ends (16 §2.15), and the
+  // automatic checks wait for step 2's choice (16 §2.16.1 A01)
+  S.firstRun = from === "first";
+  if (S.firstRun) api.GuideHold().catch(() => {});
   if (D.run && D.run.end) D.run = null;
   // Without a running copy the copy way starts afresh: the current Game Config, its plan asked
   // again. A kept pick asked no plan, so after a copy "copy and add" stayed off with no reason
@@ -104,11 +115,14 @@ export async function start(from = "first") {
 // keeps picked when it is still found (a reread after a switch).
 async function find(first = false, keep = "") {
   const read = beginPageRead("guide", { replace: true });
-  let games, folder = null, lists = [];
+  let games, folder = null, lists = [], found = null, lang = null;
   try {
-    [games, folder, lists] = await Promise.all([api.GuideFind(), first ? api.ManagedFolder() : null,
-      adding() && A.from ? api.GameConfigLists(A.from) : []]);
-    games ||= [];
+    // the first run (and its preview) confirms the folders and the language too
+    [found, folder, lists, lang] = await Promise.all([adding() ? api.GuideFind() : api.GuideFirstRun(), first ? api.ManagedFolder() : null,
+      adding() && A.from ? api.GameConfigLists(A.from) : [], adding() ? null : api.GuideLanguages()]);
+    games = (adding() ? found : found?.games) || [];
+    G.found = adding() ? null : found;
+    G.lang = lang;
   } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
   // the managed folder is not asked on the first run: the default is taken (Settings ›
@@ -167,19 +181,7 @@ function draw() {
   // no lead: the step bar says where the guide goes (16 §2.15)
   const w = page("guide");
   sc.append(w);
-  // the steps: where you are, where you can go back to; the managed folder is step -1
-  const bar = el("div", "steps");
-  const all = STEPS;
-  const steps = G.folder ? ["managed folders", ...all] : all, first = G.folder ? -1 : 0;
-  steps.forEach((s, k) => {
-    const i = first + k;
-    if (k) bar.append(el("span", "line" + (i <= G.step ? " on" : "")));
-    const b = el("button", "st" + (i === G.step ? " cur" : i < G.step ? " done" : ""));
-    b.append(el("span", "n", i < G.step ? "✓" : String(k + 1)), el("span", "t", T(s)));
-    b.disabled = i >= G.step || (i === 1 && !G.added.length);
-    b.onclick = () => go(i);
-    bar.append(b);
-  });
+  const bar = guideSteps(G.step);
   // the steps on the left, Archo on the right: one row, as tall as she is
   const top = el("div", "guide-top"), left = el("div", "guide-lead"), head = el("div", "page-head");
   if (previewing()) head.append(el("p", "guide-preview-note muted", T("a preview of the first run: nothing you choose here is saved")));
@@ -199,6 +201,25 @@ function draw() {
   w.append(top, card);
   [folderStep, step1, step2][G.step + 1](card);
   ui.renderWhere();
+}
+
+// guideSteps is the step bar: where you are, where you can go back to; the managed folder is
+// step -1. The Import page draws it too, as the first run's step 3 (16 §2.15), where it
+// only shows the way.
+export function guideSteps(cur) {
+  const bar = el("div", "steps");
+  const all = adding() ? ADD_STEPS : FIRST_STEPS;
+  const steps = G.folder ? ["managed folders", ...all] : all, first = G.folder ? -1 : 0;
+  steps.forEach((s, k) => {
+    const i = first + k;
+    if (k) bar.append(el("span", "line" + (i <= cur ? " on" : "")));
+    const b = el("button", "st" + (i === cur ? " cur" : i < cur ? " done" : ""));
+    b.append(el("span", "n", i < cur ? "✓" : String(k + 1)), el("span", "t", T(s)));
+    b.disabled = i >= cur || cur > 1 || (i === 1 && !G.added.length);
+    b.onclick = () => go(i);
+    bar.append(b);
+  });
+  return bar;
 }
 
 // Archo's face follows the guide: a wink to start, thinking while something runs, a salute
@@ -221,11 +242,17 @@ function go(i) {
   draw();
 }
 
-function footer(card, ...btns) {
+// footer: the step's buttons at the right; left holds quiet ways at the left ("add another
+// folder", "download a version" on the first run's "found" step).
+function footer(card, ...btns) { footerWith(card, [], ...btns); }
+function footerWith(card, left, ...btns) {
   const f = el("div", "guide-foot");
+  for (const b of left) { b.classList.add("quiet"); f.append(b); }
   if (G.error) f.append(el("span", "err grow", G.error)); else f.append(el("span", "grow"));
   if (previewing()) f.append(button(T("end the preview"), "", () => finish("")));
   if (G.step > (G.folder ? -1 : 0)) f.append(button(T("back"), "", () => go(G.step - 1)));
+  // the first run's download is a way out of "found": back returns to it
+  else if (G.step === 0 && G.way === 1 && !adding() && !D.run && !C.id && !C.submitting) f.append(button(T("back"), "", () => { G.way = 0; G.error = ""; draw(); }));
   for (const b of btns) if (b) f.append(b);
   card.append(f);
 }
@@ -267,11 +294,16 @@ function folderStep(card) {
 
 const freeText = (n) => n < 0 ? T("free space unknown") : sizeText(n);
 
-// ---- 1. find the game ----
+// ---- 1. found (first run) / find the game (Add Game Config) ----
 
 function step1(card) {
-  card.append(el("div", "guide-q", adding() ? T("which game is this Game Config for?") : T("which RimWorld installs should RimArcho manage?")));
-  // copying needs a Game Config whose game is copied (a preview shows the way with yours)
+  // the first run confirms what was found; downloading is a way out of it (16 §2.15)
+  if (!adding()) {
+    if (G.way === 1) { card.append(el("div", "guide-q", T("download a version"))); return download(card); }
+    return G.games.length ? found(card) : noGame(card);
+  }
+  card.append(el("div", "guide-q", T("which game is this Game Config for?")));
+  // copying needs a Game Config whose game is copied
   const canCopyGame = addedConfigs().length > 0;
   if (G.way === 2 && !canCopyGame) G.way = 0;
   const ways = [T("a game you have"), T("download a version")];
@@ -290,73 +322,247 @@ function step1(card) {
   const list = el("div", "games");
   if (!G.games.length) list.append(el("div", "empty-state", T("no RimWorld found in the Steam libraries or the usual folders; add its folder below")));
   G.games.forEach((g, i) => {
-    const one = adding(); // Add Game Config: one game, a used one too
-    const r = el("label", "game" + (g.env && !one ? " used" : ""));
+    // Add Game Config: one game, a used one too
+    const r = el("label", "game");
     const cb = el("input");
-    cb.type = one ? "radio" : "checkbox";
-    if (one) cb.name = "guide-game";
-    cb.checked = (one || !g.env) && G.picked.has(i);
-    cb.disabled = !one && !!g.env;
-    cb.onchange = () => { if (one) pickOne(i); else cb.checked ? G.picked.add(i) : G.picked.delete(i); draw(); };
+    cb.type = "radio";
+    cb.name = "guide-game";
+    cb.checked = G.picked.has(i);
+    cb.onchange = () => { pickOne(i); draw(); };
     const body = el("div", "b");
     const top = el("div", "top");
     top.append(el("span", "v", "RimWorld " + (g.version || "—")), el("span", "chip", g.source));
     if (g.env) top.append(el("span", "chip cur", Tf("added as %s", g.env)));
-    else if (g.known && one) top.append(el("span", "chip", T("has a Game Config")));
+    else if (g.known) top.append(el("span", "chip", T("has a Game Config")));
     body.append(top, copyablePath(el("div", "path", g.game), g.game));
-    if (!g.env && !one) {
-      const name = el("input", "field small");
-      name.value = g.name;
-      name.spellcheck = false;
-      name.title = T("the game's name");
-      name.onclick = (e) => e.preventDefault();
-      name.oninput = () => { g.name = name.value.trim(); };
-      const nm = el("div", "nm");
-      nm.append(el("span", "muted", T("name")), name);
-      body.append(nm);
-    }
     r.append(cb, body);
     list.append(r);
   });
   card.append(list);
   const typed = el("div", "typed");
-  const addPath = async (path) => {
-    let g;
-    // the names already on the page count as taken: two games of one version get 1.6-2, 1.6-3
-    const pending = G.games.filter((x) => !x.env && x.name).map((x) => x.name);
-    try { g = await api.GuideGame(path, pending); } catch (e) { G.typed = path; G.error = errText(e); return draw(); }
-    if (previewing()) g = { ...g, env: "" };
-    G.typed = "";
-    G.error = "";
-    let at = G.games.findIndex((x) => x.game.toLowerCase() === g.game.toLowerCase());
-    if (at < 0) {
-      G.games.push(g);
-      at = G.games.length - 1;
-      if (!g.env && !adding()) G.picked.add(at);
-    }
-    if (adding()) pickOne(at);
-    draw();
-  };
   typed.append(button(T("add this folder"), "", () => chooseLocalPath(G.typed, addPath)));
   card.append(typed);
-  if (adding()) return configChoices(card);
-  const picked = [...G.picked].filter((i) => G.games[i] && !G.games[i].env);
-  const next = button(picked.length > 1 ? Tf("add %d games", picked.length) : T("add and continue"), "", async () => {
-    next.disabled = true;
-    let names;
-    try {
-      const games = picked.map((i) => G.games[i]);
-      if (previewing()) return await added(games.map((g) => g.name));
-      const accepted = await withEnvironmentSwitch(games[0].name, async () => {
-        names = await api.GuideAdd(games);
-      });
-      // a newer switch took over: the button is usable again
-      if (!accepted) return draw();
-      await added(names || []);
-    } catch (e) { G.error = errText(e); draw(); }
-  }, "primary");
-  next.disabled = !picked.length;
-  footer(card, G.added.length ? button(T("next"), "", () => go(1)) : null, next);
+  configChoices(card);
+}
+
+// addPath adds a game folder the player chose (the native dialog) to the cards, picked.
+async function addPath(path) {
+  let g;
+  // the names already on the page count as taken: two games of one version get 1.6-2, 1.6-3
+  const pending = G.games.filter((x) => !x.env && x.name).map((x) => x.name);
+  try { g = await api.GuideGame(path, pending); } catch (e) { G.typed = path; G.error = errText(e); return draw(); }
+  if (previewing()) g = { ...g, env: "" };
+  G.typed = "";
+  G.error = "";
+  G.way = 0;
+  let at = G.games.findIndex((x) => x.game.toLowerCase() === g.game.toLowerCase());
+  if (at < 0) {
+    G.games.push(g);
+    at = G.games.length - 1;
+    if (!g.env && !adding()) G.picked.add(at);
+  }
+  if (adding()) pickOne(at);
+  draw();
+}
+
+const pickedGames = () => [...G.picked].sort((a, b) => a - b).map((i) => G.games[i]).filter((g) => g && !g.env);
+
+// sharesWith: the picked game that game g would share its user data folder with (saves,
+// ModsConfig.xml, Mod settings) while being another version, or null. Only the later game
+// of the two asks (16 §2.15); a Proton game keeps its own prefix's folder anyway.
+function sharesWith(g) {
+  const ps = pickedGames(), at = ps.indexOf(g);
+  if (at <= 0 || !g.userData || /proton/i.test(g.source)) return null;
+  const key = g.userData.toLowerCase(), v = majorMinor(g.version);
+  return ps.slice(0, at).find((o) => o.userData && o.userData.toLowerCase() === key && majorMinor(o.version) !== v) || null;
+}
+const majorMinor = (v) => (String(v || "").match(/^\d+\.\d+/) || [""])[0];
+const savesOf = (g) => G.saves.get(g.game) || "own";
+
+// section: a muted label over a group of rows (game, Mod folders, language)
+const section = (card, label) => card.append(el("div", "guide-sec", label));
+
+// counted: "1,204 Mods" with the number bold, from a format whose %s is the number
+function counted(format, n) {
+  const c = el("span", "cnt"), [pre, post = ""] = T(format).split("%s");
+  if (pre.trim()) c.append(el("span", "u", pre.trim()));
+  c.append(el("span", "num", Number(n).toLocaleString()));
+  if (post.trim()) c.append(el("span", "u", post.trim()));
+  return c;
+}
+
+// shortPath keeps a long folder's last three parts: "…\common\RimWorld\Mods"
+function shortPath(p) {
+  if (!p || p.length <= 56) return p || "";
+  const sep = p.includes("\\") ? "\\" : "/", parts = p.split(sep);
+  return parts.length > 3 ? "…" + sep + parts.slice(-3).join(sep) : p;
+}
+
+// found is the first run's step 1 (16 §2.15): what RimArcho found, as a confirmation. The
+// games (untick to leave one alone), the Mod folders it will read, the language; one
+// button adds them and reads their Mods.
+function found(card) {
+  card.append(el("div", "guide-q", T("RimArcho found these. Untick what it should leave alone.")));
+  section(card, T("game"));
+  const list = el("div", "games");
+  G.games.forEach((g, i) => list.append(gameCard(g, i)));
+  card.append(list);
+  modFolders(card);
+  languageRow(card);
+  const n = pickedGames().length;
+  const next = button(n > 1 ? Tf("add %d games and read Mods", n) : T("add and read Mods"), "", () => addPicked(next), "primary");
+  next.disabled = !n;
+  footerWith(card, [button(T("add another folder"), "", () => chooseLocalPath(G.typed, addPath)),
+    button(T("download a version"), "", () => { G.way = 1; G.error = ""; draw(); if (!D.run && !D.loading) loadDownload(); })],
+  G.added.length ? button(T("next"), "", () => go(1)) : null, next);
+}
+
+// gameCard: big version, the build muted, how it starts, the path; at the right how many
+// Mods its current list enables; under it, for a second version on the same user data
+// folder, whose saves and Mod settings it uses.
+function gameCard(g, i) {
+  const r = el("label", "game found" + (g.env ? " used" : ""));
+  const cb = el("input");
+  cb.type = "checkbox";
+  cb.checked = !g.env && G.picked.has(i);
+  cb.disabled = !!g.env;
+  cb.onchange = () => { cb.checked ? G.picked.add(i) : G.picked.delete(i); draw(); };
+  const body = el("div", "b"), top = el("div", "top");
+  const mm = majorMinor(g.version), rest = String(g.version || "").slice(mm.length).replace(/^\./, "");
+  top.append(el("span", "v", "RimWorld " + (mm || g.version || "—")));
+  if (rest) top.append(el("span", "rev", rest));
+  top.append(el("span", "chip", g.source));
+  if (g.env) top.append(el("span", "chip cur", Tf("added as %s", g.env)));
+  top.append(el("span", "grow"));
+  if (g.gameMods) {
+    const on = counted("%s enabled", g.gameMods);
+    on.prepend(okMark());
+    on.title = T("the game's current list; it stays as it is");
+    top.append(on);
+  }
+  const path = el("div", "path", g.game);
+  body.append(top, path);
+  const other = G.picked.has(i) ? sharesWith(g) : null;
+  if (other) {
+    const row = el("div", "saves");
+    const own = savesOf(g) === "own";
+    const sw = seg([Tf("shared with %s", other.name), T("its own")], own ? 1 : 0, (k) => { G.saves.set(g.game, k ? "own" : "shared"); draw(); });
+    sw.title = T("its own: RimArcho keeps this game's saves, Mod settings and Mod list in a folder of its own; shared: both versions write the same ones");
+    // a click on the switch is not a click on the card's box
+    sw.addEventListener("click", (e) => e.preventDefault());
+    row.append(el("span", "", T("saves and Mod settings")), sw);
+    body.append(row);
+  }
+  r.append(cb, body);
+  return r;
+}
+
+function okMark() {
+  const m = el("span", "okmark");
+  m.innerHTML = icon.ok;
+  return m;
+}
+
+// modFolders: the folders the picked games read, counted without a scan: the Workshop
+// folder and each game's Mods folder (always read: a tick, no box), and the folders another
+// manager uses (a box, ticked: 16 §2.15).
+function modFolders(card) {
+  const ps = pickedGames(), managers = G.found?.managers || [];
+  const ws = ps.find((g) => g.workshop);
+  if (!ws && !ps.length && !managers.length) return;
+  section(card, T("Mod folders"));
+  const box = el("div", "fbox settings");
+  const row = (mark, ic, name, path, n) => {
+    const r = el("div", "set"), l = el("div", "l"), rr = el("div", "r");
+    const i = el("span", "fic");
+    i.innerHTML = icon[ic] || "";
+    const p = el("span", "p", shortPath(path));
+    p.title = path;
+    l.append(mark, i, el("span", "t", name), p);
+    if (n >= 0) rr.append(counted("%s Mods", n));
+    r.append(l, rr);
+    box.append(r);
+    return r;
+  };
+  if (ws) row(okMark(), "workshop", T("Steam Workshop"), ws.workshop, ws.workshopMods);
+  for (const g of ps) row(okMark(), "local", ps.length > 1 ? Tf("Mods folder of %s", g.name) : T("game's Mods folder"), joinPath(g.game, "Mods"), Math.max(0, g.mods));
+  for (const m of managers) {
+    const cb = el("input");
+    cb.type = "checkbox";
+    cb.checked = !G.off.has(m.path);
+    cb.setAttribute("aria-label", Tf("used by %s", m.manager));
+    cb.onchange = () => { cb.checked ? G.off.delete(m.path) : G.off.add(m.path); };
+    row(cb, "import", Tf("used by %s", m.manager), m.path, m.mods);
+  }
+  card.append(box);
+}
+
+const joinPath = (dir, name) => dir + (dir.startsWith("/") ? "/" : "\\") + name;
+
+// languageRow: follow the system (named), then each bundled language in itself; a pick
+// applies at once, in place (16 §2.14 "language"). A preview only shows the pick.
+function languageRow(card) {
+  const L = G.lang;
+  if (!L || !L.codes) return;
+  section(card, T("language"));
+  const box = el("div", "fbox settings lang");
+  const r = el("div", "set");
+  const values = ["auto", ...L.codes];
+  const at = Math.max(0, values.indexOf(L.value));
+  r.append(seg([Tf("follow system (%s)", L.system), ...L.labels], at, async (k) => {
+    if (values[k] === L.value) return;
+    L.value = values[k];
+    if (previewing()) return draw();
+    try { await api.ApplySetting(["config", "set", "ui.lang", "{}"], values[k]); } catch (e) { G.error = errText(e); return draw(); }
+    await ui.relang();
+    try { G.lang = await api.GuideLanguages(); } catch { /* the row keeps the pick */ }
+    draw();
+  }));
+  box.append(r);
+  card.append(box);
+}
+
+// addPicked adds the ticked games: a later version on a shared user data folder gets its
+// own saves unless the player chose shared (its own folder starts from the game's current
+// list); the first game brings the other managers' folders left ticked.
+async function addPicked(next) {
+  next.disabled = true;
+  const keep = (G.found?.managers || []).filter((m) => !G.off.has(m.path)).map((m) => m.path);
+  const games = pickedGames().map((g, k) => {
+    const own = sharesWith(g) && savesOf(g) === "own";
+    return { ...g, saves: own ? "own" : "", gameList: !!own, extra: k === 0 ? keep : [] };
+  });
+  let names;
+  try {
+    if (previewing()) return await added(games.map((g) => g.name));
+    const accepted = await withEnvironmentSwitch(games[0].name, async () => { names = await api.GuideAdd(games); });
+    // a newer switch took over: the button is usable again
+    if (!accepted) return draw();
+    await added(names || []);
+  } catch (e) { G.error = errText(e); draw(); }
+}
+
+// noGame: nothing found. Two ways in, as tiles: the folder that holds the game, or a
+// download; one muted line says where RimArcho looked; the language row stays.
+function noGame(card) {
+  card.append(el("div", "guide-q", T("No RimWorld found")));
+  const tiles = el("div", "guide-tiles");
+  const tile = (ic, t, s, run) => {
+    const b = el("button", "guide-tile");
+    const i = el("span", "fic");
+    i.innerHTML = icon[ic] || "";
+    b.append(i, el("span", "t", t), el("span", "s muted", s));
+    b.onclick = run;
+    tiles.append(b);
+  };
+  tile("local", T("choose its folder"), T("the folder with RimWorldWin64.exe"), () => chooseLocalPath(G.typed, addPath));
+  tile("import", T("download a version"), T("from Valve, with SteamCMD"), () => { G.way = 1; G.error = ""; draw(); if (!D.run && !D.loading) loadDownload(); });
+  card.append(tiles);
+  const f = G.found || {}, n = f.libraries || 0, where = (f.folders || []).join(", ");
+  const libs = n === 1 ? T("1 Steam library") : Tf("%d Steam libraries", n);
+  card.append(el("div", "guide-tried muted", where ? Tf("looked in %s and %s", libs, where) : Tf("looked in %s", libs)));
+  languageRow(card);
+  footer(card);
 }
 
 // pickOne picks game i for Add Game Config; its saves default to the game's default
@@ -451,7 +657,8 @@ async function finishConfig(name) {
 // added: environments were added (found, typed or downloaded); read their mods.
 async function added(names) {
   G.added = names;
-  if (!previewing()) G.games = (await api.GuideFind()) || G.games;
+  if (!previewing() && adding()) G.games = (await api.GuideFind()) || G.games;
+  else if (!previewing()) { const f = await api.GuideFirstRun(); if (f) { G.found = f; G.games = f.games || G.games; } }
   G.picked.clear();
   await scanAll();
 }
@@ -647,6 +854,8 @@ async function scanAll() {
   G.step = 1;
   G.scan = { rows: G.added.map((n) => ({ env: n, text: T("waiting"), state: "wait" })), done: false, ok: true };
   draw();
+  // the first run's two switches, as set now (16 §2.15)
+  if (!adding() && !G.choices) api.GuideChoices().then((c) => { G.choices = c; draw(); }).catch(() => {});
   if (previewing()) return previewScan();
   // A scan that did not start gives the flag back as it was (another scan may still run).
   const was = S.busy.scan;
@@ -705,6 +914,7 @@ function step2(card) {
   progress(bar, card.querySelector(".guide-q"), s.rows.length ? Math.round(100 * doneN / s.rows.length) : undefined, 100);
   prog.append(bar);
   card.append(prog);
+  if (!adding()) whileYouWait(card);
   const again = s.done && !s.ok ? button(T("rescan"), "", () => scanAll()) : null;
   // Add Game Config chose its list already: the scan is the last step
   const next = adding() ? button(T("done"), "", () => finish(""), "primary") : button(T("next"), "", firstList, "primary");
@@ -712,13 +922,45 @@ function step2(card) {
   footer(card, again, next);
 }
 
+// whileYouWait: the two defaults that would apply unasked, decided during the scan (16
+// §2.15): automatic checks (updates.auto: RimArcho, Mods, tools and community data) and
+// Archo Monitor (monitor.default). A switch writes the setting at once, so the scan that
+// is running sees it; a preview only shows it.
+function whileYouWait(card) {
+  const c = G.choices;
+  if (!c) return;
+  section(card, T("while you wait"));
+  const box = el("div", "fbox settings");
+  const row = (ic, name, sub, key, prop) => {
+    const r = el("div", "set"), l = el("div", "l"), rr = el("div", "r");
+    const i = el("span", "fic");
+    i.innerHTML = icon[ic] || "";
+    l.append(i, el("span", "t", name), el("span", "d", sub));
+    rr.append(seg([T("on"), T("off")], c[prop] ? 0 : 1, async (k) => {
+      if (c[prop] === !k) return;
+      c[prop] = !k;
+      draw();
+      if (previewing()) return;
+      try { await api.ApplySetting(["config", "set", key, "{}"], k ? "off" : "on"); } catch (e) { c[prop] = !!k; G.error = errText(e); draw(); }
+    }));
+    r.append(l, rr);
+    box.append(r);
+  };
+  row("rescan", T("check for updates"), T("RimArcho, Mods, tools and community data, about 50 MB once"), "updates.auto", "updates");
+  row("log", T("Archo Monitor"), T("a helper Mod added to your lists: it names the Mod behind an error"), "monitor.default", "monitor");
+  card.append(box);
+}
+
 // ---- then: where the first list comes from ----
 // The Import page in its first-run view (16 §2.18): the game's current list first
 // and picked, then a Mod list, a pack and other managers. Whatever the player brings in, or
 // "use this list" / "skip", ends the guide. A preview ends here: it never imports.
 
-function firstList() {
+async function firstList() {
   if (previewing()) return finish("");
+  // step 2's choices hold from here: the automatic checks may start, and Archo Monitor off
+  // takes it out of the lists the scan just made
+  try { await api.GuideChoicesDone(G.added); } catch (e) { G.error = errText(e); return draw(); }
   ui.afterImport = (text) => finish(text || "");
   return ui.importFirstList();
 }
@@ -727,6 +969,8 @@ async function finish(text) {
   activeSession = null;
   ui.afterImport = null;
   G.scan = null;
+  // the sidebar fills in now, as the guide ends (16 §2.15)
+  if (S.firstRun) { S.firstRun = false; api.GuideChoicesDone([]).catch(() => {}); }
   if (previewing()) {
     P.timer = null;
     if (D.run?.preview) D.run = null;
@@ -848,7 +1092,6 @@ function copyGame(card) {
   card.append(el("div", "dl-note muted", Tf("The copy plays %s's Mod list and starts with the game's own exe, so Steam never updates it. RimArcho's Mod links are made again when it launches.", K.from)));
   const go = button(T("copy and add"), "", async () => {
     go.disabled = true;
-    if (previewing()) return previewCopy();
     let ok;
     try { ok = await api.GuideCopy(K.from, K.dir, K.name, K.mods, K.own); } catch (e) { G.error = errText(e); return draw(); }
     if (!ok) { G.error = T("a copy is already running"); return draw(); }
@@ -892,15 +1135,4 @@ function copyEvent(ev) {
   }
   Object.assign(K.run, ev);
   draw();
-}
-
-function previewCopy() {
-  G.error = "";
-  const total = K.plan?.bytes || 1.3e9, env = K.name || K.plan?.name || K.from + "-copy";
-  K.run = { bytes: 0, total, end: false, preview: true };
-  const steps = [];
-  for (let k = 1; k <= 10; k++) steps.push(() => { K.run.bytes = total * k / 10; });
-  steps.push(() => { Object.assign(K.run, { end: true, ok: true, env }); added([env]); });
-  draw();
-  previewTick(steps, 200);
 }

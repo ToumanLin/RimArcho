@@ -2,20 +2,27 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Element, loadModules, flush, deferred } from "./dom.mjs";
 
+// arrays made inside the page's context compare as plain data
+const plain = (x) => JSON.parse(JSON.stringify(x));
+
 const info = (description = "old", refreshing = true, error = "") => ({
   steamcmd: "fake", games: "D:\\Games", refreshing, error,
   branches: [{ name: "public", description }, { name: "version-1.5", version: "1.5", description }],
 });
 
-async function setup({ folder = { done: true }, space = (path) => ({ path, free: 50e9 }), scan = async () => true, from, envs = [] } = {}) {
+// found is what the first run's "found" step confirms (view.FirstRunFound); none by default
+async function setup({ folder = { done: true }, space = (path) => ({ path, free: 50e9 }), scan = async () => true, from, envs = [], found = null, lang = null } = {}) {
   const screen = new Element("div"), S = { screen: "guide", busy: {}, board: { env: envs[0], envs } }, chosen = [], handlers = {}, copies = [];
   let now = 0, calls = 0, response = info(), switchWay, pathEditor;
-  const timers = [], delays = [], gameCalls = [], writes = [], went = [];
+  const timers = [], delays = [], gameCalls = [], writes = [], went = [], added = [], settings = [], segs = [];
   const el = (tag, cls, text) => new Element(tag, cls, text);
   const guide = await loadModules("./guide.js", {
     "./fields.js": { copyablePath: (n) => n, editablePath: (n) => n, pathContent: (n) => n },
     "./state.js": { S, $: () => screen, el, api: {
-      GuideFind: async () => [], GuideAdd: async (games) => { writes.push("add"); return games.map((g) => g.name); }, GuideScan: (names) => { writes.push("scan"); return scan(names); }, GuideDownloadInfo: async () => { calls++; return await response; },
+      GuideFind: async () => [], GuideAdd: async (games) => { writes.push("add"); added.push(games); return games.map((g) => g.name); }, GuideScan: (names) => { writes.push("scan"); return scan(names); }, GuideDownloadInfo: async () => { calls++; return await response; },
+      GuideFirstRun: async () => found || { games: [], managers: [], libraries: 1, folders: [] }, GuideLanguages: async () => lang,
+      GuideHold: async () => {}, GuideChoices: async () => ({ updates: true, monitor: true }), GuideChoicesDone: async (names) => { if (names.length) writes.push("choices"); },
+      ApplySetting: async (argv, value) => { settings.push([argv[2], value]); writes.push("setting"); return ["ok"]; },
       GuideCopyPlan: async (from, dir, name, mods) => ({ dir: dir || "D:\\Games\\RimWorld " + from + "-copy", name: name || from + "-copy", bytes: mods ? 5e9 : 1e9, modBytes: 4e9, free: 50e9, low: false }),
       GuideCopy: async (...args) => { copies.push(args); writes.push("copy"); return true; },
       GameConfigLists: async () => [],
@@ -31,19 +38,22 @@ async function setup({ folder = { done: true }, space = (path) => ({ path, free:
     "./screens.js": {
       page: () => el("div"),
       button: (label, _, action) => { const b = el("button", "", label); b.onclick = action; return b; },
-      seg: (_, __, action) => { switchWay = action; return el("div"); },
+      seg: (names, on, action) => { switchWay = action; segs.push({ names, on, action }); return el("div", "seg", names.join("|")); },
       chooseLocalPath: (value, done) => { pathEditor = { value, done }; }, beginPageRead: () => ({ current: () => true, finish() {}, fail(e) { throw e; } }),
     },
     "./exchange.js": { exchange() {}, importFrom() {} },
     "./environment.js": { withEnvironmentSwitch: async (_, run) => { await run(); return true; } },
     "./api.js": { on(name, fn) { handlers[name] = fn; } },
   }, { Date: { now: () => now }, setTimeout: (fn, ms) => { timers.push({fn,ms}); delays.push(ms); } });
-  const ui = { renderWhere() {}, go: (id) => went.push(id), reload: async () => {}, importFirstList: () => went.push("import:first") };
+  const ui = { renderWhere() {}, go: (id) => went.push(id), reload: async () => {}, relang: async () => { writes.push("relang"); }, importFirstList: () => went.push("import:first") };
   guide.initGuide(ui);
   await guide.start(from);
-  if (folder.done && !from) { switchWay(1); await flush(); }
+  // the first run's download is a tile while no game is found (16 §2.15)
+  const tile = (t) => screen.querySelectorAll(".guide-tile").find(b => b.textContent.startsWith(t));
+  if (folder.done && !from && !found) { tile("download a version").onclick(); await flush(); }
   return {
-    ui, screen, S, timers, delays, guide, chosen, gameCalls, writes, went, handlers, copies, choosePath: (value) => pathEditor.done(value),
+    ui, screen, S, timers, delays, guide, chosen, gameCalls, writes, went, handlers, copies, added, settings, segs, tile, choosePath: (value) => pathEditor.done(value),
+    button: (label) => screen.querySelectorAll("button").find(b => b.textContent === label),
     calls: () => calls, now: () => now, respond: value => { response = value; },
     switchWay: n => switchWay(n),
     changeDirectory(value) { screen.querySelectorAll("button").find(b => b.textContent === "change…").onclick(); pathEditor.done(value); },
@@ -100,7 +110,7 @@ test("failed refresh retains branches and shows its error", async () => {
 test("leaving the page or switching away stops polling", async () => {
   for (const way of ["page", "tab"]) {
     const h = await setup(); const calls = h.calls();
-    if (way === "page") h.S.screen = "home"; else h.switchWay(0);
+    if (way === "page") h.S.screen = "home"; else h.button("back").onclick();
     await h.tick();
     assert.equal(h.calls(), calls); assert.equal(h.timers.length, 0);
   }
@@ -115,79 +125,160 @@ test("a response arriving after navigation cannot redraw the page", async () => 
 });
 
 test("a first run takes the default managed folder without asking (16 §2.15)", async () => {
-  const h = await setup({ folder: { path: "C:\RimArcho", free: 50e9, done: false } });
-  assert.deepEqual(h.chosen, ["C:\RimArcho"]);
-  assert.equal(h.screen.querySelectorAll(".st").length, 2);
-  assert.match(h.screen.querySelector(".st.cur").textContent, /find the game/);
+  const h = await setup({ folder: { path: "C:\\RimArcho", free: 50e9, done: false } });
+  assert.deepEqual(h.chosen, ["C:\\RimArcho"]);
+  assert.equal(h.screen.querySelectorAll(".st").length, 3);
+  assert.match(h.screen.querySelector(".st.cur").textContent, /found/);
 });
 
 test("a default managed folder that cannot be used starts on that step, which has no way to skip it", async () => {
   const button = (h, label) => h.screen.querySelectorAll("button").find(b => b.textContent === label);
-  const h = await setup({ folder: { path: "C:\RimArcho", free: 50e9, done: false, error: "not writable" }, space: (path) => ({ path, free: 2e9, low: true }) });
-  assert.equal(h.screen.querySelectorAll(".st").length, 3);
+  const h = await setup({ folder: { path: "C:\\RimArcho", free: 50e9, done: false, error: "not writable" }, space: (path) => ({ path, free: 2e9, low: true }) });
+  assert.equal(h.screen.querySelectorAll(".st").length, 4);
   assert.match(h.screen.querySelector(".st.cur").textContent, /managed folders/);
-  assert.ok(h.screen.textContent.includes("C:\RimArcho"));
+  assert.ok(h.screen.textContent.includes("C:\\RimArcho"));
   assert.equal(button(h, "not now"), undefined);
   assert.equal(button(h, "back"), undefined);
   // another folder: its free space and the low-space warning; nothing is saved yet
-  button(h, "change…").onclick(); h.choosePath("E:\Archo"); await flush();
-  assert.ok(h.screen.textContent.includes("E:\Archo"));
+  button(h, "change…").onclick(); h.choosePath("E:\\Archo"); await flush();
+  assert.ok(h.screen.textContent.includes("E:\\Archo"));
   assert.match(h.screen.textContent, /Less than 10 GB/);
   assert.deepEqual(h.chosen, []);
-  // confirming saves it and moves on to finding the game; the step stays, done
+  // confirming saves it and moves on to "found"; the step stays, done
   button(h, "use this folder").onclick(); await flush();
-  assert.deepEqual(h.chosen, ["E:\Archo"]);
-  assert.match(h.screen.querySelector(".st.cur").textContent, /find the game/);
+  assert.deepEqual(h.chosen, ["E:\\Archo"]);
+  assert.match(h.screen.querySelector(".st.cur").textContent, /found/);
   assert.match(h.screen.querySelector(".st.done").textContent, /managed folders/);
   assert.ok(button(h, "back"), "the folder step can be revisited");
 });
 
-test("a managed folder already chosen, or adding another game, has no folder step", async () => {
+test("a managed folder already chosen has no folder step; the first run has three steps", async () => {
   const h = await setup();
-  assert.equal(h.screen.querySelectorAll(".st").length, 2);
-  assert.match(h.screen.querySelector(".st.cur").textContent, /find the game/);
+  assert.deepEqual(h.screen.querySelectorAll(".st").map(s => s.textContent), ["1found", "2read the mods", "3first list"]);
+  assert.match(h.screen.querySelector(".st.cur").textContent, /found/);
+});
+
+test("no game found: two tiles, where RimArcho looked, and the download has a way back", async () => {
+  const h = await setup({ found: { games: [], managers: [], libraries: 2, folders: ["D:\\Games"] } });
+  assert.equal(h.screen.querySelector(".guide-q").textContent, "No RimWorld found");
+  assert.equal(h.screen.querySelectorAll(".guide-tile").length, 2);
+  assert.match(h.screen.querySelector(".guide-tried").textContent, /looked in %s and %s/);
+  h.tile("download a version").onclick(); await flush();
+  assert.match(h.screen.textContent, /refreshing branch list…|asking Steam/);
+  h.button("back").onclick(); await flush();
+  assert.equal(h.screen.querySelector(".guide-q").textContent, "No RimWorld found");
 });
 
 test("two folders of one version added in one pass get different names", async () => {
-  const h = await setup();
-  h.switchWay(0); await flush();
-  const add = () => h.screen.querySelectorAll("button").find(b => b.textContent === "add this folder");
-  add().onclick(); await h.choosePath("D:\\Game2"); await flush();
-  add().onclick(); await h.choosePath("D:\\Game3"); await flush();
+  const h = await setup({ found: { games: [], managers: [], libraries: 1, folders: [] } });
+  h.tile("choose its folder").onclick(); await h.choosePath("D:\\Game2"); await flush();
+  h.button("add another folder").onclick(); await h.choosePath("D:\\Game3"); await flush();
   assert.deepEqual(h.gameCalls.map(([, pending]) => pending), [[], ["1.6-2"]]);
-  assert.deepEqual(h.screen.querySelectorAll(".game .field").map(i => i.value), ["1.6-2", "1.6-3"]);
+  // no name fields: the names are the versions (16 §2.15)
+  assert.equal(h.screen.querySelectorAll(".game .field").length, 0);
+  await h.button("add %d games and read Mods").onclick(); await flush();
+  assert.deepEqual(plain(h.added[0].map(g => g.name)), ["1.6-2", "1.6-3"]);
+});
+
+// 1.6 and 1.7 on one LocalLow, and a folder RimSort uses (16 §2.15)
+const two = () => ({
+  libraries: 2, folders: [],
+  managers: [{ manager: "RimSort", path: "E:\\RimMods", mods: 27 }],
+  games: [
+    { name: "1.6", game: "D:\\S\\RimWorld", version: "1.6.4633 rev1261", source: "Steam", launch: "steam", userData: "C:\\LL\\RimWorld", workshop: "D:\\S\\ws", workshopMods: 1204, mods: 3, gameMods: 13 },
+    { name: "1.7", game: "D:\\Games\\RimWorld 1.7", version: "1.7.5014 rev1300", source: "started directly", launch: "direct", userData: "c:\\ll\\rimworld", mods: 0, gameMods: 13 },
+  ],
+});
+
+test("found: game cards, Mod folders and the second version's own saves by default", async () => {
+  const h = await setup({ found: two() });
+  assert.equal(h.screen.querySelector(".guide-q").textContent, "RimArcho found these. Untick what it should leave alone.");
+  const cards = h.screen.querySelectorAll(".game");
+  assert.equal(cards.length, 2);
+  assert.match(cards[0].textContent, /RimWorld 1\.6.*4633 rev1261.*Steam/);
+  assert.equal(cards[0].querySelectorAll(".saves").length, 0, "the first game asks nothing");
+  assert.equal(cards[1].querySelector(".saves .seg").textContent, "shared with %s|its own");
+  assert.equal(h.segs.find(s => s.names[1] === "its own").on, 1, "its own by default");
+  // the Workshop folder, each game's Mods folder, the manager's folder (ticked)
+  const rows = h.screen.querySelectorAll(".fbox .set");
+  assert.deepEqual(rows.map(r => r.querySelector(".t").textContent), ["Steam Workshop", "Mods folder of %s", "Mods folder of %s", "used by %s"]);
+  assert.ok(rows[3].querySelector("input").checked);
+  await h.button("add %d games and read Mods").onclick(); await flush();
+  const [g16, g17] = h.added[0];
+  assert.deepEqual(plain([g16.saves, g16.gameList, g16.extra]), ["", false, ["E:\\RimMods"]]);
+  assert.deepEqual(plain([g17.saves, g17.gameList, g17.extra]), ["own", true, []]);
+});
+
+test("found: shared saves and an unticked manager folder are what gets added", async () => {
+  const h = await setup({ found: two() });
+  h.segs.find(s => s.names[1] === "its own").action(0); await flush();
+  const box = h.screen.querySelectorAll(".fbox .set")[3].querySelector("input");
+  box.checked = false; box.onchange();
+  await h.button("add %d games and read Mods").onclick(); await flush();
+  const [g16, g17] = h.added[0];
+  assert.deepEqual(plain([g16.extra, g17.saves, g17.gameList]), [[], "", false]);
+});
+
+test("found: unticking the first game leaves the second alone, with nothing to share", async () => {
+  const h = await setup({ found: two() });
+  const box = h.screen.querySelectorAll(".game")[0].querySelector("input");
+  box.checked = false; box.onchange(); await flush();
+  assert.equal(h.screen.querySelectorAll(".saves").length, 0);
+  await h.button("add and read Mods").onclick(); await flush();
+  assert.deepEqual(plain(h.added[0].map(g => [g.name, g.saves])), [["1.7", ""]]);
+});
+
+test("found: the language row names the system's language and applies a pick in place", async () => {
+  const h = await setup({ found: two(), lang: { value: "auto", codes: ["en", "zh"], labels: ["English", "Chinese"], system: "English" } });
+  const row = h.segs.find(s => s.names[0] === "follow system (%s)");
+  assert.deepEqual([row.names.length, row.on], [3, 0]);
+  await row.action(2); await flush();
+  assert.deepEqual(h.settings, [["ui.lang", "zh"]]);
+  assert.ok(h.writes.includes("relang"));
 });
 
 for (const way of ["throws", "refuses"]) test(`a first scan that ${way} gives back the scan flag and ends the step`, async () => {
-  const h = await setup({ scan: async () => { if (way === "throws") throw "scan failed"; return false; } });
-  h.switchWay(0); await flush();
-  h.screen.querySelectorAll("button").find(b => b.textContent === "add this folder").onclick(); await h.choosePath("D:\Game2"); await flush();
-  await h.screen.querySelectorAll("button").find(b => b.textContent === "add and continue").onclick(); await flush();
+  const h = await setup({ scan: async () => { if (way === "throws") throw "scan failed"; return false; }, found: { games: [], managers: [], libraries: 1, folders: [] } });
+  h.tile("choose its folder").onclick(); await h.choosePath("D:\\Game2"); await flush();
+  await h.button("add and read Mods").onclick(); await flush();
   assert.ok(!h.S.busy.scan, "no scan runs");
   assert.match(h.screen.textContent, way === "throws" ? /scan failed/ : /a scan is already running/);
-  if (way === "throws") assert.ok(h.screen.querySelectorAll("button").some(b => b.textContent === "rescan"));
+  if (way === "throws") assert.ok(h.button("rescan"));
+});
+
+test("read the mods: the two switches write their settings at once, and next releases the checks", async () => {
+  const h = await setup({ found: two() });
+  await h.button("add %d games and read Mods").onclick(); await flush();
+  assert.match(h.screen.textContent, /while you wait/);
+  const [updates, monitor] = h.segs.filter(s => s.names.join() === "on,off").slice(-2);
+  await updates.action(1); await flush();
+  const [, monitor2] = h.segs.filter(s => s.names.join() === "on,off").slice(-2);
+  await monitor2.action(1); await flush();
+  assert.deepEqual(h.settings, [["updates.auto", "off"], ["monitor.default", "off"]]);
+  assert.equal(monitor.on, 0);
 });
 
 test("the preview shows the first run from finding the game and writes nothing", async () => {
-  const button = (h, label) => h.screen.querySelectorAll("button").find(b => b.textContent === label);
   const h = await setup({ from: "preview", folder: { path: "C:\\RimArcho", free: 50e9, done: false } });
   // a first run takes the default folder, so the preview has no folder step and chooses none
-  assert.equal(h.screen.querySelectorAll(".st").length, 2);
+  assert.equal(h.screen.querySelectorAll(".st").length, 3);
   assert.deepEqual(h.chosen, []);
   assert.match(h.screen.textContent, /nothing you choose here is saved/);
-  assert.match(h.screen.querySelector(".st.cur").textContent, /find the game/);
-  h.switchWay(0); await flush();
-  button(h, "add this folder").onclick(); await h.choosePath("D:\\Game2"); await flush();
-  await button(h, "add and continue").onclick(); await flush();
+  assert.match(h.screen.querySelector(".st.cur").textContent, /found/);
+  h.tile("choose its folder").onclick(); await h.choosePath("D:\\Game2"); await flush();
+  await h.button("add and read Mods").onclick(); await flush();
   // the scan plays out on timers
   assert.match(h.screen.querySelector(".st.cur").textContent, /read the mods/);
   assert.match(h.screen.querySelector(".guide-q").textContent, /Reading your Mods/);
+  // the switches show, and a pick writes nothing
+  const updates = h.segs.filter(s => s.names.join() === "on,off").at(-2);
+  await updates.action(1); await flush();
   for (let i = 0; h.timers.length; i++) { assert.ok(i < 40, "the made-up scan did not end"); await h.tick(); }
   assert.match(h.screen.textContent, /✓/);
   // the heading no longer says reading once the scan has ended (VM 2026-11-22)
   assert.equal(h.screen.querySelector(".guide-q").textContent, "Your Mods are read");
-  // where the first list comes from is Import & export (16 §2.15): a preview ends here
-  await button(h, "next").onclick(); await flush();
+  // where the first list comes from is Import (16 §2.15): a preview ends here
+  await h.button("next").onclick(); await flush();
   assert.deepEqual(h.writes, []);
   assert.deepEqual(h.went, ["settings"]);
 });
@@ -195,7 +286,7 @@ test("the preview shows the first run from finding the game and writes nothing",
 test("the preview's download plays out without SteamCMD", async () => {
   const h = await setup({ from: "preview" });
   h.respond({ games: "", offer: { bytes: 1e6, dir: "C:\\x" } });
-  h.switchWay(1); await flush();
+  h.tile("download a version").onclick(); await flush();
   h.screen.querySelectorAll("button").find(b => b.textContent === "download SteamCMD").onclick(); await flush();
   assert.equal(h.screen.querySelectorAll(".branch").length, 3);
   await h.screen.querySelectorAll("button").find(b => b.textContent === "download and add").onclick(); await flush();
@@ -315,32 +406,26 @@ test("the copy way opened again from the Game Config page after a copy asks a ne
   assert.equal(button(h, "copy and add").disabled, false);
 });
 
-test("with no Game Config there is no copy way", async () => {
-  const h = await setup();
-  h.switchWay(2); await flush();
-  assert.doesNotMatch(h.screen.textContent, /copy and add/);
+test("the first run has no copy way, a preview with a Game Config neither (16 §2.15)", async () => {
+  for (const h of [await setup(), await setup({ from: "preview", envs: ["1.6"] })]) {
+    assert.doesNotMatch(h.screen.textContent, /copy a game folder|copy and add/);
+  }
 });
 
-test("the preview's copy plays out and writes nothing", async () => {
-  const h = await setup({ from: "preview", envs: ["1.6"] });
-  h.switchWay(2); await flush();
-  await h.screen.querySelectorAll("button").find(b => b.textContent === "copy and add").onclick(); await flush();
-  for (let i = 0; h.timers.length; i++) { assert.ok(i < 60, "the made-up copy did not end"); await h.tick(); }
-  assert.match(h.screen.querySelector(".st.cur").textContent, /read the mods/);
-  assert.deepEqual(h.writes, []);
-});
-
-test("after the scan the first run hands over to Import & export, which ends the guide", async () => {
-  const button = (h, label) => h.screen.querySelectorAll("button").find(b => b.textContent === label);
-  const h = await setup();
-  h.switchWay(0); await flush();
-  button(h, "add this folder").onclick(); await h.choosePath("D:\Game2"); await flush();
-  await button(h, "add and continue").onclick(); await flush();
-  for (let i = 0; h.timers.length && i < 40; i++) await h.tick();
-  const next = button(h, "next");
-  assert.ok(next, "the scan ended")
+test("after the scan the first run hands over to Import, which ends the guide", async () => {
+  const h = await setup({ found: { games: [], managers: [], libraries: 1, folders: [] } });
+  assert.ok(h.S.firstRun, "the sidebar waits for the guide's end");
+  h.tile("choose its folder").onclick(); await h.choosePath("D:\\Game2"); await flush();
+  await h.button("add and read Mods").onclick(); await flush();
+  h.handlers.guide?.({ done: true, ok: true });
+  h.guide.guideEvent({ done: true, ok: true }); await flush();
+  const next = h.button("next");
+  assert.ok(next && !next.disabled, "the scan ended");
   await next.onclick(); await flush();
+  // step 2's choices hold from here (API.GuideChoicesDone), then Import
+  assert.deepEqual(h.writes, ["add", "scan", "choices"]);
   assert.deepEqual(h.went, ["import:first"]);
   await h.ui.afterImport(""); await flush();
   assert.deepEqual(h.went, ["import:first", "home"]);
+  assert.ok(!h.S.firstRun, "the sidebar fills in");
 });

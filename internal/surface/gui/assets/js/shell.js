@@ -229,6 +229,9 @@ export function settle() { settled = true; }
 function renderSide() {
   const nav = $("#nav");
   nav.setAttribute("aria-label", T("pages"));
+  // the first run's sidebar stays empty until the guide ends, its step 3 (Import) included:
+  // the pages and their counts come all at once with the first list (16 §2.15)
+  document.body.classList.toggle("first-run", !!S.firstRun);
   const sh = S.shell;
   if (!sh) return;
   const cur = current();
@@ -367,6 +370,8 @@ export function crumbs() {
     const from = S.guideFrom, label = from === "env" ? T("Add Game Config") : from === "preview" ? T("first-run guide (preview)") : T("getting started");
     out = (from === "env" || from === "preview" ? out : []).concat([{ label, id: "guide" }]);
   }
+  // the first run's step 3 is the Import page, still inside the guide
+  if (S.firstRun && S.screen === "plan-import") out = [{ label: T("getting started"), id: "guide" }];
   if (S.screen === "full" && S.fullName) out = out.concat([{ label: S.fullName, id: "full" }]);
   if (S.screen === "uninstall" || S.screen === "uninstall-progress") out = out.concat([{ label: T("uninstall RimArcho"), id: "uninstall" }]);
   // Settings: the group shown at the right is its second level (16 §2.14 "Layout")
