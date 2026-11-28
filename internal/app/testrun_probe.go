@@ -20,16 +20,18 @@ import (
 
 // TestRunProbe is the probe part of a test run's report.
 type TestRunProbe struct {
-	Folder    string `json:"folder"`
-	PackageID string `json:"package_id"`
-	Position  int    `json:"position"` // 1-based in the tested load order, official content included
 	// Outcome: result, exception, or none when no last line arrived.
 	Outcome    string   `json:"outcome"`
 	Result     string   `json:"result,omitempty"`
 	Exception  string   `json:"exception,omitempty"`
+	Folder     string   `json:"folder"`
+	PackageID  string   `json:"package_id"`
+	Position   int      `json:"position"` // 1-based in the tested load order, official content included
 	Lines      []string `json:"lines"`
 	LinesTotal int      `json:"lines_total"`
-	Screenshot string   `json:"screenshot,omitempty"`
+	// LinesFile: probe-lines.txt in the run folder, every [Probe] line in full.
+	LinesFile  string `json:"lines_file,omitempty"`
+	Screenshot string `json:"screenshot,omitempty"`
 	// Screenshots are the named ones the scenario took (probe-<name>.png), by name.
 	Screenshots []string `json:"screenshots,omitempty"`
 	MissingDeps []string `json:"missing_dependencies,omitempty"`
@@ -217,7 +219,11 @@ func finishProbe(p *TestRunProbe, logPath, data, runDir string) error {
 		}
 		p.Screenshots = append(p.Screenshots, dst)
 	}
-	if err := readProbeLines(p, logPath); err != nil {
+	all, err := readProbeLines(p, logPath)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	if err := writeProbeLines(p, runDir, all); err != nil {
 		errs = append(errs, err)
 	}
 	if len(errs) > 0 {
@@ -226,13 +232,14 @@ func finishProbe(p *TestRunProbe, logPath, data, runDir string) error {
 	return nil
 }
 
-func readProbeLines(p *TestRunProbe, logPath string) error {
+// readProbeLines fills the report's lines and returns every [Probe] line uncut.
+func readProbeLines(p *TestRunProbe, logPath string) ([]string, error) {
 	f, err := os.Open(logPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer f.Close()
-	var head, tail []string
+	var head, tail, all []string
 	stack := -1 // lines left to add to the exception's text
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 64<<10), 16<<20)
@@ -250,6 +257,7 @@ func readProbeLines(p *TestRunProbe, logPath string) error {
 		}
 		stack = -1
 		p.LinesTotal++
+		all = append(all, text)
 		short := cutRunes(text, probeLineMax)
 		if len(head) < probeLinesHead {
 			head = append(head, short)
@@ -273,7 +281,7 @@ func readProbeLines(p *TestRunProbe, logPath string) error {
 		}
 	}
 	p.Lines = append(append([]string{}, head...), tail...)
-	return sc.Err()
+	return all, sc.Err()
 }
 
 // probeStackLine: a line of the exception's own stack ("at …"), not Unity's logging stack.

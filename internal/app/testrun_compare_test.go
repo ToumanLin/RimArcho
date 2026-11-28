@@ -49,8 +49,11 @@ func runComparisonJSON(t *testing.T, e *testkit.Env, text string, flags ...strin
 	if err != nil || len(stored.Args) == 0 || strings.Contains(out, `"args"`) {
 		t.Fatalf("saved report: %v; output has args: %v", err, strings.Contains(out, `"args"`))
 	}
+	// The output folds the clusters and cuts the probe's lines (20 §2 "Report size").
 	stored.Args = nil
-	if b, _ := json.MarshalIndent(&stored, "", "  "); string(b)+"\n" != out {
+	stored.Clusters, stored.Fixed, stored.Gone = app.FoldClusters(stored.Clusters), app.FoldClusters(stored.Fixed), app.FoldClusters(stored.Gone)
+	stored.Probe = stored.Probe.Brief()
+	if b, _ := json.Marshal(&stored); func() string { c, _ := json.Marshal(&r); return string(c) }() != string(b) {
 		t.Fatalf("saved report differs from the output:\n%s\n%s", b, out)
 	}
 	if strings.Contains(out, `"key"`) || strings.Contains(out, `"clusterKeys"`) {

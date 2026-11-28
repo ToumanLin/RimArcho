@@ -1,9 +1,11 @@
 package cmds
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -42,13 +44,30 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 		c.ExitCode = ExitError
 	}
 	if args.Bool("json") {
-		// The launch arguments are for report.json (a later run's baseline), not for readers.
-		out := *r
-		out.Args = nil
-		b, err := json.MarshalIndent(&out, "", "  ")
+		b, err := lineJSON(testRunJSONReport(r))
 		return &render.Doc{Raw: string(b) + "\n"}, err
 	}
 	return testRunDoc(r), nil
+}
+
+// testRunJSON is the --json report (20 §2 "Report size"): the verdict and the probe first,
+// repeated clusters folded, the probe's lines cut (all in its lines_file). The outer
+// fields hide the report's own of the same name.
+type testRunJSON struct {
+	Verdict string            `json:"verdict"`
+	Probe   *app.TestRunProbe `json:"probe,omitempty"`
+	*app.TestRunReport
+	Clusters []app.TestRunCluster `json:"clusters"`
+	Fixed    []app.TestRunCluster `json:"fixed,omitempty"`
+	Gone     []app.TestRunCluster `json:"gone,omitempty"`
+}
+
+func testRunJSONReport(r *app.TestRunReport) *testRunJSON {
+	// The launch arguments are for report.json (a later run's baseline), not for readers.
+	out := *r
+	out.Args = nil
+	return &testRunJSON{Verdict: r.Verdict(), Probe: r.Probe.Brief(), TestRunReport: &out,
+		Clusters: app.FoldClusters(r.Clusters), Fixed: app.FoldClusters(r.Fixed), Gone: app.FoldClusters(r.Gone)}
 }
 
 // testRunDoc is the text report of a test run.
@@ -165,12 +184,12 @@ func testRunSummary(root *render.Node, r *app.TestRunReport) {
 // testRunClusters adds the run's error clusters and its informational ones.
 func testRunClusters(root *render.Node, r *app.TestRunReport) {
 	clusters := root.Section(fmt.Sprintf("error clusters: %d", r.ClustersTotal))
-	for _, cluster := range r.Clusters {
+	for _, cluster := range app.FoldClusters(r.Clusters) {
 		prefix := ""
 		if cluster.Delta == "new" {
 			prefix = "new "
 		}
-		n := clusters.Addf("%s%s x%d: %s", prefix, cluster.Class, cluster.Count, cluster.Message)
+		n := clusters.Addf("%s%s x%d: %s", prefix, cluster.Class, cluster.Count, testClusterMessage(cluster))
 		switch cluster.Before {
 		case "present":
 			n.KV("before", "in the player's log")
@@ -217,8 +236,8 @@ func testRunCompared(root *render.Node, r *app.TestRunReport) {
 		}
 		root.Add(line)
 		fixed := root.Section(fmt.Sprintf("fixed: %d", p.Fixed))
-		for _, cluster := range r.Fixed {
-			n := fixed.Addf("%s x%d: %s", cluster.Class, cluster.Count, cluster.Message)
+		for _, cluster := range app.FoldClusters(r.Fixed) {
+			n := fixed.Addf("%s x%d: %s", cluster.Class, cluster.Count, testClusterMessage(cluster))
 			testClusterMods(n, cluster)
 			if cluster.Note != "" {
 				n.KV("note", cluster.Note)
@@ -232,8 +251,8 @@ func testRunCompared(root *render.Node, r *app.TestRunReport) {
 		}
 		root.Addf("%s", line)
 		gone := root.Section(fmt.Sprintf("gone: %d", b.Gone))
-		for _, cluster := range r.Gone {
-			testClusterMods(gone.Addf("%s x%d: %s", cluster.Class, cluster.Count, cluster.Message), cluster)
+		for _, cluster := range app.FoldClusters(r.Gone) {
+			testClusterMods(gone.Addf("%s x%d: %s", cluster.Class, cluster.Count, testClusterMessage(cluster)), cluster)
 		}
 	} else {
 		root.Add("compared with: no earlier run of this plan")
@@ -274,6 +293,9 @@ func testProbe(root *render.Node, p *app.TestRunProbe) {
 	if p.Screenshot != "" {
 		n.KV("screenshot", p.Screenshot)
 	}
+	if p.LinesFile != "" {
+		n.KV("all lines", p.LinesFile)
+	}
 	if len(p.Screenshots) > 0 {
 		n.KV("screenshots", fmt.Sprintf("%d named, probe-<name>.png in %s", len(p.Screenshots), filepath.Dir(p.Screenshots[0])))
 	}
@@ -303,7 +325,74 @@ func testClusterMods(n *render.Node, cluster app.TestRunCluster) {
 	}
 	mods := "no mod identified"
 	if len(cluster.Mods) > 0 {
-		mods = strings.Join(cluster.Mods, ", ")
+		names := slices.Clone(cluster.Mods)
+		if len(cluster.ModClusters) == len(names) {
+			for i, n := range cluster.ModClusters {
+				names[i] += fmt.Sprintf(" (%d)", n)
+			}
+		}
+		mods = strings.Join(names, ", ")
 	}
 	n.KV("mods", mods+" ("+cluster.Confidence+")")
+}
+
+// testClusterMessage is a cluster's message, or a folded entry's cluster count and examples.
+func testClusterMessage(c app.TestRunCluster) string {
+	if c.Folded == 0 {
+		return c.Message
+	}
+	return fmt.Sprintf("%d clusters, e.g. %s", c.Folded, strings.Join(c.Examples, " | "))
+}
+
+// lineJSON writes v as JSON with each top-level field, and each item of a top-level list,
+// on a line of its own and everything inside them compact: the --json test run report,
+// readable without the indentation that made up a third of it.
+func lineJSON(v any) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false) // probe lines often have > and &
+	if err := enc.Encode(v); err != nil {
+		return nil, err
+	}
+	b := bytes.TrimSpace(buf.Bytes())
+	var out []byte
+	var stack []byte // the open brackets
+	inString, escaped := false, false
+	for _, c := range b {
+		out = append(out, c)
+		if inString {
+			switch {
+			case escaped:
+				escaped = false
+			case c == '\\':
+				escaped = true
+			case c == '"':
+				inString = false
+			}
+			continue
+		}
+		switch c {
+		case '"':
+			inString = true
+		case '{', '[':
+			stack = append(stack, c)
+			if len(stack) == 1 || len(stack) == 2 && c == '[' {
+				out = append(out, '\n')
+				out = append(out, strings.Repeat("  ", len(stack))...)
+			}
+		case '}', ']':
+			if len(stack) == 1 || len(stack) == 2 && c == ']' {
+				out = append(out[:len(out)-1], '\n')
+				out = append(out, strings.Repeat("  ", len(stack)-1)...)
+				out = append(out, c)
+			}
+			stack = stack[:len(stack)-1]
+		case ',':
+			if len(stack) == 1 || len(stack) == 2 && stack[1] == '[' {
+				out = append(out, '\n')
+				out = append(out, strings.Repeat("  ", len(stack))...)
+			}
+		}
+	}
+	return out, nil
 }

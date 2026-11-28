@@ -55,8 +55,12 @@ func TestTestRunToolReport(t *testing.T) {
 	if err == nil {
 		err = json.Unmarshal(saved, &stored)
 	}
+	// The result folds clusters and cuts probe lines (20 §2 "Report size"); these 35 are unattributed and stay.
 	stored.Args = nil
-	if b, _ := json.MarshalIndent(&stored, "", "  "); err != nil || string(b)+"\n" != out {
+	stored.Clusters, stored.Fixed, stored.Gone = app.FoldClusters(stored.Clusters), app.FoldClusters(stored.Fixed), app.FoldClusters(stored.Gone)
+	stored.Probe = stored.Probe.Brief()
+	b, _ := json.Marshal(&stored)
+	if got, _ := json.Marshal(&r); err != nil || string(got) != string(b) || !strings.HasPrefix(out, "{\n  \"verdict\":") {
 		t.Fatalf("tool result differs from report.json: %v", err)
 	}
 	out, isErr = call(t, cs, "test_run", map[string]any{"env": "main", "timeout_seconds": 5})

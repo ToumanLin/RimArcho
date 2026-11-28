@@ -58,6 +58,11 @@ type TestRunCluster struct {
 	// Consequences: clusters that follow from this one's failed def file, folded into it and
 	// not listed (06 §3); they still count in counts and clusters_total.
 	Consequences int `json:"consequences,omitempty"`
+	// Folded: in the --json and text reports, the clusters this entry stands for (FoldClusters):
+	// Count is their sum, Examples their first messages, ModClusters how many name each of Mods.
+	Folded      int      `json:"folded,omitempty"`
+	Examples    []string `json:"examples,omitempty"`
+	ModClusters []int    `json:"mod_clusters,omitempty"`
 }
 
 type TestRunReport struct {

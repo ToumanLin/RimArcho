@@ -103,6 +103,11 @@ func TestTestRunProbe(t *testing.T) {
 	if p.Screenshot != filepath.Join(r.RunDir, "probe.png") {
 		t.Fatalf("screenshot %q", p.Screenshot)
 	}
+	// every [Probe] line, uncut, in the run folder (20 §3)
+	if b, err := os.ReadFile(p.LinesFile); err != nil || p.LinesFile != filepath.Join(r.RunDir, "probe-lines.txt") ||
+		strings.Count(string(b), "\n") != 6 || !strings.Contains(string(b), "t=250 a:Wait\n") {
+		t.Fatalf("probe-lines.txt %q: %q, %v", p.LinesFile, b, err)
+	}
 	// the scenario's named screenshots move with it; an earlier run's are gone
 	if !slices.Equal(p.Screenshots, []string{filepath.Join(r.RunDir, "probe-pawn.png")}) {
 		t.Fatalf("named screenshots %v", p.Screenshots)
