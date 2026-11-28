@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strconv"
@@ -15,6 +16,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/finding"
 	"github.com/ToumanLin/RimArcho/internal/modchanges"
 	"github.com/ToumanLin/RimArcho/internal/perftrace"
+	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
@@ -618,11 +620,79 @@ type GameFound struct {
 	// game's current list); GameMods is how many Mods it enables (0: no such file).
 	GameList bool `json:"gameList,omitempty"`
 	GameMods int  `json:"gameMods,omitempty"`
+	// The first-run guide's Mod folder rows (16 §2.15), counted without a scan: how many
+	// Mod folders the game's Mods folder and the Workshop folder hold (-1: none or
+	// unreadable). Extra are other managers' folders the player kept ticked; they become
+	// shared Mod folders with this game (EnvSpec.Extra).
+	Mods         int      `json:"mods"`
+	WorkshopMods int      `json:"workshopMods"`
+	Extra        []string `json:"extra,omitempty"`
+}
+
+// FirstRunFound is what the first-run guide's "found" step confirms (16 §2.15): the games,
+// other managers' Mod folders, and where detection looked (for "no RimWorld found").
+type FirstRunFound struct {
+	Games     []GameFound          `json:"games"`
+	Managers  []ManagerFolderFound `json:"managers"`
+	Libraries int                  `json:"libraries"`
+	Folders   []string             `json:"folders"`
+}
+
+// ManagerFolderFound is another manager's Mod folder with its Mod count.
+type ManagerFolderFound struct {
+	Manager string `json:"manager"`
+	Path    string `json:"path"`
+	Mods    int    `json:"mods"`
+}
+
+// FirstRun is FindGames with the folders the guide shows beside the games: each game's Mods
+// and Workshop folder counted, the folders other managers use (managers, from
+// app.FindManagerModFolders) that hold Mods and are not a game's or Steam's own, and where
+// detection looked (env.Searched).
+func FirstRun(a *app.App, managers []app.ManagerFolder) FirstRunFound {
+	out := FirstRunFound{Games: FindGames(a), Managers: []ManagerFolderFound{}, Folders: []string{}}
+	known := map[string]bool{}
+	var games []string
+	for i := range out.Games {
+		g := &out.Games[i]
+		countGameFolders(g)
+		games = append(games, g.Game)
+		known[env.PathKey(filepath.Join(g.Game, "Mods"))] = true
+		if g.Workshop != "" {
+			known[env.PathKey(g.Workshop)] = true
+		}
+	}
+	for _, w := range env.WorkshopFolders(a.Detect) {
+		known[env.PathKey(w)] = true
+	}
+	for _, m := range managers {
+		if known[env.PathKey(m.Path)] || slices.ContainsFunc(games, func(g string) bool { return source.Within(m.Path, g) }) {
+			continue
+		}
+		known[env.PathKey(m.Path)] = true
+		if n := env.CountModDirs(m.Path); n > 0 {
+			out.Managers = append(out.Managers, ManagerFolderFound{Manager: m.Manager, Path: m.Path, Mods: n})
+		}
+	}
+	libs, folders := env.Searched(a.Detect)
+	out.Libraries = libs
+	if folders != nil {
+		out.Folders = folders
+	}
+	return out
+}
+
+// countGameFolders fills in a found game's Mod folder counts.
+func countGameFolders(g *GameFound) {
+	g.Mods, g.WorkshopMods = env.CountModDirs(filepath.Join(g.Game, "Mods")), -1
+	if g.Workshop != "" {
+		g.WorkshopMods = env.CountModDirs(g.Workshop)
+	}
 }
 
 // spec is the env add of a found game with the page's choices.
 func (g GameFound) spec() app.EnvSpec {
-	sp := app.EnvSpec{GameRoot: g.Game, UserDataRoot: g.UserData, Launch: g.Launch, Like: g.Like, List: g.List, NewList: g.NewList}
+	sp := app.EnvSpec{GameRoot: g.Game, UserDataRoot: g.UserData, Launch: g.Launch, Like: g.Like, List: g.List, NewList: g.NewList, Extra: g.Extra}
 	if g.GameList && g.UserData != "" {
 		sp.GameList = g.UserData
 	}
@@ -722,6 +792,7 @@ func GameAt(a *app.App, path string, pending ...string) (*GameFound, error) {
 	}
 	g.Source = gameSource(*g)
 	g.Name = freeName(env.MajorMinor(g.Version), taken)
+	countGameFolders(g)
 	return g, nil
 }
 

@@ -212,15 +212,58 @@ func defaultSteamRoots(o DetectOptions) []string {
 	return roots
 }
 
+// defaultManualRoots are the fixed candidate folders, then every RimWorld* folder in the
+// games folders (GameParents: each fixed drive's Games and GOG Games on Windows), so
+// `D:\Games\RimWorld 1.7` is found too (03 §3.2).
 func defaultManualRoots(goos, home string) []string {
+	var fixed []string
 	switch goos {
 	case "windows":
-		return []string{`C:\Games\RimWorld`, `D:\Games\RimWorld`, `C:\GOG Games\RimWorld`, `D:\GOG Games\RimWorld`, `C:\Program Files\RimWorld`, `C:\Program Files (x86)\RimWorld`}
+		fixed = []string{`C:\Games\RimWorld`, `D:\Games\RimWorld`, `C:\GOG Games\RimWorld`, `D:\GOG Games\RimWorld`, `C:\Program Files\RimWorld`, `C:\Program Files (x86)\RimWorld`}
 	case "darwin":
 		return []string{"/Applications/RimWorld.app", "/Applications/RimWorld"}
 	default:
-		return []string{filepath.Join(home, "GOG Games", "RimWorld"), filepath.Join(home, "Games", "RimWorld")}
+		fixed = []string{filepath.Join(home, "GOG Games", "RimWorld"), filepath.Join(home, "Games", "RimWorld")}
 	}
+	seen := map[string]bool{}
+	for _, f := range fixed {
+		seen[PathKey(f)] = true
+	}
+	for _, g := range GameFoldersIn(GameParents(goos, home)) {
+		if !seen[PathKey(g)] {
+			seen[PathKey(g)] = true
+			fixed = append(fixed, g)
+		}
+	}
+	return fixed
+}
+
+// Searched says where detection looks (the guide's "looked in" line, 16 §2.15): how many
+// Steam libraries, and the games folders that exist. With explicit ManualRoots (tests, the
+// synthetic host) the folders are those roots' parents that exist.
+func Searched(o DetectOptions) (libraries int, folders []string) {
+	if o.GOOS == "" {
+		o.GOOS = runtime.GOOS
+	}
+	if o.Home == "" {
+		o.Home, _ = os.UserHomeDir()
+	}
+	if o.SteamRoots == nil {
+		o.SteamRoots = defaultSteamRoots(o)
+	}
+	libraries = len(SteamLibraries(o.SteamRoots))
+	if o.ManualRoots == nil {
+		return libraries, GameParents(o.GOOS, o.Home)
+	}
+	seen := map[string]bool{}
+	for _, r := range o.ManualRoots {
+		p := filepath.Dir(filepath.Clean(r))
+		if k := PathKey(p); !seen[k] && isDir(p) {
+			seen[k] = true
+			folders = append(folders, p)
+		}
+	}
+	return libraries, folders
 }
 
 func userDataCandidates(goos, home string) []string {
