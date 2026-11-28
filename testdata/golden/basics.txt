@@ -279,13 +279,13 @@ mods: 3 (env:main, filter: source:local)
   #xamx  Old Mod     [local OldMod]
 
 $ archo find harmony
-found: 1 for "harmony"
+found: 1 for "harmony" (env:main)
   #6olp  Harmony  [workshop ws:2009463077]
 next:
   archo mod 6olp
 
 $ archo find nothing-like-this
-found: 0 for "nothing-like-this"
+found: 0 for "nothing-like-this" (env:main)
 
 $ archo mod pkg:brrainz.harmony
 #6olp Harmony  [workshop ws:2009463077]

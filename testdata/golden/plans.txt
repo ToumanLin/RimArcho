@@ -21,7 +21,7 @@ next:
 $ archo plan new listed --from $ROOT/Raid Night.txt
 plan:listed created: 4 active
   v1: import, Raid Night.txt
-  not installed: 1
+  not installed: 1: not.installed
   current: plan:default (unchanged)
 next:
   archo plan use listed
@@ -29,7 +29,7 @@ next:
 $ archo loadout import $ROOT/Raid Night.txt --new
 plan:Raid Night created: 4 active
   v1: import, Raid Night.txt
-  not installed: 1
+  not installed: 1: not.installed
   current: plan:default (unchanged)
 next:
   archo plan use "Raid Night"
@@ -37,7 +37,7 @@ next:
 $ archo loadout import $ROOT/Raid Night.txt --new night 2
 plan:night 2 created: 4 active
   v1: import, Raid Night.txt
-  not installed: 1
+  not installed: 1: not.installed
   current: plan:default (unchanged)
 next:
   archo plan use "night 2"

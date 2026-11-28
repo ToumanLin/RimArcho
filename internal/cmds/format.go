@@ -7,6 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/render"
+	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
@@ -26,6 +27,13 @@ func tags(c *Ctx, ix *app.Index, m *store.Mod) string {
 	}
 	if m.Unloadable != "" {
 		parts = append(parts, "unloadable: "+m.Unloadable)
+	}
+	// Another game's own Mods/ folder: this game does not see it; a save or test run links it
+	// only when the plan names this copy, so a packageId in a list file does not pick it (09 §3).
+	if m.Kind == source.Elsewhere && m.Status == identity.Live {
+		if st := c.Loadout(); st != nil && st.Ix.Env.ID == ix.Env.ID && st.Deployable(m) && st.Position(m.ID) == 0 {
+			parts = append(parts, "another game's Mods/: enable this reference to link it")
+		}
 	}
 	if b := app.Basis(m.LineageBasis); b != "" && b != "manual" && len(ix.ByLineage[m.LineageID]) > 1 {
 		parts = append(parts, "copy "+b)

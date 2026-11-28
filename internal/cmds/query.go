@@ -408,12 +408,31 @@ func findCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	q := strings.Join(a.Pos, " ")
-	d, root := render.New(fmt.Sprintf("found: %d for %q", len(ms), q))
+	// Live copies first; tombstones (removed copies) fold into one line unless --all
+	// ("Hospitality" gave 17 rows, half of them tombstones; 2026-11-27).
+	var live, tomb []*store.Mod
+	for _, m := range ms {
+		if m.Status == identity.Tombstone {
+			tomb = append(tomb, m)
+		} else {
+			live = append(live, m)
+		}
+	}
+	head := fmt.Sprintf("found: %d for %q (env:%s)", len(live), q, ix.Env.Name)
+	if !a.Bool("all") {
+		ms = live
+	} else {
+		ms = append(live, tomb...)
+	}
+	d, root := render.New(head)
 	limit := render.DefaultLimit
 	if a.Bool("all") {
 		limit = 0
 	}
 	addMods(c, root, ix, ms, limit, "archo find "+quote(q)+" --all")
+	if len(tomb) > 0 && !a.Bool("all") {
+		root.Addf("+%d removed copies (tombstones; archo find %s --all)", len(tomb), quote(q))
+	}
 	if len(ms) == 1 {
 		d.AddNext("archo mod " + ix.Ref(ms[0].ID))
 	}

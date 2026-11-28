@@ -71,14 +71,18 @@ func newPlanDoc(c *Ctx, r *app.NewPlanResult) *render.Doc {
 		if il.Game != "" {
 			root.KV("game", il.Game)
 		}
-		missing := 0
+		// Name them: "not installed: 1" sent an agent hunting for which (2026-11-27).
+		var missing []string
 		for _, e := range r.List {
 			if e.Instance == "" {
-				missing++
+				missing = append(missing, e.Missing)
 			}
 		}
-		if missing > 0 {
-			root.KV("not installed", fmt.Sprint(missing))
+		if len(missing) > 0 {
+			root.KV("not installed", fmt.Sprintf("%d: %s", len(missing), strings.Join(firstN(missing, 8), ", ")))
+			if len(missing) > 8 {
+				root.KV("not installed", fmt.Sprintf("… %d more", len(missing)-8))
+			}
 		}
 		if len(r.Unresolved) > 0 {
 			root.KV("skipped", fmt.Sprintf("%d workshop IDs no installed mod has", len(r.Unresolved)))
