@@ -343,7 +343,7 @@ func Sections(a *app.App, ix *app.Index, mod *store.Mod) []Section {
 	}
 	run(T("Defs"), "def", "--mod", ref)
 	run(T("patches"), "patches", "--mod", ref)
-	run("Harmony", "harmony", "--mod", ref)
+	run("Harmony", "harmony", "--mod", ref, "--list-only")
 	out = append(out, rulesSection(a, ix, mod), historySection(a, ix, mod.ID))
 	return out
 }

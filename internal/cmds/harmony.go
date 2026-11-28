@@ -13,7 +13,10 @@ import (
 
 func init() {
 	register(&Command{Name: "harmony", Summary: "Harmony patches: of a mod, on a target method, or shared between mods", MaxArgs: 0, Run: harmonyCmd,
-		Flags: []Flag{{Name: "mod", Value: "<ref>"}, {Name: "target", Value: "<Type.Method | part>"}, {Name: "shared"}, {Name: "all"}, gameVersionFlag}})
+		Flags: []Flag{{Name: "mod", Value: "<ref>"}, {Name: "target", Value: "<Type.Method | part>"}, {Name: "shared"}, {Name: "all"},
+			// --list-only: the window's details pane, which opens on every row, keeps "not analysed"
+			// for a Mod outside the list instead of reading its assemblies (16 §10).
+			{Name: "list-only", Help: "with --mod: say \"not analysed\" for a mod outside the current list instead of reading it"}, gameVersionFlag}})
 }
 
 func harmonyLine(ix *app.Index, h *store.HarmonyRow, withMod, withTarget bool) string {
@@ -55,6 +58,9 @@ func harmonyCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		inst = m.ID
 		if a.Str("target") == "" && st.Position(m.ID) == 0 {
+			if a.Bool("list-only") {
+				return notAnalysed("harmony"), nil
+			}
 			return harmonyOutside(c, a, st, s, inst, limit)
 		}
 	}
