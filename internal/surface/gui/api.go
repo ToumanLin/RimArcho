@@ -2031,7 +2031,7 @@ func (s *API) startAnalyzeOf(list string, background bool) bool {
 		from.AnalyzeBackground = background
 	}
 	task := s.tasks.BeginOnce(view.TaskAnalyze, obj, nil) // one row, updated in place (16 §8.9)
-	began := time.Now()                                   // the slow-check prompt's wall time (16 §2.14)
+	clock := app.NewCheckClock()                          // the slow-check prompt's wall time and phases (16 §2.14)
 	// the open list's findings will change: its problems button says so while this runs
 	if c, _ := s.cachedNeedsLocked(); c != nil && c.scope == scope {
 		ev := s.problemsNowLocked(c.n)
@@ -2052,9 +2052,10 @@ func (s *API) startAnalyzeOf(list string, background bool) bool {
 		case run != nil:
 			err = run(from, progress)
 		default:
-			err = app.ChildAnalyzeExeOf(exe, home, env, plan, mm, background, progress)
+			err = app.ChildAnalyzeClocked(exe, home, env, plan, mm, background, clock, progress)
 		}
 		s.mu.Lock()
+		clock.Lap("lock") // waiting for the window's lock
 		s.busy["analyze"], s.needs = false, nil
 		if err == nil && inputs != "" {
 			s.analyzedKey, s.analyzedAt = inputs, time.Now()
@@ -2088,7 +2089,8 @@ func (s *API) startAnalyzeOf(list string, background bool) bool {
 		}
 		s.send("analyze", ev)
 		if err == nil {
-			s.offerSlowCheck(began)
+			clock.Lap("ui") // the task row, the findings' refresh starting and the events
+			s.offerSlowCheck(clock)
 		}
 	}()
 	return true

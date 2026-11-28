@@ -99,6 +99,8 @@ type App struct {
 	AnalyzeBackground bool
 	// AnalyzeWorkers caps the analysis's file readers; 0 is the analyzer's default.
 	AnalyzeWorkers int
+	// OpenedIn is how long OpenWith took (the slow-check report's open phase, 16 §2.14).
+	OpenedIn time.Duration
 	// SavesIndexRunner reads saves into the full-read cache (12 §1.7), the given saves
 	// first; nil means the `archo saves index` child process. Tests run it in-process.
 	SavesIndexRunner func(first []string, progress func(string)) error
@@ -271,8 +273,14 @@ type OpenOptions struct {
 }
 
 // OpenWith is Open with options.
-func OpenWith(home string, o OpenOptions) (*App, error) {
+func OpenWith(home string, o OpenOptions) (a *App, err error) {
 	defer perftrace.Span("app-open")()
+	opened := time.Now()
+	defer func() {
+		if a != nil {
+			a.OpenedIn = time.Since(opened)
+		}
+	}()
 	if err := os.MkdirAll(home, 0o755); err != nil {
 		return nil, err
 	}
@@ -290,7 +298,7 @@ func OpenWith(home string, o OpenOptions) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	a := &App{Home: home, Store: st, Config: cfg, Now: time.Now, Rand: rand.Reader, Loc: time.Local}
+	a = &App{Home: home, Store: st, Config: cfg, Now: time.Now, Rand: rand.Reader, Loc: time.Local}
 	a.Ops = oplog.New(st, oplog.OriginFromEnv(oplog.CLI))
 	a.Ops.Now = func() time.Time { return a.Now() }
 	a.ApplyNetwork()

@@ -30,24 +30,26 @@ var readDLL = harmony.Read
 
 // readAssembly returns the Harmony facts of the DLL at path, from c or by reading it.
 // Failures are not cached: they are cheap and rare, and read again with the same error.
-func readAssembly(c AssemblyCache, path string, skipped bool) (*harmony.Assembly, error) {
+func readAssembly(c AssemblyCache, path string, skipped bool) (a *harmony.Assembly, cached bool, err error) {
 	if c == nil {
-		return readDLL(path, skipped)
+		a, err = readDLL(path, skipped)
+		return a, false, err
 	}
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return readDLL(path, skipped) // the same error as without a cache
+		a, err = readDLL(path, skipped) // the same error as without a cache
+		return a, false, err
 	}
 	sum := sha256.Sum256(b)
 	key := AssemblyCacheKey(hex.EncodeToString(sum[:]), skipped)
 	if a, ok := c.Get(key); ok {
-		return a, nil
+		return a, true, nil
 	}
-	a, err := readDLL(path, skipped)
+	a, err = readDLL(path, skipped)
 	if err == nil {
 		c.Put(key, a)
 	}
-	return a, err
+	return a, false, err
 }
 
 // AssemblyCacheKey names the facts of a DLL with SHA-256 sum read with the skip flag, for

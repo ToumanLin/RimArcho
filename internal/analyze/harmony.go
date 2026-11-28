@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/content"
 	"github.com/ToumanLin/RimArcho/internal/finding"
@@ -36,7 +37,7 @@ func AssemblyKey(m *Mod, folders []string, skip []string) string {
 
 // harmonyLayer reads every effective DLL of the active mods (05 §5.3). It is independent
 // of the Def/Patch layers: a failure only affects its own facts.
-func harmonyLayer(active []*Mod, folders map[string][]string, skip []string, workers int, cache AssemblyCache) []*AssemblyFacts {
+func harmonyLayer(active []*Mod, folders map[string][]string, skip []string, workers int, cache AssemblyCache) ([]*AssemblyFacts, []DLLTime) {
 	type job struct {
 		m *Mod
 		a content.Asset
@@ -48,6 +49,7 @@ func harmonyLayer(active []*Mod, folders map[string][]string, skip []string, wor
 		}
 	}
 	out := make([]*AssemblyFacts, len(jobs))
+	times := make([]DLLTime, len(jobs))
 	var wg sync.WaitGroup
 	next := make(chan int)
 	for w := 0; w < workers; w++ {
@@ -57,7 +59,9 @@ func harmonyLayer(active []*Mod, folders map[string][]string, skip []string, wor
 			for i := range next {
 				j := jobs[i]
 				f := &AssemblyFacts{Instance: j.m.Instance, File: j.a.Rel, Skipped: harmony.SkippedFor(filepath.Base(j.a.Path), j.m.Pkg, skip)}
-				r, err := readAssembly(cache, j.a.Path, f.Skipped)
+				t0 := time.Now()
+				r, cached, err := readAssembly(cache, j.a.Path, f.Skipped)
+				times[i] = DLLTime{Instance: j.m.Instance, Pkg: j.m.Pkg, File: j.a.Rel, Cached: cached, Dur: time.Since(t0)}
 				if err != nil {
 					f.Err = err.Error()
 					f.Assembly = &harmony.Assembly{}
@@ -73,7 +77,7 @@ func harmonyLayer(active []*Mod, folders map[string][]string, skip []string, wor
 	}
 	close(next)
 	wg.Wait()
-	return out
+	return out, times
 }
 
 type hpatch struct {

@@ -142,6 +142,40 @@ type Stats struct {
 	// Guards: the run marks guarded operations (PatchVersion ≥ 1); the app's quick patch
 	// check between runs trusts only such runs (05 §4.4 "Between checks")
 	Guards bool `json:",omitempty"`
+
+	// For the slow-check report (16 §2.14 "Slow checks"), not stored: the patch layer's
+	// reading and simulation (the rest of PatchMs builds facts and findings), its slowest
+	// operations and the Harmony layer's slowest DLLs (slowest first), how many DLLs came
+	// from the assembly cache, and how many methods the static patches target.
+	PatchParseMs, PatchSimMs int64     `json:"-"`
+	SlowestOps               []OpTime  `json:"-"`
+	SlowestDLLs              []DLLTime `json:"-"`
+	DLLsCached               int       `json:"-"`
+	HarmonyTargets           int       `json:"-"`
+}
+
+// SlowestOpsKept and SlowestDLLsKept: how many of each Stats keeps.
+const (
+	SlowestOpsKept  = 10
+	SlowestDLLsKept = 5
+)
+
+// OpTime is one top-level patch operation and how long the simulation spent on it.
+type OpTime struct {
+	Instance, Pkg string
+	File          string // the patch file, relative to the Mod's folder
+	Class         string // PatchOperationAdd, or a Mod's own class
+	XPath         string // the operation's (a sequence's first); the one past the step budget when TooSlow
+	TooSlow       bool   // patch.too-slow (05 §5.2)
+	Dur           time.Duration
+}
+
+// DLLTime is one DLL the Harmony layer read and how long it took.
+type DLLTime struct {
+	Instance, Pkg string
+	File          string // relative to the Mod's folder
+	Cached        bool   // its facts came from the assembly cache
+	Dur           time.Duration
 }
 
 // ProgressEvery is the longest the Patch simulation goes without a progress line while it
@@ -197,7 +231,10 @@ func Run(in Input) (*Output, error) {
 	sim := newSim(r.doc, r.root, r.active, in.MM, r.folders)
 	sim.skippedOf = r.skipped
 	tops := r.parsePatches()
+	t1s := time.Now()
+	r.out.Stats.PatchParseMs = t1s.Sub(t1).Milliseconds()
 	r.simulate(sim, tops)
+	r.out.Stats.PatchSimMs = time.Since(t1s).Milliseconds()
 	if in.AfterSimulation != nil {
 		in.AfterSimulation()
 	}
@@ -394,12 +431,14 @@ func (r *run) simulate(sim *sim, tops []*topOp) {
 	seq := map[string]int{}
 	st := &r.out.Stats
 	last := time.Now()
+	slow := slowest[*topOp]{n: SlowestOpsKept}
 	for k, t := range tops {
 		seq[t.mod.Instance]++
 		t.seq = seq[t.mod.Instance]
 		t0 := time.Now()
 		sim.run(t)
 		now := time.Now()
+		slow.add(t, now.Sub(t0))
 		if d := now.Sub(t0).Milliseconds(); d > st.SlowestMs {
 			st.SlowestMs, st.SlowestOp = d, fmt.Sprintf("%s %s:%d", t.mod.Name, t.file, t.op.Line)
 		}
@@ -411,6 +450,10 @@ func (r *run) simulate(sim *sim, tops []*topOp) {
 		}
 	}
 	st.TopOps = len(tops)
+	for i, t := range slow.items {
+		st.SlowestOps = append(st.SlowestOps, OpTime{Instance: t.mod.Instance, Pkg: t.mod.Pkg, File: t.file,
+			Class: t.op.Class, XPath: t.reportXPath(), TooSlow: t.slow, Dur: slow.durs[i]})
+	}
 	st.IndexHits, st.IndexRebuilds, st.Evaluations = sim.ix.hits, sim.ix.rebuilds, sim.evals
 	st.Nodes, st.TextMB = r.doc.Len(), r.doc.TextBytes()>>20
 	var ms runtime.MemStats
@@ -450,7 +493,9 @@ func (r *run) readAssemblies() {
 	if skip == nil {
 		skip = harmony.DefaultSkip
 	}
-	out.Assemblies = harmonyLayer(r.active, r.folders, skip, r.in.Workers, r.in.Assemblies)
+	var times []DLLTime
+	out.Assemblies, times = harmonyLayer(r.active, r.folders, skip, r.in.Workers, r.in.Assemblies)
+	targets := map[string]bool{}
 	for _, a := range out.Assemblies {
 		out.Stats.Assemblies++
 		out.Stats.HarmonyPatches += len(a.Patches)
@@ -458,9 +503,76 @@ func (r *run) readAssemblies() {
 		if a.Err != "" {
 			out.Stats.AssemblyErrors++
 		}
+		for _, p := range a.Patches {
+			if p.TargetType != "" && p.TargetMethod != "" {
+				targets[p.TargetType+"."+p.TargetMethod+p.Args] = true
+			}
+		}
 	}
+	out.Stats.HarmonyTargets = len(targets)
+	slow := slowest[DLLTime]{n: SlowestDLLsKept}
+	for _, t := range times {
+		if t.Cached {
+			out.Stats.DLLsCached++
+		}
+		slow.add(t, t.Dur)
+	}
+	out.Stats.SlowestDLLs = slow.items
 	out.Findings = append(out.Findings, harmonyFindings(r.active, out.Assemblies)...)
 	out.Findings = append(out.Findings, asmDuplicates(r.active, out.Assemblies)...)
+}
+
+// slowest keeps the n items that took longest, slowest first. Adding costs one comparison
+// unless the item is among them (the slow-check report's cheap collection, 16 §2.14).
+type slowest[T any] struct {
+	n     int
+	items []T
+	durs  []time.Duration
+}
+
+func (s *slowest[T]) add(x T, d time.Duration) {
+	if len(s.items) == s.n && d <= s.durs[len(s.durs)-1] {
+		return
+	}
+	i := len(s.items)
+	if i == s.n {
+		i--
+	} else {
+		var zero T
+		s.items, s.durs = append(s.items, zero), append(s.durs, 0)
+	}
+	for i > 0 && s.durs[i-1] < d {
+		s.items[i], s.durs[i] = s.items[i-1], s.durs[i-1]
+		i--
+	}
+	s.items[i], s.durs[i] = x, d
+}
+
+// reportXPath is the expression the report names: the one past the step budget, the
+// operation's own, or for a sequence or a conditional the first inside it.
+func (t *topOp) reportXPath() string {
+	if t.slowXPath != "" {
+		return t.slowXPath
+	}
+	return firstXPath(t.op)
+}
+
+func firstXPath(o *Op) string {
+	if o == nil {
+		return ""
+	}
+	if o.XPath != "" {
+		return o.XPath
+	}
+	for _, c := range o.ops {
+		if x := firstXPath(c); x != "" {
+			return x
+		}
+	}
+	if x := firstXPath(o.match); x != "" {
+		return x
+	}
+	return firstXPath(o.nomatch)
 }
 
 func defFact(d *xdoc.Doc, t int32, file string, line int) DefFact {

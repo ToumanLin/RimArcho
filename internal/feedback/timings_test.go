@@ -30,9 +30,9 @@ func TestSendTimings(t *testing.T) {
 	if err := SendTimings(context.Background(), srv.URL+"/timings", "RimArcho/1.1.4", tm.Body()); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(tm.Body(), `"phases": [
-    {"name": "defs", "ms": 1200}
-  ]`) {
+	if !strings.Contains(tm.Body(), `
+  "phases": {"defs":1200}
+`) {
 		t.Fatalf("body %s", tm.Body())
 	}
 	var back Timings

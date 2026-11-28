@@ -98,3 +98,13 @@ func ParseCheckPhases(detail string) (CheckPhases, bool) {
 	}
 	return p, true
 }
+
+// Ms is how long the phase named name took (0 when there is none).
+func (p CheckPhases) Ms(name string) int64 {
+	for _, ph := range p.Phases {
+		if ph.Name == name {
+			return ph.Ms
+		}
+	}
+	return 0
+}

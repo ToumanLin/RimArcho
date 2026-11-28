@@ -5,6 +5,7 @@ package gui
 import (
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -13,9 +14,9 @@ import (
 // send. The page answers with SlowCheckSend or SlowCheckDismiss; what goes is what the
 // prompt previewed, kept here, never text from the page.
 
-// offerSlowCheck sends the prompt for the check that began at began, if it gets one.
-func (s *API) offerSlowCheck(began time.Time) {
-	p := view.SlowCheckOf(s.a, began, time.Since(began))
+// offerSlowCheck sends the prompt for the check clock timed, if it gets one.
+func (s *API) offerSlowCheck(clock *app.CheckClock) {
+	p := view.SlowCheckOf(s.a, clock, time.Since(clock.Began))
 	if p == nil {
 		return
 	}

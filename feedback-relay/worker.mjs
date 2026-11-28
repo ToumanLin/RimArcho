@@ -393,9 +393,10 @@ async function plusComment(env, fetchFn, now, n, count) {
   if (res.ok) await env.COUNTS.put("plusc:" + n, String((await res.json()).id));
 }
 
-// TIMINGS_FIELDS is everything a slow check's timings may carry (RimArcho's feedback.Timings,
-// 16 §2.14 "Slow checks"): anything else is dropped, so no name, path or account can reach
-// the issue even from a changed client. Strings are short and plain; numbers are bounded.
+// TIMINGS_FIELDS is everything a slow check's timings may carry at the top level (RimArcho's
+// feedback.Timings, 16 §2.14 "Slow checks"): anything else is dropped, so no player, path or
+// account can reach the issue even from a changed client. Strings are short and plain;
+// numbers are bounded. phases, run, patches and harmony are cleaned on their own below.
 const TIMINGS_FIELDS = {
   version: "str",
   os: "str",
@@ -403,42 +404,149 @@ const TIMINGS_FIELDS = {
   active_mods: "int",
   total_mods: "int",
   automatic: "bool",
+  priority: "str",
   wall_ms: "int",
+  cpu: "str",
   cpu_threads: "int",
   ram_gb: "int",
   disk: "str",
 };
+const TIMINGS_RUN = { cold: "bool", first: "bool", list: "str", mods_read: "int", mods_cached: "int", workers: "int", gc_ms: "int", peak_heap_mb: "int" };
+const TIMINGS_PATCHES = { ops: "int", nodes: "int", too_slow: "int", parse_ms: "int", sim_ms: "int", facts_ms: "int" };
+const TIMINGS_HARMONY = { dlls: "int", cached: "int", patches: "int", methods: "int" };
+const TIMINGS_OP = { ms: "ms", pkg: "pkg", ws: "ws", class: "class", xpath: "xpath", file: "file", too_slow: "bool" };
+const TIMINGS_DLL = { ms: "ms", pkg: "pkg", ws: "ws", file: "file", cached: "bool" };
 const TIMINGS_PHASE = /^[a-z]{1,16}$/;
+const TIMINGS_MAX_PHASES = 20;
+const TIMINGS_SLOWEST_OPS = 10;
+const TIMINGS_SLOWEST_DLLS = 5;
 const TIMINGS_PER_IP_DAY = 2; // timings a day from one sender
 const TIMINGS_PER_DAY = 100; // timings a day from everyone
+const TIMINGS_MAX_BYTES = 16000; // ten XPaths of 300 characters fit
 
-// cleanTimings keeps TIMINGS_FIELDS and up to 12 phases {name, ms}; null when the request is
-// not timings at all (no wall time, or no phases).
-export function cleanTimings(input) {
-  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
-  const out = {};
-  for (const [k, kind] of Object.entries(TIMINGS_FIELDS)) {
-    const v = input[k];
-    if (kind === "str" && typeof v === "string" && v.trim()) out[k] = v.replace(/[^\w .,()+\-]/g, "").trim().slice(0, 80);
-    if (kind === "int" && Number.isInteger(v) && v >= 0 && v < 1e9) out[k] = v;
-    if (kind === "bool" && typeof v === "boolean") out[k] = v;
+// a path on the sender's computer: a drive, a share, a user folder
+const LOCAL_PATH = /(^|[^a-z])[a-z]:[\\/]|\\\\|(^|[\\/])(users|home|documents and settings)[\\/]/i;
+
+// cleanValue cleans one value of a kind; undefined drops it.
+function cleanValue(kind, v) {
+  switch (kind) {
+    case "str":
+      return typeof v === "string" && v.trim() ? v.replace(/[^\w .,()+\-]/g, "").trim().slice(0, 80) || undefined : undefined;
+    case "int":
+      return Number.isInteger(v) && v >= 0 && v < 1e9 ? v : undefined;
+    case "ms":
+      return typeof v === "number" && Number.isFinite(v) && v >= 0 && v < 1e9 ? Math.round(v * 10) / 10 : undefined;
+    case "bool":
+      return typeof v === "boolean" ? v : undefined;
+    case "pkg": // a packageId
+      return typeof v === "string" && /^[\w.\-]{1,100}$/.test(v) ? v : undefined;
+    case "ws": // a Workshop id
+      return typeof v === "string" && /^\d{1,20}$/.test(v) ? v : undefined;
+    case "class": // PatchOperationAdd, or a Mod's own class (namespace and generic arity allowed)
+      return typeof v === "string" && /^[\w.+`\-]{1,120}$/.test(v) ? v : undefined;
+    case "xpath": {
+      if (typeof v !== "string" || LOCAL_PATH.test(v)) return undefined;
+      const s = [...v.replace(/[\u0000-\u001f\u007f`]/g, "")].slice(0, 300).join("");
+      return s || undefined;
+    }
+    case "file": { // relative to the Mod's folder
+      if (typeof v !== "string") return undefined;
+      const s = v.replace(/\\/g, "/");
+      if (LOCAL_PATH.test(v) || s.startsWith("/") || s.split("/").includes("..")) return undefined;
+      const f = [...s.replace(/[^\p{L}\p{N} ._\/()\-+\[\]&',]/gu, "")].slice(0, 200).join("");
+      return f || undefined;
+    }
   }
-  if (!Array.isArray(input.phases) || !out.wall_ms) return null;
-  out.phases = input.phases
-    .filter((p) => p && TIMINGS_PHASE.test(p.name) && Number.isInteger(p.ms) && p.ms >= 0 && p.ms < 1e9)
-    .slice(0, 12)
-    .map((p) => ({ name: p.name, ms: p.ms }));
-  if (!out.phases.length) return null;
-  return out;
+  return undefined;
 }
 
-// timingsComment is the comment: one line a maintainer can scan, then the JSON as it came
-// (cleaned).
+// cleanObject keeps the fields of shape in input that clean, or null when none does.
+function cleanObject(input, shape) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const out = {};
+  for (const [k, kind] of Object.entries(shape)) {
+    const v = cleanValue(kind, input[k]);
+    if (v !== undefined) out[k] = v;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+// cleanPhases reads {name: ms} (1.1.6 and later) or [{name, ms}] (1.1.5) into {name: ms}.
+function cleanPhases(input) {
+  const pairs = Array.isArray(input)
+    ? input.map((p) => [p?.name, p?.ms])
+    : input && typeof input === "object"
+      ? Object.entries(input)
+      : [];
+  const out = {};
+  for (const [name, ms] of pairs) {
+    if (Object.keys(out).length >= TIMINGS_MAX_PHASES) break;
+    if (typeof name === "string" && TIMINGS_PHASE.test(name) && !(name in out) && cleanValue("int", ms) !== undefined) out[name] = ms;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+// cleanSlowest cleans up to n entries of an array, dropping ones without a packageId.
+function cleanSlowest(input, shape, n) {
+  if (!Array.isArray(input)) return undefined;
+  const out = input.slice(0, 4 * n).map((x) => cleanObject(x, shape)).filter((x) => x && x.pkg && x.ms !== undefined).slice(0, n);
+  return out.length ? out : undefined;
+}
+
+// cleanTimings keeps the fields above; null when the request is not timings at all (no
+// wall time, or no phases). The phases come out as one object in either case.
+export function cleanTimings(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const out = cleanObject(input, TIMINGS_FIELDS) || {};
+  const phases = cleanPhases(input.phases);
+  if (!phases || !out.wall_ms) return null;
+  out.phases = phases;
+  const run = cleanObject(input.run, TIMINGS_RUN);
+  if (run) out.run = run;
+  const patches = cleanObject(input.patches, TIMINGS_PATCHES) || {};
+  const ops = cleanSlowest(input.patches?.slowest, TIMINGS_OP, TIMINGS_SLOWEST_OPS);
+  if (ops) patches.slowest = ops;
+  if (Object.keys(patches).length) out.patches = patches;
+  const harmony = cleanObject(input.harmony, TIMINGS_HARMONY) || {};
+  const dlls = cleanSlowest(input.harmony?.slowest, TIMINGS_DLL, TIMINGS_SLOWEST_DLLS);
+  if (dlls) harmony.slowest = dlls;
+  if (Object.keys(harmony).length) out.harmony = harmony;
+  // the top level in RimArcho's order
+  const order = [...Object.keys(TIMINGS_FIELDS).slice(0, 8), "phases", "run", "patches", "harmony", ...Object.keys(TIMINGS_FIELDS).slice(8)];
+  return Object.fromEntries(order.filter((k) => k in out).map((k) => [k, out[k]]));
+}
+
+// compactJSON lays t out as RimArcho's preview does: one field to a line, phases on one
+// line, each slow operation on one line.
+export function compactJSON(t) {
+  const field = (k, v, pad) => {
+    if (k !== "phases" && v && typeof v === "object" && !Array.isArray(v)) {
+      return `${pad}${JSON.stringify(k)}: {\n${Object.entries(v).map(([k2, v2]) => field(k2, v2, pad + "  ")).join(",\n")}\n${pad}}`;
+    }
+    if (Array.isArray(v)) return `${pad}${JSON.stringify(k)}: [\n${v.map((x) => pad + "  " + JSON.stringify(x)).join(",\n")}\n${pad}]`;
+    return `${pad}${JSON.stringify(k)}: ${JSON.stringify(v)}`;
+  };
+  return `{\n${Object.entries(t).map(([k, v]) => field(k, v, "  ")).join(",\n")}\n}`;
+}
+
+// culprit is a phase and its seconds, with the slowest operation or DLL inside it when the
+// timings name one: "patches 43.8 s (slowest: some.mod 12.1 s PatchOperationReplace)".
+function culprit(t, name, ms) {
+  const s = (ms) => (ms / 1000).toFixed(1) + " s";
+  let line = `${name} ${s(ms)}`;
+  const top = name === "patches" ? t.patches?.slowest?.[0] : name === "harmony" ? t.harmony?.slowest?.[0] : null;
+  if (top) line += ` (slowest: ${top.pkg} ${s(top.ms)}${top.class ? " " + top.class : top.file ? " " + top.file.split("/").pop() : ""})`;
+  return line;
+}
+
+// timingsComment is the comment: one line a maintainer can scan, naming the two slowest
+// phases, then the JSON as it came (cleaned).
 export function timingsComment(t) {
   const s = (ms) => (ms / 1000).toFixed(1) + " s";
-  const top = [...t.phases].sort((a, b) => b.ms - a.ms).slice(0, 3).map((p) => `${p.name} ${s(p.ms)}`).join(", ");
-  const head = `**${s(t.wall_ms)}**${t.automatic ? " (automatic)" : ""}: ${t.active_mods ?? "?"}/${t.total_mods ?? "?"} Mods, game ${t.game || "?"}, RimArcho ${t.version || "?"}; slowest: ${top}`;
-  return defuse(head) + "\n\n```json\n" + JSON.stringify(t, null, 2) + "\n```\n\n<sub>Sent from RimArcho after a slow check.</sub>\n";
+  const top = Object.entries(t.phases).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([n, ms]) => culprit(t, n, ms)).join(", ");
+  const how = [t.automatic ? "automatic" : "", t.run ? (t.run.cold ? "cold" : "warm") : ""].filter(Boolean).join(", ");
+  const head = `**${s(t.wall_ms)}**${how ? ` (${how})` : ""}: ${t.active_mods ?? "?"}/${t.total_mods ?? "?"} Mods, game ${t.game || "?"}, RimArcho ${t.version || "?"}; slowest: ${top}`;
+  return defuse(head) + "\n\n```json\n" + compactJSON(t) + "\n```\n\n<sub>Sent from RimArcho after a slow check.</sub>\n";
 }
 
 // timings answers POST /timings with {ok: true} after appending the timings as a comment on
@@ -453,7 +561,7 @@ async function timings(request, env, fetchFn, now) {
   if (!env.APP_ID || !env.GITHUB_APP_KEY || !env.REPO || !env.COUNTS || !env.GATE) return reply(503, { error: "not_configured" });
   if (!(request.headers.get("user-agent") || "").startsWith("RimArcho/")) return reply(403, { error: "client" });
   const raw = await request.text();
-  if (raw.length > 8000) return reply(413, { error: "too_long" });
+  if (raw.length > TIMINGS_MAX_BYTES) return reply(413, { error: "too_long" });
   let t;
   try {
     t = cleanTimings(JSON.parse(raw));

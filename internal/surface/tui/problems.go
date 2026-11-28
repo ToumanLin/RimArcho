@@ -202,13 +202,14 @@ func (m *model) startAnalyzeOf(background bool) tea.Cmd {
 		return nil
 	}
 	m.analyzing, m.analyzeQuiet = true, false
-	m.analyzeBegan = time.Now()
+	clock := app.NewCheckClock()
+	m.analyzeClock = clock
 	m.status = T("analyzing…")
 	run, name := m.opts.Analyze, m.envName
 	if run == nil {
 		home := m.app.Home
 		run = func(env string, progress func(string)) error {
-			return app.ChildAnalyzeExeOf("", home, env, "", "", background, progress)
+			return app.ChildAnalyzeClocked("", home, env, "", "", background, clock, progress)
 		}
 	}
 	ch := make(chan string, 16)
@@ -241,13 +242,16 @@ func (m *model) analyzeMsg(msg tea.Msg) tea.Cmd {
 		return m.analyzeWait
 	case analyzeDoneMsg:
 		m.analyzing = false
+		m.analyzeClock.Lap("ui") // until the terminal took the result
 		if msg.err != nil {
 			m.openPanel(T("analysis failed"), msg.err.Error())
 		} else if !m.analyzeQuiet {
 			m.status = T("analysis done")
 		}
 		m.reload()
+		m.analyzeClock.Lap("reload")
 		m.loadProblems()
+		m.analyzeClock.Lap("findings")
 		if msg.err == nil {
 			m.offerSlowCheck()
 		}
@@ -259,10 +263,10 @@ func (m *model) analyzeMsg(msg tea.Msg) tea.Cmd {
 // took longer than view.SlowCheckAfter: the question, exactly what would be sent, and its
 // keys. It never replaces a panel the player has open.
 func (m *model) offerSlowCheck() {
-	if m.panel != nil || m.analyzeBegan.IsZero() {
+	if m.panel != nil || m.analyzeClock == nil {
 		return
 	}
-	p := view.SlowCheckOf(m.app, m.analyzeBegan, time.Since(m.analyzeBegan))
+	p := view.SlowCheckOf(m.app, m.analyzeClock, time.Since(m.analyzeClock.Began))
 	if p == nil {
 		return
 	}

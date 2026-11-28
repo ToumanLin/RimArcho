@@ -4,7 +4,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { generateKeyPairSync, createVerify } from "node:crypto";
-import { handle, clean, defuse, appJWT, pkcs8, forgetToken, LIMITS, SendGate } from "./worker.mjs";
+import { handle, clean, cleanTimings, defuse, appJWT, pkcs8, forgetToken, LIMITS, SendGate } from "./worker.mjs";
 
 const keys = generateKeyPairSync("rsa", {
   modulusLength: 2048,
@@ -473,10 +473,76 @@ test("timings: a slow check's timings become a comment on the one fixed issue", 
   const c = gh.calls.filter((x) => x.url.endsWith("/repos/ToumanLin/RimArcho/issues/50/comments"));
   assert.equal(c.length, 1);
   const body = c[0].body.body;
-  assert.match(body, /^\*\*48\.2 s\*\*: 312\/1354 Mods, game 1\.6, RimArcho 1\.1\.4; slowest: defs 20\.1 s, patches 19\.0 s, harmony 4\.1 s/);
+  assert.match(body, /^\*\*48\.2 s\*\*: 312\/1354 Mods, game 1\.6, RimArcho 1\.1\.4; slowest: defs 20\.1 s, patches 19\.0 s\n/);
   assert.ok(body.includes('"wall_ms": 48200') && body.includes('"disk": "hdd"'));
+  assert.ok(body.includes('"phases": {"read":900,"defs":20100,"patches":19000,"harmony":4100,"other":4100}'), "1.1.5's phase array becomes one object");
   for (const s of ["Combat Extended", "Users", "7656119", "203.0.113.9"]) assert.ok(!JSON.stringify(gh.calls).includes(s), s + " stays out of GitHub");
   assert.equal(gh.calls.filter((x) => x.url.endsWith("/issues")).length, 0, "no new issue");
+});
+
+// TIMINGS_DETAIL is 1.1.6's shape: phases as one object, the run, the slowest operations
+// and DLLs by packageId and Workshop id, the CPU.
+const TIMINGS_DETAIL = {
+  version: "1.1.6", os: "Windows 11 Pro 25H2 (26200.6899)", game: "1.7", active_mods: 572, total_mods: 573, automatic: false, priority: "normal", wall_ms: 75400,
+  phases: { spawn: 90, boot: 140, open: 60, read: 33, defs: 1000, patches: 43800, harmony: 2900, cache: 2, save: 507, refs: 11, exit: 40, lock: 26000, ui: 20, other: 800 },
+  run: { cold: true, first: true, list: "changed", mods_read: 572, mods_cached: 1, workers: 8, gc_ms: 9000, peak_heap_mb: 290 },
+  patches: {
+    ops: 7495, nodes: 2100000, too_slow: 2, parse_ms: 3000, sim_ms: 38000, facts_ms: 2800,
+    slowest: [
+      { ms: 12100.4, pkg: "some.mod", ws: "2009463077", class: "PatchOperationReplace", xpath: 'Defs/ThingDef[@Name="BaseX"]/comps', file: "1.6/Patches/A.xml" },
+      { ms: 900, pkg: "other.mod", class: "XmlExtensions.PatchOperationSafeAdd", xpath: "Defs/*", file: "Patches/65b030573044/B.xml", too_slow: true },
+    ],
+  },
+  harmony: { dlls: 340, cached: 300, patches: 4100, methods: 3600, slowest: [{ ms: 800, pkg: "some.mod", ws: "2009463077", file: "1.6/Assemblies/X.dll" }] },
+  cpu: "AMD Ryzen 7 5800H with Radeon Graphics", cpu_threads: 16, ram_gb: 32, disk: "ssd",
+};
+
+test("timings: 1.1.6's detail is kept, bounded, and named in the summary line", async () => {
+  forgetToken();
+  const e = env({ TIMINGS_ISSUE: "50" }), gh = commentHub();
+  assert.deepEqual(await sendTimings(e, gh, TIMINGS_DETAIL), { status: 200, data: { ok: true } });
+  const body = gh.calls.find((x) => x.url.endsWith("/issues/50/comments")).body.body;
+  assert.match(body, /^\*\*75\.4 s\*\* \(cold\): 572\/573 Mods, game 1\.7, RimArcho 1\.1\.6; slowest: patches 43\.8 s \(slowest: some\.mod 12\.1 s PatchOperationReplace\), lock 26\.0 s\n/);
+  assert.deepEqual(JSON.parse(body.split("```json\n")[1].split("\n```")[0]), JSON.parse(JSON.stringify(cleanTimings(TIMINGS_DETAIL))));
+  assert.ok(body.includes('\n      {"ms":12100.4,"pkg":"some.mod","ws":"2009463077","class":"PatchOperationReplace","xpath":"Defs/ThingDef[@Name=\\"BaseX\\"]/comps","file":"1.6/Patches/A.xml"},\n'), "one operation to a line");
+  const t = cleanTimings(TIMINGS_DETAIL);
+  assert.equal(t.cpu, "AMD Ryzen 7 5800H with Radeon Graphics");
+  assert.deepEqual(Object.keys(t), ["version", "os", "game", "active_mods", "total_mods", "automatic", "priority", "wall_ms", "phases", "run", "patches", "harmony", "cpu", "cpu_threads", "ram_gb", "disk"]);
+  assert.equal(t.patches.slowest[1].file, "Patches/65b030573044/B.xml");
+  assert.equal(t.patches.slowest[1].too_slow, true);
+});
+
+test("timings: bounds on every new field; paths and accounts never pass", () => {
+  const long = "x".repeat(1000);
+  const t = cleanTimings({
+    ...TIMINGS_DETAIL,
+    phases: Object.fromEntries([...Array(30)].map((_, i) => ["p" + String.fromCharCode(97 + (i % 26)) + "x".repeat(i >> 4), i])),
+    run: { ...TIMINGS_DETAIL.run, list: long, workers: -1, gc_ms: 1e12, user: "me", steam_id: "7656119" },
+    patches: {
+      ops: 1.5, nodes: 3, too_slow: "2",
+      slowest: [...Array(15)].map((_, i) => ({ ms: 15 - i, pkg: "p" + i, ws: "12a", class: "Bad Class!", xpath: "Defs/" + long, file: "Patches/" + i + ".xml" }))
+        .concat([{ ms: 1, pkg: "x", file: "C:\\Users\\me\\Mods\\A.xml", xpath: 'Defs/X[@a="D:\\Games"]' }]),
+    },
+    harmony: { dlls: 1, slowest: [
+      { ms: 5, pkg: "a", file: "../../Users/me/x.dll" }, { ms: 4, pkg: "b", file: "/home/me/x.dll" }, { ms: 3, pkg: "c", file: "\\\\server\\x.dll" },
+      { ms: 2, pkg: "Bad Pkg!", file: "x.dll" }, { ms: 1, pkg: "d", file: "Assemblies\\D.dll" }, { ms: 0.5, pkg: "e", file: "E.dll" }, { ms: 0.1, pkg: "f", file: "F.dll" },
+    ] },
+    mods: ["Combat Extended"], path: "C:\\Users\\me",
+  });
+  assert.equal(Object.keys(t.phases).length, 20, "at most 20 phases");
+  assert.equal(t.run.list.length, 80);
+  assert.equal(t.run.workers, undefined);
+  assert.equal(t.run.gc_ms, undefined);
+  assert.equal(t.run.user, undefined);
+  assert.equal(t.patches.ops, undefined);
+  assert.equal(t.patches.too_slow, undefined);
+  assert.equal(t.patches.slowest.length, 10, "at most 10 operations");
+  assert.equal(t.patches.slowest[0].ws, undefined);
+  assert.equal(t.patches.slowest[0].class, undefined);
+  assert.equal([...t.patches.slowest[0].xpath].length, 300);
+  assert.deepEqual(t.harmony.slowest.map((d) => [d.pkg, d.file]), [["a", undefined], ["b", undefined], ["c", undefined], ["d", "Assemblies/D.dll"], ["e", "E.dll"]], "at most 5 DLLs; paths outside the Mod dropped");
+  const s = JSON.stringify(t);
+  for (const banned of ["Users", "me\\", "7656119", "Combat Extended", ":\\", "home/"]) assert.ok(!s.includes(banned), banned);
 });
 
 test("timings: no issue set is 404, which RimArcho takes quietly; bad input is refused", async () => {
@@ -489,7 +555,7 @@ test("timings: no issue set is 404, which RimArcho takes quietly; bad input is r
   assert.deepEqual(await sendTimings(e, gh, "{"), { status: 400, data: { error: "bad_json" } });
   assert.deepEqual(await sendTimings(e, gh, { version: "1" }), { status: 400, data: { error: "empty" } });
   assert.deepEqual(await sendTimings(e, gh, { ...TIMINGS, phases: [{ name: "Mod Name!", ms: 1 }] }), { status: 400, data: { error: "empty" } });
-  assert.equal((await sendTimings(e, gh, "x".repeat(9000))).status, 413);
+  assert.equal((await sendTimings(e, gh, "x".repeat(17000))).status, 413);
   assert.equal(gh.calls.length, 0);
 });
 

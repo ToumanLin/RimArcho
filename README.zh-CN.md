@@ -271,7 +271,7 @@ RimArcho 的设计原则是尊重你的文件。它会写入的全部内容，�
 | 合集：导入合集，以及打开“全部列表”时重新读取列表关注的合集 | `api.steampowered.com` | 合集 ID | 没有开关（取消关注该合集） |
 | 订阅、下载 Mod 或游戏 | SteamCMD 和 Steam 客户端（它们自己连接 Valve）；`api.steampowered.com` | 工坊 ID；使用账号时的 Steam 账号名（密码只输入到你电脑上的 SteamCMD 窗口，RimArcho 不发送它） | 每次都由你发起 |
 | 安装 SteamCMD、todds 或 RimArcho 更新 | Valve 的 SteamCMD 下载、GitHub（更新还有蓝奏云） | 不含你的信息 | 每次都由你发起 |
-| Can it run 检查超过 30 秒时的耗时：你点“发送”时，或选了“总是发送”后每天最多一次 | 反馈中转站，作为一条评论加到一个**公开的** GitHub issue | RimArcho 版本、系统、游戏版本、启用和已安装的 Mod 数、每一步的耗时、CPU 线程数、内存、SSD 还是 HDD；不含 Mod 名称、路径或账号（卡片会先显示要发送的原文） | `feedback.timings off` |
+| Can it run 检查超过 30 秒时的耗时：你点“发送”时，或选了“总是发送”后每天最多一次 | 反馈中转站，作为一条评论加到一个**公开的** GitHub issue | RimArcho 版本、系统、游戏版本、启用和已安装的 Mod 数、每一步的耗时（包括启动检查进程和窗口之后的处理）、是首次检查还是重复检查、最慢的 10 个补丁操作和 5 个 DLL 及其 Mod 的 packageId 和创意工坊 ID、操作的类名、XPath 和 Mod 文件夹内的补丁文件、CPU 型号和线程数、内存、SSD 还是 HDD；不含本机路径、用户名或账号（卡片会先显示要发送的原文） | `feedback.timings off` |
 | 反馈报告 | 反馈中转站，它会建成一个**公开的** GitHub issue | 你写的内容、你留的联系方式（不放进 issue），以及你勾选的信息：版本、系统、启用的 Mod、日志错误、隐去用户名的路径 | 你看过内容并点发送 |
 | 写功能建议时列出已有建议 | 反馈中转站 | 不含你的信息 | 没有开关 |
 | 导入 Rentry 列表 | `rentry.co` | 页面 ID | 由你发起 |

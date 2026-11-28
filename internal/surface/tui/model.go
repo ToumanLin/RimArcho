@@ -143,7 +143,7 @@ type model struct {
 	// status line keeps what the player just did (the undo hint, 16 §2.4)
 	analyzeQuiet bool
 	analyzeWait  func() tea.Msg
-	analyzeBegan time.Time // the slow-check prompt's wall time (16 §2.14)
+	analyzeClock *app.CheckClock // the slow-check prompt's wall time and phases (16 §2.14)
 
 	chg          chState
 	libr         libState

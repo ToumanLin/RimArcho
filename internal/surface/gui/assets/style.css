@@ -1431,7 +1431,7 @@ svg.i.fill { fill: currentColor; }
 .slow-check-show { margin-left: auto; color: var(--muted); }
 .slow-check-show .i { width: 12px; height: 12px; transition: transform var(--t-press); }
 .slow-check.open .slow-check-show .i { transform: rotate(90deg); }
-.slow-check-preview { margin: 0; max-height: 420px; overflow: auto; padding: 8px 10px; border-radius: var(--r-sm); background: color-mix(in srgb, var(--fg) 5%, transparent); font-family: var(--code); font-size: 12px; line-height: 1.45; color: var(--fg-2); -webkit-user-select: text; user-select: text; white-space: pre; }
+.slow-check-preview { margin: 0; max-height: 420px; overflow: auto; padding: 8px 10px; border-radius: var(--r-sm); background: color-mix(in srgb, var(--fg) 5%, transparent); font-family: var(--code); font-size: 12px; line-height: 1.45; color: var(--fg-2); -webkit-user-select: text; user-select: text; white-space: pre-wrap; overflow-wrap: anywhere; }
 .slow-check-err { color: var(--red); font-size: 12px; }
 .slow-check-sent { color: var(--green); font-size: 13px; }
 .dl-line { margin-top: 8px; font: 12px var(--code); color: var(--muted); overflow-wrap: anywhere; }

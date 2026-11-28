@@ -158,6 +158,8 @@ func (a *App) AnalyzeContext(ctx context.Context, progress func(string)) (rep *A
 	var ph CheckPhases
 	ph.Automatic = a.AnalyzeBackground
 	mark := time.Now()
+	gc0 := gcCPU()
+	var report *CheckReport // for the slow-check report (16 §2.14), saved with the row
 	lap := func() int64 {
 		now := time.Now()
 		d := now.Sub(mark).Milliseconds()
@@ -171,6 +173,10 @@ func (a *App) AnalyzeContext(ctx context.Context, progress func(string)) (rep *A
 		result := oplog.OK
 		if err != nil {
 			result = oplog.Failed
+		}
+		if report != nil {
+			report.GCMs = (gcCPU() - gc0).Milliseconds()
+			a.saveCheckReport(*report)
 		}
 		h.End(result, joinDetail(ph.Detail(), errText(err)))
 	}()
@@ -192,6 +198,10 @@ func (a *App) AnalyzeContext(ctx context.Context, progress func(string)) (rep *A
 			ph.Active++
 		}
 	}
+	list := "new"
+	if prev, _ := a.analysisOf(st, false); prev != nil && prev.Run != nil {
+		list = map[bool]string{true: "same", false: "changed"}[prev.Run.RunKey == key]
+	}
 	ph.Add("read", lap())
 	in.Progress = progress
 	cache := a.assemblyCache()
@@ -205,6 +215,18 @@ func (a *App) AnalyzeContext(ctx context.Context, progress func(string)) (rep *A
 	}
 	cache.prune()
 	run := lap()
+	ws := map[string]string{}
+	for _, m := range st.Ix.Mods {
+		if id := m.WorkshopID(); id != "" {
+			ws[m.ID] = id
+		}
+	}
+	rp := checkReport(h.ID(), out.Stats, func(inst string) string { return ws[inst] })
+	rp.OpenMs, rp.List, rp.Workers = a.OpenedIn.Milliseconds(), list, in.Workers
+	if rp.Workers <= 0 {
+		rp.Workers = min(max(2, runtime.NumCPU()), 8) // analyze.Run's default
+	}
+	report = &rp
 	ph.Add("defs", out.Stats.DefsMs)
 	ph.Add("patches", out.Stats.PatchMs)
 	ph.Add("harmony", out.Stats.HarmonyMs)
@@ -272,6 +294,12 @@ func ChildAnalyzeExe(exe, home, envName, plan, mm string, progress func(string))
 // ChildAnalyzeExeOf is ChildAnalyzeExe; background starts an automatic check's child
 // (`analyze --background`, SetAnalyzeBackground). exe "" is this executable.
 func ChildAnalyzeExeOf(exe, home, envName, plan, mm string, background bool, progress func(string)) error {
+	return ChildAnalyzeClocked(exe, home, envName, plan, mm, background, nil, progress)
+}
+
+// ChildAnalyzeClocked is ChildAnalyzeExeOf that also records on clock (nil: none) when the
+// child started and exited, for the slow-check report (16 §2.14).
+func ChildAnalyzeClocked(exe, home, envName, plan, mm string, background bool, clock *CheckClock, progress func(string)) error {
 	if exe == "" {
 		var err error
 		if exe, err = os.Executable(); err != nil {
@@ -307,6 +335,9 @@ func ChildAnalyzeExeOf(exe, home, envName, plan, mm string, background bool, pro
 	if err := cmd.Start(); err != nil {
 		return err
 	}
+	if clock != nil {
+		clock.Started = time.Now()
+	}
 	var last string
 	sc := bufio.NewScanner(out)
 	for sc.Scan() {
@@ -315,7 +346,11 @@ func ChildAnalyzeExeOf(exe, home, envName, plan, mm string, background bool, pro
 			progress(strings.TrimSpace(last))
 		}
 	}
-	if err := cmd.Wait(); err != nil {
+	err = cmd.Wait()
+	if clock != nil {
+		clock.Exited = time.Now()
+	}
+	if err != nil {
 		return fmt.Errorf("archo analyze: %v (%s)", err, last)
 	}
 	return nil
