@@ -305,6 +305,9 @@ func sameFolder(st *LoadoutState, m *store.Mod, name string) bool {
 	return err1 == nil && err2 == nil && env.PathKey(link) == env.PathKey(own)
 }
 
+// testRunPausedHint: the one hint for a stalled run (20 §2).
+const testRunPausedHint = "the game window may have been paused"
+
 // testRunNotTested turns a run that reached its target with Mods missing into
 // "incomplete", and says why a run is no test of the plan; "" when it is one (20 §2).
 func testRunNotTested(r *TestRunReport, mode string) string {
@@ -322,7 +325,11 @@ func testRunNotTested(r *TestRunReport, mode string) string {
 	}
 	switch r.Status {
 	case "timeout":
-		return fmt.Sprintf("the game did not reach %s within %.0f s%s%s", target, r.TimeoutSeconds, where, last)
+		stalled := ""
+		if r.Stalled != "" {
+			stalled = "; " + r.Stalled
+		}
+		return fmt.Sprintf("the game did not reach %s within %.0f s%s%s%s", target, r.TimeoutSeconds, where, stalled, last)
 	case "exited":
 		return fmt.Sprintf("the game exited before it reached %s%s%s", target, where, last)
 	case "start-failed":

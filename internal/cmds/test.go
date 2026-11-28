@@ -120,6 +120,9 @@ func testRunSummary(root *render.Node, r *app.TestRunReport) {
 		root.Add("NOT TESTED: " + r.NotTested)
 	}
 	root.KV("status", r.Status)
+	if r.Stalled != "" && r.Status != "timeout" { // a timeout's NOT TESTED line has it
+		root.KV("stalled", r.Stalled)
+	}
 	for _, l := range r.Links {
 		root.Addf("%s: %s -> %s: %s", l.Code, l.Path, l.Target, l.ShortReason())
 	}

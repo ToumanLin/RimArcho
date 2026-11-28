@@ -142,3 +142,13 @@ func TestTestRunSameFolderThroughLink(t *testing.T) {
 		}
 	}
 }
+
+// A timeout whose log stopped says so first, with the one paused-window hint (20 §2).
+func TestTestRunNotTestedStalled(t *testing.T) {
+	r := &TestRunReport{Status: "timeout", TimeoutSeconds: 900, Phase: "loading", LastLogLine: "Loading textures",
+		Stalled: "the log did not grow for 640 s; " + testRunPausedHint}
+	want := "the game did not reach the main menu within 900 s; the log did not grow for 640 s; the game window may have been paused; last log line: Loading textures"
+	if got := testRunNotTested(r, "menu"); got != want {
+		t.Fatalf("not tested %q", got)
+	}
+}

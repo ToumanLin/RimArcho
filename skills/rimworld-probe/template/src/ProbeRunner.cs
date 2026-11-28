@@ -264,7 +264,8 @@ namespace RimProbe
         static ProbeStartup()
         {
             ErrorCapture.Start();   // later than most load errors; those stay in Player.log
-            // A runner that writes no Prefs.xml (archo test run --probe) starts the game with runInBackground off:
+            // A runner that writes no Prefs.xml starts the game with runInBackground off
+            // (archo test run now writes it on; older RimArcho versions did not):
             // keep the probe running when its window loses focus.
             if (GenCommandLine.CommandLineArgPassed("probequit"))
             {

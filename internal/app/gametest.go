@@ -85,6 +85,10 @@ type TestRunReport struct {
 	TicksReached   int    `json:"ticks_reached,omitempty"`
 	TicksEstimated int    `json:"ticks_estimated,omitempty"`
 	LastLogLine    string `json:"last_log_line,omitempty"` // a run that did not arrive: the log's last line
+	// Stalled: the hint for a log that did not grow for a minute or more while the game
+	// loaded, or until a timeout (gametest StallSeconds): "the log did not grow for N s; the
+	// game window may have been paused".
+	Stalled string `json:"stalled,omitempty"`
 	// Save: the save a save run loaded, and how its Mods differ from the plan (testRunSave).
 	Save      *TestRunSave     `json:"save,omitempty"`
 	Requested int              `json:"requested"`
@@ -378,6 +382,9 @@ func (a *App) reportTestRun(ctx context.Context, c *testRunSetup, raw *gametest.
 		r.TicksEstimated = r.TicksReached
 	}
 	a.testRunLoaded(st, r, c.seen, c.data)
+	if raw.StallSeconds > 0 {
+		r.Stalled = fmt.Sprintf("the log did not grow for %.0f s; %s", raw.StallSeconds, testRunPausedHint)
+	}
 	r.NotTested = testRunNotTested(r, c.mode)
 	var probeErr error
 	if c.probe != nil {

@@ -4,6 +4,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- `archo test run` / MCP `test_run`: menu, map and probe runs no longer freeze while the game window is unfocused. Every run now writes its own `Prefs.xml` with `runInBackground` (dev mode still only in a save run). When the log stops growing for a minute or more while the game loads, or until a timeout, the report has `stalled` ("the log did not grow for N s; the game window may have been paused"), and a timeout's `not_tested` says it.
+
 ## 1.1.5 — 2026-11-27
 
 - Packs: building a pack of a list that was never checked is no longer refused with the Def and patch errors of another list; `archo pack build` notes that the list has not been analysed.

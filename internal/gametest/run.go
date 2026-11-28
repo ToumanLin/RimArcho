@@ -61,7 +61,11 @@ type Result struct {
 	// TicksReached: Ticks, when the first autosave showed they were played.
 	TicksReached int
 	// LastLine: the log's last line, for a run that did not arrive (timeout, exited).
-	LastLine     string
+	LastLine string
+	// StallSeconds: the longest time the log did not grow while the game loaded (launch to
+	// the menu, new-game or load marker), or, in a timeout, until the end; 0 when under
+	// StallMin. A paused window or a hang looks like this (20 §2).
+	StallSeconds float64 `json:",omitempty"`
 	PeakMemoryMB int64
 	LogPath      string
 	Args         []string
@@ -198,11 +202,10 @@ func prepareData(o Options) error {
 	if err := prepareSaves(filepath.Join(o.DataDir, "Saves"), o.Save); err != nil {
 		return err
 	}
-	if o.Save != "" || o.Ticks > 0 {
-		// Dev mode loads Saves/autostart.rws at startup; a test map needs no dev mode.
-		if err := writeRunPreferences(o.DataDir, o.Save != "", o.Ticks); err != nil {
-			return err
-		}
+	// Every run writes its own Prefs.xml after the reset, so the game keeps running while its
+	// window is unfocused. Dev mode loads Saves/autostart.rws at startup: only a save run has it.
+	if err := writeRunPreferences(o.DataDir, o.Save != "", o.Ticks); err != nil {
+		return err
 	}
 	knowledge := filepath.Join(o.DataDir, "Config", "Knowledge.xml")
 	if err := os.Remove(knowledge); err != nil && !os.IsNotExist(err) {
@@ -226,6 +229,7 @@ type gameRun struct {
 	menuAt, menuSeen, probeAt time.Time
 	tail                      logTail
 	played                    autosave
+	stall                     time.Duration // the longest quiet log so far (noteStall)
 	result                    *Result
 }
 
@@ -303,6 +307,10 @@ func (g *gameRun) saveResult() error {
 	if result.Status == "timeout" || result.Status == "exited" {
 		result.LastLine = tail.last
 	}
+	g.noteStall(end, result.Status == "timeout")
+	if g.stall >= StallMin {
+		result.StallSeconds = g.stall.Round(time.Second).Seconds()
+	}
 	b, err := json.MarshalIndent(result, "", "  ")
 	if err == nil {
 		err = os.WriteFile(filepath.Join(g.o.RunDir, "result.json"), append(b, '\n'), 0o644)
@@ -357,6 +365,26 @@ func (g *gameRun) seeMenu(now time.Time) error {
 	return nil
 }
 
+// StallMin: a quiet log this long counts as a stall. Loading logs every few seconds; an
+// unfocused window without runInBackground stops it until someone clicks the window.
+const StallMin = 60 * time.Second
+
+// noteStall keeps the longest time the log has not grown while the game loads (until the
+// menu, new-game or load marker); final counts the quiet up to now whatever the phase.
+func (g *gameRun) noteStall(now time.Time, final bool) {
+	t := &g.tail
+	if !final && (!t.newAt.IsZero() || !t.saveAt.IsZero() || !g.menuSeen.IsZero()) {
+		return
+	}
+	since := t.lastWrite
+	if since.Before(g.launch) {
+		since = g.launch
+	}
+	if q := now.Sub(since); q > g.stall {
+		g.stall = q
+	}
+}
+
 // probeEnded marks the run "probe" once the probe's last line is in the log.
 func (g *gameRun) probeEnded(now time.Time) bool {
 	if g.probeAt.IsZero() && g.tail.probeEnd != "" {
@@ -397,6 +425,7 @@ func (g *gameRun) wait(ctx context.Context) error {
 			if err := errors.Join(g.tail.read(g.logPath, now), g.seeMenu(now)); err != nil {
 				return errors.Join(err, g.stop())
 			}
+			g.noteStall(now, false)
 			arrived, err := g.arrived(now)
 			if err != nil {
 				return errors.Join(err, g.stop())

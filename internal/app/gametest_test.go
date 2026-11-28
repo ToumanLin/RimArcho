@@ -150,10 +150,13 @@ func TestTestRunPlanConfigVisibilityAndReport(t *testing.T) {
 	var linkedDuringRun []string
 	e.App.TestGameStart = func(cmd *exec.Cmd) error {
 		linkedDuringRun = linkNames(t, filepath.Join(e.Game, "Mods"))
-		for _, name := range []string{"Prefs.xml", "KeyPrefs.xml"} {
-			if _, err := os.Lstat(filepath.Join(data, "Config", name)); !os.IsNotExist(err) {
-				t.Errorf("player preferences reached test launch: %s: %v", name, err)
-			}
+		if _, err := os.Lstat(filepath.Join(data, "Config", "KeyPrefs.xml")); !os.IsNotExist(err) {
+			t.Errorf("player key preferences reached test launch: %v", err)
+		}
+		// The run writes its own Prefs.xml, which keeps an unfocused window running (20 §2).
+		if b, err := os.ReadFile(filepath.Join(data, "Config", "Prefs.xml")); err != nil ||
+			!strings.Contains(string(b), "<runInBackground>True</runInBackground>") || strings.Contains(string(b), "devMode") {
+			t.Errorf("menu run preferences at launch: %q %v", b, err)
 		}
 		return start(cmd)
 	}
