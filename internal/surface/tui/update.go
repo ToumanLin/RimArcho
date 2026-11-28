@@ -217,6 +217,10 @@ func (m *model) noGameKey(s string) tea.Cmd {
 		return m.openCmdLine()
 	case "E":
 		return m.chooseEnv()
+	case "enter":
+		if errors.Is(m.loadErr, app.ErrNoEnv) && len(m.detected) > 0 {
+			return m.addDetected()
+		}
 	}
 	if errors.Is(m.loadErr, app.ErrNoEnv) {
 		m.say(sayInfo, T("No game added yet."))
@@ -224,6 +228,36 @@ func (m *model) noGameKey(s string) tea.Cmd {
 		m.say(sayFail, m.humanize(m.loadErr.Error()))
 	}
 	return nil
+}
+
+// addDetected adds every game the empty screen lists (env add --detected for each) and
+// reads their Mods, one scan after another (16 §9).
+func (m *model) addDetected() tea.Cmd {
+	if m.scanning {
+		return nil
+	}
+	names, err := view.AddGames(m.app, m.detected)
+	if err != nil {
+		m.say(sayFail, m.humanize(err.Error()))
+		return nil
+	}
+	m.detected = nil
+	m.reload()
+	m.scanning = true
+	m.tasks.scanning.Store(true)
+	m.say(sayBusy, T("scanning…"))
+	scan := m.opts.Scan
+	return func() tea.Msg {
+		var outs []string
+		for _, n := range names {
+			out, err := scan(n)
+			if err != nil {
+				return scanDoneMsg{out: strings.Join(append(outs, out), "\n"), err: err}
+			}
+			outs = append(outs, out)
+		}
+		return scanDoneMsg{out: strings.Join(outs, "\n")}
+	}
 }
 
 // itemlessKeys are the global keys a Can it run item can never take: quit, help and the

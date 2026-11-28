@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -178,6 +179,9 @@ func (m *model) reload() {
 	b, err := view.BuildBoard(m.app)
 	st := b.St
 	m.st, m.loadErr = st, err
+	if errors.Is(err, app.ErrNoEnv) && !m.detectedRead {
+		m.detected, m.detectedRead = view.DetectedNew(m.app), true
+	}
 	for k := range m.cols {
 		m.cols[k].kind = colKind(k)
 		m.cols[k].items = m.cols[k].items[:0]

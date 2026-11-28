@@ -45,5 +45,13 @@
   "opened the download page": "已打开下载页",
   "enter: stop the update (nothing is changed before the files are replaced); esc: keep going": "enter：停止更新（替换文件之前什么都不会改）；esc：继续",
   "enter: install; esc: cancel   :update --check checks again": "enter：安装；esc：取消   :update --check 重新检查",
-  "enter: check for updates; esc: cancel": "enter：检查更新；esc：取消"
+  "enter: check for updates; esc: cancel": "enter：检查更新；esc：取消",
+  "RimArcho found:": "RimArcho 找到了：",
+  "its own saves": "独立存档",
+  "adds it and reads its Mods": "添加它并读取它的 Mod",
+  "adds them and reads their Mods": "全部添加并读取它们的 Mod",
+  "before the first scan, from a terminal:": "第一次扫描前，可在终端里设置：",
+  "language (auto follows the system)": "语言（auto 跟随系统）",
+  "no update checks and no community data": "不检查更新，也不下载社区数据",
+  "no Archo Monitor in new lists": "新列表不加 Archo Monitor"
 }

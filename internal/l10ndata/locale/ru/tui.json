@@ -45,5 +45,13 @@
   "opened the download page": "страница загрузки открыта",
   "enter: stop the update (nothing is changed before the files are replaced); esc: keep going": "enter: остановить обновление (до замены файлов ничего не меняется); esc: продолжить",
   "enter: install; esc: cancel   :update --check checks again": "enter: установить; esc: отмена   :update --check проверяет снова",
-  "enter: check for updates; esc: cancel": "enter: проверить обновления; esc: отмена"
+  "enter: check for updates; esc: cancel": "enter: проверить обновления; esc: отмена",
+  "RimArcho found:": "RimArcho нашёл:",
+  "its own saves": "свои сохранения",
+  "adds it and reads its Mods": "добавить игру и прочитать её моды",
+  "adds them and reads their Mods": "добавить игры и прочитать их моды",
+  "before the first scan, from a terminal:": "до первого сканирования, в терминале:",
+  "language (auto follows the system)": "язык (auto — как в системе)",
+  "no update checks and no community data": "без проверки обновлений и без данных сообщества",
+  "no Archo Monitor in new lists": "без Archo Monitor в новых списках"
 }

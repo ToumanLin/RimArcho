@@ -97,6 +97,7 @@ func TestEnvPickerAliasNoticeUntilAcknowledged(t *testing.T) {
 func TestNoGameConfigKeys(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
+	e.Remove(e.Game) // nothing to detect: enter adds nothing (TestNoGameDetected)
 	scans := 0
 	m := New(Options{App: e.App, Scan: func(string) (string, error) { scans++; return "", errors.New("no game") }}).(*model)
 	m.Init()
@@ -128,5 +129,42 @@ func TestNoGameConfigKeys(t *testing.T) {
 	key(m, runes("q"))
 	if !m.quitting {
 		t.Fatal("q did not quit")
+	}
+}
+
+// No game added, but detection finds some (16 §9): the screen lists them, enter adds them
+// all (a later version on the same user data folder with its own saves) and reads their
+// Mods one after another; the help names the first-run choices as config set lines.
+func TestNoGameDetected(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	g17 := e.OtherGame("RimWorld 1.7", "1.7.5014 rev1300")
+	e.App.Detect.ManualRoots = []string{g17}
+	var scanned []string
+	m := New(Options{App: e.App, Scan: func(n string) (string, error) { scanned = append(scanned, n); return "scan complete", nil }}).(*model)
+	m.Init()
+	m.update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	s := screen(m)
+	for _, want := range []string{T("No game added yet."), T("RimArcho found:"), "RimWorld 1.6", "RimWorld 1.7", T("its own saves"), T("adds them and reads their Mods")} {
+		if !strings.Contains(s, want) {
+			t.Fatalf("no %q on the empty screen:\n%s", want, s)
+		}
+	}
+	key(m, runes("?"))
+	if m.panel == nil || !strings.Contains(strings.Join(m.panel.lines, "\n"), "archo config set monitor.default off") {
+		t.Fatalf("the help has no config set lines:\n%s", screen(m))
+	}
+	press(m, "esc")
+	cmd := m.noGameKey("enter")
+	if cmd == nil {
+		t.Fatal("enter did nothing")
+	}
+	m.update(cmd())
+	if strings.Join(scanned, ",") != "1.6,1.7" || m.loadErr != nil || m.envName != "1.6" {
+		t.Fatalf("scanned %v, loadErr %v, env %q", scanned, m.loadErr, m.envName)
+	}
+	envs, _ := e.App.Store.Envs()
+	if len(envs) != 2 {
+		t.Fatalf("envs %d", len(envs))
 	}
 }

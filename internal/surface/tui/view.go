@@ -10,6 +10,8 @@ import (
 	"sync"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
+	"github.com/mattn/go-runewidth"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -37,8 +39,12 @@ func (m *model) View() string {
 		if !errors.Is(m.loadErr, app.ErrNoEnv) {
 			first = sErrS.Render(fit(T("error: ")+view.Humanize(nil, m.loadErr.Error()), m.w-2))
 		}
-		content = []string{"", "  " + first,
-			"  " + sSecond.Render(fit(T("Add a game first: archo env detect, archo env add <name> --detected (or --game <dir> to name the game folder yourself)"), m.w-2))}
+		content = []string{"", "  " + first}
+		if errors.Is(m.loadErr, app.ErrNoEnv) && len(m.detected) > 0 {
+			content = append(content, m.detectedLines()...)
+		}
+		content = append(content,
+			"  "+sSecond.Render(fit(T("Add a game first: archo env detect, archo env add <name> --detected (or --game <dir> to name the game folder yourself)"), m.w-2)))
 		if name := windowNextToUs(); name != "" {
 			content = append(content, "  "+sSecond.Render(fit(Tf("Or open %s in this folder: the window has a guide that finds your games.", name), m.w-2)))
 		}
@@ -491,4 +497,38 @@ func windowNextTo(exe, goos string) string {
 		return ""
 	}
 	return name
+}
+
+// detectedLines: the games detection found while none is added (16 §9), one row each with
+// the version, how it starts and its folder (cut at the left: the end names it), then what
+// enter does.
+func (m *model) detectedLines() []string {
+	nameW, srcW := 0, 0
+	for _, g := range m.detected {
+		nameW = max(nameW, runewidth.StringWidth("RimWorld "+g.Name))
+		srcW = max(srcW, runewidth.StringWidth(g.Source))
+	}
+	out := []string{"", "  " + sSecond.Render(fit(T("RimArcho found:"), m.w-2))}
+	for _, g := range m.detected {
+		own := ""
+		if g.Saves == app.SavesOwn {
+			own = "  " + T("its own saves")
+		}
+		pathW := max(m.w-4-nameW-2-srcW-2-runewidth.StringWidth(own), 8)
+		out = append(out, "    "+sBold.Render(runewidth.FillRight("RimWorld "+g.Name, nameW))+"  "+
+			sSecond.Render(runewidth.FillRight(g.Source, srcW))+"  "+sText.Render(fitLeft(g.Game, pathW))+sSecond.Render(own))
+	}
+	what := T("adds it and reads its Mods")
+	if len(m.detected) > 1 {
+		what = T("adds them and reads their Mods")
+	}
+	return append(out, "", "  "+sAccent.Render("enter")+" "+sText.Render(fit(what, m.w-9)), "")
+}
+
+// fitLeft keeps the end of s within w cells, with … in front when it is cut.
+func fitLeft(s string, w int) string {
+	if sw := runewidth.StringWidth(s); sw > w {
+		return "…" + ansi.TruncateLeft(s, sw-w+1, "")
+	}
+	return s
 }

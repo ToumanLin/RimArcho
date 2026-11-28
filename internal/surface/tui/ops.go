@@ -310,6 +310,17 @@ func (m *model) helpPage() tea.Cmd {
 	for _, r := range rows {
 		b.WriteString(width.FillRight(r.Keys, w+3) + r.What + "\n")
 	}
+	if errors.Is(m.loadErr, app.ErrNoEnv) {
+		// the first-run guide's choices, which the TUI leaves to the command line (16 §9)
+		b.WriteString("\n" + T("before the first scan, from a terminal:") + "\n")
+		for _, r := range [][2]string{
+			{"archo config set ui.lang zh", T("language (auto follows the system)")},
+			{"archo config set updates.auto off", T("no update checks and no community data")},
+			{"archo config set monitor.default off", T("no Archo Monitor in new lists")},
+		} {
+			b.WriteString("  " + width.FillRight(r[0], 39) + r[1] + "\n")
+		}
+	}
 	m.openPanel(T("all keys"), b.String())
 	return nil
 }

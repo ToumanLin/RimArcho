@@ -45,5 +45,13 @@
   "opened the download page": "다운로드 페이지를 열었어요",
   "enter: stop the update (nothing is changed before the files are replaced); esc: keep going": "enter: 업데이트 중지(파일을 바꾸기 전에는 아무것도 바뀌지 않음); esc: 계속",
   "enter: install; esc: cancel   :update --check checks again": "enter: 설치; esc: 취소   :update --check 다시 확인",
-  "enter: check for updates; esc: cancel": "enter: 업데이트 확인; esc: 취소"
+  "enter: check for updates; esc: cancel": "enter: 업데이트 확인; esc: 취소",
+  "RimArcho found:": "RimArcho가 찾은 항목:",
+  "its own saves": "전용 저장",
+  "adds it and reads its Mods": "추가하고 모드 읽기",
+  "adds them and reads their Mods": "모두 추가하고 모드 읽기",
+  "before the first scan, from a terminal:": "첫 스캔 전에 터미널에서:",
+  "language (auto follows the system)": "언어 (auto는 시스템을 따름)",
+  "no update checks and no community data": "업데이트 확인과 커뮤니티 데이터 끄기",
+  "no Archo Monitor in new lists": "새 목록에 Archo Monitor 넣지 않기"
 }

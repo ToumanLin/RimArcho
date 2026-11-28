@@ -71,3 +71,24 @@ func TestFirstRunNothingFound(t *testing.T) {
 		t.Fatalf("found %+v", f)
 	}
 }
+
+// The TUI's empty screen (16 §9): the detected games no Game Config uses; a later version
+// on the same user data folder gets its own saves, also beside a game added already, the guide's default (16 §2.15).
+func TestDetectedNewOwnSaves(t *testing.T) {
+	e := testkit.New(t)
+	g17 := e.OtherGame("RimWorld 1.7", "1.7.5014 rev1300")
+	e.App.Detect.ManualRoots = []string{g17}
+	games := view.DetectedNew(e.App)
+	if len(games) != 2 || games[0].Game != e.Game || games[1].Game != g17 {
+		t.Fatalf("games %+v", games)
+	}
+	if games[0].Saves != "" || games[1].Saves != app.SavesOwn || !games[1].GameList {
+		t.Fatalf("saves %q %q list %v", games[0].Saves, games[1].Saves, games[1].GameList)
+	}
+	if _, err := view.AddGames(e.App, games[:1]); err != nil {
+		t.Fatal(err)
+	}
+	if left := view.DetectedNew(e.App); len(left) != 1 || left[0].Game != g17 || left[0].Saves != app.SavesOwn {
+		t.Fatalf("after adding 1.6: %+v", left)
+	}
+}

@@ -45,5 +45,13 @@
   "opened the download page": "ダウンロードページを開きました",
   "enter: stop the update (nothing is changed before the files are replaced); esc: keep going": "Enter：更新を中止（ファイルを置き換えるまでは何も変更されません）／Esc：続行",
   "enter: install; esc: cancel   :update --check checks again": "Enter：インストール／Esc：キャンセル   :update --check で再確認",
-  "enter: check for updates; esc: cancel": "Enter：更新を確認／Esc：キャンセル"
+  "enter: check for updates; esc: cancel": "Enter：更新を確認／Esc：キャンセル",
+  "RimArcho found:": "RimArcho が見つけたもの：",
+  "its own saves": "専用のセーブ",
+  "adds it and reads its Mods": "追加して MOD を読み込む",
+  "adds them and reads their Mods": "すべて追加して MOD を読み込む",
+  "before the first scan, from a terminal:": "最初のスキャンの前に、ターミナルで：",
+  "language (auto follows the system)": "言語（auto はシステムに従う）",
+  "no update checks and no community data": "更新を確認せず、コミュニティデータも取得しない",
+  "no Archo Monitor in new lists": "新しいリストに Archo Monitor を入れない"
 }

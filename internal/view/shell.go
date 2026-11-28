@@ -682,6 +682,30 @@ func FirstRun(a *app.App, managers []app.ManagerFolder) FirstRunFound {
 	return out
 }
 
+// DetectedNew is the TUI's empty screen (16 §9): the detected games no Game Config uses,
+// with the first-run guide's default for saves (16 §2.15): a later version whose user data
+// folder an earlier one also uses (added, or above it in the list) gets its own saves, starting from the game's
+// ModsConfig.xml. Proton games keep their prefix's folder.
+func DetectedNew(a *app.App) []GameFound {
+	var out, before []GameFound // before: the games added already (FindGames lists them first) and those above
+	for _, g := range FindGames(a) {
+		if g.Known || g.Env != "" {
+			before = append(before, g)
+			continue
+		}
+		if g.UserData != "" && ProtonBadge(g.Game) == "" {
+			v, key := env.MajorMinor(g.Version), store.UserDataKey(g.UserData)
+			if slices.ContainsFunc(before, func(o GameFound) bool {
+				return o.UserData != "" && store.UserDataKey(o.UserData) == key && env.MajorMinor(o.Version) != v
+			}) {
+				g.Saves, g.GameList = app.SavesOwn, true
+			}
+		}
+		out, before = append(out, g), append(before, g)
+	}
+	return out
+}
+
 // countGameFolders fills in a found game's Mod folder counts.
 func countGameFolders(g *GameFound) {
 	g.Mods, g.WorkshopMods = env.CountModDirs(filepath.Join(g.Game, "Mods")), -1

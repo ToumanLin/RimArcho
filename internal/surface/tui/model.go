@@ -126,6 +126,10 @@ type model struct {
 	question   int
 	missing    int
 
+	// detected: the games detection finds while no game is added (16 §9), read once
+	detected     []view.GameFound
+	detectedRead bool
+
 	uninstallRun *uninstallRun
 	idleSeq      int
 	detailRef    string
