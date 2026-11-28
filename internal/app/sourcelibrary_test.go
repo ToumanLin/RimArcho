@@ -188,7 +188,9 @@ func TestSourceLibrarySharedIdentityAndTypes(t *testing.T) {
 		t.Fatal("clear cache removed library", err)
 	}
 	out := e.MustRun("source", "search", "AllComps.Remove(", "--in", st.Ix.Ref(a.ID), "--in", st.Ix.Ref(b.ID))
-	if strings.Count(out, "same code in:") != 1 || !strings.Contains(out, whole) {
+	// The project folder once, then the file relative to it (05 §5.4 "Search report").
+	project := strings.TrimSuffix(whole, string(filepath.Separator)+filepath.Join("ModA", "CompBroken.cs"))
+	if strings.Count(out, "same code in:") != 1 || project == whole || !strings.Contains(out, project+"\n") || !strings.Contains(out, "  ModA/CompBroken.cs\n") {
 		t.Fatalf("CLI attribution/path:\n%s", out)
 	}
 	run := view.NewFileSearchRun()

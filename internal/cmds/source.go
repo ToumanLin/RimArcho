@@ -287,10 +287,19 @@ func sourceSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		return nil, &UsageError{Msg: "source search needs a scope: --in <ref>, --implicated, or --active --yes"}
 	}
 	var re *regexp.Regexp
-	if a.Bool("regex") {
+	alts := searchAlternatives(a.Pos[0])
+	switch {
+	case a.Bool("regex"):
 		if re, err = regexp.Compile("(?i)" + a.Pos[0]); err != nil {
 			return nil, &UsageError{Msg: "bad --regex pattern: " + err.Error()}
 		}
+	case len(alts) > 1:
+		// "A|B|C": any of the literal texts (agents wrote it so and got 0 matches).
+		quoted := make([]string, len(alts))
+		for i, s := range alts {
+			quoted[i] = regexp.QuoteMeta(s)
+		}
+		re = regexp.MustCompile("(?i)" + strings.Join(quoted, "|"))
 	}
 	var budget time.Duration
 	if b := a.Str("budget"); b != "" {
@@ -323,32 +332,27 @@ func sourceSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	for _, e := range res.Errors {
 		root.KV("error", e)
 	}
-	lst := root.Section("matches")
-	for _, h := range res.Hits {
-		t := h.Text
-		if len(t) > 140 {
-			t = t[:137] + "..."
-		}
-		ref := st.Ix.Ref(h.Instance)
-		if strings.HasPrefix(h.Instance, "game:") {
-			ref = "game"
-		}
-		lst.Addf("%s  %s:%d  %s", ref, h.Path, h.Line, t)
-		if len(h.Shared) > 1 {
-			copies := make([]string, 0, len(h.Shared))
-			for _, id := range h.Shared {
-				copies = append(copies, modLabel(st.Ix, id))
-			}
-			lst.Addf("same code in: %s", strings.Join(copies, ", "))
-		}
+	switch {
+	case a.Bool("regex"):
+		root.KV("pattern", "regular expression, any case")
+	case len(alts) > 1:
+		root.KV("pattern", fmt.Sprintf("any of %d texts separated by |, any case (regex for a regular expression)", len(alts)))
+	default:
+		root.KV("pattern", "literal text, any case (A|B for any of several; regex for a regular expression)")
 	}
+	lst := root.Section("matches")
+	sourceHits(st, lst, res.Hits)
 	if len(res.Hits) == 0 {
 		lst.Add("(none)")
 	}
 	if res.Total > len(res.Hits) {
 		lst.Addf("… %d more (add --all)", res.Total-len(res.Hits))
 	}
-	for _, l := range sourceCoverage(c, st, res, kind, a.Bool("game"), scope) {
+	named := mods
+	if kind != "named" {
+		named = nil
+	}
+	for _, l := range sourceCoverage(c, st, res, kind, a.Bool("game"), scope, named) {
 		root.Add(l)
 	}
 	return d, nil
@@ -358,7 +362,7 @@ func sourceSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 // the implicated pair that finds nothing says nothing about the other enabled mods, and
 // agents took it for an answer (h7 G2). A restricted search with no match also says where
 // to look next.
-func sourceCoverage(c *Ctx, st *app.LoadoutState, res *app.SourceSearchResult, kind string, game bool, scope string) []string {
+func sourceCoverage(c *Ctx, st *app.LoadoutState, res *app.SourceSearchResult, kind string, game bool, scope string, named []*store.Mod) []string {
 	enabled := map[string]bool{}
 	for _, e := range st.List {
 		if st.Ix.ByID[e.Instance] != nil {
@@ -382,6 +386,32 @@ func sourceCoverage(c *Ctx, st *app.LoadoutState, res *app.SourceSearchResult, k
 	switch {
 	case kind == "game only":
 		sb.WriteString("searched the game only")
+	case kind == "named":
+		// Each named Mod: searched or not, and why (an agent could not tell from counts
+		// whether its one not-enabled Mod was searched; 2026-11-27).
+		searched := map[string]bool{}
+		for _, id := range res.Searched {
+			searched[id] = true
+		}
+		var parts []string
+		for _, m := range named {
+			state := "enabled"
+			if !enabled[m.ID] {
+				state = "not enabled"
+			}
+			why := "searched"
+			if !searched[m.ID] {
+				why = "not searched: no assemblies of its own for " + st.GameMM()
+				if res.Pending > 0 {
+					why = "not searched yet: not decompiled within the budget"
+				}
+			}
+			parts = append(parts, fmt.Sprintf("%s (%s): %s", modLabel(st.Ix, m.ID), state, why))
+		}
+		sb.WriteString("named: " + strings.Join(parts, "; "))
+		if game {
+			sb.WriteString("; and the game")
+		}
 	default:
 		fmt.Fprintf(&sb, "searched %d of %d enabled mods", in, len(enabled))
 		if other > 0 {
@@ -395,7 +425,10 @@ func sourceCoverage(c *Ctx, st *app.LoadoutState, res *app.SourceSearchResult, k
 	if res.Pending > 0 {
 		fmt.Fprintf(&sb, "; %d of %d assemblies not decompiled yet: repeat the call", res.Pending, res.Assemblies)
 	}
-	if rest > 0 {
+	switch {
+	case rest > 0 && kind == "named":
+		fmt.Fprintf(&sb, "; the other %d enabled mods: not searched (%s)", rest, hint)
+	case rest > 0:
 		fmt.Fprintf(&sb, "; not searched: %d (%s)", rest, hint)
 	}
 	out := []string{sb.String()}
@@ -520,4 +553,62 @@ func typeFile(modRoot string, b *app.BuildInfo, typ string) string {
 		}
 	}
 	return found
+}
+
+// searchAlternatives splits a literal search pattern at "|" into the texts it means any of;
+// one text when a part would be empty ("a || b" is C#, not three texts).
+func searchAlternatives(p string) []string {
+	parts := strings.Split(p, "|")
+	for _, s := range parts {
+		if strings.TrimSpace(s) == "" {
+			return []string{p}
+		}
+	}
+	return parts
+}
+
+// sourceHits lists the matches by assembly and file: the decompiled project's folder once,
+// each file relative to it once, then its lines (an agent's 53 matches were 9 KB, half of it
+// the absolute path repeated on every line; 2026-11-27).
+func sourceHits(st *app.LoadoutState, lst *render.Node, hits []app.SourceHit) {
+	var group, file *render.Node
+	groupKey, fileKey := "", ""
+	for _, h := range hits {
+		ref := st.Ix.Ref(h.Instance)
+		if strings.HasPrefix(h.Instance, "game:") {
+			ref = "game"
+		}
+		root, rel := sourceRoot(h)
+		if k := ref + "\x00" + root; k != groupKey || group == nil {
+			groupKey, fileKey = k, ""
+			group = lst.Addf("%s  %s", ref, root)
+		}
+		if rel != fileKey || file == nil {
+			fileKey = rel
+			file = group.Add(rel)
+			if len(h.Shared) > 1 {
+				copies := make([]string, 0, len(h.Shared))
+				for _, id := range h.Shared {
+					copies = append(copies, modLabel(st.Ix, id))
+				}
+				file.KV("same code in", strings.Join(copies, ", "))
+			}
+		}
+		t := h.Text
+		if len(t) > 140 {
+			t = t[:137] + "..."
+		}
+		file.Addf("%d  %s", h.Line, t)
+	}
+}
+
+// sourceRoot splits a hit's file into the decompiled project's folder and the file's path in
+// it (File is <dll>/<path in project>).
+func sourceRoot(h app.SourceHit) (string, string) {
+	_, inProject, ok := strings.Cut(filepath.ToSlash(h.File), "/")
+	path := filepath.ToSlash(h.Path)
+	if !ok || !strings.HasSuffix(strings.ToLower(path), strings.ToLower("/"+inProject)) {
+		return filepath.Dir(h.Path), filepath.Base(h.Path)
+	}
+	return filepath.FromSlash(path[:len(path)-len(inProject)-1]), inProject
 }

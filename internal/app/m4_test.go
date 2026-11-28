@@ -120,7 +120,7 @@ func TestSourceCache(t *testing.T) {
 	if !strings.Contains(out, "ModA.CompBroken  (5 lines)") || !strings.Contains(out, "   3          public void CompTick()") {
 		t.Fatalf("--type from the cached project (tabs become spaces):\n%s", out)
 	}
-	if out := e.MustRun("source", "search", "AllComps.Remove(", "--in", modA); !strings.Contains(out, "1 matches") || !strings.Contains(out, "CompBroken.cs:3") {
+	if out := e.MustRun("source", "search", "AllComps.Remove(", "--in", modA); !strings.Contains(out, "1 matches") || !strings.Contains(out, "ModA/CompBroken.cs\n        3  ") {
 		t.Fatalf("source search:\n%s", out)
 	}
 	// A type of an assembly that is not cached is decompiled alone (-t).

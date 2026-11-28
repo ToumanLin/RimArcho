@@ -40,13 +40,21 @@ func TestSourceSearchCoverage(t *testing.T) {
 
 	// Named: a hit, and the rest of the list is reported as not searched.
 	out := e.MustRun("source", "search", "AllComps.Remove(", "--in", modA)
-	wantRest := fmt.Sprintf("searched 1 of %d enabled mods (named); not searched: %d (--active --yes)", enabled, enabled-1)
+	wantRest := fmt.Sprintf("named: %s Mod A (enabled): searched; the other %d enabled mods: not searched (--active --yes)", modA, enabled-1)
 	if !strings.Contains(out, "1 matches") || last(out) != wantRest {
 		t.Fatalf("named search, want last line %q:\n%s", wantRest, out)
 	}
 	if out := mcpRun(e, "source", "search", "AllComps.Remove(", "--in", modA, "--budget", "10"); !strings.HasSuffix(strings.TrimRight(out, "\n"),
-		fmt.Sprintf(`searched 1 of %d enabled mods (named); not searched: %d (scope="active": repeat while pending)`, enabled, enabled-1)) {
+		fmt.Sprintf(`named: %s Mod A (enabled): searched; the other %d enabled mods: not searched (scope="active": repeat while pending)`, modA, enabled-1)) {
 		t.Fatalf("MCP wording:\n%s", out)
+	}
+	// "A|B" is any of the texts (an agent got 0 matches for it, 2026-11-27); "a || b" stays one text.
+	if out := e.MustRun("source", "search", "NoSuchCall(|AllComps.Remove(", "--in", modA); !strings.Contains(out, "1 matches") ||
+		!strings.Contains(out, "pattern: any of 2 texts separated by |") {
+		t.Fatalf("alternatives:\n%s", out)
+	}
+	if out := e.MustRun("source", "search", "a || b", "--in", modA); !strings.Contains(out, "0 matches") || !strings.Contains(out, "pattern: literal text") {
+		t.Fatalf("|| is not a separator:\n%s", out)
 	}
 
 	// Nothing found in a restricted scope: say so and name the next call.
@@ -73,7 +81,7 @@ func TestSourceSearchCoverage(t *testing.T) {
 		t.Fatalf("game only:\n%s", out)
 	}
 	out = e.MustRun("source", "search", "AllComps.Remove(", "--game", "--in", modA)
-	if !strings.Contains(out, "searched 1 of ") || !strings.Contains(out, " enabled mods and the game (named)") {
+	if !strings.Contains(out, "named: "+modA+" Mod A (enabled): searched; and the game") {
 		t.Fatalf("mod and game:\n%s", out)
 	}
 }
