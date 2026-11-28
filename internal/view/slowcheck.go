@@ -139,7 +139,26 @@ func slowCheckTimings(a *app.App, clock *app.CheckClock, wall time.Duration) (fe
 	if st, err := a.LoadoutSnapshot(); err == nil && st != nil && st.Ix != nil && st.Ix.Env != nil {
 		t.Disk = fsscan.DiskType(st.Ix.Env.GameRoot)
 	}
+	t.Local(localFolders(a)...)
 	return t, true
+}
+
+// localFolders are the folders on this computer a Mod's text could name (its data folder,
+// every game and user data folder, every Mod folder): Body removes them, also where no
+// drive or home shows they are local (a Linux game under /opt).
+func localFolders(a *app.App) []string {
+	dirs := []string{a.Home}
+	if es, err := a.Store.Envs(); err == nil {
+		for _, e := range es {
+			dirs = append(dirs, e.GameRoot, e.UserDataRoot)
+		}
+	}
+	if ss, err := a.Store.AllSources(); err == nil {
+		for _, s := range ss {
+			dirs = append(dirs, s.Root)
+		}
+	}
+	return dirs
 }
 
 // usMs is microseconds as milliseconds with one decimal.

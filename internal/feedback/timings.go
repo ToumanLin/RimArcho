@@ -37,7 +37,14 @@ type Timings struct {
 	Threads int            `json:"cpu_threads,omitempty"`
 	RAMGB   int            `json:"ram_gb,omitempty"`
 	Disk    string         `json:"disk,omitempty"` // ssd, hdd: the disk of the game's Mods folder
+	// local are this computer's folders RimArcho knows (its data folder, the games, the Mod
+	// folders), removed like home by Scrub: a Linux game under /opt or /mnt names no
+	// drive and no home. Never sent.
+	local []string
 }
+
+// Local adds folders on this computer that Body must never send.
+func (t *Timings) Local(dirs ...string) { t.local = append(t.local, dirs...) }
 
 // TimingPhase is one phase of a check and its milliseconds.
 type TimingPhase struct {
@@ -160,7 +167,7 @@ type TimingDLL struct {
 // preview stays short. Anything that looks like a path on this computer is removed first
 // (Scrub).
 func (t Timings) Body() string {
-	t.Scrub(homeDir())
+	t.Scrub(homeDir(), t.local...)
 	b, _ := json.Marshal(t)
 	return compactJSON(b)
 }
@@ -168,17 +175,18 @@ func (t Timings) Body() string {
 func homeDir() string { h, _ := os.UserHomeDir(); return h }
 
 // Scrub removes local paths: a file that is not relative to its Mod's folder keeps only
-// its name, and any other text that names a drive, a user folder or home becomes "".
-func (t *Timings) Scrub(home string) {
+// its name, and any other text that names a drive, a user folder, home or one of local
+// becomes "".
+func (t *Timings) Scrub(home string, local ...string) {
 	clean := func(s string) string {
-		if localPath(s, home) {
+		if localPath(s, home, local) {
 			return ""
 		}
 		return s
 	}
 	file := func(s string) string {
 		s = strings.ReplaceAll(s, `\`, "/")
-		if localPath(s, home) || strings.HasPrefix(s, "/") || strings.Contains(s, "../") {
+		if localPath(s, home, local) || strings.HasPrefix(s, "/") || strings.Contains(s, "../") {
 			s = s[strings.LastIndex(s, "/")+1:]
 		}
 		return clean(s)
@@ -200,12 +208,15 @@ func (t *Timings) Scrub(home string) {
 
 var localPathRe = regexp.MustCompile(`(?i)(^|[^a-z])[a-z]:[\\/]|\\\\|(^|[\\/])(users|home|documents and settings)[\\/]`)
 
-func localPath(s, home string) bool {
+func localPath(s, home string, local []string) bool {
 	if localPathRe.MatchString(s) {
 		return true
 	}
-	if home = strings.Trim(strings.ReplaceAll(home, `\`, "/"), "/"); len(home) > 3 && strings.Contains(strings.ToLower(strings.ReplaceAll(s, `\`, "/")), strings.ToLower(home)) {
-		return true
+	low := strings.ToLower(strings.ReplaceAll(s, `\`, "/"))
+	for _, d := range append([]string{home}, local...) {
+		if d = strings.Trim(strings.ReplaceAll(d, `\`, "/"), "/"); len(d) > 3 && strings.Contains(low, strings.ToLower(d)) {
+			return true
+		}
 	}
 	return false
 }

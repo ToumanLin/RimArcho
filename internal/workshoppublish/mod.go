@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -110,7 +111,10 @@ func AssembleMod(source string, o ModOptions) (*ModItem, error) {
 func normalizeExcludes(paths []string) ([]string, error) {
 	exclude := make([]string, 0, len(paths))
 	for _, e := range paths {
-		e = strings.Trim(filepath.ToSlash(filepath.Clean(e)), "/")
+		// a backslash separates on every system: a Mod's paths are the same on Steam
+		// everywhere, and Windows authors type them so (Linux would keep `Notes\todo.txt`
+		// as one name)
+		e = strings.Trim(path.Clean(strings.ReplaceAll(e, `\`, "/")), "/")
 		if e == "" || e == "." || e == ".." || strings.HasPrefix(e, "../") || filepath.IsAbs(e) {
 			return nil, fmt.Errorf("--exclude %q must be a path inside the Mod folder", e)
 		}

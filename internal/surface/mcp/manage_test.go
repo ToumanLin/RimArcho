@@ -23,6 +23,23 @@ var freeRe = regexp.MustCompile(`(space: )[0-9.]+ [KMGT]?B`)
 
 // Database footprint changes with the schema. MCP and CLI still compare their
 // actual byte counts above the golden check; only that check normalizes the size.
+// mcpWindowsShape maps what this transcript says on other systems back to the Windows
+// recording, after testkit.WindowsShaped: a path with no drive or backslash needs no
+// quotes in a hint, and Linux's todds message names no archo command, so no "(CLI only)".
+func mcpWindowsShape(out string) string {
+	if runtime.GOOS == "windows" {
+		return out
+	}
+	out = unquotedRootRe.ReplaceAllString(out, `from="$1"`)
+	for _, line := range []string{" — the build is refused", ""} {
+		win := "todds (the DDS encoder) is not installed; archo textures tool --install downloads it" + line
+		out = strings.ReplaceAll(out, win+"\n", win+" (CLI only)\n")
+	}
+	return out
+}
+
+var unquotedRootRe = regexp.MustCompile(`from=(\$ROOT/[^\s"]+)`)
+
 var compactedSizeRe = regexp.MustCompile(`(database compacted: freed [0-9.]+ [KMGT]?B \(now )[0-9.]+ [KMGT]?B(\))`)
 
 var update = flag.Bool("update", false, "rewrite golden files")
@@ -330,7 +347,7 @@ func TestGoldenManageTools(t *testing.T) {
 		}
 		args, _ = json.Marshal(unq)
 		fmt.Fprintf(&sb, "> %s %s\n", m.tool, args)
-		sb.WriteString(testkit.WindowsShaped(got))
+		sb.WriteString(mcpWindowsShape(testkit.WindowsShaped(got)))
 		if isErr {
 			sb.WriteString("[isError]\n")
 		}
