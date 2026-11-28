@@ -79,7 +79,9 @@ func TestEnvironmentLatePreparationCannotSelectOldGame(t *testing.T) {
 		if b.EnvName != "main" {
 			t.Fatalf("premature destination %s", b.EnvName)
 		}
-	case <-time.After(time.Second):
+	// A held mutex blocks until unblock, so a generous bound still catches it; a slow
+	// CI runner needed over 1 s for the read itself.
+	case <-time.After(5 * time.Second):
 		unblock()
 		t.Fatal("preparation held the page mutex")
 	}

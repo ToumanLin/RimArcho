@@ -93,8 +93,10 @@ func TestIgnoreMergedDependency(t *testing.T) {
 	}
 	elapsed := time.Since(start)
 	t.Logf("%d refs in %v, %d problem computations, %d write commits", count, elapsed, probe.problems, probe.commits)
-	if probe.problems != 1 || probe.commits != 1 || elapsed > timingLimit(500*time.Millisecond) {
-		t.Error("expected one problem computation and one write transaction within 500 ms")
+	// The counts are the guard; the time catches a return to per-Mod work (2.25 s on the
+	// base before grouping, 18) and leaves room for CI (526 ms there; 24–29 ms locally).
+	if probe.problems != 1 || probe.commits != 1 || elapsed > timingLimit(1500*time.Millisecond) {
+		t.Error("expected one problem computation and one write transaction within 1.5 s")
 	}
 	rows, err := s.Ignores(ps.State.Ix.Env.ID)
 	if err != nil || len(rows) != count {

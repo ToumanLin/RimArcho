@@ -145,7 +145,9 @@ func TestMaintenanceBusySpaceAndCancellation(t *testing.T) {
 			if mode == "cancel" && !errors.Is(err, context.Canceled) {
 				t.Fatal(err)
 			}
-			if time.Since(start) > time.Second {
+			// Waiting would take the 5 s busy_timeout; a slow CI runner needs over 1 s
+			// for a refusal, so the bound sits between the two.
+			if time.Since(start) > 3*time.Second {
 				t.Fatal("busy/cancel waited")
 			}
 			// Release the held connection before reading completion metadata.
