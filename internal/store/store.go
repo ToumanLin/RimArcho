@@ -54,6 +54,18 @@ var upgrades = []func(tx *sql.Tx, report func(done, total int64)) error{
 // ErrPreRelease: the database was created by a development build before 1.0.0.
 var ErrPreRelease = errors.New("store: database from a pre-1.0 development build")
 
+// ErrNewerSchema: the database was written by a newer RimArcho than this program (04 §4).
+// Every surface prints it as it is: the CLI and MCP on stderr, the window in its message box.
+type ErrNewerSchema struct{ Have, Max int }
+
+func (e *ErrNewerSchema) Error() string {
+	prog := "this program"
+	if exe, err := os.Executable(); err == nil {
+		prog = "this " + filepath.Base(exe)
+	}
+	return fmt.Sprintf("this data was written by a newer RimArcho (schema %d); %s supports schema %d at most, so update it (or use the RimArcho that wrote the data)", e.Have, prog, e.Max)
+}
+
 // Shared is the environment ID of what every environment shares (03 §2): the mod folders
 // and their instances, the lineages, the player's data on lineages and the user rules.
 const Shared = ""
@@ -190,7 +202,10 @@ func (s *Store) migrate(progress func(UpgradeProgress)) error {
 	if v >= 1 && v < FirstReleaseSchema {
 		return fmt.Errorf("%w (schema %d); move %s away to start with a new database", ErrPreRelease, v, s.Path)
 	}
-	if v < 1 || v > SchemaVersion {
+	if v > SchemaVersion {
+		return &ErrNewerSchema{Have: v, Max: SchemaVersion}
+	}
+	if v < 1 {
 		return fmt.Errorf("store: unsupported schema version %d (want %d)", v, SchemaVersion)
 	}
 	from := v
