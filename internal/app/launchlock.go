@@ -71,7 +71,7 @@ func (w *WorkspaceLock) Bind(a *App) func() {
 func tryWorkspaceLock(path string) (func(), error) {
 	unlock, err := lockGameLinks(path)
 	if err != nil {
-		return nil, fmt.Errorf("another launch or credit replacement is running: %w", err)
+		return nil, busyError(path, fmt.Errorf("another launch or credit replacement is running: %w", err))
 	}
 	return unlock, nil
 }

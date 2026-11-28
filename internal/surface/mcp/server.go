@@ -76,8 +76,17 @@ func (s *Server) Execute(env string, argv []string) (string, int) {
 }
 
 func (s *Server) executeContext(ctx context.Context, env string, argv []string) (string, int) {
+	return s.executeMode(ctx, env, argv, false)
+}
+
+// executeMode runs argv; a read-only tool's call reads the stored lists (app.SnapshotReads),
+// so another process's test run, which holds the launch lock for minutes, does not block it (14 §1).
+func (s *Server) executeMode(ctx context.Context, env string, argv []string, readOnly bool) (string, int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if readOnly {
+		defer s.app.SnapshotReads()()
+	}
 	if env != "" {
 		prev := s.app.EnvName
 		s.app.EnvName = env
@@ -114,13 +123,21 @@ func ClipOutput(out string) string {
 }
 
 func (s *Server) run(ctx context.Context, req *sdk.CallToolRequest, env string, argv []string) (*sdk.CallToolResult, any, error) {
+	return s.runMode(ctx, req, env, argv, false)
+}
+
+func (s *Server) readRun(ctx context.Context, req *sdk.CallToolRequest, env string, argv []string) (*sdk.CallToolResult, any, error) {
+	return s.runMode(ctx, req, env, argv, true)
+}
+
+func (s *Server) runMode(ctx context.Context, req *sdk.CallToolRequest, env string, argv []string, readOnly bool) (*sdk.CallToolResult, any, error) {
 	// An argv builder that refuses the arguments returns its message as the only word (unknown,
 	// for example); no command name has a space, so say it as the refusal it is.
 	if len(argv) == 1 && strings.ContainsRune(argv[0], ' ') {
 		return &sdk.CallToolResult{Content: []sdk.Content{&sdk.TextContent{Text: "error: " + argv[0] + "\n"}}, IsError: true}, nil, nil
 	}
 	ctx, stop := heartbeat(ctx, req)
-	out, code := s.executeContext(ctx, env, argv)
+	out, code := s.executeMode(ctx, env, argv, readOnly)
 	stop()
 	// Test reports already limit clusters; clipping their JSON would corrupt it.
 	if len(argv) < 2 || (argv[0] != "test" || argv[1] != "run") && argv[0] != "links" {
@@ -186,7 +203,11 @@ func New(a *app.App, g Group) *Server {
 		if !t.readOnly {
 			ann.DestructiveHint = ptr(t.destructive)
 		}
-		t.add(s.srv, s.run, &sdk.Tool{Name: t.name, Description: t.desc, Annotations: ann})
+		run := s.run
+		if t.readOnly {
+			run = s.readRun
+		}
+		t.add(s.srv, run, &sdk.Tool{Name: t.name, Description: t.desc, Annotations: ann})
 	}
 	return s
 }
