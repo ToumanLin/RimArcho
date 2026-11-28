@@ -27,4 +27,5 @@ Pages must load quickly and use little memory. Requirements and thresholds: 16 �
 
 - Static checks: `go test -count=1 -run 'TestArch|TestSpec|TestStyleRules|TestUI|TestEndlessAnimations' ./internal/...` (about 15 s). They check architecture, forbidden APIs, specification ↔ code agreement, and the GUI's visual and interaction rules (17 §4 "Static checks"). Claude Code runs the matching subset after each edit. A failure names the spec section to read: fix the code or the spec. Do not add an exception unless the spec allows it.
 - `go test -count=1 ./...` (`-count=1` skips the test cache, whose file-access recording is slow on Windows), `node --test "scripts/vm/*.test.mjs" "feedback-relay/*.test.mjs"`.
+- Before pushing (always before a release commit): `pwsh scripts/preflight.ps1` runs CI's `check` and `linux` jobs locally (gofmt, vet, staticcheck, all tests, Linux in WSL); `-Quick` skips the tests (17 §5).
 - Automated tests use only synthetic data (`internal/testkit`). Touch real games, Mods and `%APPDATA%\RimArcho` only inside the VM ([scripts/vm/README.md](scripts/vm/README.md); safety rules: 17 §4).

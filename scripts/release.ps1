@@ -58,9 +58,17 @@ if (-not $SkipTests -and -not $PackageOnly -and -not $FromCI) {
     # Keep tested spikes explicit so local experiments cannot enter the release gate.
     # Scale checks run only with RIMARCHO_SCALE_TESTS=1; set it for scan or TUI speed changes.
     # -count=1 reruns tests without recording the costly Windows file-access test cache.
-    Write-Host "go test -count=1 ./internal/... ./cmd/... ./scripts/... ./spikes/hugslogs ./spikes/corpuslabel"
-    go test -count=1 ./internal/... ./cmd/... ./scripts/... ./spikes/hugslogs ./spikes/corpuslabel
-    if ($LASTEXITCODE -ne 0) { throw "tests failed" }
+    # On Windows, scripts/preflight.ps1 runs CI's check and linux jobs locally (gofmt, vet,
+    # staticcheck, every tracked package's tests, Linux in WSL); it covers the list below.
+    if ($GOOS -eq "windows" -and $env:OS -eq "Windows_NT") {
+        Write-Host "scripts/preflight.ps1"
+        & (Join-Path $PSScriptRoot "preflight.ps1")
+        if ($LASTEXITCODE -ne 0) { throw "preflight failed" }
+    } else {
+        Write-Host "go test -count=1 ./internal/... ./cmd/... ./scripts/... ./spikes/hugslogs ./spikes/corpuslabel"
+        go test -count=1 ./internal/... ./cmd/... ./scripts/... ./spikes/hugslogs ./spikes/corpuslabel
+        if ($LASTEXITCODE -ne 0) { throw "tests failed" }
+    }
 }
 
 $name = "archo-$Version-$GOOS-$GOARCH"
