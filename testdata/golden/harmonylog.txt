@@ -9,7 +9,7 @@ next:
 $ archo harmony
 harmony: 7 patches in 5 assemblies
   shared-targets:
-    Verse.Pawn.Tick  3 mods: #gpto #iqmu #xamx
+    Verse.Pawn.Tick  3 mods: #iqmu Mod A, #gpto Mod B, #xamx Mod C
 next:
   archo harmony --target <Type.Method>
   archo problems --code harmony

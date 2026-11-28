@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/render"
@@ -54,7 +55,7 @@ func harmonyCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		inst = m.ID
 		if a.Str("target") == "" && st.Position(m.ID) == 0 {
-			return notAnalysed("harmony"), nil
+			return harmonyOutside(c, a, st, s, inst, limit)
 		}
 	}
 	switch {
@@ -65,7 +66,7 @@ func harmonyCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	default:
 		d, root := render.New(fmt.Sprintf("harmony: %d patches in %d assemblies", s.Run.Stats.HarmonyPatches, s.Run.Stats.Assemblies))
 		harmonyStale(s, root)
-		addShared(c, ix, root, "", limit)
+		addShared(c, st, root, "", limit)
 		d.AddNext("archo harmony --target <Type.Method>", "archo problems --code harmony")
 		return d, nil
 	}
@@ -86,12 +87,14 @@ func harmonyTarget(c *Ctx, st *app.LoadoutState, s *app.AnalysisState, t, inst s
 	if err != nil {
 		return nil, err
 	}
+	rows = harmonyInScope(st, rows, inst)
 	like := false
 	if len(rows) == 0 {
 		rows, err = c.App.Store.HarmonyPatches(store.HarmonyFilter{Target: t, Instance: inst, Like: true})
 		if err != nil {
 			return nil, err
 		}
+		rows = harmonyInScope(st, rows, inst)
 		like = true
 	}
 	mods := map[string]bool{}
@@ -151,10 +154,51 @@ func harmonyByKind(st *app.LoadoutState, root *render.Node, rows []*store.Harmon
 	}
 }
 
+// harmonyInScope keeps the patches of the current list's Mods and of inst. The stored
+// facts cover every copy analysed for this game version, in any list or Game Config
+// (content_state); the others printed as #? or as a long ID no reference resolves.
+func harmonyInScope(st *app.LoadoutState, rows []*store.HarmonyRow, inst string) []*store.HarmonyRow {
+	out := rows[:0:0]
+	for _, h := range rows {
+		if h.Instance == inst || st.Position(h.Instance) > 0 {
+			out = append(out, h)
+		}
+	}
+	return out
+}
+
+// harmonyScanBudget bounds the on-demand read of a Mod outside the list (14 §1).
+var harmonyScanBudget = 10 * time.Second
+
+// harmonyOutside is harmony --mod for a Mod outside the current list: the stored analysis
+// of that copy for this game version when one exists (it was in another list), otherwise its
+// assemblies read now, not stored (05 §5.3).
+func harmonyOutside(c *Ctx, a *Args, st *app.LoadoutState, s *app.AnalysisState, inst string, limit int) (*render.Doc, error) {
+	asms, err := c.App.Store.Assemblies(inst)
+	if err != nil {
+		return nil, err
+	}
+	if len(asms) > 0 {
+		rows, err := c.App.Store.HarmonyPatches(store.HarmonyFilter{Instance: inst})
+		if err != nil {
+			return nil, err
+		}
+		return harmonyModRows(c, a, st, s, inst, asms, rows, "not in the current list: from an earlier analysis of this copy for "+st.GameMM(), limit), nil
+	}
+	m := st.Ix.ByID[inst]
+	asms, rows, pending, err := c.App.ScanModHarmony(st, m, harmonyScanBudget)
+	if err != nil {
+		return nil, err
+	}
+	scope := "not in the current list: its assemblies read now for " + st.GameMM() + ", not stored"
+	if pending > 0 {
+		scope += fmt.Sprintf("; %d assemblies not read within %s: call again", pending, harmonyScanBudget)
+	}
+	return harmonyModRows(c, a, st, nil, inst, asms, rows, scope, limit), nil
+}
+
 // harmonyMod is harmony --mod: one mod's assemblies and patches.
 func harmonyMod(c *Ctx, a *Args, st *app.LoadoutState, s *app.AnalysisState, inst string, limit int) (*render.Doc, error) {
-	ix := st.Ix
-	m := ix.ByID[inst]
 	asms, err := c.App.Store.Assemblies(inst)
 	if err != nil {
 		return nil, err
@@ -163,8 +207,21 @@ func harmonyMod(c *Ctx, a *Args, st *app.LoadoutState, s *app.AnalysisState, ins
 	if err != nil {
 		return nil, err
 	}
+	return harmonyModRows(c, a, st, s, inst, asms, rows, "", limit), nil
+}
+
+// harmonyModRows prints one Mod's assemblies and patches; scope, when set, says where they
+// come from (a Mod outside the list), and s is nil for facts read now.
+func harmonyModRows(c *Ctx, a *Args, st *app.LoadoutState, s *app.AnalysisState, inst string, asms []*store.AssemblyRow, rows []*store.HarmonyRow, scope string, limit int) *render.Doc {
+	ix := st.Ix
+	m := ix.ByID[inst]
 	d, root := render.New(fmt.Sprintf("%s  harmony: %d patches", modLabel(ix, m.ID), len(rows)))
-	harmonyStale(s, root)
+	if scope != "" {
+		root.KV("scope", scope)
+	}
+	if s != nil {
+		harmonyStale(s, root)
+	}
 	if len(asms) == 0 {
 		root.Add("no assemblies in the effective content")
 	}
@@ -182,9 +239,9 @@ func harmonyMod(c *Ctx, a *Args, st *app.LoadoutState, s *app.AnalysisState, ins
 		root.Add("no Harmony patches declared")
 	}
 	if a.Bool("shared") {
-		addShared(c, ix, root, inst, limit)
+		addShared(c, st, root, inst, limit)
 	}
-	return d, nil
+	return d
 }
 
 // harmonyAssemblies adds a mod's assemblies and reports whether one calls Harmony.Patch
@@ -230,12 +287,15 @@ func harmonyManual(ix *app.Index, root *render.Node, id string, rows []*store.Ha
 	mn.Truncate(limit, "archo harmony --mod "+ix.Ref(id)+" --all")
 }
 
-// addShared lists targets patched by several mods (only those involving inst, if set).
-func addShared(c *Ctx, ix *app.Index, root *render.Node, inst string, limit int) {
+// addShared lists targets patched by several mods of the list (only those involving inst,
+// if set; inst may be outside the list), each Mod by reference and name.
+func addShared(c *Ctx, st *app.LoadoutState, root *render.Node, inst string, limit int) {
+	ix := st.Ix
 	rows, err := c.App.Store.HarmonyPatches(store.HarmonyFilter{})
 	if err != nil {
 		return
 	}
+	rows = harmonyInScope(st, rows, inst)
 	by := map[string]map[string]bool{}
 	var order []string
 	for _, h := range rows {
@@ -257,12 +317,16 @@ func addShared(c *Ctx, ix *app.Index, root *render.Node, inst string, limit int)
 		if len(ms) < 2 || (inst != "" && !ms[inst]) {
 			continue
 		}
-		var refs []string
+		var ids []string
 		for id := range ms {
-			refs = append(refs, ix.Ref(id))
+			ids = append(ids, id)
 		}
-		sort.Strings(refs)
-		sec.Addf("%s  %d mods: %s", t, len(ms), strings.Join(refs, " "))
+		sort.Slice(ids, func(i, j int) bool { return st.Position(ids[i]) < st.Position(ids[j]) })
+		var names []string
+		for _, id := range ids {
+			names = append(names, modLabel(ix, id))
+		}
+		sec.Addf("%s  %d mods: %s", t, len(ms), strings.Join(names, ", "))
 	}
 	if len(sec.Children) == 0 {
 		sec.Add("(none)")

@@ -52,7 +52,7 @@ Example: get_patches {"failed": true}
   patches: 9 failed of 412 operations simulated, 0 not simulated
     list:
       #ed2b Node Research  Patches/x.xml:40  Verse.PatchOperationAdd(Defs/ThingDef[defName="X"])  hit 0  (patch.no-match: target-inactive)`},
-	{"get_harmony", `Harmony patches read from mod assemblies (no game run needed): target=<Type.Method> lists every prefix/postfix/transpiler/finalizer on that method with the owning mod and patch class (bool prefixes can skip the original); mod=<ref> lists a mod's assemblies and patches (and says when it patches from code with Harmony.Patch, which cannot be resolved statically); shared=true lists methods several mods patch. Use for stack traces with "- PREFIX/POSTFIX owner:" lines and for "which mods touch Pawn.Tick". Then read_source with the patch class to see the code.
+	{"get_harmony", `Harmony patches read from mod assemblies (no game run needed): target=<Type.Method> lists every prefix/postfix/transpiler/finalizer on that method with the owning mod and patch class (bool prefixes can skip the original); mod=<ref> lists a mod's assemblies and patches (and says when it patches from code with Harmony.Patch, which cannot be resolved statically), also for a mod outside the current list (its earlier analysis, or its assemblies read now: see scope); shared=true lists methods several mods of the list patch, by name. Use for stack traces with "- PREFIX/POSTFIX owner:" lines and for "which mods touch Pawn.Tick". Then read_source with the patch class to see the code.
 Example: get_harmony {"target": "Verse.Pawn.Tick"}
   harmony:Verse.Pawn.Tick  2 patches from 2 mods
     prefixes:
