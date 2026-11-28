@@ -353,5 +353,12 @@
   "%d installed, not enabled": "%d개 설치됨, 아직 켜지 않음",
   "ready to catch up: %s": "따라잡을 수 있어요: %s",
   "no list is open": "열린 목록이 없어요",
-  "RimArcho Looks Preference and RimArcho Styles Preference": "RimArcho Looks Preference 및 RimArcho Styles Preference"
+  "RimArcho Looks Preference and RimArcho Styles Preference": "RimArcho Looks Preference 및 RimArcho Styles Preference",
+  "%s linked from %s": "%s: %s에서 링크",
+  "%s's Mods folder": "%s의 Mods 폴더",
+  "the SteamCMD folder": "SteamCMD 폴더",
+  "the lock library": "고정 라이브러리",
+  "the Archo Monitor folder": "Archo Monitor 폴더",
+  "the subscriptions folder": "구독 폴더",
+  "the folder %s": "폴더 %s"
 }

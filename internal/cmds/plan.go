@@ -84,6 +84,9 @@ func newPlanDoc(c *Ctx, r *app.NewPlanResult) *render.Doc {
 				root.KV("not installed", fmt.Sprintf("… %d more", len(missing)-8))
 			}
 		}
+		if linked := app.ImportLinked(r.State, r.List); len(linked) > 0 {
+			root.Children = append(root.Children, linkedNode(linked))
+		}
 		if len(r.Unresolved) > 0 {
 			root.KV("skipped", fmt.Sprintf("%d workshop IDs no installed mod has", len(r.Unresolved)))
 		}

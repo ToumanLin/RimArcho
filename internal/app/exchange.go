@@ -363,6 +363,13 @@ func ImportedEntries(st *LoadoutState, il *ImportedList) (list loadout.List, unr
 		}
 	}
 	list, _ = st.Reg.FromTokens(tokens)
+	for i, e := range list {
+		if e.Missing != "" {
+			if id := importCopy(st, e.Missing, il.Lineages[e.Missing], il.Hash(e.Missing)); id != "" && list.Index(id) < 0 {
+				list[i] = loadout.Entry{Instance: id}
+			}
+		}
+	}
 	list = append(keptOfficial(st, il), list...)
 	for i, e := range list {
 		if e.Missing != "" {
@@ -377,6 +384,100 @@ func ImportedEntries(st *LoadoutState, il *ImportedList) (list loadout.List, unr
 		}
 	}
 	return list, unresolved
+}
+
+// importCopy is the copy an import links for a packageId the game sees no copy of (07 §7.1
+// "Copies the game does not see"): a live deployable copy (another game's Mods/, SteamCMD,
+// an extra folder, the lock library; 09 §3) that lists the game's version, else the only
+// such copy, whatever it lists (the version finding then flags it). Among several, the one
+// with the list's content, then its lineage. "" when there is none, or several and none
+// lists the version.
+func importCopy(st *LoadoutState, token, lineage, hash string) string {
+	base := packageBase(strings.ToLower(token))
+	mm := st.GameMM()
+	var all, listing []*store.Mod
+	for _, m := range st.Ix.Mods {
+		if packageBase(strings.ToLower(m.PackageID)) != base || !st.Deployable(m) {
+			continue
+		}
+		all = append(all, m)
+		if listsVersion(m, mm) {
+			listing = append(listing, m)
+		}
+	}
+	pick := listing
+	if len(pick) == 0 && len(all) == 1 {
+		pick = all
+	}
+	if len(pick) == 0 {
+		return ""
+	}
+	for _, m := range pick {
+		if hash != "" && SameContent(m, hash) {
+			return m.ID
+		}
+	}
+	for _, m := range pick {
+		if lineage != "" && m.LineageID == lineage {
+			return m.ID
+		}
+	}
+	return pick[0].ID
+}
+
+// listsVersion says whether m's About.xml lists the game version mm.
+func listsVersion(m *store.Mod, mm string) bool {
+	for _, v := range strings.Fields(strings.ReplaceAll(m.SupportedVersions, ",", " ")) {
+		if v == mm {
+			return true
+		}
+	}
+	return false
+}
+
+// LinkedFrom says where a list's copy the game does not see is linked from when the list
+// is saved or launched (09 §3): "1.6's Mods folder", "the SteamCMD folder"; "" for a copy
+// the game sees. An import names it per Mod (07 §7.1).
+func LinkedFrom(st *LoadoutState, m *store.Mod) string {
+	game, folder := LinkedFromParts(st, m)
+	if game != "" {
+		return game + "'s Mods folder"
+	}
+	return folder
+}
+
+// LinkedFromParts is LinkedFrom for a translated text: the other game's name (its Mods
+// folder), or else one of the fixed folder phrases, or "the folder <label>".
+func LinkedFromParts(st *LoadoutState, m *store.Mod) (game, folder string) {
+	if m == nil || !st.Deployable(m) {
+		return "", ""
+	}
+	switch {
+	case m.Kind == source.Elsewhere:
+		return strings.TrimPrefix(m.SourceLabel, "local-"), ""
+	case m.Kind == source.SteamCMD:
+		return "", "the SteamCMD folder"
+	case m.SourceLabel == LockLabel:
+		return "", "the lock library"
+	case m.SourceLabel == MonitorLabel:
+		return "", "the Archo Monitor folder"
+	case m.SourceLabel == SubscribedLabel:
+		return "", "the subscriptions folder"
+	}
+	return "", "the folder " + m.SourceLabel
+}
+
+// ImportLinked names, as "<name> (<packageId>) linked from <where>", the entries of an
+// imported list that are copies the game does not see (LinkedFrom).
+func ImportLinked(st *LoadoutState, list loadout.List) []string {
+	var out []string
+	for _, e := range list {
+		m := st.Ix.ByID[e.Instance]
+		if from := LinkedFrom(st, m); from != "" {
+			out = append(out, fmt.Sprintf("%s (%s) linked from %s", m.DisplayName(), m.PackageID, from))
+		}
+	}
+	return out
 }
 
 // KeptOfficial is how many entries at the head of ImportedEntries come from the current

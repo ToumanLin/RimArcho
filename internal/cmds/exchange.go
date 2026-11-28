@@ -115,6 +115,9 @@ func loadoutImport(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		head = append(head, n)
 	}
+	if linked := app.ImportLinked(r.State, r.State.List); len(linked) > 0 {
+		head = append(head, linkedNode(linked))
+	}
 	if len(other) > 0 {
 		n := &render.Node{Line: fmt.Sprintf("another version installed: %d (the list was made with a different version of these)", len(other))}
 		for i, x := range other {
@@ -134,4 +137,18 @@ func loadoutImport(c *Ctx, a *Args) (*render.Doc, error) {
 		d.AddNext("archo undo")
 	}
 	return d, nil
+}
+
+// linkedNode lists the imported entries that are copies the game does not see, each with
+// the folder a save or launch links it from (07 §7.1).
+func linkedNode(linked []string) *render.Node {
+	n := &render.Node{Line: fmt.Sprintf("linked from other folders: %d (a save or launch links them into Mods/)", len(linked))}
+	for i, x := range linked {
+		if i == 8 {
+			n.Children = append(n.Children, &render.Node{Line: fmt.Sprintf("… %d more", len(linked)-8)})
+			break
+		}
+		n.Children = append(n.Children, &render.Node{Line: x})
+	}
+	return n
 }

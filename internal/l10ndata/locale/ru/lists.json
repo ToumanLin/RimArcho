@@ -353,5 +353,12 @@
   "%d installed, not enabled": "%d установлено, ещё не включено",
   "ready to catch up: %s": "можно догнать: %s",
   "no list is open": "нет открытого списка",
-  "RimArcho Looks Preference and RimArcho Styles Preference": "RimArcho Looks Preference и RimArcho Styles Preference"
+  "RimArcho Looks Preference and RimArcho Styles Preference": "RimArcho Looks Preference и RimArcho Styles Preference",
+  "%s linked from %s": "%s — ссылка из: %s",
+  "%s's Mods folder": "папка Mods игры %s",
+  "the SteamCMD folder": "папка SteamCMD",
+  "the lock library": "закреплённая библиотека",
+  "the Archo Monitor folder": "папка Archo Monitor",
+  "the subscriptions folder": "папка подписок",
+  "the folder %s": "папка %s"
 }

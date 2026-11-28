@@ -458,10 +458,52 @@ func ApplyImport(a *app.App, imp *Import, merge bool) (string, error) {
 			e.Swapped++
 		}
 	}
+	t := Tf("imported %s: %d added, %d removed, %d moved, unsaved, u undoes", imp.Source, e.Added+e.Swapped, e.Removed, e.Moved)
 	if merge {
-		return Tf("added %s from %s, unsaved, u undoes", Plural(e.Added, "mod"), imp.Source), nil
+		t = Tf("added %s from %s, unsaved, u undoes", Plural(e.Added, "mod"), imp.Source)
 	}
-	return Tf("imported %s: %d added, %d removed, %d moved, unsaved, u undoes", imp.Source, e.Added+e.Swapped, e.Removed, e.Moved), nil
+	return t + linkedText(r.State, r.State.List), nil
+}
+
+// linkedText names the entries of an imported list the game does not see, each with where
+// a save or launch links it from ("  UF Light Industries linked from 1.6's Mods folder"),
+// at most three; "" for none (07 §7.1).
+func linkedText(st *app.LoadoutState, list loadout.List) string {
+	var parts []string
+	n := 0
+	for _, e := range list {
+		m := st.Ix.ByID[e.Instance]
+		game, folder := app.LinkedFromParts(st, m)
+		if game == "" && folder == "" {
+			continue
+		}
+		if n++; n > 3 {
+			continue
+		}
+		var where string
+		switch folder {
+		case "":
+			where = Tf("%s's Mods folder", game)
+		case "the SteamCMD folder":
+			where = T("the SteamCMD folder")
+		case "the lock library":
+			where = T("the lock library")
+		case "the Archo Monitor folder":
+			where = T("the Archo Monitor folder")
+		case "the subscriptions folder":
+			where = T("the subscriptions folder")
+		default:
+			where = Tf("the folder %s", strings.TrimPrefix(folder, "the folder "))
+		}
+		parts = append(parts, Tf("%s linked from %s", m.DisplayName(), where))
+	}
+	if n > 3 {
+		parts = append(parts, "…")
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "  " + strings.Join(parts, "; ")
 }
 
 // FollowImported makes a list follow the collection an import read (no network: the

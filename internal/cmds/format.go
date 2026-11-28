@@ -29,7 +29,8 @@ func tags(c *Ctx, ix *app.Index, m *store.Mod) string {
 		parts = append(parts, "unloadable: "+m.Unloadable)
 	}
 	// Another game's own Mods/ folder: this game does not see it; a save or test run links it
-	// only when the plan names this copy, so a packageId in a list file does not pick it (09 §3).
+	// only when the plan names this copy; an import picks it only when the game has no copy of
+	// the packageId (07 §7.1 "Copies the game does not see").
 	if m.Kind == source.Elsewhere && m.Status == identity.Live {
 		if st := c.Loadout(); st != nil && st.Ix.Env.ID == ix.Env.ID && st.Deployable(m) && st.Position(m.ID) == 0 {
 			parts = append(parts, "another game's Mods/: enable this reference to link it")

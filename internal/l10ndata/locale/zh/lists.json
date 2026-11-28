@@ -353,5 +353,12 @@
   "%d installed, not enabled": "%d 个已装好、还没启用",
   "ready to catch up: %s": "可以跟上了：%s",
   "no list is open": "没有打开的列表",
-  "RimArcho Looks Preference and RimArcho Styles Preference": "RimArcho Looks Preference 和 RimArcho Styles Preference"
+  "RimArcho Looks Preference and RimArcho Styles Preference": "RimArcho Looks Preference 和 RimArcho Styles Preference",
+  "%s linked from %s": "%s 从%s链接",
+  "%s's Mods folder": "%s 的 Mods 文件夹",
+  "the SteamCMD folder": "SteamCMD 文件夹",
+  "the lock library": "锁定库",
+  "the Archo Monitor folder": "Archo Monitor 文件夹",
+  "the subscriptions folder": "订阅文件夹",
+  "the folder %s": "文件夹 %s"
 }

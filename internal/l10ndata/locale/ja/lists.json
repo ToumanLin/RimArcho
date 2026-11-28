@@ -353,5 +353,12 @@
   "%d installed, not enabled": "%d 個がインストール済み・未有効",
   "ready to catch up: %s": "追従できます：%s",
   "no list is open": "開いているリストがありません",
-  "RimArcho Looks Preference and RimArcho Styles Preference": "RimArcho Looks Preference と RimArcho Styles Preference"
+  "RimArcho Looks Preference and RimArcho Styles Preference": "RimArcho Looks Preference と RimArcho Styles Preference",
+  "%s linked from %s": "%s は%sからリンク",
+  "%s's Mods folder": "%s の Mods フォルダー",
+  "the SteamCMD folder": "SteamCMD フォルダー",
+  "the lock library": "固定ライブラリ",
+  "the Archo Monitor folder": "Archo Monitor フォルダー",
+  "the subscriptions folder": "購読フォルダー",
+  "the folder %s": "フォルダー %s"
 }
