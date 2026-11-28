@@ -191,7 +191,9 @@ function draw(loading) {
     const bar = el("div", "fd-tabs");
     bar.append(seg(names, F.tab, (i) => { F.tab = i; draw(false); }));
     tech.append(bar);
-    const pre = el("pre", "lines");
+    // a Mod outside the list: its earlier analysis, muted under where it came from (16 §4.1)
+    if (secs[F.tab].note) tech.append(el("div", "fd-note muted", secs[F.tab].note));
+    const pre = el("pre", secs[F.tab].muted ? "lines muted" : "lines");
     pathContent(pre, (secs[F.tab].lines || []).join("\n"), [...(secs[F.tab].paths || []), ...(F.d?.fields || []).filter(f => f.kind === "path").map(f => f.value)]);
     tech.append(pre);
   } else tech.append(el("div", "empty-state", F.secs ? T("nothing technical recorded") : T("loading…")));

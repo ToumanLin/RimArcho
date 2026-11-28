@@ -444,5 +444,7 @@
   "set by you; automatic: %s": "あなたが設定；自動判定：%s",
   "%s: automatic category": "%s：自動のカテゴリに戻した",
   "%d XML in Defs": "Defs に XML %d 個",
-  "only patches: %d XML in Patches, no Defs or DLL": "パッチのみ：Patches に XML %d 個、Def と DLL なし"
+  "only patches: %d XML in Patches, no Defs or DLL": "パッチのみ：Patches に XML %d 個、Def と DLL なし",
+  "from an earlier analysis": "以前の分析から",
+  "from an earlier analysis in %s": "以前の %s での分析から"
 }

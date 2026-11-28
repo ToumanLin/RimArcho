@@ -444,5 +444,7 @@
   "set by you; automatic: %s": "직접 설정함. 자동: %s",
   "%s: automatic category": "%s: 자동 분류",
   "%d XML in Defs": "Defs의 XML %d개",
-  "only patches: %d XML in Patches, no Defs or DLL": "패치만: Patches의 XML %d개, Def나 DLL 없음"
+  "only patches: %d XML in Patches, no Defs or DLL": "패치만: Patches의 XML %d개, Def나 DLL 없음",
+  "from an earlier analysis": "이전 분석에서",
+  "from an earlier analysis in %s": "이전 %s 분석에서"
 }

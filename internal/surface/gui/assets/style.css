@@ -2051,6 +2051,8 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .fd-hist .link { margin-top: 6px; color: var(--accent-11, var(--accent)); font-size: 13px; }
 .fd-tabs { padding: 8px 14px 0; }
 .fd-tech pre.lines { padding: 10px 14px 14px; max-height: 60vh; overflow: auto; }
+.fd-tech pre.lines.muted { color: var(--muted); }
+.fd-tech .fd-note { padding: 10px 14px 0; font-size: 12px; }
 @media (max-width: 900px) { .fd { grid-template-columns: minmax(0, 1fr); } }
 .fd-desc .desc p { margin: 0 0 2px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .fd-desc .desc p.gap { height: 8px; }

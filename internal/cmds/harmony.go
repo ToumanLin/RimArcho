@@ -14,9 +14,9 @@ import (
 func init() {
 	register(&Command{Name: "harmony", Summary: "Harmony patches: of a mod, on a target method, or shared between mods", MaxArgs: 0, Run: harmonyCmd,
 		Flags: []Flag{{Name: "mod", Value: "<ref>"}, {Name: "target", Value: "<Type.Method | part>"}, {Name: "shared"}, {Name: "all"},
-			// --list-only: the window's details pane, which opens on every row, keeps "not analysed"
-			// for a Mod outside the list instead of reading its assemblies (16 §10).
-			{Name: "list-only", Help: "with --mod: say \"not analysed\" for a mod outside the current list instead of reading it"}, gameVersionFlag}})
+			// --list-only: the window's details pane, which opens on every row, shows only stored facts
+			// for a Mod outside the list and never reads its assemblies (16 §4.1, §10).
+			{Name: "list-only", Help: "with --mod: for a mod outside the current list, only its stored analysis (else \"not analysed\"); never read its assemblies"}, gameVersionFlag}})
 }
 
 func harmonyLine(ix *app.Index, h *store.HarmonyRow, withMod, withTarget bool) string {
@@ -58,10 +58,7 @@ func harmonyCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		inst = m.ID
 		if a.Str("target") == "" && st.Position(m.ID) == 0 {
-			if a.Bool("list-only") {
-				return notAnalysed("harmony"), nil
-			}
-			return harmonyOutside(c, a, st, s, inst, limit)
+			return harmonyOutside(c, a, st, s, inst, a.Bool("list-only"), limit)
 		}
 	}
 	switch {
@@ -179,7 +176,7 @@ var harmonyScanBudget = 10 * time.Second
 // harmonyOutside is harmony --mod for a Mod outside the current list: the stored analysis
 // of that copy for this game version when one exists (it was in another list), otherwise its
 // assemblies read now, not stored (05 §5.3).
-func harmonyOutside(c *Ctx, a *Args, st *app.LoadoutState, s *app.AnalysisState, inst string, limit int) (*render.Doc, error) {
+func harmonyOutside(c *Ctx, a *Args, st *app.LoadoutState, s *app.AnalysisState, inst string, storedOnly bool, limit int) (*render.Doc, error) {
 	asms, err := c.App.Store.Assemblies(inst)
 	if err != nil {
 		return nil, err
@@ -189,7 +186,14 @@ func harmonyOutside(c *Ctx, a *Args, st *app.LoadoutState, s *app.AnalysisState,
 		if err != nil {
 			return nil, err
 		}
-		return harmonyModRows(c, a, st, s, inst, asms, rows, "not in the current list: from an earlier analysis of this copy for "+st.GameMM(), limit), nil
+		scope := "not in the current list: from an earlier analysis of this copy for " + st.GameMM()
+		if lists, _ := c.App.PlansUsing(st, inst); len(lists) > 0 {
+			scope += " (lists with it: " + strings.Join(firstN(lists, 3), ", ") + ")"
+		}
+		return harmonyModRows(c, a, st, s, inst, asms, rows, scope, limit), nil
+	}
+	if storedOnly { // the window's details pane never reads assemblies (16 §4.1)
+		return notAnalysed("harmony"), nil
 	}
 	m := st.Ix.ByID[inst]
 	asms, rows, pending, err := c.App.ScanModHarmony(st, m, harmonyScanBudget)

@@ -444,5 +444,7 @@
   "set by you; automatic: %s": "задано вами; автоматически: %s",
   "%s: automatic category": "%s: автоматическая категория",
   "%d XML in Defs": "XML в Defs: %d",
-  "only patches: %d XML in Patches, no Defs or DLL": "только патчи: XML в Patches: %d, нет Def и DLL"
+  "only patches: %d XML in Patches, no Defs or DLL": "только патчи: XML в Patches: %d, нет Def и DLL",
+  "from an earlier analysis": "из прежнего анализа",
+  "from an earlier analysis in %s": "из прежнего анализа в %s"
 }

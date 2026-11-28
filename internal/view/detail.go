@@ -281,6 +281,10 @@ type Section struct {
 	Count int        `json:"count"` // -1: no count
 	Lines []string   `json:"lines"` // indented text lines
 	Paths []PathText `json:"paths,omitempty"`
+	// Note says where muted lines come from: a Mod outside the list shows its earlier
+	// analysis (16 §4.1), "from an earlier analysis in Raid night".
+	Note  string `json:"note,omitempty"`
+	Muted bool   `json:"muted,omitempty"`
 }
 
 var sectionFileRe = regexp.MustCompile(`^([^:\n]+\.xml):[0-9]+`)
@@ -344,8 +348,40 @@ func Sections(a *app.App, ix *app.Index, mod *store.Mod) []Section {
 	run(T("Defs"), "def", "--mod", ref)
 	run(T("patches"), "patches", "--mod", ref)
 	run("Harmony", "harmony", "--mod", ref, "--list-only")
+	earlierAnalysis(a, mod, &out[len(out)-1])
 	out = append(out, rulesSection(a, ix, mod), historySection(a, ix, mod.ID))
 	return out
+}
+
+// earlierAnalysis marks the Harmony section of a Mod outside the list that shows the stored
+// facts of an earlier analysis (harmony --list-only, never a DLL read): muted, without a
+// count, its scope line replaced by a short note naming the lists that have the Mod.
+func earlierAnalysis(a *app.App, mod *store.Mod, sec *Section) {
+	scope := -1
+	for i, l := range sec.Lines {
+		if strings.HasPrefix(strings.TrimSpace(l), "scope: not in the current list: from an earlier analysis") {
+			scope = i
+			break
+		}
+	}
+	if scope < 0 {
+		return
+	}
+	sec.Lines = append(sec.Lines[:scope:scope], sec.Lines[scope+1:]...)
+	sec.Count, sec.Muted = -1, true
+	sec.Note = T("from an earlier analysis")
+	if st, err := a.Loadout(); err == nil {
+		if refs, _ := a.PlansUsing(st, mod.ID); len(refs) > 0 {
+			names := make([]string, 0, 2)
+			for _, r := range refs[:min(len(refs), 2)] {
+				names = append(names, strings.TrimPrefix(r, "plan:"))
+			}
+			if len(refs) > 2 {
+				names = append(names, "…")
+			}
+			sec.Note = Tf("from an earlier analysis in %s", strings.Join(names, ", "))
+		}
+	}
 }
 
 func indentOf(s string) int { return len(s) - len(strings.TrimLeft(s, " ")) }

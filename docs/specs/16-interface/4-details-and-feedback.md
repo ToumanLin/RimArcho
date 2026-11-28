@@ -46,7 +46,7 @@ technical information   i expand                ← collapsed by default
 
 - The package ID is visible by default because players use it in other tools and forums. This is the sole exception to hiding developer terms.
 - Each Can it run item uses a plain sentence and ends with a directly executable key (§5).
-- Technical information appears only after expansion: #id references, paths, Workshop ID, file count and size, Def, Patch, and Harmony counts, Lineage and copies, and the unloadable reason (`view.UnloadableWhy`). In the TUI, i expands it and only then loads the mod command output; in the GUI, clicking expands it. Patches and Harmony are analysed only for the current list (05 §5). For a Mod outside it, `patches --mod` and `harmony --mod` say "not analysed (not in the current list)", and the sections show no count rather than 0. Defs are read for every loadable Mod, so their count always shows.
+- Technical information appears only after expansion: #id references, paths, Workshop ID, file count and size, Def, Patch, and Harmony counts, Lineage and copies, and the unloadable reason (`view.UnloadableWhy`). In the TUI, i expands it and only then loads the mod command output; in the GUI, clicking expands it. Patches and Harmony are analysed only for the current list (05 §5). For a Mod outside it, `patches --mod` says "not analysed (not in the current list)". The Harmony section runs `harmony --mod --list-only`, which never reads a DLL: when an earlier analysis of that copy is stored (05 §5.3 "Scope of the views"), the section shows it muted (`Section.Muted`, `pre.lines.muted`), its `scope:` line replaced by one short muted note above it, "from an earlier analysis in <list>" (up to two lists that hold the copy, else "from an earlier analysis", `view.earlierAnalysis`); otherwise it says "not analysed (not in the current list)". These sections show no count rather than 0. The TUI's full details show the same note and lines dim. Defs are read for every loadable Mod, so their count always shows.
 - All text wraps by display width, treating CJK characters as 2 cells, without overflowing the column or splitting a character:
   - Break at spaces or between CJK characters, without breaking Latin words. Honor punctuation rules for line beginnings and endings. Long paths break after a slash or backslash, retaining the line's indentation.
   - Status text, description subheadings, long dependency names, and bottom hints also wrap without truncation. Only the detail column's … enter for all marker and wide BBCode table cells use an ellipsis.
@@ -79,7 +79,7 @@ The current technical sections are:
 | --- | --- |
 | Def | def --mod text with references replaced by names |
 | Patches | patches --mod text |
-| Harmony | harmony --mod text for attribute patches and resolved manual `Harmony.Patch` calls; the latter are marked `Harmony.Patch` call in code. A manual: line gives resolved and unresolved counts, followed by each unresolved method and reason (05 §5.3). |
+| Harmony | harmony --mod text for attribute patches and resolved manual `Harmony.Patch` calls; the latter are marked `Harmony.Patch` call in code. A manual: line gives resolved and unresolved counts, followed by each unresolved method and reason (05 §5.3). A Mod outside the list shows its stored earlier analysis muted under a note, or "not analysed" (§4.1); the pane never reads a DLL. |
 | Rules | Plain wording for About.xml loadAfter, loadBefore, and incompatibleWith declarations, and relevant player rules |
 | Full history | All Mod change events, newest first |
 

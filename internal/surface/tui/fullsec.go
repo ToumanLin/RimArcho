@@ -64,6 +64,13 @@ func (m *model) secLines(w int) []dline {
 			title += "  " + fmt.Sprint(s.Count)
 		}
 		out = append(out, dline{text: sBold.Render(fit(title, w)), sec: i + 1})
+		if s.Note != "" { // a Mod outside the list: its earlier analysis, dim (16 §4.1)
+			out = append(out, dline{text: "  " + sDimS.Render(fit(s.Note, w-2))})
+		}
+		style := sText
+		if s.Muted {
+			style = sDimS
+		}
 		for j, l := range s.Lines {
 			if j == secCap {
 				out = append(out, dline{text: "  " + sDimS.Render(fit(Tf("… %d more, tab shows all", len(s.Lines)-secCap), w-2))})
@@ -75,7 +82,7 @@ func (m *model) secLines(w int) []dline {
 				if k > 0 {
 					pad = ind + 2 // continuation lines hang under the first
 				}
-				out = append(out, dline{text: strings.Repeat(" ", pad) + sText.Render(fit(x, w-pad))})
+				out = append(out, dline{text: strings.Repeat(" ", pad) + style.Render(fit(x, w-pad))})
 			}
 		}
 		out = append(out, dline{})
